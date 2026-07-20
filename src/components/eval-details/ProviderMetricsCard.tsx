@@ -7,11 +7,9 @@ export type MetricItem = {
 
 type ProviderMetricsCardProps = {
   metrics: MetricItem[];
-  /** Optional caveat/footnote shown in muted text below the metric grid. */
-  footnote?: React.ReactNode;
 };
 
-export function ProviderMetricsCard({ metrics, footnote }: ProviderMetricsCardProps) {
+export function ProviderMetricsCard({ metrics }: ProviderMetricsCardProps) {
   return (
     <div className="border rounded-xl p-4 bg-muted/10">
       <h3 className="text-[15px] font-semibold mb-4">Overall Metrics</h3>
@@ -25,9 +23,6 @@ export function ProviderMetricsCard({ metrics, footnote }: ProviderMetricsCardPr
           </div>
         ))}
       </div>
-      {footnote && (
-        <div className="mt-3 text-[11px] text-muted-foreground">{footnote}</div>
-      )}
     </div>
   );
 }

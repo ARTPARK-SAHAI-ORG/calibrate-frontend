@@ -984,6 +984,8 @@ export default function STTEvaluationDetailPage() {
                       showSarvamMetrics={hasSarvamMetrics}
                       showSemanticWer={hasSemanticWer}
                       showTtfs={hasTtfs}
+                      providerResults={evaluationResult.provider_results}
+                      runDate={evaluationResult.created_at}
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
@@ -1056,7 +1058,6 @@ export default function STTEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
-                      runDate={evaluationResult.created_at}
                       tableRef={tableContainerRef}
                       labellingSelection={
                         evaluationResult.status === "done"

@@ -613,6 +613,66 @@ describe("STTEvaluationAbout", () => {
       "sarvam_entity",
     ]);
   });
+
+  it("omits the cost row and caveats when no provider computed a cost", () => {
+    render(
+      <STTEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        providerResults={[{ metrics: { wer: 0.1 } }]}
+      />,
+    );
+    const keys = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    ).map((m: { key?: string }) => m.key);
+    expect(keys).not.toContain("cost_usd");
+    expect(screen.queryByText(/Cost is an estimate/)).not.toBeInTheDocument();
+  });
+
+  it("adds the cost row and general estimate caveat when a provider has cost", () => {
+    render(
+      <STTEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        providerResults={[
+          { metrics: { wer: 0.1, cost: { currency: "USD", cost_usd: 0.01 } } },
+        ]}
+      />,
+    );
+    const keys = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    ).map((m: { key?: string }) => m.key);
+    expect(keys).toContain("cost_usd");
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    // USD provider → no FX-conversion line.
+    expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
+  });
+
+  it("aggregates caveats across providers and dates the INR line by the run", () => {
+    render(
+      <STTEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        runDate="2026-07-15 10:00:00"
+        providerResults={[
+          { metrics: { cost: { currency: "USD", cost_usd: 0.01 } } },
+          {
+            metrics: {
+              cost: {
+                currency: "INR",
+                conversion_rate: 96.35,
+                cost_usd: 0.0104,
+              },
+            },
+          },
+        ]}
+      />,
+    );
+    // General caveat appears once even though two providers have cost.
+    expect(screen.getAllByText(/Cost is an estimate from bundled/)).toHaveLength(1);
+    expect(
+      screen.getByText(
+        /Total cost converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
+      ),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("SEMANTIC_WER_ABOUT_METRIC", () => {
@@ -641,6 +701,46 @@ describe("TTSEvaluationAbout", () => {
       range: "Pass / Fail",
     });
     expect(metrics[1]).toEqual(TTFB_ABOUT_METRIC);
+  });
+
+  it("appends the cost row after TTFB and shows the audio-billed caveat for minute-billed TTS", () => {
+    render(
+      <TTSEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        providerResults={[
+          {
+            metrics: {
+              cost: {
+                billing_unit: "minute",
+                currency: "USD",
+                cost_usd: 0.045,
+              },
+            },
+          },
+        ]}
+      />,
+    );
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics[1]).toEqual(TTFB_ABOUT_METRIC);
+    expect(metrics[2]).toMatchObject({ key: "cost_usd" });
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    expect(screen.getByText(/Audio-billed models/)).toBeInTheDocument();
+  });
+
+  it("omits the cost row when no provider computed a cost", () => {
+    render(
+      <TTSEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        providerResults={[{ metrics: { ttfb: { p50: 0.5 } } }]}
+      />,
+    );
+    const keys = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    ).map((m: { key?: string }) => m.key);
+    expect(keys).not.toContain("cost_usd");
+    expect(screen.queryByText(/Cost is an estimate/)).not.toBeInTheDocument();
   });
 });
 
@@ -1787,16 +1887,12 @@ describe("STTEvaluationOutputs cost tiles", () => {
     expect(screen.getByTestId("metric-Cost per minute").textContent).toBe(
       "$0.0048",
     );
-    // General estimate caveat is shown; no FX-conversion line for a USD provider.
-    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
-    expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
   });
 
-  it("shows the INR conversion caveat dated with the run for an INR provider", () => {
+  it("shows the native per-minute tile in rupees and total in USD for an INR provider", () => {
     render(
       <STTEvaluationOutputs
         {...baseProps}
-        runDate="2026-07-15 10:00:00"
         providerResults={[
           {
             provider: "sarvam",
@@ -1819,14 +1915,6 @@ describe("STTEvaluationOutputs cost tiles", () => {
     );
     expect(screen.getByTestId("metric-Cost per minute").textContent).toBe("₹0.5");
     expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0104");
-    // General estimate caveat is always present when cost is shown.
-    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
-    // Plus the dated FX-conversion caveat for the INR provider.
-    expect(
-      screen.getByText(
-        "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
-      ),
-    ).toBeInTheDocument();
   });
 
   it("omits the cost tiles when no cost was computed", () => {
@@ -1881,11 +1969,10 @@ describe("TTSEvaluationOutputs cost tiles", () => {
     );
   });
 
-  it("shows the INR caveat for a character-billed INR provider", () => {
+  it("shows the native per-1M-characters tile in rupees for an INR provider", () => {
     render(
       <TTSEvaluationOutputs
         {...baseProps}
-        runDate="2026-07-15 10:00:00"
         providerResults={[
           {
             provider: "sarvam",
@@ -1909,39 +1996,7 @@ describe("TTSEvaluationOutputs cost tiles", () => {
     expect(screen.getByTestId("metric-Cost per 1M characters").textContent).toBe(
       "₹3000",
     );
-    expect(
-      screen.getByText(
-        /Total cost converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
-      ),
-    ).toBeInTheDocument();
-    // Character-billed → no audio-billed approximation caveat.
-    expect(screen.queryByText(/Audio-billed models/)).not.toBeInTheDocument();
-  });
-
-  it("shows the audio-billed approximation caveat for a minute-billed TTS provider", () => {
-    render(
-      <TTSEvaluationOutputs
-        {...baseProps}
-        providerResults={[
-          {
-            provider: "openai",
-            success: true,
-            metrics: {
-              ttfb: { p50: 0.5 },
-              cost: {
-                billing_unit: "minute",
-                currency: "USD",
-                cost_per_minute_currency: 0.015,
-                cost_usd: 0.045,
-              },
-            },
-            results: [],
-          },
-        ]}
-      />,
-    );
-    expect(screen.getByText(/Audio-billed models/)).toBeInTheDocument();
-    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$15.57");
   });
 
   it("omits the cost tiles when no cost was computed", () => {

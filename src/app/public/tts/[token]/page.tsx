@@ -309,7 +309,6 @@ export default function PublicTTSPage() {
                 status={data.status}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
-                runDate={data.created_at}
                 className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden min-h-[480px]"
               />
             )}
@@ -332,6 +331,8 @@ export default function PublicTTSPage() {
                         ? "Pass / Fail"
                         : "-",
                 }))}
+                providerResults={data.provider_results}
+                runDate={data.created_at}
               />
             )}
           </>

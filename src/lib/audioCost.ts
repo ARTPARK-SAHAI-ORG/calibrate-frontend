@@ -187,3 +187,29 @@ export function costCaveats(source: unknown, ctx: CostCaveatContext): string[] {
   }
   return lines;
 }
+
+/**
+ * Every cost caveat that applies across a run's providers, deduped and in first-
+ * seen order. Combines each provider's `costCaveats` so the About tab shows the
+ * general estimate line once, plus the audio-billed / FX-conversion lines only
+ * when some provider needs them. Empty when no provider computed a cost.
+ */
+export function aggregateCostCaveats(
+  providerResults:
+    | Array<{ metrics?: Record<string, unknown> | null }>
+    | null
+    | undefined,
+  ctx: CostCaveatContext,
+): string[] {
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const pr of providerResults ?? []) {
+    for (const line of costCaveats(pr.metrics, ctx)) {
+      if (!seen.has(line)) {
+        seen.add(line);
+        lines.push(line);
+      }
+    }
+  }
+  return lines;
+}

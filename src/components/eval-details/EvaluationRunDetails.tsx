@@ -31,7 +31,7 @@ import {
 import {
   type AudioCostBreakdown,
   costTiles,
-  costCaveats,
+  aggregateCostCaveats,
   formatMoney,
   readTotalCostUsd,
 } from "@/lib/audioCost";
@@ -539,16 +539,22 @@ const costChartConfig: ChartConfig = {
 };
 
 
+// Total run cost, explained on the STT/TTS About tab. Rendered only when a run
+// computed a cost; the applicable estimate caveats show as prose below the table.
+const COST_ABOUT_METRIC: MetricDescription = {
+  key: "cost_usd",
+  metric: COST_USD_LABEL,
+  description:
+    "Estimated total cost to run this dataset through the provider, converted to US dollars so providers on different billing units and currencies can be compared. The provider's Outputs card shows the native per-unit price.",
+  preference: "Lower is better",
+  range: "0 - ∞",
+};
+
 /** Renders the applicable cost caveats as stacked muted lines (or nothing). */
-function costCaveatFootnote(
-  metrics: Record<string, unknown> | null | undefined,
-  component: "stt" | "tts",
-  runDate?: string | null,
-): React.ReactNode {
-  const lines = costCaveats(metrics, { component, runDate });
-  if (lines.length === 0) return undefined;
+function CostCaveatLines({ lines }: { lines: string[] }) {
+  if (lines.length === 0) return null;
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 text-[13px] text-muted-foreground">
       {lines.map((line, i) => (
         <p key={i}>{line}</p>
       ))}
@@ -646,6 +652,8 @@ export function STTEvaluationAbout({
   showSarvamMetrics = false,
   showSemanticWer = false,
   showTtfs = false,
+  providerResults,
+  runDate,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
   /** Include the Sarvam LLM-judge metric rows — set when the run used them. */
@@ -654,33 +662,61 @@ export function STTEvaluationAbout({
   showSemanticWer?: boolean;
   /** Include the TTFS row — set when the run measured it. */
   showTtfs?: boolean;
+  /** Provider results — drive the cost row and its estimate caveats. */
+  providerResults?: Array<{ metrics?: Record<string, unknown> | null }>;
+  /** Run date (created_at) — dates the FX-conversion caveat. */
+  runDate?: string | null;
 }) {
+  const costCaveatLines = aggregateCostCaveats(providerResults, {
+    component: "stt",
+    runDate,
+  });
+  const showCost = costCaveatLines.length > 0;
   return (
-    <AboutMetricsTable
-      metrics={[
-        WER_ABOUT_METRIC,
-        CER_ABOUT_METRIC,
-        ...(showSemanticWer ? [SEMANTIC_WER_ABOUT_METRIC] : []),
-        ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
-        ...(showTtfs ? [TTFS_ABOUT_METRIC] : []),
-        ...evaluatorRowsToMetricDescriptions(evaluatorRows),
-      ]}
-    />
+    <div className="space-y-4 md:space-y-6">
+      <AboutMetricsTable
+        metrics={[
+          WER_ABOUT_METRIC,
+          CER_ABOUT_METRIC,
+          ...(showSemanticWer ? [SEMANTIC_WER_ABOUT_METRIC] : []),
+          ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
+          ...(showTtfs ? [TTFS_ABOUT_METRIC] : []),
+          ...(showCost ? [COST_ABOUT_METRIC] : []),
+          ...evaluatorRowsToMetricDescriptions(evaluatorRows),
+        ]}
+      />
+      <CostCaveatLines lines={costCaveatLines} />
+    </div>
   );
 }
 
 export function TTSEvaluationAbout({
   evaluatorRows,
+  providerResults,
+  runDate,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
+  /** Provider results — drive the cost row and its estimate caveats. */
+  providerResults?: Array<{ metrics?: Record<string, unknown> | null }>;
+  /** Run date (created_at) — dates the FX-conversion caveat. */
+  runDate?: string | null;
 }) {
+  const costCaveatLines = aggregateCostCaveats(providerResults, {
+    component: "tts",
+    runDate,
+  });
+  const showCost = costCaveatLines.length > 0;
   return (
-    <AboutMetricsTable
-      metrics={[
-        ...evaluatorRowsToMetricDescriptions(evaluatorRows),
-        TTFB_ABOUT_METRIC,
-      ]}
-    />
+    <div className="space-y-4 md:space-y-6">
+      <AboutMetricsTable
+        metrics={[
+          ...evaluatorRowsToMetricDescriptions(evaluatorRows),
+          TTFB_ABOUT_METRIC,
+          ...(showCost ? [COST_ABOUT_METRIC] : []),
+        ]}
+      />
+      <CostCaveatLines lines={costCaveatLines} />
+    </div>
   );
 }
 
@@ -826,7 +862,6 @@ export function STTEvaluationOutputs({
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
   tableRef,
-  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -839,8 +874,6 @@ export function STTEvaluationOutputs({
   getProviderLabel: (value: string) => string;
   className?: string;
   tableRef?: React.RefObject<HTMLDivElement | null>;
-  // Run date (created_at) — used to date the INR conversion-rate caveat.
-  runDate?: string | null;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
   // provider switches (e.g. `openai:0`).
@@ -926,11 +959,6 @@ export function STTEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
-                  footnote={costCaveatFootnote(
-                    providerResult.metrics,
-                    "stt",
-                    runDate,
-                  )}
                   metrics={[
                     {
                       label: "WER",
@@ -1040,7 +1068,6 @@ export function TTSEvaluationOutputs({
   evaluatorColumns,
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
-  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -1052,8 +1079,6 @@ export function TTSEvaluationOutputs({
   status: EvaluationStatus;
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
-  // Run date (created_at) — used to date the INR conversion-rate caveat.
-  runDate?: string | null;
   className?: string;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
@@ -1151,11 +1176,6 @@ export function TTSEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
-                  footnote={costCaveatFootnote(
-                    providerResult.metrics,
-                    "tts",
-                    runDate,
-                  )}
                   metrics={[
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,

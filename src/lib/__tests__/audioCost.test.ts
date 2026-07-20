@@ -7,6 +7,7 @@ import {
   unitCostTile,
   formatCaveatDate,
   costCaveats,
+  aggregateCostCaveats,
   GENERAL_COST_CAVEAT,
   TTS_AUDIO_BILLED_CAVEAT,
 } from "../audioCost";
@@ -210,5 +211,62 @@ describe("costCaveats", () => {
 
   it("returns [] when there is no cost", () => {
     expect(costCaveats({ wer: 0.1 }, { component: "stt" })).toEqual([]);
+  });
+});
+
+describe("aggregateCostCaveats", () => {
+  it("returns [] when no provider has a cost", () => {
+    expect(
+      aggregateCostCaveats(
+        [{ metrics: { wer: 0.1 } }, { metrics: null }],
+        { component: "stt" },
+      ),
+    ).toEqual([]);
+  });
+
+  it("shows the general estimate line once across many costed providers", () => {
+    const lines = aggregateCostCaveats(
+      [
+        { metrics: { cost: { currency: "USD", cost_usd: 0.01 } } },
+        { metrics: { cost: { currency: "USD", cost_usd: 0.02 } } },
+      ],
+      { component: "stt" },
+    );
+    expect(lines).toEqual([GENERAL_COST_CAVEAT]);
+  });
+
+  it("adds the audio-billed and FX lines only when some provider needs them", () => {
+    const lines = aggregateCostCaveats(
+      [
+        {
+          metrics: {
+            cost: { billing_unit: "minute", currency: "USD", cost_usd: 0.045 },
+          },
+        },
+        {
+          metrics: {
+            cost: {
+              billing_unit: "character",
+              currency: "INR",
+              conversion_rate: 96.35,
+              cost_usd: 0.01,
+            },
+          },
+        },
+      ],
+      { component: "tts", runDate: "2026-07-15 10:00:00" },
+    );
+    expect(lines[0]).toBe(GENERAL_COST_CAVEAT);
+    expect(lines).toContain(TTS_AUDIO_BILLED_CAVEAT);
+    expect(lines).toContain(
+      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
+    );
+    // No duplicate general line.
+    expect(lines.filter((l) => l === GENERAL_COST_CAVEAT)).toHaveLength(1);
+  });
+
+  it("tolerates null/undefined provider lists", () => {
+    expect(aggregateCostCaveats(null, { component: "stt" })).toEqual([]);
+    expect(aggregateCostCaveats(undefined, { component: "tts" })).toEqual([]);
   });
 });

@@ -921,6 +921,8 @@ export default function TTSEvaluationDetailPage() {
                   {/* About Tab */}
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <TTSEvaluationAbout
+                      providerResults={evaluationResult.provider_results}
+                      runDate={evaluationResult.created_at}
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
@@ -969,7 +971,6 @@ export default function TTSEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
-                      runDate={evaluationResult.created_at}
                       labellingSelection={
                         evaluationResult.status === "done"
                           ? ttsLabellingSelected
