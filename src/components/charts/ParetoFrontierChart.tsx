@@ -230,7 +230,7 @@ export function ParetoFrontierChart({
   const resolvedSubtitle =
     subtitle ??
     (hasLatency
-      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies (faster ${entityNoun}s are bigger). The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and speed all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
+      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies. The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and speed all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
       : `Each ${entityNoun} is placed by ${qualityComparative} and what it costs. The green line joins the best ${entityNoun}s: the ones that nothing else beats on both ${qualityNoun} and cost at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`);
 
   // Domains are derived from ALL models (not just the visible ones) so points
@@ -254,15 +254,22 @@ export function ParetoFrontierChart({
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const zMin = latencies.length ? Math.min(...latencies) : 0;
   const zMax = latencies.length ? Math.max(...latencies) : 0;
+  // Faster (lower latency) → bigger bubble, so the quickest models stand out.
+  const radiusForLatency = (latency: number): number => {
+    if (zMax === zMin) return (R_MIN + R_MAX) / 2;
+    const t = (latency - zMin) / (zMax - zMin);
+    return R_MIN + (1 - t) * (R_MAX - R_MIN);
+  };
   const radiusFor = (d: ChartDatum): number => {
     if (!hasLatency || typeof d.latency !== "number" || !Number.isFinite(d.latency)) {
       return R_FIXED;
     }
-    if (zMax === zMin) return (R_MIN + R_MAX) / 2;
-    // Faster (lower latency) → bigger bubble, so the quickest models stand out.
-    const t = (d.latency - zMin) / (zMax - zMin);
-    return R_MIN + (1 - t) * (R_MAX - R_MIN);
+    return radiusForLatency(d.latency);
   };
+  // The bubble-size legend explains "bigger = faster" visually: the fastest and
+  // slowest latencies in the run, drawn at their actual bubble sizes. Only shown
+  // when speed is a real, varying factor.
+  const showSizeLegend = hasLatency && zMax > zMin;
 
   // Best value per column (over ALL models) so the table can highlight the
   // winner in each dimension.
@@ -455,8 +462,8 @@ export function ParetoFrontierChart({
               onClick={() => setFrontierOnly((v) => !v)}
               className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                 frontierOnly
-                  ? "border-green-500 bg-green-500 text-white hover:bg-green-600"
-                  : "border-green-500 text-green-700 hover:bg-green-500/10 dark:text-green-400"
+                  ? "border-green-600 bg-green-600 text-white hover:bg-green-700"
+                  : "border-green-600 text-green-700 hover:bg-green-600/10 dark:text-green-400"
               }`}
               title="Show only the best models (the ones on the green line)"
             >
@@ -486,7 +493,49 @@ export function ParetoFrontierChart({
         </div>
       </div>
       <div className="flex flex-col gap-4 md:flex-row">
-        <div ref={chartRef} className="flex-1 min-w-0">
+        <div ref={chartRef} className="relative flex-1 min-w-0">
+          {showSizeLegend && (
+            <div
+              data-testid="pareto-size-legend"
+              className="pointer-events-none absolute bottom-12 right-3 z-10 flex items-end gap-3 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 backdrop-blur-sm"
+            >
+              <span className="max-w-[3.5rem] self-center text-[10px] font-medium leading-tight text-muted-foreground">
+                Reply speed
+              </span>
+              {[
+                { latency: zMin, caption: "fastest" },
+                { latency: zMax, caption: "slowest" },
+              ].map(({ latency, caption }) => {
+                const r = radiusForLatency(latency);
+                return (
+                  <div
+                    key={caption}
+                    className="flex flex-col items-center gap-0.5"
+                  >
+                    <svg
+                      width={R_MAX * 2}
+                      height={R_MAX * 2}
+                      className="text-muted-foreground"
+                    >
+                      <circle
+                        cx={R_MAX}
+                        cy={R_MAX * 2 - r}
+                        r={r}
+                        fill="currentColor"
+                        fillOpacity={0.3}
+                        stroke="currentColor"
+                        strokeOpacity={0.55}
+                        strokeWidth={1}
+                      />
+                    </svg>
+                    <span className="text-[9px] tabular-nums text-muted-foreground">
+                      {formatLatencyMs(latency)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <ResponsiveContainer width="100%" height={height}>
             <ScatterChart margin={MARGIN}>
               <CartesianGrid strokeDasharray="3 3" />

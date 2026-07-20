@@ -2333,7 +2333,7 @@ describe("STTEvaluationTopPicks", () => {
     );
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
     const pareto = capturedPareto()!;
-    expect(pareto.title).toBe("Accuracy vs cost tradeoff");
+    expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
     expect(pareto.passRateLabel).toBe("Accuracy");
     expect(pareto.points).toHaveLength(2);
   });
@@ -2425,7 +2425,7 @@ describe("TTSEvaluationTopPicks", () => {
     );
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
     const pareto = capturedPareto()!;
-    expect(pareto.title).toBe("Naturalness vs cost tradeoff");
+    expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
     expect(pareto.passRateLabel).toBe("Naturalness");
     expect(pareto.points).toHaveLength(2);
   });

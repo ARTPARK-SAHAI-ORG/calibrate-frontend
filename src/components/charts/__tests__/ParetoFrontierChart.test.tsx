@@ -1,4 +1,4 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, within } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -71,16 +71,26 @@ describe("ParetoFrontierChart", () => {
     expect(
       screen.getByText("Cost, quality and speed tradeoff"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/faster models are bigger/i)).toBeInTheDocument();
+    expect(screen.getByText(/how fast it replies/i)).toBeInTheDocument();
     expect(
       screen.getByText(/there is no reason to choose it/i),
     ).toBeInTheDocument();
   });
 
-  it("drops the speed wording from the title and subtitle when latency is absent", () => {
+  it("shows a bubble-size legend with the fastest and slowest reply times", () => {
+    renderChart(points);
+    // points span 400 ms (fastest) to 2000 ms = 2 s (slowest).
+    const legend = screen.getByTestId("pareto-size-legend");
+    expect(within(legend).getByText("Reply speed")).toBeInTheDocument();
+    expect(within(legend).getByText("400 ms")).toBeInTheDocument();
+    expect(within(legend).getByText("2 s")).toBeInTheDocument();
+  });
+
+  it("drops the speed wording and the size legend when latency is absent", () => {
     renderChart(points.map((p) => ({ ...p, latency: undefined })));
     expect(screen.getByText("Cost and quality tradeoff")).toBeInTheDocument();
-    expect(screen.queryByText(/faster models are bigger/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/how fast it replies/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pareto-size-legend")).not.toBeInTheDocument();
     expect(
       screen.getByText(/on both quality and cost at once/i),
     ).toBeInTheDocument();

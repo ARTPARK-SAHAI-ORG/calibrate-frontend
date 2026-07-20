@@ -877,7 +877,7 @@ export function STTEvaluationTopPicks({
       <ParetoFrontierChart
         points={points}
         colorMap={getColorMap(points.map((p) => p.model))}
-        title="Accuracy vs cost tradeoff"
+        title="Quality vs cost vs latency tradeoff"
         passRateLabel="Accuracy"
         qualityNoun="accuracy"
         qualityComparative="how accurate it is"
@@ -1028,7 +1028,7 @@ export function TTSEvaluationTopPicks({
       <ParetoFrontierChart
         points={points}
         colorMap={getColorMap(points.map((p) => p.model))}
-        title={`${primaryEvaluator?.label ?? "Quality"} vs cost tradeoff`}
+        title="Quality vs cost vs latency tradeoff"
         passRateLabel={primaryEvaluator?.label ?? "Quality"}
         qualityNoun="quality"
         qualityComparative="how well it scores"

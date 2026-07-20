@@ -70,6 +70,7 @@ export function BenchmarkTopPicks({
     <ParetoFrontierChart
       points={paretoPoints}
       colorMap={paretoColorMap}
+      title="Quality vs cost vs latency tradeoff"
       passRateLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
       filename={`${filename}-pareto`}
     />

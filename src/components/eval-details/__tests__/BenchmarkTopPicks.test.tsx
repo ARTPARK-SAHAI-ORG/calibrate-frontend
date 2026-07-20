@@ -49,7 +49,9 @@ describe("BenchmarkTopPicks", () => {
       />,
     );
 
-    expect(screen.getByText("Cost, quality and speed tradeoff")).toBeInTheDocument();
+    expect(
+      screen.getByText("Quality vs cost vs latency tradeoff"),
+    ).toBeInTheDocument();
   });
 
   it("renders nothing when rows lack cost", () => {
@@ -66,7 +68,9 @@ describe("BenchmarkTopPicks", () => {
       />,
     );
 
-    expect(screen.queryByText("Cost, quality and speed tradeoff")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Quality vs cost vs latency tradeoff"),
+    ).not.toBeInTheDocument();
     expect(container).toBeEmptyDOMElement();
   });
 
