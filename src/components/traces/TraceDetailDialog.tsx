@@ -25,6 +25,90 @@ function historyToolCalls(turn: TraceTurn): HistoryToolCall[] {
   return Array.isArray(calls) ? (calls as HistoryToolCall[]) : [];
 }
 
+/** Render a parameter value: strings verbatim, everything else as JSON. */
+function formatArgValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/**
+ * OpenAI history tool calls carry `arguments` as a JSON string; normalize it
+ * to the same `{key: value}` map the flat output tool calls already use. A
+ * non-object payload (or unparseable string) is shown as a single `value` row
+ * rather than dropped.
+ */
+function parseHistoryArgs(raw?: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return { value: parsed };
+  } catch {
+    return { value: raw };
+  }
+}
+
+/**
+ * One tool call rendered as a table: the tool name, then a parameters section
+ * with a row per argument. Shared by the agent output (flat `{tool, arguments}`
+ * shape) and the OpenAI-format history turns.
+ */
+function ToolCallTable({
+  name,
+  args,
+}: {
+  name: string;
+  args: Record<string, unknown> | null;
+}) {
+  const entries = args ? Object.entries(args) : [];
+  return (
+    <div className="border border-border rounded-md overflow-hidden bg-background">
+      <table className="w-full text-xs">
+        <tbody>
+          <tr className="border-b border-border">
+            <td className="px-2.5 py-1.5 font-medium text-muted-foreground align-top w-32">
+              tool call
+            </td>
+            <td className="px-2.5 py-1.5 font-mono text-foreground break-all">
+              {name}
+            </td>
+          </tr>
+          <tr className="border-b border-border last:border-b-0 bg-muted/40">
+            <td
+              colSpan={2}
+              className="px-2.5 py-1 font-medium text-muted-foreground uppercase tracking-wide text-[10px]"
+            >
+              parameters
+            </td>
+          </tr>
+          {entries.length === 0 ? (
+            <tr>
+              <td
+                colSpan={2}
+                className="px-2.5 py-1.5 text-muted-foreground italic"
+              >
+                None
+              </td>
+            </tr>
+          ) : (
+            entries.map(([key, value]) => (
+              <tr key={key} className="border-b border-border last:border-b-0">
+                <td className="px-2.5 py-1.5 font-mono text-muted-foreground align-top w-32 break-all">
+                  {key}
+                </td>
+                <td className="px-2.5 py-1.5 font-mono text-foreground break-all whitespace-pre-wrap">
+                  {formatArgValue(value)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TurnBubble({ turn }: { turn: TraceTurn }) {
   const toolCalls = historyToolCalls(turn);
   return (
@@ -37,14 +121,17 @@ function TurnBubble({ turn }: { turn: TraceTurn }) {
           {turn.content}
         </p>
       )}
-      {toolCalls.map((call, index) => (
-        <div
-          key={call.id ?? index}
-          className="mt-2 font-mono text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1 overflow-x-auto"
-        >
-          {call.function?.name ?? "tool call"}({call.function?.arguments ?? ""})
+      {toolCalls.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {toolCalls.map((call, index) => (
+            <ToolCallTable
+              key={call.id ?? index}
+              name={call.function?.name ?? "tool call"}
+              args={parseHistoryArgs(call.function?.arguments)}
+            />
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -166,16 +253,11 @@ export function TraceDetailDialog({
                   {outputToolCalls.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {outputToolCalls.map((call, index) => (
-                        <div
+                        <ToolCallTable
                           key={index}
-                          className="font-mono text-xs bg-background border border-border rounded-md px-2 py-1.5 overflow-x-auto"
-                        >
-                          <span className="text-foreground">{call.tool}</span>
-                          <span className="text-muted-foreground">
-                            ({call.arguments ? JSON.stringify(call.arguments) : ""}
-                            )
-                          </span>
-                        </div>
+                          name={call.tool}
+                          args={call.arguments ?? null}
+                        />
                       ))}
                     </div>
                   )}

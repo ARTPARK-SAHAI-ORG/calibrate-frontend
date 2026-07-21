@@ -71,11 +71,16 @@ it("fetches and renders history, output, and metadata", async () => {
   expect(
     screen.getByText("You are a vaccination assistant."),
   ).toBeInTheDocument();
-  // OpenAI-format tool call on a history turn renders name + args.
-  expect(screen.getByText(/get_schedule\(\{\}\)/)).toBeInTheDocument();
-  // Output tool call renders the flat {tool, arguments} shape.
-  expect(screen.getByText("get_schedule")).toBeInTheDocument();
-  expect(screen.getByText(/child_age_weeks/)).toBeInTheDocument();
+  // Both the history turn and the output render get_schedule as a tool-call
+  // table (name row + parameters section).
+  expect(screen.getAllByText("get_schedule")).toHaveLength(2);
+  expect(screen.getAllByText("tool call")).toHaveLength(2);
+  expect(screen.getAllByText("parameters")).toHaveLength(2);
+  // The output tool call breaks its arguments into name/value rows.
+  expect(screen.getByText("child_age_weeks")).toBeInTheDocument();
+  expect(screen.getByText("14")).toBeInTheDocument();
+  // The empty-argument history call shows a "None" parameters row.
+  expect(screen.getByText("None")).toBeInTheDocument();
   // Metadata.
   expect(screen.getByText("gen_ai.request.model")).toBeInTheDocument();
   expect(screen.getByText("gpt-4")).toBeInTheDocument();
@@ -98,6 +103,8 @@ it("shows a fallback when the output has no text response", async () => {
   await waitFor(() =>
     expect(screen.getByText("No text response")).toBeInTheDocument(),
   );
+  // A tool-call-only output still renders its tool call as a table.
+  expect(screen.getByText("x")).toBeInTheDocument();
 });
 
 it("surfaces an error when the fetch fails", async () => {
