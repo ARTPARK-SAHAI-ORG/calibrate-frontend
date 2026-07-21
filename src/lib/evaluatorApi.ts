@@ -23,6 +23,14 @@ export type EvaluatorData = {
   owner_user_id?: string | null;
   /** True for org default (forked seed) evaluators. The ONLY default marker. */
   is_default?: boolean;
+  /**
+   * Provenance of a forked default: the seed it came from (`source_default_slug`)
+   * or, for a legacy unforked seed, its own `slug`. Use `defaultOriginSlug` to
+   * resolve WHICH built-in default this is (e.g. seed a picker with
+   * `default-llm-next-reply`) — `is_default` only says it is one.
+   */
+  slug?: string | null;
+  source_default_slug?: string | null;
   data_type?: "text" | "audio";
   kind?: "single" | "side_by_side";
   output_type?: "binary" | "rating";

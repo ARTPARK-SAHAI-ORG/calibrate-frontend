@@ -2,6 +2,7 @@ import {
   fetchTraces,
   fetchTrace,
   bulkDeleteMatchingTraces,
+  convertTracesToTests,
 } from "../tracesApi";
 import { apiGet, apiPost } from "../api";
 
@@ -108,5 +109,56 @@ describe("bulkDeleteMatchingTraces", () => {
     expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
       select_all: true,
     });
+  });
+});
+
+describe("convertTracesToTests", () => {
+  it("shapes a response conversion with evaluators and agents", async () => {
+    mockApiPost.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+
+    const result = await convertTracesToTests("tok", {
+      traceIds: ["a", "b"],
+      type: "response",
+      evaluatorUuids: ["ev1", "ev2"],
+      agentUuids: ["ag1"],
+    });
+
+    expect(mockApiPost).toHaveBeenCalledWith("/traces/convert-to-tests", "tok", {
+      trace_ids: ["a", "b"],
+      type: "response",
+      evaluators: [{ evaluator_uuid: "ev1" }, { evaluator_uuid: "ev2" }],
+      agent_uuids: ["ag1"],
+    });
+    expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
+  });
+
+  it("sends accept_any_arguments only for tool_call and omits empty evaluators/agents", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "tool_call",
+      acceptAnyArguments: true,
+    });
+
+    expect(mockApiPost).toHaveBeenCalledWith("/traces/convert-to-tests", "tok", {
+      trace_ids: ["a"],
+      type: "tool_call",
+      accept_any_arguments: true,
+    });
+  });
+
+  it("does not send accept_any_arguments for a response conversion", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "response",
+      evaluatorUuids: ["ev1"],
+    });
+
+    const body = mockApiPost.mock.calls[0][2];
+    expect(body).not.toHaveProperty("accept_any_arguments");
+    expect(body).not.toHaveProperty("agent_uuids");
   });
 });

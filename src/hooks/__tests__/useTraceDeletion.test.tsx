@@ -60,6 +60,16 @@ it("bulk-deletes selected traces via POST /traces/bulk-delete with trace_ids", a
   expect(onDeleted).toHaveBeenCalledWith(["t1", "t2"]);
 });
 
+it("clears the selection without deleting (for convert-to-tests)", () => {
+  const { result } = renderHook(() =>
+    useTraceDeletion({ traces, onDeleted: jest.fn(), accessToken: "tok" }),
+  );
+  act(() => result.current.toggleSelectAll());
+  expect(result.current.selectedUuids.size).toBe(2);
+  act(() => result.current.clearSelection());
+  expect(result.current.selectedUuids.size).toBe(0);
+});
+
 it("single-deletes one trace through the same batched endpoint", async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,

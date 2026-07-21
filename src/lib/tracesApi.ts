@@ -106,3 +106,49 @@ export async function bulkDeleteMatchingTraces(
   if (conversationId) body.conversation_id = conversationId;
   return apiPost<BulkDeleteTracesResult>("/traces/bulk-delete", accessToken, body);
 }
+
+export type ConvertTestType = "response" | "tool_call";
+
+export type ConvertTracesToTestsBody = {
+  traceIds: string[];
+  type: ConvertTestType;
+  /** Evaluators to link to each created test. Required (and used) for `response`. */
+  evaluatorUuids?: string[];
+  /** Agents to link every created test to, so they're runnable immediately. */
+  agentUuids?: string[];
+  /** For `tool_call`: match only the tool name, ignore the recorded arguments. */
+  acceptAnyArguments?: boolean;
+};
+
+export type ConvertTracesToTestsResult = {
+  created: number;
+  test_uuids: string[];
+};
+
+/**
+ * Convert selected traces into regression tests. `response` tests re-run the
+ * agent and judge the reply (needs ≥1 evaluator); `tool_call` tests assert the
+ * recorded tool calls. Backed by `POST /traces/convert-to-tests`.
+ */
+export async function convertTracesToTests(
+  accessToken: string,
+  {
+    traceIds,
+    type,
+    evaluatorUuids,
+    agentUuids,
+    acceptAnyArguments,
+  }: ConvertTracesToTestsBody,
+): Promise<ConvertTracesToTestsResult> {
+  const body: Record<string, unknown> = { trace_ids: traceIds, type };
+  if (evaluatorUuids && evaluatorUuids.length) {
+    body.evaluators = evaluatorUuids.map((uuid) => ({ evaluator_uuid: uuid }));
+  }
+  if (agentUuids && agentUuids.length) body.agent_uuids = agentUuids;
+  if (type === "tool_call") body.accept_any_arguments = !!acceptAnyArguments;
+  return apiPost<ConvertTracesToTestsResult>(
+    "/traces/convert-to-tests",
+    accessToken,
+    body,
+  );
+}

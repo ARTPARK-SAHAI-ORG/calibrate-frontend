@@ -124,6 +124,10 @@ export function useBulkDeletion<T extends { uuid: string }>({
     }
   };
 
+  /** Clear the selection without deleting — for a non-delete bulk action (e.g.
+   *  convert-to-tests) that consumed the selection successfully. */
+  const clearSelection = () => setSelectedUuids(new Set());
+
   const openDeleteDialog = (item: T) => {
     setDeleteError(null);
     setItemToDelete(item);
@@ -220,6 +224,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
     hasSelectableItems,
     checkboxProps,
     toggleSelectAll,
+    clearSelection,
     deleteDialogOpen,
     itemToDelete,
     itemsToDeleteBulk,

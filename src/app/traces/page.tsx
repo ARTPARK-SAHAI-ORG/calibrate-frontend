@@ -1,12 +1,14 @@
 "use client";
 
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
+import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { LoadingState, SearchInput } from "@/components/ui";
 import {
   useAccessToken,
@@ -109,6 +111,21 @@ function TracesPageInner() {
     }
   };
 
+  // Convert selected traces to tests. tool_call conversion needs every selected
+  // trace to have recorded tool calls, so gate it on the loaded summaries.
+  const [convertOpen, setConvertOpen] = useState(false);
+  const selectedTraceUuids = useMemo(
+    () => Array.from(deletion.selectedUuids),
+    [deletion.selectedUuids],
+  );
+  const allSelectedHaveToolCalls = useMemo(() => {
+    if (selectedTraceUuids.length === 0) return false;
+    const selected = new Set(selectedTraceUuids);
+    return items
+      .filter((t) => selected.has(t.uuid))
+      .every((t) => t.tool_call_count > 0);
+  }, [items, selectedTraceUuids]);
+
   const [openTraceUuid, setOpenTraceUuid] = useState<string | null>(null);
   const { setParam: setTraceParam } = useDialogUrlParam({
     param: "traceId",
@@ -173,6 +190,15 @@ function TracesPageInner() {
               </button>
             )}
             <div className="flex items-center gap-2 md:ml-auto">
+              {deletion.selectedUuids.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setConvertOpen(true)}
+                  className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Convert to tests ({deletion.selectedUuids.size})
+                </button>
+              )}
               {deletion.selectedUuids.size > 0 && (
                 <button
                   type="button"
@@ -256,6 +282,27 @@ function TracesPageInner() {
         onClose={closeTrace}
         accessToken={accessToken}
         traceUuid={openTraceUuid}
+      />
+
+      <ConvertTracesToTestsDialog
+        isOpen={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        accessToken={accessToken}
+        traceUuids={selectedTraceUuids}
+        allHaveToolCalls={allSelectedHaveToolCalls}
+        onConverted={(result) => {
+          setConvertOpen(false);
+          deletion.clearSelection();
+          toast.success(
+            `Created ${result.created} test${result.created === 1 ? "" : "s"}`,
+            {
+              action: {
+                label: "View tests",
+                onClick: () => router.push("/tests"),
+              },
+            },
+          );
+        }}
       />
 
       <DeleteConfirmationDialog
