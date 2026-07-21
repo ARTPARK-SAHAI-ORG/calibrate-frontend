@@ -93,4 +93,57 @@ test.describe("Traces page (authenticated, real backend)", () => {
       timeout: 15000,
     });
   });
+
+  test("converts selected traces into response tests", async ({ page }) => {
+    await page.goto("/traces");
+    await expect(page.getByRole("heading", { name: "Traces" })).toBeVisible();
+
+    const auth = await page.evaluate(() => ({
+      token: localStorage.getItem("access_token"),
+      org: localStorage.getItem("activeOrgUuid"),
+    }));
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    };
+    if (auth.org) headers["X-Org-UUID"] = auth.org;
+
+    const stamp = Date.now();
+    const term = `convert${stamp}`;
+    const msgId = `e2e-conv-${stamp}`;
+    await page.request.post(`${BACKEND}/traces`, {
+      headers,
+      data: {
+        message_id: msgId,
+        conversation_id: `e2e-conv-grp-${stamp}`,
+        input: [{ role: "user", content: `${term} question` }],
+        output: { response: "An answer." },
+      },
+    });
+
+    // Find and select the seeded trace's row checkbox.
+    await page.reload();
+    await page.getByPlaceholder("Search traces").fill(term);
+    await expect(page.getByText(msgId).first()).toBeVisible({ timeout: 15000 });
+    await page.getByRole("button", { name: "Select trace" }).first().click();
+
+    // Open the convert dialog and submit (response type, default evaluator
+    // preselected — no evaluator click needed).
+    await page.getByRole("button", { name: /Convert to tests/ }).click();
+    const dialog = page.locator(".fixed.inset-0.z-50");
+    await expect(
+      dialog.getByText("Test type", { exact: true }),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Convert" }).click();
+
+    // Success toast with a link to the tests page.
+    await expect(page.getByText(/Created \d+ test/)).toBeVisible({
+      timeout: 15000,
+    });
+
+    // The converted test appears on /tests under the trace's message id.
+    await page.goto("/tests");
+    await page.getByPlaceholder("Search tests").fill(msgId);
+    await expect(page.getByText(msgId).first()).toBeVisible({ timeout: 15000 });
+  });
 });
