@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
 
 export type MessageRow = {
@@ -11,10 +11,11 @@ export type MessageRow = {
 type VerifyRequestPreviewDialogProps = {
   open: boolean;
   onClose: () => void;
-  onConfirm: (messages: MessageRow[]) => void;
+  onConfirm: (messages: MessageRow[], inputs?: Record<string, unknown>) => void;
   isVerifying: boolean;
   verifyError?: string | null;
   verifySampleResponse?: Record<string, unknown> | null;
+  initialInputs?: Record<string, unknown>;
 };
 
 const DEFAULT_MESSAGES: MessageRow[] = [
@@ -28,9 +29,31 @@ export function VerifyRequestPreviewDialog({
   isVerifying,
   verifyError,
   verifySampleResponse,
+  initialInputs,
 }: VerifyRequestPreviewDialogProps) {
   const [messages, setMessages] = useState<MessageRow[]>(DEFAULT_MESSAGES);
   const [emptyIndices, setEmptyIndices] = useState<Set<number>>(new Set());
+  const [inputsText, setInputsText] = useState<string>("");
+  const [inputsError, setInputsError] = useState<string | null>(null);
+
+  const showInputs = Object.keys(initialInputs ?? {}).length > 0;
+
+  useEffect(() => {
+    if (open) setInputsText(JSON.stringify(initialInputs ?? {}, null, 2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const parseInputs = (): Record<string, unknown> | null => {
+    try {
+      const parsed = JSON.parse(inputsText);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // fall through
+    }
+    return null;
+  };
 
   const handleRoleChange = (index: number, role: MessageRow["role"]) => {
     setMessages((prev) =>
@@ -66,6 +89,8 @@ export function VerifyRequestPreviewDialog({
     if (isVerifying) return;
     setMessages(DEFAULT_MESSAGES);
     setEmptyIndices(new Set());
+    setInputsText("");
+    setInputsError(null);
     onClose();
   };
 
@@ -79,6 +104,16 @@ export function VerifyRequestPreviewDialog({
       return;
     }
     setEmptyIndices(new Set());
+    if (showInputs) {
+      const parsedInputs = parseInputs();
+      if (!parsedInputs) {
+        setInputsError("Custom fields must be valid JSON object");
+        return;
+      }
+      setInputsError(null);
+      onConfirm(messages, parsedInputs);
+      return;
+    }
     onConfirm(messages);
   };
 
@@ -98,7 +133,8 @@ export function VerifyRequestPreviewDialog({
         </h2>
         <p className="text-xs md:text-sm text-muted-foreground mb-4">
           This is the sample request body that will be sent to your agent.
-          Edit the messages or add more rows before verifying.
+          Edit the messages, add more rows, or change the custom fields before
+          verifying.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
@@ -181,6 +217,27 @@ export function VerifyRequestPreviewDialog({
               </svg>
               Add message
             </button>
+
+            {showInputs && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Custom fields (optional override)
+                </p>
+                <textarea
+                  value={inputsText}
+                  onChange={(e) => {
+                    setInputsText(e.target.value);
+                    if (inputsError) setInputsError(null);
+                  }}
+                  disabled={isVerifying}
+                  rows={5}
+                  className="w-full px-3 py-2 rounded-md text-xs font-mono border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                {inputsError && (
+                  <p className="text-[11px] text-red-500 mt-0.5">{inputsError}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right column: JSON preview */}
@@ -188,7 +245,10 @@ export function VerifyRequestPreviewDialog({
             <p className="text-xs font-medium text-muted-foreground mb-2">Request body preview</p>
             <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
               {JSON.stringify(
-                { messages: messages.map(({ role, content }) => ({ role, content })) },
+                {
+                  messages: messages.map(({ role, content }) => ({ role, content })),
+                  ...(showInputs ? parseInputs() ?? {} : {}),
+                },
                 null,
                 2,
               )}

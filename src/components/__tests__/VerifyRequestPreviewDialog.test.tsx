@@ -1,3 +1,4 @@
+import { fireEvent } from "@testing-library/react";
 import { render, screen, setupUser } from "@/test-utils";
 import { VerifyRequestPreviewDialog } from "../VerifyRequestPreviewDialog";
 
@@ -293,6 +294,63 @@ describe("VerifyRequestPreviewDialog", () => {
 
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
     expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
+  });
+
+  it("does not render the custom-fields editor when initialInputs is absent", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+      />,
+    );
+
+    expect(
+      screen.queryByText("Custom fields (optional override)"),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
+  });
+
+  it("seeds the custom-fields editor and blocks/allows confirm based on JSON validity", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ cond: "x" }}
+      />,
+    );
+
+    const textarea = screen.getByText(
+      "Custom fields (optional override)",
+    ).parentElement!.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"cond": "x"');
+    // Preview includes the custom field.
+    expect(screen.getAllByText(/"cond": "x"/).length).toBeGreaterThan(0);
+
+    // Invalid JSON blocks confirm and shows the error.
+    fireEvent.change(textarea, { target: { value: "{ not json" } });
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(
+      screen.getByText("Custom fields must be valid JSON object"),
+    ).toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // Fixing it to a valid object confirms with the parsed inputs.
+    fireEvent.change(textarea, { target: { value: '{"cond":"y"}' } });
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      [{ role: "user", content: "Hi" }],
+      { cond: "y" },
+    );
   });
 
   it("shows a spinner and 'Verifying...' label while isVerifying", () => {

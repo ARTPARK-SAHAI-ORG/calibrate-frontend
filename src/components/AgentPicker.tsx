@@ -12,6 +12,8 @@ export type Agent = {
   name: string;
   type?: "agent" | "connection";
   verified?: boolean;
+  // True for connection agents that have custom fields (backend `default_inputs`).
+  hasDefaultInputs?: boolean;
 };
 
 // Normalise a raw GET /agents list payload into the picker's Agent shape.
@@ -28,6 +30,12 @@ function formatAgents(data: unknown): Agent[] {
         ? (agent.connection_verified ?? agent.config?.connection_verified) ===
           true
         : true,
+    hasDefaultInputs:
+      agent.type === "connection" &&
+      (agent.has_default_inputs ??
+        (agent.config?.default_inputs &&
+          Object.keys(agent.config.default_inputs).length > 0) ??
+        false) === true,
   }));
 }
 
@@ -38,6 +46,9 @@ type AgentPickerProps = {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  // When true, connection agents with custom fields are shown but not
+  // selectable (text simulation does not support them).
+  disableCustomFieldConnections?: boolean;
 };
 
 function UnverifiedPill() {
@@ -100,6 +111,7 @@ export function AgentPicker({
   placeholder = "Select an agent",
   className = "",
   disabled = false,
+  disableCustomFieldConnections = false,
 }: AgentPickerProps) {
   const backendAccessToken = useAccessToken();
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -159,6 +171,14 @@ export function AgentPicker({
       loading={agentsLoading}
       loadingLabel="Loading agents"
       emptyLabel="No agents found"
+      {...(disableCustomFieldConnections
+        ? {
+            isItemDisabled: (a: Agent) =>
+              a.hasDefaultInputs
+                ? "Text simulation is not supported for connections with custom fields"
+                : null,
+          }
+        : {})}
       searchPlaceholder="Search agents"
       matchesSearch={(a, q) => a.name.toLowerCase().includes(q.toLowerCase())}
       renderTrigger={(agent) => agent?.name ?? ""}

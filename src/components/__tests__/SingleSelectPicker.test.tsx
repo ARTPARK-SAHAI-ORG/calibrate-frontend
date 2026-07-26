@@ -217,6 +217,28 @@ describe("SingleSelectPicker", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
   });
 
+  it("renders a disabled option with its reason and does not select it on click", async () => {
+    const user = setupUser();
+    const { onSelect } = renderPicker({
+      isItemDisabled: (it) =>
+        it.id === "2" ? "Not allowed for Beta" : null,
+    });
+    await user.click(screen.getByRole("button", { expanded: false }));
+
+    const disabledOption = screen.getByRole("option", { name: /Beta/ });
+    expect(disabledOption).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("Not allowed for Beta")).toBeInTheDocument();
+
+    await user.click(disabledOption);
+    expect(onSelect).not.toHaveBeenCalled();
+    // dropdown stays open since the row is non-interactive
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+    // a normal option is still selectable
+    await user.click(screen.getByRole("option", { name: /Alpha/ }));
+    expect(onSelect).toHaveBeenCalledWith(items[0]);
+  });
+
   it("opens above the trigger when there isn't enough space below", async () => {
     const user = setupUser();
     renderPicker();

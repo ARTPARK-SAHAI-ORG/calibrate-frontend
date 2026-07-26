@@ -111,6 +111,42 @@ describe("useVerifyConnection", () => {
       );
     });
 
+    it("includes inputs override in the body when provided and non-empty", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      const messages = [{ role: "user", content: "hi" }];
+      await act(async () => {
+        await result.current.verifySavedAgent("agent-1", messages, {
+          condition_area: "neurology",
+        });
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({
+            messages,
+            inputs: { condition_area: "neurology" },
+          }),
+        })
+      );
+    });
+
+    it("omits inputs when the override object is empty", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      await act(async () => {
+        await result.current.verifySavedAgent("agent-1", undefined, {});
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ body: JSON.stringify({}) })
+      );
+    });
+
     it("returns false and sets error/sample_response on unsuccessful verification", async () => {
       fetchMock.mockResolvedValueOnce(
         jsonResponse({ success: false, error: "bad config", sample_response: { foo: "bar" } })
@@ -313,6 +349,51 @@ describe("useVerifyConnection", () => {
             agent_url: "https://agent.example.com",
             messages,
           }),
+        })
+      );
+    });
+
+    it("includes default_inputs when provided and non-empty", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      await act(async () => {
+        await result.current.verifyAdHoc(
+          "https://agent.example.com",
+          undefined,
+          undefined,
+          { condition_area: "cardiology", retries: 2 }
+        );
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({
+            agent_url: "https://agent.example.com",
+            default_inputs: { condition_area: "cardiology", retries: 2 },
+          }),
+        })
+      );
+    });
+
+    it("omits default_inputs when the object is empty", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      await act(async () => {
+        await result.current.verifyAdHoc(
+          "https://agent.example.com",
+          undefined,
+          undefined,
+          {}
+        );
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({ agent_url: "https://agent.example.com" }),
         })
       );
     });

@@ -337,8 +337,11 @@ export function AgentDetail({
     setVerifyDialogOpen(true);
   };
 
-  const handleVerifyConfirm = async (messages: MessageRow[]) => {
-    const success = await verify.verifySavedAgent(agentUuid, messages);
+  const handleVerifyConfirm = async (
+    messages: MessageRow[],
+    inputs?: Record<string, unknown>,
+  ) => {
+    const success = await verify.verifySavedAgent(agentUuid, messages, inputs);
     if (success) {
       setConnectionConfig((prev) => ({
         ...prev,
@@ -1462,6 +1465,10 @@ export function AgentDetail({
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
+        initialInputs={
+          (connectionConfig as { default_inputs?: Record<string, unknown> })
+            .default_inputs
+        }
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}
