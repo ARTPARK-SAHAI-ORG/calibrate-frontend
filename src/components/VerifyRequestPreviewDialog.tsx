@@ -24,9 +24,7 @@ type VerifyRequestPreviewDialogProps = {
   initialInputs?: Record<string, unknown>;
 };
 
-const DEFAULT_MESSAGES: MessageRow[] = [
-  { role: "user", content: "Hi" },
-];
+const DEFAULT_MESSAGES: MessageRow[] = [{ role: "user", content: "Hi" }];
 
 export function VerifyRequestPreviewDialog({
   open,
@@ -75,7 +73,8 @@ export function VerifyRequestPreviewDialog({
 
   const handleAddRow = () => {
     const lastRole = messages[messages.length - 1]?.role;
-    const nextRole: MessageRow["role"] = lastRole === "user" ? "assistant" : "user";
+    const nextRole: MessageRow["role"] =
+      lastRole === "user" ? "assistant" : "user";
     setMessages((prev) => [...prev, { role: nextRole, content: "" }]);
   };
 
@@ -126,22 +125,27 @@ export function VerifyRequestPreviewDialog({
           Verify connection
         </h2>
         <p className="text-xs md:text-sm text-muted-foreground mb-4">
-          This is the sample request body that will be sent to your agent.
-          Edit the messages, add more rows, or change the custom fields before
+          This is the sample request body that will be sent to your agent. Edit
+          the messages, add more rows, or change the custom fields before
           verifying.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
           {/* Left column: message editor */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Messages</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Messages
+            </p>
             <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
               {messages.map((msg, index) => (
                 <div key={index} className="flex items-start gap-2">
                   <select
                     value={msg.role}
                     onChange={(e) =>
-                      handleRoleChange(index, e.target.value as MessageRow["role"])
+                      handleRoleChange(
+                        index,
+                        e.target.value as MessageRow["role"],
+                      )
                     }
                     disabled={isVerifying}
                     className="h-9 px-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer flex-shrink-0 w-[100px] appearance-none"
@@ -153,7 +157,9 @@ export function VerifyRequestPreviewDialog({
                     <input
                       type="text"
                       value={msg.content}
-                      onChange={(e) => handleContentChange(index, e.target.value)}
+                      onChange={(e) =>
+                        handleContentChange(index, e.target.value)
+                      }
                       disabled={isVerifying}
                       placeholder="Message content"
                       className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ${
@@ -163,7 +169,9 @@ export function VerifyRequestPreviewDialog({
                       }`}
                     />
                     {emptyIndices.has(index) && (
-                      <p className="text-[11px] text-red-500 mt-0.5">Message cannot be empty</p>
+                      <p className="text-[11px] text-red-500 mt-0.5">
+                        Message cannot be empty
+                      </p>
                     )}
                   </div>
                   <button
@@ -218,7 +226,7 @@ export function VerifyRequestPreviewDialog({
                   rows={inputRows}
                   errors={inputErrors}
                   onRowsChange={setInputRows}
-                  label="Custom fields (optional override)"
+                  label=""
                   disabled={isVerifying}
                   lockFields
                 />
@@ -228,11 +236,16 @@ export function VerifyRequestPreviewDialog({
 
           {/* Right column: JSON preview */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Request body preview</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Request body preview
+            </p>
             <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
               {JSON.stringify(
                 {
-                  messages: messages.map(({ role, content }) => ({ role, content })),
+                  messages: messages.map(({ role, content }) => ({
+                    role,
+                    content,
+                  })),
                   ...(showInputs ? parsedInputs : {}),
                 },
                 null,
@@ -272,7 +285,11 @@ export function VerifyRequestPreviewDialog({
             className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isVerifying && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-            {isVerifying ? "Verifying..." : verifyError ? "Retry" : "Send & Verify"}
+            {isVerifying
+              ? "Verifying..."
+              : verifyError
+                ? "Retry"
+                : "Send & Verify"}
           </button>
         </div>
       </div>

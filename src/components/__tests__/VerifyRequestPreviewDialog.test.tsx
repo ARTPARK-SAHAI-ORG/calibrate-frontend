@@ -25,9 +25,7 @@ describe("VerifyRequestPreviewDialog", () => {
     );
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hi")).toBeInTheDocument();
-    expect(
-      screen.getByText(/"role": "user"/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/"role": "user"/)).toBeInTheDocument();
   });
 
   it("closes on backdrop click", async () => {
@@ -140,9 +138,7 @@ describe("VerifyRequestPreviewDialog", () => {
     const input = screen.getByPlaceholderText("Message content");
     await user.clear(input);
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
-    expect(
-      screen.getByText("Message cannot be empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Message cannot be empty")).toBeInTheDocument();
 
     await user.type(input, "Hello there");
     expect(
@@ -168,9 +164,7 @@ describe("VerifyRequestPreviewDialog", () => {
     await user.type(contentInputs[1], "Second message");
 
     expect((contentInputs[0] as HTMLInputElement).value).toBe("Hi");
-    expect((contentInputs[1] as HTMLInputElement).value).toBe(
-      "Second message",
-    );
+    expect((contentInputs[1] as HTMLInputElement).value).toBe("Second message");
 
     const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
     await user.selectOptions(selects[1], "user");
@@ -227,9 +221,9 @@ describe("VerifyRequestPreviewDialog", () => {
     );
 
     // Only one row exists initially — remove button disabled.
-    const removeButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (b) => b.querySelector("path[d='M6 18L18 6M6 6l12 12']"),
-    );
+    const removeButtons = screen
+      .getAllByRole("button", { hidden: true })
+      .filter((b) => b.querySelector("path[d='M6 18L18 6M6 6l12 12']"));
     expect(removeButtons[0]).toBeDisabled();
 
     await user.click(screen.getByText("Add message"));
@@ -307,10 +301,6 @@ describe("VerifyRequestPreviewDialog", () => {
       />,
     );
 
-    expect(
-      screen.queryByText("Custom fields (optional override)"),
-    ).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
     expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
   });
@@ -339,10 +329,9 @@ describe("VerifyRequestPreviewDialog", () => {
     await user.clear(valueInput);
     await user.type(valueInput, "y");
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
-    expect(onConfirm).toHaveBeenCalledWith(
-      [{ role: "user", content: "Hi" }],
-      { cond: "y" },
-    );
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }], {
+      cond: "y",
+    });
   });
 
   it("validates a number override field and blocks confirm on bad input", async () => {
@@ -385,7 +374,10 @@ describe("VerifyRequestPreviewDialog", () => {
     expect(screen.queryByText("cond")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
-    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }], {});
+    expect(onConfirm).toHaveBeenCalledWith(
+      [{ role: "user", content: "Hi" }],
+      {},
+    );
   });
 
   it("shows a spinner and 'Verifying...' label while isVerifying", () => {
