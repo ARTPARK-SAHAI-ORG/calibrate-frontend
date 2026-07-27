@@ -909,9 +909,7 @@ export function AddTestDialog({
   const overrideInputs = useMemo(() => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(validInputs)) {
-      if (
-        JSON.stringify(value) !== JSON.stringify(agentDefaultInputs?.[key])
-      ) {
+      if (JSON.stringify(value) !== JSON.stringify(agentDefaultInputs?.[key])) {
         out[key] = value;
       }
     }
@@ -2672,9 +2670,7 @@ export function AddTestDialog({
                   placeholder="e.g. A friendly reminder with the date"
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
-              ) : isNull ||
-                isAny ? // "Is null" / "Is any" assert presence only — no value box.
-              null : (
+              ) : isNull || isAny ? null : ( // "Is null" / "Is any" assert presence only — no value box.
                 <input
                   type="text"
                   value={param.value}
@@ -3965,7 +3961,6 @@ export function AddTestDialog({
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* Footer */}
@@ -5114,12 +5109,19 @@ export function AddTestDialog({
           {/* Right Column - Custom inputs (only when the agent has fields) */}
           {hasCustomInputs && (
             <div className="w-full md:w-[28%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
+              <div className="mb-2 shrink-0">
+                <label className="text-base font-medium text-foreground">
+                  Custom inputs
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Override the agent&apos;s custom fields for this test case
+                  only. Sent to the agent alongside the conversation.
+                </p>
+              </div>
               <CustomFieldsEditor
                 rows={inputRows}
                 errors={inputErrors}
                 onRowsChange={setInputRows}
-                label="Custom inputs"
-                helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
                 disabled={isCreating}
                 lockFields
               />
