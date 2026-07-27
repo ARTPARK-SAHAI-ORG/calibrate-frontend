@@ -220,6 +220,7 @@ export function VerifyRequestPreviewDialog({
                   onRowsChange={setInputRows}
                   label="Custom fields (optional override)"
                   disabled={isVerifying}
+                  lockFields
                 />
               </div>
             )}

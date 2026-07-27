@@ -84,6 +84,35 @@ describe("CustomFieldsEditor", () => {
     expect(screen.getByText("Reserved name")).toBeInTheDocument();
   });
 
+  it("locks name and type but keeps value editable and removable when lockFields", async () => {
+    const user = setupUser();
+    const onRowsChange = jest.fn();
+    render(
+      <CustomFieldsEditor
+        rows={[{ key: "cond", type: "text", value: "x" }]}
+        errors={{}}
+        onRowsChange={onRowsChange}
+        lockFields
+      />,
+    );
+
+    // Name shown read-only, type shown as a label, no picker, no "Add field".
+    expect(screen.getByText("cond")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Field name")).not.toBeInTheDocument();
+    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Field type")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add field" }),
+    ).not.toBeInTheDocument();
+
+    // Value stays editable and the row is removable.
+    const value = screen.getByDisplayValue("x");
+    await user.type(value, "y");
+    expect(onRowsChange).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Remove field" }));
+    expect(onRowsChange).toHaveBeenLastCalledWith([]);
+  });
+
   it("disables inputs and buttons when disabled", () => {
     render(
       <CustomFieldsEditor

@@ -97,6 +97,13 @@ export function seedInputRows(
   });
 }
 
+const TYPE_LABELS: Record<InputFieldType, string> = {
+  text: "Text",
+  number: "Number",
+  boolean: "Boolean",
+  json: "JSON",
+};
+
 type CustomFieldsEditorProps = {
   rows: InputRow[];
   errors: Record<number, string>;
@@ -104,6 +111,11 @@ type CustomFieldsEditorProps = {
   label?: string;
   helpText?: string;
   disabled?: boolean;
+  // When true, the field name and type are shown read-only and "Add field" is
+  // hidden. Only the value stays editable (plus per-row delete). Used for the
+  // verify dialog, where the user overrides the agent's existing fields rather
+  // than defining new ones.
+  lockFields?: boolean;
 };
 
 export function CustomFieldsEditor({
@@ -113,6 +125,7 @@ export function CustomFieldsEditor({
   label,
   helpText,
   disabled,
+  lockFields,
 }: CustomFieldsEditorProps) {
   const handleAdd = () => {
     onRowsChange([...rows, { key: "", type: "text", value: "" }]);
@@ -151,43 +164,57 @@ export function CustomFieldsEditor({
         {rows.map((row, index) => (
           <div key={index}>
             <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-              <input
-                type="text"
-                value={row.key}
-                onChange={(e) => handleRowChange(index, { key: e.target.value })}
-                placeholder="Field name"
-                disabled={disabled}
-                className="flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <div className="relative">
-                <select
-                  value={row.type}
+              {lockFields ? (
+                <span className="flex-1 min-w-0 h-9 md:h-10 flex items-center text-sm md:text-base font-medium text-foreground truncate">
+                  {row.key}
+                </span>
+              ) : (
+                <input
+                  type="text"
+                  value={row.key}
                   onChange={(e) =>
-                    handleRowChange(index, {
-                      type: e.target.value as InputFieldType,
-                    })
+                    handleRowChange(index, { key: e.target.value })
                   }
-                  aria-label="Field type"
+                  placeholder="Field name"
                   disabled={disabled}
-                  className="h-9 md:h-10 pl-3 pr-8 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="text">Text</option>
-                  <option value="number">Number</option>
-                </select>
-                <svg
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </div>
+                  className="flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              )}
+              {lockFields ? (
+                <span className="h-9 md:h-10 flex items-center text-sm md:text-base text-muted-foreground flex-shrink-0">
+                  {TYPE_LABELS[row.type]}
+                </span>
+              ) : (
+                <div className="relative">
+                  <select
+                    value={row.type}
+                    onChange={(e) =>
+                      handleRowChange(index, {
+                        type: e.target.value as InputFieldType,
+                      })
+                    }
+                    aria-label="Field type"
+                    disabled={disabled}
+                    className="h-9 md:h-10 pl-3 pr-8 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                  </select>
+                  <svg
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </div>
+              )}
               {row.type === "boolean" ? (
                 <div className="flex-1 min-w-0 flex items-center h-9 md:h-10">
                   <button
@@ -253,27 +280,29 @@ export function CustomFieldsEditor({
           </div>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={handleAdd}
-        disabled={disabled}
-        className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
+      {!lockFields && (
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={disabled}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 4.5v15m7.5-7.5h-15"
-          />
-        </svg>
-        Add field
-      </button>
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
+          </svg>
+          Add field
+        </button>
+      )}
     </div>
   );
 }

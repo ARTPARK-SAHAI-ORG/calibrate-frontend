@@ -328,8 +328,10 @@ describe("VerifyRequestPreviewDialog", () => {
       />,
     );
 
-    // Seeded as one row (name + value inputs), not a JSON blob.
-    expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
+    // Seeded as one row. Name is shown read-only (not an input); only the
+    // value is editable.
+    expect(screen.getByText("cond")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Field name")).not.toBeInTheDocument();
     const valueInput = screen.getByDisplayValue("x");
     // Preview includes the custom field.
     expect(screen.getAllByText(/"cond": "x"/).length).toBeGreaterThan(0);
@@ -356,9 +358,9 @@ describe("VerifyRequestPreviewDialog", () => {
       />,
     );
 
-    expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
+    expect(screen.getByText("cond")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove field" }));
-    expect(screen.queryByDisplayValue("cond")).not.toBeInTheDocument();
+    expect(screen.queryByText("cond")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
     expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }], {});
