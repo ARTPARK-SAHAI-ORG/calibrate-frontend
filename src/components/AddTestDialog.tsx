@@ -917,6 +917,9 @@ export function AddTestDialog({
     }
     return out;
   }, [validInputs, agentDefaultInputs]);
+  // When the agent has custom fields, the dialog grows a dedicated third
+  // column for them so they are not crammed under the form.
+  const hasCustomInputs = inputRows.length > 0;
 
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
@@ -3222,7 +3225,11 @@ export function AddTestDialog({
           }`}
         >
           {/* Left Column - Form */}
-          <div className="w-full md:w-1/2 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border">
+          <div
+            className={`w-full ${
+              hasCustomInputs ? "md:w-[30%]" : "md:w-1/2"
+            } flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border`}
+          >
             {/* Tabs — hidden in labelItem mode (always next-reply). When
               editing an existing test the type is fixed (the backend no
               longer allows changing a test's type), so we show only the
@@ -3959,19 +3966,6 @@ export function AddTestDialog({
                 </div>
               )}
 
-              {inputRows.length > 0 && (
-                <div className="px-4 md:px-6 py-4">
-                  <CustomFieldsEditor
-                    rows={inputRows}
-                    errors={inputErrors}
-                    onRowsChange={setInputRows}
-                    label="Custom inputs"
-                    helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
-                    disabled={isCreating}
-                    lockFields
-                  />
-                </div>
-              )}
             </div>
 
             {/* Footer */}
@@ -4101,8 +4095,12 @@ export function AddTestDialog({
             </div>
           </div>
 
-          {/* Right Column - Chat Messages */}
-          <div className="w-full md:w-1/2 flex flex-col min-h-0 bg-muted/30 overflow-visible">
+          {/* Middle Column - Chat Messages */}
+          <div
+            className={`w-full ${
+              hasCustomInputs ? "md:w-[42%]" : "md:w-1/2"
+            } flex flex-col min-h-0 bg-muted/30 overflow-visible`}
+          >
             {/* Info banner */}
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
               <div className="flex items-start gap-3">
@@ -5112,6 +5110,21 @@ export function AddTestDialog({
               )}
             </div>
           </div>
+
+          {/* Right Column - Custom inputs (only when the agent has fields) */}
+          {hasCustomInputs && (
+            <div className="w-full md:w-[28%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
+              <CustomFieldsEditor
+                rows={inputRows}
+                errors={inputErrors}
+                onRowsChange={setInputRows}
+                label="Custom inputs"
+                helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
+                disabled={isCreating}
+                lockFields
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
