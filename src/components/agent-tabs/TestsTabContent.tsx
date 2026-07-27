@@ -944,9 +944,12 @@ export function TestsTabContent({
         conversation_history: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
         tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
+        inputs?: Record<string, unknown>;
       } = {
         name: newTestName.trim(),
         conversation_history: config.history,
+        ...(config.inputs &&
+          Object.keys(config.inputs).length > 0 && { inputs: config.inputs }),
       };
       if (usesEvaluators) {
         testItem.evaluators = evaluators;

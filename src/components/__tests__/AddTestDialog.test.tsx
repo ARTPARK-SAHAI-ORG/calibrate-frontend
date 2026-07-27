@@ -362,6 +362,52 @@ describe("AddTestDialog", () => {
       ]);
     });
 
+    it("includes typed custom inputs in the submitted config", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(<ControlledDialog {...baseProps({ initialTab: "next-reply", onSubmit })} />);
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText("Your test name"), "My test");
+
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "Hi there");
+      await user.type(textareas[1], "Hello!");
+      await user.type(textareas[2], "How are you?");
+
+      const criteriaInput = screen.getByPlaceholderText("Enter value for {{criteria}}");
+      await user.type(criteriaInput, "Reply is polite");
+
+      // Add one custom input via the CustomFieldsEditor UI.
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.type(screen.getByPlaceholderText("Field name"), "cond");
+      await user.type(screen.getByPlaceholderText("Value"), "abc");
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config.inputs).toEqual({ cond: "abc" });
+    });
+
+    it("seeds custom-input rows from initialConfig.inputs when editing", () => {
+      const initialConfig: TestConfig = {
+        history: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+        ],
+        evaluation: { type: "response" },
+        inputs: { cond: "x" },
+      };
+      render(
+        <AddTestDialog
+          {...baseProps({ isEditing: true, initialTab: "next-reply", initialConfig })}
+        />,
+      );
+      expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("x")).toBeInTheDocument();
+    });
+
     it("adds and removes a user message via the Add message dropdown", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);

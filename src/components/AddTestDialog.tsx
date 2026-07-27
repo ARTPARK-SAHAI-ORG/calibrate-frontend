@@ -5,6 +5,7 @@ import React, {
   useState,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useCallback,
 } from "react";
@@ -20,6 +21,12 @@ import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
+import {
+  CustomFieldsEditor,
+  deriveInputs,
+  seedInputRows,
+  type InputRow,
+} from "@/components/CustomFieldsEditor";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -625,6 +632,7 @@ export type TestConfig = {
     }>;
     criteria?: string;
   };
+  inputs?: Record<string, unknown>;
 };
 
 // Evaluator type for the conversation tab — picker is filtered to this.
@@ -880,6 +888,13 @@ export function AddTestDialog({
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
 
+  // Optional per-test custom inputs that override the agent's default_inputs.
+  const [inputRows, setInputRows] = useState<InputRow[]>([]);
+  const { inputs: validInputs, errors: inputErrors } = useMemo(
+    () => deriveInputs(inputRows),
+    [inputRows],
+  );
+
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
     if (initialTab) {
@@ -889,6 +904,11 @@ export function AddTestDialog({
 
   // Track if tools have been fetched (even if the result is empty)
   const [toolsFetched, setToolsFetched] = useState(false);
+
+  // Seed custom-input rows from the loaded config (independent of tools).
+  useEffect(() => {
+    setInputRows(seedInputRows(initialConfig?.inputs));
+  }, [initialConfig]);
 
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
@@ -2793,7 +2813,11 @@ export function AddTestDialog({
       };
     }
 
-    return { history, evaluation };
+    return {
+      history,
+      evaluation,
+      ...(Object.keys(validInputs).length > 0 && { inputs: validInputs }),
+    };
   };
 
   // Build the EvaluatorRef[] payload sent alongside `config` on POST/PUT
@@ -2834,6 +2858,7 @@ export function AddTestDialog({
       history,
       evaluation: config.evaluation,
       evaluators: buildEvaluatorsPayload(),
+      inputs: config.inputs ?? {},
     });
   };
 
@@ -3904,6 +3929,17 @@ export function AddTestDialog({
                   </div>
                 </div>
               )}
+
+              <div className="px-4 md:px-6 py-4 border-t border-border">
+                <CustomFieldsEditor
+                  rows={inputRows}
+                  errors={inputErrors}
+                  onRowsChange={setInputRows}
+                  label="Custom inputs"
+                  helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
+                  disabled={isCreating}
+                />
+              </div>
             </div>
 
             {/* Footer */}

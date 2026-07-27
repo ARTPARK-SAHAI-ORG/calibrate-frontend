@@ -215,7 +215,20 @@ export default function SimulationDetailPage() {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to launch simulation");
+        // Surface the backend's message verbatim. A text simulation for an
+        // agent that has custom fields (default_inputs) returns 400 with
+        // "Simulations are not supported for agents with default inputs. Run
+        // an agent test instead." — show that so the user knows to use tests.
+        let message = "Failed to launch simulation";
+        try {
+          const body = await response.json();
+          if (typeof body?.detail === "string" && body.detail.trim()) {
+            message = body.detail;
+          }
+        } catch {
+          // response had no JSON body; keep the generic message
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
