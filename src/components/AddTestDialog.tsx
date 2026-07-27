@@ -3223,7 +3223,7 @@ export function AddTestDialog({
           {/* Left Column - Form */}
           <div
             className={`w-full ${
-              hasCustomInputs ? "md:w-[30%]" : "md:w-1/2"
+              hasCustomInputs ? "md:w-[35%]" : "md:w-1/2"
             } flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border`}
           >
             {/* Tabs — hidden in labelItem mode (always next-reply). When
@@ -4093,7 +4093,7 @@ export function AddTestDialog({
           {/* Middle Column - Chat Messages */}
           <div
             className={`w-full ${
-              hasCustomInputs ? "md:w-[42%]" : "md:w-1/2"
+              hasCustomInputs ? "md:w-[40%]" : "md:w-1/2"
             } flex flex-col min-h-0 bg-muted/30 overflow-visible`}
           >
             {/* Info banner */}
@@ -5108,14 +5108,14 @@ export function AddTestDialog({
 
           {/* Right Column - Custom inputs (only when the agent has fields) */}
           {hasCustomInputs && (
-            <div className="w-full md:w-[28%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
+            <div className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
               <div className="mb-2 shrink-0">
                 <label className="text-base font-medium text-foreground">
                   Custom inputs
                 </label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Override the agent&apos;s custom fields for this test case
-                  only. Sent to the agent alongside the conversation.
+                  Override the custom fields sent as input for this test case
+                  along with the conversation history
                 </p>
               </div>
               <CustomFieldsEditor
