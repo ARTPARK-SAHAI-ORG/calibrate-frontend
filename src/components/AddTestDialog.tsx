@@ -751,6 +751,13 @@ type AddTestDialogProps = {
    */
   agentEvaluatorUuids?: string[];
   /**
+   * The connected agent's custom fields (`config.default_inputs`). When set,
+   * the "Custom inputs" section shows those fields with their defaults so the
+   * user can override a value for this test case only. Leave unset (e.g. the
+   * standalone Tests page, or a build agent) to hide the section entirely.
+   */
+  agentDefaultInputs?: Record<string, unknown>;
+  /**
    * True while the parent is still loading `agentEvaluatorUuids`. When set, a
    * new test's evaluator seeding waits for the list rather than seeding off an
    * empty one. Callers with no agent context leave this unset.
@@ -822,6 +829,7 @@ export function AddTestDialog({
   initialConfig,
   initialEvaluators,
   agentEvaluatorUuids,
+  agentDefaultInputs,
   agentEvaluatorsPending,
   mode = "test",
   allowAgentLastMessage = false,
@@ -889,11 +897,26 @@ export function AddTestDialog({
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
 
   // Optional per-test custom inputs that override the agent's default_inputs.
+  // Rows are seeded from the agent's fields (locked name/type); the user edits
+  // the value or deletes a row to drop an override.
   const [inputRows, setInputRows] = useState<InputRow[]>([]);
   const { inputs: validInputs, errors: inputErrors } = useMemo(
     () => deriveInputs(inputRows),
     [inputRows],
   );
+  // Only the values that actually differ from the agent's default count as an
+  // override; unchanged fields are not written to config.inputs.
+  const overrideInputs = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(validInputs)) {
+      if (
+        JSON.stringify(value) !== JSON.stringify(agentDefaultInputs?.[key])
+      ) {
+        out[key] = value;
+      }
+    }
+    return out;
+  }, [validInputs, agentDefaultInputs]);
 
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
@@ -905,10 +928,16 @@ export function AddTestDialog({
   // Track if tools have been fetched (even if the result is empty)
   const [toolsFetched, setToolsFetched] = useState(false);
 
-  // Seed custom-input rows from the loaded config (independent of tools).
+  // Seed custom-input rows from the agent's fields, with any existing per-case
+  // override values layered on top. Independent of tools.
   useEffect(() => {
-    setInputRows(seedInputRows(initialConfig?.inputs));
-  }, [initialConfig]);
+    setInputRows(
+      seedInputRows({
+        ...(agentDefaultInputs ?? {}),
+        ...(initialConfig?.inputs ?? {}),
+      }),
+    );
+  }, [initialConfig, agentDefaultInputs]);
 
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
@@ -2816,7 +2845,7 @@ export function AddTestDialog({
     return {
       history,
       evaluation,
-      ...(Object.keys(validInputs).length > 0 && { inputs: validInputs }),
+      ...(Object.keys(overrideInputs).length > 0 && { inputs: overrideInputs }),
     };
   };
 
@@ -3930,16 +3959,19 @@ export function AddTestDialog({
                 </div>
               )}
 
-              <div className="px-4 md:px-6 py-4 border-t border-border">
-                <CustomFieldsEditor
-                  rows={inputRows}
-                  errors={inputErrors}
-                  onRowsChange={setInputRows}
-                  label="Custom inputs"
-                  helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
-                  disabled={isCreating}
-                />
-              </div>
+              {inputRows.length > 0 && (
+                <div className="px-4 md:px-6 py-4">
+                  <CustomFieldsEditor
+                    rows={inputRows}
+                    errors={inputErrors}
+                    onRowsChange={setInputRows}
+                    label="Custom inputs"
+                    helpText="Optional. Override the agent's custom fields for this test case only. Sent to the agent alongside the conversation."
+                    disabled={isCreating}
+                    lockFields
+                  />
+                </div>
+              )}
             </div>
 
             {/* Footer */}

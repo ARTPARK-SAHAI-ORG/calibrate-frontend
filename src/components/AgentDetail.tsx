@@ -1227,6 +1227,11 @@ export function AgentDetail({
                   ? connectionConfig.benchmark_provider
                   : undefined
               }
+              agentDefaultInputs={
+                agent.type === "connection"
+                  ? connectionConfig.default_inputs
+                  : undefined
+              }
               onConnectionVerified={() =>
                 setConnectionConfig((prev) => ({
                   ...prev,

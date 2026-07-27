@@ -362,53 +362,104 @@ describe("AddTestDialog", () => {
       ]);
     });
 
-    it("includes typed custom inputs in the submitted config", async () => {
-      const user = setupUser();
-      const onSubmit = jest.fn();
-      render(<ControlledDialog {...baseProps({ initialTab: "next-reply", onSubmit })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
-
+    async function fillRequiredNextReplyFields(
+      user: ReturnType<typeof setupUser>,
+    ) {
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
-
       const textareas = document.querySelectorAll("textarea[data-msg-id]");
       await user.type(textareas[0], "Hi there");
       await user.type(textareas[1], "Hello!");
       await user.type(textareas[2], "How are you?");
-
-      const criteriaInput = screen.getByPlaceholderText("Enter value for {{criteria}}");
-      await user.type(criteriaInput, "Reply is polite");
-
-      // Add one custom input via the CustomFieldsEditor UI.
-      await user.click(screen.getByRole("button", { name: "Add field" }));
-      await user.type(screen.getByPlaceholderText("Field name"), "cond");
-      await user.type(
-        screen.getByPlaceholderText("Default value (optional)"),
-        "abc",
+      const criteriaInput = screen.getByPlaceholderText(
+        "Enter value for {{criteria}}",
       );
+      await user.type(criteriaInput, "Reply is polite");
+    }
+
+    it("submits only the custom-input values that differ from the agent default", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            onSubmit,
+            agentDefaultInputs: { cond: "x" },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      await fillRequiredNextReplyFields(user);
+
+      // The agent's field is seeded (locked name), value editable. Override it.
+      const valueInput = screen.getByDisplayValue("x");
+      await user.clear(valueInput);
+      await user.type(valueInput, "y");
 
       await user.click(screen.getByRole("button", { name: "Create" }));
 
       expect(onSubmit).toHaveBeenCalledTimes(1);
       const [config] = onSubmit.mock.calls[0];
-      expect(config.inputs).toEqual({ cond: "abc" });
+      expect(config.inputs).toEqual({ cond: "y" });
     });
 
-    it("seeds custom-input rows from initialConfig.inputs when editing", () => {
+    it("omits custom inputs when the value is left at the agent default", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            onSubmit,
+            agentDefaultInputs: { cond: "x" },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      await fillRequiredNextReplyFields(user);
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config.inputs).toBeUndefined();
+    });
+
+    it("hides the custom-inputs section when the agent has no custom fields", () => {
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "next-reply" })} />,
+      );
+      expect(screen.queryByText("Custom inputs")).not.toBeInTheDocument();
+    });
+
+    it("seeds custom-input rows from the agent fields with per-case overrides layered on", () => {
       const initialConfig: TestConfig = {
         history: [
           { role: "user", content: "Hi" },
           { role: "assistant", content: "Hello" },
         ],
         evaluation: { type: "response" },
-        inputs: { cond: "x" },
+        inputs: { cond: "override" },
       };
       render(
         <AddTestDialog
-          {...baseProps({ isEditing: true, initialTab: "next-reply", initialConfig })}
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            initialConfig,
+            agentDefaultInputs: { cond: "x", extra: "e" },
+          })}
         />,
       );
-      expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("x")).toBeInTheDocument();
+      // Names shown read-only; the per-case override value wins over the default.
+      expect(screen.getByText("cond")).toBeInTheDocument();
+      expect(screen.getByText("extra")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("override")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("e")).toBeInTheDocument();
     });
 
     it("adds and removes a user message via the Add message dropdown", async () => {

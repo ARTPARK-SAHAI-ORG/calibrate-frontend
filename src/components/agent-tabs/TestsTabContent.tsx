@@ -220,6 +220,9 @@ type TestsTabContentProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  // The connection agent's custom fields (config.default_inputs). Forwarded to
+  // the test dialog so a test case can override them. Unset for build agents.
+  agentDefaultInputs?: Record<string, unknown>;
   // Called after a passing endpoint check so the parent flips connectionVerified true.
   onConnectionVerified?: () => void;
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
@@ -234,6 +237,7 @@ export function TestsTabContent({
   supportsBenchmark,
   benchmarkModelsVerified,
   benchmarkProvider,
+  agentDefaultInputs,
   onConnectionVerified,
   onGoToConnectionSettings,
 }: TestsTabContentProps) {
@@ -2710,6 +2714,7 @@ export function TestsTabContent({
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
+          agentDefaultInputs={agentDefaultInputs}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
           showRunAfterSave={!isConnectionUnverified}
           onRun={() => {
