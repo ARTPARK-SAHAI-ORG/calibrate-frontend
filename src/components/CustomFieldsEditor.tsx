@@ -173,7 +173,6 @@ export function CustomFieldsEditor({
                 >
                   <option value="text">Text</option>
                   <option value="number">Number</option>
-                  <option value="boolean">Boolean</option>
                 </select>
                 <svg
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"

@@ -57,7 +57,7 @@ describe("CustomFieldsEditor", () => {
     ]);
   });
 
-  it("coerces the value when the type changes to boolean", async () => {
+  it("reports a type change through onRowsChange", async () => {
     const user = setupUser();
     const onRowsChange = jest.fn();
     render(
@@ -65,10 +65,10 @@ describe("CustomFieldsEditor", () => {
     );
 
     const typeSelect = screen.getAllByLabelText("Field type")[0];
-    await user.selectOptions(typeSelect, "boolean");
+    await user.selectOptions(typeSelect, "number");
 
     expect(onRowsChange).toHaveBeenCalledWith([
-      { key: "city", type: "boolean", value: false },
+      { key: "city", type: "number", value: "Pune" },
       rows[1],
     ]);
   });

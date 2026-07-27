@@ -577,19 +577,6 @@ describe("AgentConnectionTabContent", () => {
     expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ n: 42 });
   });
 
-  it("keeps a boolean custom field as a boolean", () => {
-    const { onConnectionConfigChange } = renderComponent();
-    fireEvent.click(screen.getByText("Add field"));
-    fireEvent.change(screen.getByPlaceholderText("Field name"), {
-      target: { value: "b" },
-    });
-    fireEvent.change(screen.getByLabelText("Field type"), {
-      target: { value: "boolean" },
-    });
-    fireEvent.click(screen.getByLabelText("Field value"));
-    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ b: true });
-  });
-
 
   it("flags a reserved custom field name and excludes it", () => {
     const { onConnectionConfigChange } = renderComponent();
