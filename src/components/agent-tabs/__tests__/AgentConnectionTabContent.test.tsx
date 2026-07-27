@@ -603,7 +603,7 @@ describe("AgentConnectionTabContent", () => {
     expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({});
   });
 
-  it("resets verification status when a custom field value is edited", () => {
+  it("keeps verification status when a custom field value is edited", () => {
     renderComponent({
       agentUrl: "https://example.com",
       connectionConfig: makeConfig({
@@ -618,6 +618,9 @@ describe("AgentConnectionTabContent", () => {
       target: { value: "y" },
     });
 
-    expect(screen.getByText("Not verified")).toBeInTheDocument();
+    // Changing a custom field's default does not affect the connection
+    // verification, which only depends on the URL and headers.
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.queryByText("Not verified")).not.toBeInTheDocument();
   });
 });

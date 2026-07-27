@@ -10,7 +10,6 @@ import {
 import {
   CustomFieldsEditor,
   deriveInputs,
-  serializeInputs,
   seedInputRows,
   type InputRow,
 } from "@/components/CustomFieldsEditor";
@@ -101,10 +100,6 @@ export function AgentConnectionTabContent({
     () => deriveInputs(inputRows),
     [inputRows],
   );
-  const currentInputsStr = useMemo(
-    () => serializeInputs(validInputs),
-    [validInputs],
-  );
 
   // Push the newly-derived default_inputs to the parent whenever a row changes.
   // Spreads the latest config so nothing else is lost.
@@ -128,7 +123,6 @@ export function AgentConnectionTabContent({
   const verifiedSnapshotRef = useRef<{
     url: string;
     headers: string;
-    inputs: string;
     status: VerificationStatus;
     at: string | null;
   } | null>(
@@ -136,9 +130,6 @@ export function AgentConnectionTabContent({
       ? {
           url: (connectionConfig.agent_url || "").trim(),
           headers: JSON.stringify(connectionConfig.agent_headers || {}),
-          inputs: serializeInputs(
-            deriveInputs(seedInputRows(connectionConfig.default_inputs)).inputs,
-          ),
           status: "verified" as const,
           at: connectionConfig.connection_verified_at || null,
         }
@@ -159,9 +150,7 @@ export function AgentConnectionTabContent({
     const draftUrl = agentUrl.trim();
     const draftHeaders = JSON.stringify(currentHeadersObj);
     const matchesVerified =
-      draftUrl === snapshot.url &&
-      draftHeaders === snapshot.headers &&
-      currentInputsStr === snapshot.inputs;
+      draftUrl === snapshot.url && draftHeaders === snapshot.headers;
 
     if (matchesVerified) {
       setVerifyStatus(snapshot.status);
@@ -183,7 +172,7 @@ export function AgentConnectionTabContent({
         connection_verified_error: null,
       });
     }
-  }, [agentUrl, agentHeaders, currentInputsStr]);
+  }, [agentUrl, agentHeaders]);
 
   const handleAddHeader = () => {
     onAgentHeadersChange([...agentHeaders, { key: "", value: "" }]);
@@ -237,7 +226,6 @@ export function AgentConnectionTabContent({
     verifiedSnapshotRef.current = {
       url: agentUrl.trim(),
       headers: JSON.stringify(currentHeadersObj),
-      inputs: currentInputsStr,
       status: newStatus,
       at: now,
     };
