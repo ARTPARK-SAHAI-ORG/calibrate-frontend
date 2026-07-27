@@ -97,13 +97,6 @@ export function seedInputRows(
   });
 }
 
-const TYPE_LABELS: Record<InputFieldType, string> = {
-  text: "Text",
-  number: "Number",
-  boolean: "Boolean",
-  json: "JSON",
-};
-
 type CustomFieldsEditorProps = {
   rows: InputRow[];
   errors: Record<number, string>;
@@ -160,15 +153,72 @@ export function CustomFieldsEditor({
       {helpText && (
         <p className="text-xs text-muted-foreground">{helpText}</p>
       )}
-      <div className="space-y-2">
-        {rows.map((row, index) => (
-          <div key={index}>
-            <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-              {lockFields ? (
-                <span className="flex-1 min-w-0 h-9 md:h-10 flex items-center text-sm md:text-base font-medium text-foreground truncate">
+      <div className={lockFields ? "space-y-3" : "space-y-2"}>
+        {rows.map((row, index) => {
+          const hasError = Boolean(errors[index]);
+          const valueInputClass = `flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+            hasError
+              ? "border-red-500 focus:ring-red-500"
+              : "border-border focus:ring-accent"
+          }`;
+          const removeButton = (
+            <button
+              type="button"
+              onClick={() => handleRemove(index)}
+              aria-label="Remove field"
+              disabled={disabled}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          );
+
+          // Locked mode (verify override): the field name and type are fixed,
+          // so render a normal labeled input like the rest of the app. Only
+          // the value is editable; the hidden type still drives validation.
+          if (lockFields) {
+            return (
+              <div key={index} className="space-y-1">
+                <label className="block text-sm font-medium text-foreground truncate">
                   {row.key}
-                </span>
-              ) : (
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode={row.type === "number" ? "decimal" : undefined}
+                    value={typeof row.value === "boolean" ? "" : row.value}
+                    onChange={(e) =>
+                      handleRowChange(index, { value: e.target.value })
+                    }
+                    placeholder="Value"
+                    aria-label="Field value"
+                    disabled={disabled}
+                    className={valueInputClass}
+                  />
+                  {removeButton}
+                </div>
+                {hasError && (
+                  <p className="text-[11px] text-red-500">{errors[index]}</p>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div key={index}>
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
                 <input
                   type="text"
                   value={row.key}
@@ -179,12 +229,6 @@ export function CustomFieldsEditor({
                   disabled={disabled}
                   className="flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-              )}
-              {lockFields ? (
-                <span className="h-9 md:h-10 flex items-center text-sm md:text-base text-muted-foreground flex-shrink-0">
-                  {TYPE_LABELS[row.type]}
-                </span>
-              ) : (
                 <div className="relative">
                   <select
                     value={row.type}
@@ -214,32 +258,6 @@ export function CustomFieldsEditor({
                     />
                   </svg>
                 </div>
-              )}
-              {row.type === "boolean" ? (
-                <div className="flex-1 min-w-0 flex items-center h-9 md:h-10">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={row.value === true}
-                    aria-label="Field value"
-                    disabled={disabled}
-                    onClick={() =>
-                      handleRowChange(index, {
-                        value: !(row.value === true),
-                      })
-                    }
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                      row.value === true ? "bg-foreground" : "bg-border"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                        row.value === true ? "translate-x-4" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              ) : (
                 <input
                   type={row.type === "number" ? "number" : "text"}
                   value={typeof row.value === "boolean" ? "" : row.value}
@@ -249,36 +267,16 @@ export function CustomFieldsEditor({
                   placeholder="Default value (optional)"
                   aria-label="Field value"
                   disabled={disabled}
-                  className="flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={valueInputClass}
                 />
+                {removeButton}
+              </div>
+              {hasError && (
+                <p className="text-[11px] text-red-500 mt-1">{errors[index]}</p>
               )}
-              <button
-                type="button"
-                onClick={() => handleRemove(index)}
-                aria-label="Remove field"
-                disabled={disabled}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
             </div>
-            {errors[index] && (
-              <p className="text-[11px] text-red-500 mt-1">{errors[index]}</p>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
       {!lockFields && (
         <button

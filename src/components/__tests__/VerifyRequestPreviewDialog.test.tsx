@@ -345,6 +345,28 @@ describe("VerifyRequestPreviewDialog", () => {
     );
   });
 
+  it("validates a number override field and blocks confirm on bad input", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ n: 5 }}
+      />,
+    );
+
+    const valueInput = screen.getByDisplayValue("5");
+    await user.clear(valueInput);
+    await user.type(valueInput, "abc");
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+
+    expect(screen.getByText("Not a valid number")).toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("removes a custom input row one by one", async () => {
     const user = setupUser();
     const onConfirm = jest.fn();

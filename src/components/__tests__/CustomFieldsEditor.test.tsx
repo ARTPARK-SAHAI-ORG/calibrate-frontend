@@ -96,10 +96,10 @@ describe("CustomFieldsEditor", () => {
       />,
     );
 
-    // Name shown read-only, type shown as a label, no picker, no "Add field".
+    // Name shown read-only as a label, no name input, no type picker, no
+    // "Add field".
     expect(screen.getByText("cond")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Field name")).not.toBeInTheDocument();
-    expect(screen.getByText("Text")).toBeInTheDocument();
     expect(screen.queryByLabelText("Field type")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add field" }),
