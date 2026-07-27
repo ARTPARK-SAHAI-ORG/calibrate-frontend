@@ -490,7 +490,7 @@ export function AgentConnectionTabContent({
             errors={inputErrors}
             onRowsChange={pushInputRows}
             label="Custom fields"
-            helpText="Extra fields sent to your agent on every request, alongside messages. Set a default value for each. These defaults are used when verifying and when running tests."
+            helpText="Extra fields sent to your agent on every request, alongside the conversation history"
             disabled={isSaving}
           />
 

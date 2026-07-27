@@ -381,7 +381,10 @@ describe("AddTestDialog", () => {
       // Add one custom input via the CustomFieldsEditor UI.
       await user.click(screen.getByRole("button", { name: "Add field" }));
       await user.type(screen.getByPlaceholderText("Field name"), "cond");
-      await user.type(screen.getByPlaceholderText("Value"), "abc");
+      await user.type(
+        screen.getByPlaceholderText("Default value (optional)"),
+        "abc",
+      );
 
       await user.click(screen.getByRole("button", { name: "Create" }));
 

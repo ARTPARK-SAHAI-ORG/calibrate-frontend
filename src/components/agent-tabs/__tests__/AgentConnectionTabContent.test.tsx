@@ -590,22 +590,6 @@ describe("AgentConnectionTabContent", () => {
     expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ b: true });
   });
 
-  it("parses a JSON custom field into an object", () => {
-    const { onConnectionConfigChange } = renderComponent();
-    fireEvent.click(screen.getByText("Add field"));
-    fireEvent.change(screen.getByPlaceholderText("Field name"), {
-      target: { value: "j" },
-    });
-    fireEvent.change(screen.getByLabelText("Field type"), {
-      target: { value: "json" },
-    });
-    fireEvent.change(screen.getByLabelText("Field value"), {
-      target: { value: '{"a":1}' },
-    });
-    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({
-      j: { a: 1 },
-    });
-  });
 
   it("flags a reserved custom field name and excludes it", () => {
     const { onConnectionConfigChange } = renderComponent();
@@ -616,24 +600,6 @@ describe("AgentConnectionTabContent", () => {
     });
 
     expect(screen.getByText("Reserved name")).toBeInTheDocument();
-    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({});
-  });
-
-  it("flags invalid JSON and excludes it", () => {
-    const { onConnectionConfigChange } = renderComponent();
-
-    fireEvent.click(screen.getByText("Add field"));
-    fireEvent.change(screen.getByPlaceholderText("Field name"), {
-      target: { value: "j" },
-    });
-    fireEvent.change(screen.getByLabelText("Field type"), {
-      target: { value: "json" },
-    });
-    fireEvent.change(screen.getByLabelText("Field value"), {
-      target: { value: "{bad" },
-    });
-
-    expect(screen.getByText("Not valid JSON")).toBeInTheDocument();
     expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({});
   });
 

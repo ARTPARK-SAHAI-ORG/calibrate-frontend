@@ -38,21 +38,35 @@ export function deriveInputs(rows: InputRow[]): {
     if (row.type === "boolean") {
       value = row.value === true;
     } else if (row.type === "number") {
-      const n = Number(row.value);
-      if (!Number.isFinite(n)) {
-        errors[index] = "Not a valid number";
-        return;
+      const raw = String(row.value).trim();
+      // No value entered → send null, not 0.
+      if (!raw) {
+        value = null;
+      } else {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) {
+          errors[index] = "Not a valid number";
+          return;
+        }
+        value = n;
       }
-      value = n;
     } else if (row.type === "json") {
-      try {
-        value = JSON.parse(String(row.value));
-      } catch {
-        errors[index] = "Not valid JSON";
-        return;
+      const raw = String(row.value).trim();
+      // No value entered → send null (not an error, and not an empty string).
+      if (!raw) {
+        value = null;
+      } else {
+        try {
+          value = JSON.parse(raw);
+        } catch {
+          errors[index] = "Not valid JSON";
+          return;
+        }
       }
     } else {
-      value = String(row.value);
+      // text: no value entered → send null, not an empty string.
+      const s = String(row.value);
+      value = s.trim() === "" ? null : s;
     }
 
     seen.add(key);
@@ -160,7 +174,6 @@ export function CustomFieldsEditor({
                   <option value="text">Text</option>
                   <option value="number">Number</option>
                   <option value="boolean">Boolean</option>
-                  <option value="json">JSON</option>
                 </select>
                 <svg
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
@@ -177,39 +190,29 @@ export function CustomFieldsEditor({
                 </svg>
               </div>
               {row.type === "boolean" ? (
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={row.value === true}
-                  aria-label="Field value"
-                  disabled={disabled}
-                  onClick={() =>
-                    handleRowChange(index, {
-                      value: !(row.value === true),
-                    })
-                  }
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                    row.value === true ? "bg-foreground" : "bg-border"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                      row.value === true ? "translate-x-4" : "translate-x-1"
+                <div className="flex-1 min-w-0 flex items-center h-9 md:h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={row.value === true}
+                    aria-label="Field value"
+                    disabled={disabled}
+                    onClick={() =>
+                      handleRowChange(index, {
+                        value: !(row.value === true),
+                      })
+                    }
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      row.value === true ? "bg-foreground" : "bg-border"
                     }`}
-                  />
-                </button>
-              ) : row.type === "json" ? (
-                <textarea
-                  rows={2}
-                  value={typeof row.value === "boolean" ? "" : row.value}
-                  onChange={(e) =>
-                    handleRowChange(index, { value: e.target.value })
-                  }
-                  placeholder='{"key": "value"}'
-                  aria-label="Field value"
-                  disabled={disabled}
-                  className="flex-1 min-w-0 px-3 md:px-4 py-2 rounded-md text-sm md:text-base font-mono border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                        row.value === true ? "translate-x-4" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
               ) : (
                 <input
                   type={row.type === "number" ? "number" : "text"}
@@ -217,7 +220,7 @@ export function CustomFieldsEditor({
                   onChange={(e) =>
                     handleRowChange(index, { value: e.target.value })
                   }
-                  placeholder="Value"
+                  placeholder="Default value (optional)"
                   aria-label="Field value"
                   disabled={disabled}
                   className="flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"

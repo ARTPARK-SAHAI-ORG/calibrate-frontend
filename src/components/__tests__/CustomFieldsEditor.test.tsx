@@ -112,6 +112,15 @@ describe("deriveInputs", () => {
     expect(inputs).toEqual({ n: 42, b: true, j: { a: 1 } });
   });
 
+  it("uses null for empty text and number values", () => {
+    const { inputs, errors } = deriveInputs([
+      { key: "t", type: "text", value: "" },
+      { key: "n", type: "number", value: "" },
+    ]);
+    expect(errors).toEqual({});
+    expect(inputs).toEqual({ t: null, n: null });
+  });
+
   it("flags reserved and duplicate names", () => {
     const { errors } = deriveInputs([
       { key: "messages", type: "text", value: "x" },
