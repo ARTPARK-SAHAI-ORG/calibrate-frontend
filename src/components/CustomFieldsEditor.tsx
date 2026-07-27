@@ -146,7 +146,13 @@ export function CustomFieldsEditor({
   return (
     <div className="space-y-2">
       {label && (
-        <label className="text-sm md:text-base font-medium text-foreground">
+        <label
+          className={
+            lockFields
+              ? "block text-xs font-medium text-muted-foreground"
+              : "text-sm md:text-base font-medium text-foreground"
+          }
+        >
           {label}
         </label>
       )}
@@ -191,7 +197,7 @@ export function CustomFieldsEditor({
           if (lockFields) {
             return (
               <div key={index} className="space-y-1">
-                <label className="block text-sm font-medium text-foreground truncate">
+                <label className="block text-xs font-medium text-muted-foreground truncate">
                   {row.key}
                 </label>
                 <div className="flex items-center gap-2">
