@@ -1,4 +1,3 @@
-import { fireEvent } from "@testing-library/react";
 import { render, screen, setupUser } from "@/test-utils";
 import { VerifyRequestPreviewDialog } from "../VerifyRequestPreviewDialog";
 
@@ -316,7 +315,7 @@ describe("VerifyRequestPreviewDialog", () => {
     expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
   });
 
-  it("seeds the custom-fields editor and blocks/allows confirm based on JSON validity", async () => {
+  it("seeds the custom-fields editor as rows and confirms with the edited value", async () => {
     const user = setupUser();
     const onConfirm = jest.fn();
     render(
@@ -329,28 +328,40 @@ describe("VerifyRequestPreviewDialog", () => {
       />,
     );
 
-    const textarea = screen.getByText(
-      "Custom fields (optional override)",
-    ).parentElement!.querySelector("textarea") as HTMLTextAreaElement;
-    expect(textarea.value).toContain('"cond": "x"');
+    // Seeded as one row (name + value inputs), not a JSON blob.
+    expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
+    const valueInput = screen.getByDisplayValue("x");
     // Preview includes the custom field.
     expect(screen.getAllByText(/"cond": "x"/).length).toBeGreaterThan(0);
 
-    // Invalid JSON blocks confirm and shows the error.
-    fireEvent.change(textarea, { target: { value: "{ not json" } });
-    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
-    expect(
-      screen.getByText("Custom fields must be valid JSON object"),
-    ).toBeInTheDocument();
-    expect(onConfirm).not.toHaveBeenCalled();
-
-    // Fixing it to a valid object confirms with the parsed inputs.
-    fireEvent.change(textarea, { target: { value: '{"cond":"y"}' } });
+    await user.clear(valueInput);
+    await user.type(valueInput, "y");
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
     expect(onConfirm).toHaveBeenCalledWith(
       [{ role: "user", content: "Hi" }],
       { cond: "y" },
     );
+  });
+
+  it("removes a custom input row one by one", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ cond: "x" }}
+      />,
+    );
+
+    expect(screen.getByDisplayValue("cond")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove field" }));
+    expect(screen.queryByDisplayValue("cond")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }], {});
   });
 
   it("shows a spinner and 'Verifying...' label while isVerifying", () => {

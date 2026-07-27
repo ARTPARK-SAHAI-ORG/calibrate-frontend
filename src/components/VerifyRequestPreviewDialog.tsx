@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
+import {
+  CustomFieldsEditor,
+  deriveInputs,
+  seedInputRows,
+  type InputRow,
+} from "@/components/CustomFieldsEditor";
 
 export type MessageRow = {
   role: "user" | "assistant";
@@ -33,27 +39,20 @@ export function VerifyRequestPreviewDialog({
 }: VerifyRequestPreviewDialogProps) {
   const [messages, setMessages] = useState<MessageRow[]>(DEFAULT_MESSAGES);
   const [emptyIndices, setEmptyIndices] = useState<Set<number>>(new Set());
-  const [inputsText, setInputsText] = useState<string>("");
-  const [inputsError, setInputsError] = useState<string | null>(null);
+  const [inputRows, setInputRows] = useState<InputRow[]>([]);
 
   const showInputs = Object.keys(initialInputs ?? {}).length > 0;
+  const { inputs: parsedInputs, errors: inputErrors } = useMemo(
+    () => deriveInputs(inputRows),
+    [inputRows],
+  );
 
+  // Seed the override rows from the agent's saved custom fields each time the
+  // dialog opens, so the user edits copies rather than the stored values.
   useEffect(() => {
-    if (open) setInputsText(JSON.stringify(initialInputs ?? {}, null, 2));
+    if (open) setInputRows(seedInputRows(initialInputs));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  const parseInputs = (): Record<string, unknown> | null => {
-    try {
-      const parsed = JSON.parse(inputsText);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    } catch {
-      // fall through
-    }
-    return null;
-  };
 
   const handleRoleChange = (index: number, role: MessageRow["role"]) => {
     setMessages((prev) =>
@@ -89,8 +88,7 @@ export function VerifyRequestPreviewDialog({
     if (isVerifying) return;
     setMessages(DEFAULT_MESSAGES);
     setEmptyIndices(new Set());
-    setInputsText("");
-    setInputsError(null);
+    setInputRows([]);
     onClose();
   };
 
@@ -105,12 +103,8 @@ export function VerifyRequestPreviewDialog({
     }
     setEmptyIndices(new Set());
     if (showInputs) {
-      const parsedInputs = parseInputs();
-      if (!parsedInputs) {
-        setInputsError("Custom fields must be valid JSON object");
-        return;
-      }
-      setInputsError(null);
+      // Block on any per-row error (the editor shows them inline).
+      if (Object.keys(inputErrors).length > 0) return;
       onConfirm(messages, parsedInputs);
       return;
     }
@@ -220,22 +214,13 @@ export function VerifyRequestPreviewDialog({
 
             {showInputs && (
               <div className="mt-4">
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  Custom fields (optional override)
-                </p>
-                <textarea
-                  value={inputsText}
-                  onChange={(e) => {
-                    setInputsText(e.target.value);
-                    if (inputsError) setInputsError(null);
-                  }}
+                <CustomFieldsEditor
+                  rows={inputRows}
+                  errors={inputErrors}
+                  onRowsChange={setInputRows}
+                  label="Custom fields (optional override)"
                   disabled={isVerifying}
-                  rows={5}
-                  className="w-full px-3 py-2 rounded-md text-xs font-mono border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                 />
-                {inputsError && (
-                  <p className="text-[11px] text-red-500 mt-0.5">{inputsError}</p>
-                )}
               </div>
             )}
           </div>
@@ -247,7 +232,7 @@ export function VerifyRequestPreviewDialog({
               {JSON.stringify(
                 {
                   messages: messages.map(({ role, content }) => ({ role, content })),
-                  ...(showInputs ? parseInputs() ?? {} : {}),
+                  ...(showInputs ? parsedInputs : {}),
                 },
                 null,
                 2,
