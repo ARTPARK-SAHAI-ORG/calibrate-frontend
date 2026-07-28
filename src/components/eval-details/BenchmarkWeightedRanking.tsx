@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 import {
   buildBenchmarkCombinedLeaderboardPayload,
@@ -101,6 +101,32 @@ export function BenchmarkWeightedRanking({
     [ranked],
   );
 
+  // FLIP: after the list re-sorts, slide each row from where it used to be to
+  // its new spot instead of jumping. offsetTop is measured against the shared
+  // <ol> parent and is unaffected by the transform, so overlapping drags stay
+  // correct. A no-op in jsdom (offsetTop is 0), so tests are unaffected.
+  const listRef = useRef<HTMLOListElement>(null);
+  const prevTops = useRef<Map<string, number>>(new Map());
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const next = new Map<string, number>();
+    for (const el of list.querySelectorAll<HTMLElement>("li[data-model]")) {
+      const model = el.dataset.model ?? "";
+      const top = el.offsetTop;
+      next.set(model, top);
+      const prev = prevTops.current.get(model);
+      if (prev != null && prev !== top) {
+        el.style.transition = "none";
+        el.style.transform = `translateY(${prev - top}px)`;
+        void el.offsetHeight; // flush the start position before animating
+        el.style.transition = "transform 350ms cubic-bezier(0.2, 0.7, 0.2, 1)";
+        el.style.transform = "";
+      }
+    }
+    prevTops.current = next;
+  });
+
   // Ranking only means something with at least two competing priorities and
   // more than one model to order.
   if (dims.length < 2 || ranked.length < 2) return null;
@@ -172,11 +198,15 @@ export function BenchmarkWeightedRanking({
         </div>
       </div>
 
-      <ol className="rounded-xl border border-border overflow-hidden">
+      <ol
+        ref={listRef}
+        className="rounded-xl border border-border overflow-hidden"
+      >
         {ranked.map((m) => (
           <li
             key={m.model}
-            className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0"
+            data-model={m.model}
+            className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 bg-background"
           >
             <span className="w-6 text-center tabular-nums text-sm font-medium text-muted-foreground">
               {m.rank}

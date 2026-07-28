@@ -164,6 +164,59 @@ describe("BenchmarkWeightedRanking", () => {
     expect(rankedOrder(container)[0]).toBe("model-a");
   });
 
+  it("animates rows to their new position when the order changes", () => {
+    // jsdom reports every offsetTop as 0, so the FLIP slide never fires. Feed
+    // ever-changing tops so each re-measure differs from the stored one and the
+    // transform branch runs.
+    const original = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetTop",
+    );
+    let tick = 0;
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get() {
+        return (tick += 10);
+      },
+    });
+
+    try {
+      const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
+        { model: "model-a", pass_rate: "90", cost: "0.10", latency_p50: "1000" },
+        { model: "model-b", pass_rate: "50", cost: "0.01", latency_p50: "1000" },
+      ];
+      const modelResults: BenchmarkModelLike[] = [
+        { model: "model-a" },
+        { model: "model-b" },
+      ];
+
+      const { container } = render(
+        <BenchmarkWeightedRanking
+          leaderboardSummary={leaderboardSummary}
+          modelResults={modelResults}
+        />,
+      );
+
+      fireEvent.change(screen.getByLabelText("Cost weight"), {
+        target: { value: "100" },
+      });
+
+      // A transform was applied to at least one row as it slid into place.
+      const moved = Array.from(
+        container.querySelectorAll<HTMLElement>("ol li[data-model]"),
+      ).some((li) => li.style.transform !== "" || li.style.transition !== "");
+      expect(moved).toBe(true);
+      expect(rankedOrder(container)[0]).toBe("model-b");
+    } finally {
+      if (original) {
+        Object.defineProperty(HTMLElement.prototype, "offsetTop", original);
+      } else {
+        delete (HTMLElement.prototype as unknown as { offsetTop?: unknown })
+          .offsetTop;
+      }
+    }
+  });
+
   it("renders nothing when only one metric is present", () => {
     // pass_rate only (no cost, no latency) → a single active dimension.
     const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
