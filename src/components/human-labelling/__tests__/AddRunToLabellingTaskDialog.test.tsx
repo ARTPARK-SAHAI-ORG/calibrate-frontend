@@ -43,7 +43,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           test_case: {
             name: "Greeting",
             evaluation: { type: "response" },
-            config: { history: [{ role: "user", content: "hi" }] },
+            history: [{ role: "user", content: "hi" }],
             evaluators: [
               { evaluator_uuid: "ev-1", variable_values: { tone: "polite" } },
             ],

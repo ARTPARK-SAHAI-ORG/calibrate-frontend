@@ -208,7 +208,7 @@ type RawTestCaseLike = {
   test_case?: {
     name?: string;
     evaluation?: { type?: string } | null;
-    config?: { history?: TestCaseHistory[] } | null;
+    history?: TestCaseHistory[] | null;
     evaluators?: Array<{
       evaluator_uuid?: string | null;
       uuid?: string | null;
@@ -243,7 +243,7 @@ function buildOneItem(
     raw.name ??
     "Untitled test";
 
-  const chat_history = raw.test_case?.config?.history ?? raw.chat_history ?? [];
+  const chat_history = raw.test_case?.history ?? raw.chat_history ?? [];
   const agent_response = raw.output?.response ?? "";
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
