@@ -192,6 +192,39 @@ describe("rankModelsByWeights", () => {
     expect(ranked[1].score).toBe(100);
   });
 
+  it("gives a constant cost/latency column full credit, not zero (no inversion trap)", () => {
+    // Both models share cost and latency; only quality differs. The constant
+    // columns must contribute their full weight to both, not zero them out.
+    const A = { model: "A", pass_rate: 80, avg_cost: 5, avg_latency_ms: 100 };
+    const B = { model: "B", pass_rate: 60, avg_cost: 5, avg_latency_ms: 100 };
+    const ranked = rankModelsByWeights(
+      [A, B],
+      { quality: 50, cost: 25, latency: 25 },
+      ALL,
+    );
+    // A wins quality (norm 1), B loses it (norm 0); cost+latency give both full
+    // credit (norm 1). A = 50*1 + 50*1 = 100; B = 50*0 + 50*1 = 50.
+    expect(ranked[0].model).toBe("A");
+    expect(ranked[0].score).toBe(100);
+    expect(ranked[1].model).toBe("B");
+    expect(ranked[1].score).toBe(50);
+  });
+
+  it("scores identical models on a single inverted dimension at full marks", () => {
+    // Cost-only weighting over two equal-cost models: both are equally good, so
+    // both score 100 (the pre-fix bug scored them 0).
+    const ranked = rankModelsByWeights(
+      [
+        { model: "M1", avg_cost: 5 },
+        { model: "M2", avg_cost: 5 },
+      ],
+      { cost: 100 },
+      ["cost"],
+    );
+    expect(ranked[0].score).toBe(100);
+    expect(ranked[1].score).toBe(100);
+  });
+
   it("assigns 1-based sequential ranks", () => {
     const ranked = rankModelsByWeights(
       [

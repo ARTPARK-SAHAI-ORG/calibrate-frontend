@@ -146,9 +146,16 @@ export function rankModelsByWeights(
       const range = ranges.get(d);
       const w = weights[d] || 0;
       if (value === undefined || !range || w <= 0) continue;
-      const t =
-        range.max === range.min ? 1 : (value - range.min) / (range.max - range.min);
-      const norm = LOWER_IS_BETTER[d] ? 1 - t : t;
+      // A constant column can't rank anyone, so give every model the same full
+      // credit regardless of direction — inverting here would zero out a
+      // constant cost/latency column and wrongly deflate the score.
+      let norm: number;
+      if (range.max === range.min) {
+        norm = 1;
+      } else {
+        const t = (value - range.min) / (range.max - range.min);
+        norm = LOWER_IS_BETTER[d] ? 1 - t : t;
+      }
       acc += w * norm;
       weightSum += w;
     }
