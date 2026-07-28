@@ -3,7 +3,6 @@ import {
   defaultWeights,
   rebalanceWeights,
   rankModelsByWeights,
-  RANKING_DIMENSIONS,
   type RankingDimension,
 } from "../benchmarkWeightedRanking";
 
@@ -11,12 +10,6 @@ const ALL: RankingDimension[] = ["quality", "cost", "latency"];
 
 const sum = (w: Record<string, number | undefined>) =>
   Object.values(w).reduce((acc: number, v) => acc + (v || 0), 0);
-
-describe("RANKING_DIMENSIONS", () => {
-  it("is quality, cost, latency in that order", () => {
-    expect(RANKING_DIMENSIONS).toEqual(["quality", "cost", "latency"]);
-  });
-});
 
 describe("weightsFromTemplate / defaultWeights", () => {
   it("default weights over all three dims are integers summing to 100", () => {

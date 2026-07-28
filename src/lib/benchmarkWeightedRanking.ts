@@ -28,13 +28,6 @@ const LOWER_IS_BETTER: Record<RankingDimension, boolean> = {
   latency: true,
 };
 
-/** Order dimensions render in, and the default relative emphasis (quality first). */
-export const RANKING_DIMENSIONS: RankingDimension[] = [
-  "quality",
-  "cost",
-  "latency",
-];
-
 const DEFAULT_TEMPLATE: Record<RankingDimension, number> = {
   quality: 0.5,
   cost: 0.3,
