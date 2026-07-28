@@ -169,8 +169,17 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           model: "claude",
           test_results: [
             {
-              test_case: { name: "B", evaluation: { type: "response" } },
-              output: { response: "r2" },
+              test_case: {
+                name: "B",
+                evaluation: { type: "response" },
+                history: [{ role: "user", content: "go" }],
+              },
+              output: {
+                response: "",
+                tool_calls: [
+                  { tool: "process_user_turn", arguments: { ack: "ok" } },
+                ],
+              },
             },
           ],
         },
@@ -180,6 +189,16 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items).toHaveLength(2);
     expect(result.items[0].payload.name).toBe("A — bench-uu — gpt-4");
     expect(result.items[1].payload.name).toBe("B — bench-uu — claude");
+    // The tool-call output on the benchmark path lands in chat_history too.
+    const history = result.items[1].payload.chat_history as Array<
+      Record<string, unknown>
+    >;
+    expect(history).toHaveLength(2);
+    expect(history[0]).toEqual({ role: "user", content: "go" });
+    expect(history[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [{ function: { name: "process_user_turn" } }],
+    });
   });
 
   it("falls back to run-level evaluators when no per-test evaluator uuids are present", () => {
