@@ -1,6 +1,9 @@
 import React from "react";
 import { render, screen, fireEvent } from "@/test-utils";
-import { BenchmarkWeightedRanking } from "../BenchmarkWeightedRanking";
+import {
+  BenchmarkWeightedRanking,
+  scoreBandClass,
+} from "../BenchmarkWeightedRanking";
 import type {
   BenchmarkLeaderboardSummaryRow,
   BenchmarkModelLike,
@@ -215,6 +218,39 @@ describe("BenchmarkWeightedRanking", () => {
           .offsetTop;
       }
     }
+  });
+
+  it("colors the score bar by band, not by model", () => {
+    expect(scoreBandClass(100)).toBe("bg-green-500");
+    expect(scoreBandClass(70)).toBe("bg-green-500");
+    expect(scoreBandClass(69)).toBe("bg-yellow-500");
+    expect(scoreBandClass(50)).toBe("bg-yellow-500");
+    expect(scoreBandClass(49)).toBe("bg-red-500");
+    expect(scoreBandClass(0)).toBe("bg-red-500");
+
+    // The rendered bars carry a band class and no inline model color.
+    const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
+      { model: "model-a", pass_rate: "90", cost: "0.10", latency_p50: "1000" },
+      { model: "model-b", pass_rate: "50", cost: "0.01", latency_p50: "1000" },
+    ];
+    const modelResults: BenchmarkModelLike[] = [
+      { model: "model-a" },
+      { model: "model-b" },
+    ];
+
+    const { container } = render(
+      <BenchmarkWeightedRanking
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+      />,
+    );
+
+    const bars = container.querySelectorAll<HTMLElement>("ol li .bg-muted > div");
+    expect(bars.length).toBe(2);
+    bars.forEach((bar) => {
+      expect(bar.className).toMatch(/bg-(green|yellow|red)-500/);
+      expect(bar.style.backgroundColor).toBe("");
+    });
   });
 
   it("renders nothing when only one metric is present", () => {

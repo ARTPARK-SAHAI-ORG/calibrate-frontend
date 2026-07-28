@@ -48,6 +48,13 @@ const PRESETS: {
 
 const formatModelName = (name: string) => name.replace(/__/g, "/");
 
+/** Score-band color for the ranking bar: 70+ green, 50–69 yellow, below 50 red. */
+export function scoreBandClass(score: number): string {
+  if (score >= 70) return "bg-green-500";
+  if (score >= 50) return "bg-yellow-500";
+  return "bg-red-500";
+}
+
 /**
  * Weight sliders (quality / cost / latency, always summing to 100%) over a
  * benchmark's models, with a leaderboard that re-orders live as the weights
@@ -228,11 +235,8 @@ export function BenchmarkWeightedRanking({
             <div className="hidden sm:block w-28">
               <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.round((m.score / topScore) * 100)}%`,
-                    backgroundColor: colorMap.get(m.model),
-                  }}
+                  className={`h-full rounded-full ${scoreBandClass(Math.round(m.score))}`}
+                  style={{ width: `${Math.round((m.score / topScore) * 100)}%` }}
                 />
               </div>
             </div>
