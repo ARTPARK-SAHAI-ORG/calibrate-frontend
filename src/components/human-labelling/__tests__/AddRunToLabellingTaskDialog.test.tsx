@@ -43,7 +43,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           test_case: {
             name: "Greeting",
             evaluation: { type: "response" },
-            config: { history: [{ role: "user", content: "hi" }] },
+            history: [{ role: "user", content: "hi" }],
             evaluators: [
               { evaluator_uuid: "ev-1", variable_values: { tone: "polite" } },
             ],
@@ -72,6 +72,59 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       "ev-1": { tone: "polite2" },
     });
     expect(result.evaluatorUuids.has("ev-1")).toBe(true);
+  });
+
+  it("appends the agent's output tool call to chat_history as the final turn", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-toolcall1",
+      results: [
+        {
+          test_case: {
+            name: "Fills the form",
+            evaluation: { type: "response" },
+            history: [{ role: "user", content: "sdsd" }],
+          },
+          output: {
+            response: "",
+            tool_calls: [
+              {
+                tool: "process_user_turn",
+                arguments: { acknowledgement: "ठीक है" },
+                output: { ok: true },
+              },
+            ],
+          },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+    const result = buildItemsFromSource(source);
+    const history = result.items[0].payload.chat_history as Array<
+      Record<string, unknown>
+    >;
+    // prior user turn + assistant tool-call turn + tool result turn
+    expect(history).toHaveLength(3);
+    expect(history[0]).toEqual({ role: "user", content: "sdsd" });
+    expect(history[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        {
+          type: "function",
+          function: {
+            name: "process_user_turn",
+            arguments: JSON.stringify({ acknowledgement: "ठीक है" }),
+          },
+        },
+      ],
+    });
+    expect(history[2]).toMatchObject({
+      role: "tool",
+      content: JSON.stringify({ ok: true }),
+    });
+    // the tool result turn is keyed back to the assistant call's id
+    expect((history[1].tool_calls as Array<{ id: string }>)[0].id).toBe(
+      history[2].tool_call_id,
+    );
   });
 
   it("falls back to test_case.evaluators variable values when judge_results has none", () => {
@@ -116,8 +169,17 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           model: "claude",
           test_results: [
             {
-              test_case: { name: "B", evaluation: { type: "response" } },
-              output: { response: "r2" },
+              test_case: {
+                name: "B",
+                evaluation: { type: "response" },
+                history: [{ role: "user", content: "go" }],
+              },
+              output: {
+                response: "",
+                tool_calls: [
+                  { tool: "process_user_turn", arguments: { ack: "ok" } },
+                ],
+              },
             },
           ],
         },
@@ -127,6 +189,16 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items).toHaveLength(2);
     expect(result.items[0].payload.name).toBe("A — bench-uu — gpt-4");
     expect(result.items[1].payload.name).toBe("B — bench-uu — claude");
+    // The tool-call output on the benchmark path lands in chat_history too.
+    const history = result.items[1].payload.chat_history as Array<
+      Record<string, unknown>
+    >;
+    expect(history).toHaveLength(2);
+    expect(history[0]).toEqual({ role: "user", content: "go" });
+    expect(history[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [{ function: { name: "process_user_turn" } }],
+    });
   });
 
   it("falls back to run-level evaluators when no per-test evaluator uuids are present", () => {
