@@ -74,6 +74,59 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.evaluatorUuids.has("ev-1")).toBe(true);
   });
 
+  it("appends the agent's output tool call to chat_history as the final turn", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-toolcall1",
+      results: [
+        {
+          test_case: {
+            name: "Fills the form",
+            evaluation: { type: "response" },
+            history: [{ role: "user", content: "sdsd" }],
+          },
+          output: {
+            response: "",
+            tool_calls: [
+              {
+                tool: "process_user_turn",
+                arguments: { acknowledgement: "ठीक है" },
+                output: { ok: true },
+              },
+            ],
+          },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+    const result = buildItemsFromSource(source);
+    const history = result.items[0].payload.chat_history as Array<
+      Record<string, unknown>
+    >;
+    // prior user turn + assistant tool-call turn + tool result turn
+    expect(history).toHaveLength(3);
+    expect(history[0]).toEqual({ role: "user", content: "sdsd" });
+    expect(history[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        {
+          type: "function",
+          function: {
+            name: "process_user_turn",
+            arguments: JSON.stringify({ acknowledgement: "ठीक है" }),
+          },
+        },
+      ],
+    });
+    expect(history[2]).toMatchObject({
+      role: "tool",
+      content: JSON.stringify({ ok: true }),
+    });
+    // the tool result turn is keyed back to the assistant call's id
+    expect((history[1].tool_calls as Array<{ id: string }>)[0].id).toBe(
+      history[2].tool_call_id,
+    );
+  });
+
   it("falls back to test_case.evaluators variable values when judge_results has none", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",

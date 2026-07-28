@@ -96,6 +96,43 @@ export type TestCaseEvaluation = {
   criteria?: string;
 };
 
+// Convert the agent's output tool calls into `history` turns: one
+// assistant turn per call (nested `function.name` + JSON-stringified
+// `arguments`, synthetic id/type) plus, when the tool actually ran, a
+// matching `role: "tool"` result turn keyed by that id. Shared by the run
+// dialog's JSON view and the labelling item builder so both render an
+// agent tool-call output identically.
+export function outputToolCallsToHistory(
+  toolCalls: ToolCallOutput[],
+): TestCaseHistory[] {
+  const turns: TestCaseHistory[] = [];
+  toolCalls.forEach((tc, i) => {
+    const id = `output-tool-call-${i}`;
+    turns.push({
+      role: "assistant",
+      tool_calls: [
+        {
+          id,
+          type: "function",
+          function: {
+            name: tc.tool,
+            arguments: JSON.stringify(tc.arguments ?? {}),
+          },
+        },
+      ],
+    });
+    if (tc.output !== undefined && tc.output !== null) {
+      turns.push({
+        role: "tool",
+        tool_call_id: id,
+        content:
+          typeof tc.output === "string" ? tc.output : JSON.stringify(tc.output),
+      });
+    }
+  });
+  return turns;
+}
+
 // Per-evaluator attachment on a test (echoed by the run-result API when the
 // backend includes the test's evaluator config in the test_case payload).
 // Used as a fallback by `EvaluationCriteriaPanel` to render the user-
@@ -934,37 +971,7 @@ export function TestDetailView({
       turns.push({ role: "assistant", content: output.response });
     }
     if (output?.tool_calls && output.tool_calls.length > 0) {
-      // Normalize the output's tool calls into the same shape used by
-      // `history` (nested `function.name`, JSON-stringified `arguments`,
-      // synthetic `id`/`type`) so the whole array is one consistent schema.
-      // A tool's execution result, when present, is emitted as a separate
-      // `role: "tool"` turn keyed by the same id — exactly as history does.
-      output.tool_calls.forEach((tc, i) => {
-        const id = `output-tool-call-${i}`;
-        turns.push({
-          role: "assistant",
-          tool_calls: [
-            {
-              id,
-              type: "function",
-              function: {
-                name: tc.tool,
-                arguments: JSON.stringify(tc.arguments ?? {}),
-              },
-            },
-          ],
-        });
-        if (tc.output !== undefined && tc.output !== null) {
-          turns.push({
-            role: "tool",
-            tool_call_id: id,
-            content:
-              typeof tc.output === "string"
-                ? tc.output
-                : JSON.stringify(tc.output),
-          });
-        }
-      });
+      turns.push(...outputToolCallsToHistory(output.tool_calls));
     }
     return JSON.stringify(turns, null, 2);
   }, [history, output]);

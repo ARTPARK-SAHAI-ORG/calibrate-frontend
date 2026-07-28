@@ -10,7 +10,9 @@ import type { BenchmarkModelResult } from "@/components/eval-details";
 import type {
   TestCaseHistory,
   TestRunEvaluator,
+  ToolCallOutput,
 } from "@/components/test-results/shared";
+import { outputToolCallsToHistory } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
 
 // Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
@@ -218,7 +220,7 @@ type RawTestCaseLike = {
   test_name?: string;
   name?: string;
   chat_history?: TestCaseHistory[];
-  output?: { response?: string } | null;
+  output?: { response?: string; tool_calls?: ToolCallOutput[] } | null;
   judge_results?: Array<{
     evaluator_uuid?: string | null;
     variable_values?: Record<string, string> | null;
@@ -243,8 +245,18 @@ function buildOneItem(
     raw.name ??
     "Untitled test";
 
-  const chat_history = raw.test_case?.history ?? raw.chat_history ?? [];
   const agent_response = raw.output?.response ?? "";
+  // The agent's reply may be a tool call instead of text. `agent_response` can
+  // only hold text, so append any output tool calls to the conversation as the
+  // final assistant turn(s) — otherwise the tool call is dropped and the
+  // annotator sees an empty evaluation target.
+  const outputToolCalls = raw.output?.tool_calls ?? [];
+  const chat_history: TestCaseHistory[] = [
+    ...(raw.test_case?.history ?? raw.chat_history ?? []),
+    ...(outputToolCalls.length > 0
+      ? outputToolCallsToHistory(outputToolCalls)
+      : []),
+  ];
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
   const evaluatorUuids: string[] = [];
