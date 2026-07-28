@@ -54,6 +54,7 @@ export type { BenchmarkTestResult, BenchmarkModelResult } from "./BenchmarkOutpu
 export { BenchmarkCombinedLeaderboard } from "./BenchmarkCombinedLeaderboard";
 
 export { BenchmarkTopPicks } from "./BenchmarkTopPicks";
+export { BenchmarkWeightedRanking } from "./BenchmarkWeightedRanking";
 
 export { TestRunOutputsPanel } from "./TestRunOutputsPanel";
 export type { TestRunResult } from "./TestRunOutputsPanel";

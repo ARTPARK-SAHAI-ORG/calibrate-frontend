@@ -83,6 +83,7 @@ jest.mock("../eval-details", () => {
     BenchmarkTopPicks: (props: any) => (
       <div data-testid="top-picks">{props.filename}</div>
     ),
+    BenchmarkWeightedRanking: () => <div data-testid="weighted-ranking" />,
   };
 });
 

@@ -14,6 +14,7 @@ import {
   BenchmarkOutputsPanel,
   BenchmarkCombinedLeaderboard,
   BenchmarkTopPicks,
+  BenchmarkWeightedRanking,
   benchmarkLabellingKey,
   LLMEvaluationAbout,
   evaluatorColumnsToAbout,
@@ -850,7 +851,12 @@ export function BenchmarkResultsDialog({
 
             {/* Top Picks Tab - Only when done and there is data to plot */}
             {isDone && showTopPicks && activeTab === "top-picks" && (
-              <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
+              <div className="p-4 md:p-6 space-y-6 md:space-y-8 overflow-y-auto h-full">
+                <BenchmarkWeightedRanking
+                  leaderboardSummary={leaderboardSummary}
+                  modelResults={modelResults}
+                  benchmarkScoreLabel={benchmarkScoreLabel}
+                />
                 <BenchmarkTopPicks
                   leaderboardSummary={leaderboardSummary}
                   modelResults={modelResults}
