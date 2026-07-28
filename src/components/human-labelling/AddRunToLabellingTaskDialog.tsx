@@ -7,12 +7,12 @@ import { reportError } from "@/lib/reportError";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
-import type {
-  TestCaseHistory,
-  TestRunEvaluator,
-  ToolCallOutput,
+import {
+  outputToolCallsToHistory,
+  type TestCaseHistory,
+  type TestRunEvaluator,
+  type ToolCallOutput,
 } from "@/components/test-results/shared";
-import { outputToolCallsToHistory } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
 
 // Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
@@ -250,12 +250,9 @@ function buildOneItem(
   // only hold text, so append any output tool calls to the conversation as the
   // final assistant turn(s) — otherwise the tool call is dropped and the
   // annotator sees an empty evaluation target.
-  const outputToolCalls = raw.output?.tool_calls ?? [];
   const chat_history: TestCaseHistory[] = [
     ...(raw.test_case?.history ?? raw.chat_history ?? []),
-    ...(outputToolCalls.length > 0
-      ? outputToolCallsToHistory(outputToolCalls)
-      : []),
+    ...outputToolCallsToHistory(raw.output?.tool_calls ?? []),
   ];
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
