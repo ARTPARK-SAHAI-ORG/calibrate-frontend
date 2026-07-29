@@ -697,6 +697,56 @@ export function AgentConnectionTabContent({
                   tool.
                 </p>
               )}
+
+              <p className="text-sm text-muted-foreground">
+                You can also include an optional{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  metrics
+                </code>{" "}
+                object to report the cost, latency and tokens consumed for each
+                agent run:
+              </p>
+              <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
+                {`{
+  "response": "...",
+  "metrics": {
+    "cost": 0.0021,
+    "prompt_tokens": 1200,
+    "completion_tokens": 340,
+    "latency_ms": 850
+  }
+}`}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                Every field inside{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  metrics
+                </code>{" "}
+                is optional, and you can leave out the whole{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  metrics
+                </code>{" "}
+                object too. For tokens, send{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  total_tokens
+                </code>{" "}
+                or send{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  prompt_tokens
+                </code>{" "}
+                and{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  completion_tokens
+                </code>{" "}
+                and Calibrate adds them up.{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  latency_ms
+                </code>{" "}
+                is your agent&apos;s own response time, so latency is only shown
+                when you send it. Reporting these lets Calibrate show the
+                latency, cost, and tokens for each test and compare models on
+                the tradeoff between quality, cost, and speed.
+              </p>
             </div>
           </div>
         </div>

@@ -521,6 +521,17 @@ describe("AgentConnectionTabContent", () => {
     ).toBeInTheDocument();
   });
 
+  it("documents the optional metrics object for latency, cost, and tokens", () => {
+    renderComponent();
+    expect(
+      screen.getByText(/You can also include an optional/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/"cost": 0.0021/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/compare models on\s+the tradeoff between quality, cost, and speed/)
+    ).toBeInTheDocument();
+  });
+
   it("disables the verify button while a verification is in flight", () => {
     hookState.isVerifying = true;
     renderComponent({ agentUrl: "https://example.com" });
