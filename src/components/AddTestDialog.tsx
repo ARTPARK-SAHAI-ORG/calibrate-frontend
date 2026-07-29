@@ -937,19 +937,32 @@ export function AddTestDialog({
   // Track if tools have been fetched (even if the result is empty)
   const [toolsFetched, setToolsFetched] = useState(false);
 
-  // Seed custom-input rows from the agent's fields, with any existing per-case
-  // override values layered on top. Independent of tools.
+  // Latest agent-default props, read through refs so their object identity
+  // changing on a parent re-render never re-triggers the seed effect below
+  // (which would wipe a user's in-progress overrides).
+  const agentDefaultInputsRef = useRef(agentDefaultInputs);
+  const agentDefaultInputTypesRef = useRef(agentDefaultInputTypes);
   useEffect(() => {
+    agentDefaultInputsRef.current = agentDefaultInputs;
+    agentDefaultInputTypesRef.current = agentDefaultInputTypes;
+  }, [agentDefaultInputs, agentDefaultInputTypes]);
+
+  // Seed custom-input rows when the dialog opens, and again if the edited
+  // test's config loads in afterwards (the parent opens first, then fetches).
+  // Only these two triggers re-seed; the agent-default identities do not, so a
+  // parent re-render cannot reset edits mid-entry.
+  useEffect(() => {
+    if (!isOpen) return;
     setInputRows(
       seedInputRows(
         {
-          ...(agentDefaultInputs ?? {}),
+          ...(agentDefaultInputsRef.current ?? {}),
           ...(initialConfig?.inputs ?? {}),
         },
-        agentDefaultInputTypes,
+        agentDefaultInputTypesRef.current,
       ),
     );
-  }, [initialConfig, agentDefaultInputs, agentDefaultInputTypes]);
+  }, [isOpen, initialConfig]);
 
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types

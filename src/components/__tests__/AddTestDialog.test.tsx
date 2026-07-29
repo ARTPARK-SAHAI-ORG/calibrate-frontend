@@ -462,6 +462,38 @@ describe("AddTestDialog", () => {
       expect(screen.getByDisplayValue("e")).toBeInTheDocument();
     });
 
+    it("keeps custom-input edits when the agent-defaults prop identity changes", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentDefaultInputs: { cond: "x" },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      const valueInput = screen.getByDisplayValue("x");
+      await user.clear(valueInput);
+      await user.type(valueInput, "y");
+
+      // Parent re-renders and hands a fresh object with the same content. The
+      // in-progress edit must survive (no re-seed on default-prop identity).
+      rerender(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentDefaultInputs: { cond: "x" },
+          })}
+        />,
+      );
+
+      expect(screen.getByDisplayValue("y")).toBeInTheDocument();
+    });
+
     it("adds and removes a user message via the Add message dropdown", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
