@@ -588,6 +588,7 @@ export function BenchmarkOutputsPanel({
             <EvaluationCriteriaPanel
               testName={selectedTestName}
               evaluation={selectedTestResult.test_case?.evaluation}
+              inputs={selectedTestResult.test_case?.inputs}
               testCaseEvaluators={selectedTestResult.test_case?.evaluators}
               passed={selectedTestResult.passed}
               judgeResults={selectedTestResult.judge_results}

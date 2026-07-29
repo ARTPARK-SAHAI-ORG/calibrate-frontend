@@ -669,6 +669,25 @@ describe("EvaluationCriteriaPanel", () => {
     expect(screen.getByText("My test name")).toBeInTheDocument();
   });
 
+  it("renders a custom inputs table below the results when inputs are given", () => {
+    render(
+      <EvaluationCriteriaPanel
+        testType="response"
+        inputs={{ condition_area: "anc", baby_age_months: null }}
+      />,
+    );
+    expect(screen.getByText("Custom inputs")).toBeInTheDocument();
+    expect(screen.getByText("condition_area")).toBeInTheDocument();
+    expect(screen.getByText("anc")).toBeInTheDocument();
+    expect(screen.getByText("baby_age_months")).toBeInTheDocument();
+    expect(screen.getByText("null")).toBeInTheDocument();
+  });
+
+  it("does not render the custom inputs section when there are no inputs", () => {
+    render(<EvaluationCriteriaPanel testType="response" inputs={{}} />);
+    expect(screen.queryByText("Custom inputs")).not.toBeInTheDocument();
+  });
+
   it("renders per-evaluator cards for a response test with judgeResults", () => {
     const judgeResults: JudgeResult[] = [
       {

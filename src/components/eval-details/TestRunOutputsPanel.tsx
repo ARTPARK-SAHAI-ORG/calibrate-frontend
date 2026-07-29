@@ -372,6 +372,7 @@ export function TestRunOutputsPanel({
             <EvaluationCriteriaPanel
               testName={selectedResult.name}
               evaluation={selectedResult.testCase?.evaluation}
+              inputs={selectedResult.testCase?.inputs}
               testCaseEvaluators={selectedResult.testCase?.evaluators}
               passed={
                 selectedResult.status === "passed"
