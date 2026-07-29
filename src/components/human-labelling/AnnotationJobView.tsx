@@ -505,9 +505,16 @@ function AnnotateView({
     }));
   };
 
-  const handleSubmitItem = async () => {
-    if (isAdmin) return;
-    if (!currentItem || submitting) return;
+  // `advance` controls the auto-jump to the next item. It's true for the
+  // explicit "Submit & Next" button, and false when we save silently because
+  // the annotator navigated away — there we jump to wherever they clicked,
+  // not to the next incomplete item. Returns whether the save succeeded so
+  // the caller can decide whether to leave the item.
+  const handleSubmitItem = async ({
+    advance = true,
+  }: { advance?: boolean } = {}): Promise<boolean> => {
+    if (isAdmin) return false;
+    if (!currentItem || submitting) return false;
     setTopError(null);
 
     const annotationsBody: {
@@ -518,7 +525,7 @@ function AnnotateView({
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
       if (!f || f.value === undefined || f.value === null || f.value === "") {
-        return;
+        return false;
       }
       annotationsBody.push({
         evaluator_id: ev.uuid,
@@ -563,7 +570,7 @@ function AnnotateView({
         } else {
           setTopError(`Save failed (${result.status})`);
         }
-        return;
+        return false;
       }
 
       const justSaved = new Set<FieldKey>();
@@ -588,22 +595,52 @@ function AnnotateView({
           status: "completed",
           completed_at: data.job.completed_at ?? new Date().toISOString(),
         });
-        return;
+        return true;
       }
 
-      const isItemDone = (itemId: string) =>
-        evaluators.every((ev) => {
-          const k = fieldKey(itemId, ev.uuid);
-          return justSaved.has(k) || savedKeys.has(k);
-        });
-      const nextIncomplete = items.findIndex(
-        (it, i) => i !== currentIndex && !isItemDone(it.uuid),
-      );
-      if (nextIncomplete >= 0) onJumpTo(nextIncomplete);
-      else if (currentIndex < total - 1) onJumpTo(currentIndex + 1);
+      if (advance) {
+        const isItemDone = (itemId: string) =>
+          evaluators.every((ev) => {
+            const k = fieldKey(itemId, ev.uuid);
+            return justSaved.has(k) || savedKeys.has(k);
+          });
+        const nextIncomplete = items.findIndex(
+          (it, i) => i !== currentIndex && !isItemDone(it.uuid),
+        );
+        if (nextIncomplete >= 0) onJumpTo(nextIncomplete);
+        else if (currentIndex < total - 1) onJumpTo(currentIndex + 1);
+      }
+      return true;
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Every way of leaving the current item (Previous, Next, the index list)
+  // routes through here. If the annotator answered every evaluator but never
+  // hit "Submit & Next", save it before moving on — otherwise they believe
+  // it's done while the admin sees nothing. Only saves a not-yet-saved item;
+  // a failed save keeps them on it so the error is visible.
+  const navigateTo = async (target: number) => {
+    if (target === currentIndex) return;
+    if (!isAdmin && !submitting && currentItem) {
+      const alreadySaved = evaluators.every((ev) =>
+        savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
+      );
+      const allAnswered =
+        evaluators.length > 0 &&
+        evaluators.every((ev) => {
+          const f = fields[fieldKey(currentItem.uuid, ev.uuid)];
+          return (
+            f && f.value !== undefined && f.value !== null && f.value !== ""
+          );
+        });
+      if (!alreadySaved && allAnswered) {
+        const ok = await handleSubmitItem({ advance: false });
+        if (!ok) return;
+      }
+    }
+    onJumpTo(target);
   };
 
   const wrapperClass = fillViewport
@@ -668,7 +705,7 @@ function AnnotateView({
         </div>
         <div className="flex items-center justify-center gap-2 flex-wrap">
           <button
-            onClick={() => onJumpTo(Math.max(0, currentIndex - 1))}
+            onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
             disabled={currentIndex === 0}
             className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -678,7 +715,7 @@ function AnnotateView({
             Item {Math.min(currentIndex + 1, Math.max(total, 1))} of {total}
           </span>
           <button
-            onClick={() => onJumpTo(Math.min(total - 1, currentIndex + 1))}
+            onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
             disabled={currentIndex >= total - 1}
             className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -730,7 +767,7 @@ function AnnotateView({
                 : undefined;
               return (
                 <button
-                  onClick={handleSubmitItem}
+                  onClick={() => handleSubmitItem()}
                   disabled={disabled}
                   title={tooltip}
                   className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -758,7 +795,7 @@ function AnnotateView({
               return (
                 <button
                   key={it.uuid}
-                  onClick={() => onJumpTo(i)}
+                  onClick={() => navigateTo(i)}
                   title={`Item ${i + 1}${done ? " (completed)" : ""}`}
                   className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                     isCurrent
@@ -784,7 +821,7 @@ function AnnotateView({
                 return (
                   <button
                     key={it.uuid}
-                    onClick={() => onJumpTo(i)}
+                    onClick={() => navigateTo(i)}
                     title={`Item ${i + 1}${done ? " (completed)" : ""}`}
                     className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                       isCurrent
