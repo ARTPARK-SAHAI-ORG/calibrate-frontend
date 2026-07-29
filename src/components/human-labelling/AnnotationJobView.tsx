@@ -616,28 +616,46 @@ function AnnotateView({
     }
   };
 
+  // Target index the annotator is trying to reach while the current item has
+  // partial, un-saveable progress. Non-null shows the confirmation overlay.
+  const [pendingNav, setPendingNav] = useState<number | null>(null);
+
   // Every way of leaving the current item (Previous, Next, the index list)
-  // routes through here. If the annotator answered every evaluator but never
-  // hit "Submit & Next", save it before moving on — otherwise they believe
-  // it's done while the admin sees nothing. Only saves a not-yet-saved item;
-  // a failed save keeps them on it so the error is visible.
+  // routes through here.
+  //   - Every evaluator answered but never submitted: save it before moving
+  //     on, otherwise the annotator believes it's done while the admin sees
+  //     nothing. A failed save keeps them on the item so the error is visible.
+  //   - Some (but not all) evaluators answered, or a comment typed: the
+  //     backend needs every evaluator, so this can't be saved. Warn before
+  //     leaving so they don't assume it was recorded.
+  //   - No progress, or already saved: just navigate.
   const navigateTo = async (target: number) => {
     if (target === currentIndex) return;
     if (!isAdmin && !submitting && currentItem) {
+      const uuid = currentItem.uuid;
       const alreadySaved = evaluators.every((ev) =>
-        savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
+        savedKeys.has(fieldKey(uuid, ev.uuid)),
       );
-      const allAnswered =
-        evaluators.length > 0 &&
-        evaluators.every((ev) => {
-          const f = fields[fieldKey(currentItem.uuid, ev.uuid)];
+      if (!alreadySaved) {
+        const answered = (ev: Evaluator) => {
+          const f = fields[fieldKey(uuid, ev.uuid)];
           return (
-            f && f.value !== undefined && f.value !== null && f.value !== ""
+            !!f && f.value !== undefined && f.value !== null && f.value !== ""
           );
-        });
-      if (!alreadySaved && allAnswered) {
-        const ok = await handleSubmitItem({ advance: false });
-        if (!ok) return;
+        };
+        if (evaluators.length > 0 && evaluators.every(answered)) {
+          const ok = await handleSubmitItem({ advance: false });
+          if (!ok) return;
+          onJumpTo(target);
+          return;
+        }
+        const commentChanged =
+          (itemComments[uuid] ?? "").trim() !==
+          (savedComments[uuid] ?? "").trim();
+        if (evaluators.some(answered) || commentChanged) {
+          setPendingNav(target);
+          return;
+        }
       }
     }
     onJumpTo(target);
@@ -903,6 +921,44 @@ function AnnotateView({
         </main>
       </div>
       </div>
+      {pendingNav !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setPendingNav(null)}
+        >
+          <div
+            className="bg-background border border-border rounded-xl w-full max-w-sm shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-foreground">
+              Not every evaluator is answered
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              This item is not finished, so your answers here will not be
+              saved. If you move on now, no one will see them.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={() => setPendingNav(null)}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer"
+              >
+                Stay
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingNav === null) return;
+                  const target = pendingNav;
+                  setPendingNav(null);
+                  onJumpTo(target);
+                }}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                Leave without saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -673,7 +673,7 @@ describe("AnnotationJobView", () => {
     expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
   });
 
-  it("does not save when jumping away from a partially-answered item", async () => {
+  it("warns before leaving a partially-answered item and stays on cancel", async () => {
     const user = setupUser();
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
@@ -681,13 +681,60 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
     );
 
-    // Answer only one of the two evaluators, then move on.
+    // Answer only one of the two evaluators, then try to move on.
     await user.click(screen.getByRole("button", { name: "Correct" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
-    // Only the initial GET fired — no annotation POST.
+    expect(
+      screen.getByText("Not every evaluator is answered"),
+    ).toBeInTheDocument();
+    // Still on item 1, nothing saved.
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stay" }));
+    expect(
+      screen.queryByText("Not every evaluator is answered"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a partially-answered item without saving when confirmed", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(
+      screen.getByRole("button", { name: "Leave without saving" }),
+    );
+
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    // Still just the initial GET — the partial answer was never sent.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns before leaving when only a comment was typed", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("Add any notes about this item"),
+      "work in progress",
+    );
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      screen.getByText("Not every evaluator is answered"),
+    ).toBeInTheDocument();
   });
 
   it("does not re-save an already-submitted item when navigating away", async () => {
