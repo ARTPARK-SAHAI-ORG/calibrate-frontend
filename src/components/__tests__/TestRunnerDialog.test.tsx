@@ -21,6 +21,9 @@ jest.mock("../eval-details", () => ({
           <button onClick={() => onSelect(r.id)}>
             {r.name}:{r.status}
           </button>
+          <span data-testid={`inputs-${r.id}`}>
+            {r.inputs ? JSON.stringify(r.inputs) : ""}
+          </span>
           {onToggleLabellingSelection && (
             <button
               aria-label={`toggle-labelling-${r.id}`}
@@ -192,6 +195,49 @@ describe("TestRunnerDialog", () => {
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
+  });
+
+  it("passes each result's effective inputs through to the outputs panel", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-inputs")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-inputs",
+            status: "in_progress",
+            name: "Inputs Run",
+            results: [
+              {
+                test_uuid: "t-1",
+                name: "basic",
+                status: "passed",
+                passed: true,
+                inputs: { condition_area: "anc", trimester: 1 },
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-inputs"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("inputs-t-1")).toHaveTextContent(
+        '{"condition_area":"anc","trimester":1}',
+      ),
+    );
   });
 
   it("renders server values: name fallbacks and pass/fail/running from `passed`", async () => {

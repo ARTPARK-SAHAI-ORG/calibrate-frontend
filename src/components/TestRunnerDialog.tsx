@@ -569,6 +569,7 @@ export function TestRunnerDialog({
                     status: r.status,
                     output: r.output,
                     testCase: r.testCase,
+                    inputs: r.inputs,
                     reasoning: r.reasoning,
                     evaluation: r.evaluation,
                     judgeResults: r.judgeResults,
