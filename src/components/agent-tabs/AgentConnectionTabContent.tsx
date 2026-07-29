@@ -272,17 +272,15 @@ export function AgentConnectionTabContent({
 
   const verifyError = connectionConfig.connection_verified_error;
 
-  // Valid custom fields rendered into the example request body.
-  const customFieldsBlock =
-    Object.keys(validInputs).length > 0
-      ? ",\n" +
-        Object.entries(validInputs)
-          .map(([k, v]) => `  "${k}": ${JSON.stringify(v)}`)
-          .join(",\n")
-      : "";
-  const customFieldsInline = Object.entries(validInputs)
-    .map(([k, v]) => `, "${k}": ${JSON.stringify(v)}`)
-    .join("");
+  // Valid custom fields rendered into the example request body. Built once,
+  // then formatted for each snippet (indented block vs. inline).
+  const customFieldEntries = Object.entries(validInputs).map(
+    ([k, v]) => `"${k}": ${JSON.stringify(v)}`,
+  );
+  const customFieldsBlock = customFieldEntries.length
+    ? ",\n" + customFieldEntries.map((e) => `  ${e}`).join(",\n")
+    : "";
+  const customFieldsInline = customFieldEntries.map((e) => `, ${e}`).join("");
 
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
   const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";

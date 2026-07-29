@@ -16,6 +16,16 @@ export type Agent = {
   hasDefaultInputs?: boolean;
 };
 
+// Whether an agent has any custom fields. Reads the new top-level
+// `has_default_inputs` flag, falling back to counting the legacy nested
+// `config.default_inputs` so it works whether or not the slimmed backend
+// response has shipped.
+function agentHasDefaultInputs(agent: any): boolean {
+  if (agent.has_default_inputs != null) return agent.has_default_inputs === true;
+  const di = agent.config?.default_inputs;
+  return !!di && Object.keys(di).length > 0;
+}
+
 // Normalise a raw GET /agents list payload into the picker's Agent shape.
 // `connection_verified` is read from the new top-level field, falling back to
 // the legacy nested `config.connection_verified` so this works whether or not
@@ -31,11 +41,7 @@ function formatAgents(data: unknown): Agent[] {
           true
         : true,
     hasDefaultInputs:
-      agent.type === "connection" &&
-      (agent.has_default_inputs ??
-        (agent.config?.default_inputs &&
-          Object.keys(agent.config.default_inputs).length > 0) ??
-        false) === true,
+      agent.type === "connection" && agentHasDefaultInputs(agent),
   }));
 }
 
@@ -171,14 +177,14 @@ export function AgentPicker({
       loading={agentsLoading}
       loadingLabel="Loading agents"
       emptyLabel="No agents found"
-      {...(disableCustomFieldConnections
-        ? {
-            isItemDisabled: (a: Agent) =>
+      isItemDisabled={
+        disableCustomFieldConnections
+          ? (a) =>
               a.hasDefaultInputs
                 ? "Text simulation is not supported for connections with custom fields"
-                : null,
-          }
-        : {})}
+                : null
+          : undefined
+      }
       searchPlaceholder="Search agents"
       matchesSearch={(a, q) => a.name.toLowerCase().includes(q.toLowerCase())}
       renderTrigger={(agent) => agent?.name ?? ""}
