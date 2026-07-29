@@ -109,6 +109,7 @@ export function AgentConnectionTabContent({
     () => deriveInputs(inputRows),
     [inputRows],
   );
+  const inputTypes = useMemo(() => inputRowsToTypes(inputRows), [inputRows]);
 
   // Push the newly-derived default_inputs (plus the field-type map) to the
   // parent whenever a row changes. Spreads the latest config so nothing else
@@ -228,7 +229,7 @@ export function AgentConnectionTabContent({
       agentUrl,
       currentHeadersObj,
       messages,
-      inputs ?? validInputs,
+      inputs,
     );
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
@@ -770,7 +771,7 @@ export function AgentConnectionTabContent({
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
         initialInputs={validInputs}
-        initialInputTypes={inputRowsToTypes(inputRows)}
+        initialInputTypes={inputTypes}
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}

@@ -185,7 +185,7 @@ describe("AgentConnectionTabContent", () => {
         "https://example.com",
         { Authorization: "Bearer x" },
         [{ role: "user", content: "Hi" }],
-        {}
+        undefined
       )
     );
 
@@ -241,7 +241,7 @@ describe("AgentConnectionTabContent", () => {
         "https://example.com",
         { "X-Test": "keep" },
         expect.anything(),
-        {}
+        undefined
       )
     );
   });

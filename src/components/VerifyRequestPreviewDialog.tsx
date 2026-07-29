@@ -229,7 +229,6 @@ export function VerifyRequestPreviewDialog({
                   rows={inputRows}
                   errors={inputErrors}
                   onRowsChange={setInputRows}
-                  label=""
                   disabled={isVerifying}
                   lockFields
                 />

@@ -132,14 +132,21 @@ describe("CustomFieldsEditor", () => {
 });
 
 describe("deriveInputs", () => {
-  it("coerces number, boolean, and json values", () => {
+  it("coerces number and text values", () => {
     const { inputs, errors } = deriveInputs([
       { key: "n", type: "number", value: "42" },
-      { key: "b", type: "boolean", value: true },
-      { key: "j", type: "json", value: '{"a":1}' },
+      { key: "t", type: "text", value: "hi" },
     ]);
     expect(errors).toEqual({});
-    expect(inputs).toEqual({ n: 42, b: true, j: { a: 1 } });
+    expect(inputs).toEqual({ n: 42, t: "hi" });
+  });
+
+  it("flags a non-numeric value for a number field", () => {
+    const { inputs, errors } = deriveInputs([
+      { key: "n", type: "number", value: "asad" },
+    ]);
+    expect(errors[0]).toBe("Not a valid number");
+    expect(inputs).toEqual({});
   });
 
   it("uses null for empty text and number values", () => {
@@ -164,12 +171,10 @@ describe("deriveInputs", () => {
 
 describe("seedInputRows", () => {
   it("round-trips a typed map", () => {
-    const rows = seedInputRows({ s: "hi", n: 5, b: false, o: { k: 1 } });
+    const rows = seedInputRows({ s: "hi", n: 5 });
     expect(rows).toEqual([
       { key: "s", type: "text", value: "hi" },
       { key: "n", type: "number", value: "5" },
-      { key: "b", type: "boolean", value: false },
-      { key: "o", type: "json", value: JSON.stringify({ k: 1 }, null, 2) },
     ]);
   });
 

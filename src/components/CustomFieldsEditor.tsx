@@ -2,12 +2,12 @@
 
 import React from "react";
 
-export type InputFieldType = "text" | "number" | "boolean" | "json";
+export type InputFieldType = "text" | "number";
 
 export type InputRow = {
   key: string;
   type: InputFieldType;
-  value: string | boolean;
+  value: string;
 };
 
 // Turn the editable rows into the typed `default_inputs` object the backend
@@ -34,11 +34,9 @@ export function deriveInputs(rows: InputRow[]): {
       return;
     }
 
+    const raw = row.value.trim();
     let value: unknown;
-    if (row.type === "boolean") {
-      value = row.value === true;
-    } else if (row.type === "number") {
-      const raw = String(row.value).trim();
+    if (row.type === "number") {
       // No value entered → send null, not 0.
       if (!raw) {
         value = null;
@@ -50,23 +48,9 @@ export function deriveInputs(rows: InputRow[]): {
         }
         value = n;
       }
-    } else if (row.type === "json") {
-      const raw = String(row.value).trim();
-      // No value entered → send null (not an error, and not an empty string).
-      if (!raw) {
-        value = null;
-      } else {
-        try {
-          value = JSON.parse(raw);
-        } catch {
-          errors[index] = "Not valid JSON";
-          return;
-        }
-      }
     } else {
       // text: no value entered → send null, not an empty string.
-      const s = String(row.value);
-      value = s.trim() === "" ? null : s;
+      value = raw === "" ? null : row.value;
     }
 
     seen.add(key);
@@ -76,18 +60,10 @@ export function deriveInputs(rows: InputRow[]): {
   return { inputs, errors };
 }
 
-export function serializeInputs(inputs: Record<string, unknown>): string {
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(inputs).sort()) {
-    sorted[key] = inputs[key];
-  }
-  return JSON.stringify(sorted);
-}
-
-// Turn a stored `{key: value}` map back into editable rows. When a `types`
-// map is given, it wins over inferring the type from the value — this is how a
-// number field with an empty (null) default keeps its "number" type across a
-// save, which inference alone cannot recover.
+// Turn a stored `{key: value}` map back into editable rows. A `types` map, when
+// given, wins over inferring the type from the value — this is how a number
+// field with an empty (null) default keeps its "number" type across a save,
+// which inference alone cannot recover.
 export function seedInputRows(
   inputs: Record<string, unknown> | undefined | null,
   types?: Record<string, InputFieldType> | null,
@@ -95,23 +71,11 @@ export function seedInputRows(
   const di = inputs || {};
   return Object.entries(di).map(([key, v]) => {
     const declared = types?.[key];
-    if (declared === "boolean")
-      return { key, type: "boolean", value: v === true };
-    if (declared === "number")
-      return { key, type: "number", value: v == null ? "" : String(v) };
-    if (declared === "json")
-      return {
-        key,
-        type: "json",
-        value: v == null ? "" : JSON.stringify(v, null, 2),
-      };
-    if (declared === "text")
-      return { key, type: "text", value: v == null ? "" : String(v) };
-    if (typeof v === "boolean") return { key, type: "boolean", value: v };
-    if (typeof v === "number") return { key, type: "number", value: String(v) };
-    if (v !== null && typeof v === "object")
-      return { key, type: "json", value: JSON.stringify(v, null, 2) };
-    return { key, type: "text", value: v == null ? "" : String(v) };
+    const type: InputFieldType =
+      declared === "number" || (declared == null && typeof v === "number")
+        ? "number"
+        : "text";
+    return { key, type, value: v == null ? "" : String(v) };
   });
 }
 
@@ -162,18 +126,7 @@ export function CustomFieldsEditor({
   };
 
   const handleRowChange = (index: number, patch: Partial<InputRow>) => {
-    onRowsChange(
-      rows.map((r, i) => {
-        if (i !== index) return r;
-        const next = { ...r, ...patch };
-        // Keep the value shape sensible when the type changes.
-        if (patch.type && patch.type !== r.type) {
-          if (patch.type === "boolean") next.value = r.value === true;
-          else if (typeof r.value === "boolean") next.value = String(r.value);
-        }
-        return next;
-      }),
-    );
+    onRowsChange(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
   return (
@@ -237,7 +190,7 @@ export function CustomFieldsEditor({
                   <input
                     type="text"
                     inputMode={row.type === "number" ? "decimal" : undefined}
-                    value={typeof row.value === "boolean" ? "" : row.value}
+                    value={row.value}
                     onChange={(e) =>
                       handleRowChange(index, { value: e.target.value })
                     }
@@ -299,7 +252,7 @@ export function CustomFieldsEditor({
                 </div>
                 <input
                   type={row.type === "number" ? "number" : "text"}
-                  value={typeof row.value === "boolean" ? "" : row.value}
+                  value={row.value}
                   onChange={(e) =>
                     handleRowChange(index, { value: e.target.value })
                   }
