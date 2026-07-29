@@ -356,6 +356,30 @@ describe("VerifyRequestPreviewDialog", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("validates a number field with an empty default via initialInputTypes", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ baby_age_months: null }}
+        initialInputTypes={{ baby_age_months: "number" }}
+      />,
+    );
+
+    // Empty is fine (no error). A non-number value is flagged.
+    expect(screen.queryByText("Not a valid number")).not.toBeInTheDocument();
+    const valueInput = screen.getByLabelText("Field value");
+    await user.type(valueInput, "asad");
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+
+    expect(screen.getByText("Not a valid number")).toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("removes a custom input row one by one", async () => {
     const user = setupUser();
     const onConfirm = jest.fn();

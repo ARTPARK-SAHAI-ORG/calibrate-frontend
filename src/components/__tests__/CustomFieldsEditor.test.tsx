@@ -4,6 +4,7 @@ import {
   CustomFieldsEditor,
   deriveInputs,
   seedInputRows,
+  inputRowsToTypes,
   type InputRow,
 } from "@/components/CustomFieldsEditor";
 
@@ -170,5 +171,29 @@ describe("seedInputRows", () => {
       { key: "b", type: "boolean", value: false },
       { key: "o", type: "json", value: JSON.stringify({ k: 1 }, null, 2) },
     ]);
+  });
+
+  it("keeps a declared number type even when the value is null", () => {
+    const rows = seedInputRows(
+      { baby_age_months: null, trimester: 2 },
+      { baby_age_months: "number", trimester: "number" },
+    );
+    expect(rows).toEqual([
+      { key: "baby_age_months", type: "number", value: "" },
+      { key: "trimester", type: "number", value: "2" },
+    ]);
+  });
+});
+
+describe("inputRowsToTypes", () => {
+  it("maps non-empty-key rows to their type, first occurrence wins", () => {
+    expect(
+      inputRowsToTypes([
+        { key: "n", type: "number", value: "" },
+        { key: " ", type: "text", value: "x" },
+        { key: "t", type: "text", value: "hi" },
+        { key: "n", type: "text", value: "2" },
+      ]),
+    ).toEqual({ n: "number", t: "text" });
   });
 });

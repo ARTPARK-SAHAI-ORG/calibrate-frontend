@@ -7,6 +7,7 @@ import {
   deriveInputs,
   seedInputRows,
   type InputRow,
+  type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 
 export type MessageRow = {
@@ -22,6 +23,7 @@ type VerifyRequestPreviewDialogProps = {
   verifyError?: string | null;
   verifySampleResponse?: Record<string, unknown> | null;
   initialInputs?: Record<string, unknown>;
+  initialInputTypes?: Record<string, InputFieldType>;
 };
 
 const DEFAULT_MESSAGES: MessageRow[] = [{ role: "user", content: "Hi" }];
@@ -34,6 +36,7 @@ export function VerifyRequestPreviewDialog({
   verifyError,
   verifySampleResponse,
   initialInputs,
+  initialInputTypes,
 }: VerifyRequestPreviewDialogProps) {
   const [messages, setMessages] = useState<MessageRow[]>(DEFAULT_MESSAGES);
   const [emptyIndices, setEmptyIndices] = useState<Set<number>>(new Set());
@@ -48,7 +51,7 @@ export function VerifyRequestPreviewDialog({
   // Seed the override rows from the agent's saved custom fields each time the
   // dialog opens, so the user edits copies rather than the stored values.
   useEffect(() => {
-    if (open) setInputRows(seedInputRows(initialInputs));
+    if (open) setInputRows(seedInputRows(initialInputs, initialInputTypes));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

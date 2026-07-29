@@ -11,7 +11,9 @@ import {
   CustomFieldsEditor,
   deriveInputs,
   seedInputRows,
+  inputRowsToTypes,
   type InputRow,
+  type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
@@ -29,6 +31,10 @@ export type ConnectionConfig = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   default_inputs?: Record<string, string | number | boolean | object | null>;
+  /** Frontend-only field-type map for `default_inputs`, keyed by name. Lets a
+   * number field with an empty default keep its type across a save. Stored in
+   * the agent config but never sent to the agent (only `default_inputs` is). */
+  default_input_types?: Record<string, InputFieldType>;
 };
 
 type AgentConnectionTabContentProps = {
@@ -94,21 +100,26 @@ export function AgentConnectionTabContent({
   // Custom request fields (backend contract: `default_inputs`). Seeded once
   // from the saved config; edits push the coerced object back to the parent.
   const [inputRows, setInputRows] = useState<InputRow[]>(() =>
-    seedInputRows(connectionConfig.default_inputs),
+    seedInputRows(
+      connectionConfig.default_inputs,
+      connectionConfig.default_input_types,
+    ),
   );
   const { inputs: validInputs, errors: inputErrors } = useMemo(
     () => deriveInputs(inputRows),
     [inputRows],
   );
 
-  // Push the newly-derived default_inputs to the parent whenever a row changes.
-  // Spreads the latest config so nothing else is lost.
+  // Push the newly-derived default_inputs (plus the field-type map) to the
+  // parent whenever a row changes. Spreads the latest config so nothing else
+  // is lost.
   const pushInputRows = (rows: InputRow[]) => {
     setInputRows(rows);
     const { inputs } = deriveInputs(rows);
     onConnectionConfigChange({
       ...connectionConfigRef.current,
       default_inputs: inputs as ConnectionConfig["default_inputs"],
+      default_input_types: inputRowsToTypes(rows),
     });
   };
 
@@ -761,6 +772,7 @@ export function AgentConnectionTabContent({
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
         initialInputs={validInputs}
+        initialInputTypes={inputRowsToTypes(inputRows)}
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}

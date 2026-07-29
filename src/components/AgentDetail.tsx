@@ -1232,6 +1232,11 @@ export function AgentDetail({
                   ? connectionConfig.default_inputs
                   : undefined
               }
+              agentDefaultInputTypes={
+                agent.type === "connection"
+                  ? connectionConfig.default_input_types
+                  : undefined
+              }
               onConnectionVerified={() =>
                 setConnectionConfig((prev) => ({
                   ...prev,
@@ -1470,10 +1475,8 @@ export function AgentDetail({
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
-        initialInputs={
-          (connectionConfig as { default_inputs?: Record<string, unknown> })
-            .default_inputs
-        }
+        initialInputs={connectionConfig.default_inputs}
+        initialInputTypes={connectionConfig.default_input_types}
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}

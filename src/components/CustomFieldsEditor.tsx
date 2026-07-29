@@ -84,17 +84,50 @@ export function serializeInputs(inputs: Record<string, unknown>): string {
   return JSON.stringify(sorted);
 }
 
+// Turn a stored `{key: value}` map back into editable rows. When a `types`
+// map is given, it wins over inferring the type from the value — this is how a
+// number field with an empty (null) default keeps its "number" type across a
+// save, which inference alone cannot recover.
 export function seedInputRows(
   inputs: Record<string, unknown> | undefined | null,
+  types?: Record<string, InputFieldType> | null,
 ): InputRow[] {
   const di = inputs || {};
   return Object.entries(di).map(([key, v]) => {
+    const declared = types?.[key];
+    if (declared === "boolean")
+      return { key, type: "boolean", value: v === true };
+    if (declared === "number")
+      return { key, type: "number", value: v == null ? "" : String(v) };
+    if (declared === "json")
+      return {
+        key,
+        type: "json",
+        value: v == null ? "" : JSON.stringify(v, null, 2),
+      };
+    if (declared === "text")
+      return { key, type: "text", value: v == null ? "" : String(v) };
     if (typeof v === "boolean") return { key, type: "boolean", value: v };
     if (typeof v === "number") return { key, type: "number", value: String(v) };
     if (v !== null && typeof v === "object")
       return { key, type: "json", value: JSON.stringify(v, null, 2) };
     return { key, type: "text", value: v == null ? "" : String(v) };
   });
+}
+
+// Field-type map for the current rows, keyed by name (first occurrence wins).
+// Persisted alongside `default_inputs` so types survive a round-trip even when
+// a field's value is empty. Rows with an empty/whitespace key are skipped.
+export function inputRowsToTypes(
+  rows: InputRow[],
+): Record<string, InputFieldType> {
+  const types: Record<string, InputFieldType> = {};
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (!key || key in types) continue;
+    types[key] = row.type;
+  }
+  return types;
 }
 
 type CustomFieldsEditorProps = {

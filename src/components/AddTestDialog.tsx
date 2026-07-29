@@ -26,6 +26,7 @@ import {
   deriveInputs,
   seedInputRows,
   type InputRow,
+  type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
@@ -758,6 +759,12 @@ type AddTestDialogProps = {
    */
   agentDefaultInputs?: Record<string, unknown>;
   /**
+   * Field-type map for the agent's custom fields (`config.default_input_types`).
+   * Lets a number field with an empty default still validate as a number when
+   * overridden per test case.
+   */
+  agentDefaultInputTypes?: Record<string, InputFieldType>;
+  /**
    * True while the parent is still loading `agentEvaluatorUuids`. When set, a
    * new test's evaluator seeding waits for the list rather than seeding off an
    * empty one. Callers with no agent context leave this unset.
@@ -830,6 +837,7 @@ export function AddTestDialog({
   initialEvaluators,
   agentEvaluatorUuids,
   agentDefaultInputs,
+  agentDefaultInputTypes,
   agentEvaluatorsPending,
   mode = "test",
   allowAgentLastMessage = false,
@@ -933,12 +941,15 @@ export function AddTestDialog({
   // override values layered on top. Independent of tools.
   useEffect(() => {
     setInputRows(
-      seedInputRows({
-        ...(agentDefaultInputs ?? {}),
-        ...(initialConfig?.inputs ?? {}),
-      }),
+      seedInputRows(
+        {
+          ...(agentDefaultInputs ?? {}),
+          ...(initialConfig?.inputs ?? {}),
+        },
+        agentDefaultInputTypes,
+      ),
     );
-  }, [initialConfig, agentDefaultInputs]);
+  }, [initialConfig, agentDefaultInputs, agentDefaultInputTypes]);
 
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
@@ -5114,7 +5125,7 @@ export function AddTestDialog({
                   Custom inputs
                 </label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Override the custom fields sent as input for this test case
+                  Set the fields that are sent as inputs for this test case
                   along with the conversation history
                 </p>
               </div>
