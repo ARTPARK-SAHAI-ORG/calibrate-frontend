@@ -686,14 +686,14 @@ describe("AnnotationJobView", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     expect(
-      screen.getByText("Not every evaluator is answered"),
+      screen.getByText("Review incomplete"),
     ).toBeInTheDocument();
     // Still on item 1, nothing saved.
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Stay" }));
     expect(
-      screen.queryByText("Not every evaluator is answered"),
+      screen.queryByText("Review incomplete"),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -733,7 +733,7 @@ describe("AnnotationJobView", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     expect(
-      screen.getByText("Not every evaluator is answered"),
+      screen.getByText("Review incomplete"),
     ).toBeInTheDocument();
   });
 

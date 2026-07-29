@@ -492,6 +492,15 @@ function AnnotateView({
     [evaluators, savedKeys],
   );
 
+  // Shared answered / dirty checks, so the submit guard, the navigate guard,
+  // and the button label all agree on what counts as answered or edited.
+  const hasFieldValue = (f?: FieldValue) =>
+    !!f && f.value !== undefined && f.value !== null && f.value !== "";
+  const evaluatorAnswered = (itemId: string, ev: Evaluator) =>
+    hasFieldValue(fields[fieldKey(itemId, ev.uuid)]);
+  const commentChangedFor = (itemId: string) =>
+    (itemComments[itemId] ?? "").trim() !== (savedComments[itemId] ?? "").trim();
+
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
     setFields((prev) => ({
       ...prev,
@@ -505,7 +514,7 @@ function AnnotateView({
 
   // `advance` controls the auto-jump to the next item. It's true for the
   // explicit "Submit & Next" button, and false when we save silently because
-  // the annotator navigated away — there we jump to wherever they clicked,
+  // the annotator navigated away: there we jump to wherever they clicked,
   // not to the next incomplete item. Returns whether the save succeeded so
   // the caller can decide whether to leave the item.
   const handleSubmitItem = async ({
@@ -522,7 +531,7 @@ function AnnotateView({
     for (const ev of evaluators) {
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
-      if (!f || f.value === undefined || f.value === null || f.value === "") {
+      if (!hasFieldValue(f)) {
         return false;
       }
       annotationsBody.push({
@@ -540,8 +549,7 @@ function AnnotateView({
     // work, and we'd erase a saved comment if we sent an empty string for
     // an item that never had one edited.
     const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
-    const savedComment = (savedComments[currentItem.uuid] ?? "").trim();
-    const commentChanged = currentComment !== savedComment;
+    const commentChanged = commentChangedFor(currentItem.uuid);
     if (commentChanged) {
       annotationsBody.push({
         evaluator_id: null,
@@ -629,28 +637,25 @@ function AnnotateView({
   //   - No progress, or already saved: just navigate.
   const navigateTo = async (target: number) => {
     if (target === currentIndex) return;
-    if (!isAdmin && !submitting && currentItem) {
+    // Ignore navigation while a save is in flight so a rapid second click
+    // can't race the auto-save's own jump.
+    if (submitting) return;
+    if (!isAdmin && currentItem) {
       const uuid = currentItem.uuid;
-      const alreadySaved = evaluators.every((ev) =>
-        savedKeys.has(fieldKey(uuid, ev.uuid)),
-      );
-      if (!alreadySaved) {
-        const answered = (ev: Evaluator) => {
-          const f = fields[fieldKey(uuid, ev.uuid)];
-          return (
-            !!f && f.value !== undefined && f.value !== null && f.value !== ""
-          );
-        };
-        if (evaluators.length > 0 && evaluators.every(answered)) {
+      if (!itemCompleted(uuid)) {
+        if (
+          evaluators.length > 0 &&
+          evaluators.every((ev) => evaluatorAnswered(uuid, ev))
+        ) {
           const ok = await handleSubmitItem({ advance: false });
           if (!ok) return;
           onJumpTo(target);
           return;
         }
-        const commentChanged =
-          (itemComments[uuid] ?? "").trim() !==
-          (savedComments[uuid] ?? "").trim();
-        if (evaluators.some(answered) || commentChanged) {
+        if (
+          evaluators.some((ev) => evaluatorAnswered(uuid, ev)) ||
+          commentChangedFor(uuid)
+        ) {
           setPendingNav(target);
           return;
         }
@@ -760,15 +765,9 @@ function AnnotateView({
                 const allEvaluatorsAnswered =
                   !!currentItem &&
                   evaluators.length > 0 &&
-                  evaluators.every((ev) => {
-                    const f = fields[fieldKey(currentItem.uuid, ev.uuid)];
-                    return (
-                      f &&
-                      f.value !== undefined &&
-                      f.value !== null &&
-                      f.value !== ""
-                    );
-                  });
+                  evaluators.every((ev) =>
+                    evaluatorAnswered(currentItem.uuid, ev),
+                  );
                 const disabled =
                   submitting || total === 0 || !allEvaluatorsAnswered;
                 const label = submitting
@@ -929,11 +928,11 @@ function AnnotateView({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-foreground">
-              Job incomplete
+              Review incomplete
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              This item is not finished, so your answers here will not be saved.
-              If you move on now, no one will see them.
+              This sample is not completely reviewed yet and a few questions are
+              still unanswered. If you leave, your answers will not be saved.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
               <button
