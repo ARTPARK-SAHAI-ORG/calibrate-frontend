@@ -624,6 +624,172 @@ describe("AnnotationJobView", () => {
     expect(screen.getByText(/"foo": "bar"/)).toBeInTheDocument();
   });
 
+  it("auto-submits an answered item when the annotator jumps to another item instead of clicking Submit", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "3" }));
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
+    );
+    // Jump straight to item 2 via the index list, never touching Submit & Next.
+    const item2Buttons = screen.getAllByTitle(/^Item 2/);
+    await user.click(item2Buttons[0]);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body.item_id).toBe("item-1");
+    expect(body.annotations).toEqual([
+      { evaluator_id: "ev-1", value: { value: true } },
+      { evaluator_id: "ev-2", value: { value: 3 } },
+    ]);
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+  });
+
+  it("also auto-submits when leaving via the Next button", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "3" }));
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).item_id).toBe("item-1");
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+  });
+
+  it("warns before leaving a partially-answered item and stays on cancel", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    // Answer only one of the two evaluators, then try to move on.
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      screen.getByText("Review incomplete"),
+    ).toBeInTheDocument();
+    // Still on item 1, nothing saved.
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stay" }));
+    expect(
+      screen.queryByText("Review incomplete"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a partially-answered item without saving when confirmed", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(
+      screen.getByRole("button", { name: "Leave without saving" }),
+    );
+
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    // Still just the initial GET — the partial answer was never sent.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns before leaving when only a comment was typed", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("Add any notes about this item"),
+      "work in progress",
+    );
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      screen.getByText("Review incomplete"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not re-save an already-submitted item when navigating away", async () => {
+    const user = setupUser();
+    const ann = (item: string, ev: string, value: unknown) => ({
+      uuid: `${item}-${ev}`,
+      job_id: "job-1",
+      item_id: item,
+      evaluator_id: ev,
+      value: { value },
+      created_at: "",
+      updated_at: "",
+    });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        jobResponse({
+          annotations: [
+            ann("item-1", "ev-1", true),
+            ann("item-1", "ev-2", 3),
+            ann("item-2", "ev-1", true),
+            ann("item-2", "ev-2", 4),
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the annotator on the item and shows an error if the auto-save fails", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "3" }));
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 500));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Save failed (500)")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+  });
+
   it("shows the item description when the payload has one", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(

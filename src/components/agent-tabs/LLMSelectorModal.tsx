@@ -149,7 +149,7 @@ export function LLMSelectorModal({
             </div>
           ) : (
             filteredProviders.map((provider) => (
-              <div key={provider.name} className="py-2">
+              <div key={provider.slug} className="py-2">
                 <h3 className="px-4 py-2 text-sm font-medium text-muted-foreground">
                   {provider.name}
                 </h3>
