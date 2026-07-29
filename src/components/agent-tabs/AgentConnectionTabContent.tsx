@@ -703,12 +703,13 @@ export function AgentConnectionTabContent({
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">
                   metrics
                 </code>{" "}
-                object to report what the call cost:
+                object to report the cost, latency and tokens consumed for each
+                agent run:
               </p>
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
                 {`{
   "response": "...",
-  "metrics": {
+  "metrics": { // optional
     "cost": 0.0021,
     "prompt_tokens": 1200,
     "completion_tokens": 340,
@@ -717,11 +718,15 @@ export function AgentConnectionTabContent({
 }`}
               </pre>
               <p className="text-xs text-muted-foreground">
-                Every field is optional, and you can leave{" "}
+                Every field inside{" "}
                 <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
                   metrics
                 </code>{" "}
-                out entirely. For tokens, send{" "}
+                is optional, and you can leave out the whole{" "}
+                <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                  metrics
+                </code>{" "}
+                object too. For tokens, send{" "}
                 <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
                   total_tokens
                 </code>{" "}
