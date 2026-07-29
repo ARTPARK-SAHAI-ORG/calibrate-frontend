@@ -198,9 +198,7 @@ export function jobStatusPillClass(
   }
 }
 
-export function jobStatusLabel(
-  status: AnnotationJobMeta["jobStatus"],
-): string {
+export function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
   if (status === "in_progress") return "In progress";
   if (status === "completed") return "Completed";
   return "Pending";
@@ -713,126 +711,100 @@ function AnnotateView({
             : "flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6"
         }
       >
-      <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
-        <div className="min-w-0">
-          {currentItem && (
-            <h2 className="text-sm font-semibold truncate">
-              {currentItemName || "Item"}
-            </h2>
-          )}
-        </div>
-        <div className="flex items-center justify-center gap-2 flex-wrap">
-          <button
-            onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
-            disabled={currentIndex === 0}
-            className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-muted-foreground tabular-nums px-2">
-            Item {Math.min(currentIndex + 1, Math.max(total, 1))} of {total}
-          </span>
-          <button
-            onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
-            disabled={currentIndex >= total - 1}
-            className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
-        <div className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto">
-          {!isAdmin &&
-            (() => {
-              const currentItemSaved = currentItem
-                ? evaluators.every((ev) =>
-                    savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
-                  )
-                : false;
-              const unsavedCount = items.reduce(
-                (n, it) =>
-                  evaluators.every((ev) =>
-                    savedKeys.has(fieldKey(it.uuid, ev.uuid)),
-                  )
-                    ? n
-                    : n + 1,
-                0,
-              );
-              const isLastUnsaved =
-                !!currentItem && !currentItemSaved && unsavedCount === 1;
-              const allEvaluatorsAnswered =
-                !!currentItem &&
-                evaluators.length > 0 &&
-                evaluators.every((ev) => {
-                  const f = fields[fieldKey(currentItem.uuid, ev.uuid)];
-                  return (
-                    f &&
-                    f.value !== undefined &&
-                    f.value !== null &&
-                    f.value !== ""
-                  );
-                });
-              const disabled =
-                submitting || total === 0 || !allEvaluatorsAnswered;
-              const label = submitting
-                ? "Saving..."
-                : currentItemSaved
-                  ? "Update"
-                  : isLastUnsaved
-                    ? "Mark as complete"
-                    : "Submit & Next";
-              const tooltip = !allEvaluatorsAnswered
-                ? "Judgements should be given for all evaluators before submitting"
-                : undefined;
-              return (
-                <button
-                  onClick={() => handleSubmitItem()}
-                  disabled={disabled}
-                  title={tooltip}
-                  className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {label}
-                </button>
-              );
-            })()}
-        </div>
-      </header>
-
-      {topError && (
-        <div className="mx-4 md:mx-6 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
-          {topError}
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col md:flex-row min-h-0">
-        {/* Mobile: horizontal scrolling strip */}
-        <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
-          <div className="p-2 grid grid-cols-8 gap-2">
-            {items.map((it, i) => {
-              const done = itemCompleted(it.uuid);
-              const isCurrent = i === currentIndex;
-              return (
-                <button
-                  key={it.uuid}
-                  onClick={() => navigateTo(i)}
-                  title={`Item ${i + 1}${done ? " (completed)" : ""}`}
-                  className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                    isCurrent
-                      ? "border-foreground bg-foreground text-background"
-                      : done
-                        ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                        : "border-border bg-background text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              );
-            })}
+        <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
+          <div className="min-w-0">
+            {currentItem && (
+              <h2 className="text-sm font-semibold truncate">
+                {currentItemName || "Item"}
+              </h2>
+            )}
           </div>
-        </div>
-        {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
-        <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="p-3 grid grid-cols-1 gap-2">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <button
+              onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
+              disabled={currentIndex === 0}
+              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-muted-foreground tabular-nums px-2">
+              Item {Math.min(currentIndex + 1, Math.max(total, 1))} of {total}
+            </span>
+            <button
+              onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
+              disabled={currentIndex >= total - 1}
+              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+          <div className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto">
+            {!isAdmin &&
+              (() => {
+                const currentItemSaved = currentItem
+                  ? evaluators.every((ev) =>
+                      savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
+                    )
+                  : false;
+                const unsavedCount = items.reduce(
+                  (n, it) =>
+                    evaluators.every((ev) =>
+                      savedKeys.has(fieldKey(it.uuid, ev.uuid)),
+                    )
+                      ? n
+                      : n + 1,
+                  0,
+                );
+                const isLastUnsaved =
+                  !!currentItem && !currentItemSaved && unsavedCount === 1;
+                const allEvaluatorsAnswered =
+                  !!currentItem &&
+                  evaluators.length > 0 &&
+                  evaluators.every((ev) => {
+                    const f = fields[fieldKey(currentItem.uuid, ev.uuid)];
+                    return (
+                      f &&
+                      f.value !== undefined &&
+                      f.value !== null &&
+                      f.value !== ""
+                    );
+                  });
+                const disabled =
+                  submitting || total === 0 || !allEvaluatorsAnswered;
+                const label = submitting
+                  ? "Saving..."
+                  : currentItemSaved
+                    ? "Update"
+                    : isLastUnsaved
+                      ? "Mark as complete"
+                      : "Submit & Next";
+                const tooltip = !allEvaluatorsAnswered
+                  ? "Judgements should be given for all evaluators before submitting"
+                  : undefined;
+                return (
+                  <button
+                    onClick={() => handleSubmitItem()}
+                    disabled={disabled}
+                    title={tooltip}
+                    className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {label}
+                  </button>
+                );
+              })()}
+          </div>
+        </header>
+
+        {topError && (
+          <div className="mx-4 md:mx-6 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+            {topError}
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {/* Mobile: horizontal scrolling strip */}
+          <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
+            <div className="p-2 grid grid-cols-8 gap-2">
               {items.map((it, i) => {
                 const done = itemCompleted(it.uuid);
                 const isCurrent = i === currentIndex;
@@ -855,52 +827,45 @@ function AnnotateView({
               })}
             </div>
           </div>
-        </div>
-
-        <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
-          {!currentItem ? (
-            <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
-              No items in this job.
-            </div>
-          ) : data.task.type === "stt" || data.task.type === "tts" ? (
-            // STT/TTS show compact inputs (short transcripts, or text +
-            // an audio clip) side-by-side with the evaluators; keep a
-            // single outer scroll container so they stay aligned.
-            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto">
-              <ItemPane item={currentItem} taskType={data.task.type} />
-              <EvaluatorsPane
-                evaluators={evaluators}
-                item={currentItem}
-                fields={fields}
-                setField={setField}
-                readOnly={isAdmin}
-                itemComment={itemComments[currentItem.uuid] ?? ""}
-                onItemCommentChange={(s) =>
-                  setItemComments((prev) => ({
-                    ...prev,
-                    [currentItem.uuid]: s,
-                  }))
-                }
-              />
-            </div>
-          ) : (
-            // LLM / conversation: long conversation on the left, evaluators
-            // on the right. Each panel scrolls independently so the
-            // evaluator controls stay visible while the annotator scrolls
-            // through history.
-            <>
-              <div
-                className={`${
-                  isAdmin ? "md:flex-[6]" : "md:flex-[7]"
-                } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 pb-4 md:px-6 md:pb-6`}
-              >
-                <ItemPane item={currentItem} taskType={data.task.type} />
+          {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
+          <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
+            <div className="absolute inset-0 overflow-y-auto">
+              <div className="p-3 grid grid-cols-1 gap-2">
+                {items.map((it, i) => {
+                  const done = itemCompleted(it.uuid);
+                  const isCurrent = i === currentIndex;
+                  return (
+                    <button
+                      key={it.uuid}
+                      onClick={() => navigateTo(i)}
+                      title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                        isCurrent
+                          ? "border-foreground bg-foreground text-background"
+                          : done
+                            ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                            : "border-border bg-background text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
               </div>
-              <div
-                className={`${
-                  isAdmin ? "md:flex-[4]" : "md:flex-[3]"
-                } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
-              >
+            </div>
+          </div>
+
+          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
+            {!currentItem ? (
+              <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
+                No items in this job.
+              </div>
+            ) : data.task.type === "stt" || data.task.type === "tts" ? (
+              // STT/TTS show compact inputs (short transcripts, or text +
+              // an audio clip) side-by-side with the evaluators; keep a
+              // single outer scroll container so they stay aligned.
+              <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto">
+                <ItemPane item={currentItem} taskType={data.task.type} />
                 <EvaluatorsPane
                   evaluators={evaluators}
                   item={currentItem}
@@ -916,10 +881,43 @@ function AnnotateView({
                   }
                 />
               </div>
-            </>
-          )}
-        </main>
-      </div>
+            ) : (
+              // LLM / conversation: long conversation on the left, evaluators
+              // on the right. Each panel scrolls independently so the
+              // evaluator controls stay visible while the annotator scrolls
+              // through history.
+              <>
+                <div
+                  className={`${
+                    isAdmin ? "md:flex-[6]" : "md:flex-[7]"
+                  } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 pb-4 md:px-6 md:pb-6`}
+                >
+                  <ItemPane item={currentItem} taskType={data.task.type} />
+                </div>
+                <div
+                  className={`${
+                    isAdmin ? "md:flex-[4]" : "md:flex-[3]"
+                  } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
+                >
+                  <EvaluatorsPane
+                    evaluators={evaluators}
+                    item={currentItem}
+                    fields={fields}
+                    setField={setField}
+                    readOnly={isAdmin}
+                    itemComment={itemComments[currentItem.uuid] ?? ""}
+                    onItemCommentChange={(s) =>
+                      setItemComments((prev) => ({
+                        ...prev,
+                        [currentItem.uuid]: s,
+                      }))
+                    }
+                  />
+                </div>
+              </>
+            )}
+          </main>
+        </div>
       </div>
       {pendingNav !== null && (
         <div
@@ -931,11 +929,11 @@ function AnnotateView({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-foreground">
-              Not every evaluator is answered
+              Job incomplete
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              This item is not finished, so your answers here will not be
-              saved. If you move on now, no one will see them.
+              This item is not finished, so your answers here will not be saved.
+              If you move on now, no one will see them.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
               <button

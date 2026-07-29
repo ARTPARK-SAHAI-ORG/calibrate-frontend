@@ -254,6 +254,41 @@ describe("LLMSelectorModal", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it("renders two providers that share a display name without a duplicate-key warning", () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <LLMSelectorModal
+        isOpen={true}
+        onClose={jest.fn()}
+        selectedLLM={null}
+        onSelect={jest.fn()}
+        availableProviders={[
+          {
+            slug: "meta-llama",
+            name: "Meta",
+            models: [{ id: "meta-llama/llama-3", name: "Llama 3" }],
+          },
+          {
+            slug: "meta",
+            name: "Meta",
+            models: [{ id: "meta/llama-4", name: "Llama 4" }],
+          },
+        ]}
+      />
+    );
+
+    // Both same-named groups render; keying on the unique slug avoids the
+    // React "two children with the same key" collision.
+    expect(screen.getAllByText("Meta")).toHaveLength(2);
+    expect(screen.getByText("Llama 3")).toBeInTheDocument();
+    expect(screen.getByText("Llama 4")).toBeInTheDocument();
+    const dupKeyWarned = errorSpy.mock.calls.some(
+      (args) => typeof args[0] === "string" && args[0].includes("same key")
+    );
+    expect(dupKeyWarned).toBe(false);
+    errorSpy.mockRestore();
+  });
+
   it("still renders providers when error is set but providers are non-empty", () => {
     mockUseOpenRouterModels.mockReturnValue({
       providers,
