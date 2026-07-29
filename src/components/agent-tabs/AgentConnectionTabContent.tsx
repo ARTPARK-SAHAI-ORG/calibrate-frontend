@@ -709,7 +709,7 @@ export function AgentConnectionTabContent({
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
                 {`{
   "response": "...",
-  "metrics": { // optional
+  "metrics": {
     "cost": 0.0021,
     "prompt_tokens": 1200,
     "completion_tokens": 340,
