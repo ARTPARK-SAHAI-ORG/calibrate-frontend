@@ -26,6 +26,10 @@ export type TestCaseResult = {
   reasoning?: string;
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
+  /** Effective custom inputs the agent received: the agent's default_inputs
+   * merged with this case's per-test overrides. Absent when the agent has no
+   * custom fields. */
+  inputs?: Record<string, unknown> | null;
   chat_history?: ChatMessage[];
   evaluation?: {
     passed: boolean;

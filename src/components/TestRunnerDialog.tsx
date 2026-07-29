@@ -63,6 +63,8 @@ type Row = {
   chatHistory?: ChatMessage[];
   output?: TestCaseOutput;
   testCase?: TestCaseData;
+  /** Effective custom inputs the agent received (defaults + overrides). */
+  inputs?: Record<string, unknown>;
   reasoning?: string;
   evaluation?: TestCaseResult["evaluation"];
   judgeResults?: JudgeResult[] | null;
@@ -230,6 +232,7 @@ export function TestRunnerDialog({
         chatHistory: r.chat_history,
         output: r.output ?? undefined,
         testCase: r.test_case ?? undefined,
+        inputs: r.inputs ?? undefined,
         reasoning: r.reasoning,
         judgeResults: r.judge_results ?? null,
         evaluation:

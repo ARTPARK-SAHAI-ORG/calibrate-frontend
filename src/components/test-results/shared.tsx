@@ -113,10 +113,6 @@ export type TestCaseData = {
   name?: string;
   history?: TestCaseHistory[];
   evaluation?: TestCaseEvaluation;
-  /** Per-case custom input overrides (`config.inputs`) sent to a connection
-   * agent alongside the conversation. Only the keys this test case overrode.
-   * Absent for tests without overrides. */
-  inputs?: Record<string, unknown>;
   /** Evaluators attached to this test (with their per-test variable
    * values). Optional — only present when the run-result API echoes the
    * full test config including evaluators. */
@@ -1376,8 +1372,9 @@ export function EvaluationCriteriaPanel({
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
   /** Disable on public share pages because evaluator detail routes require auth. */
   enableEvaluatorLinks?: boolean;
-  /** Per-case custom input overrides sent to the agent for this test case.
-   * Rendered read-only below the evaluator results. */
+  /** Effective custom inputs the agent received for this test case: the
+   * agent's default_inputs merged with any per-case overrides. Rendered
+   * read-only below the evaluator results. */
   inputs?: Record<string, unknown>;
 }) {
   const resolvedType =
@@ -1530,7 +1527,8 @@ export function EvaluationCriteriaPanel({
         </p>
       )}
 
-      {/* Per-case custom input overrides, below all evaluator results. */}
+      {/* Custom inputs the agent actually received (defaults + overrides),
+          below all evaluator results. */}
       {inputs && Object.keys(inputs).length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">
