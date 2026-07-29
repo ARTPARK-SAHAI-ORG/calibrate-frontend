@@ -1349,6 +1349,7 @@ export function EvaluationCriteriaPanel({
   evaluatorsByUuid,
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
+  inputs,
 }: {
   evaluation?: TestCaseEvaluation;
   testType?: string;
@@ -1378,6 +1379,10 @@ export function EvaluationCriteriaPanel({
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
   /** Disable on public share pages because evaluator detail routes require auth. */
   enableEvaluatorLinks?: boolean;
+  /** Effective custom inputs the agent received for this test case: the
+   * agent's default_inputs merged with any per-case overrides. Rendered
+   * read-only below the evaluator results. */
+  inputs?: Record<string, unknown>;
 }) {
   const resolvedType =
     testType ||
@@ -1527,6 +1532,35 @@ export function EvaluationCriteriaPanel({
         <p className="text-xs text-muted-foreground">
           No evaluator details available
         </p>
+      )}
+
+      {/* Custom inputs the agent actually received (defaults + overrides),
+          below all evaluator results. */}
+      {inputs && Object.keys(inputs).length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">
+            Custom inputs
+          </h3>
+          <div className="rounded-lg border border-border bg-background overflow-hidden">
+            {Object.entries(inputs).map(([key, value], i) => (
+              <div
+                key={key}
+                className={`flex items-start justify-between gap-3 px-3 py-2 text-xs ${
+                  i > 0 ? "border-t border-border" : ""
+                }`}
+              >
+                <span className="text-muted-foreground break-all">{key}</span>
+                <span className="text-foreground text-right break-all">
+                  {value === null
+                    ? "null"
+                    : typeof value === "object"
+                      ? JSON.stringify(value)
+                      : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

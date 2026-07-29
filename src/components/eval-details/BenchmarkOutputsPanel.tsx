@@ -25,6 +25,10 @@ export type BenchmarkTestResult = {
   reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
+  /** Effective custom inputs the agent received: the agent's default_inputs
+   * merged with this case's per-test overrides. Absent when the agent has no
+   * custom fields. */
+  inputs?: Record<string, unknown>;
   /** Set when the test errored out (neither passed nor failed evaluation). */
   error?: string;
   /** Per-evaluator verdicts for response (next-reply) tests. Null for
@@ -588,6 +592,7 @@ export function BenchmarkOutputsPanel({
             <EvaluationCriteriaPanel
               testName={selectedTestName}
               evaluation={selectedTestResult.test_case?.evaluation}
+              inputs={selectedTestResult.inputs}
               testCaseEvaluators={selectedTestResult.test_case?.evaluators}
               passed={selectedTestResult.passed}
               judgeResults={selectedTestResult.judge_results}

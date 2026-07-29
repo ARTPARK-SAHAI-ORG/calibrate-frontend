@@ -184,7 +184,8 @@ describe("AgentConnectionTabContent", () => {
       expect(verifyAdHoc).toHaveBeenCalledWith(
         "https://example.com",
         { Authorization: "Bearer x" },
-        [{ role: "user", content: "Hi" }]
+        [{ role: "user", content: "Hi" }],
+        undefined
       )
     );
 
@@ -239,7 +240,8 @@ describe("AgentConnectionTabContent", () => {
       expect(verifyAdHoc).toHaveBeenCalledWith(
         "https://example.com",
         { "X-Test": "keep" },
-        expect.anything()
+        expect.anything(),
+        undefined
       )
     );
   });
@@ -548,5 +550,88 @@ describe("AgentConnectionTabContent", () => {
     await user.click(screen.getByText("Confirm verify"));
 
     expect(await screen.findByText("Verifying...")).toBeInTheDocument();
+  });
+
+  // --- Custom fields (default_inputs) ---
+
+  const lastDefaultInputs = (mock: jest.Mock) => {
+    const calls = mock.mock.calls;
+    return calls[calls.length - 1][0].default_inputs;
+  };
+
+  it("writes a typed text custom field into the config", () => {
+    const { onConnectionConfigChange } = renderComponent();
+
+    fireEvent.click(screen.getByText("Add field"));
+    fireEvent.change(screen.getByPlaceholderText("Field name"), {
+      target: { value: "cond" },
+    });
+    fireEvent.change(screen.getByLabelText("Field value"), {
+      target: { value: "x" },
+    });
+
+    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ cond: "x" });
+  });
+
+  it("keeps a number custom field as a number", () => {
+    const { onConnectionConfigChange } = renderComponent();
+    fireEvent.click(screen.getByText("Add field"));
+    fireEvent.change(screen.getByPlaceholderText("Field name"), {
+      target: { value: "n" },
+    });
+    fireEvent.change(screen.getByLabelText("Field type"), {
+      target: { value: "number" },
+    });
+    fireEvent.change(screen.getByLabelText("Field value"), {
+      target: { value: "42" },
+    });
+    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ n: 42 });
+  });
+
+
+  it("flags a reserved custom field name and excludes it", () => {
+    const { onConnectionConfigChange } = renderComponent();
+
+    fireEvent.click(screen.getByText("Add field"));
+    fireEvent.change(screen.getByPlaceholderText("Field name"), {
+      target: { value: "messages" },
+    });
+
+    expect(screen.getByText("Reserved name")).toBeInTheDocument();
+    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({});
+  });
+
+  it("removes a custom field", () => {
+    const { onConnectionConfigChange } = renderComponent();
+
+    fireEvent.click(screen.getByText("Add field"));
+    fireEvent.change(screen.getByPlaceholderText("Field name"), {
+      target: { value: "cond" },
+    });
+    fireEvent.click(screen.getByLabelText("Remove field"));
+
+    expect(screen.queryByPlaceholderText("Field name")).not.toBeInTheDocument();
+    expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({});
+  });
+
+  it("keeps verification status when a custom field value is edited", () => {
+    renderComponent({
+      agentUrl: "https://example.com",
+      connectionConfig: makeConfig({
+        connection_verified: true,
+        agent_url: "https://example.com",
+        default_inputs: { cond: "x" },
+      }),
+    });
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Field value"), {
+      target: { value: "y" },
+    });
+
+    // Changing a custom field's default does not affect the connection
+    // verification, which only depends on the URL and headers.
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.queryByText("Not verified")).not.toBeInTheDocument();
   });
 });

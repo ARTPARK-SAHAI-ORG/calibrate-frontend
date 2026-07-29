@@ -27,6 +27,9 @@ type SingleSelectPickerProps<T> = {
   // Tighter rows + smaller trigger; useful when the picker sits inside
   // dense layouts (e.g. a row of evaluator versions inside a dialog).
   compact?: boolean;
+  // Returns a reason string when an item cannot be selected (rendered as a
+  // muted line under the option and made non-interactive), or null when it can.
+  isItemDisabled?: (item: T) => string | null;
 };
 
 type Rect = { left: number; top: number; width: number; bottom: number };
@@ -49,6 +52,7 @@ export function SingleSelectPicker<T>({
   className = "",
   ariaLabel,
   compact = false,
+  isItemDisabled,
 }: SingleSelectPickerProps<T>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -230,6 +234,25 @@ export function SingleSelectPicker<T>({
                   filtered.map((item) => {
                     const id = getId(item);
                     const isSelected = id === selectedId;
+                    const disabledReason = isItemDisabled?.(item) ?? null;
+                    if (disabledReason) {
+                      return (
+                        <div
+                          key={id}
+                          role="option"
+                          aria-selected={isSelected}
+                          aria-disabled={true}
+                          className={`w-full ${optionPaddingClass} text-left text-sm cursor-not-allowed opacity-50 text-foreground`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            {renderOption(item, isSelected)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            {disabledReason}
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         key={id}

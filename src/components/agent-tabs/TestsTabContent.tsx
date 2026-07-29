@@ -31,6 +31,7 @@ import {
   EvaluatorVariableDef,
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
+import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
@@ -220,6 +221,12 @@ type TestsTabContentProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  // The connection agent's custom fields (config.default_inputs). Forwarded to
+  // the test dialog so a test case can override them. Unset for build agents.
+  agentDefaultInputs?: Record<string, unknown>;
+  // Field-type map for those custom fields (config.default_input_types), so a
+  // number field with an empty default still validates as a number.
+  agentDefaultInputTypes?: Record<string, InputFieldType>;
   // Called after a passing endpoint check so the parent flips connectionVerified true.
   onConnectionVerified?: () => void;
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
@@ -234,6 +241,8 @@ export function TestsTabContent({
   supportsBenchmark,
   benchmarkModelsVerified,
   benchmarkProvider,
+  agentDefaultInputs,
+  agentDefaultInputTypes,
   onConnectionVerified,
   onGoToConnectionSettings,
 }: TestsTabContentProps) {
@@ -944,9 +953,12 @@ export function TestsTabContent({
         conversation_history: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
         tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
+        inputs?: Record<string, unknown>;
       } = {
         name: newTestName.trim(),
         conversation_history: config.history,
+        ...(config.inputs &&
+          Object.keys(config.inputs).length > 0 && { inputs: config.inputs }),
       };
       if (usesEvaluators) {
         testItem.evaluators = evaluators;
@@ -2707,6 +2719,8 @@ export function TestsTabContent({
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
+          agentDefaultInputs={agentDefaultInputs}
+          agentDefaultInputTypes={agentDefaultInputTypes}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
           showRunAfterSave={!isConnectionUnverified}
           onRun={() => {

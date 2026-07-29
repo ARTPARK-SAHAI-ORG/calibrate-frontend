@@ -25,9 +25,7 @@ describe("VerifyRequestPreviewDialog", () => {
     );
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hi")).toBeInTheDocument();
-    expect(
-      screen.getByText(/"role": "user"/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/"role": "user"/)).toBeInTheDocument();
   });
 
   it("closes on backdrop click", async () => {
@@ -140,9 +138,7 @@ describe("VerifyRequestPreviewDialog", () => {
     const input = screen.getByPlaceholderText("Message content");
     await user.clear(input);
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
-    expect(
-      screen.getByText("Message cannot be empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Message cannot be empty")).toBeInTheDocument();
 
     await user.type(input, "Hello there");
     expect(
@@ -168,9 +164,7 @@ describe("VerifyRequestPreviewDialog", () => {
     await user.type(contentInputs[1], "Second message");
 
     expect((contentInputs[0] as HTMLInputElement).value).toBe("Hi");
-    expect((contentInputs[1] as HTMLInputElement).value).toBe(
-      "Second message",
-    );
+    expect((contentInputs[1] as HTMLInputElement).value).toBe("Second message");
 
     const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
     await user.selectOptions(selects[1], "user");
@@ -227,9 +221,9 @@ describe("VerifyRequestPreviewDialog", () => {
     );
 
     // Only one row exists initially — remove button disabled.
-    const removeButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (b) => b.querySelector("path[d='M6 18L18 6M6 6l12 12']"),
-    );
+    const removeButtons = screen
+      .getAllByRole("button", { hidden: true })
+      .filter((b) => b.querySelector("path[d='M6 18L18 6M6 6l12 12']"));
     expect(removeButtons[0]).toBeDisabled();
 
     await user.click(screen.getByText("Add message"));
@@ -293,6 +287,121 @@ describe("VerifyRequestPreviewDialog", () => {
 
     await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
     expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
+  });
+
+  it("does not render the custom-fields editor when initialInputs is absent", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
+  });
+
+  it("seeds the custom-fields editor as rows and confirms with the edited value", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ cond: "x" }}
+      />,
+    );
+
+    // Seeded as one row. Name is shown read-only (not an input); only the
+    // value is editable.
+    expect(screen.getByText("cond")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Field name")).not.toBeInTheDocument();
+    const valueInput = screen.getByDisplayValue("x");
+    // Preview includes the custom field.
+    expect(screen.getAllByText(/"cond": "x"/).length).toBeGreaterThan(0);
+
+    await user.clear(valueInput);
+    await user.type(valueInput, "y");
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }], {
+      cond: "y",
+    });
+  });
+
+  it("validates a number override field and blocks confirm on bad input", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ n: 5 }}
+      />,
+    );
+
+    const valueInput = screen.getByDisplayValue("5");
+    await user.clear(valueInput);
+    await user.type(valueInput, "abc");
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+
+    expect(screen.getByText("Not a valid number")).toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("validates a number field with an empty default via initialInputTypes", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ baby_age_months: null }}
+        initialInputTypes={{ baby_age_months: "number" }}
+      />,
+    );
+
+    // Empty is fine (no error). A non-number value is flagged.
+    expect(screen.queryByText("Not a valid number")).not.toBeInTheDocument();
+    const valueInput = screen.getByLabelText("Field value");
+    await user.type(valueInput, "asad");
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+
+    expect(screen.getByText("Not a valid number")).toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("removes a custom input row one by one", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        initialInputs={{ cond: "x" }}
+      />,
+    );
+
+    expect(screen.getByText("cond")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove field" }));
+    expect(screen.queryByText("cond")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Send & Verify/i }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      [{ role: "user", content: "Hi" }],
+      {},
+    );
   });
 
   it("shows a spinner and 'Verifying...' label while isVerifying", () => {

@@ -12,7 +12,19 @@ export type Agent = {
   name: string;
   type?: "agent" | "connection";
   verified?: boolean;
+  // True for connection agents that have custom fields (backend `default_inputs`).
+  hasDefaultInputs?: boolean;
 };
+
+// Whether an agent has any custom fields. Reads the new top-level
+// `has_default_inputs` flag, falling back to counting the legacy nested
+// `config.default_inputs` so it works whether or not the slimmed backend
+// response has shipped.
+function agentHasDefaultInputs(agent: any): boolean {
+  if (agent.has_default_inputs != null) return agent.has_default_inputs === true;
+  const di = agent.config?.default_inputs;
+  return !!di && Object.keys(di).length > 0;
+}
 
 // Normalise a raw GET /agents list payload into the picker's Agent shape.
 // `connection_verified` is read from the new top-level field, falling back to
@@ -28,6 +40,8 @@ function formatAgents(data: unknown): Agent[] {
         ? (agent.connection_verified ?? agent.config?.connection_verified) ===
           true
         : true,
+    hasDefaultInputs:
+      agent.type === "connection" && agentHasDefaultInputs(agent),
   }));
 }
 
@@ -38,6 +52,9 @@ type AgentPickerProps = {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  // When true, connection agents with custom fields are shown but not
+  // selectable (text simulation does not support them).
+  disableCustomFieldConnections?: boolean;
 };
 
 function UnverifiedPill() {
@@ -100,6 +117,7 @@ export function AgentPicker({
   placeholder = "Select an agent",
   className = "",
   disabled = false,
+  disableCustomFieldConnections = false,
 }: AgentPickerProps) {
   const backendAccessToken = useAccessToken();
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -159,6 +177,14 @@ export function AgentPicker({
       loading={agentsLoading}
       loadingLabel="Loading agents"
       emptyLabel="No agents found"
+      isItemDisabled={
+        disableCustomFieldConnections
+          ? (a) =>
+              a.hasDefaultInputs
+                ? "Text simulation is not supported for connections with custom fields"
+                : null
+          : undefined
+      }
       searchPlaceholder="Search agents"
       matchesSearch={(a, q) => a.name.toLowerCase().includes(q.toLowerCase())}
       renderTrigger={(agent) => agent?.name ?? ""}

@@ -190,6 +190,84 @@ describe("AgentPicker", () => {
     expect(screen.getAllByText("Unverified")).toHaveLength(1);
   });
 
+  it("disables connection agents with custom fields when disableCustomFieldConnections is set", async () => {
+    const payload = [
+      { uuid: "a1", name: "Support Bot", type: "agent" },
+      {
+        uuid: "a2",
+        name: "Plain Connect",
+        type: "connection",
+        connection_verified: true,
+      },
+      {
+        uuid: "a3",
+        name: "Custom Fields Connect",
+        type: "connection",
+        connection_verified: true,
+        has_default_inputs: true,
+      },
+    ];
+    mockFetchOnce({ json: async () => payload });
+    const user = setupUser();
+    const onSelectAgent = jest.fn();
+    render(
+      <AgentPicker
+        disableCustomFieldConnections
+        selectedAgentUuid=""
+        onSelectAgent={onSelectAgent}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select an agent" }));
+    await screen.findByText("Support Bot");
+
+    const disabledOption = screen.getByRole("option", {
+      name: /Custom Fields Connect/,
+    });
+    expect(disabledOption).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByText(
+        "Text simulation is not supported for connections with custom fields",
+      ),
+    ).toBeInTheDocument();
+
+    // clicking the disabled option does nothing
+    await user.click(disabledOption);
+    expect(onSelectAgent).not.toHaveBeenCalled();
+
+    // a plain connection is still selectable
+    await user.click(screen.getByRole("option", { name: /Plain Connect/ }));
+    expect(onSelectAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: "a2", hasDefaultInputs: false }),
+    );
+  });
+
+  it("derives hasDefaultInputs from config.default_inputs when the top-level flag is absent", async () => {
+    const payload = [
+      {
+        uuid: "a4",
+        name: "Config Fields Connect",
+        type: "connection",
+        connection_verified: true,
+        config: { default_inputs: { name: "x" } },
+      },
+    ];
+    mockFetchOnce({ json: async () => payload });
+    const user = setupUser();
+    render(
+      <AgentPicker
+        disableCustomFieldConnections
+        selectedAgentUuid=""
+        onSelectAgent={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select an agent" }));
+    expect(
+      await screen.findByRole("option", { name: /Config Fields Connect/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("filters agents by search query", async () => {
     mockFetchOnce({ json: async () => agentsPayload });
     const user = setupUser();

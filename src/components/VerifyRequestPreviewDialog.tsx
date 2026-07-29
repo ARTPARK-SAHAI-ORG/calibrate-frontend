@@ -1,7 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
+import {
+  CustomFieldsEditor,
+  deriveInputs,
+  seedInputRows,
+  type InputRow,
+  type InputFieldType,
+} from "@/components/CustomFieldsEditor";
 
 export type MessageRow = {
   role: "user" | "assistant";
@@ -11,15 +18,15 @@ export type MessageRow = {
 type VerifyRequestPreviewDialogProps = {
   open: boolean;
   onClose: () => void;
-  onConfirm: (messages: MessageRow[]) => void;
+  onConfirm: (messages: MessageRow[], inputs?: Record<string, unknown>) => void;
   isVerifying: boolean;
   verifyError?: string | null;
   verifySampleResponse?: Record<string, unknown> | null;
+  initialInputs?: Record<string, unknown>;
+  initialInputTypes?: Record<string, InputFieldType>;
 };
 
-const DEFAULT_MESSAGES: MessageRow[] = [
-  { role: "user", content: "Hi" },
-];
+const DEFAULT_MESSAGES: MessageRow[] = [{ role: "user", content: "Hi" }];
 
 export function VerifyRequestPreviewDialog({
   open,
@@ -28,9 +35,25 @@ export function VerifyRequestPreviewDialog({
   isVerifying,
   verifyError,
   verifySampleResponse,
+  initialInputs,
+  initialInputTypes,
 }: VerifyRequestPreviewDialogProps) {
   const [messages, setMessages] = useState<MessageRow[]>(DEFAULT_MESSAGES);
   const [emptyIndices, setEmptyIndices] = useState<Set<number>>(new Set());
+  const [inputRows, setInputRows] = useState<InputRow[]>([]);
+
+  const showInputs = Object.keys(initialInputs ?? {}).length > 0;
+  const { inputs: parsedInputs, errors: inputErrors } = useMemo(
+    () => deriveInputs(inputRows),
+    [inputRows],
+  );
+
+  // Seed the override rows from the agent's saved custom fields each time the
+  // dialog opens, so the user edits copies rather than the stored values.
+  useEffect(() => {
+    if (open) setInputRows(seedInputRows(initialInputs, initialInputTypes));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleRoleChange = (index: number, role: MessageRow["role"]) => {
     setMessages((prev) =>
@@ -53,7 +76,8 @@ export function VerifyRequestPreviewDialog({
 
   const handleAddRow = () => {
     const lastRole = messages[messages.length - 1]?.role;
-    const nextRole: MessageRow["role"] = lastRole === "user" ? "assistant" : "user";
+    const nextRole: MessageRow["role"] =
+      lastRole === "user" ? "assistant" : "user";
     setMessages((prev) => [...prev, { role: nextRole, content: "" }]);
   };
 
@@ -66,6 +90,7 @@ export function VerifyRequestPreviewDialog({
     if (isVerifying) return;
     setMessages(DEFAULT_MESSAGES);
     setEmptyIndices(new Set());
+    setInputRows([]);
     onClose();
   };
 
@@ -79,6 +104,12 @@ export function VerifyRequestPreviewDialog({
       return;
     }
     setEmptyIndices(new Set());
+    if (showInputs) {
+      // Block on any per-row error (the editor shows them inline).
+      if (Object.keys(inputErrors).length > 0) return;
+      onConfirm(messages, parsedInputs);
+      return;
+    }
     onConfirm(messages);
   };
 
@@ -97,21 +128,27 @@ export function VerifyRequestPreviewDialog({
           Verify connection
         </h2>
         <p className="text-xs md:text-sm text-muted-foreground mb-4">
-          This is the sample request body that will be sent to your agent.
-          Edit the messages or add more rows before verifying.
+          This is the sample request body that will be sent to your agent. Edit
+          the messages, add more rows, or change the custom fields before
+          verifying.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
           {/* Left column: message editor */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Messages</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Messages
+            </p>
             <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
               {messages.map((msg, index) => (
                 <div key={index} className="flex items-start gap-2">
                   <select
                     value={msg.role}
                     onChange={(e) =>
-                      handleRoleChange(index, e.target.value as MessageRow["role"])
+                      handleRoleChange(
+                        index,
+                        e.target.value as MessageRow["role"],
+                      )
                     }
                     disabled={isVerifying}
                     className="h-9 px-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer flex-shrink-0 w-[100px] appearance-none"
@@ -123,7 +160,9 @@ export function VerifyRequestPreviewDialog({
                     <input
                       type="text"
                       value={msg.content}
-                      onChange={(e) => handleContentChange(index, e.target.value)}
+                      onChange={(e) =>
+                        handleContentChange(index, e.target.value)
+                      }
                       disabled={isVerifying}
                       placeholder="Message content"
                       className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ${
@@ -133,7 +172,9 @@ export function VerifyRequestPreviewDialog({
                       }`}
                     />
                     {emptyIndices.has(index) && (
-                      <p className="text-[11px] text-red-500 mt-0.5">Message cannot be empty</p>
+                      <p className="text-[11px] text-red-500 mt-0.5">
+                        Message cannot be empty
+                      </p>
                     )}
                   </div>
                   <button
@@ -181,14 +222,34 @@ export function VerifyRequestPreviewDialog({
               </svg>
               Add message
             </button>
+
+            {showInputs && (
+              <div className="mt-4">
+                <CustomFieldsEditor
+                  rows={inputRows}
+                  errors={inputErrors}
+                  onRowsChange={setInputRows}
+                  disabled={isVerifying}
+                  lockFields
+                />
+              </div>
+            )}
           </div>
 
           {/* Right column: JSON preview */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Request body preview</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Request body preview
+            </p>
             <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
               {JSON.stringify(
-                { messages: messages.map(({ role, content }) => ({ role, content })) },
+                {
+                  messages: messages.map(({ role, content }) => ({
+                    role,
+                    content,
+                  })),
+                  ...(showInputs ? parsedInputs : {}),
+                },
                 null,
                 2,
               )}
@@ -226,7 +287,11 @@ export function VerifyRequestPreviewDialog({
             className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isVerifying && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-            {isVerifying ? "Verifying..." : verifyError ? "Retry" : "Send & Verify"}
+            {isVerifying
+              ? "Verifying..."
+              : verifyError
+                ? "Retry"
+                : "Send & Verify"}
           </button>
         </div>
       </div>

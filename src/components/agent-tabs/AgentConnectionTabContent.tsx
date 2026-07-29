@@ -1,12 +1,20 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useVerifyConnection } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon, AlertIcon } from "@/components/icons";
 import {
   VerifyRequestPreviewDialog,
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
+import {
+  CustomFieldsEditor,
+  deriveInputs,
+  seedInputRows,
+  inputRowsToTypes,
+  type InputRow,
+  type InputFieldType,
+} from "@/components/CustomFieldsEditor";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -22,6 +30,11 @@ export type ConnectionConfig = {
     string,
     { verified: boolean; verified_at: string; error: string | null }
   >;
+  default_inputs?: Record<string, string | number | boolean | object | null>;
+  /** Frontend-only field-type map for `default_inputs`, keyed by name. Lets a
+   * number field with an empty default keep its type across a save. Stored in
+   * the agent config but never sent to the agent (only `default_inputs` is). */
+  default_input_types?: Record<string, InputFieldType>;
 };
 
 type AgentConnectionTabContentProps = {
@@ -83,6 +96,33 @@ export function AgentConnectionTabContent({
   useEffect(() => {
     connectionConfigRef.current = connectionConfig;
   }, [connectionConfig]);
+
+  // Custom request fields (backend contract: `default_inputs`). Seeded once
+  // from the saved config; edits push the coerced object back to the parent.
+  const [inputRows, setInputRows] = useState<InputRow[]>(() =>
+    seedInputRows(
+      connectionConfig.default_inputs,
+      connectionConfig.default_input_types,
+    ),
+  );
+  const { inputs: validInputs, errors: inputErrors } = useMemo(
+    () => deriveInputs(inputRows),
+    [inputRows],
+  );
+  const inputTypes = useMemo(() => inputRowsToTypes(inputRows), [inputRows]);
+
+  // Push the newly-derived default_inputs (plus the field-type map) to the
+  // parent whenever a row changes. Spreads the latest config so nothing else
+  // is lost.
+  const pushInputRows = (rows: InputRow[]) => {
+    setInputRows(rows);
+    const { inputs } = deriveInputs(rows);
+    onConnectionConfigChange({
+      ...connectionConfigRef.current,
+      default_inputs: inputs as ConnectionConfig["default_inputs"],
+      default_input_types: inputRowsToTypes(rows),
+    });
+  };
 
   // Snapshot of the last successfully verified URL + headers.
   // Used to restore "verified" status if the user edits then reverts.
@@ -172,7 +212,10 @@ export function AgentConnectionTabContent({
     setVerifyDialogOpen(true);
   };
 
-  const handleVerifyConfirm = async (messages: MessageRow[]) => {
+  const handleVerifyConfirm = async (
+    messages: MessageRow[],
+    inputs?: Record<string, unknown>,
+  ) => {
     setVerifyStatus("verifying");
 
     const currentHeadersObj: Record<string, string> = {};
@@ -186,6 +229,7 @@ export function AgentConnectionTabContent({
       agentUrl,
       currentHeadersObj,
       messages,
+      inputs,
     );
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
@@ -228,6 +272,16 @@ export function AgentConnectionTabContent({
     : null;
 
   const verifyError = connectionConfig.connection_verified_error;
+
+  // Valid custom fields rendered into the example request body. Built once,
+  // then formatted for each snippet (indented block vs. inline).
+  const customFieldEntries = Object.entries(validInputs).map(
+    ([k, v]) => `"${k}": ${JSON.stringify(v)}`,
+  );
+  const customFieldsBlock = customFieldEntries.length
+    ? ",\n" + customFieldEntries.map((e) => `  ${e}`).join(",\n")
+    : "";
+  const customFieldsInline = customFieldEntries.map((e) => `, ${e}`).join("");
 
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
   const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";
@@ -428,6 +482,16 @@ export function AgentConnectionTabContent({
             </button>
           </div>
 
+          {/* Custom fields (default_inputs) */}
+          <CustomFieldsEditor
+            rows={inputRows}
+            errors={inputErrors}
+            onRowsChange={pushInputRows}
+            label="Custom fields"
+            helpText="Extra fields sent to your agent on every request, alongside the conversation history"
+            disabled={isSaving}
+          />
+
           {/* Benchmark Provider Picker */}
           {supportsBenchmark && (
             <div className="space-y-2 border border-border rounded-xl bg-muted/20 p-3 md:p-4">
@@ -593,7 +657,7 @@ export function AgentConnectionTabContent({
   "messages": [
     { "role": "assistant", "content": "Namaste! Main aapki kaise madad kar sakti hoon?" },
     { "role": "user",      "content": "Meri beti ka vaccination schedule kya hai?"      }
-  ]
+  ]${customFieldsBlock}
 }`}
               </pre>
 
@@ -608,7 +672,7 @@ export function AgentConnectionTabContent({
                     LLM:
                   </p>
                   <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                    {`{ "messages": [...], "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
+                    {`{ "messages": [...]${customFieldsInline}, "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
                   </pre>
                   <div className="flex gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                     <svg
@@ -756,6 +820,8 @@ export function AgentConnectionTabContent({
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
+        initialInputs={validInputs}
+        initialInputTypes={inputTypes}
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}

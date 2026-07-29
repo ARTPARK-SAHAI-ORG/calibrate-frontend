@@ -11,13 +11,19 @@ export type VerifyConnectionResult = {
   isVerifying: boolean;
   verifyError: string | null;
   verifySampleResponse: Record<string, unknown> | null;
-  /** Verify a saved agent's connection by UUID */
-  verifySavedAgent: (agentUuid: string, messages?: VerifyMessage[]) => Promise<boolean>;
+  /** Verify a saved agent's connection by UUID. `inputs` overrides the
+   * agent's stored `default_inputs` per key for this one verification. */
+  verifySavedAgent: (
+    agentUuid: string,
+    messages?: VerifyMessage[],
+    inputs?: Record<string, unknown>,
+  ) => Promise<boolean>;
   /** Verify an ad-hoc connection (unsaved URL/headers) */
   verifyAdHoc: (
     agentUrl: string,
     agentHeaders?: Record<string, string>,
     messages?: VerifyMessage[],
+    defaultInputs?: Record<string, unknown>,
   ) => Promise<boolean>;
   dismiss: () => void;
 };
@@ -59,7 +65,11 @@ export function useVerifyConnection(): VerifyConnectionResult {
   };
 
   const verifySavedAgent = useCallback(
-    async (agentUuid: string, messages?: VerifyMessage[]): Promise<boolean> => {
+    async (
+      agentUuid: string,
+      messages?: VerifyMessage[],
+      inputs?: Record<string, unknown>,
+    ): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
       setVerifySampleResponse(null);
@@ -77,9 +87,11 @@ export function useVerifyConnection(): VerifyConnectionResult {
               accept: "application/json",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-            body: JSON.stringify(
-              messages && messages.length > 0 ? { messages } : {},
-            ),
+            body: JSON.stringify({
+              ...(messages && messages.length > 0 && { messages }),
+              ...(inputs &&
+                Object.keys(inputs).length > 0 && { inputs }),
+            }),
           },
         );
 
@@ -102,6 +114,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
       agentUrl: string,
       agentHeaders?: Record<string, string>,
       messages?: VerifyMessage[],
+      defaultInputs?: Record<string, unknown>,
     ): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
@@ -127,6 +140,10 @@ export function useVerifyConnection(): VerifyConnectionResult {
                   agent_headers: agentHeaders,
                 }),
               ...(messages && messages.length > 0 && { messages }),
+              ...(defaultInputs &&
+                Object.keys(defaultInputs).length > 0 && {
+                  default_inputs: defaultInputs,
+                }),
             }),
           },
         );

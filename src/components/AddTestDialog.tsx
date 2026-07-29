@@ -5,6 +5,7 @@ import React, {
   useState,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useCallback,
 } from "react";
@@ -20,6 +21,13 @@ import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
+import {
+  CustomFieldsEditor,
+  deriveInputs,
+  seedInputRows,
+  type InputRow,
+  type InputFieldType,
+} from "@/components/CustomFieldsEditor";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -625,6 +633,7 @@ export type TestConfig = {
     }>;
     criteria?: string;
   };
+  inputs?: Record<string, unknown>;
 };
 
 // Evaluator type for the conversation tab — picker is filtered to this.
@@ -743,6 +752,19 @@ type AddTestDialogProps = {
    */
   agentEvaluatorUuids?: string[];
   /**
+   * The connected agent's custom fields (`config.default_inputs`). When set,
+   * the "Custom inputs" section shows those fields with their defaults so the
+   * user can override a value for this test case only. Leave unset (e.g. the
+   * standalone Tests page, or a build agent) to hide the section entirely.
+   */
+  agentDefaultInputs?: Record<string, unknown>;
+  /**
+   * Field-type map for the agent's custom fields (`config.default_input_types`).
+   * Lets a number field with an empty default still validate as a number when
+   * overridden per test case.
+   */
+  agentDefaultInputTypes?: Record<string, InputFieldType>;
+  /**
    * True while the parent is still loading `agentEvaluatorUuids`. When set, a
    * new test's evaluator seeding waits for the list rather than seeding off an
    * empty one. Callers with no agent context leave this unset.
@@ -814,6 +836,8 @@ export function AddTestDialog({
   initialConfig,
   initialEvaluators,
   agentEvaluatorUuids,
+  agentDefaultInputs,
+  agentDefaultInputTypes,
   agentEvaluatorsPending,
   mode = "test",
   allowAgentLastMessage = false,
@@ -880,6 +904,29 @@ export function AddTestDialog({
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
 
+  // Optional per-test custom inputs that override the agent's default_inputs.
+  // Rows are seeded from the agent's fields (locked name/type); the user edits
+  // the value or deletes a row to drop an override.
+  const [inputRows, setInputRows] = useState<InputRow[]>([]);
+  const { inputs: validInputs, errors: inputErrors } = useMemo(
+    () => deriveInputs(inputRows),
+    [inputRows],
+  );
+  // Only the values that actually differ from the agent's default count as an
+  // override; unchanged fields are not written to config.inputs.
+  const overrideInputs = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(validInputs)) {
+      if (JSON.stringify(value) !== JSON.stringify(agentDefaultInputs?.[key])) {
+        out[key] = value;
+      }
+    }
+    return out;
+  }, [validInputs, agentDefaultInputs]);
+  // When the agent has custom fields, the dialog grows a dedicated third
+  // column for them so they are not crammed under the form.
+  const hasCustomInputs = inputRows.length > 0;
+
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
     if (initialTab) {
@@ -889,6 +936,33 @@ export function AddTestDialog({
 
   // Track if tools have been fetched (even if the result is empty)
   const [toolsFetched, setToolsFetched] = useState(false);
+
+  // Latest agent-default props, read through refs so their object identity
+  // changing on a parent re-render never re-triggers the seed effect below
+  // (which would wipe a user's in-progress overrides).
+  const agentDefaultInputsRef = useRef(agentDefaultInputs);
+  const agentDefaultInputTypesRef = useRef(agentDefaultInputTypes);
+  useEffect(() => {
+    agentDefaultInputsRef.current = agentDefaultInputs;
+    agentDefaultInputTypesRef.current = agentDefaultInputTypes;
+  }, [agentDefaultInputs, agentDefaultInputTypes]);
+
+  // Seed custom-input rows when the dialog opens, and again if the edited
+  // test's config loads in afterwards (the parent opens first, then fetches).
+  // Only these two triggers re-seed; the agent-default identities do not, so a
+  // parent re-render cannot reset edits mid-entry.
+  useEffect(() => {
+    if (!isOpen) return;
+    setInputRows(
+      seedInputRows(
+        {
+          ...(agentDefaultInputsRef.current ?? {}),
+          ...(initialConfig?.inputs ?? {}),
+        },
+        agentDefaultInputTypesRef.current,
+      ),
+    );
+  }, [isOpen, initialConfig]);
 
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
@@ -2620,9 +2694,7 @@ export function AddTestDialog({
                   placeholder="e.g. A friendly reminder with the date"
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
-              ) : isNull ||
-                isAny ? // "Is null" / "Is any" assert presence only — no value box.
-              null : (
+              ) : isNull || isAny ? null : ( // "Is null" / "Is any" assert presence only — no value box.
                 <input
                   type="text"
                   value={param.value}
@@ -2793,7 +2865,11 @@ export function AddTestDialog({
       };
     }
 
-    return { history, evaluation };
+    return {
+      history,
+      evaluation,
+      ...(Object.keys(overrideInputs).length > 0 && { inputs: overrideInputs }),
+    };
   };
 
   // Build the EvaluatorRef[] payload sent alongside `config` on POST/PUT
@@ -2834,6 +2910,7 @@ export function AddTestDialog({
       history,
       evaluation: config.evaluation,
       evaluators: buildEvaluatorsPayload(),
+      inputs: config.inputs ?? {},
     });
   };
 
@@ -3168,7 +3245,11 @@ export function AddTestDialog({
           }`}
         >
           {/* Left Column - Form */}
-          <div className="w-full md:w-1/2 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border">
+          <div
+            className={`w-full ${
+              hasCustomInputs ? "md:w-[35%]" : "md:w-1/2"
+            } flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border`}
+          >
             {/* Tabs — hidden in labelItem mode (always next-reply). When
               editing an existing test the type is fixed (the backend no
               longer allows changing a test's type), so we show only the
@@ -4033,8 +4114,12 @@ export function AddTestDialog({
             </div>
           </div>
 
-          {/* Right Column - Chat Messages */}
-          <div className="w-full md:w-1/2 flex flex-col min-h-0 bg-muted/30 overflow-visible">
+          {/* Middle Column - Chat Messages */}
+          <div
+            className={`w-full ${
+              hasCustomInputs ? "md:w-[40%]" : "md:w-1/2"
+            } flex flex-col min-h-0 bg-muted/30 overflow-visible`}
+          >
             {/* Info banner */}
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
               <div className="flex items-start gap-3">
@@ -5044,6 +5129,28 @@ export function AddTestDialog({
               )}
             </div>
           </div>
+
+          {/* Right Column - Custom inputs (only when the agent has fields) */}
+          {hasCustomInputs && (
+            <div className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
+              <div className="mb-2 shrink-0">
+                <label className="text-base font-medium text-foreground">
+                  Custom inputs
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Set the fields that are sent as inputs for this test case
+                  along with the conversation history
+                </p>
+              </div>
+              <CustomFieldsEditor
+                rows={inputRows}
+                errors={inputErrors}
+                onRowsChange={setInputRows}
+                disabled={isCreating}
+                lockFields
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

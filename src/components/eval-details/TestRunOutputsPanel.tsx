@@ -26,6 +26,10 @@ export type TestRunResult = {
   reasoning?: string;
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
   error?: string;
+  /** Effective custom inputs the agent received for this case: the agent's
+   * default_inputs merged with the per-case overrides. Absent when the agent
+   * has no custom fields. */
+  inputs?: Record<string, unknown>;
   /** Per-evaluator verdicts for response (next-reply) tests. Null/absent
    * for tool-call tests and for legacy rows (which fall back to a single
    * default-evaluator reasoning). */
@@ -372,6 +376,7 @@ export function TestRunOutputsPanel({
             <EvaluationCriteriaPanel
               testName={selectedResult.name}
               evaluation={selectedResult.testCase?.evaluation}
+              inputs={selectedResult.inputs}
               testCaseEvaluators={selectedResult.testCase?.evaluators}
               passed={
                 selectedResult.status === "passed"

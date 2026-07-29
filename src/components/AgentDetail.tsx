@@ -337,8 +337,11 @@ export function AgentDetail({
     setVerifyDialogOpen(true);
   };
 
-  const handleVerifyConfirm = async (messages: MessageRow[]) => {
-    const success = await verify.verifySavedAgent(agentUuid, messages);
+  const handleVerifyConfirm = async (
+    messages: MessageRow[],
+    inputs?: Record<string, unknown>,
+  ) => {
+    const success = await verify.verifySavedAgent(agentUuid, messages, inputs);
     if (success) {
       setConnectionConfig((prev) => ({
         ...prev,
@@ -1224,6 +1227,16 @@ export function AgentDetail({
                   ? connectionConfig.benchmark_provider
                   : undefined
               }
+              agentDefaultInputs={
+                agent.type === "connection"
+                  ? connectionConfig.default_inputs
+                  : undefined
+              }
+              agentDefaultInputTypes={
+                agent.type === "connection"
+                  ? connectionConfig.default_input_types
+                  : undefined
+              }
               onConnectionVerified={() =>
                 setConnectionConfig((prev) => ({
                   ...prev,
@@ -1462,6 +1475,8 @@ export function AgentDetail({
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}
+        initialInputs={connectionConfig.default_inputs}
+        initialInputTypes={connectionConfig.default_input_types}
         isVerifying={verify.isVerifying}
         verifyError={verify.verifyError}
         verifySampleResponse={verify.verifySampleResponse}
