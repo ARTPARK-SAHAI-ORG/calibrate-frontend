@@ -23,14 +23,6 @@ export function LandingFooter() {
               </li>
               <li>
                 <a
-                  href={`${process.env.NEXT_PUBLIC_DOCS_URL}/cli/overview`}
-                  className="hover:text-gray-900 transition-colors"
-                >
-                  CLI
-                </a>
-              </li>
-              <li>
-                <a
                   href="https://docs.google.com/document/d/e/2PACX-1vScdz5QUGyo_q4fBSAymagmoi55K8Ss77t2AcnsDYriYXp0LyM8GQ1Pnj3EDjrCUg/pub"
                   target="_blank"
                   rel="noopener noreferrer"
