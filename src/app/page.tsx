@@ -46,7 +46,7 @@ const USE_CASES: {
 }[] = [
   {
     name: "Noora Health",
-    logo: "/use-cases/noora-health.png",
+    logo: "/use-cases/noora-health.jpeg",
     whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
     useCase: [
       "Align LLM judges with experts for continuously monitoring AI response quality",
@@ -1106,7 +1106,7 @@ export default function HomePage() {
                 <img
                   src={useCase.logo}
                   alt={`${useCase.name} logo`}
-                  className="h-12 w-auto max-w-[140px] object-contain mb-5 md:mb-6"
+                  className="h-16 md:h-20 w-auto max-w-[200px] object-contain object-left mb-5 md:mb-6"
                 />
                 <h3 className="text-xl md:text-2xl font-semibold text-gray-900 mb-5">
                   {useCase.name}
