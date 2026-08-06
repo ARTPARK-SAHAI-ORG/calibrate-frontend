@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
 import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarquee";
@@ -496,6 +496,9 @@ import {
 export default function HomePage() {
   const [activeFeatureSectionId, setActiveFeatureSectionId] =
     useState<string>("llm");
+  // While a click-driven smooth scroll is in flight, holds the clicked tab id so
+  // the scroll listener keeps it active instead of flipping to sections it passes.
+  const pendingScrollTargetRef = useRef<string | null>(null);
 
   // Set page title
   useEffect(() => {
@@ -513,25 +516,45 @@ export default function HomePage() {
           activeId = tab.id;
         }
       }
+      // Hold the clicked tab active until the smooth scroll reaches it.
+      if (pendingScrollTargetRef.current) {
+        if (activeId === pendingScrollTargetRef.current) {
+          pendingScrollTargetRef.current = null;
+        } else {
+          return;
+        }
+      }
       setActiveFeatureSectionId((prev) =>
         prev === activeId ? prev : activeId,
       );
     };
 
+    // If the user takes over scrolling, drop the lock so the scroll spy resumes.
+    const releasePendingTarget = () => {
+      pendingScrollTargetRef.current = null;
+    };
+
     measureActiveSection();
     window.addEventListener("scroll", measureActiveSection, { passive: true });
     window.addEventListener("resize", measureActiveSection);
+    window.addEventListener("wheel", releasePendingTarget, { passive: true });
+    window.addEventListener("touchmove", releasePendingTarget, {
+      passive: true,
+    });
     return () => {
       window.removeEventListener("scroll", measureActiveSection);
       window.removeEventListener("resize", measureActiveSection);
+      window.removeEventListener("wheel", releasePendingTarget);
+      window.removeEventListener("touchmove", releasePendingTarget);
     };
   }, []);
 
   const scrollToLandingSection = (tabId: string) => {
+    pendingScrollTargetRef.current = tabId;
+    setActiveFeatureSectionId(tabId);
     document
       .getElementById(`landing-${tabId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setActiveFeatureSectionId(tabId);
   };
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
@@ -862,7 +885,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col">
           <nav
             aria-label="Product areas"
-            className="sticky top-[5.25rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
+            className="sticky top-[4.5rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
@@ -877,7 +900,7 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
               <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
-                <div className="sticky top-[5.25rem] z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
+                <div className="sticky top-[4.5rem] z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
                 <section

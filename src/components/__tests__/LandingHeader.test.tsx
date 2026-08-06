@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { LandingHeader } from "../LandingHeader";
 
 describe("LandingHeader", () => {
@@ -55,6 +55,24 @@ describe("LandingHeader", () => {
     expect(
       screen.queryByRole("link", { name: "GitHub" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("toggles the mobile menu with the hamburger button", async () => {
+    const user = setupUser();
+    render(<LandingHeader />);
+    const button = screen.getByRole("button", { name: "Menu" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    // Desktop copy of the nav links is always in the DOM.
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
+
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    // Mobile menu adds a second copy of each link.
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(2);
+
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
   });
 
   it("links case studies, integrations, and open source to their landing sections", () => {
