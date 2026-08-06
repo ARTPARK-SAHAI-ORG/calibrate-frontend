@@ -50,4 +50,11 @@ describe("LandingHeader", () => {
       screen.getByRole("link", { name: "Get started" }),
     ).toHaveAttribute("href", "/login");
   });
+
+  it("links case studies to the landing use cases section", () => {
+    render(<LandingHeader />);
+    expect(
+      screen.getByRole("link", { name: "Case studies" }),
+    ).toHaveAttribute("href", "/#use-cases");
+  });
 });
