@@ -16,14 +16,6 @@ export function TtsItemPane({
   return (
     <div className="space-y-4">
       <Section
-        title="Reference text"
-        subtitle="What the TTS model was asked to speak"
-      >
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {text || "—"}
-        </p>
-      </Section>
-      <Section
         title="Generated audio"
         subtitle="What the TTS model produced — listen and judge its quality"
       >
@@ -32,6 +24,14 @@ export function TtsItemPane({
         ) : (
           <p className="text-sm text-muted-foreground">No audio provided</p>
         )}
+      </Section>
+      <Section
+        title="Reference text"
+        subtitle="What the TTS model was asked to speak"
+      >
+        <p className="text-sm whitespace-pre-wrap break-words">
+          {text || "—"}
+        </p>
       </Section>
     </div>
   );
