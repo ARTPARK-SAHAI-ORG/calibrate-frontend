@@ -16,10 +16,9 @@ describe("LandingFooter", () => {
   it("renders resource links", () => {
     render(<LandingFooter />);
     expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "CLI" })).toHaveAttribute(
-      "href",
-      `${process.env.NEXT_PUBLIC_DOCS_URL}/cli/overview`,
-    );
+    expect(
+      screen.queryByRole("link", { name: "CLI" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
       "href",
       "https://docs.google.com/document/d/e/2PACX-1vScdz5QUGyo_q4fBSAymagmoi55K8Ss77t2AcnsDYriYXp0LyM8GQ1Pnj3EDjrCUg/pub",
