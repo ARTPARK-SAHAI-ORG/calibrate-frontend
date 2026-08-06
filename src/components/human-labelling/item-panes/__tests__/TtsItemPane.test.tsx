@@ -23,6 +23,18 @@ describe("TtsItemPane", () => {
     expect(screen.getByLabelText("Play")).toBeInTheDocument();
   });
 
+  it("shows the audio above the reference text", () => {
+    render(
+      <TtsItemPane
+        payload={{ text: "Hello world", audio_path: "https://example.com/a.wav" }}
+      />,
+    );
+    const audio = screen.getByText("Generated audio");
+    const reference = screen.getByText("Reference text");
+    // Node.DOCUMENT_POSITION_FOLLOWING (4) => reference comes after audio.
+    expect(audio.compareDocumentPosition(reference) & 4).toBeTruthy();
+  });
+
   it("shows an em-dash when text is missing or non-string", () => {
     render(<TtsItemPane payload={{ text: 5, audio_path: "https://x/a.wav" }} />);
     expect(screen.getByText("—")).toBeInTheDocument();
