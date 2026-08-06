@@ -37,6 +37,37 @@ type LandingFeatureSection = {
   };
 };
 
+/** Customer stories shown in the "Trusted by mission-driven teams" section. Logos live in /public/use-cases. */
+const USE_CASES: {
+  name: string;
+  logo: string;
+  whatTheyDo: string;
+  useCase: string;
+}[] = [
+  {
+    name: "Noora Health",
+    logo: "/use-cases/noora-health.png",
+    whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
+    useCase:
+      "LLM judge alignment with human labels, creating structured tests to evaluate all AI modules, evaluating TTS models for voice response and running human labelling workshops with experts",
+  },
+  {
+    name: "ARMMAN",
+    logo: "/use-cases/armman.png",
+    whatTheyDo:
+      "Voice agents to help mothers fill forms for maternal health programs",
+    useCase:
+      "Evaluating the quality of LLMs, finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff, aligning LLM judges to humans",
+  },
+  {
+    name: "Kabakoo",
+    logo: "/use-cases/kabakoo.png",
+    whatTheyDo: "Mentor AI for upskilling African youth to get jobs",
+    useCase:
+      "Evaluating quality of their agent's response, empowering domain experts to own evals, deploying changes confidently without any mistakes",
+  },
+];
+
 function LandingFeatureImageColumn(props: {
   section: LandingFeatureSection;
   getAlt: (imageIndex: number) => string;
@@ -1040,6 +1071,52 @@ export default function HomePage() {
             Request an integration
             <span>→</span>
           </a> */}
+        </div>
+      </div>
+
+      {/* Use Cases Section */}
+      <div
+        id="use-cases"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10 md:mb-14">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
+              Trusted by mission-driven teams
+            </h2>
+            <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
+              How organizations use Calibrate to ship trustworthy AI agents
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {USE_CASES.map((useCase) => (
+              <div
+                key={useCase.name}
+                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
+              >
+                <img
+                  src={useCase.logo}
+                  alt={`${useCase.name} logo`}
+                  className="h-12 w-auto max-w-[140px] object-contain mb-5 md:mb-6"
+                />
+                <h3 className="text-xl md:text-2xl font-semibold text-gray-900 mb-5">
+                  {useCase.name}
+                </h3>
+                <p className="text-sm font-semibold text-gray-400 mb-1.5">
+                  What they do
+                </p>
+                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5">
+                  {useCase.whatTheyDo}
+                </p>
+                <p className="text-sm font-semibold text-gray-400 mb-1.5">
+                  Use case
+                </p>
+                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed">
+                  {useCase.useCase}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
