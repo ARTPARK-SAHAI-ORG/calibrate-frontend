@@ -19,12 +19,18 @@ import {
   weightsFromTemplate,
   type RankingDimension,
   type RankingWeights,
+  type WeightedRankingRow,
 } from "@/lib/benchmarkWeightedRanking";
 
 type BenchmarkWeightedRankingProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
   modelResults: BenchmarkModelLike[];
   benchmarkScoreLabel?: string;
+};
+
+const toNum = (v: unknown): number | undefined => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 };
 
 const DIMENSION_META: Record<
@@ -56,35 +62,59 @@ export function scoreBandClass(score: number): string {
 }
 
 /**
- * Weight sliders (quality / cost / latency, always summing to 100%) over a
- * benchmark's models, with a leaderboard that re-orders live as the weights
- * move. Shown above the tradeoff scatter in the Model selection tab. Renders
- * nothing unless at least two of the three metrics are present across the run.
+ * LLM benchmark adapter: turns the combined-leaderboard payload into the
+ * ranking widget's rows (quality shown as "N% pass") and feeds
+ * `WeightedRankingView`. Kept as its own export so `BenchmarkResultsDialog`
+ * and its tests are unchanged.
  */
 export function BenchmarkWeightedRanking({
   leaderboardSummary,
   modelResults,
   benchmarkScoreLabel = "Test pass rate (%)",
 }: BenchmarkWeightedRankingProps) {
-  const payload = useMemo(
-    () =>
-      buildBenchmarkCombinedLeaderboardPayload(
-        leaderboardSummary,
-        modelResults,
-        benchmarkScoreLabel,
-      ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel],
-  );
-
-  const dims = useMemo<RankingDimension[]>(() => {
-    if (!payload) return [];
+  const { rows, dims } = useMemo(() => {
+    const payload = buildBenchmarkCombinedLeaderboardPayload(
+      leaderboardSummary,
+      modelResults,
+      benchmarkScoreLabel,
+    );
+    if (!payload) return { rows: [] as WeightedRankingRow[], dims: [] as RankingDimension[] };
     const active: RankingDimension[] = [];
     if (payload.plan.showOverallPassRate) active.push("quality");
     if (payload.plan.showCost) active.push("cost");
     if (payload.plan.showLatency) active.push("latency");
-    return active;
-  }, [payload]);
+    const rows: WeightedRankingRow[] = payload.rows.map((r) => {
+      const passRate = toNum(r.pass_rate);
+      return {
+        model: String(r.model),
+        name: formatModelName(String(r.model)),
+        qualityText: `${formatPercent(passRate)} pass`,
+        pass_rate: passRate,
+        avg_cost: toNum(r.avg_cost),
+        avg_latency_ms: toNum(r.avg_latency_ms),
+      };
+    });
+    return { rows, dims: active };
+  }, [leaderboardSummary, modelResults, benchmarkScoreLabel]);
 
+  return <WeightedRankingView rows={rows} dims={dims} />;
+}
+
+/**
+ * Weight sliders (quality / cost / latency, always summing to 100%) over a set
+ * of models/providers, with a leaderboard that re-orders live as the weights
+ * move. Shown above the tradeoff scatter in the Model selection tab of the LLM,
+ * STT, and TTS results. Quality shows the way each surface's chart does, via the
+ * row's `qualityText`. Renders nothing unless at least two dimensions and two
+ * rows are present.
+ */
+export function WeightedRankingView({
+  rows,
+  dims,
+}: {
+  rows: WeightedRankingRow[];
+  dims: RankingDimension[];
+}) {
   const dimKey = dims.join(",");
   const [weights, setWeights] = useState<RankingWeights>(() =>
     defaultWeights(dims),
@@ -99,9 +129,17 @@ export function BenchmarkWeightedRanking({
   }
 
   const ranked = useMemo(
-    () => rankModelsByWeights(payload?.rows ?? [], weights, dims),
-    [payload, weights, dims],
+    () =>
+      rankModelsByWeights(
+        rows as unknown as Record<string, unknown>[],
+        weights,
+        dims,
+      ),
+    [rows, weights, dims],
   );
+
+  // Display name + quality chunk per row, looked up when rendering the list.
+  const meta = useMemo(() => new Map(rows.map((r) => [r.model, r])), [rows]);
 
   const colorMap = useMemo(
     () => getColorMap(ranked.map((m) => m.model)),
@@ -225,11 +263,11 @@ export function BenchmarkWeightedRanking({
             />
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-foreground truncate">
-                {formatModelName(m.model)}
+                {meta.get(m.model)?.name ?? m.model}
               </div>
               <div className="text-xs text-muted-foreground tabular-nums">
-                {formatPercent(m.quality)} pass · {formatCostUsd(m.cost)} ·{" "}
-                {formatLatencyMs(m.latency)}
+                {meta.get(m.model)?.qualityText ?? formatPercent(m.quality)} ·{" "}
+                {formatCostUsd(m.cost)} · {formatLatencyMs(m.latency)}
               </div>
             </div>
             <div className="hidden sm:block w-28">

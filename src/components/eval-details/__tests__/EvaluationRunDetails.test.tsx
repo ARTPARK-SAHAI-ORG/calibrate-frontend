@@ -2406,6 +2406,31 @@ describe("STTEvaluationTopPicks", () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("shows the weighted ranking above the chart, best accuracy first, WER shown raw", () => {
+    const { container } = render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "deepgram", semantic_wer: 0.15 },
+          { run: "openai", semantic_wer: 0.05 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Rank by your priorities")).toBeInTheDocument();
+    // Quality-heavy default → the lower-WER provider ranks first.
+    const names = Array.from(container.querySelectorAll("ol li .truncate")).map(
+      (el) => el.textContent?.trim(),
+    );
+    expect(names).toEqual(["Provider openai", "Provider deepgram"]);
+    // Quality is shown as the raw error rate, matching the chart.
+    expect(screen.getByText(/Semantic WER 0\.05/)).toBeInTheDocument();
+  });
 });
 
 describe("hasSttTopPicks", () => {
@@ -2504,6 +2529,28 @@ describe("TTSEvaluationTopPicks", () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows the weighted ranking, best judge score first, quality shown as a percentage", () => {
+    const { container } = render(
+      <TTSEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    expect(screen.getByText("Rank by your priorities")).toBeInTheDocument();
+    const names = Array.from(container.querySelectorAll("ol li .truncate")).map(
+      (el) => el.textContent?.trim(),
+    );
+    expect(names).toEqual(["Provider eleven", "Provider azure"]);
+    // Judge score shown as a percentage, matching the chart's percent axis.
+    expect(screen.getByText(/90% ·/)).toBeInTheDocument();
   });
 });
 

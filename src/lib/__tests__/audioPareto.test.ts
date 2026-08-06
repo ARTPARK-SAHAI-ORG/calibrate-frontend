@@ -3,6 +3,7 @@ import {
   sttQualityMetrics,
   ttsQualityMetrics,
   buildAudioParetoPoints,
+  buildAudioWeightedRows,
   countValidParetoPoints,
   formatErrorRate,
   type AudioQualityMetric,
@@ -230,5 +231,69 @@ describe("countValidParetoPoints", () => {
       { model: "d", label: "d", cost: 0.003, passRate: 70 },
     ];
     expect(countValidParetoPoints(points)).toBe(2);
+  });
+});
+
+describe("buildAudioWeightedRows", () => {
+  const rawMetric: AudioQualityMetric = {
+    id: "wer",
+    label: "WER",
+    qualityNoun: "accuracy",
+    qualityComparative: "how accurate it is",
+    display: "raw",
+    rawValue: () => null,
+    score: () => null,
+  };
+  const percentMetric: AudioQualityMetric = {
+    id: "judge",
+    label: "Correctness",
+    qualityNoun: "quality",
+    qualityComparative: "how well it scores",
+    display: "percent",
+    score: () => null,
+  };
+
+  it("shows the raw error rate as the quality text for accuracy metrics", () => {
+    const points = [
+      { model: "openai", label: "OpenAI", cost: 0.004, passRate: 95, latency: 800, qualityDisplay: 0.05 },
+    ];
+    const [row] = buildAudioWeightedRows(points, rawMetric);
+    expect(row).toEqual({
+      model: "openai",
+      name: "OpenAI",
+      qualityText: "WER 0.05",
+      pass_rate: 95,
+      avg_cost: 0.004,
+      avg_latency_ms: 800,
+    });
+  });
+
+  it("shows a percentage as the quality text for percent metrics", () => {
+    const points = [
+      { model: "eleven", label: "ElevenLabs", cost: 0.01, passRate: 88.5, latency: 500 },
+    ];
+    const [row] = buildAudioWeightedRows(points, percentMetric);
+    expect(row.qualityText).toBe("88.5%");
+    expect(row.pass_rate).toBe(88.5);
+  });
+
+  it("drops non-finite cost/quality to undefined so a gap never buries a provider", () => {
+    const points = [
+      { model: "a", label: "A", cost: NaN, passRate: NaN, latency: undefined },
+    ];
+    const [row] = buildAudioWeightedRows(points, percentMetric);
+    expect(row.avg_cost).toBeUndefined();
+    expect(row.pass_rate).toBeUndefined();
+    expect(row.avg_latency_ms).toBeUndefined();
+    // Percent of a missing score reads as an em dash, not "NaN%".
+    expect(row.qualityText).toBe("—");
+  });
+
+  it("shows an em dash for a raw metric with no underlying value", () => {
+    const points = [
+      { model: "a", label: "A", cost: 0.004, passRate: 90, qualityDisplay: undefined },
+    ];
+    const [row] = buildAudioWeightedRows(points, rawMetric);
+    expect(row.qualityText).toBe("—");
   });
 });

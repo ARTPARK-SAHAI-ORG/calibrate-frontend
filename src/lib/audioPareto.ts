@@ -17,6 +17,8 @@
 import type { ParetoModelPoint } from "@/components/charts/ParetoFrontierChart";
 import { isValidParetoPoint } from "@/lib/paretoFrontier";
 import { readTotalCostUsd } from "@/lib/audioCost";
+import type { WeightedRankingRow } from "@/lib/benchmarkWeightedRanking";
+import { formatPercent } from "@/lib/llmMetrics";
 
 const SECONDS_TO_MS = 1000;
 
@@ -209,4 +211,35 @@ export function buildAudioParetoPoints(
 /** How many points have both a finite cost and quality — the Pareto chart's minimum. */
 export function countValidParetoPoints(points: ParetoModelPoint[]): number {
   return points.filter(isValidParetoPoint).length;
+}
+
+/**
+ * Rows for the weighted ranking widget on the STT / TTS "Model selection" tab.
+ * Reuses the Pareto points already built for the chart so the two never
+ * disagree: quality is the selected metric's 0–100 score (used for ranking),
+ * while `qualityText` shows it the way the chart does — the raw error rate for
+ * accuracy metrics (e.g. "WER 0.05"), a percentage otherwise.
+ */
+export function buildAudioWeightedRows(
+  points: ParetoModelPoint[],
+  metric: AudioQualityMetric,
+): WeightedRankingRow[] {
+  return points.map((p) => {
+    const passRate = Number.isFinite(p.passRate) ? p.passRate : undefined;
+    const cost = Number.isFinite(p.cost) ? p.cost : undefined;
+    const qualityText =
+      metric.display === "raw"
+        ? p.qualityDisplay != null
+          ? `${metric.label} ${formatErrorRate(p.qualityDisplay)}`
+          : "—"
+        : formatPercent(passRate);
+    return {
+      model: p.model,
+      name: p.label,
+      qualityText,
+      pass_rate: passRate,
+      avg_cost: cost,
+      avg_latency_ms: p.latency,
+    };
+  });
 }

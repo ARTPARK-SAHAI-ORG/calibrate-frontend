@@ -39,9 +39,12 @@ import {
   sttQualityMetrics,
   ttsQualityMetrics,
   buildAudioParetoPoints,
+  buildAudioWeightedRows,
   formatErrorRate,
   type AudioQualityMetric,
 } from "@/lib/audioPareto";
+import { dimsFromRows } from "@/lib/benchmarkWeightedRanking";
+import { WeightedRankingView } from "./BenchmarkWeightedRanking";
 import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
@@ -1000,9 +1003,13 @@ function TopPicksChart({
   if (metrics.length === 0) return null;
   const selected = metrics.find((m) => m.id === metricId) ?? metrics[0];
   const points = buildAudioParetoPoints(rows, getProviderLabel, selected, kind);
+  const rankingRows = buildAudioWeightedRows(points, selected);
+  const rankingDims = dimsFromRows(rankingRows);
   return (
     <div className={className}>
-      <ParetoFrontierChart
+      <div className="space-y-6">
+        <WeightedRankingView rows={rankingRows} dims={rankingDims} />
+        <ParetoFrontierChart
         points={points}
         colorMap={getColorMap(points.map((p) => p.model))}
         title="Quality vs cost vs latency tradeoff"
@@ -1054,7 +1061,8 @@ function TopPicksChart({
             </div>
           ) : undefined
         }
-      />
+        />
+      </div>
     </div>
   );
 }
