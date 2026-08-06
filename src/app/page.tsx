@@ -42,29 +42,38 @@ const USE_CASES: {
   name: string;
   logo: string;
   whatTheyDo: string;
-  useCase: string;
+  useCase: string[];
 }[] = [
   {
     name: "Noora Health",
     logo: "/use-cases/noora-health.png",
     whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
-    useCase:
-      "LLM judge alignment with human labels, creating structured tests to evaluate all AI modules, evaluating TTS models for voice response and running human labelling workshops with experts",
+    useCase: [
+      "Align LLM judges with experts for continuously monitoring AI response quality",
+      "Creating structured tests to evaluate all AI modules and preventing regressions",
+      "Evaluating TTS models for voice response and running human labelling workshops with experts",
+    ],
   },
   {
     name: "ARMMAN",
     logo: "/use-cases/armman.png",
     whatTheyDo:
       "Voice agents to help mothers fill forms for maternal health programs",
-    useCase:
-      "Evaluating the quality of LLMs, finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff, aligning LLM judges to humans",
+    useCase: [
+      "Evaluating the quality of LLMs",
+      "Finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff",
+      "Aligning LLM judges to humans",
+    ],
   },
   {
     name: "Kabakoo",
     logo: "/use-cases/kabakoo.png",
     whatTheyDo: "Mentor AI for upskilling African youth to get jobs",
-    useCase:
-      "Evaluating quality of their agent's response, empowering domain experts to own evals, deploying changes confidently without any mistakes",
+    useCase: [
+      "Evaluating quality of their agent's response",
+      "Empowering domain experts to own evals",
+      "Deploying changes confidently without any mistakes",
+    ],
   },
 ];
 
@@ -1108,12 +1117,23 @@ export default function HomePage() {
                 <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5">
                   {useCase.whatTheyDo}
                 </p>
-                <p className="text-sm font-semibold text-gray-400 mb-1.5">
+                <p className="text-sm font-semibold text-gray-400 mb-2">
                   Use case
                 </p>
-                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed">
-                  {useCase.useCase}
-                </p>
+                <ul className="space-y-2">
+                  {useCase.useCase.map((point) => (
+                    <li
+                      key={point}
+                      className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
+                    >
+                      <span
+                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
+                        aria-hidden
+                      />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
