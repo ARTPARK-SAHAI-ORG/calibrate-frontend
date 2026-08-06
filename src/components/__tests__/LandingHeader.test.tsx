@@ -42,13 +42,19 @@ describe("LandingHeader", () => {
     );
   });
 
-  it("renders documentation, github, and get started links", () => {
+  it("renders documentation and get started links", () => {
     render(<LandingHeader />);
     expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Get started" }),
     ).toHaveAttribute("href", "/login");
+  });
+
+  it("does not render a GitHub link", () => {
+    render(<LandingHeader />);
+    expect(
+      screen.queryByRole("link", { name: "GitHub" }),
+    ).not.toBeInTheDocument();
   });
 
   it("links case studies, integrations, and open source to their landing sections", () => {
