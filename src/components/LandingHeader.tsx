@@ -40,6 +40,12 @@ export function LandingHeader({
 
       <div className="flex items-center gap-3">
         <a
+          href="/#use-cases"
+          className="hidden sm:inline-block text-gray-600 text-sm md:text-base font-medium hover:text-gray-900 transition-colors cursor-pointer"
+        >
+          Case studies
+        </a>
+        <a
           href={process.env.NEXT_PUBLIC_DOCS_URL}
           target="_blank"
           rel="noopener noreferrer"
