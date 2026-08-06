@@ -55,6 +55,7 @@ import {
 } from "@/components/TestTypeFilter";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
+  parseBackendErrorResponse,
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
@@ -861,7 +862,12 @@ function LLMPageInner() {
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to create test");
+        // Surface the backend's verbatim detail for tool-call link failures
+        // (404 "Tool {uuid} not found" when a sent tool_uuid isn't a live tool)
+        // and any other actionable error.
+        throw new Error(
+          await parseBackendErrorResponse(response, "Create test"),
+        );
       }
 
       // POST /tests/bulk returns { uuids, count, message, warnings }.
@@ -1115,7 +1121,12 @@ function LLMPageInner() {
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to update test");
+        // Surface the backend's verbatim detail for tool-call link failures
+        // (404 "Tool {uuid} not found" when a sent tool_uuid isn't a live tool)
+        // and any other actionable error.
+        throw new Error(
+          await parseBackendErrorResponse(response, "Update test"),
+        );
       }
 
       // Refetch the tests list to get the updated data

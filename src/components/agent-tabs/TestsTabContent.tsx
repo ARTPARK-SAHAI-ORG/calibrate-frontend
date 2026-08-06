@@ -46,6 +46,7 @@ import {
   type SearchMode,
 } from "@/components/ui/SearchModeInput";
 import {
+  parseBackendErrorResponse,
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
@@ -994,7 +995,12 @@ export function TestsTabContent({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to create test");
+        // Surface the backend's verbatim detail for tool-call link failures
+        // (404 "Tool {uuid} not found" when a sent tool_uuid isn't a live tool)
+        // and any other actionable error.
+        throw new Error(
+          await parseBackendErrorResponse(response, "Create test"),
+        );
       }
 
       // Bulk endpoint creates the test atomically but links it best-effort.
@@ -1378,7 +1384,12 @@ export function TestsTabContent({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to update test");
+        // Surface the backend's verbatim detail for tool-call link failures
+        // (404 "Tool {uuid} not found" when a sent tool_uuid isn't a live tool)
+        // and any other actionable error.
+        throw new Error(
+          await parseBackendErrorResponse(response, "Update test"),
+        );
       }
 
       await fetchAgentTests();
