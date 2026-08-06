@@ -898,7 +898,10 @@ export default function HomePage() {
       </div>
 
       {/* Open source — procurement & trust */}
-      <div className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100">
+      <div
+        id="open-source"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100 scroll-mt-20"
+      >
         <div className="max-w-5xl mx-auto text-center mb-10 md:mb-14">
           <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-medium text-gray-900 mb-3 md:mb-4 leading-[1.15] tracking-[-0.02em] text-balance">
             Proudly open source
@@ -1049,7 +1052,10 @@ export default function HomePage() {
       </div>
 
       {/* Integrations Section */}
-      <div className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
+      <div
+        id="integrations"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
             Works with any AI agent stack
@@ -1094,7 +1100,7 @@ export default function HomePage() {
               Trusted by mission-driven teams
             </h2>
             <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-              How organizations use Calibrate to ship trustworthy AI agents
+              How non-profits use Calibrate to ship trustworthy AI agents
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">

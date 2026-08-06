@@ -51,10 +51,16 @@ describe("LandingHeader", () => {
     ).toHaveAttribute("href", "/login");
   });
 
-  it("links case studies to the landing use cases section", () => {
+  it("links case studies, integrations, and open source to their landing sections", () => {
     render(<LandingHeader />);
     expect(
       screen.getByRole("link", { name: "Case studies" }),
     ).toHaveAttribute("href", "/#use-cases");
+    expect(
+      screen.getByRole("link", { name: "Integrations" }),
+    ).toHaveAttribute("href", "/#integrations");
+    expect(
+      screen.getByRole("link", { name: "Open source" }),
+    ).toHaveAttribute("href", "/#open-source");
   });
 });
