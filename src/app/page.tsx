@@ -862,7 +862,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col">
           <nav
             aria-label="Product areas"
-            className="sticky top-0 z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
+            className="sticky top-[5.25rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
@@ -877,7 +877,7 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
               <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
-                <div className="sticky top-0 z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
+                <div className="sticky top-[5.25rem] z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
                 <section

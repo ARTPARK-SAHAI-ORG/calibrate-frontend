@@ -27,7 +27,7 @@ export function LandingHeader({
   );
 
   return (
-    <nav className="flex items-center justify-between gap-3 px-4 md:px-8 py-4 border-b border-gray-100">
+    <nav className="sticky top-0 z-50 flex items-center justify-between gap-3 px-4 md:px-8 py-4 border-b border-gray-100 bg-white/95 backdrop-blur-sm">
       {showLogoLink ? (
         <Link href="/" className="flex items-center gap-2">
           {LogoContent}
