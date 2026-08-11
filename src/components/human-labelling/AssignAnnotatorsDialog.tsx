@@ -130,6 +130,9 @@ export function AssignAnnotatorsDialog({
     setLoadError(null);
   };
 
+  // The dialog is short in this state, so it gets tighter outer spacing.
+  const noAnnotators = !loading && !loadError && annotators.length === 0;
+
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
@@ -204,15 +207,19 @@ export function AssignAnnotatorsDialog({
                 : ""
             }
           >
-            <div className="space-y-2 flex flex-col min-h-0">
+            <div
+              className={`space-y-2 flex flex-col min-h-0 ${
+                noAnnotators ? "-my-2" : ""
+              }`}
+            >
               {showEvaluatorChoice && (
                 <p className="text-xs font-medium text-muted-foreground">
                   Annotators
                 </p>
               )}
-              {!loading && !loadError && annotators.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center mb-2">
-                  No annotators yet, add one below
+              {noAnnotators && (
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  No annotators added yet, add one below
                 </p>
               )}
               <AddAnnotatorInline

@@ -67,9 +67,7 @@ describe("AssignAnnotatorsDialog", () => {
       new Error('Request failed: 500 - {"detail":"Server exploded"}'),
     );
     renderDialog();
-    expect(
-      await screen.findByText("Server exploded"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Server exploded")).toBeInTheDocument();
   });
 
   it("shows a plain-text load error when the response isn't in structured format", async () => {
@@ -104,18 +102,16 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue([]);
     renderDialog();
     expect(
-      await screen.findByText("No annotators yet, add one below"),
+      await screen.findByText("No annotators added yet, add one below"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("New annotator name"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("New annotator name")).toBeInTheDocument();
   });
 
   it("tolerates a non-array response by treating it as empty", async () => {
     mockedApiClient.mockResolvedValue({ not: "an array" });
     renderDialog();
     expect(
-      await screen.findByText("No annotators yet, add one below"),
+      await screen.findByText("No annotators added yet, add one below"),
     ).toBeInTheDocument();
   });
 
@@ -123,7 +119,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     const { onConfirm } = renderDialog();
-    await screen.findByText("No annotators yet, add one below");
+    await screen.findByText("No annotators added yet, add one below");
 
     mockedApiClient.mockResolvedValueOnce({ uuid: "a-9", message: "ok" });
     await user.type(screen.getByLabelText("New annotator name"), "Carol");
@@ -147,7 +143,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     renderDialog();
-    await screen.findByText("No annotators yet, add one below");
+    await screen.findByText("No annotators added yet, add one below");
 
     mockedApiClient.mockRejectedValueOnce(
       new Error('Request failed: 400 - {"detail":"Name already used"}'),
