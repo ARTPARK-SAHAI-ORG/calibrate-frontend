@@ -43,6 +43,8 @@ const USE_CASES: {
   logo: string;
   whatTheyDo: string;
   useCase: string[];
+  quote?: string;
+  quoteHref?: string;
 }[] = [
   {
     name: "Noora Health",
@@ -74,6 +76,10 @@ const USE_CASES: {
       "Empowering domain experts to own evals",
       "Deploying changes confidently without any mistakes",
     ],
+    quote:
+      "Thanks to a tool like Calibrate, Content and Learning colleagues can write test cases. AI evaluation is not a private language reserved for engineers.",
+    quoteHref:
+      "https://kabakoo.substack.com/p/the-ai-worked-did-it-work-for-the",
   },
 ];
 
@@ -1123,7 +1129,7 @@ export default function HomePage() {
               Trusted by mission-driven teams
             </h2>
             <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-              How non-profits use Calibrate to ship trustworthy AI agents
+              How non-profits use Calibrate to build AI products responsibly
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -1163,6 +1169,24 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
+                {useCase.quote && (
+                  <figure className="mt-6 pt-5 border-t border-gray-100">
+                    <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
+                      &ldquo;{useCase.quote}&rdquo;
+                    </blockquote>
+                    {useCase.quoteHref && (
+                      <a
+                        href={useCase.quoteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                      >
+                        Read the story
+                        <span aria-hidden>→</span>
+                      </a>
+                    )}
+                  </figure>
+                )}
               </div>
             ))}
           </div>
