@@ -3,6 +3,7 @@ import {
   DEFAULT_BINARY_FALSE_LABEL,
   defaultBinaryLabel,
   coerceBinaryValue,
+  binaryScaleFor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -110,6 +111,31 @@ describe("toRatingScale", () => {
       { value: 1, name: "One", description: "Ignores the question." },
       { value: 2, name: "Two", description: null },
     ]);
+  });
+});
+
+describe("binaryScaleFor", () => {
+  const ratingScale = [
+    { value: 1, name: "Bad", description: "Ignores the question." },
+    { value: 2, name: "Good", description: "Answers it fully." },
+  ];
+
+  it("drops a rating evaluator's scale so its levels are never read as true/false", () => {
+    expect(binaryScaleFor("rating", ratingScale)).toBeNull();
+    // Without the guard, level 1 would coerce to `true` and level 0 to `false`.
+    expect(getBinaryLabel(binaryScaleFor("rating", ratingScale), true)).toBe(
+      DEFAULT_BINARY_TRUE_LABEL,
+    );
+    expect(
+      getBinaryDescription(binaryScaleFor("rating", ratingScale), true),
+    ).toBeNull();
+  });
+
+  it("passes a binary evaluator's scale through, and normalises missing scales to null", () => {
+    const binary = [{ value: true, name: "Yes", description: "Answers fully." }];
+    expect(binaryScaleFor("binary", binary)).toBe(binary);
+    expect(binaryScaleFor(undefined, binary)).toBe(binary);
+    expect(binaryScaleFor("binary", undefined)).toBeNull();
   });
 });
 

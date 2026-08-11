@@ -51,6 +51,19 @@ export function getBinaryLabel(
   return value ? DEFAULT_BINARY_TRUE_LABEL : DEFAULT_BINARY_FALSE_LABEL;
 }
 
+// Only a binary evaluator's scale may be read as true/false. A rating
+// scale encodes levels 1..N, and `coerceBinaryValue` would misread levels
+// 1 and 0 as true/false — showing that evaluator's level names and rubrics
+// as the Correct/Wrong ones. Callers whose output type can fall back to
+// binary (because a row carries no score, or carries a boolean value)
+// must route the scale through this before any binary lookup.
+export function binaryScaleFor(
+  outputType: string | null | undefined,
+  scale: readonly BinaryScaleEntryLike[] | null | undefined,
+): readonly BinaryScaleEntryLike[] | null {
+  return outputType === "rating" ? null : (scale ?? null);
+}
+
 // Pull the per-option rubric for a true/false verdict out of a scale
 // array. Returns null when the entry is missing or the text is blank —
 // descriptions are optional, so there is no default to fall back to.

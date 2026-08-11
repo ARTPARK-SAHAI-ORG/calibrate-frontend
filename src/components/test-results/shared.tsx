@@ -19,6 +19,7 @@ import {
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import {
+  binaryScaleFor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -714,13 +715,20 @@ function JudgeResultCard({
 }) {
   const isRating = result.score !== null && result.score !== undefined;
   const scale = evaluator?.output_config?.scale ?? null;
-  // A rating evaluator's scale encodes levels 1..N, and `coerceBinaryValue`
-  // would misread levels 1 and 0 as true/false. `isRating` above comes from
-  // the row's score, so a rating row missing its score would otherwise pull
-  // a rating rubric into the Pass/Fail labels. Only consult the scale for
-  // binary lookups when the evaluator itself declares binary output.
-  const binaryScale = evaluator?.output_type === "rating" ? null : scale;
+  // The card falls back to binary whenever the row has no score, so a
+  // rating evaluator's scale must not be read as true/false here.
+  const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
   const valueName = result.value_name?.trim() || null;
+  // The recorded value_name wins over the local scale for the label,
+  // because the local scale can belong to a newer evaluator version. The
+  // rubric has no such recorded copy, so when the two disagree it
+  // describes a different option: drop it rather than show text that
+  // contradicts the label beside it. Same guard the rating path applies
+  // in EvaluatorVerdictCard's readVerdictDescription.
+  const binaryRubricScale =
+    valueName && valueName !== getBinaryLabel(binaryScale, result.match === true)
+      ? null
+      : binaryScale;
   return (
     <EvaluatorVerdictCard
       mode="read"
@@ -755,8 +763,8 @@ function JudgeResultCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryScale, true)}
-      falseDescription={getBinaryDescription(binaryScale, false)}
+      trueDescription={getBinaryDescription(binaryRubricScale, true)}
+      falseDescription={getBinaryDescription(binaryRubricScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />
@@ -1290,13 +1298,20 @@ function EvaluatorPanelCard({
       ? result.variable_values
       : variableValues ?? null;
   const scale = evaluator?.output_config?.scale ?? null;
-  // A rating evaluator's scale encodes levels 1..N, and `coerceBinaryValue`
-  // would misread levels 1 and 0 as true/false. `isRating` above comes from
-  // the row's score, so a rating row missing its score would otherwise pull
-  // a rating rubric into the Pass/Fail labels. Only consult the scale for
-  // binary lookups when the evaluator itself declares binary output.
-  const binaryScale = evaluator?.output_type === "rating" ? null : scale;
+  // The card falls back to binary whenever the row has no score, so a
+  // rating evaluator's scale must not be read as true/false here.
+  const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
   const valueName = result.value_name?.trim() || null;
+  // The recorded value_name wins over the local scale for the label,
+  // because the local scale can belong to a newer evaluator version. The
+  // rubric has no such recorded copy, so when the two disagree it
+  // describes a different option: drop it rather than show text that
+  // contradicts the label beside it. Same guard the rating path applies
+  // in EvaluatorVerdictCard's readVerdictDescription.
+  const binaryRubricScale =
+    valueName && valueName !== getBinaryLabel(binaryScale, result.match === true)
+      ? null
+      : binaryScale;
   return (
     <EvaluatorVerdictCard
       mode="read"
@@ -1330,8 +1345,8 @@ function EvaluatorPanelCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryScale, true)}
-      falseDescription={getBinaryDescription(binaryScale, false)}
+      trueDescription={getBinaryDescription(binaryRubricScale, true)}
+      falseDescription={getBinaryDescription(binaryRubricScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />

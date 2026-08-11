@@ -12,6 +12,7 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
+  binaryScaleFor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -779,6 +780,12 @@ export function EvaluatorResultsPane({
           if (typeof v === "boolean") outputType = "binary";
           else if (typeof v === "number") outputType = "rating";
         }
+        // outputType above can flip to binary on a boolean-valued row, so
+        // gate the binary lookups on the evaluator's declared type instead.
+        const binaryScale = binaryScaleFor(
+          jobEvaluator?.output_type,
+          jobEvaluator?.output_config?.scale,
+        );
 
         const stillRunning =
           !r && (jobStatus === "in_progress" || jobStatus === "queued");
@@ -970,22 +977,10 @@ export function EvaluatorResultsPane({
               score={displayScore}
               scaleMin={scaleMin}
               scaleMax={scaleMax}
-              trueLabel={getBinaryLabel(
-                jobEvaluator?.output_config?.scale ?? null,
-                true,
-              )}
-              falseLabel={getBinaryLabel(
-                jobEvaluator?.output_config?.scale ?? null,
-                false,
-              )}
-              trueDescription={getBinaryDescription(
-                jobEvaluator?.output_config?.scale ?? null,
-                true,
-              )}
-              falseDescription={getBinaryDescription(
-                jobEvaluator?.output_config?.scale ?? null,
-                false,
-              )}
+              trueLabel={getBinaryLabel(binaryScale, true)}
+              falseLabel={getBinaryLabel(binaryScale, false)}
+              trueDescription={getBinaryDescription(binaryScale, true)}
+              falseDescription={getBinaryDescription(binaryScale, false)}
               ratingScale={toRatingScale(
                 jobEvaluator?.output_config?.scale,
               )}
@@ -1222,6 +1217,12 @@ function GroupedEvaluatorCard({
   const anchorEv =
     selectedVersion?.ev ?? versions.find((x) => x.r)?.ev ?? evaluators[0];
   const jobEvaluator = getJobEvaluator(anchorEv);
+  // Never read a rating evaluator's scale as true/false, whichever way
+  // outputType above resolved.
+  const binaryScale = binaryScaleFor(
+    jobEvaluator?.output_type,
+    jobEvaluator?.output_config?.scale,
+  );
   const evaluatorName = evaluatorDisplayName(
     evaluators[0],
     evaluatorNamesById,
@@ -1301,22 +1302,10 @@ function GroupedEvaluatorCard({
         score={displayScore}
         scaleMin={scaleMin}
         scaleMax={scaleMax}
-        trueLabel={getBinaryLabel(
-          jobEvaluator?.output_config?.scale ?? null,
-          true,
-        )}
-        falseLabel={getBinaryLabel(
-          jobEvaluator?.output_config?.scale ?? null,
-          false,
-        )}
-        trueDescription={getBinaryDescription(
-          jobEvaluator?.output_config?.scale ?? null,
-          true,
-        )}
-        falseDescription={getBinaryDescription(
-          jobEvaluator?.output_config?.scale ?? null,
-          false,
-        )}
+        trueLabel={getBinaryLabel(binaryScale, true)}
+        falseLabel={getBinaryLabel(binaryScale, false)}
+        trueDescription={getBinaryDescription(binaryScale, true)}
+        falseDescription={getBinaryDescription(binaryScale, false)}
         ratingScale={toRatingScale(jobEvaluator?.output_config?.scale)}
         reasoning={displayReasoning}
       />

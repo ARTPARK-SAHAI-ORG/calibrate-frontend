@@ -350,6 +350,53 @@ describe("JudgeResultsList", () => {
     expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
   });
 
+  it("hides the rubric when the recorded label disagrees with the local scale", () => {
+    render(
+      <JudgeResultsList
+        results={[
+          { evaluator_uuid: "ev-1", match: true, value_name: "Excellent" },
+        ]}
+        evaluatorsByUuid={{
+          "ev-1": {
+            uuid: "ev-1",
+            name: "Correctness",
+            output_type: "binary",
+            output_config: {
+              scale: [
+                { value: true, name: "Good", description: "Local v9 rubric." },
+              ],
+            },
+          },
+        }}
+      />,
+    );
+    // The verdict was recorded against an older evaluator version, so the
+    // local rubric describes a differently-named option.
+    expect(screen.getByText("Excellent")).toBeInTheDocument();
+    expect(screen.queryByText("Local v9 rubric.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the rubric when the recorded label agrees with the local scale", () => {
+    render(
+      <JudgeResultsList
+        results={[{ evaluator_uuid: "ev-1", match: true, value_name: "Good" }]}
+        evaluatorsByUuid={{
+          "ev-1": {
+            uuid: "ev-1",
+            name: "Correctness",
+            output_type: "binary",
+            output_config: {
+              scale: [
+                { value: true, name: "Good", description: "Answers fully." },
+              ],
+            },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Answers fully.")).toBeInTheDocument();
+  });
+
   it("does not read a rating evaluator's levels as binary labels or rubrics", () => {
     // A rating row with no score falls back to the binary card. Its scale
     // encodes levels 1..N, which must not be mistaken for true/false.
