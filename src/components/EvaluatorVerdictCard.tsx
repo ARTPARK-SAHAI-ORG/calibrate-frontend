@@ -375,10 +375,11 @@ function ReadVerdictPill({
 }
 
 // Shared classes for an option button that carries a rubric underneath.
-// Wider and left-aligned so the description has room to wrap, and
-// `flex-1` so a row of options shares the width evenly.
+// Left-aligned so the description has room to wrap, `flex-1` so a row of
+// options shares the width evenly, and `min-w-40` so they wrap to the
+// next line rather than squeezing the text into a column.
 const DESCRIBED_OPTION_BTN =
-  "flex-1 basis-40 min-w-40 text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
+  "flex-1 min-w-40 text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
 
 function OptionDescription({
   text,
