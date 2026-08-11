@@ -67,9 +67,7 @@ describe("AssignAnnotatorsDialog", () => {
       new Error('Request failed: 500 - {"detail":"Server exploded"}'),
     );
     renderDialog();
-    expect(
-      await screen.findByText("Server exploded"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Server exploded")).toBeInTheDocument();
   });
 
   it("shows a plain-text load error when the response isn't in structured format", async () => {
@@ -94,20 +92,95 @@ describe("AssignAnnotatorsDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows an empty state with a link when there are no annotators", async () => {
+  it("disables the inline add form until annotators have loaded", async () => {
+    mockedApiClient.mockReturnValue(new Promise(() => {}));
+    renderDialog();
+    expect(screen.getByLabelText("New annotator name")).toBeDisabled();
+  });
+
+  it("points at the inline form when there are no annotators", async () => {
     mockedApiClient.mockResolvedValue([]);
     renderDialog();
-    expect(await screen.findByText("No annotators yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add annotators" })).toHaveAttribute(
-      "href",
-      "/human-alignment?tab=annotators",
-    );
+    expect(
+      await screen.findByText("No annotators added yet, add one below"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("New annotator name")).toBeInTheDocument();
   });
 
   it("tolerates a non-array response by treating it as empty", async () => {
     mockedApiClient.mockResolvedValue({ not: "an array" });
     renderDialog();
-    expect(await screen.findByText("No annotators yet")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No annotators added yet, add one below"),
+    ).toBeInTheDocument();
+  });
+
+  it("adds an annotator inline, selects it, and enables Assign", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce([]);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("No annotators added yet, add one below");
+
+    mockedApiClient.mockResolvedValueOnce({ uuid: "a-9", message: "ok" });
+    await user.type(screen.getByLabelText("New annotator name"), "Carol");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText("Carol")).toBeInTheDocument();
+    expect(mockedApiClient).toHaveBeenLastCalledWith("/annotators", "tok", {
+      method: "POST",
+      body: { name: "Carol" },
+    });
+    // Auto-selected, so Assign is immediately usable.
+    const assign = screen.getByRole("button", { name: "Assign" });
+    expect(assign).not.toBeDisabled();
+    await user.click(assign);
+    expect(onConfirm).toHaveBeenCalledWith(["a-9"], null);
+    // Input is cleared for the next one.
+    expect(screen.getByLabelText("New annotator name")).toHaveValue("");
+  });
+
+  it("shows an error when adding an annotator fails", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce([]);
+    renderDialog();
+    await screen.findByText("No annotators added yet, add one below");
+
+    mockedApiClient.mockRejectedValueOnce(
+      new Error('Request failed: 400 - {"detail":"Name already used"}'),
+    );
+    await user.type(screen.getByLabelText("New annotator name"), "Alice");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText("Name already used")).toBeInTheDocument();
+    // Typing again clears the error.
+    await user.type(screen.getByLabelText("New annotator name"), "x");
+    expect(screen.queryByText("Name already used")).not.toBeInTheDocument();
+
+    // A non-Error rejection falls back to the default message.
+    mockedApiClient.mockRejectedValueOnce("boom");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(
+      await screen.findByText("Failed to add annotator"),
+    ).toBeInTheDocument();
+
+    // A plain Error message is shown as-is.
+    mockedApiClient.mockRejectedValueOnce(new Error("Network down"));
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("Network down")).toBeInTheDocument();
+
+    // A structured failure whose body isn't JSON shows the raw body.
+    mockedApiClient.mockRejectedValueOnce(
+      new Error("Request failed: 500 - upstream exploded"),
+    );
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("upstream exploded")).toBeInTheDocument();
+
+    // An Error with no message falls back to the default.
+    mockedApiClient.mockRejectedValueOnce(new Error(""));
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(
+      await screen.findByText("Failed to add annotator"),
+    ).toBeInTheDocument();
   });
 
   it("lists annotators and keeps Assign disabled until one is picked", async () => {

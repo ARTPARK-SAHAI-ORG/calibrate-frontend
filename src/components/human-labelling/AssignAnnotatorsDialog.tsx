@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { EmptyState } from "@/components/ui/LoadingState";
 import { apiClient } from "@/lib/api";
+import { AddAnnotatorInline, type NewAnnotator } from "./AddAnnotatorInline";
 
 type Annotator = {
   uuid: string;
@@ -119,6 +118,21 @@ export function AssignAnnotatorsDialog({
     }
   };
 
+  // A freshly added annotator is almost always one the user wants to assign,
+  // so select it straight away.
+  const handleAnnotatorAdded = (a: NewAnnotator) => {
+    setAnnotators((prev) =>
+      [...prev.filter((x) => x.uuid !== a.uuid), a].sort((x, y) =>
+        x.name.localeCompare(y.name),
+      ),
+    );
+    setPicked((prev) => new Set(prev).add(a.uuid));
+    setLoadError(null);
+  };
+
+  // The dialog is short in this state, so it gets tighter outer spacing.
+  const noAnnotators = !loading && !loadError && annotators.length === 0;
+
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
@@ -193,12 +207,28 @@ export function AssignAnnotatorsDialog({
                 : ""
             }
           >
-            <div className="space-y-2 flex flex-col min-h-0">
+            <div
+              className={`space-y-2 flex flex-col min-h-0 ${
+                noAnnotators ? "-my-2" : ""
+              }`}
+            >
               {showEvaluatorChoice && (
                 <p className="text-xs font-medium text-muted-foreground">
                   Annotators
                 </p>
               )}
+              {noAnnotators && (
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  No annotators added yet, add one below
+                </p>
+              )}
+              <AddAnnotatorInline
+                accessToken={accessToken}
+                // Disabled until the list has loaded, otherwise the in-flight
+                // fetch would land afterwards and drop the new annotator.
+                disabled={submitting || loading}
+                onAdded={handleAnnotatorAdded}
+              />
               <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -225,36 +255,6 @@ export function AssignAnnotatorsDialog({
                   </div>
                 ) : loadError ? (
                   <p className="text-sm text-red-500">{loadError}</p>
-                ) : annotators.length === 0 ? (
-                  <EmptyState
-                    icon={
-                      <svg
-                        className="w-7 h-7 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-                        />
-                      </svg>
-                    }
-                    title="No annotators yet"
-                    description={
-                      <>
-                        <Link
-                          href="/human-alignment?tab=annotators"
-                          className="underline underline-offset-2 hover:text-foreground transition-colors"
-                        >
-                          Add annotators
-                        </Link>{" "}
-                        to your account first
-                      </>
-                    }
-                  />
                 ) : (
                   <>
                     {annotators.length > 1 && (
