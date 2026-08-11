@@ -1536,10 +1536,13 @@ function EvaluatorSummary({
   const agreementById = new Map(
     (agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
   );
-  const noHumanLabels =
-    !agreement ||
-    (agreement.evaluators.every((e) => e.agreement === null) &&
-      agreement.items.length === 0);
+  // Human labels can land on some evaluators and not others (an annotator
+  // labelled one evaluator, or a newly added evaluator has not been labelled
+  // yet). Warn in both cases, with wording that says whether it is all of
+  // them or only some.
+  const unlabelled = evaluators.filter(
+    (ev) => agreementById.get(ev.evaluator_id)?.agreement == null,
+  );
 
   return (
     <div className="space-y-2">
@@ -1553,7 +1556,7 @@ function EvaluatorSummary({
         </div>
         {headerActions}
       </div>
-      {noHumanLabels && (
+      {unlabelled.length > 0 && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
           <svg
             className="w-4 h-4 mt-0.5 shrink-0"
@@ -1569,8 +1572,9 @@ function EvaluatorSummary({
             />
           </svg>
           <span>
-            No human labels found on the items in this run yet. Once labelled,
-            each evaluator&apos;s alignment with humans will be shown.
+            {unlabelled.length === evaluators.length
+              ? "No human labels found on the items in this run yet. Once labelled, each evaluator's alignment with humans will be shown."
+              : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
           </span>
         </div>
       )}

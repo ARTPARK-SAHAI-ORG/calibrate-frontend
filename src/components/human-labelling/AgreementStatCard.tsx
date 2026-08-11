@@ -23,14 +23,20 @@ function Stat({
   value,
   valueClassName = "",
   title,
+  centered = false,
 }: {
   label: string;
   value: string;
   valueClassName?: string;
   title?: string;
+  /** Centre the label and number — used when this is the card's only stat. */
+  centered?: boolean;
 }) {
   return (
-    <div className="min-w-0" title={title}>
+    <div
+      className={`min-w-0 ${centered ? "w-full text-center" : ""}`}
+      title={title}
+    >
       <div className="text-[11px] text-muted-foreground whitespace-nowrap">
         {label}
       </div>
@@ -78,7 +84,14 @@ export function AgreementStatCard(
 ) {
   const { value, valueClassName = "", result = null } = props;
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] w-max shrink-0">
+    <div
+      className={`border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 ${
+        // With two numbers side by side the card needs a floor so the pair
+        // does not read as cramped. A single number only needs the width of
+        // the evaluator's name.
+        result && value == null ? "" : "min-w-[160px]"
+      }`}
+    >
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}
@@ -118,6 +131,7 @@ export function AgreementStatCard(
               result.ratio == null ? "" : agreementColor(result.ratio)
             }
             title={result.title}
+            centered={value == null}
           />
           {value != null && (
             <Stat

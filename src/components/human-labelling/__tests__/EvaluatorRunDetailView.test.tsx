@@ -981,6 +981,72 @@ describe("EvaluatorRunDetailView", () => {
     ).toBeInTheDocument();
     // Nothing to agree with, so that number is dropped from the card.
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    // The score is the card's only number, so it is centred.
+    expect(screen.getByTitle(/Correct on 1 of/).className).toContain(
+      "text-center",
+    );
+  });
+
+  it("warns that only some evaluators have human labels", () => {
+    const job = makeJob({
+      evaluators: [
+        evaluatorBinary,
+        { ...evaluatorRating, uuid: "ev-rate", name: "Rating Evaluator" },
+      ],
+      runs: [makeRun({ value: { value: true } })],
+      human_agreement: {
+        evaluators: [
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.9,
+            pair_count: 2,
+            item_count: 1,
+          },
+          {
+            evaluator_id: "ev-rate",
+            evaluator_version_id: "v-rate-1",
+            agreement: null,
+            pair_count: 0,
+            item_count: 0,
+          },
+        ],
+        items: [],
+      },
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(
+      screen.getByText(/No human labels yet for some of the evaluators/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No human labels found on the items in this run yet/),
+    ).not.toBeInTheDocument();
+    // The labelled evaluator still shows its agreement number.
+    expect(screen.getByText("90%")).toBeInTheDocument();
+  });
+
+  it("hides the warning once every evaluator has human labels", () => {
+    const job = makeJob({
+      runs: [makeRun()],
+      human_agreement: {
+        evaluators: [
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 1,
+            pair_count: 2,
+            item_count: 1,
+          },
+        ],
+        items: [],
+      },
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.queryByText(/No human labels/)).not.toBeInTheDocument();
   });
 
   it("does not render the human agreement summary while the job is still in progress", () => {
