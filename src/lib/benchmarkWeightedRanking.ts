@@ -73,7 +73,8 @@ export function dimsFromRows(rows: WeightedRankingRow[]): RankingDimension[] {
   return dims;
 }
 
-function toFinite(value: unknown): number | undefined {
+/** Coerce to a finite number, or undefined when the value isn't one. */
+export function toFinite(value: unknown): number | undefined {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 }

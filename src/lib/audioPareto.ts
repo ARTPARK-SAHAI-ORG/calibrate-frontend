@@ -217,7 +217,7 @@ export function countValidParetoPoints(points: ParetoModelPoint[]): number {
  * Rows for the weighted ranking widget on the STT / TTS "Model selection" tab.
  * Reuses the Pareto points already built for the chart so the two never
  * disagree: quality is the selected metric's 0–100 score (used for ranking),
- * while `qualityText` shows it the way the chart does — the raw error rate for
+ * while `qualityText` shows it the way the chart does: the raw error rate for
  * accuracy metrics (e.g. "WER 0.05"), a percentage otherwise.
  */
 export function buildAudioWeightedRows(
