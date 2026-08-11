@@ -172,14 +172,17 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+          {/* One line that scrolls sideways: the name and its version pill
+              stay together on the chips' row however long the name is,
+              instead of wrapping and pushing the pill below the name. */}
+          <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap">
             <NameLabel
               name={props.name}
               uuid={props.evaluatorUuid}
               enableLink={props.enableLink}
-            />
+            />{" "}
             {props.versionLabel && (
-              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground inline-block align-middle whitespace-nowrap">
                 {props.versionLabel}
               </span>
             )}
@@ -279,7 +282,9 @@ function NameLabel({
   enableLink?: boolean;
 }) {
   const cls =
-    "text-sm font-medium text-foreground break-words inline-block max-w-full align-top";
+    // `inline`, not `inline-block`, so the version pill sits right after the
+    // name. The header keeps both on one scrolling line, so no wrapping here.
+    "text-sm font-medium text-foreground align-middle";
   if (enableLink && uuid) {
     return (
       <Link
@@ -672,7 +677,16 @@ export function ReasoningToggleButton({
       aria-expanded={open}
       className={`inline-flex items-center gap-1.5 max-w-[min(100%,14rem)] rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer shrink-0 ${toneClass}`}
     >
-      <span className="truncate">{label}</span>
+      {/* Both labels occupy the same grid cell, so the button keeps the
+          width of the longer one ("Hide reasoning") in both states. Without
+          this the button grows on open and pushes the card header's name and
+          version pill onto separate lines. */}
+      <span className="grid min-w-0">
+        <span className="col-start-1 row-start-1 invisible" aria-hidden>
+          {open ? labels.closed : labels.open}
+        </span>
+        <span className="col-start-1 row-start-1 truncate">{label}</span>
+      </span>
       <ChevronDownIcon
         className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
           open ? "rotate-180" : ""

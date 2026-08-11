@@ -21,6 +21,7 @@ import {
   AgreementStatCard,
   agreementColor,
 } from "@/components/human-labelling/AgreementStatCard";
+import { formatPercent, formatRating } from "@/lib/llmMetrics";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
 
 // ---------------------------------------------------------------------------
@@ -329,6 +330,74 @@ export function computeEvaluatorHumanAgreement(
     if (valuesMatchOutput(h, machineVal, outputType)) aligned++;
   }
   return comparable > 0 ? aligned / comparable : null;
+}
+
+/**
+ * Roll one evaluator's outputs across every item in the run into a single
+ * number: the share of items it marked true (binary), or the mean score
+ * (rating). Returns null when the evaluator produced no usable values.
+ */
+export function summariseEvaluatorRuns(
+  runs: EvaluatorRunRow[],
+  ev: { evaluator_id: string; evaluator_version_id?: string },
+  jobEvaluator: JobEvaluator | null,
+): {
+  label: string;
+  value: string;
+  title: string;
+  /** 0–1 position of the value on its own scale, so the card can colour it
+   * on the same thresholds as the agreement number. Null when the scale is
+   * unknown (a rating evaluator with no scale_max), which leaves the value
+   * in the default text colour. */
+  ratio: number | null;
+} | null {
+  const values = runs
+    .filter(
+      (r) =>
+        r.evaluator_id === ev.evaluator_id &&
+        (!ev.evaluator_version_id ||
+          r.evaluator_version_id === ev.evaluator_version_id),
+    )
+    .map((r) => r.value?.value);
+
+  const itemWord = (n: number) => `${n} item${n === 1 ? "" : "s"}`;
+
+  if (jobEvaluator?.output_type === "rating") {
+    const nums = values.filter(
+      (v): v is number => typeof v === "number" && Number.isFinite(v),
+    );
+    if (nums.length === 0) return null;
+    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+    const rounded = formatRating(avg);
+    const max =
+      typeof jobEvaluator?.scale_max === "number"
+        ? jobEvaluator.scale_max
+        : null;
+    const min =
+      typeof jobEvaluator?.scale_min === "number" ? jobEvaluator.scale_min : 0;
+    return {
+      label: "Score",
+      value: max != null ? `${rounded} / ${max}` : rounded,
+      title: `Average across ${itemWord(nums.length)}`,
+      ratio: max != null && max > min ? (avg - min) / (max - min) : null,
+    };
+  }
+
+  const bools = values.filter((v): v is boolean => typeof v === "boolean");
+  if (bools.length === 0) return null;
+  const trueCount = bools.filter(Boolean).length;
+  // The verdict word (Correct / Pass / whatever the evaluator calls it) goes
+  // in the hover text, not the label, so every card reads "Score".
+  const trueLabel = getBinaryLabel(
+    binaryScaleFor(jobEvaluator?.output_type, jobEvaluator?.output_config?.scale),
+    true,
+  );
+  return {
+    label: "Score",
+    value: formatPercent((trueCount / bools.length) * 100, 0),
+    title: `${trueLabel} on ${trueCount} of ${itemWord(bools.length)}`,
+    ratio: trueCount / bools.length,
+  };
 }
 
 export function isBelowFullEvaluatorAgreement(
@@ -1430,7 +1499,7 @@ export function ItemDetailPane({
   );
 }
 
-function HumanAgreementSummary({
+function EvaluatorSummary({
   jobStatus,
   agreement,
   evaluators,
@@ -1438,9 +1507,17 @@ function HumanAgreementSummary({
   versionLabels,
   linkEvaluators,
   headerActions,
+  runs,
+  getJobEvaluator,
 }: {
   jobStatus: EvaluatorRunJob["status"];
   agreement: HumanAgreement | undefined;
+  /** Every run row in the job, used for the per-evaluator summarised value. */
+  runs: EvaluatorRunRow[];
+  getJobEvaluator: (key: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+  }) => JobEvaluator | null;
   evaluators: {
     evaluator_id: string;
     evaluator_version_id?: string;
@@ -1454,66 +1531,75 @@ function HumanAgreementSummary({
   headerActions?: React.ReactNode;
 }) {
   if (jobStatus !== "completed") return null;
-  if (!agreement || agreement.evaluators.length === 0) return null;
-
-  const allNull = agreement.evaluators.every((e) => e.agreement === null);
-  const noItems = agreement.items.length === 0;
-
-  if (allNull && noItems) {
-    return (
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
-        <svg
-          className="w-4 h-4 mt-0.5 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
-          />
-        </svg>
-        <span>
-          No human labels found on the items in this run yet. Once labelled,
-          each evaluator&apos;s alignment with humans will be shown.
-        </span>
-      </div>
-    );
-  }
+  if (evaluators.length === 0) return null;
 
   const agreementById = new Map(
-    agreement.evaluators.map((e) => [e.evaluator_id, e]),
+    (agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
+  );
+  // Human labels can land on some evaluators and not others (an annotator
+  // labelled one evaluator, or a newly added evaluator has not been labelled
+  // yet). Warn in both cases, with wording that says whether it is all of
+  // them or only some.
+  const unlabelled = evaluators.filter(
+    (ev) => agreementById.get(ev.evaluator_id)?.agreement == null,
   );
 
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-sm font-semibold">Human agreement</h2>
+          <h2 className="text-sm font-semibold">Evaluator results</h2>
           <p className="text-xs text-muted-foreground max-w-2xl mt-1">
-            How closely each evaluator&apos;s outputs in this run match the
-            human annotations on the same items
+            What each evaluator scored across the items in this run, and how
+            closely that matches the human annotations on the same items
           </p>
         </div>
         {headerActions}
       </div>
+      {unlabelled.length > 0 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
+          <svg
+            className="w-4 h-4 mt-0.5 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+            />
+          </svg>
+          <span>
+            {unlabelled.length === evaluators.length
+              ? "No human labels found on the items in this run yet. Once labelled, each evaluator's alignment with humans will be shown."
+              : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
+          </span>
+        </div>
+      )}
       <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
         {evaluators.map((ev) => {
           const row = agreementById.get(ev.evaluator_id);
-          if (!row) return null;
           const name = evaluatorDisplayName(ev, evaluatorNamesById);
-          const version = row.evaluator_version_id
+          const version = row?.evaluator_version_id
             ? (versionLabels[row.evaluator_version_id] ?? null)
             : ev.evaluator_version_id
               ? (versionLabels[ev.evaluator_version_id] ?? null)
               : null;
+          // No human labels on this evaluator's items means there is nothing
+          // to agree with, so the card drops that number rather than showing
+          // an em dash next to the result.
           const value =
-            row.agreement != null
+            row?.agreement != null
               ? `${Math.round(row.agreement * 100)}%`
-              : "—";
-          const valueClassName = agreementColor(row.agreement);
+              : null;
+          const valueClassName = agreementColor(row?.agreement);
+          const result = summariseEvaluatorRuns(
+            runs,
+            ev,
+            getJobEvaluator(ev),
+          );
           const key = `${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`;
           if (linkEvaluators) {
             return (
@@ -1526,6 +1612,7 @@ function HumanAgreementSummary({
                 }}
                 value={value}
                 valueClassName={valueClassName}
+                result={result}
               />
             );
           }
@@ -1537,6 +1624,7 @@ function HumanAgreementSummary({
               }
               value={value}
               valueClassName={valueClassName}
+              result={result}
             />
           );
         })}
@@ -1750,17 +1838,11 @@ export function EvaluatorRunDetailView({
     return null;
   }
 
-  const ha = job.human_agreement;
-  // The agreement cards (rendered by HumanAgreementSummary) already name the
+  // The summary cards (rendered by EvaluatorSummary) already name the
   // evaluators. When they show, the status pill + action buttons move up onto
-  // the "Human agreement" heading row instead of sitting on their own line.
+  // the "Evaluator results" heading row instead of sitting on their own line.
   const cardsWillRender =
-    job.status === "completed" &&
-    !!ha &&
-    ha.evaluators.length > 0 &&
-    !(
-      ha.evaluators.every((e) => e.agreement === null) && ha.items.length === 0
-    );
+    job.status === "completed" && detailsEvaluators.length > 0;
 
   const statusPill = !hideStatusPill ? (
     <span
@@ -1840,9 +1922,11 @@ export function EvaluatorRunDetailView({
         </div>
       )}
 
-      <HumanAgreementSummary
+      <EvaluatorSummary
         jobStatus={job.status}
         agreement={job.human_agreement}
+        runs={job.runs ?? []}
+        getJobEvaluator={getJobEvaluator}
         evaluators={detailsEvaluators}
         evaluatorNamesById={evaluatorNamesById}
         versionLabels={versionLabels}

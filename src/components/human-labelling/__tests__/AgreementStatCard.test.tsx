@@ -63,6 +63,45 @@ describe("AgreementStatCard", () => {
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
+  it("shows the evaluator's own result next to the agreement number", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        value="90%"
+        result={{
+          label: "Correct",
+          value: "75%",
+          title: "3 of 4 items",
+          ratio: 0.75,
+        }}
+      />
+    );
+    const stat = screen.getByTitle("3 of 4 items");
+    expect(stat).toHaveTextContent("Correct");
+    expect(stat).toHaveTextContent("75%");
+    // Coloured on the same thresholds as the agreement number.
+    expect(screen.getByText("75%").className).toContain("text-green-600");
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+    expect(screen.getByText("90%")).toBeInTheDocument();
+    // The word "alignment" is dropped once each number carries its own label.
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+  });
+
+  it("renders the static pill variant with a result", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Correctness v2"
+        value="—"
+        result={{ label: "Average score", value: "3.5 / 5", ratio: null }}
+      />
+    );
+    expect(screen.getByText("Average score")).toBeInTheDocument();
+    // No ratio, so the number keeps the default text colour.
+    expect(screen.getByText("3.5 / 5").className).not.toMatch(
+      /text-(green|red|yellow)/,
+    );
+  });
+
   it("renders the evaluator pill variant without a version label", () => {
     render(
       <AgreementStatCard

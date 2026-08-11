@@ -17,12 +17,54 @@ const agreementStatPillBase =
 const evaluatorAgreementPillLink =
   "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground shrink-0 text-left";
 
+/** One labelled number inside the card. */
+function Stat({
+  label,
+  value,
+  valueClassName = "",
+  title,
+  centered = false,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+  title?: string;
+  /** Centre the label and number — used when this is the card's only stat. */
+  centered?: boolean;
+}) {
+  return (
+    <div
+      className={`min-w-0 ${centered ? "w-full text-center" : ""}`}
+      title={title}
+    >
+      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+        {label}
+      </div>
+      <div
+        className={`text-2xl font-semibold tabular-nums mt-0.5 whitespace-nowrap ${valueClassName}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/** The evaluator's own summarised result across the run's items. */
+export type EvaluatorResultStat = {
+  /** What the number is, e.g. the "true" label or "Average score". */
+  label: string;
+  value: string;
+  /** Hover text, e.g. "8 of 10 items". */
+  title?: string;
+  /** 0–1 position of the value on its own scale. Colours the number on the
+   * same thresholds as the agreement number. Null leaves it uncoloured. */
+  ratio?: number | null;
+};
+
 export function AgreementStatCard(
-  props:
+  props: (
     | {
         staticPillText: string;
-        value: string;
-        valueClassName?: string;
       }
     | {
         evaluatorPill: {
@@ -30,13 +72,26 @@ export function AgreementStatCard(
           name: string;
           versionLabel?: string | null;
         };
-        value: string;
-        valueClassName?: string;
-      },
+      }
+  ) & {
+    /** Human agreement. Null hides that number entirely — used when the run's
+     * items carry no human labels, so there is nothing to agree with. */
+    value: string | null;
+    valueClassName?: string;
+    /** When present, the card shows this next to the agreement number. */
+    result?: EvaluatorResultStat | null;
+  },
 ) {
-  const { value, valueClassName = "" } = props;
+  const { value, valueClassName = "", result = null } = props;
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] w-max shrink-0">
+    <div
+      className={`border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 ${
+        // With two numbers side by side the card needs a floor so the pair
+        // does not read as cramped. A single number only needs the width of
+        // the evaluator's name.
+        result && value == null ? "" : "min-w-[160px]"
+      }`}
+    >
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}
@@ -60,16 +115,39 @@ export function AgreementStatCard(
               </span>
             )}
           </Link>
-          <span className="text-sm font-medium text-foreground shrink-0">
-            alignment
-          </span>
+          {!result && (
+            <span className="text-sm font-medium text-foreground shrink-0">
+              alignment
+            </span>
+          )}
         </div>
       )}
-      <div
-        className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
-      >
-        {value}
-      </div>
+      {result ? (
+        <div className="mt-2 flex items-start gap-6">
+          <Stat
+            label={result.label}
+            value={result.value}
+            valueClassName={
+              result.ratio == null ? "" : agreementColor(result.ratio)
+            }
+            title={result.title}
+            centered={value == null}
+          />
+          {value != null && (
+            <Stat
+              label="Human agreement"
+              value={value}
+              valueClassName={valueClassName}
+            />
+          )}
+        </div>
+      ) : (
+        <div
+          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+        >
+          {value ?? "—"}
+        </div>
+      )}
     </div>
   );
 }
