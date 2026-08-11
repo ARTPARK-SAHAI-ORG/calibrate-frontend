@@ -211,8 +211,8 @@ export function AssignAnnotatorsDialog({
                 </p>
               )}
               {!loading && !loadError && annotators.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  No annotators yet. Add one below.
+                <p className="text-sm text-muted-foreground text-center mb-2">
+                  No annotators yet, add one below
                 </p>
               )}
               <AddAnnotatorInline
