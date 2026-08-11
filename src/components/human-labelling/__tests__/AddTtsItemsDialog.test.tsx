@@ -233,6 +233,7 @@ describe("AddTtsItemsDialog", () => {
         name: "Clip 1",
         text: "hello",
         audio_path: "tts/media/clip.wav",
+        evaluatorIds: undefined,
       },
     ]);
   });
@@ -435,8 +436,171 @@ describe("AddTtsItemsDialog", () => {
           name: "Clip 1",
           text: "hello",
           audio_path: "https://x/a.wav",
+          evaluatorIds: undefined,
         },
       ]);
+    });
+  });
+
+  describe("evaluator picker", () => {
+    const taskEvaluators = [
+      { uuid: "e1", name: "Naturalness", description: "Does it sound human" },
+      { uuid: "e2", name: "Clarity" },
+    ];
+    const editRows = [
+      { uuid: "u1", name: "Clip 1", text: "hello", audio: "https://x/a.wav" },
+    ];
+
+    const saveEdit = async () => {
+      await act(async () => {
+        screen.getByRole("button", { name: "Save item" }).click();
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+      });
+    };
+
+    it("renders no picker when the task has no evaluators, and leaves the evaluators alone", async () => {
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({ mode: "edit", initialRows: editRows, onSubmit });
+      expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+
+      await saveEdit();
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
+
+    it("lists the task evaluators, all ticked, following the task", () => {
+      renderDialog({ taskEvaluators });
+      expect(screen.getByText("Evaluators")).toBeInTheDocument();
+      expect(screen.getByText("Naturalness")).toBeInTheDocument();
+      expect(screen.getByText("Does it sound human")).toBeInTheDocument();
+      expect(screen.getByText("Clarity")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "This item uses the task's evaluators and follows any change made to them.",
+        ),
+      ).toBeInTheDocument();
+      screen
+        .getAllByRole("checkbox")
+        .forEach((box) => expect(box).toBeChecked());
+    });
+
+    it("unticking one sends the reduced list on submit", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        initialRows: editRows,
+        taskEvaluators,
+        onSubmit,
+      });
+
+      await user.click(screen.getAllByRole("checkbox")[1]);
+      expect(
+        screen.getByText(
+          "This item uses its own evaluators. Adding an evaluator to the task later will not add it to this item.",
+        ),
+      ).toBeInTheDocument();
+
+      await saveEdit();
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toEqual(["e1"]);
+    });
+
+    it("cannot untick the last remaining evaluator", async () => {
+      const user = setupUser();
+      renderDialog({ taskEvaluators });
+      const boxes = () => screen.getAllByRole("checkbox");
+      await user.click(boxes()[1]);
+      expect(boxes()[0]).toBeChecked();
+      expect(boxes()[0]).toBeDisabled();
+      await user.click(boxes()[0]);
+      expect(boxes()[0]).toBeChecked();
+    });
+
+    it("'Use the task's evaluators' resets the choice and leaves it alone", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        initialRows: editRows,
+        taskEvaluators,
+        onSubmit,
+      });
+
+      await user.click(screen.getAllByRole("checkbox")[1]);
+      await user.click(
+        screen.getByRole("button", { name: "Use the task's evaluators" }),
+      );
+      screen
+        .getAllByRole("checkbox")
+        .forEach((box) => expect(box).toBeChecked());
+
+      await saveEdit();
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
+
+    it("edit mode seeds from initialEvaluatorIds and keeps the saved list when untouched", async () => {
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        initialRows: editRows,
+        taskEvaluators,
+        initialEvaluatorIds: ["e2"],
+        onSubmit,
+      });
+      const boxes = screen.getAllByRole("checkbox");
+      expect(boxes[0]).not.toBeChecked();
+      expect(boxes[1]).toBeChecked();
+
+      await saveEdit();
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
+
+    it("falls back to the task's list when the item's saved evaluators are all gone", async () => {
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        initialRows: editRows,
+        taskEvaluators,
+        initialEvaluatorIds: ["gone"],
+        onSubmit,
+      });
+      screen
+        .getAllByRole("checkbox")
+        .forEach((box) => expect(box).toBeChecked());
+      expect(
+        screen.getByText(
+          "This item uses the task's evaluators and follows any change made to them.",
+        ),
+      ).toBeInTheDocument();
+
+      await saveEdit();
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
+
+    it("add mode treats an evaluator change as unsaved work", async () => {
+      const user = setupUser();
+      const { onClose } = renderDialog({ taskEvaluators });
+      await user.click(screen.getAllByRole("checkbox")[1]);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+    });
+
+    it("edit mode treats an evaluator change as unsaved work", async () => {
+      const user = setupUser();
+      const { onClose } = renderDialog({
+        mode: "edit",
+        initialRows: editRows,
+        taskEvaluators,
+      });
+      await user.click(screen.getAllByRole("checkbox")[1]);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText("Discard changes?")).toBeInTheDocument();
     });
   });
 });

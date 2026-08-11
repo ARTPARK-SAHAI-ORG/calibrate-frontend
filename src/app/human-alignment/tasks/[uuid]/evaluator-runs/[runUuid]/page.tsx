@@ -29,6 +29,8 @@ import {
   extractPayloadInputValues,
   isBelowFullEvaluatorAgreement,
   orderedSnapshotsForRun,
+  parseRerunError,
+  rerunSkipNotice,
   runOutputType,
   snapshotToItem,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
@@ -101,6 +103,11 @@ export default function EvaluatorRunDetailPage() {
   const [rerunOpen, setRerunOpen] = useState(false);
   const [rerunSubmitting, setRerunSubmitting] = useState(false);
   const [rerunError, setRerunError] = useState<string | null>(null);
+  // Set when a re-run started but left some item and evaluator pairs out.
+  const [rerunNotice, setRerunNotice] = useState<{
+    message: string;
+    jobUuid: string;
+  } | null>(null);
 
   const evaluatorNamesById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -252,21 +259,38 @@ export default function EvaluatorRunDetailPage() {
           status: string;
           evaluator_count: number;
           item_count: number;
+          skipped_pair_count?: number;
+          evaluators_with_no_items?: string[];
         }>(`/annotation-tasks/${taskUuid}/evaluator-runs`, accessToken, {
           method: "POST",
           body,
         });
         setRerunOpen(false);
+        const notice = rerunSkipNotice(result, evaluatorNamesById);
+        if (notice) {
+          // Something was left out. Say so and let the user open the new run
+          // themselves instead of moving them without a word.
+          setRerunNotice({ message: notice, jobUuid: result.job_uuid });
+          setRerunSubmitting(false);
+          return;
+        }
         // Navigate to the new run; rerunSubmitting stays true through unmount.
         router.push(
           `/human-alignment/tasks/${taskUuid}/evaluator-runs/${result.job_uuid}`,
         );
       } catch (err) {
-        setRerunError(parseApiError(err, "Failed to start evaluation run"));
+        setRerunError(parseRerunError(err));
         setRerunSubmitting(false);
       }
     },
-    [accessToken, taskUuid, rerunItemIds, rerunSubmitting, router],
+    [
+      accessToken,
+      taskUuid,
+      rerunItemIds,
+      rerunSubmitting,
+      router,
+      evaluatorNamesById,
+    ],
   );
 
   const handleExport = useCallback(async () => {
@@ -543,6 +567,25 @@ export default function EvaluatorRunDetailPage() {
           </div>
         )}
 
+        {rerunNotice && (
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground flex items-center justify-between gap-3 flex-wrap">
+            <span>{rerunNotice.message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                const target = rerunNotice.jobUuid;
+                setRerunNotice(null);
+                router.push(
+                  `/human-alignment/tasks/${taskUuid}/evaluator-runs/${target}`,
+                );
+              }}
+              className="h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted transition-colors cursor-pointer shrink-0"
+            >
+              View the new run
+            </button>
+          </div>
+        )}
+
         {job &&
         task &&
         (task.type === "stt" ||
@@ -568,6 +611,7 @@ export default function EvaluatorRunDetailPage() {
                     type="button"
                     onClick={() => {
                       setRerunError(null);
+                      setRerunNotice(null);
                       setRerunOpen(true);
                     }}
                     disabled={rerunSubmitting}

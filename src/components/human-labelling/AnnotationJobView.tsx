@@ -23,6 +23,7 @@ import {
   type ValueFilter,
 } from "./ItemValueFilter";
 import { useUrlValueFilters } from "./valueFilterUrl";
+import { filterEvaluatorsForItem } from "./itemEvaluators";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -93,6 +94,9 @@ export type Item = {
   payload: Record<string, unknown> | unknown;
   created_at: string;
   deleted_at: string | null;
+  /** Evaluators this item is labelled against, frozen when the job was
+   * created. Absent on older responses, which means every task evaluator. */
+  evaluator_ids?: string[] | null;
 };
 
 type Annotation = {
@@ -291,7 +295,9 @@ export function AnnotationJobView({
         return;
       }
       const firstIncomplete = data.items.findIndex((it) =>
-        data.evaluators.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+        filterEvaluatorsForItem(data.evaluators, it.evaluator_ids).some(
+          (ev) => !saved.has(fieldKey(it.uuid, ev.uuid)),
+        ),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
@@ -561,10 +567,33 @@ function AnnotateView({
     prevStatus.current = data.job.status;
   }, [data.job.status, isAdmin]);
 
+  // Each item carries its own evaluator list, so every completeness check has
+  // to look up the item rather than use the job-wide list. Built once here and
+  // read by all of them.
+  const evaluatorsByItem = useMemo(
+    () =>
+      new Map(
+        items.map((it) => [
+          it.uuid,
+          filterEvaluatorsForItem(evaluators, it.evaluator_ids),
+        ]),
+      ),
+    [items, evaluators],
+  );
+  const evaluatorsFor = useCallback(
+    (itemId: string) => evaluatorsByItem.get(itemId) ?? evaluators,
+    [evaluatorsByItem, evaluators],
+  );
+  const currentEvaluators = currentItem
+    ? evaluatorsFor(currentItem.uuid)
+    : evaluators;
+
   const itemCompleted = useCallback(
     (itemId: string) =>
-      evaluators.every((ev) => savedKeys.has(fieldKey(itemId, ev.uuid))),
-    [evaluators, savedKeys],
+      evaluatorsFor(itemId).every((ev) =>
+        savedKeys.has(fieldKey(itemId, ev.uuid)),
+      ),
+    [evaluatorsFor, savedKeys],
   );
 
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
@@ -603,7 +632,7 @@ function AnnotateView({
       evaluator_id: string | null;
       value: Record<string, unknown>;
     }[] = [];
-    for (const ev of evaluators) {
+    for (const ev of currentEvaluators) {
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
       if (!hasFieldValue(f)) {
@@ -655,7 +684,7 @@ function AnnotateView({
       }
 
       const justSaved = new Set<FieldKey>();
-      for (const ev of evaluators) {
+      for (const ev of currentEvaluators) {
         justSaved.add(fieldKey(currentItem.uuid, ev.uuid));
       }
       setSavedKeys((prev) => {
@@ -681,7 +710,7 @@ function AnnotateView({
 
       if (advance) {
         const isItemDone = (itemId: string) =>
-          evaluators.every((ev) => {
+          evaluatorsFor(itemId).every((ev) => {
             const k = fieldKey(itemId, ev.uuid);
             return justSaved.has(k) || savedKeys.has(k);
           });
@@ -719,8 +748,8 @@ function AnnotateView({
       const uuid = currentItem.uuid;
       if (!itemCompleted(uuid)) {
         if (
-          evaluators.length > 0 &&
-          evaluators.every((ev) => evaluatorAnswered(uuid, ev))
+          currentEvaluators.length > 0 &&
+          currentEvaluators.every((ev) => evaluatorAnswered(uuid, ev))
         ) {
           const ok = await handleSubmitItem({ advance: false });
           if (!ok) return;
@@ -728,7 +757,7 @@ function AnnotateView({
           return;
         }
         if (
-          evaluators.some((ev) => evaluatorAnswered(uuid, ev)) ||
+          currentEvaluators.some((ev) => evaluatorAnswered(uuid, ev)) ||
           commentChangedFor(uuid)
         ) {
           setPendingNav(target);
@@ -822,25 +851,22 @@ function AnnotateView({
             {!isAdmin &&
               (() => {
                 const currentItemSaved = currentItem
-                  ? evaluators.every((ev) =>
-                      savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
-                    )
+                  ? itemCompleted(currentItem.uuid)
                   : false;
                 const unsavedCount = items.reduce(
-                  (n, it) =>
-                    evaluators.every((ev) =>
-                      savedKeys.has(fieldKey(it.uuid, ev.uuid)),
-                    )
-                      ? n
-                      : n + 1,
+                  (n, it) => (itemCompleted(it.uuid) ? n : n + 1),
                   0,
                 );
                 const isLastUnsaved =
                   !!currentItem && !currentItemSaved && unsavedCount === 1;
+                // An item can end up with no evaluators. `itemCompleted` already
+                // counts it as done, so the button has to stay enabled too,
+                // otherwise the annotator is stuck on an item the progress
+                // count says needs nothing. Submitting it saves the item
+                // comment and moves on.
                 const allEvaluatorsAnswered =
                   !!currentItem &&
-                  evaluators.length > 0 &&
-                  evaluators.every((ev) =>
+                  currentEvaluators.every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
                 const disabled =
@@ -955,7 +981,7 @@ function AnnotateView({
               <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto">
                 <ItemPane item={currentItem} taskType={data.task.type} />
                 <EvaluatorsPane
-                  evaluators={evaluators}
+                  evaluators={currentEvaluators}
                   item={currentItem}
                   fields={fields}
                   setField={setField}
@@ -988,7 +1014,7 @@ function AnnotateView({
                   } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
                 >
                   <EvaluatorsPane
-                    evaluators={evaluators}
+                    evaluators={currentEvaluators}
                     item={currentItem}
                     fields={fields}
                     setField={setField}
@@ -1141,7 +1167,7 @@ function EvaluatorsPane({
         {descriptionBlock}
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          No evaluators are attached to this task.
+          There are no evaluators to review for this item.
         </div>
       </div>
     );

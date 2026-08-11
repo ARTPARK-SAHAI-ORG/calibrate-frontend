@@ -406,6 +406,236 @@ describe("ManageEvaluatorsDialog", () => {
     await waitFor(() => expect(screen.getByText("not json")).toBeInTheDocument());
   });
 
+  describe("items with their own evaluators", () => {
+    // Resolve the evaluators fetch normally and let the PUT report how many
+    // items in the task have their own saved evaluator list.
+    function mockSaveWith(customisedItemCount: number, bulkResult?: unknown) {
+      mockApiClient.mockImplementation((url: string) => {
+        if (url === "/evaluators?include_defaults=true") {
+          return Promise.resolve({ items: EVALUATORS });
+        }
+        if (url === "/annotation-tasks/task-1/evaluators") {
+          return Promise.resolve({
+            message: "ok",
+            customised_item_count: customisedItemCount,
+          });
+        }
+        return bulkResult instanceof Error
+          ? Promise.reject(bulkResult)
+          : Promise.resolve(bulkResult ?? { updated_count: 3 });
+      });
+    }
+
+    async function addHelpfulnessAndSave(onSaved: jest.Mock) {
+      const user = setupUser();
+      renderDialog({ currentEvaluatorIds: ["ev-1"], onSaved });
+      await waitForCatalogueLoaded();
+      await user.click(catalogueCheckbox("Helpfulness"));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      return user;
+    }
+
+    it("closes straight away with no prompt when no item has its own evaluators", async () => {
+      mockSaveWith(0);
+      const onSaved = jest.fn();
+      await addHelpfulnessAndSave(onSaved);
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(
+        screen.queryByRole("button", { name: "Add to all items" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not prompt when the save only removed evaluators", async () => {
+      mockSaveWith(4);
+      const user = setupUser();
+      const onSaved = jest.fn();
+      renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"], onSaved });
+      await waitForCatalogueLoaded();
+      await user.click(catalogueCheckbox("Helpfulness"));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(
+        screen.queryByRole("button", { name: "Add to all items" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("prompts with the item count and the added evaluator name", async () => {
+      mockSaveWith(7);
+      const onSaved = jest.fn();
+      await addHelpfulnessAndSave(onSaved);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/7 items have their own evaluators/),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/will not get Helpfulness\./),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Add it to those items too\?/)).toBeInTheDocument();
+      expect(onSaved).not.toHaveBeenCalled();
+    });
+
+    it("uses singular wording for a single item", async () => {
+      mockSaveWith(1);
+      await addHelpfulnessAndSave(jest.fn());
+      await waitFor(() =>
+        expect(
+          screen.getByText(/1 item has its own evaluators/),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("'Add to all items' posts the add for every item, then closes", async () => {
+      mockSaveWith(7);
+      const onSaved = jest.fn();
+      const user = await addHelpfulnessAndSave(onSaved);
+      const addBtn = await screen.findByRole("button", {
+        name: "Add to all items",
+      });
+      await user.click(addBtn);
+      await waitFor(() =>
+        expect(mockApiClient).toHaveBeenCalledWith(
+          "/annotation-tasks/task-1/items/evaluators",
+          "tok",
+          {
+            method: "POST",
+            body: {
+              action: "add",
+              evaluator_ids: ["ev-2"],
+              select_all: true,
+            },
+          },
+        ),
+      );
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    });
+
+    it("'Not now' closes without touching any item", async () => {
+      mockSaveWith(7);
+      const onSaved = jest.fn();
+      const user = await addHelpfulnessAndSave(onSaved);
+      const notNow = await screen.findByRole("button", { name: "Not now" });
+      await user.click(notNow);
+      expect(onSaved).toHaveBeenCalled();
+      expect(mockApiClient).not.toHaveBeenCalledWith(
+        "/annotation-tasks/task-1/items/evaluators",
+        "tok",
+        expect.anything(),
+      );
+    });
+
+    it("shows an error when the per-item add fails and keeps the saved evaluators", async () => {
+      mockSaveWith(7, new Error('Request failed: 400 - {"detail":"item boom"}'));
+      const onSaved = jest.fn();
+      const user = await addHelpfulnessAndSave(onSaved);
+      const addBtn = await screen.findByRole("button", {
+        name: "Add to all items",
+      });
+      await user.click(addBtn);
+      await waitFor(() =>
+        expect(screen.getByText("item boom")).toBeInTheDocument(),
+      );
+      expect(onSaved).not.toHaveBeenCalled();
+      // The evaluator save already went through: the PUT is not repeated and
+      // the prompt is still there to retry or dismiss.
+      expect(
+        mockApiClient.mock.calls.filter(
+          (c) => c[0] === "/annotation-tasks/task-1/evaluators",
+        ),
+      ).toHaveLength(1);
+      expect(
+        screen.getByRole("button", { name: "Not now" }),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to a generic message when the per-item add rejects with a non-Error", async () => {
+      mockSaveWith(7, new Error("x"));
+      mockApiClient.mockImplementation((url: string) => {
+        if (url === "/evaluators?include_defaults=true") {
+          return Promise.resolve({ items: EVALUATORS });
+        }
+        if (url === "/annotation-tasks/task-1/evaluators") {
+          return Promise.resolve({ message: "ok", customised_item_count: 2 });
+        }
+        return Promise.reject("nope");
+      });
+      const user = await addHelpfulnessAndSave(jest.fn());
+      const addBtn = await screen.findByRole("button", {
+        name: "Add to all items",
+      });
+      await user.click(addBtn);
+      await waitFor(() =>
+        expect(
+          screen.getByText("Failed to add the evaluators to those items"),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("shows a loading state on the primary button while the per-item add runs", async () => {
+      let resolveBulk: (v: unknown) => void = () => {};
+      mockApiClient.mockImplementation((url: string) => {
+        if (url === "/evaluators?include_defaults=true") {
+          return Promise.resolve({ items: EVALUATORS });
+        }
+        if (url === "/annotation-tasks/task-1/evaluators") {
+          return Promise.resolve({ message: "ok", customised_item_count: 5 });
+        }
+        return new Promise((resolve) => {
+          resolveBulk = resolve;
+        });
+      });
+      const user = await addHelpfulnessAndSave(jest.fn());
+      const addBtn = await screen.findByRole("button", {
+        name: "Add to all items",
+      });
+      await user.click(addBtn);
+      expect(
+        screen.getByRole("button", { name: "Adding..." }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Not now" })).toBeDisabled();
+      resolveBulk({ updated_count: 5 });
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Adding..." }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("names every added evaluator and uses plural wording for more than one", async () => {
+      mockSaveWith(3);
+      const user = setupUser();
+      renderDialog({ currentEvaluatorIds: ["ev-1"] });
+      await waitForCatalogueLoaded();
+      await user.click(catalogueCheckbox("Helpfulness"));
+      await user.click(catalogueCheckbox("Tone"));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await waitFor(() =>
+        expect(
+          screen.getByText(/will not get Helpfulness, Tone\./),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/Add them to those items too\?/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("warns that removing an evaluator affects every item, only while a removal is staged", async () => {
+    const user = setupUser();
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
+    await waitForCatalogueLoaded();
+    const warning =
+      "Removing an evaluator takes it off every item in this task. Past labels and judge results are kept.";
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+
+    await user.click(catalogueCheckbox("Helpfulness"));
+    expect(screen.getByText(warning)).toBeInTheDocument();
+
+    // Putting it back clears the warning again.
+    await user.click(catalogueCheckbox("Helpfulness"));
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+  });
+
   it("cancels the in-flight evaluators fetch on unmount without state updates", async () => {
     let resolveFn: (v: unknown) => void = () => {};
     mockApiClient.mockReturnValueOnce(

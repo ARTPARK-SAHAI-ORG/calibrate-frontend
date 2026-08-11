@@ -19,6 +19,8 @@ import {
   evaluatorDisplayName,
   snapshotToItem,
   orderedSnapshotsForRun,
+  parseRerunError,
+  rerunSkipNotice,
   statusPillClass,
   statusLabel,
   formatAgreement,
@@ -171,6 +173,58 @@ describe("orderedSnapshotsForRun", () => {
     });
     const out = orderedSnapshotsForRun(job);
     expect(out.map((s) => s.uuid)).toEqual(["a", "b"]);
+  });
+});
+
+describe("rerunSkipNotice", () => {
+  it("returns null when nothing was skipped", () => {
+    expect(rerunSkipNotice({}, {})).toBeNull();
+    expect(
+      rerunSkipNotice(
+        { skipped_pair_count: 0, evaluators_with_no_items: [] },
+        {},
+      ),
+    ).toBeNull();
+  });
+
+  it("reports left out pairs", () => {
+    expect(rerunSkipNotice({ skipped_pair_count: 3 }, {})).toBe(
+      "The new run has started. 3 item and evaluator pairs were left out because those evaluators do not apply to those items.",
+    );
+    expect(rerunSkipNotice({ skipped_pair_count: 1 }, {})).toContain(
+      "1 item and evaluator pair was left out",
+    );
+  });
+
+  it("names the evaluators that judge no item, falling back to plain wording", () => {
+    const notice = rerunSkipNotice(
+      { evaluators_with_no_items: ["ev-bin", "abcdefghij"] },
+      { "ev-bin": "Binary Evaluator" },
+    );
+    expect(notice).toContain("Binary Evaluator, an evaluator");
+    expect(notice).not.toContain("abcdefgh");
+  });
+});
+
+describe("parseRerunError", () => {
+  it("replaces the nothing-to-run 400 with a readable message", () => {
+    const err = new Error(
+      'Request failed: 400 - {"detail":"no item and evaluator pairs to run"}',
+    );
+    expect(parseRerunError(err)).toBe(
+      "There is nothing to run. The evaluators you picked do not apply to any of these items.",
+    );
+  });
+
+  it("keeps the backend message for other failures", () => {
+    const err = new Error(
+      'Request failed: 400 - {"detail":"item_ids not in this task"}',
+    );
+    expect(parseRerunError(err)).toBe("item_ids not in this task");
+  });
+
+  it("falls back when the error is not from the API client", () => {
+    expect(parseRerunError("nope")).toBe("Failed to start evaluation run");
   });
 });
 
@@ -1533,6 +1587,149 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("No result recorded for this item.")).toBeInTheDocument();
   });
 
+  it("does not show 'no result recorded' for an evaluator the item excludes", () => {
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [
+        {
+          uuid: "item-1",
+          payload: { name: "Item One" },
+          evaluator_ids: ["ev-bin"],
+          effective_evaluator_ids: ["ev-bin"],
+        },
+      ],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+    // The excluded evaluator is not offered for this item at all.
+    expect(screen.queryByText("Rating Evaluator")).not.toBeInTheDocument();
+  });
+
+  it("marks an item as done when every evaluator that applies to it completed", () => {
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [
+        {
+          uuid: "item-1",
+          payload: { name: "Item One" },
+          effective_evaluator_ids: ["ev-bin"],
+        },
+      ],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
+  });
+
+  it("treats an item with no per-item evaluator list as using every evaluator", () => {
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [{ uuid: "item-1", payload: { name: "Item One" } }],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    // The rating evaluator still applies, so its missing result is an error.
+    expect(
+      screen.getByText("No result recorded for this item."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTitle("Item 1 (completed)")).not.toBeInTheDocument();
+  });
+
+  it("drops a header pill for an evaluator that no item in the run uses", () => {
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [
+        {
+          uuid: "item-1",
+          payload: { name: "Item One" },
+          effective_evaluator_ids: ["ev-bin"],
+        },
+        {
+          uuid: "item-2",
+          payload: { name: "Item Two" },
+          effective_evaluator_ids: ["ev-bin"],
+        },
+      ],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.getAllByText("Binary Evaluator").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Rating Evaluator")).not.toBeInTheDocument();
+  });
+
+  it("still shows a result an evaluator recorded after the item was narrowed", () => {
+    // The item now allows only the binary evaluator, but the run really did
+    // record a rating result for it, so that result must stay visible.
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [
+        {
+          uuid: "item-1",
+          payload: { name: "Item One" },
+          evaluator_ids: ["ev-bin"],
+          effective_evaluator_ids: ["ev-bin"],
+        },
+      ],
+      runs: [
+        makeRun({ item_id: "item-1", status: "completed" }),
+        makeRun({
+          uuid: "run-2",
+          item_id: "item-1",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: 4, reasoning: "Good" },
+          status: "completed",
+        }),
+      ],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.getAllByText("Rating Evaluator").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+    // Both evaluators that ran completed, so the item still counts as done.
+    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
+  });
+
+  it("does not show an evaluator that never ran for the narrowed item", () => {
+    const job = makeJob({
+      status: "completed",
+      evaluators: [evaluatorBinary, evaluatorRating],
+      items: [
+        {
+          uuid: "item-1",
+          payload: { name: "Item One" },
+          evaluator_ids: ["ev-bin"],
+          effective_evaluator_ids: ["ev-bin"],
+        },
+      ],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.queryByText("Rating Evaluator")).not.toBeInTheDocument();
+    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
+  });
+
   it("falls back to task.items via job.details.item_ids when job.items is absent", () => {
     const job = makeJob({
       items: undefined,
@@ -1644,7 +1841,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane {...baseProps} evaluators={[]} runs={[]} />,
     );
-    expect(screen.getByText("No evaluators in this run.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No evaluators to show for this item."),
+    ).toBeInTheDocument();
   });
 
   it("renders the item description when provided", () => {

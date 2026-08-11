@@ -36,6 +36,14 @@ import {
   useUrlValueFilters,
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
+import {
+  effectiveEvaluatorIds,
+  type ItemEvaluatorFields,
+} from "@/components/human-labelling/itemEvaluators";
+import {
+  getErrorStatusCode,
+  parseBackendErrorMessage,
+} from "@/lib/parseBackendError";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,7 +97,14 @@ export type JobEvaluator = {
 export type EvaluatorRunItemSnapshot = {
   uuid: string;
   payload: unknown;
-};
+} & ItemEvaluatorFields;
+
+/**
+ * An item in a run, plus the per-item evaluator fields. The base `Item`
+ * type does not declare `effective_evaluator_ids`, but every item read
+ * carries it, so the run view keeps it on the resolved snapshots.
+ */
+export type RunItem = Item & ItemEvaluatorFields;
 
 export type HumanAnnotationValue = {
   value?: unknown;
@@ -186,7 +201,7 @@ export function evaluatorDisplayName(
 export function snapshotToItem(
   snap: EvaluatorRunItemSnapshot,
   taskId: string,
-): Item {
+): RunItem {
   return {
     id: 0,
     uuid: snap.uuid,
@@ -194,6 +209,8 @@ export function snapshotToItem(
     payload: snap.payload,
     created_at: "",
     deleted_at: null,
+    evaluator_ids: snap.evaluator_ids,
+    effective_evaluator_ids: snap.effective_evaluator_ids,
   };
 }
 
@@ -241,6 +258,55 @@ export function orderedSnapshotsForRun(
     return out.slice(0, cap);
   }
   return out;
+}
+
+/**
+ * Since evaluators can be set per item, starting a run can leave an item and
+ * evaluator pair out, or leave nothing at all to run (a 400 from the backend).
+ * These two helpers turn both outcomes into something a user can read; the
+ * re-run flow on the run detail page uses them.
+ */
+export function parseRerunError(err: unknown): string {
+  const message = parseBackendErrorMessage(
+    err,
+    "Failed to start evaluation run",
+  );
+  const isNothingToRun =
+    getErrorStatusCode(err) === 400 &&
+    /no (items?|pairs?|evaluators?)|nothing to run/i.test(message);
+  return isNothingToRun
+    ? "There is nothing to run. The evaluators you picked do not apply to any of these items."
+    : message;
+}
+
+/** Plain summary of what a started run left out, or null when it left nothing out. */
+export function rerunSkipNotice(
+  result: {
+    skipped_pair_count?: number;
+    evaluators_with_no_items?: string[];
+  },
+  evaluatorNamesById: Record<string, string>,
+): string | null {
+  const skipped = result.skipped_pair_count ?? 0;
+  const emptyEvaluators = result.evaluators_with_no_items ?? [];
+  if (skipped <= 0 && emptyEvaluators.length === 0) return null;
+  const parts: string[] = [];
+  if (skipped > 0) {
+    parts.push(
+      skipped === 1
+        ? "1 item and evaluator pair was left out because that evaluator does not apply to that item."
+        : `${skipped} item and evaluator pairs were left out because those evaluators do not apply to those items.`,
+    );
+  }
+  if (emptyEvaluators.length > 0) {
+    const names = emptyEvaluators
+      .map((id) => evaluatorNamesById[id] ?? "an evaluator")
+      .join(", ");
+    parts.push(
+      `These evaluators do not apply to any of the items, so they did not run: ${names}.`,
+    );
+  }
+  return `The new run has started. ${parts.join(" ")}`;
 }
 
 export function statusPillClass(status: EvaluatorRunJob["status"]): string {
@@ -779,7 +845,7 @@ export function EvaluatorResultsPane({
         {descriptionBlock}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          No evaluators in this run.
+          No evaluators to show for this item.
         </div>
       </div>
     );
@@ -1729,7 +1795,7 @@ export function EvaluatorRunDetailView({
     [job?.evaluators],
   );
 
-  const itemsForRun = useMemo<Item[]>(() => {
+  const itemsForRun = useMemo<RunItem[]>(() => {
     if (!job) return [];
     const taskId = task?.uuid ?? job.task_id;
     const embedded = job.items;
@@ -1755,6 +1821,52 @@ export function EvaluatorRunDetailView({
     }
     return task.items;
   }, [job, task]);
+
+  const runsByItem = useMemo(() => {
+    const m: Record<string, EvaluatorRunRow[]> = {};
+    for (const r of job?.runs ?? []) {
+      (m[r.item_id] = m[r.item_id] ?? []).push(r);
+    }
+    return m;
+  }, [job]);
+
+  // Per-item evaluators. An item can be excluded from an evaluator, so a
+  // pair may legitimately have no result. Items that carry no per-item list
+  // fall back to every evaluator in the run, which is how older runs and
+  // older backends keep rendering exactly as before.
+  //
+  // The item's list is what applies now, not a snapshot of this run, so an
+  // item narrowed after the run would otherwise hide results the run really
+  // did record. Every evaluator with a row for the item is added back in:
+  // narrowing an item stops new pairs from appearing, it never erases pairs
+  // that already ran.
+  const evaluatorIdsByItem = useMemo(() => {
+    const runEvaluatorIds = detailsEvaluators.map((e) => e.evaluator_id);
+    const m = new Map<string, Set<string>>();
+    for (const it of itemsForRun) {
+      const ids = new Set(effectiveEvaluatorIds(it, runEvaluatorIds));
+      for (const r of runsByItem[it.uuid] ?? []) ids.add(r.evaluator_id);
+      m.set(it.uuid, ids);
+    }
+    return m;
+  }, [itemsForRun, detailsEvaluators, runsByItem]);
+
+  const evaluatorsForItem = (itemId: string) => {
+    const allowed = evaluatorIdsByItem.get(itemId);
+    if (!allowed) return detailsEvaluators;
+    return detailsEvaluators.filter((e) => allowed.has(e.evaluator_id));
+  };
+
+  // Run-level evaluator list: only the evaluators that judge at least one
+  // item in this run, so an evaluator no item uses is not offered.
+  const runEvaluators = useMemo(() => {
+    if (itemsForRun.length === 0) return detailsEvaluators;
+    const used = new Set<string>();
+    for (const ids of evaluatorIdsByItem.values()) {
+      for (const id of ids) used.add(id);
+    }
+    return detailsEvaluators.filter((e) => used.has(e.evaluator_id));
+  }, [detailsEvaluators, evaluatorIdsByItem, itemsForRun.length]);
 
   const hasDisagreements = useMemo(
     () =>
@@ -1841,19 +1953,12 @@ export function EvaluatorRunDetailView({
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
   const currentItem: Item | undefined = filteredItemsForRun[safeIndex];
 
-  const runsByItem = useMemo(() => {
-    const m: Record<string, EvaluatorRunRow[]> = {};
-    for (const r of job?.runs ?? []) {
-      (m[r.item_id] = m[r.item_id] ?? []).push(r);
-    }
-    return m;
-  }, [job]);
-
   const itemDone = (itemId: string): boolean => {
     if (!job || job.status !== "completed") return false;
     const rs = runsByItem[itemId] ?? [];
-    if (rs.length === 0 || detailsEvaluators.length === 0) return false;
-    return detailsEvaluators.every((e) =>
+    const itemEvaluators = evaluatorsForItem(itemId);
+    if (rs.length === 0 || itemEvaluators.length === 0) return false;
+    return itemEvaluators.every((e) =>
       rs.some(
         (r) =>
           r.evaluator_id === e.evaluator_id &&
@@ -1906,10 +2011,10 @@ export function EvaluatorRunDetailView({
       {!cardsWillRender && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
-            {detailsEvaluators.length === 0 ? (
+            {runEvaluators.length === 0 ? (
               <span className="text-sm text-muted-foreground">—</span>
             ) : (
-              detailsEvaluators.map((e) => {
+              runEvaluators.map((e) => {
                     const name = evaluatorDisplayName(e, evaluatorNamesById);
                     const label = e.evaluator_version_id
                       ? versionLabels[e.evaluator_version_id]
@@ -1965,7 +2070,7 @@ export function EvaluatorRunDetailView({
         agreement={job.human_agreement}
         runs={job.runs ?? []}
         getJobEvaluator={getJobEvaluator}
-        evaluators={detailsEvaluators}
+        evaluators={runEvaluators}
         evaluatorNamesById={evaluatorNamesById}
         versionLabels={versionLabels}
         linkEvaluators={linkEvaluators}
@@ -2104,7 +2209,7 @@ export function EvaluatorRunDetailView({
                 <ItemDetailPane
                   item={currentItem}
                   taskType={task.type}
-                  evaluators={detailsEvaluators}
+                  evaluators={evaluatorsForItem(currentItem.uuid)}
                   evaluatorNamesById={evaluatorNamesById}
                   getJobEvaluator={getJobEvaluator}
                   runs={runsByItem[currentItem.uuid] ?? []}

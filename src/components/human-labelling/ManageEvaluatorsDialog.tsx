@@ -8,6 +8,7 @@ import {
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient, unwrapList } from "@/lib/api";
+import { bulkUpdateItemEvaluators } from "./itemEvaluators";
 
 type EvaluatorListItem = {
   uuid: string;
@@ -70,6 +71,16 @@ export function ManageEvaluatorsDialog({
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Set after a successful save that added evaluators, when the task has
+  // items with their own saved evaluator list. Those items do not pick up
+  // the new evaluators on their own, so we ask before touching them.
+  const [pendingAdd, setPendingAdd] = useState<{
+    ids: string[];
+    count: number;
+  } | null>(null);
+  const [addingToItems, setAddingToItems] = useState(false);
+  const [addToItemsError, setAddToItemsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,19 +171,45 @@ export function ManageEvaluatorsDialog({
       // the old per-evaluator POST/DELETE + separate /order PUT. No
       // ordering concern around the minimum-one-evaluator rule since
       // the whole set lands atomically.
-      await apiClient<{ message: string }>(
-        `/annotation-tasks/${taskUuid}/evaluators`,
-        accessToken,
-        {
-          method: "PUT",
-          body: { evaluator_ids: orderedSelected },
-        },
-      );
+      const result = await apiClient<{
+        message: string;
+        customised_item_count?: number;
+      }>(`/annotation-tasks/${taskUuid}/evaluators`, accessToken, {
+        method: "PUT",
+        body: { evaluator_ids: orderedSelected },
+      });
+      const customisedCount = result.customised_item_count ?? 0;
+      if (toAdd.length > 0 && customisedCount > 0) {
+        setPendingAdd({ ids: toAdd, count: customisedCount });
+        return;
+      }
       onSaved();
     } catch (err) {
       setSaveError(parseApiError(err, "Failed to update evaluators"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddToAllItems = async () => {
+    if (!pendingAdd || addingToItems) return;
+    setAddingToItems(true);
+    setAddToItemsError(null);
+    try {
+      await bulkUpdateItemEvaluators(
+        taskUuid,
+        accessToken,
+        "add",
+        pendingAdd.ids,
+        { select_all: true },
+      );
+      onSaved();
+    } catch (err) {
+      setAddToItemsError(
+        parseApiError(err, "Failed to add the evaluators to those items"),
+      );
+    } finally {
+      setAddingToItems(false);
     }
   };
 
@@ -224,6 +261,57 @@ export function ManageEvaluatorsDialog({
     });
     setOrderedSelected((prev) => prev.filter((id) => id !== uuid));
   };
+
+  if (pendingAdd) {
+    // The added ids always come from the loaded catalogue, so no fallback
+    // name is needed here.
+    const addedNames = evaluators
+      .filter((ev) => pendingAdd.ids.includes(ev.uuid))
+      .map((ev) => ev.name)
+      .join(", ");
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-background border border-border rounded-xl w-full max-w-lg shadow-2xl flex flex-col">
+          <div className="px-5 md:px-6 py-4 border-b border-border">
+            <h2 className="text-base md:text-lg font-semibold text-foreground">
+              Evaluators saved
+            </h2>
+          </div>
+          <div className="px-5 md:px-6 py-4 space-y-3">
+            <p className="text-sm text-foreground">
+              {pendingAdd.count === 1
+                ? `1 item has its own evaluators and will not get ${addedNames}.`
+                : `${pendingAdd.count} items have their own evaluators and will not get ${addedNames}.`}{" "}
+              {pendingAdd.ids.length === 1
+                ? "Add it to those items too?"
+                : "Add them to those items too?"}
+            </p>
+            {addToItemsError && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+                {addToItemsError}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
+            <button
+              onClick={onSaved}
+              disabled={addingToItems}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Not now
+            </button>
+            <button
+              onClick={handleAddToAllItems}
+              disabled={addingToItems}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addingToItems ? "Adding..." : "Add to all items"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -480,6 +568,13 @@ export function ManageEvaluatorsDialog({
               </div>
             </div>
           </div>
+
+          {toRemove.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Removing an evaluator takes it off every item in this task. Past
+              labels and judge results are kept.
+            </p>
+          )}
 
           {wouldRemoveAll && (
             <p className="text-xs text-red-500">

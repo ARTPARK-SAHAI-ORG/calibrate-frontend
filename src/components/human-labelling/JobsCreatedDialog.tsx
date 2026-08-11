@@ -16,6 +16,11 @@ type JobsCreatedDialogProps = {
   isOpen: boolean;
   jobs: CreatedJob[];
   onClose: () => void;
+  /**
+   * Items left out of these jobs because their own evaluators and the chosen
+   * evaluators had nothing in common, so there was nothing on them to label.
+   */
+  skippedItemCount?: number;
 };
 
 function buildJobUrl(token: string): string {
@@ -27,6 +32,7 @@ export function JobsCreatedDialog({
   isOpen,
   jobs,
   onClose,
+  skippedItemCount = 0,
 }: JobsCreatedDialogProps) {
   useHideFloatingButton(isOpen);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -85,6 +91,14 @@ export function JobsCreatedDialog({
           <p className="text-sm text-muted-foreground">
             Copy each link and send it to the corresponding annotator
           </p>
+
+          {skippedItemCount > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+              {skippedItemCount} item{skippedItemCount === 1 ? " was" : "s were"}{" "}
+              left out. Their own evaluators do not include any of the
+              evaluators you picked, so there is nothing on them to label.
+            </div>
+          )}
 
           <div className="border border-border rounded-lg overflow-hidden">
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,3fr)_auto] gap-4 px-4 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
