@@ -210,6 +210,11 @@ export function AssignAnnotatorsDialog({
                   Annotators
                 </p>
               )}
+              {!loading && !loadError && annotators.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  No annotators yet. Add one below.
+                </p>
+              )}
               <AddAnnotatorInline
                 accessToken={accessToken}
                 // Disabled until the list has loaded, otherwise the in-flight
@@ -243,10 +248,6 @@ export function AssignAnnotatorsDialog({
                   </div>
                 ) : loadError ? (
                   <p className="text-sm text-red-500">{loadError}</p>
-                ) : annotators.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-1">
-                    No annotators yet. Add one above.
-                  </p>
                 ) : (
                   <>
                     {annotators.length > 1 && (
