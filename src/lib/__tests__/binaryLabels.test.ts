@@ -3,6 +3,8 @@ import {
   DEFAULT_BINARY_FALSE_LABEL,
   defaultBinaryLabel,
   coerceBinaryValue,
+  binaryScaleFor,
+  getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
 } from "../binaryLabels";
@@ -90,12 +92,75 @@ describe("toRatingScale", () => {
       { value: 2, name: null },
     ]);
     expect(result).toEqual([
-      { value: 1, name: "One" },
-      { value: 2, name: null },
+      { value: 1, name: "One", description: null },
+      { value: 2, name: null, description: null },
     ]);
   });
 
   it("returns empty array when scale has no numeric entries", () => {
     expect(toRatingScale([{ value: true }, { value: "x" }])).toEqual([]);
+  });
+
+  it("carries the per-level description through, trimming blanks to null", () => {
+    expect(
+      toRatingScale([
+        { value: 1, name: "One", description: "  Ignores the question.  " },
+        { value: 2, name: "Two", description: "   " },
+      ]),
+    ).toEqual([
+      { value: 1, name: "One", description: "Ignores the question." },
+      { value: 2, name: "Two", description: null },
+    ]);
+  });
+});
+
+describe("binaryScaleFor", () => {
+  const ratingScale = [
+    { value: 1, name: "Bad", description: "Ignores the question." },
+    { value: 2, name: "Good", description: "Answers it fully." },
+  ];
+
+  it("drops a rating evaluator's scale so its levels are never read as true/false", () => {
+    expect(binaryScaleFor("rating", ratingScale)).toBeNull();
+    // Without the guard, level 1 would coerce to `true` and level 0 to `false`.
+    expect(getBinaryLabel(binaryScaleFor("rating", ratingScale), true)).toBe(
+      DEFAULT_BINARY_TRUE_LABEL,
+    );
+    expect(
+      getBinaryDescription(binaryScaleFor("rating", ratingScale), true),
+    ).toBeNull();
+  });
+
+  it("passes a binary evaluator's scale through, and normalises missing scales to null", () => {
+    const binary = [{ value: true, name: "Yes", description: "Answers fully." }];
+    expect(binaryScaleFor("binary", binary)).toBe(binary);
+    expect(binaryScaleFor(undefined, binary)).toBe(binary);
+    expect(binaryScaleFor("binary", undefined)).toBeNull();
+  });
+});
+
+describe("getBinaryDescription", () => {
+  it("returns null when there is no scale or no matching entry", () => {
+    expect(getBinaryDescription(null, true)).toBeNull();
+    expect(getBinaryDescription(undefined, false)).toBeNull();
+    expect(getBinaryDescription([{ value: false, description: "x" }], true)).toBeNull();
+  });
+
+  it("returns null for a blank or missing description", () => {
+    expect(getBinaryDescription([{ value: true }], true)).toBeNull();
+    expect(getBinaryDescription([{ value: true, description: "  " }], true)).toBeNull();
+    expect(getBinaryDescription([{ value: true, description: null }], true)).toBeNull();
+  });
+
+  it("returns the trimmed description, matching alternate value encodings", () => {
+    expect(
+      getBinaryDescription([{ value: true, description: "  Answers fully.  " }], true),
+    ).toBe("Answers fully.");
+    expect(getBinaryDescription([{ value: 0, description: "Wrong." }], false)).toBe(
+      "Wrong.",
+    );
+    expect(getBinaryDescription([{ value: "yes", description: "Right." }], true)).toBe(
+      "Right.",
+    );
   });
 });

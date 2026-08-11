@@ -18,7 +18,12 @@ import {
   WarningTriangleIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
-import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
+import {
+  binaryScaleFor,
+  getBinaryDescription,
+  getBinaryLabel,
+  toRatingScale,
+} from "@/lib/binaryLabels";
 import { copyToClipboard } from "@/lib/clipboard";
 
 // Renders the evaluator name. Authenticated result pages can link to the
@@ -710,6 +715,14 @@ function JudgeResultCard({
 }) {
   const isRating = result.score !== null && result.score !== undefined;
   const scale = evaluator?.output_config?.scale ?? null;
+  // The card falls back to binary whenever the row has no score, so a
+  // rating evaluator's scale must not be read as true/false here.
+  const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
+  // The recorded value_name wins over the local scale for the label,
+  // because the local scale can belong to a newer evaluator version. The
+  // rubric still comes from the local scale: same resolution as
+  // ItemDetailDialog, which overrides the matching scale entry's name
+  // with the recorded one and keeps the rest of the entry.
   const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
@@ -738,13 +751,15 @@ function JudgeResultCard({
       trueLabel={
         result.match === true && valueName
           ? valueName
-          : getBinaryLabel(scale, true)
+          : getBinaryLabel(binaryScale, true)
       }
       falseLabel={
         result.match === false && valueName
           ? valueName
-          : getBinaryLabel(scale, false)
+          : getBinaryLabel(binaryScale, false)
       }
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />
@@ -1278,6 +1293,14 @@ function EvaluatorPanelCard({
       ? result.variable_values
       : variableValues ?? null;
   const scale = evaluator?.output_config?.scale ?? null;
+  // The card falls back to binary whenever the row has no score, so a
+  // rating evaluator's scale must not be read as true/false here.
+  const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
+  // The recorded value_name wins over the local scale for the label,
+  // because the local scale can belong to a newer evaluator version. The
+  // rubric still comes from the local scale: same resolution as
+  // ItemDetailDialog, which overrides the matching scale entry's name
+  // with the recorded one and keeps the rest of the entry.
   const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
@@ -1305,13 +1328,15 @@ function EvaluatorPanelCard({
       trueLabel={
         result.match === true && valueName
           ? valueName
-          : getBinaryLabel(scale, true)
+          : getBinaryLabel(binaryScale, true)
       }
       falseLabel={
         result.match === false && valueName
           ? valueName
-          : getBinaryLabel(scale, false)
+          : getBinaryLabel(binaryScale, false)
       }
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />

@@ -54,11 +54,17 @@ type CommonProps = {
   /** Custom labels for binary verdicts. Defaults to Correct / Wrong. */
   trueLabel?: string | null;
   falseLabel?: string | null;
-  /** Rating-scale entries with per-level display names. When present we
-   * also show the label next to each rating button and beside the
-   * score / max pill so annotators see what each number means. */
+  /** Per-option rubric for binary verdicts, authored on the evaluator
+   * version. Shown under the option in write mode, and under the verdict
+   * in read mode. Optional — nothing renders when absent. */
+  trueDescription?: string | null;
+  falseDescription?: string | null;
+  /** Rating-scale entries with per-level display names and optional
+   * per-level rubrics. When names are present we also show the label
+   * next to each rating button and beside the score / max pill so
+   * annotators see what each number means. */
   ratingScale?:
-    | { value: number; name?: string | null }[]
+    | { value: number; name?: string | null; description?: string | null }[]
     | null;
   /** Pre-resolved label for the rating verdict pill. Wins over the
    * `ratingScale` lookup so callers can surface a backend-resolved
@@ -154,6 +160,12 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   const surface = evaluatorCardSurfaceClass(tone);
 
+  // Read mode has no option buttons, so the per-option rubric that write
+  // mode shows under every choice collapses to just the one for the
+  // verdict that was actually given.
+  const verdictDescription =
+    props.mode === "read" ? readVerdictDescription(props) : null;
+
   return (
     <div className={`${surface} p-3 space-y-3`}>
       {/* Header: name + verdict pill + toggle on one row; description
@@ -203,6 +215,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             {props.description}
           </p>
         )}
+        {verdictDescription && (
+          <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-border pl-2">
+            {verdictDescription}
+          </p>
+        )}
       </div>
 
       {props.mode === "write" && (
@@ -216,6 +233,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             disabled={props.disabled}
             trueLabel={props.trueLabel}
             falseLabel={props.falseLabel}
+            trueDescription={props.trueDescription}
+            falseDescription={props.falseDescription}
             ratingScale={props.ratingScale}
           />
           {hasVariables && (
@@ -355,6 +374,33 @@ function ReadVerdictPill({
   );
 }
 
+// Shared classes for an option button that carries a rubric underneath.
+// Left-aligned so the description has room to wrap, `flex-1` so a row of
+// options shares the width evenly, and `min-w-40` so they wrap to the
+// next line rather than squeezing the text into a column.
+const DESCRIBED_OPTION_BTN =
+  "flex-1 min-w-40 text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
+
+function OptionDescription({
+  text,
+  active,
+  activeClass,
+}: {
+  text: string;
+  active: boolean;
+  activeClass: string;
+}) {
+  return (
+    <span
+      className={`block text-xs font-normal leading-snug mt-1 whitespace-pre-wrap break-words ${
+        active ? activeClass : "text-muted-foreground"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
 function WriteControls({
   outputType,
   scaleMin,
@@ -364,6 +410,8 @@ function WriteControls({
   disabled,
   trueLabel,
   falseLabel,
+  trueDescription,
+  falseDescription,
   ratingScale,
 }: {
   outputType: EvaluatorOutputType;
@@ -374,16 +422,33 @@ function WriteControls({
   disabled?: boolean;
   trueLabel?: string | null;
   falseLabel?: string | null;
-  ratingScale?: { value: number; name?: string | null }[] | null;
+  trueDescription?: string | null;
+  falseDescription?: string | null;
+  ratingScale?:
+    | { value: number; name?: string | null; description?: string | null }[]
+    | null;
 }) {
   if (outputType === "binary") {
-    const baseBtn =
-      "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
+    const trueText = trueDescription?.trim() || null;
+    const falseText = falseDescription?.trim() || null;
+    // Only widen the buttons when there is a rubric to show. Evaluators
+    // without descriptions keep the original compact pair.
+    const described = !!(trueText || falseText);
+    const baseBtn = described
+      ? `${DESCRIBED_OPTION_BTN} text-sm font-medium`
+      : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
     return (
-      <div className="flex items-center gap-2">
+      <div
+        className={
+          described
+            ? "flex items-stretch gap-2 flex-wrap"
+            : "flex items-center gap-2"
+        }
+      >
         <button
           type="button"
           disabled={disabled}
+          aria-pressed={value === true}
           onClick={() => onChange(true)}
           className={`${baseBtn} ${
             value === true
@@ -392,10 +457,18 @@ function WriteControls({
           }`}
         >
           {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
+          {trueText && (
+            <OptionDescription
+              text={trueText}
+              active={value === true}
+              activeClass="text-green-700/80 dark:text-green-400/80"
+            />
+          )}
         </button>
         <button
           type="button"
           disabled={disabled}
+          aria-pressed={value === false}
           onClick={() => onChange(false)}
           className={`${baseBtn} ${
             value === false
@@ -404,6 +477,13 @@ function WriteControls({
           }`}
         >
           {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
+          {falseText && (
+            <OptionDescription
+              text={falseText}
+              active={value === false}
+              activeClass="text-red-700/80 dark:text-red-400/80"
+            />
+          )}
         </button>
       </div>
     );
@@ -433,42 +513,80 @@ function WriteControls({
     (_, i) => scaleMin + i,
   );
   const hasLabels = !!ratingScale?.some((e) => e.name?.trim());
+  // Any level carrying a rubric switches the whole row to the wider,
+  // left-aligned layout so every option lines up.
+  const described = !!ratingScale?.some((e) => e.description?.trim());
   return (
     <div className="flex items-stretch gap-1.5 flex-wrap">
       {options.map((n) => {
         const active = value === n;
-        const label =
-          ratingScale?.find((e) => e.value === n)?.name?.trim() || null;
+        const entry = ratingScale?.find((e) => e.value === n);
+        const label = entry?.name?.trim() || null;
+        const text = entry?.description?.trim() || null;
         return (
           <button
             key={n}
             type="button"
             disabled={disabled}
+            aria-pressed={active}
             onClick={() => onChange(n)}
             className={`${
-              hasLabels
-                ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5"
-                : "w-9 h-9"
-            } rounded-md border text-sm font-medium transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+              described
+                ? DESCRIBED_OPTION_BTN
+                : hasLabels
+                  ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  : "w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            } text-sm font-medium ${
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border bg-background hover:bg-muted/50"
             }`}
           >
-            <span>{n}</span>
-            {hasLabels && (
-              <span
-                className={`text-[10px] font-normal leading-tight ${
-                  active ? "text-background/80" : "text-muted-foreground"
-                }`}
-              >
-                {label ?? ""}
-              </span>
+            {described ? (
+              <span>{label ? `${n} · ${label}` : n}</span>
+            ) : (
+              <span>{n}</span>
             )}
+            {described
+              ? text && (
+                  <OptionDescription
+                    text={text}
+                    active={active}
+                    activeClass="text-background/80"
+                  />
+                )
+              : hasLabels && (
+                  <span
+                    className={`text-[10px] font-normal leading-tight ${
+                      active ? "text-background/80" : "text-muted-foreground"
+                    }`}
+                  >
+                    {label ?? ""}
+                  </span>
+                )}
           </button>
         );
       })}
     </div>
+  );
+}
+
+// The rubric for the verdict a read-mode card is displaying, if the
+// evaluator authored one for that option.
+function readVerdictDescription(p: ReadProps): string | null {
+  if (p.outputType === "binary") {
+    if (p.match === true) return p.trueDescription?.trim() || null;
+    if (p.match === false) return p.falseDescription?.trim() || null;
+    return null;
+  }
+  if (typeof p.score !== "number") return null;
+  // The pill prefers the caller's pre-resolved `ratingLabel` (the backend's
+  // recorded value_name) over the local level name, but the rubric still
+  // comes from the local scale: the recorded label renames the level, it
+  // does not disqualify its description. Same resolution ItemDetailDialog
+  // uses when it overrides a scale entry's name with the recorded one.
+  return (
+    p.ratingScale?.find((e) => e.value === p.score)?.description?.trim() || null
   );
 }
 
