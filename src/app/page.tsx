@@ -52,8 +52,9 @@ const USE_CASES: {
     whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
     useCase: [
       "Align LLM judges with experts for continuously monitoring AI response quality",
-      "Creating structured tests to evaluate all AI modules and preventing regressions",
-      "Evaluating TTS models for voice response and running human labelling workshops with experts",
+      "Creating structured tests to evaluate all AI modules and preventing regressions when deploying changes",
+      "Evaluating TTS model outputs across different languages",
+      "Running human labelling workshops with experts to gather evidence on user agency",
     ],
   },
   {
@@ -62,9 +63,9 @@ const USE_CASES: {
     whatTheyDo:
       "Voice agents to help mothers fill forms for maternal health programs",
     useCase: [
-      "Evaluating the quality of LLMs",
+      "Evaluating the data extraction and response generation quality of LLMs",
       "Finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff",
-      "Aligning LLM judges to humans",
+      "Aligning LLM judges to humans to enable continuous monitoring of the agent's performance",
     ],
   },
   {
@@ -505,6 +506,11 @@ export default function HomePage() {
   // While a click-driven smooth scroll is in flight, holds the clicked tab id so
   // the scroll listener keeps it active instead of flipping to sections it passes.
   const pendingScrollTargetRef = useRef<string | null>(null);
+  // Safety net: always drop the lock a bit after the click, in case the target
+  // section is never reached (e.g. clicking the already-active tab does not scroll).
+  const pendingScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Set page title
   useEffect(() => {
@@ -535,7 +541,8 @@ export default function HomePage() {
       );
     };
 
-    // If the user takes over scrolling, drop the lock so the scroll spy resumes.
+    // If the user takes over scrolling (wheel, touch, or keyboard), drop the
+    // lock so the scroll spy resumes tracking the real position.
     const releasePendingTarget = () => {
       pendingScrollTargetRef.current = null;
     };
@@ -547,16 +554,27 @@ export default function HomePage() {
     window.addEventListener("touchmove", releasePendingTarget, {
       passive: true,
     });
+    window.addEventListener("keydown", releasePendingTarget);
     return () => {
       window.removeEventListener("scroll", measureActiveSection);
       window.removeEventListener("resize", measureActiveSection);
       window.removeEventListener("wheel", releasePendingTarget);
       window.removeEventListener("touchmove", releasePendingTarget);
+      window.removeEventListener("keydown", releasePendingTarget);
+      if (pendingScrollTimeoutRef.current) {
+        clearTimeout(pendingScrollTimeoutRef.current);
+      }
     };
   }, []);
 
   const scrollToLandingSection = (tabId: string) => {
+    if (pendingScrollTimeoutRef.current) {
+      clearTimeout(pendingScrollTimeoutRef.current);
+    }
     pendingScrollTargetRef.current = tabId;
+    pendingScrollTimeoutRef.current = setTimeout(() => {
+      pendingScrollTargetRef.current = null;
+    }, 1000);
     setActiveFeatureSectionId(tabId);
     document
       .getElementById(`landing-${tabId}`)
