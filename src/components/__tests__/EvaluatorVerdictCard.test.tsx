@@ -258,6 +258,10 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(pill.parentElement).toBe(name.parentElement);
     expect(pill.parentElement?.className).not.toContain("flex ");
     expect(name.className).not.toContain("inline-block");
+    // A long name scrolls sideways instead of wrapping and pushing the
+    // pill onto a line of its own.
+    expect(pill.parentElement?.className).toContain("overflow-x-auto");
+    expect(pill.parentElement?.className).toContain("whitespace-nowrap");
   });
 
   it("renders name as a link when enableLink and evaluatorUuid are set", () => {

@@ -171,14 +171,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
-        {/* The row wraps as a whole: on a narrow card the chips drop to
-            their own line rather than squeezing the name column until the
-            version pill falls below the name. */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {/* Plain text flow, not a flex row: the version pill then sits
-              right after the last word of the name and follows it when the
-              name wraps, instead of dropping onto a line of its own. */}
-          <div className="flex-1 min-w-[9rem]">
+        <div className="flex items-center justify-between gap-2">
+          {/* One line that scrolls sideways: the name and its version pill
+              stay together on the chips' row however long the name is,
+              instead of wrapping and pushing the pill below the name. */}
+          <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap">
             <NameLabel
               name={props.name}
               uuid={props.evaluatorUuid}
@@ -285,9 +282,9 @@ function NameLabel({
   enableLink?: boolean;
 }) {
   const cls =
-    // `inline`, not `inline-block`, so a following version pill wraps with
-    // the name's last word rather than onto its own line.
-    "text-sm font-medium text-foreground break-words align-middle";
+    // `inline`, not `inline-block`, so the version pill sits right after the
+    // name. The header keeps both on one scrolling line, so no wrapping here.
+    "text-sm font-medium text-foreground align-middle";
   if (enableLink && uuid) {
     return (
       <Link
