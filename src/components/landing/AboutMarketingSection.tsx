@@ -27,7 +27,7 @@ export function AboutMarketingSection() {
               Aman Dalmia
             </h3>
             <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed mt-1">
-              Principal ML Engineer, Artpark
+              Principal ML Engineer, Artpark & The Agency Fund
             </p>
             <p
               className="text-sm font-medium text-gray-900 mt-3 inline-flex items-center gap-1 decoration-gray-300 underline-offset-4 group-hover:underline"
