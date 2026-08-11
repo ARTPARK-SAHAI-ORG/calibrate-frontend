@@ -1378,4 +1378,38 @@ describe("ItemDetailPane", () => {
     expect(screen.getByText("Desc here")).toBeInTheDocument();
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
   });
+
+  const renderWithType = (taskType: "llm" | "conversation" | "stt") =>
+    render(
+      <ItemDetailPane
+        item={{ id: 0, uuid: "item-1", task_id: "task-1", payload: {}, created_at: "", deleted_at: null }}
+        taskType={taskType}
+        evaluators={[]}
+        evaluatorNamesById={{}}
+        getJobEvaluator={() => null}
+        runs={[]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+
+  it.each(["llm", "conversation"] as const)(
+    "drops the left pane's top padding for %s items so the sticky toggle sits flush",
+    (taskType) => {
+      renderWithType(taskType);
+      const pane = screen.getByTestId("item-detail-left-pane");
+      expect(pane.className).toContain("pb-4");
+      expect(pane.className).not.toContain("py-4");
+      expect(pane.className).not.toContain("md:py-6");
+    },
+  );
+
+  it("keeps top padding for panes that bring no padding of their own", () => {
+    renderWithType("stt");
+    const pane = screen.getByTestId("item-detail-left-pane");
+    expect(pane.className).toContain("py-4");
+    expect(pane.className).toContain("md:py-6");
+  });
 });

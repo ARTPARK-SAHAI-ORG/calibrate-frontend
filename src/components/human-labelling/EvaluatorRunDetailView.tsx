@@ -1388,9 +1388,20 @@ export function ItemDetailPane({
       ? itemPayload.description
       : null;
 
+  // The llm / conversation panes render `TestDetailView`, which brings its own
+  // padding and a `sticky top-0` UI/JSON toggle. Adding top padding here would
+  // leave a band above the toggle that content scrolls through, so the left
+  // pane drops it for those types (same as the annotation job view).
+  const paneHasOwnPadding = taskType === "llm" || taskType === "conversation";
+
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
-      <div className="md:flex-[5] md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+      <div
+        data-testid="item-detail-left-pane"
+        className={`md:flex-[5] md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 md:px-6 ${
+          paneHasOwnPadding ? "pb-4 md:pb-6" : "py-4 md:py-6"
+        }`}
+      >
         <ItemPane item={item} taskType={taskType} />
       </div>
       <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
