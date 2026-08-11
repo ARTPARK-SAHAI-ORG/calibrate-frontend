@@ -11,7 +11,11 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
+import {
+  getBinaryDescription,
+  getBinaryLabel,
+  toRatingScale,
+} from "@/lib/binaryLabels";
 import {
   AgreementStatCard,
   agreementColor,
@@ -974,6 +978,14 @@ export function EvaluatorResultsPane({
                 jobEvaluator?.output_config?.scale ?? null,
                 false,
               )}
+              trueDescription={getBinaryDescription(
+                jobEvaluator?.output_config?.scale ?? null,
+                true,
+              )}
+              falseDescription={getBinaryDescription(
+                jobEvaluator?.output_config?.scale ?? null,
+                false,
+              )}
               ratingScale={toRatingScale(
                 jobEvaluator?.output_config?.scale,
               )}
@@ -1294,6 +1306,14 @@ function GroupedEvaluatorCard({
           true,
         )}
         falseLabel={getBinaryLabel(
+          jobEvaluator?.output_config?.scale ?? null,
+          false,
+        )}
+        trueDescription={getBinaryDescription(
+          jobEvaluator?.output_config?.scale ?? null,
+          true,
+        )}
+        falseDescription={getBinaryDescription(
           jobEvaluator?.output_config?.scale ?? null,
           false,
         )}

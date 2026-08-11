@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
+import {
+  getBinaryDescription,
+  getBinaryLabel,
+  toRatingScale,
+} from "@/lib/binaryLabels";
 import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
@@ -1110,6 +1114,10 @@ function EvaluatorsPane({
           outputType === "binary" ? getBinaryLabel(scale, true) : null;
         const falseLabel =
           outputType === "binary" ? getBinaryLabel(scale, false) : null;
+        const trueDescription =
+          outputType === "binary" ? getBinaryDescription(scale, true) : null;
+        const falseDescription =
+          outputType === "binary" ? getBinaryDescription(scale, false) : null;
         const ratingScale =
           outputType === "rating" ? toRatingScale(scale) : null;
 
@@ -1140,6 +1148,8 @@ function EvaluatorsPane({
               reasoning={typeof f?.comment === "string" ? f.comment : null}
               trueLabel={trueLabel}
               falseLabel={falseLabel}
+              trueDescription={trueDescription}
+              falseDescription={falseDescription}
               ratingScale={ratingScale}
             />
           );
@@ -1161,6 +1171,8 @@ function EvaluatorsPane({
             onCommentChange={(s) => setField(k, { comment: s })}
             trueLabel={trueLabel}
             falseLabel={falseLabel}
+            trueDescription={trueDescription}
+            falseDescription={falseDescription}
             ratingScale={ratingScale}
           />
         );

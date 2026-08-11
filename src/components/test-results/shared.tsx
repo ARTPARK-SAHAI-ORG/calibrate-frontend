@@ -18,7 +18,11 @@ import {
   WarningTriangleIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
-import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
+import {
+  getBinaryDescription,
+  getBinaryLabel,
+  toRatingScale,
+} from "@/lib/binaryLabels";
 import { copyToClipboard } from "@/lib/clipboard";
 
 // Renders the evaluator name. Authenticated result pages can link to the
@@ -710,6 +714,12 @@ function JudgeResultCard({
 }) {
   const isRating = result.score !== null && result.score !== undefined;
   const scale = evaluator?.output_config?.scale ?? null;
+  // A rating evaluator's scale encodes levels 1..N, and `coerceBinaryValue`
+  // would misread levels 1 and 0 as true/false. `isRating` above comes from
+  // the row's score, so a rating row missing its score would otherwise pull
+  // a rating rubric into the Pass/Fail labels. Only consult the scale for
+  // binary lookups when the evaluator itself declares binary output.
+  const binaryScale = evaluator?.output_type === "rating" ? null : scale;
   const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
@@ -738,13 +748,15 @@ function JudgeResultCard({
       trueLabel={
         result.match === true && valueName
           ? valueName
-          : getBinaryLabel(scale, true)
+          : getBinaryLabel(binaryScale, true)
       }
       falseLabel={
         result.match === false && valueName
           ? valueName
-          : getBinaryLabel(scale, false)
+          : getBinaryLabel(binaryScale, false)
       }
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />
@@ -1278,6 +1290,12 @@ function EvaluatorPanelCard({
       ? result.variable_values
       : variableValues ?? null;
   const scale = evaluator?.output_config?.scale ?? null;
+  // A rating evaluator's scale encodes levels 1..N, and `coerceBinaryValue`
+  // would misread levels 1 and 0 as true/false. `isRating` above comes from
+  // the row's score, so a rating row missing its score would otherwise pull
+  // a rating rubric into the Pass/Fail labels. Only consult the scale for
+  // binary lookups when the evaluator itself declares binary output.
+  const binaryScale = evaluator?.output_type === "rating" ? null : scale;
   const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
@@ -1305,13 +1323,15 @@ function EvaluatorPanelCard({
       trueLabel={
         result.match === true && valueName
           ? valueName
-          : getBinaryLabel(scale, true)
+          : getBinaryLabel(binaryScale, true)
       }
       falseLabel={
         result.match === false && valueName
           ? valueName
-          : getBinaryLabel(scale, false)
+          : getBinaryLabel(binaryScale, false)
       }
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />

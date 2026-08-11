@@ -3,6 +3,7 @@ import {
   DEFAULT_BINARY_FALSE_LABEL,
   defaultBinaryLabel,
   coerceBinaryValue,
+  getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
 } from "../binaryLabels";
@@ -90,12 +91,50 @@ describe("toRatingScale", () => {
       { value: 2, name: null },
     ]);
     expect(result).toEqual([
-      { value: 1, name: "One" },
-      { value: 2, name: null },
+      { value: 1, name: "One", description: null },
+      { value: 2, name: null, description: null },
     ]);
   });
 
   it("returns empty array when scale has no numeric entries", () => {
     expect(toRatingScale([{ value: true }, { value: "x" }])).toEqual([]);
+  });
+
+  it("carries the per-level description through, trimming blanks to null", () => {
+    expect(
+      toRatingScale([
+        { value: 1, name: "One", description: "  Ignores the question.  " },
+        { value: 2, name: "Two", description: "   " },
+      ]),
+    ).toEqual([
+      { value: 1, name: "One", description: "Ignores the question." },
+      { value: 2, name: "Two", description: null },
+    ]);
+  });
+});
+
+describe("getBinaryDescription", () => {
+  it("returns null when there is no scale or no matching entry", () => {
+    expect(getBinaryDescription(null, true)).toBeNull();
+    expect(getBinaryDescription(undefined, false)).toBeNull();
+    expect(getBinaryDescription([{ value: false, description: "x" }], true)).toBeNull();
+  });
+
+  it("returns null for a blank or missing description", () => {
+    expect(getBinaryDescription([{ value: true }], true)).toBeNull();
+    expect(getBinaryDescription([{ value: true, description: "  " }], true)).toBeNull();
+    expect(getBinaryDescription([{ value: true, description: null }], true)).toBeNull();
+  });
+
+  it("returns the trimmed description, matching alternate value encodings", () => {
+    expect(
+      getBinaryDescription([{ value: true, description: "  Answers fully.  " }], true),
+    ).toBe("Answers fully.");
+    expect(getBinaryDescription([{ value: 0, description: "Wrong." }], false)).toBe(
+      "Wrong.",
+    );
+    expect(getBinaryDescription([{ value: "yes", description: "Right." }], true)).toBe(
+      "Right.",
+    );
   });
 });

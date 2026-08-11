@@ -505,6 +505,188 @@ describe("EvaluatorVerdictCard - write mode rating", () => {
   });
 });
 
+describe("EvaluatorVerdictCard - per-option descriptions", () => {
+  it("shows the rubric under each binary option and keeps it clickable", async () => {
+    const user = setupUser();
+    const onValueChange = jest.fn();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        trueLabel="Yes"
+        falseLabel="No"
+        trueDescription="Answers fully and states the refund window."
+        falseDescription="Leaves out the refund window."
+        onValueChange={onValueChange}
+      />,
+    );
+    expect(
+      screen.getByText("Answers fully and states the refund window."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Leaves out the refund window."),
+    ).toBeInTheDocument();
+    // Rubrics switch the pair to the wider left-aligned layout so the
+    // text has room to wrap.
+    expect(
+      screen.getByRole("button", { name: /Answers fully/ }),
+    ).toHaveClass("text-left");
+    // The description sits inside the option button, so the whole card
+    // stays a single click target.
+    await user.click(
+      screen.getByRole("button", { name: /Leaves out the refund window/ }),
+    );
+    expect(onValueChange).toHaveBeenCalledWith(false);
+  });
+
+  it("keeps the compact binary layout when no rubric is authored", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        trueLabel="Yes"
+        falseLabel="No"
+        trueDescription="   "
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Yes" })).toHaveClass("h-9");
+  });
+
+  it("shows the rubric under each rating option alongside the number and label", async () => {
+    const user = setupUser();
+    const onValueChange = jest.fn();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="rating"
+        scaleMin={1}
+        scaleMax={2}
+        ratingScale={[
+          { value: 1, description: "Ignores the question." },
+          { value: 2, name: "Good", description: "Answers it fully." },
+        ]}
+        onValueChange={onValueChange}
+      />,
+    );
+    // A level with a rubric but no name keeps just the number.
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2 · Good")).toBeInTheDocument();
+    expect(screen.getByText("Ignores the question.")).toBeInTheDocument();
+    expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Answers it fully/ }));
+    expect(onValueChange).toHaveBeenCalledWith(2);
+  });
+
+  it("shows only the given verdict's rubric in read mode", () => {
+    const { rerender } = render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="binary"
+        match={false}
+        trueDescription="Answers fully."
+        falseDescription="Leaves out the refund window."
+      />,
+    );
+    expect(
+      screen.getByText("Leaves out the refund window."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
+
+    rerender(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="rating"
+        score={2}
+        scaleMin={1}
+        scaleMax={2}
+        ratingScale={[
+          { value: 1, name: "Bad", description: "Ignores the question." },
+          { value: 2, name: "Good", description: "Answers it fully." },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
+    expect(screen.queryByText("Ignores the question.")).not.toBeInTheDocument();
+
+    rerender(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="binary"
+        match={true}
+        trueDescription="Answers fully."
+        falseDescription="Leaves out the refund window."
+      />,
+    );
+    expect(screen.getByText("Answers fully.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Leaves out the refund window."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the read-mode rubric when the recorded label disagrees with the local scale", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="rating"
+        score={2}
+        scaleMin={1}
+        scaleMax={2}
+        ratingLabel="Excellent"
+        ratingScale={[{ value: 2, name: "Good", description: "Answers it fully." }]}
+      />,
+    );
+    // The verdict was recorded against a different evaluator version, so
+    // the local rubric would describe a different level.
+    expect(screen.getByText("Excellent")).toBeInTheDocument();
+    expect(screen.queryByText("Answers it fully.")).not.toBeInTheDocument();
+  });
+
+  it("marks the picked option as pressed so it is not signalled by colour alone", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        trueLabel="Yes"
+        falseLabel="No"
+        value={true}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Yes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "No" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("shows no rubric in read mode when there is no verdict", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="binary"
+        match={null}
+        trueDescription="Answers fully."
+        falseDescription="Leaves out the refund window."
+      />,
+    );
+    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Leaves out the refund window."),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("EvaluatorVerdictCard - write mode variables + reasoning", () => {
   it("renders variables block inline in write mode", () => {
     render(
