@@ -629,7 +629,7 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides the read-mode rubric when the recorded label disagrees with the local scale", () => {
+  it("keeps the read-mode rubric under a recorded label that renames the level", () => {
     render(
       <EvaluatorVerdictCard
         mode="read"
@@ -642,10 +642,10 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
         ratingScale={[{ value: 2, name: "Good", description: "Answers it fully." }]}
       />,
     );
-    // The verdict was recorded against a different evaluator version, so
-    // the local rubric would describe a different level.
+    // The recorded name wins for the pill, but the rubric still comes
+    // from the local scale entry for this score.
     expect(screen.getByText("Excellent")).toBeInTheDocument();
-    expect(screen.queryByText("Answers it fully.")).not.toBeInTheDocument();
+    expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
   });
 
   it("marks the picked option as pressed so it is not signalled by colour alone", () => {

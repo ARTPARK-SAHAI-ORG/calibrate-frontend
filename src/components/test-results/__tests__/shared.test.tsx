@@ -350,7 +350,7 @@ describe("JudgeResultsList", () => {
     expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
   });
 
-  it("hides the rubric when the recorded label disagrees with the local scale", () => {
+  it("keeps the rubric under a recorded label that renames the local option", () => {
     render(
       <JudgeResultsList
         results={[
@@ -370,10 +370,11 @@ describe("JudgeResultsList", () => {
         }}
       />,
     );
-    // The verdict was recorded against an older evaluator version, so the
-    // local rubric describes a differently-named option.
+    // The recorded name wins for the label, but it renames the option
+    // rather than disqualifying its rubric — same resolution
+    // ItemDetailDialog uses for a per-row recorded name.
     expect(screen.getByText("Excellent")).toBeInTheDocument();
-    expect(screen.queryByText("Local v9 rubric.")).not.toBeInTheDocument();
+    expect(screen.getByText("Local v9 rubric.")).toBeInTheDocument();
   });
 
   it("keeps the rubric when the recorded label agrees with the local scale", () => {

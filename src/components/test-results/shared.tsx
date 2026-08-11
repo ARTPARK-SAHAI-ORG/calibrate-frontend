@@ -718,17 +718,12 @@ function JudgeResultCard({
   // The card falls back to binary whenever the row has no score, so a
   // rating evaluator's scale must not be read as true/false here.
   const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
-  const valueName = result.value_name?.trim() || null;
   // The recorded value_name wins over the local scale for the label,
   // because the local scale can belong to a newer evaluator version. The
-  // rubric has no such recorded copy, so when the two disagree it
-  // describes a different option: drop it rather than show text that
-  // contradicts the label beside it. Same guard the rating path applies
-  // in EvaluatorVerdictCard's readVerdictDescription.
-  const binaryRubricScale =
-    valueName && valueName !== getBinaryLabel(binaryScale, result.match === true)
-      ? null
-      : binaryScale;
+  // rubric still comes from the local scale: same resolution as
+  // ItemDetailDialog, which overrides the matching scale entry's name
+  // with the recorded one and keeps the rest of the entry.
+  const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
       mode="read"
@@ -763,8 +758,8 @@ function JudgeResultCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryRubricScale, true)}
-      falseDescription={getBinaryDescription(binaryRubricScale, false)}
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />
@@ -1301,17 +1296,12 @@ function EvaluatorPanelCard({
   // The card falls back to binary whenever the row has no score, so a
   // rating evaluator's scale must not be read as true/false here.
   const binaryScale = binaryScaleFor(evaluator?.output_type, scale);
-  const valueName = result.value_name?.trim() || null;
   // The recorded value_name wins over the local scale for the label,
   // because the local scale can belong to a newer evaluator version. The
-  // rubric has no such recorded copy, so when the two disagree it
-  // describes a different option: drop it rather than show text that
-  // contradicts the label beside it. Same guard the rating path applies
-  // in EvaluatorVerdictCard's readVerdictDescription.
-  const binaryRubricScale =
-    valueName && valueName !== getBinaryLabel(binaryScale, result.match === true)
-      ? null
-      : binaryScale;
+  // rubric still comes from the local scale: same resolution as
+  // ItemDetailDialog, which overrides the matching scale entry's name
+  // with the recorded one and keeps the rest of the entry.
+  const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
       mode="read"
@@ -1345,8 +1335,8 @@ function EvaluatorPanelCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryRubricScale, true)}
-      falseDescription={getBinaryDescription(binaryRubricScale, false)}
+      trueDescription={getBinaryDescription(binaryScale, true)}
+      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />

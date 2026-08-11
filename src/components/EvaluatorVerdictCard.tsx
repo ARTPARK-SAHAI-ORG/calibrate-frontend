@@ -579,16 +579,14 @@ function readVerdictDescription(p: ReadProps): string | null {
     return null;
   }
   if (typeof p.score !== "number") return null;
-  const entry = p.ratingScale?.find((e) => e.value === p.score);
-  if (!entry) return null;
   // The pill prefers the caller's pre-resolved `ratingLabel` (the backend's
-  // recorded value_name) because the local scale can belong to a newer
-  // evaluator version. Honour the same guard here: when the two disagree,
-  // the local rubric describes a different level, so show nothing rather
-  // than a rubric that contradicts the label beside it.
-  const recorded = p.ratingLabel?.trim();
-  if (recorded && recorded !== entry.name?.trim()) return null;
-  return entry.description?.trim() || null;
+  // recorded value_name) over the local level name, but the rubric still
+  // comes from the local scale: the recorded label renames the level, it
+  // does not disqualify its description. Same resolution ItemDetailDialog
+  // uses when it overrides a scale entry's name with the recorded one.
+  return (
+    p.ratingScale?.find((e) => e.value === p.score)?.description?.trim() || null
+  );
 }
 
 function VariableValuesBlock({ values }: { values: Record<string, string> }) {
