@@ -1319,7 +1319,6 @@ function EvaluatorDetailPageInner() {
                   })()}
                 </div>
               </div>
-
             </div>
 
             {/* Footer */}
