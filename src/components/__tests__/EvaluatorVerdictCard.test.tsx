@@ -239,6 +239,27 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(screen.getByText("v3")).toBeInTheDocument();
   });
 
+  it("keeps the version pill in the same text flow as the name", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        versionLabel="v3"
+        outputType="binary"
+        match={true}
+        reasoning="Because"
+      />,
+    );
+    // Same parent, and that parent is not a flex row — otherwise the pill
+    // becomes its own flex item and drops to a line of its own when the
+    // toggle button next to it grows.
+    const pill = screen.getByText("v3");
+    const name = screen.getByText("Eval");
+    expect(pill.parentElement).toBe(name.parentElement);
+    expect(pill.parentElement?.className).not.toContain("flex ");
+    expect(name.className).not.toContain("inline-block");
+  });
+
   it("renders name as a link when enableLink and evaluatorUuid are set", () => {
     render(
       <EvaluatorVerdictCard
