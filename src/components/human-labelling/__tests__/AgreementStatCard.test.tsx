@@ -63,6 +63,35 @@ describe("AgreementStatCard", () => {
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
+  it("shows the evaluator's own result next to the agreement number", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        value="90%"
+        result={{ label: "Correct", value: "75%", title: "3 of 4 items" }}
+      />
+    );
+    const stat = screen.getByTitle("3 of 4 items");
+    expect(stat).toHaveTextContent("Correct");
+    expect(stat).toHaveTextContent("75%");
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+    expect(screen.getByText("90%")).toBeInTheDocument();
+    // The word "alignment" is dropped once each number carries its own label.
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+  });
+
+  it("renders the static pill variant with a result", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Correctness v2"
+        value="—"
+        result={{ label: "Average score", value: "3.5 / 5" }}
+      />
+    );
+    expect(screen.getByText("Average score")).toBeInTheDocument();
+    expect(screen.getByText("3.5 / 5")).toBeInTheDocument();
+  });
+
   it("renders the evaluator pill variant without a version label", () => {
     render(
       <AgreementStatCard

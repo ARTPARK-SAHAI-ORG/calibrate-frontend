@@ -28,6 +28,7 @@ import {
   computeInterAnnotatorAgreement,
   computeEvaluatorHumanAgreement,
   isBelowFullEvaluatorAgreement,
+  summariseEvaluatorRuns,
   agreementExportCell,
   extractEvaluatorVariables,
   exportInputCols,
@@ -471,6 +472,113 @@ describe("annotatorDisplayName", () => {
   });
 });
 
+describe("summariseEvaluatorRuns", () => {
+  const row = (
+    overrides: Partial<EvaluatorRunRow> = {},
+  ): EvaluatorRunRow => ({
+    uuid: "r",
+    job_id: "j",
+    item_id: "i",
+    evaluator_id: "ev-1",
+    evaluator_version_id: "ver-1",
+    value: { value: true },
+    status: "completed",
+    created_at: "",
+    completed_at: "",
+    ...overrides,
+  });
+  const binaryEv: JobEvaluator = { uuid: "ev-1", name: "E", output_type: "binary" };
+  const ratingEv: JobEvaluator = {
+    uuid: "ev-1",
+    name: "E",
+    output_type: "rating",
+    scale_min: 1,
+    scale_max: 5,
+  };
+  const key = { evaluator_id: "ev-1", evaluator_version_id: "ver-1" };
+
+  it("returns the share of true values for a binary evaluator", () => {
+    const out = summariseEvaluatorRuns(
+      [
+        row({ uuid: "a", value: { value: true } }),
+        row({ uuid: "b", value: { value: false } }),
+        row({ uuid: "c", value: { value: true } }),
+        row({ uuid: "d", value: { value: true } }),
+      ],
+      key,
+      binaryEv,
+    );
+    expect(out).toEqual({
+      label: "Correct",
+      value: "75%",
+      title: "3 of 4 items",
+    });
+  });
+
+  it("uses the evaluator's custom true label", () => {
+    const out = summariseEvaluatorRuns([row()], key, {
+      ...binaryEv,
+      output_config: {
+        scale: [
+          { value: true, name: "Passed" },
+          { value: false, name: "Failed" },
+        ],
+      },
+    });
+    expect(out?.label).toBe("Passed");
+  });
+
+  it("averages the scores for a rating evaluator and shows the scale max", () => {
+    const out = summariseEvaluatorRuns(
+      [
+        row({ uuid: "a", value: { value: 4 } }),
+        row({ uuid: "b", value: { value: 3 } }),
+      ],
+      key,
+      ratingEv,
+    );
+    expect(out).toEqual({
+      label: "Average score",
+      value: "3.5 / 5",
+      title: "Average across 2 items",
+    });
+  });
+
+  it("drops the scale max when the evaluator has none", () => {
+    const out = summariseEvaluatorRuns(
+      [row({ value: { value: 2 } })],
+      key,
+      { ...ratingEv, scale_max: null },
+    );
+    expect(out?.value).toBe("2");
+    expect(out?.title).toBe("Average across 1 item");
+  });
+
+  it("ignores runs from other evaluators and other versions", () => {
+    const out = summariseEvaluatorRuns(
+      [
+        row({ uuid: "a", value: { value: true } }),
+        row({ uuid: "b", evaluator_id: "other", value: { value: false } }),
+        row({ uuid: "c", evaluator_version_id: "ver-2", value: { value: false } }),
+      ],
+      key,
+      binaryEv,
+    );
+    expect(out?.value).toBe("100%");
+    expect(out?.title).toBe("1 of 1 item");
+  });
+
+  it("returns null when the evaluator produced no usable values", () => {
+    expect(
+      summariseEvaluatorRuns([row({ value: null })], key, binaryEv),
+    ).toBeNull();
+    expect(
+      summariseEvaluatorRuns([row({ value: { value: true } })], key, ratingEv),
+    ).toBeNull();
+    expect(summariseEvaluatorRuns([], key, binaryEv)).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Fixtures for component tests
 // ---------------------------------------------------------------------------
@@ -837,6 +945,37 @@ describe("EvaluatorRunDetailView", () => {
     );
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
+  });
+
+  it("shows each evaluator's summarised value across the items", () => {
+    const job = makeJob({
+      runs: [
+        makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
+        makeRun({ uuid: "r2", item_id: "item-2", value: { value: false } }),
+      ],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    const stat = screen.getByTitle("1 of 2 items");
+    expect(stat).toHaveTextContent("Correct");
+    expect(stat).toHaveTextContent("50%");
+  });
+
+  it("shows the summarised value even when there are no human labels yet", () => {
+    const job = makeJob({
+      human_agreement: undefined,
+      runs: [makeRun({ value: { value: true } })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(
+      screen.getByText(/No human labels found on the items in this run yet/),
+    ).toBeInTheDocument();
+    // Agreement column falls back to an em dash.
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("does not render the human agreement summary while the job is still in progress", () => {

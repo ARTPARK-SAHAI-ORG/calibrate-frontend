@@ -17,12 +17,45 @@ const agreementStatPillBase =
 const evaluatorAgreementPillLink =
   "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground shrink-0 text-left";
 
+/** One labelled number inside the card. */
+function Stat({
+  label,
+  value,
+  valueClassName = "",
+  title,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+  title?: string;
+}) {
+  return (
+    <div className="min-w-0" title={title}>
+      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+        {label}
+      </div>
+      <div
+        className={`text-2xl font-semibold tabular-nums mt-0.5 whitespace-nowrap ${valueClassName}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/** The evaluator's own summarised result across the run's items. */
+export type EvaluatorResultStat = {
+  /** What the number is, e.g. the "true" label or "Average score". */
+  label: string;
+  value: string;
+  /** Hover text, e.g. "8 of 10 items". */
+  title?: string;
+};
+
 export function AgreementStatCard(
-  props:
+  props: (
     | {
         staticPillText: string;
-        value: string;
-        valueClassName?: string;
       }
     | {
         evaluatorPill: {
@@ -30,11 +63,15 @@ export function AgreementStatCard(
           name: string;
           versionLabel?: string | null;
         };
-        value: string;
-        valueClassName?: string;
-      },
+      }
+  ) & {
+    value: string;
+    valueClassName?: string;
+    /** When present, the card shows this next to the agreement number. */
+    result?: EvaluatorResultStat | null;
+  },
 ) {
-  const { value, valueClassName = "" } = props;
+  const { value, valueClassName = "", result = null } = props;
   return (
     <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] w-max shrink-0">
       {"staticPillText" in props ? (
@@ -60,16 +97,33 @@ export function AgreementStatCard(
               </span>
             )}
           </Link>
-          <span className="text-sm font-medium text-foreground shrink-0">
-            alignment
-          </span>
+          {!result && (
+            <span className="text-sm font-medium text-foreground shrink-0">
+              alignment
+            </span>
+          )}
         </div>
       )}
-      <div
-        className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
-      >
-        {value}
-      </div>
+      {result ? (
+        <div className="mt-2 flex items-start gap-6">
+          <Stat
+            label={result.label}
+            value={result.value}
+            title={result.title}
+          />
+          <Stat
+            label="Human agreement"
+            value={value}
+            valueClassName={valueClassName}
+          />
+        </div>
+      ) : (
+        <div
+          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+        >
+          {value}
+        </div>
+      )}
     </div>
   );
 }
