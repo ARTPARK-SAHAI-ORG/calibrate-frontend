@@ -171,11 +171,14 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
+        {/* The row wraps as a whole: on a narrow card the chips drop to
+            their own line rather than squeezing the name column until the
+            version pill falls below the name. */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           {/* Plain text flow, not a flex row: the version pill then sits
               right after the last word of the name and follows it when the
               name wraps, instead of dropping onto a line of its own. */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-[9rem]">
             <NameLabel
               name={props.name}
               uuid={props.evaluatorUuid}
