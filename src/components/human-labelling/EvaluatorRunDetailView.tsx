@@ -341,7 +341,16 @@ export function summariseEvaluatorRuns(
   runs: EvaluatorRunRow[],
   ev: { evaluator_id: string; evaluator_version_id?: string },
   jobEvaluator: JobEvaluator | null,
-): { label: string; value: string; title: string } | null {
+): {
+  label: string;
+  value: string;
+  title: string;
+  /** 0–1 position of the value on its own scale, so the card can colour it
+   * on the same thresholds as the agreement number. Null when the scale is
+   * unknown (a rating evaluator with no scale_max), which leaves the value
+   * in the default text colour. */
+  ratio: number | null;
+} | null {
   const values = runs
     .filter(
       (r) =>
@@ -364,24 +373,30 @@ export function summariseEvaluatorRuns(
       typeof jobEvaluator?.scale_max === "number"
         ? jobEvaluator.scale_max
         : null;
+    const min =
+      typeof jobEvaluator?.scale_min === "number" ? jobEvaluator.scale_min : 0;
     return {
-      label: "Average score",
+      label: "Score",
       value: max != null ? `${rounded} / ${max}` : rounded,
       title: `Average across ${itemWord(nums.length)}`,
+      ratio: max != null && max > min ? (avg - min) / (max - min) : null,
     };
   }
 
   const bools = values.filter((v): v is boolean => typeof v === "boolean");
   if (bools.length === 0) return null;
   const trueCount = bools.filter(Boolean).length;
+  // The verdict word (Correct / Pass / whatever the evaluator calls it) goes
+  // in the hover text, not the label, so every card reads "Score".
   const trueLabel = getBinaryLabel(
     binaryScaleFor(jobEvaluator?.output_type, jobEvaluator?.output_config?.scale),
     true,
   );
   return {
-    label: trueLabel,
+    label: "Score",
     value: formatPercent((trueCount / bools.length) * 100, 0),
-    title: `${trueCount} of ${itemWord(bools.length)}`,
+    title: `${trueLabel} on ${trueCount} of ${itemWord(bools.length)}`,
+    ratio: trueCount / bools.length,
   };
 }
 
@@ -1568,10 +1583,13 @@ function EvaluatorSummary({
             : ev.evaluator_version_id
               ? (versionLabels[ev.evaluator_version_id] ?? null)
               : null;
+          // No human labels on this evaluator's items means there is nothing
+          // to agree with, so the card drops that number rather than showing
+          // an em dash next to the result.
           const value =
             row?.agreement != null
               ? `${Math.round(row.agreement * 100)}%`
-              : "—";
+              : null;
           const valueClassName = agreementColor(row?.agreement);
           const result = summariseEvaluatorRuns(
             runs,

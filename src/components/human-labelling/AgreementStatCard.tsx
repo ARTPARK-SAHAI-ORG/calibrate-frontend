@@ -50,6 +50,9 @@ export type EvaluatorResultStat = {
   value: string;
   /** Hover text, e.g. "8 of 10 items". */
   title?: string;
+  /** 0–1 position of the value on its own scale. Colours the number on the
+   * same thresholds as the agreement number. Null leaves it uncoloured. */
+  ratio?: number | null;
 };
 
 export function AgreementStatCard(
@@ -65,7 +68,9 @@ export function AgreementStatCard(
         };
       }
   ) & {
-    value: string;
+    /** Human agreement. Null hides that number entirely — used when the run's
+     * items carry no human labels, so there is nothing to agree with. */
+    value: string | null;
     valueClassName?: string;
     /** When present, the card shows this next to the agreement number. */
     result?: EvaluatorResultStat | null;
@@ -109,19 +114,24 @@ export function AgreementStatCard(
           <Stat
             label={result.label}
             value={result.value}
+            valueClassName={
+              result.ratio == null ? "" : agreementColor(result.ratio)
+            }
             title={result.title}
           />
-          <Stat
-            label="Human agreement"
-            value={value}
-            valueClassName={valueClassName}
-          />
+          {value != null && (
+            <Stat
+              label="Human agreement"
+              value={value}
+              valueClassName={valueClassName}
+            />
+          )}
         </div>
       ) : (
         <div
           className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
         >
-          {value}
+          {value ?? "—"}
         </div>
       )}
     </div>

@@ -509,13 +509,14 @@ describe("summariseEvaluatorRuns", () => {
       binaryEv,
     );
     expect(out).toEqual({
-      label: "Correct",
+      label: "Score",
       value: "75%",
-      title: "3 of 4 items",
+      title: "Correct on 3 of 4 items",
+      ratio: 0.75,
     });
   });
 
-  it("uses the evaluator's custom true label", () => {
+  it("names the evaluator's custom true label in the hover text", () => {
     const out = summariseEvaluatorRuns([row()], key, {
       ...binaryEv,
       output_config: {
@@ -525,7 +526,8 @@ describe("summariseEvaluatorRuns", () => {
         ],
       },
     });
-    expect(out?.label).toBe("Passed");
+    expect(out?.label).toBe("Score");
+    expect(out?.title).toBe("Passed on 1 of 1 item");
   });
 
   it("averages the scores for a rating evaluator and shows the scale max", () => {
@@ -538,9 +540,10 @@ describe("summariseEvaluatorRuns", () => {
       ratingEv,
     );
     expect(out).toEqual({
-      label: "Average score",
+      label: "Score",
       value: "3.5 / 5",
       title: "Average across 2 items",
+      ratio: 0.625,
     });
   });
 
@@ -552,6 +555,8 @@ describe("summariseEvaluatorRuns", () => {
     );
     expect(out?.value).toBe("2");
     expect(out?.title).toBe("Average across 1 item");
+    // No scale max, so there is no position to colour the number by.
+    expect(out?.ratio).toBeNull();
   });
 
   it("ignores runs from other evaluators and other versions", () => {
@@ -565,7 +570,7 @@ describe("summariseEvaluatorRuns", () => {
       binaryEv,
     );
     expect(out?.value).toBe("100%");
-    expect(out?.title).toBe("1 of 1 item");
+    expect(out?.title).toBe("Correct on 1 of 1 item");
   });
 
   it("returns null when the evaluator produced no usable values", () => {
@@ -957,8 +962,8 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    const stat = screen.getByTitle("1 of 2 items");
-    expect(stat).toHaveTextContent("Correct");
+    const stat = screen.getByTitle("Correct on 1 of 2 items");
+    expect(stat).toHaveTextContent("Score");
     expect(stat).toHaveTextContent("50%");
   });
 
@@ -974,8 +979,8 @@ describe("EvaluatorRunDetailView", () => {
     expect(
       screen.getByText(/No human labels found on the items in this run yet/),
     ).toBeInTheDocument();
-    // Agreement column falls back to an em dash.
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // Nothing to agree with, so that number is dropped from the card.
+    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
   });
 
   it("does not render the human agreement summary while the job is still in progress", () => {
