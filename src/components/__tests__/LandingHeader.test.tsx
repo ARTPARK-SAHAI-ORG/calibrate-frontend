@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { LandingHeader } from "../LandingHeader";
 
 describe("LandingHeader", () => {
@@ -42,12 +42,49 @@ describe("LandingHeader", () => {
     );
   });
 
-  it("renders documentation, github, and get started links", () => {
+  it("renders documentation and get started links", () => {
     render(<LandingHeader />);
     expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Get started" }),
     ).toHaveAttribute("href", "/login");
+  });
+
+  it("does not render a GitHub link", () => {
+    render(<LandingHeader />);
+    expect(
+      screen.queryByRole("link", { name: "GitHub" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("toggles the mobile menu with the hamburger button", async () => {
+    const user = setupUser();
+    render(<LandingHeader />);
+    const button = screen.getByRole("button", { name: "Menu" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    // Desktop copy of the nav links is always in the DOM.
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
+
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    // Mobile menu adds a second copy of each link.
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(2);
+
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
+  });
+
+  it("links case studies, integrations, and open source to their landing sections", () => {
+    render(<LandingHeader />);
+    expect(
+      screen.getByRole("link", { name: "Case studies" }),
+    ).toHaveAttribute("href", "/#use-cases");
+    expect(
+      screen.getByRole("link", { name: "Integrations" }),
+    ).toHaveAttribute("href", "/#integrations");
+    expect(
+      screen.getByRole("link", { name: "Open source" }),
+    ).toHaveAttribute("href", "/#open-source");
   });
 });

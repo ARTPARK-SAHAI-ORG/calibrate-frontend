@@ -33,7 +33,9 @@ describe("AboutMarketingSection", () => {
     );
 
     expect(screen.getByText("Aman Dalmia")).toBeInTheDocument();
-    expect(screen.getByText("Principal ML Engineer, Artpark")).toBeInTheDocument();
+    expect(
+      screen.getByText("Principal ML Engineer, Artpark & The Agency Fund"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Jigar Doshi")).toBeInTheDocument();
     expect(screen.getByText("Director of ML, Artpark")).toBeInTheDocument();
 

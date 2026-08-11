@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
 import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarquee";
@@ -36,6 +36,53 @@ type LandingFeatureSection = {
     comparisonSteps?: LandingQuickStartStep[];
   };
 };
+
+/** Customer stories shown in the "Trusted by mission-driven teams" section. Logos live in /public/use-cases. */
+const USE_CASES: {
+  name: string;
+  logo: string;
+  whatTheyDo: string;
+  useCase: string[];
+  quote?: string;
+  quoteHref?: string;
+}[] = [
+  {
+    name: "Noora Health",
+    logo: "/use-cases/noora-health.jpeg",
+    whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
+    useCase: [
+      "Align LLM judges with experts for continuously monitoring AI response quality",
+      "Creating structured tests to evaluate all AI modules and preventing regressions when deploying changes",
+      "Evaluating TTS model outputs across different languages",
+      "Running human labelling workshops with experts to gather evidence on user agency",
+    ],
+  },
+  {
+    name: "ARMMAN",
+    logo: "/use-cases/armman.png",
+    whatTheyDo:
+      "Voice agents to help mothers fill forms for maternal health programs",
+    useCase: [
+      "Evaluating the data extraction and response generation quality of LLMs",
+      "Finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff",
+      "Aligning LLM judges to humans to enable continuous monitoring of the agent's performance",
+    ],
+  },
+  {
+    name: "Kabakoo",
+    logo: "/use-cases/kabakoo.png",
+    whatTheyDo: "Mentor AI for upskilling African youth to get jobs",
+    useCase: [
+      "Evaluating quality of their agent's response",
+      "Empowering domain experts to own evals",
+      "Deploying changes confidently without any mistakes",
+    ],
+    quote:
+      "Thanks to a tool like Calibrate, Content and Learning colleagues can write test cases. AI evaluation is not a private language reserved for engineers.",
+    quoteHref:
+      "https://kabakoo.substack.com/p/the-ai-worked-did-it-work-for-the",
+  },
+];
 
 function LandingFeatureImageColumn(props: {
   section: LandingFeatureSection;
@@ -456,6 +503,14 @@ import {
 export default function HomePage() {
   const [activeFeatureSectionId, setActiveFeatureSectionId] =
     useState<string>("llm");
+  // While a click-driven smooth scroll is in flight, holds the clicked tab id so
+  // the scroll listener keeps it active instead of flipping to sections it passes.
+  const pendingScrollTargetRef = useRef<string | null>(null);
+  // Safety net: always drop the lock a bit after the click, in case the target
+  // section is never reached (e.g. clicking the already-active tab does not scroll).
+  const pendingScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Set page title
   useEffect(() => {
@@ -473,25 +528,57 @@ export default function HomePage() {
           activeId = tab.id;
         }
       }
+      // Hold the clicked tab active until the smooth scroll reaches it.
+      if (pendingScrollTargetRef.current) {
+        if (activeId === pendingScrollTargetRef.current) {
+          pendingScrollTargetRef.current = null;
+        } else {
+          return;
+        }
+      }
       setActiveFeatureSectionId((prev) =>
         prev === activeId ? prev : activeId,
       );
     };
 
+    // If the user takes over scrolling (wheel, touch, or keyboard), drop the
+    // lock so the scroll spy resumes tracking the real position.
+    const releasePendingTarget = () => {
+      pendingScrollTargetRef.current = null;
+    };
+
     measureActiveSection();
     window.addEventListener("scroll", measureActiveSection, { passive: true });
     window.addEventListener("resize", measureActiveSection);
+    window.addEventListener("wheel", releasePendingTarget, { passive: true });
+    window.addEventListener("touchmove", releasePendingTarget, {
+      passive: true,
+    });
+    window.addEventListener("keydown", releasePendingTarget);
     return () => {
       window.removeEventListener("scroll", measureActiveSection);
       window.removeEventListener("resize", measureActiveSection);
+      window.removeEventListener("wheel", releasePendingTarget);
+      window.removeEventListener("touchmove", releasePendingTarget);
+      window.removeEventListener("keydown", releasePendingTarget);
+      if (pendingScrollTimeoutRef.current) {
+        clearTimeout(pendingScrollTimeoutRef.current);
+      }
     };
   }, []);
 
   const scrollToLandingSection = (tabId: string) => {
+    if (pendingScrollTimeoutRef.current) {
+      clearTimeout(pendingScrollTimeoutRef.current);
+    }
+    pendingScrollTargetRef.current = tabId;
+    pendingScrollTimeoutRef.current = setTimeout(() => {
+      pendingScrollTargetRef.current = null;
+    }, 1000);
+    setActiveFeatureSectionId(tabId);
     document
       .getElementById(`landing-${tabId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setActiveFeatureSectionId(tabId);
   };
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
@@ -822,7 +909,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col">
           <nav
             aria-label="Product areas"
-            className="sticky top-0 z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
+            className="sticky top-[4.5rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
@@ -837,7 +924,7 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
               <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
-                <div className="sticky top-0 z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
+                <div className="sticky top-[4.5rem] z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
                 <section
@@ -858,7 +945,10 @@ export default function HomePage() {
       </div>
 
       {/* Open source — procurement & trust */}
-      <div className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100">
+      <div
+        id="open-source"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100 scroll-mt-20"
+      >
         <div className="max-w-5xl mx-auto text-center mb-10 md:mb-14">
           <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-medium text-gray-900 mb-3 md:mb-4 leading-[1.15] tracking-[-0.02em] text-balance">
             Proudly open source
@@ -1009,7 +1099,10 @@ export default function HomePage() {
       </div>
 
       {/* Integrations Section */}
-      <div className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
+      <div
+        id="integrations"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
             Works with any AI agent stack
@@ -1040,6 +1133,81 @@ export default function HomePage() {
             Request an integration
             <span>→</span>
           </a> */}
+        </div>
+      </div>
+
+      {/* Use Cases Section */}
+      <div
+        id="use-cases"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10 md:mb-14">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
+              Trusted by mission-driven teams
+            </h2>
+            <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
+              How non-profits use Calibrate to build AI products responsibly
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {USE_CASES.map((useCase) => (
+              <div
+                key={useCase.name}
+                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
+              >
+                <img
+                  src={useCase.logo}
+                  alt={`${useCase.name} logo`}
+                  className="h-16 md:h-20 w-auto max-w-[200px] object-contain object-left mb-5 md:mb-6"
+                />
+                <h3 className="text-xl md:text-2xl font-semibold text-gray-900 mb-5">
+                  {useCase.name}
+                </h3>
+                <p className="text-sm font-semibold text-gray-400 mb-1.5">
+                  What they do
+                </p>
+                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5">
+                  {useCase.whatTheyDo}
+                </p>
+                <p className="text-sm font-semibold text-gray-400 mb-2">
+                  Use case
+                </p>
+                <ul className="space-y-2">
+                  {useCase.useCase.map((point) => (
+                    <li
+                      key={point}
+                      className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
+                    >
+                      <span
+                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
+                        aria-hidden
+                      />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+                {useCase.quote && (
+                  <figure className="mt-6 pt-5 border-t border-gray-100">
+                    <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
+                      &ldquo;{useCase.quote}&rdquo;
+                    </blockquote>
+                    {useCase.quoteHref && (
+                      <a
+                        href={useCase.quoteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                      >
+                        Read the story
+                        <span aria-hidden>→</span>
+                      </a>
+                    )}
+                  </figure>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
