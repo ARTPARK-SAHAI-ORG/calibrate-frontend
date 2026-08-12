@@ -2816,7 +2816,9 @@ function LabellingTaskPageInner() {
                     has nothing to put in this section. */}
                 {evaluatorsThatRan.length > 0 && (
                   <section>
-                    <h2 className="text-sm font-semibold">Score summary</h2>
+                    <h2 className="text-sm font-semibold">
+                      Performance summary
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-1">
                       What each evaluator scored across the items in this task
                     </p>
@@ -2837,15 +2839,16 @@ function LabellingTaskPageInner() {
                 )}
                 <section>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold">Agreement summary</h2>
+                    <h2 className="text-sm font-semibold">Score reliability</h2>
                     <RefreshButton
                       loading={agreementLoading}
                       onClick={() => fetchAgreement()}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How closely annotators agree with each other, and how
-                    closely each evaluator aligns with humans
+                    How far those scores can be trusted: how closely annotators
+                    agree with each other, and how closely each evaluator
+                    agrees with them
                   </p>
                   {evaluatorsWithoutHumanLabels.length > 0 && (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
