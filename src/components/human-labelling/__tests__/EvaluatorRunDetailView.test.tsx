@@ -864,6 +864,358 @@ describe("EvaluatorRunDetailView", () => {
     ).not.toBeInTheDocument();
   });
 
+  // -------------------------------------------------------------------------
+  // Value filter ("Show items scored ...")
+  // -------------------------------------------------------------------------
+
+  // Value rows share their text with the item-strip buttons ("2"), so pick
+  // the one that carries a pressed state.
+  const valueOption = (label: string) => {
+    const matches = screen
+      .getAllByRole("button")
+      .filter(
+        (b) =>
+          b.hasAttribute("aria-pressed") && b.textContent?.trim() === label,
+      );
+    expect(matches).toHaveLength(1);
+    return matches[0];
+  };
+
+  // The evaluator rows in the picker read "<name>›".
+  const evaluatorRow = (name: string) => {
+    const matches = screen
+      .getAllByRole("button")
+      .filter((b) => b.textContent === `${name}›`);
+    expect(matches).toHaveLength(1);
+    return matches[0];
+  };
+
+  const addFilter = async (
+    user: ReturnType<typeof setupUser>,
+    evaluatorName: string,
+    valueLabel: string,
+  ) => {
+    await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+    await user.click(evaluatorRow(evaluatorName));
+    await user.click(valueOption(valueLabel));
+  };
+
+  // item-1 scores 5 (rating) / true (binary); item-2 scores 2 / false.
+  function makeValueFilterJob(overrides: Partial<EvaluatorRunJob> = {}) {
+    return makeJob({
+      evaluators: [evaluatorBinary, evaluatorRating],
+      runs: [
+        makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
+        makeRun({ uuid: "r2", item_id: "item-2", value: { value: false } }),
+        makeRun({
+          uuid: "r3",
+          item_id: "item-1",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: 5 },
+        }),
+        makeRun({
+          uuid: "r4",
+          item_id: "item-2",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: 2 },
+        }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it("stops applying a filter when the bar goes away", async () => {
+    // The page keeps this component when you move between runs, so a
+    // filter picked on a finished run can arrive at one still running.
+    // With no bar to clear it, it must not keep hiding items.
+    const user = setupUser();
+    const { rerender } = render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+
+    rerender(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob({ status: "in_progress" })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "+ Add filter" })).toBeNull();
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+  });
+
+  it("ignores a filter for an evaluator the run does not have", async () => {
+    // Same carry-over, but between two finished runs with different
+    // evaluators. An unusable filter draws no tag, so it must not filter.
+    const user = setupUser();
+    const { rerender } = render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+
+    rerender(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob({ evaluators: [evaluatorBinary] })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(screen.queryByText(/Rating Evaluator is/)).toBeNull();
+  });
+
+  it("does not offer the filter while the run is still going", () => {
+    // Scores arrive as the run works through the items, so there is
+    // nothing to filter by yet.
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob({ status: "in_progress" })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "+ Add filter" }),
+    ).toBeNull();
+  });
+
+  it("narrows the items to those a rating evaluator scored at the picked level", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Item Two")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Rating Evaluator is 2" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps each item's original number when the value filter hides earlier items", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Binary Evaluator", "Wrong");
+    // Only item-2 is left, and it keeps its original number 2.
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getAllByTitle(/^Item 2/).length).toBeGreaterThan(0);
+    expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
+  });
+
+  it("shows a plain message when no item matches the value filter", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Rating Evaluator", "3");
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+  });
+
+  it("keeps only the items that satisfy both of two active filters", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    // item-2 is the only one scored Wrong and 2.
+    await addFilter(user, "Binary Evaluator", "Wrong");
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Item Two")).toBeInTheDocument();
+  });
+
+  it("drops every item when the two active filters point at different items", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    // item-1 is Correct and scored 5; item-2 is Wrong and scored 2. Asking
+    // for Correct and 2 together leaves nothing.
+    await addFilter(user, "Binary Evaluator", "Correct");
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+  });
+
+  it("widens the list again when one of two tags is removed", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Binary Evaluator", "Correct");
+    await addFilter(user, "Rating Evaluator", "2");
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Remove Rating Evaluator is 2" }),
+    );
+    // Only the Correct filter is left, so item-1 comes back.
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rating Evaluator is 2" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers Clear all only once two tags are active, and it removes both", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Binary Evaluator", "Wrong");
+    expect(
+      screen.queryByRole("button", { name: "Clear all" }),
+    ).not.toBeInTheDocument();
+    await addFilter(user, "Rating Evaluator", "2");
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Clear all" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Binary Evaluator is Wrong" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reads 'or' on a tag with two values and a count past that", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Binary Evaluator", "Correct");
+    await user.click(valueOption("Wrong"));
+    expect(
+      screen.getByRole("button", { name: "Binary Evaluator is Correct or Wrong" }),
+    ).toBeInTheDocument();
+    // Both items are back, since each scored one of the two.
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+
+    await addFilter(user, "Rating Evaluator", "2");
+    await user.click(valueOption("3"));
+    await user.click(valueOption("5"));
+    expect(
+      screen.getByRole("button", { name: "Rating Evaluator is 3 of 5 scores" }),
+    ).toBeInTheDocument();
+  });
+
+  it("combines the value filter with 'Show disagreements only'", async () => {
+    const user = setupUser();
+    // item-1 disagrees, item-2 does not.
+    const job = makeValueFilterJob({
+      human_agreement: {
+        evaluators: [
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.5,
+            pair_count: 1,
+            item_count: 1,
+          },
+        ],
+        items: [
+          {
+            item_id: "item-1",
+            annotator_count: 1,
+            evaluators: [
+              {
+                evaluator_id: "ev-bin",
+                agreement: 0,
+                pair_count: 1,
+                human_annotations: [
+                  {
+                    annotation_id: "a1",
+                    annotator_id: "ann1",
+                    annotator_name: "Annotator One",
+                    job_id: "job-1",
+                    value: { value: false },
+                    updated_at: "",
+                  },
+                ],
+              },
+            ],
+          },
+          { item_id: "item-2", annotator_count: 0, evaluators: [] },
+        ],
+      },
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show disagreements only" }),
+    );
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    // item-1 is the only disagreement, and it scored Correct, so asking for
+    // Wrong leaves nothing.
+    await addFilter(user, "Binary Evaluator", "Wrong");
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+    // Correct keeps it.
+    await user.click(valueOption("Correct"));
+    await user.click(valueOption("Wrong"));
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+  });
+
+  it("does not render the filter toolbar when no evaluator can be filtered on", () => {
+    const job = makeJob({
+      // A rating evaluator with no bounds offers no values to pick.
+      evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
+      runs: [],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "+ Add filter" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders the top-level evaluator pill row (linked) when no agreement cards will render", () => {
     const job = makeJob({ runs: [], items: [] });
     render(

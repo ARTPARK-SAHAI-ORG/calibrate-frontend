@@ -24,6 +24,13 @@ import {
 } from "@/components/human-labelling/AgreementStatCard";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import {
+  ItemValueFilter,
+  matchesAllValueFilters,
+  usableValueFilters,
+  valueFilterEvaluators,
+  type ValueFilter,
+} from "@/components/human-labelling/ItemValueFilter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1646,11 +1653,12 @@ export function EvaluatorRunDetailView({
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterDisagreements, setFilterDisagreements] = useState(false);
+  const [valueFilters, setValueFilters] = useState<ValueFilter[]>([]);
 
-  // Reset when filter toggles.
+  // Reset when either filter changes.
   React.useEffect(() => {
     setCurrentIndex(0);
-  }, [filterDisagreements]);
+  }, [filterDisagreements, valueFilters]);
 
   const evaluatorNamesById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1749,24 +1757,59 @@ export function EvaluatorRunDetailView({
     [job],
   );
 
-  const filteredItemsForRun = useMemo(
-    () =>
-      filterDisagreements
-        ? itemsForRun.filter((it) => {
-            const itemAgreement = job?.human_agreement?.items.find(
-              (i) => i.item_id === it.uuid,
-            );
-            if (!itemAgreement) return false;
-            return itemAgreement.evaluators.some(
-              (e) =>
-                e.human_annotations.length > 0 &&
-                e.agreement !== null &&
-                e.agreement !== 1,
-            );
-          })
-        : itemsForRun,
-    [filterDisagreements, itemsForRun, job],
-  );
+  // Both filters apply together: an item has to satisfy every active one.
+  const jobEvaluators = useMemo(() => job?.evaluators ?? [], [job]);
+
+  // There is nothing to filter by until the run has finished and produced
+  // scores, so the control waits for the same moment as the result cards.
+  // It also renders nothing without items to narrow or an evaluator whose
+  // values can be picked, and the toolbar row must not appear for it alone.
+  const canFilterByValue =
+    job?.status === "completed" &&
+    itemsForRun.length > 0 &&
+    valueFilterEvaluators(jobEvaluators).length > 0;
+
+  const filteredItemsForRun = useMemo(() => {
+    let items = itemsForRun;
+    if (filterDisagreements) {
+      items = items.filter((it) => {
+        const itemAgreement = job?.human_agreement?.items.find(
+          (i) => i.item_id === it.uuid,
+        );
+        if (!itemAgreement) return false;
+        return itemAgreement.evaluators.some(
+          (e) =>
+            e.human_annotations.length > 0 &&
+            e.agreement !== null &&
+            e.agreement !== 1,
+        );
+      });
+    }
+    // Gated on `canFilterByValue` too: without it a filter picked on one
+    // run keeps hiding items after you move to a run whose bar is hidden,
+    // and there is no control on screen to clear it.
+    if (canFilterByValue && usableValueFilters(valueFilters, jobEvaluators).length > 0) {
+      // An evaluator can have several version rows per item; any one of
+      // them matching keeps the item.
+      const scoresFor = (itemUuid: string, evaluatorId: string) =>
+        (job?.runs ?? [])
+          .filter(
+            (r) => r.item_id === itemUuid && r.evaluator_id === evaluatorId,
+          )
+          .map((r) => r.value?.value);
+      items = items.filter((it) =>
+        matchesAllValueFilters(it.uuid, valueFilters, jobEvaluators, scoresFor),
+      );
+    }
+    return items;
+  }, [
+    filterDisagreements,
+    valueFilters,
+    itemsForRun,
+    job,
+    canFilterByValue,
+    jobEvaluators,
+  ]);
 
   const originalIndexByUuid = useMemo(
     () => new Map(itemsForRun.map((it, i) => [it.uuid, i + 1])),
@@ -1910,20 +1953,29 @@ export function EvaluatorRunDetailView({
 
       <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
         <div className="flex flex-col flex-1 min-h-0">
-          {hasDisagreements && (
-            <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-start">
-              <button
-                onClick={() => setFilterDisagreements((f) => !f)}
-                className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                  filterDisagreements
-                    ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
-                    : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
-                }`}
-              >
-                {filterDisagreements
-                  ? "Showing disagreements only"
-                  : "Show disagreements only"}
-              </button>
+          {(hasDisagreements || canFilterByValue) && (
+            <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+              {hasDisagreements && (
+                <button
+                  onClick={() => setFilterDisagreements((f) => !f)}
+                  className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    filterDisagreements
+                      ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                      : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                  }`}
+                >
+                  {filterDisagreements
+                    ? "Showing disagreements only"
+                    : "Show disagreements only"}
+                </button>
+              )}
+              {canFilterByValue && (
+                <ItemValueFilter
+                  evaluators={jobEvaluators}
+                  filters={valueFilters}
+                  onChange={setValueFilters}
+                />
+              )}
             </div>
           )}
           <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -2020,7 +2072,12 @@ export function EvaluatorRunDetailView({
             <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
               {!currentItem ? (
                 <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
-                  No items in this run.
+                  {(canFilterByValue &&
+                    usableValueFilters(valueFilters, jobEvaluators).length >
+                      0) ||
+                  filterDisagreements
+                    ? "No items match this filter."
+                    : "No items in this run."}
                 </div>
               ) : (
                 <ItemDetailPane
