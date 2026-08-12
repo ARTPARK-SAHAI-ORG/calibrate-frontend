@@ -1589,9 +1589,9 @@ function LabellingTaskPageInner() {
       handleTabChange("items");
       return;
     }
-    // Items exist — overview only renders the agreement panel, so if
-    // there's no agreement data the overview is just an empty state.
-    // Skip straight to the items tab in that case. Wait for every
+    // Items exist — if the overview has nothing to show (no annotator
+    // agreement, no evaluator score, no finished evaluation run) it is just
+    // an empty state, so skip straight to the items tab. Wait for every
     // overview-tab fetch to complete first so the user doesn't see a
     // spinner→bounce flicker on slow connections. If the agreement
     // fetch errored, stay on overview so the user sees the error rather
@@ -1607,11 +1607,8 @@ function LabellingTaskPageInner() {
       return;
     }
     if (!agreement) return;
-    const agreementEmpty =
-      (agreement.human_human?.pair_count ?? 0) === 0 &&
-      (agreement.evaluators ?? []).every((e) => (e.pair_count ?? 0) === 0);
     autoTabSwitchedRef.current = true;
-    if (agreementEmpty) {
+    if (!hasTaskOverviewData(agreement, runs)) {
       handleTabChange("items");
     }
   }, [
@@ -1623,6 +1620,7 @@ function LabellingTaskPageInner() {
     agreementFetchCompleted,
     summaryFetchCompleted,
     runsFetchCompleted,
+    runs,
   ]);
 
   // Map item_id -> annotator uuids who have at least one labelled annotation
