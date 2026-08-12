@@ -1,7 +1,10 @@
 import { render, screen, setupUser } from "@/test-utils";
 import {
   ItemValueFilter,
+  activeValueFilters,
+  describeValueFilter,
   isValueFilterActive,
+  matchesAllValueFilters,
   matchesValueFilter,
   valueFilterEvaluators,
   valueFilterOptions,
@@ -157,133 +160,286 @@ describe("isValueFilterActive", () => {
   });
 });
 
+describe("describeValueFilter", () => {
+  it("reads as a sentence for one value", () => {
+    expect(
+      describeValueFilter(binary, { evaluatorId: "ev-binary", values: [false] }),
+    ).toBe("Correctness is Wrong");
+  });
+
+  it("joins two values with or", () => {
+    expect(
+      describeValueFilter(rating, { evaluatorId: "ev-rating", values: [1, 3] }),
+    ).toBe("Helpfulness is 1 — Poor or 3 — Great");
+  });
+
+  it("collapses to a count past two values, so the bar stays short", () => {
+    expect(
+      describeValueFilter(rating, {
+        evaluatorId: "ev-rating",
+        values: [1, 2, 3],
+      }),
+    ).toBe("Helpfulness is 3 of 3 scores");
+  });
+
+  it("falls back to the evaluator name when nothing is picked", () => {
+    expect(
+      describeValueFilter(binary, { evaluatorId: "ev-binary", values: [] }),
+    ).toBe("Correctness");
+  });
+});
+
+describe("activeValueFilters", () => {
+  it("drops the ones with no value picked", () => {
+    const live = { evaluatorId: "a", values: [true] };
+    expect(
+      activeValueFilters([{ evaluatorId: "b", values: [] }, live]),
+    ).toEqual([live]);
+  });
+});
+
+describe("matchesAllValueFilters", () => {
+  const scores: Record<string, Record<string, unknown[]>> = {
+    "item-1": { "ev-binary": [false], "ev-rating": [1] },
+    "item-2": { "ev-binary": [false], "ev-rating": [5] },
+    "item-3": { "ev-binary": [true], "ev-rating": [1] },
+  };
+  const scoresFor = (item: string, ev: string) => scores[item]?.[ev] ?? [];
+  const evs = [binary, rating];
+
+  it("an item has to satisfy every filter", () => {
+    const filters = [
+      { evaluatorId: "ev-binary", values: [false] },
+      { evaluatorId: "ev-rating", values: [1] },
+    ];
+    expect(matchesAllValueFilters("item-1", filters, evs, scoresFor)).toBe(true);
+    expect(matchesAllValueFilters("item-2", filters, evs, scoresFor)).toBe(false);
+    expect(matchesAllValueFilters("item-3", filters, evs, scoresFor)).toBe(false);
+  });
+
+  it("keeps everything when no filter is active", () => {
+    expect(matchesAllValueFilters("item-3", [], evs, scoresFor)).toBe(true);
+    expect(
+      matchesAllValueFilters(
+        "item-3",
+        [{ evaluatorId: "ev-binary", values: [] }],
+        evs,
+        scoresFor,
+      ),
+    ).toBe(true);
+  });
+
+  it("any one of an evaluator's scores matching is enough", () => {
+    // The run page can hold one score per evaluator version.
+    const twoVersions = () => [2, 5];
+    expect(
+      matchesAllValueFilters(
+        "item-1",
+        [{ evaluatorId: "ev-rating", values: [5] }],
+        evs,
+        twoVersions,
+      ),
+    ).toBe(true);
+  });
+
+  it("ignores a filter for an evaluator this view does not have", () => {
+    // Filter state outlives the run it was made on. An unknown evaluator
+    // draws no tag, so it must not silently hide items either.
+    expect(
+      matchesAllValueFilters(
+        "item-3",
+        [{ evaluatorId: "ev-gone", values: [true] }],
+        evs,
+        scoresFor,
+      ),
+    ).toBe(true);
+  });
+
+  it("an item with no score for a known evaluator never matches", () => {
+    expect(
+      matchesAllValueFilters(
+        "item-1",
+        [{ evaluatorId: "ev-rating", values: [4] }],
+        evs,
+        scoresFor,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("ItemValueFilter", () => {
+  const noop = jest.fn();
+
   it("renders nothing when no evaluator can be filtered on", () => {
     const { container } = render(
       <ItemValueFilter
         evaluators={[{ uuid: "ev", output_type: "rating" }]}
-        filter={null}
-        onChange={jest.fn()}
+        filters={[]}
+        onChange={noop}
       />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows no value options until an evaluator is picked", () => {
+  it("shows only the add button before anything is picked", () => {
     render(
-      <ItemValueFilter
-        evaluators={[binary]}
-        filter={null}
-        onChange={jest.fn()}
-      />,
+      <ItemValueFilter evaluators={[binary]} filters={[]} onChange={noop} />,
     );
-    expect(screen.queryByRole("button", { name: "Correct" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "+ Add filter" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wrong" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clear all" })).toBeNull();
   });
 
-  it("picking an evaluator reports it with no values yet", async () => {
+  it("walks from the add button to an evaluator to a value", async () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(
       <ItemValueFilter
         evaluators={[binary, rating]}
-        filter={null}
+        filters={[]}
         onChange={onChange}
       />,
     );
-    await user.selectOptions(
-      screen.getByLabelText("Filter by evaluator"),
-      "ev-rating",
-    );
-    expect(onChange).toHaveBeenCalledWith({
-      evaluatorId: "ev-rating",
-      values: [],
-    });
+    await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+    // Both evaluators are offered, neither is filtered on yet.
+    expect(screen.getByRole("button", { name: /Correctness/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Helpfulness/ }));
+    await user.click(screen.getByRole("button", { name: "3 — Great" }));
+    expect(onChange).toHaveBeenCalledWith([
+      { evaluatorId: "ev-rating", values: [3] },
+    ]);
   });
 
-  it("adds a value on click and removes it on a second click", async () => {
-    const user = setupUser();
-    const onChange = jest.fn();
-    const filter: ValueFilter = { evaluatorId: "ev-binary", values: [] };
-    const { rerender } = render(
+  it("shows a picked filter as a tag", () => {
+    render(
       <ItemValueFilter
         evaluators={[binary]}
-        filter={filter}
-        onChange={onChange}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }]}
+        onChange={noop}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Wrong" }));
-    expect(onChange).toHaveBeenCalledWith({
-      evaluatorId: "ev-binary",
-      values: [false],
-    });
-
-    rerender(
-      <ItemValueFilter
-        evaluators={[binary]}
-        filter={{ evaluatorId: "ev-binary", values: [false] }}
-        onChange={onChange}
-      />,
-    );
-    const wrong = screen.getByRole("button", { name: "Wrong" });
-    expect(wrong).toHaveAttribute("aria-pressed", "true");
-    await user.click(wrong);
-    expect(onChange).toHaveBeenLastCalledWith({
-      evaluatorId: "ev-binary",
-      values: [],
-    });
+    expect(
+      screen.getByRole("button", { name: "Correctness is Wrong" }),
+    ).toBeInTheDocument();
   });
 
-  it("keeps several values of the same evaluator", async () => {
+  it("adds a second value to an existing tag", async () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(
       <ItemValueFilter
         evaluators={[rating]}
-        filter={{ evaluatorId: "ev-rating", values: [1] }}
+        filters={[{ evaluatorId: "ev-rating", values: [1] }]}
         onChange={onChange}
       />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Helpfulness is 1 — Poor" }),
     );
     await user.click(screen.getByRole("button", { name: "3 — Great" }));
-    expect(onChange).toHaveBeenCalledWith({
-      evaluatorId: "ev-rating",
-      values: [1, 3],
-    });
+    expect(onChange).toHaveBeenCalledWith([
+      { evaluatorId: "ev-rating", values: [1, 3] },
+    ]);
   });
 
-  it("Clear appears only once a value is picked and resets the filter", async () => {
-    const user = setupUser();
-    const onChange = jest.fn();
-    const { rerender } = render(
-      <ItemValueFilter
-        evaluators={[binary]}
-        filter={{ evaluatorId: "ev-binary", values: [] }}
-        onChange={onChange}
-      />,
-    );
-    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
-
-    rerender(
-      <ItemValueFilter
-        evaluators={[binary]}
-        filter={{ evaluatorId: "ev-binary", values: [true] }}
-        onChange={onChange}
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: "Clear" }));
-    expect(onChange).toHaveBeenCalledWith(null);
-  });
-
-  it("choosing Any evaluator resets the filter", async () => {
+  it("unticking the last value drops the tag entirely", async () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(
       <ItemValueFilter
         evaluators={[binary]}
-        filter={{ evaluatorId: "ev-binary", values: [true] }}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }]}
         onChange={onChange}
       />,
     );
-    await user.selectOptions(screen.getByLabelText("Filter by evaluator"), "");
-    expect(onChange).toHaveBeenCalledWith(null);
+    await user.click(
+      screen.getByRole("button", { name: "Correctness is Wrong" }),
+    );
+    const wrong = screen.getByRole("button", { name: "Wrong" });
+    expect(wrong).toHaveAttribute("aria-pressed", "true");
+    await user.click(wrong);
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("keeps one evaluator out of the add list once it has a tag", async () => {
+    const user = setupUser();
+    render(
+      <ItemValueFilter
+        evaluators={[binary, rating]}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }]}
+        onChange={noop}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+    expect(screen.getByRole("button", { name: /Helpfulness/ })).toBeVisible();
+    // The bare name is the addable row; the tag reads "Correctness is Wrong".
+    expect(screen.queryByRole("button", { name: "Correctness" })).toBeNull();
+  });
+
+  it("hides the add button once every evaluator has a tag", () => {
+    render(
+      <ItemValueFilter
+        evaluators={[binary]}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }]}
+        onChange={noop}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "+ Add filter" })).toBeNull();
+  });
+
+  it("the x removes just that one filter", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    const keep = { evaluatorId: "ev-rating", values: [1] };
+    render(
+      <ItemValueFilter
+        evaluators={[binary, rating]}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }, keep]}
+        onChange={onChange}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Remove Correctness is Wrong" }),
+    );
+    expect(onChange).toHaveBeenCalledWith([keep]);
+  });
+
+  it("Clear all shows only with two tags and removes them all", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    const { rerender } = render(
+      <ItemValueFilter
+        evaluators={[binary, rating]}
+        filters={[{ evaluatorId: "ev-binary", values: [false] }]}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Clear all" })).toBeNull();
+
+    rerender(
+      <ItemValueFilter
+        evaluators={[binary, rating]}
+        filters={[
+          { evaluatorId: "ev-binary", values: [false] },
+          { evaluatorId: "ev-rating", values: [1] },
+        ]}
+        onChange={onChange}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("closes the panel on Escape", async () => {
+    const user = setupUser();
+    render(
+      <ItemValueFilter evaluators={[binary]} filters={[]} onChange={noop} />,
+    );
+    await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+    expect(screen.getByRole("button", { name: /Correctness/ })).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: /Correctness/ })).toBeNull();
   });
 });

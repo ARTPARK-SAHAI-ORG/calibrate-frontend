@@ -17,8 +17,8 @@ import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
   ItemValueFilter,
-  isValueFilterActive,
-  matchesValueFilter,
+  matchesAllValueFilters,
+  usableValueFilters,
   valueFilterEvaluators,
   type ValueFilter,
 } from "./ItemValueFilter";
@@ -215,8 +215,9 @@ export function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
   return "Pending";
 }
 
-/** Stable empty list so the visible-items memo doesn't rerun while loading. */
+/** Stable empty lists so the visible-items memo doesn't rerun while loading. */
 const NO_ITEMS: Item[] = [];
+const NO_EVALUATORS: Evaluator[] = [];
 
 export function AnnotationJobView({
   token,
@@ -246,14 +247,15 @@ export function AnnotationJobView({
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
   // Admin-only "show items scored X" filter over the annotator's answers.
-  const [valueFilter, setValueFilter] = useState<ValueFilter | null>(null);
+  const [valueFilters, setValueFilters] = useState<ValueFilter[]>([]);
 
   const isReadOnlyMode = mode === "admin" || mode === "public-readonly";
   // The filter is for whoever owns the task reviewing what came back. It is
   // deliberately NOT keyed off `isReadOnlyMode`, which also covers the
   // shared read-only link — that viewer gets the job as it was labelled,
-  // with no controls of their own.
-  const canFilterByValue = mode === "admin";
+  // with no controls of their own. It also waits for the first label,
+  // since there is nothing to filter by on a job nobody has started.
+  const canFilterByValue = mode === "admin" && savedKeys.size > 0;
 
   const initialise = useCallback(
     (data: JobResponse) => {
@@ -352,23 +354,30 @@ export function AnnotationJobView({
   }, [token, initialise, onLoaded]);
 
   // A filter change always lands the viewer on the first matching item.
-  const handleValueFilterChange = useCallback((next: ValueFilter | null) => {
-    setValueFilter(next);
+  const handleValueFilterChange = useCallback((next: ValueFilter[]) => {
+    setValueFilters(next);
     setCurrentIndex(0);
   }, []);
 
   const allItems = state.status === "ok" ? state.data.items : NO_ITEMS;
+  const allEvaluators =
+    state.status === "ok" ? state.data.evaluators : NO_EVALUATORS;
   // Only the items the annotator scored one of the picked values. An item
   // with no answer for that evaluator never matches.
   const visibleItems = useMemo(() => {
-    if (!canFilterByValue || !isValueFilterActive(valueFilter)) return allItems;
+    if (
+      !canFilterByValue ||
+      usableValueFilters(valueFilters, allEvaluators).length === 0
+    ) {
+      return allItems;
+    }
+    const scoresFor = (itemUuid: string, evaluatorId: string) => [
+      fields[fieldKey(itemUuid, evaluatorId)]?.value,
+    ];
     return allItems.filter((it) =>
-      matchesValueFilter(
-        fields[fieldKey(it.uuid, valueFilter.evaluatorId)]?.value,
-        valueFilter.values,
-      ),
+      matchesAllValueFilters(it.uuid, valueFilters, allEvaluators, scoresFor),
     );
-  }, [allItems, fields, canFilterByValue, valueFilter]);
+  }, [allItems, allEvaluators, fields, canFilterByValue, valueFilters]);
 
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
@@ -437,7 +446,7 @@ export function AnnotationJobView({
     <AnnotateView
       data={data}
       items={visibleItems}
-      valueFilter={valueFilter}
+      valueFilters={valueFilters}
       canFilterByValue={canFilterByValue}
       onValueFilterChange={handleValueFilterChange}
       isAdmin={isAdmin}
@@ -468,10 +477,10 @@ type ViewProps = {
   data: JobResponse;
   /** The items to show — `data.items` unless the admin filter narrowed them. */
   items: Item[];
-  valueFilter: ValueFilter | null;
+  valueFilters: ValueFilter[];
   /** Admin view only — the shared read-only link gets no filter. */
   canFilterByValue: boolean;
-  onValueFilterChange: (next: ValueFilter | null) => void;
+  onValueFilterChange: (next: ValueFilter[]) => void;
   isAdmin: boolean;
   fillViewport: boolean;
   currentIndex: number;
@@ -499,7 +508,7 @@ type ViewProps = {
 function AnnotateView({
   data,
   items,
-  valueFilter,
+  valueFilters,
   canFilterByValue,
   onValueFilterChange,
   isAdmin,
@@ -525,7 +534,9 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
-  const filterActive = canFilterByValue && isValueFilterActive(valueFilter);
+  const filterActive =
+    canFilterByValue &&
+    usableValueFilters(valueFilters, data.evaluators).length > 0;
   // 1-based position in the unfiltered list, so a filtered strip still shows
   // each item's real number.
   const originalIndexByUuid = useMemo(
@@ -857,7 +868,7 @@ function AnnotateView({
           <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
             <ItemValueFilter
               evaluators={data.evaluators}
-              filter={valueFilter}
+              filters={valueFilters}
               onChange={onValueFilterChange}
             />
           </div>

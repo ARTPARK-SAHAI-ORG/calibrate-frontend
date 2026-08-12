@@ -131,7 +131,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public-readonly" />);
     await waitFor(() =>
-      expect(screen.getAllByText("Correctness").length).toBeGreaterThan(0),
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.example.com/public/annotation-jobs/view/tok",
@@ -497,7 +497,7 @@ describe("AnnotationJobView", () => {
     );
     render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
     await waitFor(() =>
-      expect(screen.getAllByText("Correctness").length).toBeGreaterThan(0),
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     // Read mode: no write buttons, no Submit button rendered.
     expect(screen.queryByRole("button", { name: "Correct" })).not.toBeInTheDocument();
@@ -511,7 +511,7 @@ describe("AnnotationJobView", () => {
     );
     render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
     await waitFor(() =>
-      expect(screen.getAllByText("Correctness").length).toBeGreaterThan(0),
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     expect(screen.queryByText("Comments")).not.toBeInTheDocument();
   });
@@ -815,17 +815,39 @@ describe("AnnotationJobView", () => {
       ann("item-2", "ev-2", 5),
     ];
 
-    const renderAdmin = async () => {
+    const renderAdmin = async (
+      overrides: Record<string, unknown> = {},
+      itemCount = 2,
+    ) => {
       fetchMock.mockResolvedValue(
-        jsonResponse(jobResponse({ read_only: true, annotations })),
+        jsonResponse(jobResponse({ read_only: true, annotations, ...overrides })),
       );
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(
+          screen.getByText(`Item 1 of ${itemCount}`),
+        ).toBeInTheDocument(),
       );
       return user;
     };
+
+    // Open the filter bar's panel, pick an evaluator, then tick one value.
+    const addFilter = async (
+      user: ReturnType<typeof setupUser>,
+      evaluatorName: string,
+      valueLabel: string,
+    ) => {
+      await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+      // The row in the panel reads "<name> ›".
+      await user.click(
+        screen.getByRole("button", { name: `${evaluatorName} ›` }),
+      );
+      await user.click(screen.getByRole("button", { name: valueLabel }));
+    };
+
+    const queryAddFilter = () =>
+      screen.queryByRole("button", { name: "+ Add filter" });
 
     it("does not show the filter in the annotator view", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
@@ -833,9 +855,20 @@ describe("AnnotationJobView", () => {
       await waitFor(() =>
         expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
       );
-      expect(
-        screen.queryByLabelText("Filter by evaluator"),
-      ).not.toBeInTheDocument();
+      expect(queryAddFilter()).not.toBeInTheDocument();
+    });
+
+    it("does not show the filter before anything has been labelled", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ read_only: true, annotations: [] })),
+      );
+      render(
+        <AnnotationJobView token="tok" mode="admin" fillViewport={false} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      expect(queryAddFilter()).not.toBeInTheDocument();
     });
 
     it("does not show the filter on the shared read-only link", async () => {
@@ -854,19 +887,14 @@ describe("AnnotationJobView", () => {
       await waitFor(() =>
         expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
       );
-      expect(
-        screen.queryByLabelText("Filter by evaluator"),
-      ).not.toBeInTheDocument();
+      expect(queryAddFilter()).not.toBeInTheDocument();
     });
 
     it("narrows the item strip to items scored a picked rating", async () => {
       const user = await renderAdmin();
-      await user.selectOptions(
-        screen.getByLabelText("Filter by evaluator"),
-        "ev-2",
-      );
-      await user.click(screen.getByRole("button", { name: "5" }));
+      await addFilter(user, "Quality", "5");
 
+      expect(screen.getByText("Quality is 5")).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       // Only item-2 matched, and it keeps its original number.
       expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
@@ -876,23 +904,50 @@ describe("AnnotationJobView", () => {
 
     it("narrows the item strip on a binary evaluator's verdict", async () => {
       const user = await renderAdmin();
-      await user.selectOptions(
-        screen.getByLabelText("Filter by evaluator"),
-        "ev-1",
-      );
-      await user.click(screen.getByRole("button", { name: "Wrong" }));
+      await addFilter(user, "Correctness", "Wrong");
 
+      expect(screen.getByText("Correctness is Wrong")).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
     });
 
+    it("keeps only the items matching every filter when two are on", async () => {
+      // item-3 is the only one that is both Correct and scored 5.
+      const thirdItem = {
+        id: 3,
+        uuid: "item-3",
+        task_id: "task-1",
+        payload: { name: "Item Three", chat_history: [], agent_response: "yo" },
+        created_at: "2024-01-03",
+        deleted_at: null,
+      };
+      const user = await renderAdmin(
+        {
+          items: [...items, thirdItem],
+          annotations: [
+            ...annotations,
+            ann("item-3", "ev-1", true),
+            ann("item-3", "ev-2", 5),
+          ],
+        },
+        3,
+      );
+
+      await addFilter(user, "Correctness", "Correct");
+      // Correct alone still leaves item-1 and item-3.
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+
+      await addFilter(user, "Quality", "5");
+      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(screen.getByText("Item Three")).toBeInTheDocument();
+      expect(screen.getAllByTitle(/^Item 3/)).toHaveLength(2);
+      expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
+      expect(screen.queryByTitle(/^Item 2/)).not.toBeInTheDocument();
+    });
+
     it("says nothing matches when no item has the picked value", async () => {
       const user = await renderAdmin();
-      await user.selectOptions(
-        screen.getByLabelText("Filter by evaluator"),
-        "ev-2",
-      );
-      await user.click(screen.getByRole("button", { name: "4" }));
+      await addFilter(user, "Quality", "4");
 
       expect(
         screen.getByText("No items match this filter."),
@@ -900,19 +955,32 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Item 0 of 0")).toBeInTheDocument();
     });
 
-    it("restores the full list when the filter is cleared", async () => {
+    it("restores the full list when the filter tag is removed", async () => {
       const user = await renderAdmin();
-      await user.selectOptions(
-        screen.getByLabelText("Filter by evaluator"),
-        "ev-2",
-      );
-      await user.click(screen.getByRole("button", { name: "5" }));
+      await addFilter(user, "Quality", "5");
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Clear" }));
+      await user.click(
+        screen.getByRole("button", { name: "Remove Quality is 5" }),
+      );
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
       expect(screen.getAllByTitle(/^Item 1/)).toHaveLength(2);
       expect(screen.getByText("Item One")).toBeInTheDocument();
+    });
+
+    it("shows Clear all only once two filters are on and drops both", async () => {
+      const user = await renderAdmin();
+      await addFilter(user, "Correctness", "Wrong");
+      expect(
+        screen.queryByRole("button", { name: "Clear all" }),
+      ).not.toBeInTheDocument();
+
+      await addFilter(user, "Quality", "5");
+      await user.click(screen.getByRole("button", { name: "Clear all" }));
+
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.queryByText("Correctness is Wrong")).not.toBeInTheDocument();
+      expect(screen.queryByText("Quality is 5")).not.toBeInTheDocument();
     });
   });
 

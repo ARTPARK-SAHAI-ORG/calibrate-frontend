@@ -26,8 +26,8 @@ import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemValueFilter,
-  isValueFilterActive,
-  matchesValueFilter,
+  matchesAllValueFilters,
+  usableValueFilters,
   valueFilterEvaluators,
   type ValueFilter,
 } from "@/components/human-labelling/ItemValueFilter";
@@ -1653,12 +1653,12 @@ export function EvaluatorRunDetailView({
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterDisagreements, setFilterDisagreements] = useState(false);
-  const [valueFilter, setValueFilter] = useState<ValueFilter | null>(null);
+  const [valueFilters, setValueFilters] = useState<ValueFilter[]>([]);
 
   // Reset when either filter changes.
   React.useEffect(() => {
     setCurrentIndex(0);
-  }, [filterDisagreements, valueFilter]);
+  }, [filterDisagreements, valueFilters]);
 
   const evaluatorNamesById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1758,6 +1758,17 @@ export function EvaluatorRunDetailView({
   );
 
   // Both filters apply together: an item has to satisfy every active one.
+  const jobEvaluators = useMemo(() => job?.evaluators ?? [], [job]);
+
+  // There is nothing to filter by until the run has finished and produced
+  // scores, so the control waits for the same moment as the result cards.
+  // It also renders nothing without items to narrow or an evaluator whose
+  // values can be picked, and the toolbar row must not appear for it alone.
+  const canFilterByValue =
+    job?.status === "completed" &&
+    itemsForRun.length > 0 &&
+    valueFilterEvaluators(jobEvaluators).length > 0;
+
   const filteredItemsForRun = useMemo(() => {
     let items = itemsForRun;
     if (filterDisagreements) {
@@ -1774,20 +1785,31 @@ export function EvaluatorRunDetailView({
         );
       });
     }
-    if (isValueFilterActive(valueFilter)) {
+    // Gated on `canFilterByValue` too: without it a filter picked on one
+    // run keeps hiding items after you move to a run whose bar is hidden,
+    // and there is no control on screen to clear it.
+    if (canFilterByValue && usableValueFilters(valueFilters, jobEvaluators).length > 0) {
       // An evaluator can have several version rows per item; any one of
       // them matching keeps the item.
+      const scoresFor = (itemUuid: string, evaluatorId: string) =>
+        (job?.runs ?? [])
+          .filter(
+            (r) => r.item_id === itemUuid && r.evaluator_id === evaluatorId,
+          )
+          .map((r) => r.value?.value);
       items = items.filter((it) =>
-        (job?.runs ?? []).some(
-          (r) =>
-            r.item_id === it.uuid &&
-            r.evaluator_id === valueFilter.evaluatorId &&
-            matchesValueFilter(r.value?.value, valueFilter.values),
-        ),
+        matchesAllValueFilters(it.uuid, valueFilters, jobEvaluators, scoresFor),
       );
     }
     return items;
-  }, [filterDisagreements, valueFilter, itemsForRun, job]);
+  }, [
+    filterDisagreements,
+    valueFilters,
+    itemsForRun,
+    job,
+    canFilterByValue,
+    jobEvaluators,
+  ]);
 
   const originalIndexByUuid = useMemo(
     () => new Map(itemsForRun.map((it, i) => [it.uuid, i + 1])),
@@ -1838,13 +1860,6 @@ export function EvaluatorRunDetailView({
   // the "Evaluator results" heading row instead of sitting on their own line.
   const cardsWillRender =
     job.status === "completed" && detailsEvaluators.length > 0;
-
-  // The value filter renders nothing unless there are items to narrow and
-  // at least one evaluator with values to pick from, so the toolbar row
-  // must not appear for it alone.
-  const canFilterByValue =
-    itemsForRun.length > 0 &&
-    valueFilterEvaluators(job.evaluators ?? []).length > 0;
 
   const statusPill = !hideStatusPill ? (
     <span
@@ -1956,9 +1971,9 @@ export function EvaluatorRunDetailView({
               )}
               {canFilterByValue && (
                 <ItemValueFilter
-                  evaluators={job.evaluators ?? []}
-                  filter={valueFilter}
-                  onChange={setValueFilter}
+                  evaluators={jobEvaluators}
+                  filters={valueFilters}
+                  onChange={setValueFilters}
                 />
               )}
             </div>
@@ -2057,7 +2072,10 @@ export function EvaluatorRunDetailView({
             <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
               {!currentItem ? (
                 <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
-                  {isValueFilterActive(valueFilter) || filterDisagreements
+                  {(canFilterByValue &&
+                    usableValueFilters(valueFilters, jobEvaluators).length >
+                      0) ||
+                  filterDisagreements
                     ? "No items match this filter."
                     : "No items in this run."}
                 </div>
