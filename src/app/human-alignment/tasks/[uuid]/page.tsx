@@ -2820,7 +2820,7 @@ function LabellingTaskPageInner() {
                       onClick={() => fetchAgreement()}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     These cards show agreement between annotators, what each
                     evaluator scored across the items in this task, and how
                     closely each evaluator aligns with humans

@@ -1523,7 +1523,7 @@ function EvaluatorSummary({
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-sm font-semibold">Evaluator results</h2>
-          <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             What each evaluator scored across the items in this run, and how
             closely that matches the human annotations on the same items
           </p>
