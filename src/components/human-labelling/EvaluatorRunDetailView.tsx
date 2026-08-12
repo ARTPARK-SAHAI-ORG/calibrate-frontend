@@ -24,6 +24,13 @@ import {
 } from "@/components/human-labelling/AgreementStatCard";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import {
+  ItemValueFilter,
+  isValueFilterActive,
+  matchesValueFilter,
+  valueFilterEvaluators,
+  type ValueFilter,
+} from "@/components/human-labelling/ItemValueFilter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1646,11 +1653,12 @@ export function EvaluatorRunDetailView({
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterDisagreements, setFilterDisagreements] = useState(false);
+  const [valueFilter, setValueFilter] = useState<ValueFilter | null>(null);
 
-  // Reset when filter toggles.
+  // Reset when either filter changes.
   React.useEffect(() => {
     setCurrentIndex(0);
-  }, [filterDisagreements]);
+  }, [filterDisagreements, valueFilter]);
 
   const evaluatorNamesById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1749,24 +1757,37 @@ export function EvaluatorRunDetailView({
     [job],
   );
 
-  const filteredItemsForRun = useMemo(
-    () =>
-      filterDisagreements
-        ? itemsForRun.filter((it) => {
-            const itemAgreement = job?.human_agreement?.items.find(
-              (i) => i.item_id === it.uuid,
-            );
-            if (!itemAgreement) return false;
-            return itemAgreement.evaluators.some(
-              (e) =>
-                e.human_annotations.length > 0 &&
-                e.agreement !== null &&
-                e.agreement !== 1,
-            );
-          })
-        : itemsForRun,
-    [filterDisagreements, itemsForRun, job],
-  );
+  // Both filters apply together: an item has to satisfy every active one.
+  const filteredItemsForRun = useMemo(() => {
+    let items = itemsForRun;
+    if (filterDisagreements) {
+      items = items.filter((it) => {
+        const itemAgreement = job?.human_agreement?.items.find(
+          (i) => i.item_id === it.uuid,
+        );
+        if (!itemAgreement) return false;
+        return itemAgreement.evaluators.some(
+          (e) =>
+            e.human_annotations.length > 0 &&
+            e.agreement !== null &&
+            e.agreement !== 1,
+        );
+      });
+    }
+    if (isValueFilterActive(valueFilter) && valueFilter) {
+      // An evaluator can have several version rows per item; any one of
+      // them matching keeps the item.
+      items = items.filter((it) =>
+        (job?.runs ?? []).some(
+          (r) =>
+            r.item_id === it.uuid &&
+            r.evaluator_id === valueFilter.evaluatorId &&
+            matchesValueFilter(r.value?.value, valueFilter.values),
+        ),
+      );
+    }
+    return items;
+  }, [filterDisagreements, valueFilter, itemsForRun, job]);
 
   const originalIndexByUuid = useMemo(
     () => new Map(itemsForRun.map((it, i) => [it.uuid, i + 1])),
@@ -1817,6 +1838,13 @@ export function EvaluatorRunDetailView({
   // the "Evaluator results" heading row instead of sitting on their own line.
   const cardsWillRender =
     job.status === "completed" && detailsEvaluators.length > 0;
+
+  // The value filter renders nothing unless there are items to narrow and
+  // at least one evaluator with values to pick from, so the toolbar row
+  // must not appear for it alone.
+  const canFilterByValue =
+    itemsForRun.length > 0 &&
+    valueFilterEvaluators(job.evaluators ?? []).length > 0;
 
   const statusPill = !hideStatusPill ? (
     <span
@@ -1910,20 +1938,29 @@ export function EvaluatorRunDetailView({
 
       <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
         <div className="flex flex-col flex-1 min-h-0">
-          {hasDisagreements && (
-            <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-start">
-              <button
-                onClick={() => setFilterDisagreements((f) => !f)}
-                className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                  filterDisagreements
-                    ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
-                    : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
-                }`}
-              >
-                {filterDisagreements
-                  ? "Showing disagreements only"
-                  : "Show disagreements only"}
-              </button>
+          {(hasDisagreements || canFilterByValue) && (
+            <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+              {hasDisagreements && (
+                <button
+                  onClick={() => setFilterDisagreements((f) => !f)}
+                  className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    filterDisagreements
+                      ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                      : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                  }`}
+                >
+                  {filterDisagreements
+                    ? "Showing disagreements only"
+                    : "Show disagreements only"}
+                </button>
+              )}
+              {canFilterByValue && (
+                <ItemValueFilter
+                  evaluators={job.evaluators ?? []}
+                  filter={valueFilter}
+                  onChange={setValueFilter}
+                />
+              )}
             </div>
           )}
           <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -2020,7 +2057,9 @@ export function EvaluatorRunDetailView({
             <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
               {!currentItem ? (
                 <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
-                  No items in this run.
+                  {isValueFilterActive(valueFilter) || filterDisagreements
+                    ? "No items match this filter."
+                    : "No items in this run."}
                 </div>
               ) : (
                 <ItemDetailPane

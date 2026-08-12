@@ -864,6 +864,192 @@ describe("EvaluatorRunDetailView", () => {
     ).not.toBeInTheDocument();
   });
 
+  // -------------------------------------------------------------------------
+  // Value filter ("Show items scored ...")
+  // -------------------------------------------------------------------------
+
+  // The value buttons share their text with the item-strip buttons ("2"),
+  // so pick the one that carries a pressed state.
+  const valueOption = (name: string) =>
+    screen
+      .getAllByRole("button", { name })
+      .find((b) => b.hasAttribute("aria-pressed"))!;
+
+  // item-1 scores 5 (rating) / true (binary); item-2 scores 2 / false.
+  function makeValueFilterJob(overrides: Partial<EvaluatorRunJob> = {}) {
+    return makeJob({
+      evaluators: [evaluatorBinary, evaluatorRating],
+      runs: [
+        makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
+        makeRun({ uuid: "r2", item_id: "item-2", value: { value: false } }),
+        makeRun({
+          uuid: "r3",
+          item_id: "item-1",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: 5 },
+        }),
+        makeRun({
+          uuid: "r4",
+          item_id: "item-2",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: 2 },
+        }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it("narrows the items to those a rating evaluator scored at the picked level", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    await user.selectOptions(
+      screen.getByLabelText("Filter by evaluator"),
+      "ev-rate",
+    );
+    await user.click(valueOption("2"));
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Item Two")).toBeInTheDocument();
+  });
+
+  it("keeps each item's original number when the value filter hides earlier items", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Filter by evaluator"),
+      "ev-bin",
+    );
+    await user.click(valueOption("Wrong"));
+    // Only item-2 is left, and it keeps its original number 2.
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getAllByTitle(/^Item 2/).length).toBeGreaterThan(0);
+    expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
+  });
+
+  it("shows a plain message when no item matches the value filter", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Filter by evaluator"),
+      "ev-rate",
+    );
+    await user.click(valueOption("3"));
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+  });
+
+  it("Clear restores the full list", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Filter by evaluator"),
+      "ev-bin",
+    );
+    await user.click(valueOption("Correct"));
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+  });
+
+  it("combines the value filter with 'Show disagreements only'", async () => {
+    const user = setupUser();
+    // item-1 disagrees, item-2 does not.
+    const job = makeValueFilterJob({
+      human_agreement: {
+        evaluators: [
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.5,
+            pair_count: 1,
+            item_count: 1,
+          },
+        ],
+        items: [
+          {
+            item_id: "item-1",
+            annotator_count: 1,
+            evaluators: [
+              {
+                evaluator_id: "ev-bin",
+                agreement: 0,
+                pair_count: 1,
+                human_annotations: [
+                  {
+                    annotation_id: "a1",
+                    annotator_id: "ann1",
+                    annotator_name: "Annotator One",
+                    job_id: "job-1",
+                    value: { value: false },
+                    updated_at: "",
+                  },
+                ],
+              },
+            ],
+          },
+          { item_id: "item-2", annotator_count: 0, evaluators: [] },
+        ],
+      },
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show disagreements only" }),
+    );
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    // item-1 is the only disagreement, and it scored Correct, so asking for
+    // Wrong leaves nothing.
+    await user.selectOptions(
+      screen.getByLabelText("Filter by evaluator"),
+      "ev-bin",
+    );
+    await user.click(valueOption("Wrong"));
+    expect(screen.getByText("No items match this filter.")).toBeInTheDocument();
+    // Correct keeps it.
+    await user.click(valueOption("Correct"));
+    await user.click(valueOption("Wrong"));
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+  });
+
+  it("does not render the filter toolbar when no evaluator can be filtered on", () => {
+    const job = makeJob({
+      // A rating evaluator with no bounds offers no values to pick.
+      evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
+      runs: [],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(screen.queryByLabelText("Filter by evaluator")).not.toBeInTheDocument();
+  });
+
   it("renders the top-level evaluator pill row (linked) when no agreement cards will render", () => {
     const job = makeJob({ runs: [], items: [] });
     render(

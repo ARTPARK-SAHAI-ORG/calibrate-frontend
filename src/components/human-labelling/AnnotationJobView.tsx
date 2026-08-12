@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
@@ -15,6 +15,13 @@ import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
+import {
+  ItemValueFilter,
+  isValueFilterActive,
+  matchesValueFilter,
+  valueFilterEvaluators,
+  type ValueFilter,
+} from "./ItemValueFilter";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -208,6 +215,9 @@ export function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
   return "Pending";
 }
 
+/** Stable empty list so the visible-items memo doesn't rerun while loading. */
+const NO_ITEMS: Item[] = [];
+
 export function AnnotationJobView({
   token,
   mode,
@@ -235,6 +245,8 @@ export function AnnotationJobView({
   );
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
+  // Admin-only "show items scored X" filter over the annotator's answers.
+  const [valueFilter, setValueFilter] = useState<ValueFilter | null>(null);
 
   const isReadOnlyMode = mode === "admin" || mode === "public-readonly";
 
@@ -334,6 +346,33 @@ export function AnnotationJobView({
     };
   }, [token, initialise, onLoaded]);
 
+  // A filter change always lands the viewer on the first matching item.
+  const handleValueFilterChange = useCallback((next: ValueFilter | null) => {
+    setValueFilter(next);
+    setCurrentIndex(0);
+  }, []);
+
+  const allItems = state.status === "ok" ? state.data.items : NO_ITEMS;
+  // Only the items the annotator scored one of the picked values. An item
+  // with no answer for that evaluator never matches.
+  const visibleItems = useMemo(() => {
+    if (!isReadOnlyMode || !valueFilter || !isValueFilterActive(valueFilter)) {
+      return allItems;
+    }
+    return allItems.filter((it) =>
+      matchesValueFilter(
+        fields[fieldKey(it.uuid, valueFilter.evaluatorId)]?.value,
+        valueFilter.values,
+      ),
+    );
+  }, [allItems, fields, isReadOnlyMode, valueFilter]);
+  // 1-based position in the unfiltered list, so a filtered strip still shows
+  // each item's real number.
+  const originalIndexByUuid = useMemo(
+    () => new Map(allItems.map((it, i) => [it.uuid, i + 1])),
+    [allItems],
+  );
+
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
     : "flex flex-col flex-1 min-h-0";
@@ -392,15 +431,18 @@ export function AnnotationJobView({
   // Inner view treats `isAdmin` as a generic read-only flag — both the admin
   // wrapper and the public read-only viewer should disable writes.
   const isAdmin = isReadOnlyMode;
-  const items = data.items;
   const evaluators = data.evaluators;
-  const total = items.length;
+  const total = visibleItems.length;
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
-  const currentItem = items[safeIndex];
+  const currentItem = visibleItems[safeIndex];
 
   return (
     <AnnotateView
       data={data}
+      items={visibleItems}
+      originalIndexByUuid={originalIndexByUuid}
+      valueFilter={valueFilter}
+      onValueFilterChange={handleValueFilterChange}
       isAdmin={isAdmin}
       currentIndex={safeIndex}
       onJumpTo={setCurrentIndex}
@@ -427,6 +469,12 @@ export function AnnotationJobView({
 
 type ViewProps = {
   data: JobResponse;
+  /** The items to show — `data.items` unless the admin filter narrowed them. */
+  items: Item[];
+  /** uuid -> 1-based position in the unfiltered list. */
+  originalIndexByUuid: Map<string, number>;
+  valueFilter: ValueFilter | null;
+  onValueFilterChange: (next: ValueFilter | null) => void;
   isAdmin: boolean;
   fillViewport: boolean;
   currentIndex: number;
@@ -453,6 +501,10 @@ type ViewProps = {
 
 function AnnotateView({
   data,
+  items,
+  originalIndexByUuid,
+  valueFilter,
+  onValueFilterChange,
   isAdmin,
   fillViewport,
   currentIndex,
@@ -474,9 +526,9 @@ function AnnotateView({
   token,
   onJobUpdate,
 }: ViewProps) {
-  const items = data.items;
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  const filterActive = isAdmin && isValueFilterActive(valueFilter);
 
   const prevStatus = useRef(data.job.status);
   useEffect(() => {
@@ -737,7 +789,7 @@ function AnnotateView({
               Previous
             </button>
             <span className="text-sm text-muted-foreground tabular-nums px-2">
-              Item {Math.min(currentIndex + 1, Math.max(total, 1))} of {total}
+              Item {Math.min(currentIndex + 1, total)} of {total}
             </span>
             <button
               onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
@@ -798,6 +850,16 @@ function AnnotateView({
           </div>
         </header>
 
+        {isAdmin && valueFilterEvaluators(data.evaluators).length > 0 && (
+          <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+            <ItemValueFilter
+              evaluators={data.evaluators}
+              filter={valueFilter}
+              onChange={onValueFilterChange}
+            />
+          </div>
+        )}
+
         {topError && (
           <div className="mx-4 md:mx-6 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
             {topError}
@@ -811,11 +873,12 @@ function AnnotateView({
               {items.map((it, i) => {
                 const done = itemCompleted(it.uuid);
                 const isCurrent = i === currentIndex;
+                const position = originalIndexByUuid.get(it.uuid) ?? i + 1;
                 return (
                   <button
                     key={it.uuid}
                     onClick={() => navigateTo(i)}
-                    title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                    title={`Item ${position}${done ? " (completed)" : ""}`}
                     className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                       isCurrent
                         ? "border-foreground bg-foreground text-background"
@@ -824,7 +887,7 @@ function AnnotateView({
                           : "border-border bg-background text-foreground hover:bg-muted/50"
                     }`}
                   >
-                    {i + 1}
+                    {position}
                   </button>
                 );
               })}
@@ -837,11 +900,12 @@ function AnnotateView({
                 {items.map((it, i) => {
                   const done = itemCompleted(it.uuid);
                   const isCurrent = i === currentIndex;
+                  const position = originalIndexByUuid.get(it.uuid) ?? i + 1;
                   return (
                     <button
                       key={it.uuid}
                       onClick={() => navigateTo(i)}
-                      title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                      title={`Item ${position}${done ? " (completed)" : ""}`}
                       className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background"
@@ -850,7 +914,7 @@ function AnnotateView({
                             : "border-border bg-background text-foreground hover:bg-muted/50"
                       }`}
                     >
-                      {i + 1}
+                      {position}
                     </button>
                   );
                 })}
@@ -861,7 +925,9 @@ function AnnotateView({
           <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
-                No items in this job.
+                {filterActive
+                  ? "No items match this filter."
+                  : "No items in this job."}
               </div>
             ) : data.task.type === "stt" || data.task.type === "tts" ? (
               // STT/TTS show compact inputs (short transcripts, or text +
