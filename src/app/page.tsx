@@ -47,6 +47,21 @@ const USE_CASES: {
   quoteHref?: string;
 }[] = [
   {
+    name: "Kabakoo",
+    logo: "/use-cases/kabakoo.png",
+    whatTheyDo:
+      "AI-powered WhatsApp mentoring enabling West African youth to develop the mindset and the skills to create productive livelihoods",
+    useCase: [
+      "Evaluating the quality and reliability of the Mentor AI responses",
+      "Empowering non-engineers and domain experts to build and run evals",
+      "Validating changes before deploying them at scale",
+    ],
+    quote:
+      "Thanks to a tool like Calibrate, Content and Learning colleagues can write test cases. AI evaluation is not a private language reserved for engineers.",
+    quoteHref:
+      "https://kabakoo.substack.com/p/the-ai-worked-did-it-work-for-the",
+  },
+  {
     name: "Noora Health",
     logo: "/use-cases/noora-health.jpeg",
     whatTheyDo: "AI copilot for nurses to respond to caregiver questions",
@@ -67,20 +82,6 @@ const USE_CASES: {
       "Finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff",
       "Aligning LLM judges to humans to enable continuous monitoring of the agent's performance",
     ],
-  },
-  {
-    name: "Kabakoo",
-    logo: "/use-cases/kabakoo.png",
-    whatTheyDo: "Mentor AI for upskilling African youth to get jobs",
-    useCase: [
-      "Evaluating quality of their agent's response",
-      "Empowering domain experts to own evals",
-      "Deploying changes confidently without any mistakes",
-    ],
-    quote:
-      "Thanks to a tool like Calibrate, Content and Learning colleagues can write test cases. AI evaluation is not a private language reserved for engineers.",
-    quoteHref:
-      "https://kabakoo.substack.com/p/the-ai-worked-did-it-work-for-the",
   },
 ];
 
