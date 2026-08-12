@@ -47,23 +47,23 @@ const rating: ValueFilterEvaluator = {
 describe("valueFilterOptions", () => {
   it("offers both verdicts with the default labels for a binary evaluator", () => {
     expect(valueFilterOptions(binary)).toEqual([
-      { value: true, label: "Correct" },
-      { value: false, label: "Wrong" },
+      { value: true, label: "Correct", shortLabel: "Correct" },
+      { value: false, label: "Wrong", shortLabel: "Wrong" },
     ]);
   });
 
   it("uses the evaluator's own binary labels when it has them", () => {
     expect(valueFilterOptions(binaryCustom)).toEqual([
-      { value: true, label: "Polite" },
-      { value: false, label: "Rude" },
+      { value: true, label: "Polite", shortLabel: "Polite" },
+      { value: false, label: "Rude", shortLabel: "Rude" },
     ]);
   });
 
   it("offers one option per rating level, naming the levels that have names", () => {
     expect(valueFilterOptions(rating)).toEqual([
-      { value: 1, label: "1 — Poor" },
-      { value: 2, label: "2" },
-      { value: 3, label: "3 — Great" },
+      { value: 1, label: "1 — Poor", shortLabel: "Poor" },
+      { value: 2, label: "2", shortLabel: "2" },
+      { value: 3, label: "3 — Great", shortLabel: "Great" },
     ]);
   });
 
@@ -167,10 +167,16 @@ describe("describeValueFilter", () => {
     ).toBe("Correctness is Wrong");
   });
 
-  it("joins two values with or", () => {
+  it("joins two values with or, naming the levels rather than numbering them", () => {
     expect(
       describeValueFilter(rating, { evaluatorId: "ev-rating", values: [1, 3] }),
-    ).toBe("Helpfulness is 1 — Poor or 3 — Great");
+    ).toBe("Helpfulness is Poor or Great");
+  });
+
+  it("falls back to the number for a level with no name", () => {
+    expect(
+      describeValueFilter(rating, { evaluatorId: "ev-rating", values: [2] }),
+    ).toBe("Helpfulness is 2");
   });
 
   it("collapses to a count past two values, so the bar stays short", () => {
@@ -336,7 +342,7 @@ describe("ItemValueFilter", () => {
       />,
     );
     await user.click(
-      screen.getByRole("button", { name: "Helpfulness is 1 — Poor" }),
+      screen.getByRole("button", { name: "Helpfulness is Poor" }),
     );
     await user.click(screen.getByRole("button", { name: "3 — Great" }));
     expect(onChange).toHaveBeenCalledWith([

@@ -29,7 +29,14 @@ export type ValueFilterEvaluator = {
   output_config?: { scale?: BinaryScaleEntryLike[] | null } | null;
 };
 
-export type ValueFilterOption = { value: boolean | number; label: string };
+export type ValueFilterOption = {
+  value: boolean | number;
+  /** For the picker, where the level number tells the options apart. */
+  label: string;
+  /** For the tag, which reads as a sentence: the level's name on its own
+   *  when it has one, otherwise the number. */
+  shortLabel: string;
+};
 
 export type ValueFilter = {
   evaluatorId: string;
@@ -69,15 +76,19 @@ export function valueFilterOptions(
     const named = toRatingScale(scale);
     return Array.from({ length: max - min + 1 }, (_, i) => {
       const value = min + i;
-      const label = named?.find((e) => e.value === value)?.name?.trim();
-      return { value, label: label ? `${value} — ${label}` : String(value) };
+      const name = named?.find((e) => e.value === value)?.name?.trim();
+      return {
+        value,
+        label: name ? `${value} — ${name}` : String(value),
+        shortLabel: name || String(value),
+      };
     });
   }
   const binaryScale = binaryScaleFor(ev.output_type, scale);
-  return [true, false].map((value) => ({
-    value,
-    label: getBinaryLabel(binaryScale, value),
-  }));
+  return [true, false].map((value) => {
+    const label = getBinaryLabel(binaryScale, value);
+    return { value, label, shortLabel: label };
+  });
 }
 
 /**
@@ -105,23 +116,32 @@ export function evaluatorFilterName(ev: ValueFilterEvaluator): string {
 }
 
 /**
- * The tag's wording, e.g. "Correctness is Wrong" or "Helpfulness is 1 or 2".
- * Past two picked values the list would crowd the bar, so it collapses to a
- * count instead.
+ * The tag's wording, split so the evaluator and the picked scores can be
+ * emphasised and the joining "is" played down. Past two picked values the
+ * list would crowd the bar, so it collapses to a count instead.
  */
+export function valueFilterTagParts(
+  ev: ValueFilterEvaluator,
+  filter: ValueFilter,
+): { name: string; values: string | null } {
+  const options = valueFilterOptions(ev);
+  const labels = filter.values.map(
+    (v) => options.find((o) => o.value === v)?.shortLabel ?? String(v),
+  );
+  const name = evaluatorFilterName(ev);
+  if (labels.length === 0) return { name, values: null };
+  if (labels.length === 1) return { name, values: labels[0] };
+  if (labels.length === 2) return { name, values: `${labels[0]} or ${labels[1]}` };
+  return { name, values: `${labels.length} of ${options.length} scores` };
+}
+
+/** The same wording as one string, for labels read out to screen readers. */
 export function describeValueFilter(
   ev: ValueFilterEvaluator,
   filter: ValueFilter,
 ): string {
-  const options = valueFilterOptions(ev);
-  const labels = filter.values.map(
-    (v) => options.find((o) => o.value === v)?.label ?? String(v),
-  );
-  const name = evaluatorFilterName(ev);
-  if (labels.length === 0) return name;
-  if (labels.length === 1) return `${name} is ${labels[0]}`;
-  if (labels.length === 2) return `${name} is ${labels[0]} or ${labels[1]}`;
-  return `${name} is ${labels.length} of ${options.length} scores`;
+  const { name, values } = valueFilterTagParts(ev, filter);
+  return values ? `${name} is ${values}` : name;
 }
 
 /**
@@ -193,8 +213,11 @@ export function matchesAllValueFilters(
   );
 }
 
+// `accent` in this app is a near-white surface tint (#f5f5f5), not a brand
+// colour, so it must never be used for text. An active tag reads as "on"
+// the same way the rest of the app does it: solid foreground on background.
 const tagClass =
-  "h-7 pl-3 pr-1.5 rounded-full text-xs font-medium border border-accent/30 bg-accent/10 text-accent inline-flex items-center gap-2";
+  "h-7 pl-3 pr-1.5 rounded-full text-xs font-medium border border-foreground bg-foreground text-background inline-flex items-center gap-2";
 
 export function ItemValueFilter({
   evaluators,
@@ -292,7 +315,20 @@ export function ItemValueFilter({
               }}
               className="cursor-pointer"
             >
-              {describeValueFilter(ev, f)}
+              {(() => {
+                const { name, values } = valueFilterTagParts(ev, f);
+                return (
+                  <>
+                    <span className="font-semibold">{name}</span>
+                    {values && (
+                      <>
+                        <span className="font-normal opacity-60"> is </span>
+                        <span className="font-semibold">{values}</span>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </button>
             <button
               type="button"
@@ -301,7 +337,7 @@ export function ItemValueFilter({
                 if (openFor === f.evaluatorId) close();
                 setValues(f.evaluatorId, []);
               }}
-              className="w-4 h-4 rounded-full inline-flex items-center justify-center hover:bg-accent hover:text-background transition-colors cursor-pointer"
+              className="w-4 h-4 rounded-full inline-flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-background/25 transition-opacity cursor-pointer"
             >
               <svg
                 className="w-2.5 h-2.5"

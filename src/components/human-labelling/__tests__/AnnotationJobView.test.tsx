@@ -894,7 +894,9 @@ describe("AnnotationJobView", () => {
       const user = await renderAdmin();
       await addFilter(user, "Quality", "5");
 
-      expect(screen.getByText("Quality is 5")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Quality is 5" }),
+      ).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       // Only item-2 matched, and it keeps its original number.
       expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
@@ -906,7 +908,9 @@ describe("AnnotationJobView", () => {
       const user = await renderAdmin();
       await addFilter(user, "Correctness", "Wrong");
 
-      expect(screen.getByText("Correctness is Wrong")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Correctness is Wrong" }),
+      ).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
     });
