@@ -1282,6 +1282,28 @@ describe("EvaluatorRunDetailView", () => {
     expect(window.location.search).toBe("");
   });
 
+  it("ignores a disagreements link on a run that has none", () => {
+    // No button to turn it off here, so it must not hide the items or the
+    // evaluator cards inside them.
+    window.history.replaceState(null, "", "/run?disagreements=1");
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /disagreements only/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "All evaluators agree with human annotations on this item.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not render the filter toolbar when no evaluator can be filtered on", () => {
     const job = makeJob({
       // A rating evaluator with no bounds offers no values to pick.
