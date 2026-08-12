@@ -1,7 +1,11 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { signOut } from "next-auth/react";
 import { usePageErrorState } from "@/hooks/usePageErrorState";
-import { ACTIVE_ORG_UUID_KEY } from "@/lib/orgs";
+import {
+  ACTIVE_ORG_CHANGED_EVENT,
+  ACTIVE_ORG_UUID_KEY,
+  setActiveOrgUuid,
+} from "@/lib/orgs";
 
 jest.mock("next-auth/react", () => ({
   __esModule: true,
@@ -42,6 +46,7 @@ describe("usePageErrorState", () => {
     reload.mockClear();
     window.localStorage.clear();
     window.sessionStorage.clear();
+    window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGED_EVENT));
   });
 
   it("initializes with a null errorCode", () => {
@@ -161,7 +166,7 @@ describe("usePageErrorState", () => {
 
   describe("a link that belongs to another workspace", () => {
     it("switches workspace and reloads when the 404 names one", async () => {
-      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+      setActiveOrgUuid("org-current");
       const { result } = renderHook(() => usePageErrorState());
 
       act(() => {
@@ -223,7 +228,7 @@ describe("usePageErrorState", () => {
     });
 
     it("switches on an apiClient 404 that names a workspace", () => {
-      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+      setActiveOrgUuid("org-current");
       mockGetErrorStatusCode.mockReturnValue(404);
       const { result } = renderHook(() => usePageErrorState());
 

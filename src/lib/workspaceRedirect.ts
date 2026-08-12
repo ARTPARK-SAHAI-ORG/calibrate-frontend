@@ -1,4 +1,8 @@
-import { getActiveOrgUuid, setActiveOrgUuid } from "@/lib/orgs";
+import {
+  ACTIVE_ORG_CHANGED_EVENT,
+  getActiveOrgUuid,
+  setActiveOrgUuid,
+} from "@/lib/orgs";
 
 /**
  * Opening a shared link to a resource that lives in one of the user's *other*
@@ -44,6 +48,21 @@ export function orgUuidFromErrorMessage(err: unknown): string | null {
 const SWITCHED_PATH_KEY = "calibrate:workspace-switched-path";
 
 /**
+ * The active workspace as this tab last saw it change: read once when the page
+ * loads, then kept current through the change event, which only fires in the
+ * tab that made the change. So when the stored workspace stops matching this,
+ * some *other* tab changed it.
+ */
+let workspaceKnownToThisTab: string | null = null;
+
+if (typeof window !== "undefined") {
+  workspaceKnownToThisTab = getActiveOrgUuid();
+  window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, () => {
+    workspaceKnownToThisTab = getActiveOrgUuid();
+  });
+}
+
+/**
  * Makes the owning workspace active and reloads, so every fetch on the page
  * re-runs under it (same approach as the sidebar workspace switcher). Returns
  * false — leaving the caller to render the normal "Not Found" — whenever
@@ -51,7 +70,16 @@ const SWITCHED_PATH_KEY = "calibrate:workspace-switched-path";
  */
 export function switchToOwningWorkspace(uuid: string | null): boolean {
   // Already active: a reload would change nothing and repeat this 404.
-  if (!uuid || uuid === getActiveOrgUuid()) return false;
+  const active = getActiveOrgUuid();
+  if (!uuid || uuid === active) return false;
+
+  // Another tab changed the workspace after this page loaded. That is a newer
+  // decision than anything this page can infer from a 404, so leave it alone:
+  // a background poll here would otherwise quietly undo the switch the user
+  // just made over there, and send that tab's requests to the wrong workspace.
+  if (workspaceKnownToThisTab !== null && active !== workspaceKnownToThisTab) {
+    return false;
+  }
 
   // The active workspace is shared by every tab, but a reload is not. Two
   // tabs open on two workspaces would otherwise flip the setting back and

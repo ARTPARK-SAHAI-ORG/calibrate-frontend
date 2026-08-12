@@ -3,7 +3,11 @@ import {
   readOwningOrgUuid,
   switchToOwningWorkspace,
 } from "@/lib/workspaceRedirect";
-import { ACTIVE_ORG_UUID_KEY } from "@/lib/orgs";
+import {
+  ACTIVE_ORG_CHANGED_EVENT,
+  ACTIVE_ORG_UUID_KEY,
+  setActiveOrgUuid,
+} from "@/lib/orgs";
 
 const reload = jest.fn();
 
@@ -19,6 +23,9 @@ beforeEach(() => {
   reload.mockClear();
   window.localStorage.clear();
   window.sessionStorage.clear();
+  // Reset what this tab believes the workspace to be, the same way a real
+  // workspace change tells it.
+  window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGED_EVENT));
 });
 
 describe("readOwningOrgUuid", () => {
@@ -66,7 +73,7 @@ describe("orgUuidFromErrorMessage", () => {
 
 describe("switchToOwningWorkspace", () => {
   it("saves the workspace and reloads", () => {
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
 
     expect(switchToOwningWorkspace("org-other")).toBe(true);
     expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe("org-other");
@@ -79,28 +86,46 @@ describe("switchToOwningWorkspace", () => {
   });
 
   it("does not reload when the workspace is already active", () => {
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
 
     expect(switchToOwningWorkspace("org-current")).toBe(false);
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it("leaves a workspace another tab picked after this page loaded", () => {
+    setActiveOrgUuid("org-current");
+    // Another tab writes the shared setting. No change event reaches this tab,
+    // which is how we know the choice was made somewhere else.
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-from-other-tab");
+
+    expect(switchToOwningWorkspace("org-current")).toBe(false);
+    expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe(
+      "org-from-other-tab",
+    );
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("switches on a first load, before any workspace is known", () => {
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it("switches only once for the same page in one tab", () => {
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(true);
 
     // Another tab put its own workspace back; this page must not reload again.
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(false);
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it("still switches for a different page in the same tab", () => {
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(true);
 
     window.location.pathname = "/simulations/other-uuid";
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(true);
     expect(reload).toHaveBeenCalledTimes(2);
   });
@@ -118,7 +143,7 @@ describe("switchToOwningWorkspace", () => {
         },
       },
     });
-    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+    setActiveOrgUuid("org-current");
 
     expect(switchToOwningWorkspace("org-other")).toBe(true);
     expect(reload).toHaveBeenCalledTimes(1);
