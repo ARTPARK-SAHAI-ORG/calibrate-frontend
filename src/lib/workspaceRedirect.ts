@@ -44,8 +44,11 @@ export function orgUuidFromErrorMessage(err: unknown): string | null {
   }
 }
 
-/** Records, per browser tab, the page we have already switched workspace for. */
-const SWITCHED_PATH_KEY = "calibrate:workspace-switched-path";
+/**
+ * Records, per browser tab, the page we have already switched for and the
+ * workspace we landed in, as `<path>@<uuid>`.
+ */
+const SWITCHED_KEY = "calibrate:workspace-switched-path";
 
 /**
  * The active workspace as this tab last saw it change: read once when the page
@@ -81,16 +84,16 @@ export function switchToOwningWorkspace(uuid: string | null): boolean {
     return false;
   }
 
-  // The active workspace is shared by every tab, but a reload is not. Two
-  // tabs open on two workspaces would otherwise flip the setting back and
-  // forth and reload each other forever, since both keep polling and keep
-  // getting a 404. One switch per page, per tab.
+  // We already switched this page into the workspace we are sitting in, and
+  // it 404'd again. Switching a second time would reload straight back into
+  // the same answer, forever. Keyed on the workspace as well as the page, so
+  // opening the same link again later, from somewhere else, still works.
   const path = window.location.pathname;
-  let switchedPath: string | null = null;
+  let switched: string | null = null;
   try {
-    switchedPath = window.sessionStorage.getItem(SWITCHED_PATH_KEY);
+    switched = window.sessionStorage.getItem(SWITCHED_KEY);
   } catch {}
-  if (switchedPath === path) return false;
+  if (switched === `${path}@${active}`) return false;
 
   // setActiveOrgUuid swallows a storage failure. Reloading without the write
   // would hit the same 404 and reload again, with no way out.
@@ -98,7 +101,7 @@ export function switchToOwningWorkspace(uuid: string | null): boolean {
   if (getActiveOrgUuid() !== uuid) return false;
 
   try {
-    window.sessionStorage.setItem(SWITCHED_PATH_KEY, path);
+    window.sessionStorage.setItem(SWITCHED_KEY, `${path}@${uuid}`);
   } catch {}
   window.location.reload();
   return true;

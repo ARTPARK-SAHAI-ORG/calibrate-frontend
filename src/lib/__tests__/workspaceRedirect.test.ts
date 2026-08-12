@@ -110,14 +110,26 @@ describe("switchToOwningWorkspace", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("switches only once for the same page in one tab", () => {
+  it("does not switch the same page twice out of the same workspace", () => {
     setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(true);
 
-    // Another tab put its own workspace back; this page must not reload again.
-    setActiveOrgUuid("org-current");
-    expect(switchToOwningWorkspace("org-other")).toBe(false);
+    // The reload landed in org-other and the page 404s again, this time
+    // naming a third workspace. Following that would bounce forever.
+    setActiveOrgUuid("org-other");
+    expect(switchToOwningWorkspace("org-third")).toBe(false);
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches again for the same page from a different workspace", () => {
+    setActiveOrgUuid("org-current");
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+
+    // Later the user is back in the workspace they started from and opens the
+    // same link again. It has to work, not read "Not Found".
+    setActiveOrgUuid("org-current");
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 
   it("still switches for a different page in the same tab", () => {
