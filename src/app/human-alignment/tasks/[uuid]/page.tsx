@@ -1506,13 +1506,17 @@ function LabellingTaskPageInner() {
     return out;
   }, [agreement, task]);
 
+  // Evaluators with a score to show. Keyed off the formatted number, not the
+  // raw count: a count with no usable value behind it (an evaluator missing
+  // from the task's own list, or one whose output type is not recorded)
+  // formats to nothing, and a card with nothing in it is worse than no card.
+  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
+    (ev) => evaluatorResultStats[ev.evaluator_id] != null,
+  );
   // An evaluator that scored the items but has no human labels on them has
   // no alignment number to show. Warn once, with wording that says whether
   // that is all of them or only some. An evaluator that has not run at all
   // is not part of this: nothing is missing on the human side there.
-  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
-    (ev) => (ev.result?.count ?? 0) > 0,
-  );
   const evaluatorsWithoutHumanLabels = evaluatorsThatRan.filter(
     (ev) => ev.current == null,
   );
@@ -2846,9 +2850,8 @@ function LabellingTaskPageInner() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How far those scores can be trusted: how closely annotators
-                    agree with each other, and how closely each evaluator
-                    agrees with them
+                    How closely annotators agree with each other, and how
+                    closely each evaluator aligns with humans
                   </p>
                   {evaluatorsWithoutHumanLabels.length > 0 && (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
