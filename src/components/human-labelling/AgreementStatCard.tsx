@@ -23,20 +23,14 @@ function Stat({
   value,
   valueClassName = "",
   title,
-  centered = false,
 }: {
   label: string;
   value: string;
   valueClassName?: string;
   title?: string;
-  /** Centre the label and number — used when this is the card's only stat. */
-  centered?: boolean;
 }) {
   return (
-    <div
-      className={`min-w-0 ${centered ? "w-full text-center" : ""}`}
-      title={title}
-    >
+    <div className="min-w-0" title={title}>
       <div className="text-[11px] text-muted-foreground whitespace-nowrap">
         {label}
       </div>
@@ -74,9 +68,10 @@ export function AgreementStatCard(
         };
       }
   ) & {
-    /** Human agreement. Null hides that number entirely — used when the run's
-     * items carry no human labels, so there is nothing to agree with. */
-    value: string | null;
+    /** Human agreement, or an em dash when there is nothing to compare
+     * against yet. Always shown, so the card says what is missing rather
+     * than quietly leaving the number out. */
+    value: string;
     valueClassName?: string;
     /** When present, the card shows this next to the agreement number. */
     result?: EvaluatorResultStat | null;
@@ -84,14 +79,7 @@ export function AgreementStatCard(
 ) {
   const { value, valueClassName = "", result = null } = props;
   return (
-    <div
-      className={`border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 ${
-        // With two numbers side by side the card needs a floor so the pair
-        // does not read as cramped. A single number only needs the width of
-        // the evaluator's name.
-        result && value == null ? "" : "min-w-[160px]"
-      }`}
-    >
+    <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}
@@ -131,21 +119,18 @@ export function AgreementStatCard(
               result.ratio == null ? "" : agreementColor(result.ratio)
             }
             title={result.title}
-            centered={value == null}
           />
-          {value != null && (
-            <Stat
-              label="Human agreement"
-              value={value}
-              valueClassName={valueClassName}
-            />
-          )}
+          <Stat
+            label="Human agreement"
+            value={value}
+            valueClassName={valueClassName}
+          />
         </div>
       ) : (
         <div
           className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
         >
-          {value ?? "—"}
+          {value}
         </div>
       )}
     </div>

@@ -979,12 +979,10 @@ describe("EvaluatorRunDetailView", () => {
     expect(
       screen.getByText(/No human labels found on the items in this run yet/),
     ).toBeInTheDocument();
-    // Nothing to agree with, so that number is dropped from the card.
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
-    // The score is the card's only number, so it is centred.
-    expect(screen.getByTitle(/Correct on 1 of/).className).toContain(
-      "text-center",
-    );
+    // Nothing to agree with yet, so the card keeps the label and shows an em
+    // dash rather than leaving the number out.
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("warns that only some evaluators have human labels", () => {

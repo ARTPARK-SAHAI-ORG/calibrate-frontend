@@ -1561,13 +1561,10 @@ function EvaluatorSummary({
             : ev.evaluator_version_id
               ? (versionLabels[ev.evaluator_version_id] ?? null)
               : null;
-          // No human labels on this evaluator's items means there is nothing
-          // to agree with, so the card drops that number rather than showing
-          // an em dash next to the result.
           const value =
             row?.agreement != null
               ? `${Math.round(row.agreement * 100)}%`
-              : null;
+              : "—";
           const valueClassName = agreementColor(row?.agreement);
           const result = summariseEvaluatorRuns(
             runs,

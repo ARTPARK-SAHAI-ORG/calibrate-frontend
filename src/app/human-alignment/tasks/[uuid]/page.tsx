@@ -2868,14 +2868,10 @@ function LabellingTaskPageInner() {
                         href: `/evaluators/${ev.evaluator_id}`,
                         name: ev.name,
                       }}
-                      // No human labels on this evaluator's items means there
-                      // is nothing to agree with, so the card drops that
-                      // number rather than showing an em dash next to the
-                      // score.
                       value={
                         ev.current != null
                           ? `${Math.round(ev.current * 100)}%`
-                          : null
+                          : "—"
                       }
                       valueClassName={agreementColor(ev.current)}
                       result={evaluatorResultStats[ev.evaluator_id] ?? null}
