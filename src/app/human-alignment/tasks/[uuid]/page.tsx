@@ -1514,16 +1514,13 @@ function LabellingTaskPageInner() {
   const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
-  // Evaluators that scored the items. An evaluator that has never run is not
-  // one of them, so it stays out of the note below: nothing is missing on the
-  // human side there.
-  const evaluatorsWithScores = (agreement?.evaluators ?? []).filter(
-    (ev) => (ev.result?.count ?? 0) > 0,
-  );
-  // An evaluator that scored the items but has no alignment number has no
-  // human labels on them. Warn once, with wording that says whether that is
-  // all of the evaluators that ran or only some.
-  const evaluatorsWithoutHumanLabels = evaluatorsWithScores.filter(
+  // An evaluator with a card but no alignment number has no human labels on
+  // its items. Warn once, with wording that says whether that is all of the
+  // evaluators on screen or only some. Counted off the same list the cards
+  // come from, so the note can only be about an evaluator the reader can see:
+  // one that has never run, or one with a score the page cannot draw, has no
+  // card and stays out of it.
+  const evaluatorsWithoutHumanLabels = evaluatorsThatRan.filter(
     (ev) => ev.current == null,
   );
 
@@ -2867,7 +2864,7 @@ function LabellingTaskPageInner() {
                       </svg>
                       <span>
                         {evaluatorsWithoutHumanLabels.length ===
-                        evaluatorsWithScores.length
+                        evaluatorsThatRan.length
                           ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
                           : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
                       </span>
