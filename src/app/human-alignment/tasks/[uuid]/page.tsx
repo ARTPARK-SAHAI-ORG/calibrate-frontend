@@ -2795,14 +2795,12 @@ function LabellingTaskPageInner() {
                     />
                   </svg>
                 }
-                title="No scores or agreement yet"
+                title="Nothing to show yet"
                 description={
                   <>
-                    What the evaluators scored, and how closely that matches the
-                    annotators,
+                    Run an evaluator on these items to see its scores.
                     <br />
-                    will appear here once evaluators are run on the task items
-                    and annotators start labelling
+                    Agreement shows up once annotators label the same items.
                   </>
                 }
               />
