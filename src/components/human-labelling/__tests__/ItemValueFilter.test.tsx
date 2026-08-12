@@ -98,6 +98,22 @@ describe("valueFilterEvaluators", () => {
       valueFilterEvaluators([binary, unusable, rating]).map((e) => e.uuid),
     ).toEqual(["ev-binary", "ev-rating"]);
   });
+
+  it("lists an evaluator once even when a run scored several of its versions", () => {
+    // The run page's list holds one row per pinned version, so the same
+    // evaluator arrives twice. Filtering is keyed by uuid alone.
+    const v2: ValueFilterEvaluator = { ...rating, scale_max: 5 };
+    expect(valueFilterEvaluators([rating, v2])).toEqual([rating]);
+  });
+
+  it("keeps a later version when the first one has no options to pick", () => {
+    const noBounds: ValueFilterEvaluator = {
+      uuid: "ev-rating",
+      name: "Helpfulness",
+      output_type: "rating",
+    };
+    expect(valueFilterEvaluators([noBounds, rating])).toEqual([rating]);
+  });
 });
 
 describe("matchesValueFilter", () => {

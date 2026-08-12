@@ -838,6 +838,27 @@ describe("AnnotationJobView", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("does not show the filter on the shared read-only link", async () => {
+      // That viewer sees the job as it was labelled, with no controls of
+      // their own — the filter belongs to whoever owns the task.
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ read_only: true, annotations })),
+      );
+      render(
+        <AnnotationJobView
+          token="tok"
+          mode="public-readonly"
+          fillViewport={false}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByLabelText("Filter by evaluator"),
+      ).not.toBeInTheDocument();
+    });
+
     it("narrows the item strip to items scored a picked rating", async () => {
       const user = await renderAdmin();
       await user.selectOptions(

@@ -249,6 +249,11 @@ export function AnnotationJobView({
   const [valueFilter, setValueFilter] = useState<ValueFilter | null>(null);
 
   const isReadOnlyMode = mode === "admin" || mode === "public-readonly";
+  // The filter is for whoever owns the task reviewing what came back. It is
+  // deliberately NOT keyed off `isReadOnlyMode`, which also covers the
+  // shared read-only link — that viewer gets the job as it was labelled,
+  // with no controls of their own.
+  const canFilterByValue = mode === "admin";
 
   const initialise = useCallback(
     (data: JobResponse) => {
@@ -356,22 +361,14 @@ export function AnnotationJobView({
   // Only the items the annotator scored one of the picked values. An item
   // with no answer for that evaluator never matches.
   const visibleItems = useMemo(() => {
-    if (!isReadOnlyMode || !valueFilter || !isValueFilterActive(valueFilter)) {
-      return allItems;
-    }
+    if (!canFilterByValue || !isValueFilterActive(valueFilter)) return allItems;
     return allItems.filter((it) =>
       matchesValueFilter(
         fields[fieldKey(it.uuid, valueFilter.evaluatorId)]?.value,
         valueFilter.values,
       ),
     );
-  }, [allItems, fields, isReadOnlyMode, valueFilter]);
-  // 1-based position in the unfiltered list, so a filtered strip still shows
-  // each item's real number.
-  const originalIndexByUuid = useMemo(
-    () => new Map(allItems.map((it, i) => [it.uuid, i + 1])),
-    [allItems],
-  );
+  }, [allItems, fields, canFilterByValue, valueFilter]);
 
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
@@ -440,8 +437,8 @@ export function AnnotationJobView({
     <AnnotateView
       data={data}
       items={visibleItems}
-      originalIndexByUuid={originalIndexByUuid}
       valueFilter={valueFilter}
+      canFilterByValue={canFilterByValue}
       onValueFilterChange={handleValueFilterChange}
       isAdmin={isAdmin}
       currentIndex={safeIndex}
@@ -471,9 +468,9 @@ type ViewProps = {
   data: JobResponse;
   /** The items to show — `data.items` unless the admin filter narrowed them. */
   items: Item[];
-  /** uuid -> 1-based position in the unfiltered list. */
-  originalIndexByUuid: Map<string, number>;
   valueFilter: ValueFilter | null;
+  /** Admin view only — the shared read-only link gets no filter. */
+  canFilterByValue: boolean;
   onValueFilterChange: (next: ValueFilter | null) => void;
   isAdmin: boolean;
   fillViewport: boolean;
@@ -502,8 +499,8 @@ type ViewProps = {
 function AnnotateView({
   data,
   items,
-  originalIndexByUuid,
   valueFilter,
+  canFilterByValue,
   onValueFilterChange,
   isAdmin,
   fillViewport,
@@ -528,7 +525,13 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
-  const filterActive = isAdmin && isValueFilterActive(valueFilter);
+  const filterActive = canFilterByValue && isValueFilterActive(valueFilter);
+  // 1-based position in the unfiltered list, so a filtered strip still shows
+  // each item's real number.
+  const originalIndexByUuid = useMemo(
+    () => new Map(data.items.map((it, i) => [it.uuid, i + 1])),
+    [data.items],
+  );
 
   const prevStatus = useRef(data.job.status);
   useEffect(() => {
@@ -850,7 +853,7 @@ function AnnotateView({
           </div>
         </header>
 
-        {isAdmin && valueFilterEvaluators(data.evaluators).length > 0 && (
+        {canFilterByValue && valueFilterEvaluators(data.evaluators).length > 0 && (
           <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
             <ItemValueFilter
               evaluators={data.evaluators}
@@ -873,7 +876,7 @@ function AnnotateView({
               {items.map((it, i) => {
                 const done = itemCompleted(it.uuid);
                 const isCurrent = i === currentIndex;
-                const position = originalIndexByUuid.get(it.uuid) ?? i + 1;
+                const position = originalIndexByUuid.get(it.uuid);
                 return (
                   <button
                     key={it.uuid}
@@ -900,7 +903,7 @@ function AnnotateView({
                 {items.map((it, i) => {
                   const done = itemCompleted(it.uuid);
                   const isCurrent = i === currentIndex;
-                  const position = originalIndexByUuid.get(it.uuid) ?? i + 1;
+                  const position = originalIndexByUuid.get(it.uuid);
                   return (
                     <button
                       key={it.uuid}

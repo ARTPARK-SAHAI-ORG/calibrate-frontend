@@ -1774,7 +1774,7 @@ export function EvaluatorRunDetailView({
         );
       });
     }
-    if (isValueFilterActive(valueFilter) && valueFilter) {
+    if (isValueFilterActive(valueFilter)) {
       // An evaluator can have several version rows per item; any one of
       // them matching keeps the item.
       items = items.filter((it) =>

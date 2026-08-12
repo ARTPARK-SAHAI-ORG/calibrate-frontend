@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Select } from "@/components/ui/Select";
 import {
   binaryScaleFor,
   coerceBinaryValue,
@@ -69,11 +70,24 @@ export function valueFilterOptions(
   }));
 }
 
-/** Evaluators that can actually be filtered on (i.e. have options). */
+/**
+ * Evaluators that can actually be filtered on (i.e. have options), one per
+ * evaluator.
+ *
+ * The run page's list holds one row per pinned version, so the same
+ * evaluator can appear more than once. The filter is keyed by evaluator
+ * uuid alone, so without this the dropdown would list a name twice and the
+ * rating levels would come from whichever version happened to be first.
+ */
 export function valueFilterEvaluators<T extends ValueFilterEvaluator>(
   evaluators: readonly T[],
 ): T[] {
-  return evaluators.filter((ev) => valueFilterOptions(ev).length > 0);
+  const seen = new Set<string>();
+  return evaluators.filter((ev) => {
+    if (seen.has(ev.uuid) || valueFilterOptions(ev).length === 0) return false;
+    seen.add(ev.uuid);
+    return true;
+  });
 }
 
 /**
@@ -94,8 +108,13 @@ export function matchesValueFilter(
   );
 }
 
-/** True when the filter is set up enough to narrow anything. */
-export function isValueFilterActive(filter: ValueFilter | null): boolean {
+/**
+ * True when the filter is set up enough to narrow anything. Narrows the
+ * type too, so callers do not need a second null check to read the fields.
+ */
+export function isValueFilterActive(
+  filter: ValueFilter | null,
+): filter is ValueFilter {
   return !!filter && filter.values.length > 0;
 }
 
@@ -118,8 +137,7 @@ export function ItemValueFilter({
 
   const toggle = (value: boolean | number) => {
     if (!selected) return;
-    const has = picked.some((v) => v === value);
-    const next = has
+    const next = picked.includes(value)
       ? picked.filter((v) => v !== value)
       : [...picked, value];
     onChange({ evaluatorId: selected.uuid, values: next });
@@ -128,7 +146,7 @@ export function ItemValueFilter({
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs text-muted-foreground">Show items scored</span>
-      <select
+      <Select
         aria-label="Filter by evaluator"
         value={selected?.uuid ?? ""}
         onChange={(e) =>
@@ -136,7 +154,8 @@ export function ItemValueFilter({
             e.target.value ? { evaluatorId: e.target.value, values: [] } : null,
           )
         }
-        className="h-8 px-2 rounded-md text-xs font-medium border border-border bg-background text-foreground cursor-pointer"
+        wrapperClassName="w-auto"
+        className="h-8 text-xs font-medium cursor-pointer"
       >
         <option value="">Any evaluator</option>
         {filterable.map((ev) => (
@@ -144,9 +163,9 @@ export function ItemValueFilter({
             {ev.name?.trim() || ev.uuid.slice(0, 8)}
           </option>
         ))}
-      </select>
+      </Select>
       {options.map((opt) => {
-        const active = picked.some((v) => v === opt.value);
+        const active = picked.includes(opt.value);
         return (
           <button
             key={String(opt.value)}
