@@ -2800,7 +2800,8 @@ function LabellingTaskPageInner() {
                   <>
                     Run an evaluator on these items to see its scores.
                     <br />
-                    Agreement shows up once annotators label the same items.
+                    Once annotators label the same items, this shows how often
+                    the evaluator matched them.
                   </>
                 }
               />
