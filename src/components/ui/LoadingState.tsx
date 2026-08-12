@@ -46,7 +46,13 @@ export function ErrorState({
 
 type NotFoundStateProps = {
   className?: string;
-  errorCode?: 401 | 403 | 404;
+  /**
+   * `"switching"` means the page hit a 404 and we are still working out
+   * whether it belongs to another of the user's workspaces. Show the spinner,
+   * not the dead-end screen, so a link that is about to switch workspaces
+   * never flashes "Not Found" first.
+   */
+  errorCode?: 401 | 403 | 404 | "switching";
 };
 
 const errorContent: Record<number, { title: string; message: string }> = {
@@ -70,6 +76,11 @@ export function NotFoundState({
   errorCode = 404,
 }: NotFoundStateProps) {
   const router = useRouter();
+
+  if (errorCode === "switching") {
+    return <LoadingState className={className} />;
+  }
+
   const { title, message } = errorContent[errorCode] || errorContent[404];
 
   return (

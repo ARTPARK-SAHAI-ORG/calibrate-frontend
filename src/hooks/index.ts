@@ -11,7 +11,7 @@ export type { VerifyConnectionResult } from "./useVerifyConnection";
 export { useMaxRowsPerEval } from "./useMaxRowsPerEval";
 export { useDialogUrlParam } from "./useDialogUrlParam";
 export { usePageErrorState } from "./usePageErrorState";
-export type { PageErrorCode } from "./usePageErrorState";
+export type { PageErrorCode, PageErrorState } from "./usePageErrorState";
 export {
   useOrganizations,
   useActiveOrgUuid,

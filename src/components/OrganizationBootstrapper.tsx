@@ -47,6 +47,10 @@ export function OrganizationBootstrapper() {
         hasFetchedRef.current = false;
         return;
       }
+      // Re-check: a page that 404'd because its resource lives in another
+      // workspace may have picked one while this request was in flight.
+      // Overwriting it here would undo that and cost the user a reload.
+      if (getActiveOrgUuid()) return;
       const chosen = pickDefaultOrg(orgs);
       if (chosen) {
         setActiveOrgUuid(chosen.uuid);

@@ -1,0 +1,77 @@
+import { getActiveOrgUuid, setActiveOrgUuid } from "@/lib/orgs";
+
+/**
+ * Opening a shared link to a resource that lives in one of the user's *other*
+ * workspaces used to dead-end on the "Not Found" screen: the request carries
+ * the active workspace in `X-Org-UUID`, the backend looks in that workspace
+ * only, and the frontend cannot tell "wrong workspace" from "deleted".
+ *
+ * The backend now answers that. On a 404 for a resource that exists in a
+ * workspace the caller is a member of, the body carries the owning workspace:
+ *
+ *   404 { "detail": "Agent not found", "organization_uuid": "<uuid>" }
+ *
+ * The field is omitted when the caller is not a member, so a plain 404 stays a
+ * plain 404 and we never reveal that someone else's resource exists.
+ *
+ * Wired into `usePageErrorState`, which every resource page routes its load
+ * failure through.
+ */
+
+/** Reads the owning workspace uuid out of a parsed 404 body. */
+export function readOwningOrgUuid(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const uuid = (body as { organization_uuid?: unknown }).organization_uuid;
+  return typeof uuid === "string" && uuid.trim().length > 0 ? uuid : null;
+}
+
+/**
+ * Same, for a failure thrown by `apiClient`, whose message follows
+ * `"Request failed: <status> - <body>"`.
+ */
+export function orgUuidFromErrorMessage(err: unknown): string | null {
+  if (!(err instanceof Error)) return null;
+  const match = err.message.match(/Request failed:\s*\d+\s*-\s*([\s\S]+)$/);
+  if (!match) return null;
+  try {
+    return readOwningOrgUuid(JSON.parse(match[1]));
+  } catch {
+    return null;
+  }
+}
+
+/** Records, per browser tab, the page we have already switched workspace for. */
+const SWITCHED_PATH_KEY = "calibrate:workspace-switched-path";
+
+/**
+ * Makes the owning workspace active and reloads, so every fetch on the page
+ * re-runs under it (same approach as the sidebar workspace switcher). Returns
+ * false — leaving the caller to render the normal "Not Found" — whenever
+ * reloading would not help.
+ */
+export function switchToOwningWorkspace(uuid: string | null): boolean {
+  // Already active: a reload would change nothing and repeat this 404.
+  if (!uuid || uuid === getActiveOrgUuid()) return false;
+
+  // The active workspace is shared by every tab, but a reload is not. Two
+  // tabs open on two workspaces would otherwise flip the setting back and
+  // forth and reload each other forever, since both keep polling and keep
+  // getting a 404. One switch per page, per tab.
+  const path = window.location.pathname;
+  let switchedPath: string | null = null;
+  try {
+    switchedPath = window.sessionStorage.getItem(SWITCHED_PATH_KEY);
+  } catch {}
+  if (switchedPath === path) return false;
+
+  // setActiveOrgUuid swallows a storage failure. Reloading without the write
+  // would hit the same 404 and reload again, with no way out.
+  setActiveOrgUuid(uuid);
+  if (getActiveOrgUuid() !== uuid) return false;
+
+  try {
+    window.sessionStorage.setItem(SWITCHED_PATH_KEY, path);
+  } catch {}
+  window.location.reload();
+  return true;
+}
