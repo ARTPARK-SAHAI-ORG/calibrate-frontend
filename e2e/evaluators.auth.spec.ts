@@ -7,13 +7,27 @@
 import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
 
+// Land on the evaluators list and wait for its authenticated fetch to come
+// back. The access token is read from localStorage on mount, and the create
+// wizard's default-prompt prefill silently does nothing when it runs before
+// that lands — which leaves the form empty and every later step failing. The
+// list request needs the same token, so its response is the ready signal.
+async function openEvaluatorsList(page: Page) {
+  const listed = page.waitForResponse(
+    (r) => r.url().includes("/evaluators?") && r.request().method() === "GET",
+    { timeout: 30000 },
+  );
+  await page.goto("/evaluators");
+  await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
+  await listed;
+}
+
 // Shared create flow: run the two-step "Speech to Text" wizard and land on the
 // "My evaluators" list with a card for `name`. Mirrors the standalone create
 // test below (see its inline comments for why each wait is needed). Returns the
 // card locator so callers can open or delete it.
 async function createEvaluator(page: Page, name: string) {
-  await page.goto("/evaluators");
-  await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
+  await openEvaluatorsList(page);
 
   await page.getByRole("button", { name: "Add evaluator" }).first().click();
   const picker = page.locator(".fixed.inset-0.z-50");
@@ -62,10 +76,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
   test("loads, creates an evaluator, then deletes it", async ({ page }) => {
     const name = `E2E Eval ${Date.now()}`;
 
-    await page.goto("/evaluators");
-    await expect(
-      page.getByRole("heading", { name: "Evaluators" }),
-    ).toBeVisible();
+    await openEvaluatorsList(page);
 
     // Step 1: use-case picker. Scope to the picker dialog — "Speech to Text"
     // also matches a "Filter by purpose" <option> on the page behind it.

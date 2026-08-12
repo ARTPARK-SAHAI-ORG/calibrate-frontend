@@ -40,6 +40,10 @@ import {
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { toast } from "sonner";
+import {
+  parseBackendErrorMessage,
+  parseBackendErrorResponse,
+} from "@/lib/parseBackendError";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -325,9 +329,7 @@ function EvaluatorDetailPageInner() {
       }
     } catch (err) {
       reportError("Error setting live version:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to set live version",
-      );
+      toast.error(parseBackendErrorMessage(err, "Failed to set live version"));
     } finally {
       setSettingLiveUuid(null);
     }
@@ -393,9 +395,7 @@ function EvaluatorDetailPageInner() {
       setEditOpen(false);
     } catch (err) {
       reportError("Error saving evaluator:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save evaluator",
-      );
+      toast.error(parseBackendErrorMessage(err, "Failed to save evaluator"));
     } finally {
       setEditSaving(false);
     }
@@ -565,9 +565,7 @@ function EvaluatorDetailPageInner() {
         return;
       }
       if (!res.ok) {
-        throw new Error(
-          await getEvaluatorErrorMessage(res, "Failed to create version"),
-        );
+        throw new Error(await parseBackendErrorResponse(res, "create version"));
       }
       // Refresh evaluator so the new version appears with the selected live state
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
@@ -589,9 +587,7 @@ function EvaluatorDetailPageInner() {
       }
     } catch (err) {
       reportError("Error creating version:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to create version",
-      );
+      toast.error(parseBackendErrorMessage(err, "Failed to create version"));
     } finally {
       setNewVersionSaving(false);
     }
