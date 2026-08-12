@@ -52,6 +52,7 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
+import { hasTaskOverviewData } from "@/lib/taskOverviewData";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -1513,11 +1514,10 @@ function LabellingTaskPageInner() {
   const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
-  // An evaluator that scored the items but has no human labels on them has
-  // no alignment number to show. Warn once, with wording that says whether
-  // that is all of them or only some. An evaluator that has not run at all
-  // is not part of this: nothing is missing on the human side there.
-  const evaluatorsWithoutHumanLabels = evaluatorsThatRan.filter(
+  // An evaluator with no alignment number has no human labels on the items
+  // it covers. Warn once, with wording that says whether that is all of the
+  // evaluators on this task or only some.
+  const evaluatorsWithoutHumanLabels = (agreement?.evaluators ?? []).filter(
     (ev) => ev.current == null,
   );
 
@@ -2780,14 +2780,7 @@ function LabellingTaskPageInner() {
                 </svg>
                 Loading
               </div>
-            ) : !agreement ||
-              ((agreement.human_human?.pair_count ?? 0) === 0 &&
-                (agreement.evaluators ?? []).every(
-                  // An evaluator that ran but has no human labels still has
-                  // its own score to show, so it is not empty.
-                  (e) =>
-                    (e.pair_count ?? 0) === 0 && (e.result?.count ?? 0) === 0,
-                )) ? (
+            ) : !agreement || !hasTaskOverviewData(agreement, runs) ? (
               <EmptyState
                 icon={
                   <svg
@@ -2870,7 +2863,7 @@ function LabellingTaskPageInner() {
                       </svg>
                       <span>
                         {evaluatorsWithoutHumanLabels.length ===
-                        evaluatorsThatRan.length
+                        (agreement.evaluators ?? []).length
                           ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
                           : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
                       </span>
