@@ -20,11 +20,13 @@ export function hasTaskOverviewData(
 ): boolean {
   if (!agreement) return false;
   if ((agreement.human_human?.pair_count ?? 0) > 0) return true;
+  const evaluators = agreement.evaluators ?? [];
   if (
-    (agreement.evaluators ?? []).some(
-      (e) => (e.pair_count ?? 0) > 0 || (e.result?.count ?? 0) > 0,
-    )
+    evaluators.some((e) => (e.pair_count ?? 0) > 0 || (e.result?.count ?? 0) > 0)
   )
     return true;
-  return runs.some((r) => r.status === "completed");
+  // A finished run counts only while its evaluator is still on the task. Once
+  // it is removed the task has no evaluators left to draw cards for, however
+  // many runs the task once had.
+  return evaluators.length > 0 && runs.some((r) => r.status === "completed");
 }

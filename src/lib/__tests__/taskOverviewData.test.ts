@@ -44,6 +44,15 @@ describe("hasTaskOverviewData", () => {
     ).toBe(true);
   });
 
+  it("is false when a run finished but its evaluator is off the task", () => {
+    expect(
+      hasTaskOverviewData(
+        { human_human: { pair_count: 0 }, evaluators: [] },
+        [{ status: "completed" }],
+      ),
+    ).toBe(false);
+  });
+
   it("is true when a run finished even though agreement is empty", () => {
     expect(
       hasTaskOverviewData(
