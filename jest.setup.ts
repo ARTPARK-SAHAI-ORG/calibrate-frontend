@@ -42,4 +42,9 @@ jest.mock("next/navigation", () => ({
 // Reset navigation spies between tests so call counts don't leak.
 afterEach(() => {
   Object.values(mockRouter).forEach((fn) => fn.mockClear());
+  // Components that keep view state in the address bar (open dialogs, item
+  // filters) write it with history.replaceState. jsdom keeps one address bar
+  // for the whole file, so without this the next test starts on the previous
+  // test's URL.
+  window.history.replaceState(null, "", "/");
 });

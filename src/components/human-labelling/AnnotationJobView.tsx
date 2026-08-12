@@ -22,6 +22,7 @@ import {
   valueFilterEvaluators,
   type ValueFilter,
 } from "./ItemValueFilter";
+import { useUrlValueFilters } from "./valueFilterUrl";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -247,7 +248,8 @@ export function AnnotationJobView({
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
   // Admin-only "show items scored X" filter over the annotator's answers.
-  const [valueFilters, setValueFilters] = useState<ValueFilter[]>([]);
+  // Kept in the address bar so a reload keeps the same filters on.
+  const [valueFilters, setValueFilters] = useUrlValueFilters();
 
   const isReadOnlyMode = mode === "admin" || mode === "public-readonly";
   // The filter is for whoever owns the task reviewing what came back. It is
@@ -354,10 +356,13 @@ export function AnnotationJobView({
   }, [token, initialise, onLoaded]);
 
   // A filter change always lands the viewer on the first matching item.
-  const handleValueFilterChange = useCallback((next: ValueFilter[]) => {
-    setValueFilters(next);
-    setCurrentIndex(0);
-  }, []);
+  const handleValueFilterChange = useCallback(
+    (next: ValueFilter[]) => {
+      setValueFilters(next);
+      setCurrentIndex(0);
+    },
+    [setValueFilters],
+  );
 
   const allItems = state.status === "ok" ? state.data.items : NO_ITEMS;
   const allEvaluators =
