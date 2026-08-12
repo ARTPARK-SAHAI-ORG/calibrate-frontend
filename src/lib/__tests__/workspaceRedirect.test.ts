@@ -105,6 +105,30 @@ describe("switchToOwningWorkspace", () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
+  it("still switches when the per-tab record is unavailable", () => {
+    const sessionStorage = window.sessionStorage;
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      value: {
+        getItem: () => {
+          throw new Error("storage disabled");
+        },
+        setItem: () => {
+          throw new Error("storage disabled");
+        },
+      },
+    });
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-current");
+
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      value: sessionStorage,
+    });
+  });
+
   it("does not reload when the workspace could not be saved", () => {
     const setItem = jest
       .spyOn(Storage.prototype, "setItem")
