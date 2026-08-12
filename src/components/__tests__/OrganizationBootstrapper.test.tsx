@@ -64,6 +64,29 @@ describe("OrganizationBootstrapper", () => {
     });
   });
 
+  it("keeps a workspace chosen while the request was in flight", async () => {
+    useAuthMock.mockReturnValue({
+      accessToken: "token-1",
+      isAuthenticated: true,
+    });
+    // Nothing set when the effect runs; a page that 404'd picks the workspace
+    // its resource lives in before the organizations request comes back.
+    getActiveOrgUuidMock
+      .mockReturnValueOnce(null)
+      .mockReturnValue("org-from-link");
+    fetchOrganizationsDedupMock.mockResolvedValue([
+      { uuid: "personal-org", is_personal: true },
+    ]);
+    pickDefaultOrgMock.mockReturnValue({ uuid: "personal-org" });
+
+    render(<OrganizationBootstrapper />);
+
+    await waitFor(() => {
+      expect(fetchOrganizationsDedupMock).toHaveBeenCalled();
+    });
+    expect(setActiveOrgUuidMock).not.toHaveBeenCalled();
+  });
+
   it("fetches organizations and sets the active org when none is set", async () => {
     useAuthMock.mockReturnValue({
       accessToken: "token-1",

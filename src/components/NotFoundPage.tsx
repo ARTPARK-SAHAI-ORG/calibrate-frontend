@@ -4,12 +4,12 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
-import type { PageErrorCode } from "@/hooks";
+import type { PageErrorState } from "@/hooks";
 
 type NotFoundPageProps = {
   /** Nav id of the section to keep highlighted in the sidebar. */
   activeItem: string;
-  errorCode: PageErrorCode;
+  errorCode: PageErrorState;
   sidebarOpen: boolean;
   onSidebarToggle: () => void;
   /** Optional header (e.g. a back button) rendered in the top bar. */

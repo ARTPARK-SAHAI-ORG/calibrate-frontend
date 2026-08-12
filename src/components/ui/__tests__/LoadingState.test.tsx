@@ -72,6 +72,15 @@ describe("NotFoundState", () => {
     expect(screen.getAllByText("Access Denied").length).toBeGreaterThan(0);
   });
 
+  it("renders a spinner while the workspace is being worked out", () => {
+    const { container } = render(<NotFoundState errorCode="switching" />);
+    expect(container.querySelector("svg.animate-spin")).toBeInTheDocument();
+    expect(screen.queryByText("404")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Go to home" })
+    ).not.toBeInTheDocument();
+  });
+
   it("navigates to /agents when the button is clicked", async () => {
     const user = setupUser();
     const router = useRouter();
