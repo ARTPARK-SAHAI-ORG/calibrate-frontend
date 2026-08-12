@@ -76,9 +76,19 @@ export function AgreementStatCard(
     /** When present, the card shows this in place of, or next to, the
      * agreement number. */
     result?: EvaluatorResultStat | null;
+    /** Name the score above the number. Off where the section heading
+     * already says what the number is, so the card is just the evaluator's
+     * name and its number. Ignored when the human agreement number is also
+     * on the card: two numbers side by side always need their own names. */
+    showResultLabel?: boolean;
   },
 ) {
-  const { value, valueClassName = "", result = null } = props;
+  const {
+    value,
+    valueClassName = "",
+    result = null,
+    showResultLabel = true,
+  } = props;
   return (
     <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
       {"staticPillText" in props ? (
@@ -111,7 +121,7 @@ export function AgreementStatCard(
           )}
         </div>
       )}
-      {result ? (
+      {result && (value != null || showResultLabel) ? (
         // Each number is labelled, so the card reads the same whether or not
         // there is a human agreement number to sit beside the score. On its
         // own the score sits in the middle of the card.
@@ -139,9 +149,16 @@ export function AgreementStatCard(
       ) : (
         // One number, named by the section the card sits in.
         <div
-          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+          className={`text-2xl font-semibold tabular-nums mt-2 ${
+            result
+              ? result.ratio == null
+                ? ""
+                : agreementColor(result.ratio)
+              : valueClassName
+          }`}
+          title={result?.title}
         >
-          {value ?? "—"}
+          {result ? result.value : (value ?? "—")}
         </div>
       )}
     </div>

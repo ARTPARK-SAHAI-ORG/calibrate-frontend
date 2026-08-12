@@ -2830,6 +2830,7 @@ function LabellingTaskPageInner() {
                           }}
                           value={null}
                           result={evaluatorResultStats[ev.evaluator_id] ?? null}
+                          showResultLabel={false}
                         />
                       ))}
                     </div>

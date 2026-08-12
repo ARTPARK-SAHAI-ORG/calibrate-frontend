@@ -111,6 +111,41 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
+  it("drops the score's label when the section heading already names it", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        value={null}
+        result={{
+          label: "Score",
+          value: "75%",
+          title: "3 of 4 items",
+          ratio: 0.75,
+        }}
+        showResultLabel={false}
+      />,
+    );
+    const number = screen.getByText("75%");
+    expect(number.className).toContain("text-green-600");
+    expect(number.className).not.toContain("text-center");
+    expect(number).toHaveAttribute("title", "3 of 4 items");
+    expect(screen.queryByText("Score")).not.toBeInTheDocument();
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+  });
+
+  it("keeps both labels when the agreement number is on the card too", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        value="90%"
+        result={{ label: "Score", value: "75%", ratio: 0.75 }}
+        showResultLabel={false}
+      />,
+    );
+    expect(screen.getByText("Score")).toBeInTheDocument();
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+  });
+
   it("renders the static pill variant with a result", () => {
     render(
       <AgreementStatCard

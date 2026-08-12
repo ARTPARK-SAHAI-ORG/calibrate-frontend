@@ -8,7 +8,7 @@
  * data-agnostic — caller fetches the job & task and passes them in.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
@@ -29,8 +29,13 @@ import {
   matchesAllValueFilters,
   usableValueFilters,
   valueFilterEvaluators,
-  type ValueFilter,
 } from "@/components/human-labelling/ItemValueFilter";
+import {
+  DISAGREEMENTS_PARAM,
+  readUrlParam,
+  useUrlValueFilters,
+  writeUrlParam,
+} from "@/components/human-labelling/valueFilterUrl";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1652,8 +1657,18 @@ export function EvaluatorRunDetailView({
   hideStatusPill = false,
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [filterDisagreements, setFilterDisagreements] = useState(false);
-  const [valueFilters, setValueFilters] = useState<ValueFilter[]>([]);
+  // Both filters live in the address bar, so a reload or a shared link opens
+  // the run narrowed the same way.
+  const [filterDisagreements, setFilterDisagreements] = useState(
+    () => readUrlParam(DISAGREEMENTS_PARAM) === "1",
+  );
+  const [valueFilters, setValueFilters] = useUrlValueFilters();
+
+  const toggleDisagreements = useCallback(() => {
+    const next = !filterDisagreements;
+    setFilterDisagreements(next);
+    writeUrlParam(DISAGREEMENTS_PARAM, next ? "1" : null);
+  }, [filterDisagreements]);
 
   // Reset when either filter changes.
   React.useEffect(() => {
@@ -1757,6 +1772,12 @@ export function EvaluatorRunDetailView({
     [job],
   );
 
+  // The disagreements filter counts only while its button is on screen. A
+  // link can carry it in, and without the button there would be no way to
+  // turn it off. Same rule as `canFilterByValue` below. Everything that
+  // narrows anything reads this, never `filterDisagreements` on its own.
+  const showDisagreementsOnly = filterDisagreements && hasDisagreements;
+
   // Both filters apply together: an item has to satisfy every active one.
   const jobEvaluators = useMemo(() => job?.evaluators ?? [], [job]);
 
@@ -1771,7 +1792,7 @@ export function EvaluatorRunDetailView({
 
   const filteredItemsForRun = useMemo(() => {
     let items = itemsForRun;
-    if (filterDisagreements) {
+    if (showDisagreementsOnly) {
       items = items.filter((it) => {
         const itemAgreement = job?.human_agreement?.items.find(
           (i) => i.item_id === it.uuid,
@@ -1803,7 +1824,7 @@ export function EvaluatorRunDetailView({
     }
     return items;
   }, [
-    filterDisagreements,
+    showDisagreementsOnly,
     valueFilters,
     itemsForRun,
     job,
@@ -1957,7 +1978,7 @@ export function EvaluatorRunDetailView({
             <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
               {hasDisagreements && (
                 <button
-                  onClick={() => setFilterDisagreements((f) => !f)}
+                  onClick={toggleDisagreements}
                   className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
                     filterDisagreements
                       ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
@@ -2075,7 +2096,7 @@ export function EvaluatorRunDetailView({
                   {(canFilterByValue &&
                     usableValueFilters(valueFilters, jobEvaluators).length >
                       0) ||
-                  filterDisagreements
+                  showDisagreementsOnly
                     ? "No items match this filter."
                     : "No items in this run."}
                 </div>
@@ -2097,7 +2118,7 @@ export function EvaluatorRunDetailView({
                   evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
                     currentItem.payload,
                   )}
-                  filterDisagreements={filterDisagreements}
+                  filterDisagreements={showDisagreementsOnly}
                   linkEvaluators={linkEvaluators}
                 />
               )}

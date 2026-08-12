@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { cleanup, render, screen, setupUser } from "@/test-utils";
 
 // AnnotationJobView pulls in canvas-confetti and backend API helpers that
 // are irrelevant to this presentational view; stub ItemPane with a simple
@@ -1200,6 +1200,108 @@ describe("EvaluatorRunDetailView", () => {
     await user.click(valueOption("Wrong"));
     expect(screen.getByText("Item One")).toBeInTheDocument();
     expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+  });
+
+  it("puts both filters in the address bar and reopens with them on", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    await addFilter(user, "Binary Evaluator", "Correct");
+    expect(window.location.search).toBe(
+      `?${encodeURIComponent("scores")}=${encodeURIComponent("ev-bin:true")}`,
+    );
+
+    // Same address, opened fresh: the filter is still on.
+    cleanup();
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+  });
+
+  it("keeps the disagreements toggle in the address bar", async () => {
+    const user = setupUser();
+    const job = makeValueFilterJob({
+      human_agreement: {
+        evaluators: [],
+        items: [
+          {
+            item_id: "item-1",
+            annotator_count: 1,
+            evaluators: [
+              {
+                evaluator_id: "ev-bin",
+                agreement: 0,
+                pair_count: 1,
+                human_annotations: [
+                  {
+                    annotation_id: "a1",
+                    annotator_id: "ann1",
+                    annotator_name: "Annotator One",
+                    job_id: "job-1",
+                    value: { value: false },
+                    updated_at: "",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show disagreements only" }),
+    );
+    expect(window.location.search).toBe("?disagreements=1");
+
+    cleanup();
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Showing disagreements only" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Showing disagreements only" }),
+    );
+    expect(window.location.search).toBe("");
+  });
+
+  it("ignores a disagreements link on a run that has none", () => {
+    // No button to turn it off here, so it must not hide the items or the
+    // evaluator cards inside them.
+    window.history.replaceState(null, "", "/run?disagreements=1");
+    render(
+      <EvaluatorRunDetailView
+        job={makeValueFilterJob()}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /disagreements only/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "All evaluators agree with human annotations on this item.",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("does not render the filter toolbar when no evaluator can be filtered on", () => {
