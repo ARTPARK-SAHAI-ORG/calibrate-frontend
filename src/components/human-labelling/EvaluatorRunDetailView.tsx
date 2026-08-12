@@ -1561,10 +1561,13 @@ function EvaluatorSummary({
             : ev.evaluator_version_id
               ? (versionLabels[ev.evaluator_version_id] ?? null)
               : null;
+          // No human labels on these items means there is nothing to put in
+          // the human agreement column, so the card leaves it out entirely
+          // rather than showing a dash. The note above the cards says why.
           const value =
             row?.agreement != null
               ? `${Math.round(row.agreement * 100)}%`
-              : "—";
+              : null;
           const valueClassName = agreementColor(row?.agreement);
           const result = summariseEvaluatorRuns(
             runs,

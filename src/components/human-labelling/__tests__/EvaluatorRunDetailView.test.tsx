@@ -979,10 +979,10 @@ describe("EvaluatorRunDetailView", () => {
     expect(
       screen.getByText(/No human labels found on the items in this run yet/),
     ).toBeInTheDocument();
-    // Nothing to agree with yet, so the card keeps the label and shows an em
-    // dash rather than leaving the number out.
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // Nothing to compare against yet, so the card leaves the human agreement
+    // column out instead of showing an empty one.
+    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
   it("warns that only some evaluators have human labels", () => {

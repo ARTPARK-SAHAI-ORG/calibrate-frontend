@@ -111,9 +111,15 @@ export function AgreementStatCard(
           )}
         </div>
       )}
-      {result && value != null ? (
-        // Both numbers on one card, so each needs its own label.
-        <div className="mt-2 flex items-start gap-6">
+      {result ? (
+        // Each number is labelled, so the card reads the same whether or not
+        // there is a human agreement number to sit beside the score. On its
+        // own the score sits in the middle of the card.
+        <div
+          className={`mt-2 flex items-start gap-6 ${
+            value == null ? "justify-center text-center" : ""
+          }`}
+        >
           <Stat
             label={result.label}
             value={result.value}
@@ -122,25 +128,20 @@ export function AgreementStatCard(
             }
             title={result.title}
           />
-          <Stat
-            label="Human agreement"
-            value={value}
-            valueClassName={valueClassName}
-          />
+          {value != null && (
+            <Stat
+              label="Human agreement"
+              value={value}
+              valueClassName={valueClassName}
+            />
+          )}
         </div>
       ) : (
         // One number, named by the section the card sits in.
         <div
-          className={`text-2xl font-semibold tabular-nums mt-2 ${
-            result
-              ? result.ratio == null
-                ? ""
-                : agreementColor(result.ratio)
-              : valueClassName
-          }`}
-          title={result?.title}
+          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
         >
-          {result ? result.value : (value ?? "—")}
+          {value ?? "—"}
         </div>
       )}
     </div>

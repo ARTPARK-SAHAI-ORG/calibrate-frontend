@@ -101,12 +101,12 @@ describe("AgreementStatCard", () => {
       />
     );
     const number = screen.getByText("75%");
-    expect(number).toHaveAttribute("title", "3 of 4 items");
+    expect(screen.getByTitle("3 of 4 items")).toContainElement(number);
     expect(number.className).toContain("text-green-600");
-    // The card is only about the score, so neither the agreement number nor
-    // the labels that tell the two numbers apart belong on it.
+    // The score keeps its own label, exactly as it has when the agreement
+    // number sits next to it. Only the agreement number is left out.
+    expect(screen.getByText("Score")).toBeInTheDocument();
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
-    expect(screen.queryByText("Score")).not.toBeInTheDocument();
     expect(screen.queryByText("alignment")).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
