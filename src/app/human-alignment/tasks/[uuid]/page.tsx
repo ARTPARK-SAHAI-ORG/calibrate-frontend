@@ -49,7 +49,9 @@ import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsD
 import {
   AgreementStatCard,
   agreementColor,
+  type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
+import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -67,7 +69,19 @@ type AgreementBlock = {
 
 type TaskAgreementResponse = {
   human_human: AgreementBlock;
-  evaluators: (AgreementBlock & { evaluator_id: string; name: string })[];
+  evaluators: (AgreementBlock & {
+    evaluator_id: string;
+    name: string;
+    /** The evaluator's own rolled-up output across every item in the task,
+     * independent of any human labels. `count` is the number of items it
+     * produced a value for; a binary evaluator fills `true_count`, a rating
+     * evaluator fills `mean`. Absent when it has not run on anything. */
+    result?: {
+      count: number;
+      true_count?: number | null;
+      mean?: number | null;
+    } | null;
+  })[];
 };
 
 // Denormalized one-row-per-(item × linked evaluator) view from
@@ -1459,6 +1473,54 @@ function LabellingTaskPageInner() {
     fetchAgreement();
   }, [fetchAgreement]);
 
+  // The agreement response carries each evaluator's rolled-up counts; the
+  // scale that turns them into "82%" or "3.9 / 5" comes from the task's own
+  // evaluator list, so the two are joined here by evaluator uuid.
+  const evaluatorResultStats = useMemo(() => {
+    const scaleById = new Map(
+      (task?.evaluators ?? []).map((e) => [e.uuid, e]),
+    );
+    const out: Record<string, EvaluatorResultStat | null> = {};
+    for (const ev of agreement?.evaluators ?? []) {
+      const scale = scaleById.get(ev.evaluator_id);
+      out[ev.evaluator_id] = formatEvaluatorResultStat(
+        ev.result
+          ? {
+              count: ev.result.count,
+              trueCount: ev.result.true_count,
+              mean: ev.result.mean,
+            }
+          : null,
+        scale
+          ? {
+              output_type: scale.output_type,
+              scale_min:
+                typeof scale.scale_min === "number" ? scale.scale_min : null,
+              scale_max:
+                typeof scale.scale_max === "number" ? scale.scale_max : null,
+              output_config: scale.output_config,
+            }
+          : null,
+      );
+    }
+    return out;
+  }, [agreement, task]);
+
+  // Evaluators with a score to show. Keyed off the formatted number, not the
+  // raw count: a count with no usable value behind it (an evaluator missing
+  // from the task's own list, or one whose output type is not recorded)
+  // formats to nothing, and a card with nothing in it is worse than no card.
+  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
+    (ev) => evaluatorResultStats[ev.evaluator_id] != null,
+  );
+  // An evaluator that scored the items but has no human labels on them has
+  // no alignment number to show. Warn once, with wording that says whether
+  // that is all of them or only some. An evaluator that has not run at all
+  // is not part of this: nothing is missing on the human side there.
+  const evaluatorsWithoutHumanLabels = evaluatorsThatRan.filter(
+    (ev) => ev.current == null,
+  );
+
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
@@ -2721,7 +2783,10 @@ function LabellingTaskPageInner() {
             ) : !agreement ||
               ((agreement.human_human?.pair_count ?? 0) === 0 &&
                 (agreement.evaluators ?? []).every(
-                  (e) => (e.pair_count ?? 0) === 0,
+                  // An evaluator that ran but has no human labels still has
+                  // its own score to show, so it is not empty.
+                  (e) =>
+                    (e.pair_count ?? 0) === 0 && (e.result?.count ?? 0) === 0,
                 )) ? (
               <EmptyState
                 icon={
@@ -2750,48 +2815,96 @@ function LabellingTaskPageInner() {
                 }
               />
             ) : (
-              <div className="space-y-2">
-                <div>
+              <div className="space-y-6">
+                {/* Only evaluators that produced a score. One that never ran
+                    has nothing to put in this section. */}
+                {evaluatorsThatRan.length > 0 && (
+                  <section>
+                    <h2 className="text-sm font-semibold">
+                      Performance summary
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      What each evaluator scored across the items in this task
+                    </p>
+                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
+                      {evaluatorsThatRan.map((ev) => (
+                        <AgreementStatCard
+                          key={ev.evaluator_id}
+                          evaluatorPill={{
+                            href: `/evaluators/${ev.evaluator_id}`,
+                            name: ev.name,
+                          }}
+                          value={null}
+                          result={evaluatorResultStats[ev.evaluator_id] ?? null}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold">Agreement summary</h2>
+                    <h2 className="text-sm font-semibold">Score reliability</h2>
                     <RefreshButton
                       loading={agreementLoading}
                       onClick={() => fetchAgreement()}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground max-w-2xl mt-1">
-                    These cards show agreement between annotators and how
+                  <p className="text-xs text-muted-foreground mt-1">
+                    How closely annotators agree with each other, and how
                     closely each evaluator aligns with humans
                   </p>
-                </div>
-                <div className="flex flex-wrap items-stretch gap-3">
-                  <AgreementStatCard
-                    staticPillText="Annotator agreement"
-                    value={
-                      agreement.human_human?.current != null
-                        ? `${Math.round(agreement.human_human.current * 100)}%`
-                        : "—"
-                    }
-                    valueClassName={agreementColor(
-                      agreement.human_human?.current,
-                    )}
-                  />
-                  {(agreement.evaluators ?? []).map((ev) => (
+                  {evaluatorsWithoutHumanLabels.length > 0 && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
+                      <svg
+                        className="w-4 h-4 mt-0.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                        />
+                      </svg>
+                      <span>
+                        {evaluatorsWithoutHumanLabels.length ===
+                        evaluatorsThatRan.length
+                          ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
+                          : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-stretch gap-3 mt-3">
                     <AgreementStatCard
-                      key={ev.evaluator_id}
-                      evaluatorPill={{
-                        href: `/evaluators/${ev.evaluator_id}`,
-                        name: ev.name,
-                      }}
+                      staticPillText="Annotator agreement"
                       value={
-                        ev.current != null
-                          ? `${Math.round(ev.current * 100)}%`
+                        agreement.human_human?.current != null
+                          ? `${Math.round(agreement.human_human.current * 100)}%`
                           : "—"
                       }
-                      valueClassName={agreementColor(ev.current)}
+                      valueClassName={agreementColor(
+                        agreement.human_human?.current,
+                      )}
                     />
-                  ))}
-                </div>
+                    {(agreement.evaluators ?? []).map((ev) => (
+                      <AgreementStatCard
+                        key={ev.evaluator_id}
+                        evaluatorPill={{
+                          href: `/evaluators/${ev.evaluator_id}`,
+                          name: ev.name,
+                        }}
+                        value={
+                          ev.current != null
+                            ? `${Math.round(ev.current * 100)}%`
+                            : "—"
+                        }
+                        valueClassName={agreementColor(ev.current)}
+                      />
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
 

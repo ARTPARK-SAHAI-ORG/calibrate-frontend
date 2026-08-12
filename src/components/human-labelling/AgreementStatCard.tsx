@@ -23,20 +23,14 @@ function Stat({
   value,
   valueClassName = "",
   title,
-  centered = false,
 }: {
   label: string;
   value: string;
   valueClassName?: string;
   title?: string;
-  /** Centre the label and number — used when this is the card's only stat. */
-  centered?: boolean;
 }) {
   return (
-    <div
-      className={`min-w-0 ${centered ? "w-full text-center" : ""}`}
-      title={title}
-    >
+    <div className="min-w-0" title={title}>
       <div className="text-[11px] text-muted-foreground whitespace-nowrap">
         {label}
       </div>
@@ -74,24 +68,19 @@ export function AgreementStatCard(
         };
       }
   ) & {
-    /** Human agreement. Null hides that number entirely — used when the run's
-     * items carry no human labels, so there is nothing to agree with. */
+    /** Human agreement, or an em dash when there is nothing to compare
+     * against yet. Null only where the score has a card of its own, so
+     * agreement is not this card's subject. */
     value: string | null;
     valueClassName?: string;
-    /** When present, the card shows this next to the agreement number. */
+    /** When present, the card shows this in place of, or next to, the
+     * agreement number. */
     result?: EvaluatorResultStat | null;
   },
 ) {
   const { value, valueClassName = "", result = null } = props;
   return (
-    <div
-      className={`border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 ${
-        // With two numbers side by side the card needs a floor so the pair
-        // does not read as cramped. A single number only needs the width of
-        // the evaluator's name.
-        result && value == null ? "" : "min-w-[160px]"
-      }`}
-    >
+    <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}
@@ -122,7 +111,8 @@ export function AgreementStatCard(
           )}
         </div>
       )}
-      {result ? (
+      {result && value != null ? (
+        // Both numbers on one card, so each needs its own label.
         <div className="mt-2 flex items-start gap-6">
           <Stat
             label={result.label}
@@ -131,21 +121,26 @@ export function AgreementStatCard(
               result.ratio == null ? "" : agreementColor(result.ratio)
             }
             title={result.title}
-            centered={value == null}
           />
-          {value != null && (
-            <Stat
-              label="Human agreement"
-              value={value}
-              valueClassName={valueClassName}
-            />
-          )}
+          <Stat
+            label="Human agreement"
+            value={value}
+            valueClassName={valueClassName}
+          />
         </div>
       ) : (
+        // One number, named by the section the card sits in.
         <div
-          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+          className={`text-2xl font-semibold tabular-nums mt-2 ${
+            result
+              ? result.ratio == null
+                ? ""
+                : agreementColor(result.ratio)
+              : valueClassName
+          }`}
+          title={result?.title}
         >
-          {value ?? "—"}
+          {result ? result.value : (value ?? "—")}
         </div>
       )}
     </div>

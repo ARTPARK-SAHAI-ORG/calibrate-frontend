@@ -140,6 +140,22 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
 
+## Writing UI copy
+
+Every user-facing string in this app — headings, labels, buttons, empty states, notes, tooltips, error messages — is written for a **domain expert who is not technical**. Picture the person who runs the programme the voice agent serves: they know their own field and what a good conversation with a caller looks like, they do not know machine learning, statistics, or software.
+
+Rules:
+
+- **Name things after the question the reader is asking**, not after the data structure behind them. "What the evaluators found" beats "Evaluator run aggregates".
+- **No machine learning or statistics vocabulary** in the interface: no inference, ground truth, inter-annotator reliability, F1, precision/recall, aggregation, normalisation, distribution, threshold tuning. If a concept genuinely needs one of these, say it in ordinary words and put the detail in the description line below the heading.
+- **No software vocabulary** either: no payload, schema, endpoint, config, JSON, uuid, null, boolean, cache, poll. The user should never have to know how the app is built.
+- **Do not invent a term** and then reuse it as if it were established. Use the words already on screen and in the docs (evaluator, annotator, task, item, run, score, agreement). One product, one vocabulary.
+- **Say what a number is and what it is measured against.** "Human agreement" is clear; "alignment" alone is not. A number with no stated comparison is a number nobody trusts.
+- **Plain sentence case, expanded contractions** (does not, cannot), no em-dashes, no idioms, no metaphors, no cute phrasing.
+- **Short, but never at the cost of the detail that makes it usable.** Cut the padding, keep the fact.
+
+When renaming or adding copy, apply the change everywhere the same idea appears (both the run page and the task page, the dialog and the list) rather than only where the user pointed. Inconsistent wording for the same thing reads as two different things.
+
 ## Before making any change (mandatory)
 
 Whenever making a change, adding a new feature, or modifying anything, always do the following before writing code:

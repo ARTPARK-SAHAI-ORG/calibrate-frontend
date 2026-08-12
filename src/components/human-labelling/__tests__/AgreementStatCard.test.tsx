@@ -87,6 +87,30 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("alignment")).not.toBeInTheDocument();
   });
 
+  it("shows the result on its own when agreement belongs to another section", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        value={null}
+        result={{
+          label: "Score",
+          value: "75%",
+          title: "3 of 4 items",
+          ratio: 0.75,
+        }}
+      />
+    );
+    const number = screen.getByText("75%");
+    expect(number).toHaveAttribute("title", "3 of 4 items");
+    expect(number.className).toContain("text-green-600");
+    // The card is only about the score, so neither the agreement number nor
+    // the labels that tell the two numbers apart belong on it.
+    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    expect(screen.queryByText("Score")).not.toBeInTheDocument();
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
   it("renders the static pill variant with a result", () => {
     render(
       <AgreementStatCard
