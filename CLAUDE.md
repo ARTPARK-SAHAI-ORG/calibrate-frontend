@@ -144,6 +144,8 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 Every user-facing string in this app — headings, labels, buttons, empty states, notes, tooltips, error messages — is written for a **domain expert who is not technical**. Picture the person who runs the programme the voice agent serves: they know their own field and what a good conversation with a caller looks like, they do not know machine learning, statistics, or software.
 
+**Who is reading it: a team, not one person.** The reader is a nonprofit with a team of domain experts. The people who label items (annotators) are usually not the same person reading the screen. So never address the reader as the one doing the labelling: no "label the items yourself", no "how often it agrees with you", no "your annotators". Write about the work, not about the reader: "Once annotators label the same items, this section shows how often the evaluator and the annotators agree." Second person is fine only for an action the reader themselves takes on that screen ("Run an evaluator on these items").
+
 Rules:
 
 - **Name things after the question the reader is asking**, not after the data structure behind them. "What the evaluators found" beats "Evaluator run aggregates".
@@ -153,8 +155,12 @@ Rules:
 - **Say what a number is and what it is measured against.** "Human agreement" is clear; "alignment" alone is not. A number with no stated comparison is a number nobody trusts.
 - **Plain sentence case, expanded contractions** (does not, cannot), no em-dashes, no idioms, no metaphors, no cute phrasing.
 - **Short, but never at the cost of the detail that makes it usable.** Cut the padding, keep the fact.
+- **Write the sentence the way a person would say it, from the reader's side.** "The scores each evaluator gave these items" beats "What each evaluator scored across the items in this task". Anything that reads like a description of the data ("what the evaluators scored", "run aggregates", "alignment with humans") is still developer language even when the words are common ones.
+- **An empty state says what to do next**, in one or two short sentences: the action that fills the screen, then what appears once it is done.
 
 When renaming or adding copy, apply the change everywhere the same idea appears (both the run page and the task page, the dialog and the list) rather than only where the user pointed. Inconsistent wording for the same thing reads as two different things.
+
+**That rule covers renaming one idea. It does not license a tone rewrite of nearby copy.** If the user objects to the wording of one string, change that string. Leave every other string alone, even when the same weakness is visible in the heading right next to it. Say what else you would rewrite and let the user decide. Rewriting copy nobody asked about buries the fix they did ask for in a diff they now have to review.
 
 ## Before making any change (mandatory)
 
