@@ -20,8 +20,9 @@ import {
 import {
   AgreementStatCard,
   agreementColor,
+  type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
-import { formatPercent, formatRating } from "@/lib/llmMetrics";
+import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
 
 // ---------------------------------------------------------------------------
@@ -341,16 +342,7 @@ export function summariseEvaluatorRuns(
   runs: EvaluatorRunRow[],
   ev: { evaluator_id: string; evaluator_version_id?: string },
   jobEvaluator: JobEvaluator | null,
-): {
-  label: string;
-  value: string;
-  title: string;
-  /** 0–1 position of the value on its own scale, so the card can colour it
-   * on the same thresholds as the agreement number. Null when the scale is
-   * unknown (a rating evaluator with no scale_max), which leaves the value
-   * in the default text colour. */
-  ratio: number | null;
-} | null {
+): EvaluatorResultStat | null {
   const values = runs
     .filter(
       (r) =>
@@ -360,44 +352,26 @@ export function summariseEvaluatorRuns(
     )
     .map((r) => r.value?.value);
 
-  const itemWord = (n: number) => `${n} item${n === 1 ? "" : "s"}`;
-
   if (jobEvaluator?.output_type === "rating") {
     const nums = values.filter(
       (v): v is number => typeof v === "number" && Number.isFinite(v),
     );
-    if (nums.length === 0) return null;
-    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
-    const rounded = formatRating(avg);
-    const max =
-      typeof jobEvaluator?.scale_max === "number"
-        ? jobEvaluator.scale_max
-        : null;
-    const min =
-      typeof jobEvaluator?.scale_min === "number" ? jobEvaluator.scale_min : 0;
-    return {
-      label: "Score",
-      value: max != null ? `${rounded} / ${max}` : rounded,
-      title: `Average across ${itemWord(nums.length)}`,
-      ratio: max != null && max > min ? (avg - min) / (max - min) : null,
-    };
+    return formatEvaluatorResultStat(
+      {
+        count: nums.length,
+        mean: nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : null,
+      },
+      jobEvaluator,
+    );
   }
 
   const bools = values.filter((v): v is boolean => typeof v === "boolean");
-  if (bools.length === 0) return null;
-  const trueCount = bools.filter(Boolean).length;
-  // The verdict word (Correct / Pass / whatever the evaluator calls it) goes
-  // in the hover text, not the label, so every card reads "Score".
-  const trueLabel = getBinaryLabel(
-    binaryScaleFor(jobEvaluator?.output_type, jobEvaluator?.output_config?.scale),
-    true,
+  return formatEvaluatorResultStat(
+    { count: bools.length, trueCount: bools.filter(Boolean).length },
+    jobEvaluator,
   );
-  return {
-    label: "Score",
-    value: formatPercent((trueCount / bools.length) * 100, 0),
-    title: `${trueLabel} on ${trueCount} of ${itemWord(bools.length)}`,
-    ratio: trueCount / bools.length,
-  };
 }
 
 export function isBelowFullEvaluatorAgreement(
