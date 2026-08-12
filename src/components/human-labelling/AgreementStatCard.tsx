@@ -69,11 +69,12 @@ export function AgreementStatCard(
       }
   ) & {
     /** Human agreement, or an em dash when there is nothing to compare
-     * against yet. Always shown, so the card says what is missing rather
-     * than quietly leaving the number out. */
-    value: string;
+     * against yet. Null only where the score has a card of its own, so
+     * agreement is not this card's subject. */
+    value: string | null;
     valueClassName?: string;
-    /** When present, the card shows this next to the agreement number. */
+    /** When present, the card shows this in place of, or next to, the
+     * agreement number. */
     result?: EvaluatorResultStat | null;
   },
 ) {
@@ -110,7 +111,8 @@ export function AgreementStatCard(
           )}
         </div>
       )}
-      {result ? (
+      {result && value != null ? (
+        // Both numbers on one card, so each needs its own label.
         <div className="mt-2 flex items-start gap-6">
           <Stat
             label={result.label}
@@ -127,10 +129,18 @@ export function AgreementStatCard(
           />
         </div>
       ) : (
+        // One number, named by the section the card sits in.
         <div
-          className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+          className={`text-2xl font-semibold tabular-nums mt-2 ${
+            result
+              ? result.ratio == null
+                ? ""
+                : agreementColor(result.ratio)
+              : valueClassName
+          }`}
+          title={result?.title}
         >
-          {value}
+          {result ? result.value : (value ?? "—")}
         </div>
       )}
     </div>

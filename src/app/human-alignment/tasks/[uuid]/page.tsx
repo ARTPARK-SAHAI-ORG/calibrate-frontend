@@ -2811,8 +2811,31 @@ function LabellingTaskPageInner() {
                 }
               />
             ) : (
-              <div className="space-y-2">
-                <div>
+              <div className="space-y-6">
+                {/* Only evaluators that produced a score. One that never ran
+                    has nothing to put in this section. */}
+                {evaluatorsThatRan.length > 0 && (
+                  <section>
+                    <h2 className="text-sm font-semibold">Score summary</h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      What each evaluator scored across the items in this task
+                    </p>
+                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
+                      {evaluatorsThatRan.map((ev) => (
+                        <AgreementStatCard
+                          key={ev.evaluator_id}
+                          evaluatorPill={{
+                            href: `/evaluators/${ev.evaluator_id}`,
+                            name: ev.name,
+                          }}
+                          value={null}
+                          result={evaluatorResultStats[ev.evaluator_id] ?? null}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold">Agreement summary</h2>
                     <RefreshButton
@@ -2821,63 +2844,61 @@ function LabellingTaskPageInner() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    These cards show agreement between annotators, what each
-                    evaluator scored across the items in this task, and how
+                    How closely annotators agree with each other, and how
                     closely each evaluator aligns with humans
                   </p>
-                </div>
-                {evaluatorsWithoutHumanLabels.length > 0 && (
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
-                    <svg
-                      className="w-4 h-4 mt-0.5 shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
-                      />
-                    </svg>
-                    <span>
-                      {evaluatorsWithoutHumanLabels.length ===
-                      evaluatorsThatRan.length
-                        ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
-                        : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-wrap items-stretch gap-3">
-                  <AgreementStatCard
-                    staticPillText="Annotator agreement"
-                    value={
-                      agreement.human_human?.current != null
-                        ? `${Math.round(agreement.human_human.current * 100)}%`
-                        : "—"
-                    }
-                    valueClassName={agreementColor(
-                      agreement.human_human?.current,
-                    )}
-                  />
-                  {(agreement.evaluators ?? []).map((ev) => (
+                  {evaluatorsWithoutHumanLabels.length > 0 && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
+                      <svg
+                        className="w-4 h-4 mt-0.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                        />
+                      </svg>
+                      <span>
+                        {evaluatorsWithoutHumanLabels.length ===
+                        evaluatorsThatRan.length
+                          ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
+                          : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-stretch gap-3 mt-3">
                     <AgreementStatCard
-                      key={ev.evaluator_id}
-                      evaluatorPill={{
-                        href: `/evaluators/${ev.evaluator_id}`,
-                        name: ev.name,
-                      }}
+                      staticPillText="Annotator agreement"
                       value={
-                        ev.current != null
-                          ? `${Math.round(ev.current * 100)}%`
+                        agreement.human_human?.current != null
+                          ? `${Math.round(agreement.human_human.current * 100)}%`
                           : "—"
                       }
-                      valueClassName={agreementColor(ev.current)}
-                      result={evaluatorResultStats[ev.evaluator_id] ?? null}
+                      valueClassName={agreementColor(
+                        agreement.human_human?.current,
+                      )}
                     />
-                  ))}
-                </div>
+                    {(agreement.evaluators ?? []).map((ev) => (
+                      <AgreementStatCard
+                        key={ev.evaluator_id}
+                        evaluatorPill={{
+                          href: `/evaluators/${ev.evaluator_id}`,
+                          name: ev.name,
+                        }}
+                        value={
+                          ev.current != null
+                            ? `${Math.round(ev.current * 100)}%`
+                            : "—"
+                        }
+                        valueClassName={agreementColor(ev.current)}
+                      />
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
 
