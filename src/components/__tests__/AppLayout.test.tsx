@@ -89,10 +89,20 @@ describe("AppLayout", () => {
   });
 
   it("shows only a spinner while the sign-in details are still being read", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    mockAccessToken = null;
     mockAuthLoading = true;
     renderLayout();
     expect(document.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Page content")).not.toBeInTheDocument();
+  });
+
+  it("renders a cached workspace list at once, with no spinner in between", () => {
+    mockAuthLoading = true;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
   it("renders the page while the workspace list refreshes in the background", () => {
