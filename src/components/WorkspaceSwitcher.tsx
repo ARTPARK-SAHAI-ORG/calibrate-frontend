@@ -65,8 +65,7 @@ function WorkspaceAvatar({
 
 export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   const accessToken = useAccessToken();
-  const { organizations, isLoading, createOrganization } =
-    useOrganizations(accessToken);
+  const { organizations, createOrganization } = useOrganizations(accessToken);
   const [activeUuid, setActiveUuid] = useActiveOrgUuid();
 
   const [open, setOpen] = useState(false);
@@ -176,7 +175,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
               <div className="absolute left-12 top-0 z-50">
                 <DropdownPanel
                   organizations={organizations}
-                  isLoading={isLoading}
                   activeUuid={activeUuid}
                   activeOrg={activeOrg}
                   onSelect={handleSelect}
@@ -211,7 +209,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
         >
           <WorkspaceAvatar org={activeOrg} />
           <span className="flex-1 min-w-0 text-sm font-medium text-foreground truncate">
-            {activeOrg?.name ?? (isLoading ? "Loading…" : "Workspace")}
+            {activeOrg?.name ?? "Workspace"}
           </span>
           <svg
             className="w-4 h-4 text-muted-foreground flex-shrink-0"
@@ -232,7 +230,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
           <div className="absolute left-3 top-full z-50 mt-1">
             <DropdownPanel
               organizations={organizations}
-              isLoading={isLoading}
               activeUuid={activeUuid}
               activeOrg={activeOrg}
               onSelect={handleSelect}
@@ -255,7 +252,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
 
 type DropdownPanelProps = {
   organizations: Organization[];
-  isLoading: boolean;
   activeUuid: string | null;
   activeOrg: Organization | null;
   onSelect: (uuid: string) => void;
@@ -264,7 +260,6 @@ type DropdownPanelProps = {
 
 function DropdownPanel({
   organizations,
-  isLoading,
   activeUuid,
   activeOrg,
   onSelect,
@@ -279,9 +274,7 @@ function DropdownPanel({
         <p className="px-2 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Workspaces
         </p>
-        {isLoading && organizations.length === 0 ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">Loading…</p>
-        ) : organizations.length === 0 ? (
+        {organizations.length === 0 ? (
           <p className="px-2 py-2 text-sm text-muted-foreground">
             No workspaces yet.
           </p>

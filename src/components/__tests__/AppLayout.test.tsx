@@ -9,6 +9,26 @@ jest.mock("../WorkspaceSwitcher", () => ({
   ),
 }));
 
+// The layout waits on the workspace list before it renders anything, so drive
+// that hook from the test instead of hitting the network.
+let mockWorkspaces: { uuid: string }[] = [{ uuid: "org-1" }];
+let mockWorkspacesLoading = false;
+
+jest.mock("../../hooks", () => ({
+  __esModule: true,
+  useAccessToken: () => "token-1",
+  useOrganizations: () => ({
+    organizations: mockWorkspaces,
+    isLoading: mockWorkspacesLoading,
+  }),
+  clearOrgsCache: jest.fn(),
+}));
+
+beforeEach(() => {
+  mockWorkspaces = [{ uuid: "org-1" }];
+  mockWorkspacesLoading = false;
+});
+
 // jsdom has no matchMedia; AppLayout reads it when applying the "device" theme.
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -54,6 +74,33 @@ describe("AppLayout", () => {
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
     expect(screen.getByTestId("workspace-switcher-expanded")).toBeInTheDocument();
+  });
+
+  it("shows only a spinner while the workspace list is still loading", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    const { container } = render(
+      <AppLayout
+        activeItem="agents"
+        onItemChange={jest.fn()}
+        sidebarOpen
+        onSidebarToggle={jest.fn()}
+      >
+        <div>Page content</div>
+      </AppLayout>,
+    );
+    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.queryByText("Page content")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agents")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("workspace-switcher-expanded"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the page while the workspace list refreshes in the background", () => {
+    mockWorkspacesLoading = true;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
   });
 
   it("renders nav items as links to their routes", () => {

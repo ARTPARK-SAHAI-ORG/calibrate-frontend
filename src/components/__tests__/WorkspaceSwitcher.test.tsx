@@ -12,7 +12,6 @@ import { WorkspaceSwitcher } from "../WorkspaceSwitcher";
 import type { Organization } from "@/lib/orgs";
 
 let mockOrganizations: Organization[] = [];
-let mockIsLoading = false;
 let mockActiveUuid: string | null = null;
 
 const createOrganizationMock = jest.fn();
@@ -26,7 +25,6 @@ jest.mock("../../hooks", () => ({
   useActiveOrgUuid: () => [mockActiveUuid, setActiveUuidMock],
   useOrganizations: () => ({
     organizations: mockOrganizations,
-    isLoading: mockIsLoading,
     createOrganization: createOrganizationMock,
   }),
 }));
@@ -77,7 +75,6 @@ describe("WorkspaceSwitcher", () => {
     // Default: two workspaces, personal active, and a persisted uuid that
     // matches the active org so the reconcile effect stays a no-op.
     mockOrganizations = [personalOrg, acmeOrg];
-    mockIsLoading = false;
     mockActiveUuid = "org-1";
     getActiveOrgUuidMock.mockReturnValue("org-1");
     pickDefaultOrgMock.mockReturnValue(personalOrg);
@@ -92,17 +89,8 @@ describe("WorkspaceSwitcher", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows a loading label while the list is loading and empty", () => {
+    it("shows a generic label when there are no workspaces", () => {
       mockOrganizations = [];
-      mockIsLoading = true;
-      mockActiveUuid = null;
-      render(<WorkspaceSwitcher collapsed={false} />);
-      expect(screen.getByText("Loading…")).toBeInTheDocument();
-    });
-
-    it("shows a generic label when there are no workspaces and not loading", () => {
-      mockOrganizations = [];
-      mockIsLoading = false;
       mockActiveUuid = null;
       getActiveOrgUuidMock.mockReturnValue(null);
       render(<WorkspaceSwitcher collapsed={false} />);
@@ -293,19 +281,6 @@ describe("WorkspaceSwitcher", () => {
       expect(
         screen.queryByRole("link", { name: "API keys" }),
       ).not.toBeInTheDocument();
-    });
-
-    it("shows a loading state inside the panel while fetching", async () => {
-      const user = setupUser();
-      mockOrganizations = [];
-      mockIsLoading = true;
-      mockActiveUuid = null;
-      getActiveOrgUuidMock.mockReturnValue(null);
-      render(<WorkspaceSwitcher collapsed={false} />);
-
-      await user.click(screen.getByRole("button", { name: /Loading/ }));
-      const menu = screen.getByRole("menu");
-      expect(menu).toHaveTextContent("Loading…");
     });
   });
 

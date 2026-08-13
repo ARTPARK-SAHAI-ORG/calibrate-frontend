@@ -11,7 +11,8 @@ import {
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
-import { clearOrgsCache } from "@/hooks";
+import { clearOrgsCache, useAccessToken, useOrganizations } from "@/hooks";
+import { SpinnerIcon } from "@/components/icons";
 
 // Re-export the hook so existing imports continue to work
 export { useHideFloatingButton } from "@/components/providers/FloatingButtonProvider";
@@ -311,6 +312,13 @@ export function AppLayout({
 }: AppLayoutProps) {
   const { data: session } = useSession();
   const router = useRouter();
+  // The whole app is scoped to the active workspace, so nothing below can be
+  // rendered honestly until the workspace list is in. Hold the page on one
+  // spinner instead of drawing the sidebar and the page around an empty
+  // workspace switcher.
+  const accessToken = useAccessToken();
+  const { organizations, isLoading: workspacesLoading } =
+    useOrganizations(accessToken);
 
   // Launch the guided walkthrough from any entry point (sidebar or profile
   // menu). It auto-drives from the Agents page, so always land there first;
@@ -426,6 +434,14 @@ export function AppLayout({
     if (!name) return "U";
     return name.trim()[0].toUpperCase();
   };
+
+  if (workspacesLoading && organizations.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <SpinnerIcon className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background">
