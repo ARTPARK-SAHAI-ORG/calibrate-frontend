@@ -1881,8 +1881,10 @@ export function EvaluatorRunDetailView({
     return m;
   }, [job]);
 
+  // An item counts as done as soon as every evaluator has a finished score for
+  // it, even while the rest of the run is still going.
   const itemDone = (itemId: string): boolean => {
-    if (!job || job.status !== "completed") return false;
+    if (!job) return false;
     const rs = runsByItem[itemId] ?? [];
     if (rs.length === 0 || detailsEvaluators.length === 0) return false;
     return detailsEvaluators.every((e) =>
@@ -1914,14 +1916,26 @@ export function EvaluatorRunDetailView({
   const cardsWillRender =
     job.status === "completed" && detailsEvaluators.length > 0;
 
+  const doneCount = itemsForRun.filter((it) => itemDone(it.uuid)).length;
+  const showDoneCount =
+    (job.status === "in_progress" || job.status === "queued") &&
+    itemsForRun.length > 0;
+
   const statusPill = !hideStatusPill ? (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
-        job.status,
-      )}`}
-    >
-      {statusLabel(job.status)}
-    </span>
+    <>
+      <span
+        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
+          job.status,
+        )}`}
+      >
+        {statusLabel(job.status)}
+      </span>
+      {showDoneCount && (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {doneCount} of {itemsForRun.length} items scored
+        </span>
+      )}
+    </>
   ) : null;
 
   const headerActions =
