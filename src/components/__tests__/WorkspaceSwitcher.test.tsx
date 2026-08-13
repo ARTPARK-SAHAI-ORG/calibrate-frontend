@@ -92,12 +92,23 @@ describe("WorkspaceSwitcher", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows a loading label while the list is loading and empty", () => {
+    it("shows only a spinner while the workspace list is still loading", () => {
       mockOrganizations = [];
       mockIsLoading = true;
       mockActiveUuid = null;
+      const { container } = render(<WorkspaceSwitcher collapsed={false} />);
+      expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+      expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
+    });
+
+    it("keeps showing the workspace during a background refetch", () => {
+      mockIsLoading = true;
       render(<WorkspaceSwitcher collapsed={false} />);
-      expect(screen.getByText("Loading…")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Personal/ }),
+      ).toBeInTheDocument();
     });
 
     it("shows a generic label when there are no workspaces and not loading", () => {
@@ -289,17 +300,17 @@ describe("WorkspaceSwitcher", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("shows a loading state inside the panel while fetching", async () => {
-      const user = setupUser();
+    it("shows a spinner in collapsed mode too while loading", () => {
       mockOrganizations = [];
       mockIsLoading = true;
       mockActiveUuid = null;
       getActiveOrgUuidMock.mockReturnValue(null);
-      render(<WorkspaceSwitcher collapsed={false} />);
+      const { container } = render(<WorkspaceSwitcher collapsed />);
 
-      await user.click(screen.getByRole("button", { name: /Loading/ }));
-      const menu = screen.getByRole("menu");
-      expect(menu).toHaveTextContent("Loading…");
+      expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Workspace switcher" }),
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -8,6 +8,7 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
+import { SpinnerIcon } from "@/components/icons";
 import {
   getActiveOrgUuid,
   pickDefaultOrg,
@@ -153,6 +154,21 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     }
   };
 
+  // Until the workspace list arrives there is nothing meaningful to show, so
+  // show a spinner in place of the switcher rather than a placeholder avatar
+  // and a "Loading…" label that then swap out.
+  if (isLoading && !activeOrg) {
+    return (
+      <div
+        className={
+          `${collapsed ? "px-2" : "px-3"} pt-3 pb-2 flex justify-center items-center h-[3.75rem]`
+        }
+      >
+        <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   // Collapsed mode: render a small button-only avatar with a tooltip.
   if (collapsed) {
     return (
@@ -177,7 +193,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
               <div className="absolute left-12 top-0 z-50">
                 <DropdownPanel
                   organizations={organizations}
-                  isLoading={isLoading}
                   activeUuid={activeUuid}
                   activeOrg={activeOrg}
                   onSelect={handleSelect}
@@ -213,7 +228,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
         >
           <WorkspaceAvatar org={activeOrg} />
           <span className="flex-1 min-w-0 text-sm font-medium text-foreground truncate">
-            {activeOrg?.name ?? (isLoading ? "Loading…" : "Workspace")}
+            {activeOrg?.name ?? "Workspace"}
           </span>
           <svg
             className="w-4 h-4 text-muted-foreground flex-shrink-0"
@@ -234,7 +249,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
           <div className="absolute left-3 top-full z-50 mt-1">
             <DropdownPanel
               organizations={organizations}
-              isLoading={isLoading}
               activeUuid={activeUuid}
               activeOrg={activeOrg}
               onSelect={handleSelect}
@@ -258,7 +272,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
 
 type DropdownPanelProps = {
   organizations: Organization[];
-  isLoading: boolean;
   activeUuid: string | null;
   activeOrg: Organization | null;
   onSelect: (uuid: string) => void;
@@ -268,7 +281,6 @@ type DropdownPanelProps = {
 
 function DropdownPanel({
   organizations,
-  isLoading,
   activeUuid,
   activeOrg,
   onSelect,
@@ -284,9 +296,7 @@ function DropdownPanel({
         <p className="px-2 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Workspaces
         </p>
-        {isLoading && organizations.length === 0 ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">Loading…</p>
-        ) : organizations.length === 0 ? (
+        {organizations.length === 0 ? (
           <p className="px-2 py-2 text-sm text-muted-foreground">
             No workspaces yet.
           </p>
