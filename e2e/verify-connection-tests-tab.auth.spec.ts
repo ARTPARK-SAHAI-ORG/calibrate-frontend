@@ -16,7 +16,7 @@
 //   npm run test:e2e:integration  (sets E2E_FAKE_AI=1)
 // otherwise every test here is SKIPPED.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -69,7 +69,9 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 45000 });
 }
 
@@ -79,9 +81,7 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
 // leave the tab / trigger a run that reads the saved agent_url + unverified
 // flag. Mirrors agent-detail.auth.spec.ts.
 async function setConnectionUrl(page: Page, url: string): Promise<void> {
-  const urlInput = page.getByPlaceholder(
-    "https://your-agent.example.com/chat",
-  );
+  const urlInput = page.getByPlaceholder("https://your-agent.example.com/chat");
   await expect(urlInput).toBeVisible({ timeout: 15000 });
   await urlInput.fill(url);
   await page.waitForTimeout(1500);

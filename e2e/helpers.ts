@@ -1,5 +1,38 @@
 import { expect, type Page } from "@playwright/test";
 
+/** A workspace id is always a uuid. */
+const WORKSPACE_SEGMENT =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+/**
+ * Build a URL matcher that accepts the address with or without the workspace.
+ *
+ * Every page behind sign-in now sits under the workspace it belongs to
+ * (`/<workspace-id>/agents`). Opening the older address without it still works:
+ * the app forwards it to the same page under the signed-in user's workspace. So
+ * an assertion has to pass either way.
+ *
+ * Pass a plain path ("/agents") and it is matched literally, special characters
+ * and all. Pass a regular expression when part of the path varies, such as an
+ * id; write it without ^ or $, which are added here. A query string or a #part
+ * after the path is allowed; anything else is not.
+ */
+export function workspacePath(path: string | RegExp): RegExp {
+  const body =
+    typeof path === "string"
+      ? path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      : path.source;
+  return new RegExp(
+    `^https?://[^/]+(?:/${WORKSPACE_SEGMENT})?${body}(?:[?#].*)?$`,
+  );
+}
+
+/** The workspace id the address names, or null when it names none. */
+export function workspaceUuidFromUrl(url: string): string | null {
+  const first = new URL(url).pathname.split("/")[1] ?? "";
+  return new RegExp(`^${WORKSPACE_SEGMENT}$`).test(first) ? first : null;
+}
+
 /**
  * Wait until the OrganizationBootstrapper has resolved an active workspace.
  *
@@ -12,10 +45,9 @@ import { expect, type Page } from "@playwright/test";
  */
 export async function waitForOrgReady(page: Page): Promise<void> {
   await expect
-    .poll(
-      () => page.evaluate(() => localStorage.getItem("activeOrgUuid")),
-      { timeout: 30_000 },
-    )
+    .poll(() => page.evaluate(() => localStorage.getItem("activeOrgUuid")), {
+      timeout: 30_000,
+    })
     .not.toBeNull();
 }
 

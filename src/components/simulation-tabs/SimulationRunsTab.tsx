@@ -2,7 +2,7 @@
 import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";

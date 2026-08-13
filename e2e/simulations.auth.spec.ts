@@ -3,6 +3,7 @@
 // NewSimulationDialog, the simulations list + detail route, and the delete
 // path. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { workspacePath } from "./helpers";
 
 test.describe("Simulations page (authenticated, real backend)", () => {
   test("loads, creates a simulation (redirects to detail), then deletes it", async ({
@@ -25,9 +26,12 @@ test.describe("Simulations page (authenticated, real backend)", () => {
 
     // On success the backend creates the simulation and the app navigates to
     // /simulations/<uuid>.
-    await expect(page).toHaveURL(/\/simulations\/[0-9a-f-]{36}/, {
-      timeout: 15000,
-    });
+    await expect(page).toHaveURL(
+      workspacePath(/\/simulations\/[0-9a-f-]{36}/),
+      {
+        timeout: 15000,
+      },
+    );
 
     // Back to the list; the new simulation shows up as a row.
     await page.goto("/simulations");

@@ -4,6 +4,7 @@
 //
 // Run with `npm run test:e2e:integration` (needs a backend, see e2e/README.md).
 import { test, expect } from "./fixtures";
+import { workspacePath } from "./helpers";
 
 /**
  * Drives create → verify-in-list → edit (rename) → verify → delete for a
@@ -35,7 +36,7 @@ async function createEditDeleteResource(
   },
 ) {
   await page.goto(path);
-  await expect(page).toHaveURL(new RegExp(`${path}$`));
+  await expect(page).toHaveURL(workspacePath(path));
   await expect(page.getByRole("heading", { name: heading })).toBeVisible();
 
   // Open the create panel (header button; may also appear in the empty state).
@@ -65,9 +66,9 @@ async function createEditDeleteResource(
   // title switches to "Edit X" and the submit button becomes "Save". ---
   await row.click();
   await expect(panel).toBeVisible({ timeout: 15000 });
-  await expect(
-    panel.getByRole("heading", { name: editHeading }),
-  ).toBeVisible({ timeout: 15000 });
+  await expect(panel.getByRole("heading", { name: editHeading })).toBeVisible({
+    timeout: 15000,
+  });
 
   // The panel fetches details, so the label input is only populated once the
   // fetch resolves. Wait for the prefilled current name before editing it.
@@ -88,7 +89,9 @@ async function createEditDeleteResource(
   // Delete it: the row's only button is the icon-only delete button. Click it,
   // then confirm in the shared DeleteConfirmationDialog.
   await editedRow.getByRole("button").click();
-  await expect(page.getByRole("heading", { name: deleteHeading })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: deleteHeading }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
 
   // Row disappears once the backend delete resolves.

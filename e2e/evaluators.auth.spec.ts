@@ -5,6 +5,7 @@
 // only override the Name to keep reruns unique. Run with
 // `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Shared create flow: run the two-step "Speech to Text" wizard and land on the
@@ -102,7 +103,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     // never exercised by E2E), confirm it loaded, then return to the list to
     // delete. The heading renders the evaluator's name once the fetch resolves.
     await card.click();
-    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+    await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
     await expect(
@@ -137,7 +138,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
 
     // Open the detail / versioning page and confirm it loaded.
     await card.click();
-    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+    await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
     await expect(

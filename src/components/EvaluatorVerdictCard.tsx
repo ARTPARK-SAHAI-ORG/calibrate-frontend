@@ -20,7 +20,7 @@
 // other callers (tool-call verdicts in test-results/shared.tsx) reuse the
 // exact same toggle visual without duplicating it.
 
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { useState } from "react";
 import {
   DEFAULT_BINARY_FALSE_LABEL,

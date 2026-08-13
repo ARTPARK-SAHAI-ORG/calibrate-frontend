@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
   binaryScaleFor,

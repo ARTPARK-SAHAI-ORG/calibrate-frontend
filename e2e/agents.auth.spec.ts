@@ -5,7 +5,7 @@
 // Backend required: the page fetches real data from NEXT_PUBLIC_BACKEND_URL.
 // Run with `npm run test:e2e:integration` (see e2e/README.md).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 test.describe("Agents page (authenticated, real backend)", () => {
   test("loads for a logged-in user without bouncing to login", async ({
@@ -14,7 +14,7 @@ test.describe("Agents page (authenticated, real backend)", () => {
     await page.goto("/agents");
 
     // Seeded token → middleware lets us through, so we stay on /agents.
-    await expect(page).toHaveURL(/\/agents$/);
+    await expect(page).toHaveURL(workspacePath("/agents"));
 
     // The Agents component rendered its data-backed UI (a fresh account has an
     // empty list, which still shows the "New agent" action).

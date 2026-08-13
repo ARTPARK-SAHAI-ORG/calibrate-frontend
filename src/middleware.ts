@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
+import { isPublicPath, orgFromPath } from "@/lib/routes";
+import { OPENING_PATH, OPENING_TARGET_PARAM } from "@/lib/opening";
 
 // Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
@@ -61,6 +63,24 @@ export default auth((req) => {
       req.nextUrl.pathname + req.nextUrl.search
     );
     return NextResponse.redirect(loginUrl);
+  }
+
+  // An address that does not name a workspace: a link made before workspaces
+  // were part of the address, or the page someone lands on after signing in.
+  // Show the opening page in its place, which works out the workspace and puts
+  // it in the address. This is a swap, not a jump, so the address the person
+  // typed stays on screen until the real one replaces it.
+  if (
+    !isPublicPath(req.nextUrl.pathname) &&
+    req.nextUrl.pathname !== OPENING_PATH &&
+    !orgFromPath(req.nextUrl.pathname)
+  ) {
+    const opening = new URL(OPENING_PATH, req.url);
+    opening.searchParams.set(
+      OPENING_TARGET_PARAM,
+      req.nextUrl.pathname + req.nextUrl.search
+    );
+    return NextResponse.rewrite(opening);
   }
 
   return NextResponse.next();

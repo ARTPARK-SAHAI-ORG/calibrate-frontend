@@ -7,7 +7,7 @@
 // navigation is followed by waitForOrgReady. Import from ./fixtures for E2E
 // coverage. Run with `npm run test:e2e:integration` (needs a backend).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 test.describe("Human alignment page (authenticated, real backend)", () => {
   test("creates a labelling task via the dialog, then deletes it", async ({
@@ -55,9 +55,12 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await dialog.getByRole("button", { name: "Create task" }).click();
 
     // On success onCreated() navigates to the new task's detail route.
-    await expect(page).toHaveURL(/\/human-alignment\/tasks\/[0-9a-f-]+/, {
-      timeout: 20000,
-    });
+    await expect(page).toHaveURL(
+      workspacePath(/\/human-alignment\/tasks\/[0-9a-f-]+/),
+      {
+        timeout: 20000,
+      },
+    );
 
     // Back to the Tasks list to verify + delete. The row exposes a titled
     // delete button (aria-label `Delete <name>`) in both desktop and mobile

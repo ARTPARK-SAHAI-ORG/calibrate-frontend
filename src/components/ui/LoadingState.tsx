@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/nav";
 import { SpinnerIcon } from "@/components/icons";
 
 type LoadingStateProps = {

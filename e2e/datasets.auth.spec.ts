@@ -4,6 +4,7 @@
 // /datasets/[id] detail route (which mounts STTDatasetEditor / TTSDatasetEditor),
 // and dataset deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { workspacePath } from "./helpers";
 
 /**
  * After landing on a freshly-created (empty) dataset's detail page, exercise the
@@ -94,12 +95,14 @@ async function createExerciseDeleteDataset(
   await page.getByRole("button", { name: "Create", exact: true }).click();
 
   // Creating a dataset navigates to its detail page.
-  await expect(page).toHaveURL(/\/datasets\/[0-9a-f-]{36}/, { timeout: 15000 });
+  await expect(page).toHaveURL(workspacePath(/\/datasets\/[0-9a-f-]{36}/), {
+    timeout: 15000,
+  });
 
   // The detail page mounts the editor — its header shows the dataset name.
-  await expect(
-    page.getByRole("heading", { name, exact: true }),
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
+    timeout: 15000,
+  });
 
   // Exercise the editor (add rows, fill text, and for TTS also save).
   await exerciseEditor(page, editorType);

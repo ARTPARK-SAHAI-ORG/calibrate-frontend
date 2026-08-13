@@ -14,6 +14,7 @@
 // Run locally:
 //   npx playwright test --project=public onboarding-tour
 import { test, expect } from "./fixtures";
+import { workspacePath } from "./helpers";
 import type { Page, Route } from "@playwright/test";
 
 // Disables the first-visit auto-start so the tour runs only when we dispatch it
@@ -247,7 +248,10 @@ const slug = (s: string) =>
  * apart. App pages, `_next` assets, and NextAuth all share `appOrigin` and pass
  * straight through.
  */
-async function installFakeBackend(page: Page, appOrigin: string): Promise<void> {
+async function installFakeBackend(
+  page: Page,
+  appOrigin: string,
+): Promise<void> {
   const state: FakeState = {
     attachedEvaluators: [],
     tests: [],
@@ -302,10 +306,7 @@ async function installFakeBackend(page: Page, appOrigin: string): Promise<void> 
       }
 
       // --- Agent evaluators ---
-      if (
-        method === "GET" &&
-        pathname === `/agents/${AGENT_UUID}/evaluators`
-      ) {
+      if (method === "GET" && pathname === `/agents/${AGENT_UUID}/evaluators`) {
         return json(route, state.attachedEvaluators);
       }
       if (
@@ -509,7 +510,7 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
         await expect(popoverTitle(page)).toContainText("Welcome to Calibrate");
       }
       if (step.title === "Give it instructions") {
-        await expect(page).toHaveURL(new RegExp(`/agents/${AGENT_UUID}`), {
+        await expect(page).toHaveURL(workspacePath(`/agents/${AGENT_UUID}`), {
           timeout: 20000,
         });
         // Exactly one popover — no orphan left over from the create-navigation.
@@ -534,9 +535,9 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
         await expect(row).toContainText(/phone number/i, { timeout: 15000 });
       }
       if (step.title === "See the reasoning") {
-        await expect(
-          page.locator("[data-reasoning-body]").first(),
-        ).toBeVisible({ timeout: 10000 });
+        await expect(page.locator("[data-reasoning-body]").first()).toBeVisible(
+          { timeout: 10000 },
+        );
         await expect(
           page.locator("[data-reasoning-body]").first(),
         ).toContainText(/did not provide a phone number/i);

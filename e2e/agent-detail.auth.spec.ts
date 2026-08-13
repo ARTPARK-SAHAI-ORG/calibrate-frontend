@@ -12,7 +12,7 @@
 // its Tools / Tests / Evaluators / Settings / Connection tab content), and
 // agent deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Create an agent through the "New agent" dialog and land on its detail page.
@@ -44,7 +44,9 @@ async function createAgent(
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 30000 });
 }
 
@@ -111,9 +113,7 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     // action) is present. Otherwise just close the dialog — either path
     // still executes the dialog + attach code. (Full vs. open-only depends
     // on whether the seeded account has any library evaluators.)
-    const evalCheckboxes = page.locator(
-      '.fixed.z-50 input[type="checkbox"]',
-    );
+    const evalCheckboxes = page.locator('.fixed.z-50 input[type="checkbox"]');
     const evalCount = await evalCheckboxes.count();
     if (evalCount > 0) {
       await evalCheckboxes.first().check();
@@ -152,9 +152,9 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     // test). The intro box title is "Next reply test".
     await page.getByText("Next reply test", { exact: true }).first().click();
     // Editor mounted: it shows a name input placeholder like "Your test name".
-    await expect(
-      page.getByPlaceholder(/Your .* name/i).first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder(/Your .* name/i).first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // Navigating away to the list unmounts the dialog cleanly (avoids the
     // "Discard changes?" guard) and lets us delete the agent.

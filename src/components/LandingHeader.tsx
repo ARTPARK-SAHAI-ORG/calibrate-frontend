@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 
 type LandingHeaderProps = {
   /** Whether the logo should link to / (for non-home pages) */

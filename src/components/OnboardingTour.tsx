@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/lib/nav";
 import "driver.js/dist/driver.css";
 import { useAccessToken } from "@/hooks";
 import {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter as useNextRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   useAccessToken,
@@ -7,34 +8,13 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
-import {
-  getActiveOrgUuid,
-  pickDefaultOrg,
-  type Organization,
-} from "@/lib/orgs";
+import { Link, useOrgUuid, usePathname } from "@/lib/nav";
+import { landingPathAfterSwitch, withWorkspace } from "@/lib/routes";
+import { type Organization } from "@/lib/orgs";
 
 type WorkspaceSwitcherProps = {
   collapsed: boolean;
 };
-
-// Root sidebar routes — mirrors the nav item ids in AppLayout. On a workspace
-// switch we drop any deep/detail route and land on the list page for the
-// section the user was in (e.g. /simulations/<id>/runs/<run> -> /simulations),
-// since the specific resource belongs to the old workspace and won't exist in
-// the new one. Sections without a list page (e.g. /datasets/<id>) fall back to
-// /agents, a known-good page for any workspace.
-const ROOT_SIDEBAR_ROUTES = new Set([
-  "agents",
-  "tools",
-  "evaluators",
-  "human-alignment",
-  "stt",
-  "tests",
-  "tts",
-  "personas",
-  "scenarios",
-  "simulations",
-]);
 
 function workspaceInitial(name: string): string {
   const trimmed = name.trim();
@@ -67,6 +47,8 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   const accessToken = useAccessToken();
   const { organizations, createOrganization } = useOrganizations(accessToken);
   const [activeUuid, setActiveUuid] = useActiveOrgUuid();
+  const router = useNextRouter();
+  const pathname = usePathname();
 
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -93,49 +75,22 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     organizations[0] ??
     null;
 
-  // Reconcile the stored active uuid against the fetched workspaces. If the
-  // user got removed from the active workspace (or it was deleted) while the
-  // app was open, the stored uuid no longer matches anything in the list.
-  // Without this, the sidebar silently shows the personal workspace as the
-  // label while API calls still carry the stale uuid as X-Org-UUID.
+  // Move to the same section under the workspace being switched to. The item
+  // the user was looking at belongs to the workspace they are leaving, so a
+  // detail page drops back to its list page (a simulation run reopens the
+  // simulations list). See landingPathAfterSwitch.
   //
-  // Read from localStorage directly rather than the React `activeUuid` state:
-  // useActiveOrgUuid initialises to null and only reads localStorage in an
-  // effect, so on every mount there's a window where the React state is null
-  // even though localStorage holds the real choice. Trusting the state here
-  // would overwrite the user's selection with the personal-fallback on every
-  // navigation.
-  useEffect(() => {
-    if (organizations.length === 0) return;
-    const persisted = getActiveOrgUuid();
-    if (persisted && organizations.some((o) => o.uuid === persisted)) return;
-    const fallback = pickDefaultOrg(organizations);
-    if (fallback && fallback.uuid !== persisted) {
-      setActiveUuid(fallback.uuid);
-    }
-  }, [organizations, activeUuid, setActiveUuid]);
-
-  const navigateAfterSwitch = () => {
-    // Stay on workspace settings if that's where the user is — switching
-    // workspaces from there should just reload settings for the new one.
-    const path = window.location.pathname;
-    if (path === "/workspace-settings") {
-      window.location.reload();
-      return;
-    }
-    // Land on the root sidebar page for the section the user is in, so e.g.
-    // a tools page stays on tools and a simulation run page reopens the
-    // simulations list. Unknown sections fall back to /agents.
-    const section = path.split("/")[1] ?? "";
-    const target = ROOT_SIDEBAR_ROUTES.has(section) ? `/${section}` : "/agents";
-    window.location.assign(target);
+  // Nothing needs reloading: the workspace is part of the address, so every
+  // request the new pages make already carries it.
+  const navigateAfterSwitch = (uuid: string) => {
+    router.push(withWorkspace(landingPathAfterSwitch(pathname), uuid));
   };
 
   const handleSelect = (uuid: string) => {
     if (uuid !== activeUuid) {
       setActiveUuid(uuid);
       setOpen(false);
-      navigateAfterSwitch();
+      navigateAfterSwitch(uuid);
       return;
     }
     setOpen(false);
@@ -147,7 +102,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     const created = await createOrganization(name);
     if (created) {
       setActiveUuid(created.uuid);
-      navigateAfterSwitch();
+      navigateAfterSwitch(created.uuid);
     }
   };
 
@@ -265,6 +220,10 @@ function DropdownPanel({
   onSelect,
   onCreateClick,
 }: DropdownPanelProps) {
+  // These two are plain links, not in-app navigation, so they need the
+  // workspace put on by hand.
+  const org = useOrgUuid();
+
   return (
     <div
       role="menu"
@@ -323,7 +282,7 @@ function DropdownPanel({
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
           <a
-            href="/workspace-settings?tab=admin"
+            href={withWorkspace("/workspace-settings?tab=admin", org)}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -349,7 +308,7 @@ function DropdownPanel({
         )}
         {activeOrg && (
           <a
-            href="/workspace-settings?tab=api-keys"
+            href={withWorkspace("/workspace-settings?tab=api-keys", org)}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg

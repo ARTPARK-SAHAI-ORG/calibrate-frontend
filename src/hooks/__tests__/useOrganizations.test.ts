@@ -1,3 +1,17 @@
+// The address on screen decides which workspace the page is in, so the tests
+// set it per case. Everything else about next/navigation is unused here.
+let pathname = "/";
+
+jest.mock("next/navigation", () => ({
+  __esModule: true,
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: jest.fn(),
+  notFound: jest.fn(),
+}));
+
 import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useOrganizations,
@@ -11,8 +25,8 @@ import {
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
+  ACTIVE_ORG_UUID_KEY,
   ORGANIZATIONS_CHANGED_EVENT,
-  getActiveOrgUuid,
   setActiveOrgUuid,
   type Organization,
   type OrganizationMember,
@@ -39,7 +53,6 @@ jest.mock("../../lib/orgs", () => {
   const actual = jest.requireActual("../../lib/orgs");
   return {
     ...actual,
-    getActiveOrgUuid: jest.fn(),
     setActiveOrgUuid: jest.fn(),
     notifyOrganizationsChanged: jest.fn(actual.notifyOrganizationsChanged),
   };
@@ -53,8 +66,12 @@ const mockApiGet = apiGet as jest.Mock;
 const mockApiPost = apiPost as jest.Mock;
 const mockApiClient = apiClient as jest.Mock;
 const mockApiDelete = apiDelete as jest.Mock;
-const mockGetActiveOrgUuid = getActiveOrgUuid as jest.Mock;
 const mockSetActiveOrgUuid = setActiveOrgUuid as jest.Mock;
+
+// A workspace id is always a uuid: a first part of the address shaped like
+// anything else is deliberately not read as a workspace.
+const ORG_IN_ADDRESS = "8f3c1a2b-4d5e-4f6a-8b9c-0d1e2f3a4b5c";
+const ORG_LAST_OPENED = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
 const org1: Organization = {
   uuid: "org-1",
@@ -79,6 +96,8 @@ const org2: Organization = {
 describe("useOrganizations hooks", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    pathname = "/";
+    window.localStorage.clear();
     clearOrgsCache();
     // useOrgMembers / useWorkspaceApiKeys cache at module scope keyed by token;
     // wipe between tests so each case starts from a clean fetch.
@@ -338,43 +357,95 @@ describe("useOrganizations hooks", () => {
   });
 
   describe("useActiveOrgUuid", () => {
-    it("initializes from getActiveOrgUuid and updates on event with explicit uuid", async () => {
-      mockGetActiveOrgUuid.mockReturnValue("org-1");
+    it("uses the workspace in the address, right on the first render", () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_LAST_OPENED);
+
       const { result } = renderHook(() => useActiveOrgUuid());
-      await waitFor(() => expect(result.current[0]).toBe("org-1"));
+
+      expect(result.current[0]).toBe(ORG_IN_ADDRESS);
+    });
+
+    it("stays on the workspace in the address when another one is opened elsewhere", () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      const { result } = renderHook(() => useActiveOrgUuid());
 
       act(() => {
         window.dispatchEvent(
           new CustomEvent(ACTIVE_ORG_CHANGED_EVENT, {
-            detail: { uuid: "org-2" },
+            detail: { uuid: ORG_LAST_OPENED },
           }),
         );
       });
-      expect(result.current[0]).toBe("org-2");
+
+      expect(result.current[0]).toBe(ORG_IN_ADDRESS);
     });
 
-    it("falls back to getActiveOrgUuid() when the event detail has no uuid", async () => {
-      mockGetActiveOrgUuid.mockReturnValueOnce("org-1").mockReturnValueOnce("org-3");
-      const { result } = renderHook(() => useActiveOrgUuid());
-      await waitFor(() => expect(result.current[0]).toBe("org-1"));
+    it("uses the workspace last opened when the address names none", async () => {
+      pathname = "/login";
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_LAST_OPENED);
 
+      const { result } = renderHook(() => useActiveOrgUuid());
+
+      await waitFor(() => expect(result.current[0]).toBe(ORG_LAST_OPENED));
+    });
+
+    it("does not read a first part of the address that is not a workspace", async () => {
+      pathname = "/agents";
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_LAST_OPENED);
+
+      const { result } = renderHook(() => useActiveOrgUuid());
+
+      await waitFor(() => expect(result.current[0]).toBe(ORG_LAST_OPENED));
+    });
+
+    it("follows the workspace change while the address names none", async () => {
+      pathname = "/login";
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_LAST_OPENED);
+      const { result } = renderHook(() => useActiveOrgUuid());
+      await waitFor(() => expect(result.current[0]).toBe(ORG_LAST_OPENED));
+
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent(ACTIVE_ORG_CHANGED_EVENT, {
+            detail: { uuid: ORG_IN_ADDRESS },
+          }),
+        );
+      });
+
+      expect(result.current[0]).toBe(ORG_IN_ADDRESS);
+    });
+
+    it("reads the stored workspace when the change carries none", async () => {
+      pathname = "/login";
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_LAST_OPENED);
+      const { result } = renderHook(() => useActiveOrgUuid());
+      await waitFor(() => expect(result.current[0]).toBe(ORG_LAST_OPENED));
+
+      window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, ORG_IN_ADDRESS);
       act(() => {
         window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGED_EVENT));
       });
-      expect(result.current[0]).toBe("org-3");
+
+      expect(result.current[0]).toBe(ORG_IN_ADDRESS);
+    });
+
+    it("has nothing to report when the address names none and none was opened", async () => {
+      pathname = "/login";
+      const { result } = renderHook(() => useActiveOrgUuid());
+      await waitFor(() => expect(result.current[0]).toBeNull());
     });
 
     it("exposes persistActiveOrgUuid (setActiveOrgUuid) as the setter", () => {
-      mockGetActiveOrgUuid.mockReturnValue(null);
       const { result } = renderHook(() => useActiveOrgUuid());
       act(() => {
-        result.current[1]("org-9");
+        result.current[1](ORG_IN_ADDRESS);
       });
-      expect(mockSetActiveOrgUuid).toHaveBeenCalledWith("org-9");
+      expect(mockSetActiveOrgUuid).toHaveBeenCalledWith(ORG_IN_ADDRESS);
     });
 
     it("removes the event listener on unmount", async () => {
-      mockGetActiveOrgUuid.mockReturnValue(null);
+      pathname = "/login";
       const { unmount } = renderHook(() => useActiveOrgUuid());
       const removeSpy = jest.spyOn(window, "removeEventListener");
       unmount();

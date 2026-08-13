@@ -6,6 +6,7 @@ const pushMock = jest.fn();
 jest.mock("next/navigation", () => ({
   __esModule: true,
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/",
 }));
 
 jest.mock("../AppLayout", () => ({

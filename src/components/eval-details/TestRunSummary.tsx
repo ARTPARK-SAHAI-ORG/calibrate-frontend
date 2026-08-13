@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { Tooltip } from "@/components/Tooltip";
 import {
   formatLatencyMs,

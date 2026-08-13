@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { Tooltip } from "@/components/Tooltip";
 
 // `MetricData` represents one entry in `runData.metrics`. Newer simulation

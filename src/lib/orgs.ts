@@ -1,12 +1,19 @@
 /**
  * Workspace / organization state.
  *
- * The frontend stores the active workspace uuid in localStorage and sends it
- * back to the backend on every request as the `X-Org-UUID` header (attached
- * automatically in `src/lib/api.ts`). The backend falls back to the user's
- * personal workspace when the header is missing or unknown, so the worst case
- * during boot is "user briefly sees personal workspace data".
+ * The workspace a page belongs to is the first part of its address
+ * (`/<workspace-uuid>/agents`, see `src/lib/routes.ts`), and that is what every
+ * request sends back to the backend as the `X-Org-UUID` header (attached
+ * automatically in `src/lib/api.ts`).
+ *
+ * The stored copy in localStorage is only a memory of the workspace last
+ * opened, used to pick one when a link does not name it (an older link, or the
+ * page someone lands on after signing in). It is never what a request goes by,
+ * so a page can no longer load against a different workspace than the one in
+ * the address.
  */
+
+import { orgFromPath } from "@/lib/routes";
 
 export const ACTIVE_ORG_UUID_KEY = "activeOrgUuid";
 export const ACTIVE_ORG_CHANGED_EVENT = "calibrate:active-org-changed";
@@ -74,7 +81,28 @@ export type OrganizationApiKeyWithSecret = OrganizationApiKey & {
   key: string;
 };
 
+/**
+ * The workspace this page belongs to: the one named by the address, falling
+ * back to the last one opened while a page that does not name a workspace
+ * (login, a shared result page) is on screen.
+ *
+ * Reading the address rather than storage is what keeps a request and the page
+ * that made it in the same workspace, including in a second tab opened on a
+ * different workspace.
+ */
 export function getActiveOrgUuid(): string | null {
+  if (typeof window === "undefined") return null;
+  const fromUrl = orgFromPath(window.location.pathname);
+  if (fromUrl) return fromUrl;
+  try {
+    return window.localStorage.getItem(ACTIVE_ORG_UUID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The workspace last opened, ignoring the address. */
+export function getRememberedOrgUuid(): string | null {
   if (typeof window === "undefined") return null;
   try {
     return window.localStorage.getItem(ACTIVE_ORG_UUID_KEY);

@@ -2,10 +2,12 @@
  * Interaction tests for the sidebar WorkspaceSwitcher.
  *
  * The hooks it depends on (`useAccessToken` / `useActiveOrgUuid` /
- * `useOrganizations` from `@/hooks`, plus `getActiveOrgUuid` / `pickDefaultOrg`
- * from `@/lib/orgs`) are mocked so we drive the component with a fixed org list
- * and assert its render + navigation behavior. Switching workspaces calls
- * `window.location.assign` / `.reload`, which we stub so no navigation happens.
+ * `useOrganizations` from `@/hooks`) are mocked so we drive the component with
+ * a fixed workspace list and assert its render + navigation behavior.
+ *
+ * Switching workspaces is an ordinary in-app navigation to the same section
+ * under the new workspace, so the assertions watch `router.push` and the
+ * address the component reads comes from `usePathname`.
  */
 import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import { WorkspaceSwitcher } from "../WorkspaceSwitcher";
@@ -13,11 +15,11 @@ import type { Organization } from "@/lib/orgs";
 
 let mockOrganizations: Organization[] = [];
 let mockActiveUuid: string | null = null;
+let mockPathname = "/";
 
 const createOrganizationMock = jest.fn();
 const setActiveUuidMock = jest.fn();
-const getActiveOrgUuidMock = jest.fn();
-const pickDefaultOrgMock = jest.fn();
+const pushMock = jest.fn();
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
@@ -29,15 +31,17 @@ jest.mock("../../hooks", () => ({
   }),
 }));
 
-jest.mock("../../lib/orgs", () => ({
+jest.mock("next/navigation", () => ({
   __esModule: true,
-  getActiveOrgUuid: () => getActiveOrgUuidMock(),
-  pickDefaultOrg: (...args: unknown[]) => pickDefaultOrgMock(...args),
+  useRouter: () => ({ push: pushMock, replace: jest.fn(), prefetch: jest.fn() }),
+  usePathname: () => mockPathname,
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
 }));
 
 function makeOrg(overrides: Partial<Organization>): Organization {
   return {
-    uuid: "org-1",
+    uuid: "11111111-1111-4111-8111-111111111111",
     name: "Personal",
     is_personal: true,
     created_by_user_id: "user-1",
@@ -49,35 +53,30 @@ function makeOrg(overrides: Partial<Organization>): Organization {
 }
 
 const personalOrg = makeOrg({
-  uuid: "org-1",
+  uuid: "11111111-1111-4111-8111-111111111111",
   name: "Personal",
   is_personal: true,
 });
 const acmeOrg = makeOrg({
-  uuid: "org-2",
+  uuid: "22222222-2222-4222-8222-222222222222",
   name: "Acme Health",
   is_personal: false,
 });
 
-const assignMock = jest.fn();
-const reloadMock = jest.fn();
+const PERSONAL = "11111111-1111-4111-8111-111111111111";
+const ACME = "22222222-2222-4222-8222-222222222222";
 
-function setLocation(pathname: string) {
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: { pathname, assign: assignMock, reload: reloadMock },
-  });
+/** Put the user on a page inside the personal workspace. */
+function setLocation(path: string) {
+  mockPathname = `/${PERSONAL}${path}`;
 }
 
 describe("WorkspaceSwitcher", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default: two workspaces, personal active, and a persisted uuid that
-    // matches the active org so the reconcile effect stays a no-op.
+    // Default: two workspaces, with the personal one open.
     mockOrganizations = [personalOrg, acmeOrg];
-    mockActiveUuid = "org-1";
-    getActiveOrgUuidMock.mockReturnValue("org-1");
-    pickDefaultOrgMock.mockReturnValue(personalOrg);
+    mockActiveUuid = PERSONAL;
     setLocation("/agents");
   });
 
@@ -92,7 +91,6 @@ describe("WorkspaceSwitcher", () => {
     it("shows a generic label when there are no workspaces", () => {
       mockOrganizations = [];
       mockActiveUuid = null;
-      getActiveOrgUuidMock.mockReturnValue(null);
       render(<WorkspaceSwitcher collapsed={false} />);
       expect(screen.getByText("Workspace")).toBeInTheDocument();
     });
@@ -111,10 +109,14 @@ describe("WorkspaceSwitcher", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: "Workspace settings" }),
-      ).toHaveAttribute("href", "/workspace-settings?tab=admin");
-      expect(
-        screen.getByRole("link", { name: "API keys" }),
-      ).toHaveAttribute("href", "/workspace-settings?tab=api-keys");
+      ).toHaveAttribute(
+        "href",
+        `/${PERSONAL}/workspace-settings?tab=admin`,
+      );
+      expect(screen.getByRole("link", { name: "API keys" })).toHaveAttribute(
+        "href",
+        `/${PERSONAL}/workspace-settings?tab=api-keys`,
+      );
     });
 
     it("closes the dropdown on an outside click", async () => {
@@ -139,12 +141,11 @@ describe("WorkspaceSwitcher", () => {
       await user.click(screen.getByRole("button", { name: /Personal/ }));
       await user.click(screen.getByRole("button", { name: /Acme Health/ }));
 
-      expect(setActiveUuidMock).toHaveBeenCalledWith("org-2");
-      expect(assignMock).toHaveBeenCalledWith("/tools");
-      expect(reloadMock).not.toHaveBeenCalled();
+      expect(setActiveUuidMock).toHaveBeenCalledWith(ACME);
+      expect(pushMock).toHaveBeenCalledWith(`/${ACME}/tools`);
     });
 
-    it("falls back to /agents for a section without a list page", async () => {
+    it("falls back to the agents page for a section without a list page", async () => {
       const user = setupUser();
       setLocation("/datasets/abc-123");
       render(<WorkspaceSwitcher collapsed={false} />);
@@ -152,10 +153,10 @@ describe("WorkspaceSwitcher", () => {
       await user.click(screen.getByRole("button", { name: /Personal/ }));
       await user.click(screen.getByRole("button", { name: /Acme Health/ }));
 
-      expect(assignMock).toHaveBeenCalledWith("/agents");
+      expect(pushMock).toHaveBeenCalledWith(`/${ACME}/agents`);
     });
 
-    it("reloads in place when switching from /workspace-settings", async () => {
+    it("stays on workspace settings when switching from there", async () => {
       const user = setupUser();
       setLocation("/workspace-settings");
       render(<WorkspaceSwitcher collapsed={false} />);
@@ -163,9 +164,8 @@ describe("WorkspaceSwitcher", () => {
       await user.click(screen.getByRole("button", { name: /Personal/ }));
       await user.click(screen.getByRole("button", { name: /Acme Health/ }));
 
-      expect(setActiveUuidMock).toHaveBeenCalledWith("org-2");
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-      expect(assignMock).not.toHaveBeenCalled();
+      expect(setActiveUuidMock).toHaveBeenCalledWith(ACME);
+      expect(pushMock).toHaveBeenCalledWith(`/${ACME}/workspace-settings`);
     });
 
     it("just closes the dropdown when the active workspace is re-selected", async () => {
@@ -179,7 +179,7 @@ describe("WorkspaceSwitcher", () => {
       );
 
       expect(setActiveUuidMock).not.toHaveBeenCalled();
-      expect(assignMock).not.toHaveBeenCalled();
+      expect(pushMock).not.toHaveBeenCalled();
       await waitFor(() =>
         expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
       );
@@ -190,7 +190,7 @@ describe("WorkspaceSwitcher", () => {
     it("opens the create dialog and switches to the created workspace", async () => {
       const user = setupUser();
       const created = makeOrg({
-        uuid: "org-3",
+        uuid: "33333333-3333-4333-8333-333333333333",
         name: "New WS",
         is_personal: false,
       });
@@ -214,8 +214,8 @@ describe("WorkspaceSwitcher", () => {
       await waitFor(() =>
         expect(createOrganizationMock).toHaveBeenCalledWith("New WS"),
       );
-      expect(setActiveUuidMock).toHaveBeenCalledWith("org-3");
-      expect(assignMock).toHaveBeenCalledWith("/agents");
+      expect(setActiveUuidMock).toHaveBeenCalledWith("33333333-3333-4333-8333-333333333333");
+      expect(pushMock).toHaveBeenCalledWith(`/${created.uuid}/agents`);
     });
 
     it("does not navigate when creation returns nothing", async () => {
@@ -237,7 +237,7 @@ describe("WorkspaceSwitcher", () => {
         expect(createOrganizationMock).toHaveBeenCalledWith("Nope"),
       );
       expect(setActiveUuidMock).not.toHaveBeenCalled();
-      expect(assignMock).not.toHaveBeenCalled();
+      expect(pushMock).not.toHaveBeenCalled();
     });
   });
 
@@ -268,8 +268,6 @@ describe("WorkspaceSwitcher", () => {
       const user = setupUser();
       mockOrganizations = [];
       mockActiveUuid = null;
-      getActiveOrgUuidMock.mockReturnValue(null);
-      pickDefaultOrgMock.mockReturnValue(null);
       render(<WorkspaceSwitcher collapsed={false} />);
 
       await user.click(screen.getByRole("button", { name: /Workspace/ }));
@@ -284,16 +282,4 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
-  describe("reconciling a stale active uuid", () => {
-    it("resets to the default workspace when the persisted uuid is unknown", async () => {
-      mockActiveUuid = "stale-uuid";
-      getActiveOrgUuidMock.mockReturnValue("stale-uuid");
-      pickDefaultOrgMock.mockReturnValue(personalOrg);
-      render(<WorkspaceSwitcher collapsed={false} />);
-
-      await waitFor(() =>
-        expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
-      );
-    });
-  });
 });

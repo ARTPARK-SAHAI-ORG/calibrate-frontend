@@ -1,5 +1,9 @@
 // See parseBackendError.test.ts for why relative specifiers are used here.
+// Only the reader is faked: the 401 path clears the remembered workspace
+// through the real clearActiveOrgUuid, so the test can check the stored value
+// is gone rather than how it was removed.
 jest.mock("../orgs", () => ({
+  ...jest.requireActual("../orgs"),
   getActiveOrgUuid: jest.fn(),
 }));
 
@@ -8,7 +12,7 @@ jest.mock("../../hooks/useOrganizations", () => ({
 }));
 
 import { signOut } from "next-auth/react";
-import { getActiveOrgUuid } from "@/lib/orgs";
+import { ACTIVE_ORG_UUID_KEY, getActiveOrgUuid } from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
 import {
   getBackendUrl,
@@ -181,7 +185,7 @@ describe("apiClient", () => {
   it("signs out, clears storage/cookies/cache, and throws on 401", async () => {
     window.localStorage.setItem("access_token", "tok");
     window.localStorage.setItem("user", "u");
-    window.localStorage.setItem("activeOrgUuid", "org-1");
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-1");
     document.cookie = "access_token=abc; path=/";
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(401, {}));
 
@@ -191,7 +195,7 @@ describe("apiClient", () => {
 
     expect(window.localStorage.getItem("access_token")).toBeNull();
     expect(window.localStorage.getItem("user")).toBeNull();
-    expect(window.localStorage.getItem("activeOrgUuid")).toBeNull();
+    expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBeNull();
     expect(clearOrgsCache).toHaveBeenCalled();
     expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
   });

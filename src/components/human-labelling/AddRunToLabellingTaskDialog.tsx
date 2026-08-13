@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { apiClient, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
 import { useAccessToken } from "@/hooks/useAccessToken";

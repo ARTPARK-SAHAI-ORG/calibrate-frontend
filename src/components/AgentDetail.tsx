@@ -2,8 +2,7 @@
 import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";

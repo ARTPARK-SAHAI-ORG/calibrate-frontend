@@ -13,7 +13,7 @@
 // keys/cost); they SKIP unless E2E_FAKE_AI=1, which `npm run test:e2e:integration`
 // sets. Run with that command (see e2e/README.md / CLAUDE.md).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -72,7 +72,9 @@ async function createAgent(
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 45000 });
 }
 
@@ -117,9 +119,9 @@ async function createUnverifiedConnectionAgent(
 async function createStandaloneTest(page: Page, name: string): Promise<void> {
   await page.goto("/tests");
   await waitForOrgReady(page);
-  await expect(
-    page.getByRole("heading", { name: "LLM Tests" }),
-  ).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole("heading", { name: "LLM Tests" })).toBeVisible({
+    timeout: 20000,
+  });
 
   await page.getByRole("button", { name: "Create test" }).first().click();
   await expect(
@@ -159,9 +161,9 @@ async function deleteTest(page: Page, name: string): Promise<void> {
     .locator('xpath=ancestor::div[.//button[@title="Delete test"]][1]')
     .getByRole("button", { name: "Delete test" })
     .click();
-  await expect(
-    page.getByRole("heading", { name: "Delete test" }),
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Delete test" })).toBeVisible({
+    timeout: 15000,
+  });
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0, {
     timeout: 15000,
@@ -195,9 +197,9 @@ async function openRunDialogPickAgentAndRun(
   const runDialog = page
     .locator("div.fixed.inset-0.z-50")
     .filter({ has: page.getByRole("heading", { name: "Run test" }) });
-  await expect(runDialog.getByRole("heading", { name: "Run test" })).toBeVisible(
-    { timeout: 15000 },
-  );
+  await expect(
+    runDialog.getByRole("heading", { name: "Run test" }),
+  ).toBeVisible({ timeout: 15000 });
 
   await runDialog.getByRole("button", { name: "Select an agent" }).click();
   const agentSearch = page.getByPlaceholder("Search agents");
