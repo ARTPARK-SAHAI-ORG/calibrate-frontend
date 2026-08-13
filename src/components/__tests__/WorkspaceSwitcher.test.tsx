@@ -295,5 +295,48 @@ describe("WorkspaceSwitcher", () => {
         expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
       );
     });
+
+    it("reloads the section under the new workspace so the page refetches", async () => {
+      mockActiveUuid = "stale-uuid";
+      // Reads the stale uuid first, then the stored default — as it would
+      // once setActiveUuid has written the new choice.
+      getActiveOrgUuidMock
+        .mockReturnValueOnce("stale-uuid")
+        .mockReturnValue("org-1");
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      setLocation("/tools");
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() => expect(assignMock).toHaveBeenCalledWith("/tools"));
+    });
+
+    it("stays put when the new choice could not be stored", async () => {
+      // Browser storage is refusing writes, so the uuid never changes.
+      // Navigating would load the same stale workspace and navigate again.
+      mockActiveUuid = "stale-uuid";
+      getActiveOrgUuidMock.mockReturnValue("stale-uuid");
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      setLocation("/tools");
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() =>
+        expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
+      );
+      expect(assignMock).not.toHaveBeenCalled();
+      expect(reloadMock).not.toHaveBeenCalled();
+    });
+
+    it("does not navigate when no workspace was stored yet", async () => {
+      mockActiveUuid = null;
+      getActiveOrgUuidMock.mockReturnValue(null);
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() =>
+        expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
+      );
+      expect(assignMock).not.toHaveBeenCalled();
+      expect(reloadMock).not.toHaveBeenCalled();
+    });
   });
 });
