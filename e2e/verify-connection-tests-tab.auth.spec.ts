@@ -16,7 +16,7 @@
 //   npm run test:e2e:integration  (sets E2E_FAKE_AI=1)
 // otherwise every test here is SKIPPED.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -52,7 +52,7 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
   await waitForOrgReady(page);
 
-  const heading = page.getByRole("heading", { name: "New agent" });
+  const heading = page.getByRole("heading", { name: "New agent", exact: true });
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
   // Cold-start / auth race: on the first authenticated test the /agents route
   // compiles on demand and the create can 401 (a no-op) or leave the dialog
@@ -69,7 +69,9 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 45000 });
 }
 
@@ -79,9 +81,7 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
 // leave the tab / trigger a run that reads the saved agent_url + unverified
 // flag. Mirrors agent-detail.auth.spec.ts.
 async function setConnectionUrl(page: Page, url: string): Promise<void> {
-  const urlInput = page.getByPlaceholder(
-    "https://your-agent.example.com/chat",
-  );
+  const urlInput = page.getByPlaceholder("https://your-agent.example.com/chat");
   await expect(urlInput).toBeVisible({ timeout: 15000 });
   await urlInput.fill(url);
   await page.waitForTimeout(1500);
@@ -90,11 +90,12 @@ async function setConnectionUrl(page: Page, url: string): Promise<void> {
 // Delete an agent from the /agents list via its titled delete button.
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
+  await waitForOrgReady(page);
   const row = page.locator("div.grid").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete agent" }),
+    page.getByRole("heading", { name: "Delete agent", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -111,7 +112,7 @@ async function createNextReplyTestOnAgent(
 
   await page.getByRole("button", { name: "Create test", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Create a test" }),
+    page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 15000 });
   await page.getByText("Next reply test", { exact: true }).first().click();
 
@@ -136,6 +137,7 @@ async function createNextReplyTestOnAgent(
   // Dismiss it — it otherwise overlays the Run/Compare buttons.
   const evalPrompt = page.getByRole("heading", {
     name: "Update default evaluators?",
+    exact: true,
   });
   await expect(evalPrompt).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Not now" }).click();
@@ -173,7 +175,7 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     await page.getByRole("button", { name: /Run all/ }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Verify connection" }),
+      page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     // No run started — the results Summary tab is not present.
     await expect(
@@ -183,7 +185,10 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     // Scope Verify clicks / dialog assertions to the dialog box: the agent
     // detail page has its own "Verify" button in the header.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
-      has: page.getByRole("heading", { name: "Verify connection" }),
+      has: page.getByRole("heading", {
+        name: "Verify connection",
+        exact: true,
+      }),
     });
 
     // Run the endpoint check. The real outbound verify call takes a few seconds.
@@ -249,12 +254,15 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     await page.getByRole("button", { name: /Run all/ }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Verify connection" }),
+      page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     // Scope the Verify click to the dialog box: the agent detail page has its
     // own "Verify" button in the header.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
-      has: page.getByRole("heading", { name: "Verify connection" }),
+      has: page.getByRole("heading", {
+        name: "Verify connection",
+        exact: true,
+      }),
     });
     await verifyDialog.getByRole("button", { name: "Verify" }).click();
 

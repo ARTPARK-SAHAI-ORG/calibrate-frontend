@@ -6,7 +6,7 @@
 // needs uploaded audio and is out of scope here. Import from ./fixtures for
 // E2E coverage. Run with `npm run test:e2e:integration` (needs a backend).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 const BUILDERS: ReadonlyArray<{ path: string; back: string }> = [
   { path: "/stt/new", back: "Back to STT evaluations" },
@@ -20,7 +20,7 @@ test.describe("STT/TTS evaluation builder (authenticated, real backend)", () => 
       await waitForOrgReady(page);
 
       // We stayed on the route (seeded token cleared middleware).
-      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page).toHaveURL(workspacePath(path));
 
       // The custom header renders a "Back" affordance and the primary
       // "Evaluate" action once the builder component has mounted.

@@ -17,7 +17,7 @@
 //   E2E_FAKE_AI=1 NEXT_PUBLIC_BACKEND_URL=http://localhost:8001 \
 //     npx playwright test --project=authenticated runs.auth
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -29,7 +29,10 @@ async function createBuildAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
   await waitForOrgReady(page);
 
-  const dialogHeading = page.getByRole("heading", { name: "New agent" });
+  const dialogHeading = page.getByRole("heading", {
+    name: "New agent",
+    exact: true,
+  });
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
 
   // The dialog's access token comes from a hook effect, so the very first
@@ -43,17 +46,20 @@ async function createBuildAgent(page: Page, name: string): Promise<void> {
       await page.getByPlaceholder("Enter agent name").fill(name);
     }
     await createBtn.click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 5000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 5000,
+    });
   }).toPass({ timeout: 30000 });
 }
 
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
+  await waitForOrgReady(page);
   const row = page.locator("div.grid").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete agent" }),
+    page.getByRole("heading", { name: "Delete agent", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -74,7 +80,7 @@ async function createNextReplyTestOnAgent(
 
   await page.getByRole("button", { name: "Create test", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Create a test" }),
+    page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 15000 });
   await page.getByText("Next reply test", { exact: true }).first().click();
 
@@ -100,6 +106,7 @@ async function createNextReplyTestOnAgent(
   // Run/Compare buttons. (isVisible() doesn't wait, so assert-then-click.)
   const evalPrompt = page.getByRole("heading", {
     name: "Update default evaluators?",
+    exact: true,
   });
   await expect(evalPrompt).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Not now" }).click();
@@ -119,7 +126,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     );
   });
 
-  test("runs an agent's tests and shows a passing summary", async ({ page }) => {
+  test("runs an agent's tests and shows a passing summary", async ({
+    page,
+  }) => {
     const agentName = `E2E Run Agent ${Date.now()}`;
     const testName = `E2E Run Test ${Date.now()}`;
 
@@ -142,7 +151,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await expect(page.getByText("Pass rate").first()).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText("100%").first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("100%").first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // Outputs tab: the per-test results group the passing test under a
     // "Passed (n)" heading (test-results/shared StatusIcon + grouping).
@@ -216,10 +227,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // model is picked. Click the empty slot ("Select a model") to open the
     // shared LLMSelectorModal, then choose the first model in the list.
     await page.getByRole("button", { name: /Compare models/ }).click();
-    await page
-      .getByRole("button", { name: "Select a model" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Select a model" }).first().click();
     // The selector modal is the innermost overlay containing the "Search LLM"
     // box (the outer BenchmarkDialog is also .fixed, so take the last match).
     // Its model rows are full-width buttons wrapping the model name.

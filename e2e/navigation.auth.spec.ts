@@ -7,7 +7,7 @@
 // <h1> immediately (list rows sit behind a spinner), so we assert on the
 // heading rather than on data. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 // path → the exact heading text that confirms the page rendered. Headings are
 // copied from each page component and differ from the sidebar nav labels
@@ -29,16 +29,18 @@ test.describe("Authenticated navigation (real backend)", () => {
   for (const { path, heading } of PAGES) {
     test(`${path} renders for a logged-in user`, async ({ page }) => {
       await page.goto(path);
+      await waitForOrgReady(page);
       // Middleware let us through (seeded token) — we stayed on the route.
-      await expect(page).toHaveURL(new RegExp(`${path}(\\?.*)?$`));
+      await expect(page).toHaveURL(workspacePath(path));
       await expect(
-        page.getByRole("heading", { name: heading }).first(),
+        page.getByRole("heading", { name: heading, exact: true }).first(),
       ).toBeVisible();
     });
   }
 
   test("the sidebar navigates between sections", async ({ page }) => {
     await page.goto("/agents");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("button", { name: "New agent" }).first(),
     ).toBeVisible();
@@ -47,14 +49,14 @@ test.describe("Authenticated navigation (real backend)", () => {
     // sidebar nav items are Next.js <Link>s (role=link) labelled with the
     // section name.
     await page.getByRole("link", { name: "Tools", exact: true }).click();
-    await expect(page).toHaveURL(/\/tools$/);
+    await expect(page).toHaveURL(workspacePath("/tools"));
     // exact: the empty-state heading "No tools found" also contains "Tools".
     await expect(
       page.getByRole("heading", { name: "Tools", exact: true }),
     ).toBeVisible();
 
     await page.getByRole("link", { name: "Evaluators", exact: true }).click();
-    await expect(page).toHaveURL(/\/evaluators/);
+    await expect(page).toHaveURL(workspacePath("/evaluators"));
     await expect(
       page.getByRole("heading", { name: "Evaluators", exact: true }),
     ).toBeVisible();

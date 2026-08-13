@@ -13,7 +13,7 @@
 // keys/cost); they SKIP unless E2E_FAKE_AI=1, which `npm run test:e2e:integration`
 // sets. Run with that command (see e2e/README.md / CLAUDE.md).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -54,7 +54,7 @@ async function createAgent(
   await page.goto("/agents");
   await waitForOrgReady(page);
 
-  const heading = page.getByRole("heading", { name: "New agent" });
+  const heading = page.getByRole("heading", { name: "New agent", exact: true });
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
   // Cold-start / auth race: on the first authenticated test the /agents route
   // compiles on demand and the create can 401 (a no-op) or leave the dialog
@@ -72,7 +72,9 @@ async function createAgent(
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 45000 });
 }
 
@@ -80,11 +82,12 @@ async function createAgent(
 // Copied from e2e/runs.auth.spec.ts / agent-detail.auth.spec.ts.
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
+  await waitForOrgReady(page);
   const row = page.locator("div.grid").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete agent" }),
+    page.getByRole("heading", { name: "Delete agent", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -118,12 +121,14 @@ async function createStandaloneTest(page: Page, name: string): Promise<void> {
   await page.goto("/tests");
   await waitForOrgReady(page);
   await expect(
-    page.getByRole("heading", { name: "LLM Tests" }),
-  ).toBeVisible({ timeout: 20000 });
+    page.getByRole("heading", { name: "LLM Tests", exact: true }),
+  ).toBeVisible({
+    timeout: 20000,
+  });
 
   await page.getByRole("button", { name: "Create test" }).first().click();
   await expect(
-    page.getByRole("heading", { name: "Create a test" }),
+    page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 20000 });
   await page.getByRole("button", { name: "Next reply test" }).click();
 
@@ -160,8 +165,10 @@ async function deleteTest(page: Page, name: string): Promise<void> {
     .getByRole("button", { name: "Delete test" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Delete test" }),
-  ).toBeVisible({ timeout: 15000 });
+    page.getByRole("heading", { name: "Delete test", exact: true }),
+  ).toBeVisible({
+    timeout: 15000,
+  });
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0, {
     timeout: 15000,
@@ -194,10 +201,12 @@ async function openRunDialogPickAgentAndRun(
   // footer "Run test" button never collides with the DOM-present mobile card.
   const runDialog = page
     .locator("div.fixed.inset-0.z-50")
-    .filter({ has: page.getByRole("heading", { name: "Run test" }) });
-  await expect(runDialog.getByRole("heading", { name: "Run test" })).toBeVisible(
-    { timeout: 15000 },
-  );
+    .filter({
+      has: page.getByRole("heading", { name: "Run test", exact: true }),
+    });
+  await expect(
+    runDialog.getByRole("heading", { name: "Run test", exact: true }),
+  ).toBeVisible({ timeout: 15000 });
 
   await runDialog.getByRole("button", { name: "Select an agent" }).click();
   const agentSearch = page.getByPlaceholder("Search agents");
@@ -231,7 +240,7 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
 
     // The gate opened VerifyConnectionDialog instead of starting the run.
     await expect(
-      page.getByRole("heading", { name: "Verify connection" }),
+      page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     // No run started: the run window's Summary tab is absent.
     await expect(
@@ -242,7 +251,10 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     // it fails and the dialog switches to its failure state. Scope the Verify
     // click and the failure assertions to the dialog so they never collide.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
-      has: page.getByRole("heading", { name: "Verify connection" }),
+      has: page.getByRole("heading", {
+        name: "Verify connection",
+        exact: true,
+      }),
     });
     await verifyDialog.getByRole("button", { name: "Verify" }).click();
 
@@ -309,14 +321,17 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     await openRunDialogPickAgentAndRun(page, testName, agentName);
 
     await expect(
-      page.getByRole("heading", { name: "Verify connection" }),
+      page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
 
     // Passing check → dialog closes and the run starts. The run window's
     // Summary tab appears once the mocked run completes; the mocked verdict
     // passes → 100% pass rate. Scope the Verify click to the dialog.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
-      has: page.getByRole("heading", { name: "Verify connection" }),
+      has: page.getByRole("heading", {
+        name: "Verify connection",
+        exact: true,
+      }),
     });
     await verifyDialog.getByRole("button", { name: "Verify" }).click();
 

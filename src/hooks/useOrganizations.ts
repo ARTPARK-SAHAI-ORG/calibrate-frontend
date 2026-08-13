@@ -11,10 +11,11 @@ import {
   type OrganizationApiKey,
   type OrganizationApiKeyWithSecret,
   type OrganizationMember,
-  getActiveOrgUuid,
+  getRememberedOrgUuid,
   notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
 } from "@/lib/orgs";
+import { useOrgUuid } from "@/lib/nav";
 
 type UseOrganizationsReturn = {
   organizations: Organization[];
@@ -236,26 +237,32 @@ export function useOrganizations(
 }
 
 /**
- * Reactive accessor for the active workspace uuid. Subscribes to the custom
- * "active-org-changed" event so components re-render when the user switches.
+ * The workspace on screen.
+ *
+ * On a page behind sign-in this is the workspace named by the address, which
+ * is right on the very first render. Elsewhere (login, a shared result page)
+ * it falls back to the workspace last opened, read after mount and kept
+ * current through the "active-org-changed" event.
  */
 export function useActiveOrgUuid(): [
   string | null,
   (uuid: string) => void,
 ] {
-  const [uuid, setUuid] = useState<string | null>(null);
+  const fromAddress = useOrgUuid();
+  const [remembered, setRemembered] = useState<string | null>(null);
 
   useEffect(() => {
-    setUuid(getActiveOrgUuid());
+    if (fromAddress) return;
+    setRemembered(getRememberedOrgUuid());
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ uuid: string | null }>).detail;
-      setUuid(detail?.uuid ?? getActiveOrgUuid());
+      setRemembered(detail?.uuid ?? getRememberedOrgUuid());
     };
     window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, handler);
     return () => window.removeEventListener(ACTIVE_ORG_CHANGED_EVENT, handler);
-  }, []);
+  }, [fromAddress]);
 
-  return [uuid, persistActiveOrgUuid];
+  return [fromAddress ?? remembered, persistActiveOrgUuid];
 }
 
 type UseOrgMembersReturn = {

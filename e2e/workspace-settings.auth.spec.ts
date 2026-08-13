@@ -23,13 +23,34 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     });
   });
 
+  test("the API keys entry in the sidebar menu switches the tab from Admin", async ({
+    page,
+  }) => {
+    // Opening API keys while already on this page changes only the part of the
+    // address after the "?", which leaves the page itself on screen. The page
+    // has to notice that and switch tab; a check that fails if it only ever
+    // reads the address when it first opens.
+    await openWorkspaceSettings(page, "Admin");
+    await expect(
+      page.getByRole("textbox").first(),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('button[aria-haspopup="menu"]').first().click();
+    await page.getByRole("link", { name: "API keys", exact: true }).click();
+
+    await expect(page).toHaveURL(/tab=api-keys/, { timeout: 15000 });
+    await expect(
+      page.getByRole("button", { name: "Create key" }).first(),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
   test("creates then revokes a workspace API key", async ({ page }) => {
     const keyName = `E2E Key ${Date.now()}`;
     await openWorkspaceSettings(page, "API keys");
 
     await page.getByRole("button", { name: "Create key" }).first().click();
     await expect(
-      page.getByRole("heading", { name: "Create API key" }),
+      page.getByRole("heading", { name: "Create API key", exact: true }),
     ).toBeVisible();
     await page.getByPlaceholder("e.g. GitHub Actions").fill(keyName);
     await page
@@ -39,7 +60,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     // Phase 2: the plaintext key is revealed once. Close the dialog.
     await expect(
-      page.getByRole("heading", { name: "API key created" }),
+      page.getByRole("heading", { name: "API key created", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Done" }).click();
 
@@ -51,7 +72,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     // row's own "Revoke" button behind it.
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "Revoke API key" }),
+      dialog.getByRole("heading", { name: "Revoke API key", exact: true }),
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
   });
@@ -66,9 +87,11 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     await page.getByRole("button", { name: "Create workspace" }).click();
     await expect(
-      page.getByRole("heading", { name: "Create workspace" }),
+      page.getByRole("heading", { name: "Create workspace", exact: true }),
     ).toBeVisible();
-    await page.getByPlaceholder("e.g. Acme Health").fill(`E2E New WS ${Date.now()}`);
+    await page
+      .getByPlaceholder("e.g. Acme Health")
+      .fill(`E2E New WS ${Date.now()}`);
     await page
       .getByRole("button", { name: "Create workspace", exact: true })
       .last()
@@ -76,7 +99,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     // Creating a workspace closes the dialog (the switcher then reflects it).
     await expect(
-      page.getByRole("heading", { name: "Create workspace" }),
+      page.getByRole("heading", { name: "Create workspace", exact: true }),
     ).toBeHidden({ timeout: 15000 });
   });
 });

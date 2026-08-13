@@ -6,7 +6,7 @@ import {
   ReasoningExpandedContent,
   ReasoningToggleButton,
 } from "@/components/EvaluatorVerdictCard";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import {
   CheckIcon,
   XIcon,

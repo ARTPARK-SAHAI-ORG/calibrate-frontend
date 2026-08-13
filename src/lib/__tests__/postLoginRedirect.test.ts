@@ -83,3 +83,9 @@ describe("withCallback", () => {
     expect(withCallback("/signup", "")).toBe("/signup");
   });
 });
+
+describe("the opening page as a destination", () => {
+  it("refuses to send someone back to the opening page", () => {
+    expect(safeCallbackUrl("/opening?to=%2Fopening")).toBe("/agents");
+  });
+});

@@ -4,6 +4,7 @@ import {
   ORGANIZATIONS_CHANGED_EVENT,
   notifyOrganizationsChanged,
   getActiveOrgUuid,
+  getRememberedOrgUuid,
   setActiveOrgUuid,
   clearActiveOrgUuid,
   pickDefaultOrg,
@@ -51,10 +52,37 @@ describe("notifyOrganizationsChanged", () => {
   });
 });
 
+const ADDRESS_ORG = "8f3c1a2b-4d5e-4f6a-8b9c-0d1e2f3a4b5c";
+const STORED_ORG = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
 describe("getActiveOrgUuid", () => {
   afterEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, "", "/");
     jest.restoreAllMocks();
+  });
+
+  it("uses the workspace named by the address", () => {
+    window.history.replaceState(null, "", `/${ADDRESS_ORG}/agents`);
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, STORED_ORG);
+    expect(getActiveOrgUuid()).toBe(ADDRESS_ORG);
+  });
+
+  it("uses the address even when nothing is stored", () => {
+    window.history.replaceState(null, "", `/${ADDRESS_ORG}`);
+    expect(getActiveOrgUuid()).toBe(ADDRESS_ORG);
+  });
+
+  it("falls back to the stored workspace when the address names none", () => {
+    window.history.replaceState(null, "", "/login");
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, STORED_ORG);
+    expect(getActiveOrgUuid()).toBe(STORED_ORG);
+  });
+
+  it("does not read a plain page name as a workspace", () => {
+    window.history.replaceState(null, "", "/agents");
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, STORED_ORG);
+    expect(getActiveOrgUuid()).toBe(STORED_ORG);
   });
 
   it("returns null when nothing is stored", () => {
@@ -79,6 +107,45 @@ describe("getActiveOrgUuid", () => {
     delete global.window;
     expect(getActiveOrgUuid()).toBeNull();
     global.window = originalWindow;
+  });
+});
+
+describe("getRememberedOrgUuid", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.history.replaceState(null, "", "/");
+    jest.restoreAllMocks();
+  });
+
+  it("ignores the address and reads what was stored", () => {
+    window.history.replaceState(null, "", `/${ADDRESS_ORG}/agents`);
+    window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, STORED_ORG);
+    expect(getRememberedOrgUuid()).toBe(STORED_ORG);
+  });
+
+  it("returns null when nothing is stored", () => {
+    window.history.replaceState(null, "", `/${ADDRESS_ORG}/agents`);
+    expect(getRememberedOrgUuid()).toBeNull();
+  });
+
+  it("returns null when localStorage throws", () => {
+    jest
+      .spyOn(window.localStorage.__proto__, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    expect(getRememberedOrgUuid()).toBeNull();
+  });
+
+  it("returns null when window is undefined", () => {
+    const originalWindow = global.window;
+    // @ts-expect-error simulate SSR
+    delete global.window;
+    try {
+      expect(getRememberedOrgUuid()).toBeNull();
+    } finally {
+      global.window = originalWindow;
+    }
   });
 });
 

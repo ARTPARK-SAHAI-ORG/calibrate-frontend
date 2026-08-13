@@ -12,6 +12,7 @@
 //
 // Run with `npm run test:e2e:integration` (needs a backend, see e2e/README.md).
 import { test, expect } from "./fixtures";
+import { waitForOrgReady } from "./helpers";
 
 test.describe("Tests page (authenticated, real backend)", () => {
   test("opens the Create test dialog through to the editor, then closes", async ({
@@ -20,23 +21,21 @@ test.describe("Tests page (authenticated, real backend)", () => {
     const name = `E2E Test ${Date.now()}`;
 
     await page.goto("/tests");
+    await waitForOrgReady(page);
     // Page header from src/app/tests/page.tsx (<h1>LLM Tests</h1>).
     await expect(
-      page.getByRole("heading", { name: "LLM Tests" }),
+      page.getByRole("heading", { name: "LLM Tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // "Create test" appears either top-right (when tests exist) or inside the
     // empty-state placeholder card — both carry the same label, so .first().
-    await page
-      .getByRole("button", { name: "Create test" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Create test" }).first().click();
 
     // Phase 1: the two-phase create flow opens on a centred type picker.
     // Heading "Create a test" + label "Select the type of test" are from the
     // intro block in AddTestDialog.tsx (~line 2935).
     await expect(
-      page.getByRole("heading", { name: "Create a test" }),
+      page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText("Select the type of test")).toBeVisible();
 
@@ -61,20 +60,18 @@ test.describe("Tests page (authenticated, real backend)", () => {
 
   test("opens the Bulk upload modal, then closes", async ({ page }) => {
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "LLM Tests" }),
+      page.getByRole("heading", { name: "LLM Tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // "Bulk upload" appears top-right or in the empty-state card — .first().
-    await page
-      .getByRole("button", { name: "Bulk upload" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Bulk upload" }).first().click();
 
     // Heading "Bulk upload tests" + the "Select the type of test" label are
     // from BulkUploadTestsModal.tsx (~line 1298, ~1332).
     await expect(
-      page.getByRole("heading", { name: "Bulk upload tests" }),
+      page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText("Select the type of test")).toBeVisible();
 
@@ -82,7 +79,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
     // non-dismissing here).
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Bulk upload tests" }),
+      page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toHaveCount(0, { timeout: 15000 });
   });
 
@@ -100,16 +97,14 @@ test.describe("Tests page (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "LLM Tests" }),
+      page.getByRole("heading", { name: "LLM Tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    await page
-      .getByRole("button", { name: "Bulk upload" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Bulk upload" }).first().click();
     await expect(
-      page.getByRole("heading", { name: "Bulk upload tests" }),
+      page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Pick the "Tool Call" type card. Scope to the modal — the /tests page
@@ -169,7 +164,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
 
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Bulk upload tests" }),
+      page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toHaveCount(0, { timeout: 15000 });
   });
 
@@ -186,16 +181,14 @@ test.describe("Tests page (authenticated, real backend)", () => {
     const name = `E2E Editor ${Date.now()}`;
 
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "LLM Tests" }),
+      page.getByRole("heading", { name: "LLM Tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    await page
-      .getByRole("button", { name: "Create test" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Create test" }).first().click();
     await expect(
-      page.getByRole("heading", { name: "Create a test" }),
+      page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Into the full editor via the "Next reply test" card (TEST_TYPE_OPTIONS[0]).
@@ -237,7 +230,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
       .getByRole("button", { name: "Delete test" })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Delete test" }),
+      page.getByRole("heading", { name: "Delete test", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByText(name, { exact: true })).toHaveCount(0, {

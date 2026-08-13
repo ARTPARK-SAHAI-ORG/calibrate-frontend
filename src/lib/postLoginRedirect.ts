@@ -6,6 +6,8 @@
  * back so the link is not lost.
  */
 
+import { OPENING_PATH } from "@/lib/opening";
+
 export const DEFAULT_POST_LOGIN_PATH = "/agents";
 
 export const CALLBACK_PARAM = "callbackUrl";
@@ -32,7 +34,14 @@ export function safeCallbackUrl(raw: string | null | undefined): string {
     return DEFAULT_POST_LOGIN_PATH;
   }
   if (parsed.origin !== PROBE_ORIGIN) return DEFAULT_POST_LOGIN_PATH;
-  if (parsed.pathname === "/login" || parsed.pathname === "/signup") {
+  // Sending someone back to a page that only forwards them somewhere else is
+  // never what they asked for, and the opening page pointed at itself lands on
+  // a page that does not exist.
+  if (
+    parsed.pathname === "/login" ||
+    parsed.pathname === "/signup" ||
+    parsed.pathname === OPENING_PATH
+  ) {
     return DEFAULT_POST_LOGIN_PATH;
   }
   return parsed.pathname + parsed.search + parsed.hash;

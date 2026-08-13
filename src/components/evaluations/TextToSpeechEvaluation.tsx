@@ -4,7 +4,7 @@ import { unwrapList } from "@/lib/api";
 import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import {
   useAccessToken,

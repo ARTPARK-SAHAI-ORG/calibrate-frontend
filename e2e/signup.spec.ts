@@ -10,7 +10,7 @@ test.describe("Signup page", () => {
 
   test("renders the signup form", async ({ page }) => {
     await expect(
-      page.getByRole("heading", { name: "Create your account" }),
+      page.getByRole("heading", { name: "Create your account", exact: true }),
     ).toBeVisible();
     await expect(page.getByPlaceholder("John", { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder("Doe", { exact: true })).toBeVisible();

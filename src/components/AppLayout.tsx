@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/lib/nav";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
@@ -12,6 +11,7 @@ import {
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
 import { clearOrgsCache, useAuth, useOrganizations } from "@/hooks";
+import { clearActiveOrgUuid } from "@/lib/orgs";
 // Imported straight from the file, not the ui barrel: the barrel pulls in
 // SlidePanel, which imports back from here.
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -906,8 +906,9 @@ export function AppLayout({
 
                   {/* API keys — jumps straight to that tab of workspace settings. */}
                   <div className="p-2 border-b border-border">
-                    <a
+                    <Link
                       href="/workspace-settings?tab=api-keys"
+                      onClick={() => setProfileOpen(false)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
                     >
                       <svg
@@ -924,7 +925,7 @@ export function AppLayout({
                         />
                       </svg>
                       API keys
-                    </a>
+                    </Link>
                   </div>
 
                   {/* Take a tour — desktop-only, so hidden on phones. */}
@@ -945,7 +946,7 @@ export function AppLayout({
                         // Clear localStorage
                         localStorage.removeItem("access_token");
                         localStorage.removeItem("user");
-                        localStorage.removeItem("activeOrgUuid");
+                        clearActiveOrgUuid();
                         // Clear in-memory caches scoped to this user.
                         clearOrgsCache();
                         // Clear cookie

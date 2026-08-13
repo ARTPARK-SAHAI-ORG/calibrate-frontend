@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
 import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";

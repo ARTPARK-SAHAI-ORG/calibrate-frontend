@@ -1,5 +1,5 @@
 import { signOut } from "next-auth/react";
-import { getActiveOrgUuid } from "@/lib/orgs";
+import { clearActiveOrgUuid, getActiveOrgUuid } from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
 
 type RequestOptions = {
@@ -121,7 +121,7 @@ export async function apiClient<T>(
     // Clear localStorage
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
-    localStorage.removeItem("activeOrgUuid");
+    clearActiveOrgUuid();
     // Clear in-memory caches that are scoped to the signed-in user.
     clearOrgsCache();
     // Clear cookie

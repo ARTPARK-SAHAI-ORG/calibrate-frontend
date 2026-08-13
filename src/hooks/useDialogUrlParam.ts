@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "@/lib/nav";
 
 /**
  * Deep-links a dialog (or any single "open item") to a URL query param, e.g.

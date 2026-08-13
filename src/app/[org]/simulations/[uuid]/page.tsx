@@ -1,0 +1,965 @@
+"use client";
+import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
+
+import React, { useState, useEffect, useRef } from "react";
+import { replaceUrl, useParams, useRouter, useSearchParams } from "@/lib/nav";
+import { signOut } from "next-auth/react";
+import { useAccessToken, useVerifyConnection, usePageErrorState } from "@/hooks";
+import { toast } from "sonner";
+import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
+import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
+import {
+  VerifyRequestPreviewDialog,
+  type MessageRow,
+} from "@/components/VerifyRequestPreviewDialog";
+import { AppLayout } from "@/components/AppLayout";
+import { NotFoundState } from "@/components/ui";
+import { Agent } from "@/components/AgentPicker";
+import { PickerItem } from "@/components/MultiSelectPicker";
+import {
+  SimulationConfigTab,
+  SimulationRunsTab,
+} from "@/components/simulation-tabs";
+import { LIMITS, showLimitToast } from "@/constants/limits";
+import { useSidebarState } from "@/lib/sidebar";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
+
+type PersonaData = {
+  uuid: string;
+  name: string;
+  description: string;
+  config?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+};
+
+type ScenarioData = {
+  uuid: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// One row from `simulation.evaluators` on `GET /simulations/{uuid}`. Each
+// row carries the evaluator's stable `uuid` (which is what the PUT body
+// expects as `evaluator_uuid` — see `handleCreate` below) plus the usual
+// display fields. `metrics` was the legacy field name; the backend now
+// stores and returns these rows under `evaluators`.
+type EvaluatorData = {
+  uuid: string;
+  name: string;
+  description: string;
+  config?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type AgentData = {
+  uuid: string;
+  name: string;
+  type?: "agent" | "connection";
+  config?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+};
+
+type SimulationData = {
+  uuid: string;
+  name: string;
+  description?: string;
+  status?: "pending" | "running" | "completed" | "failed";
+  created_at: string;
+  updated_at: string;
+  agent?: AgentData;
+  personas?: PersonaData[];
+  scenarios?: ScenarioData[];
+  evaluators?: EvaluatorData[];
+};
+
+export default function SimulationDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const backendAccessToken = useAccessToken();
+  const uuid = params.uuid as string;
+  const [sidebarOpen, setSidebarOpen] = useSidebarState();
+  const [simulation, setSimulation] = useState<SimulationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { errorCode, reset: resetErrorCode, captureResponse } =
+    usePageErrorState();
+
+  // Form state
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+
+  // Personas state
+  const [personas, setPersonas] = useState<PickerItem[]>([]);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [selectedPersonas, setSelectedPersonas] = useState<PickerItem[]>([]);
+
+  // Scenarios state
+  const [scenarios, setScenarios] = useState<PickerItem[]>([]);
+  const [scenariosLoading, setScenariosLoading] = useState(false);
+  const [selectedScenarios, setSelectedScenarios] = useState<PickerItem[]>([]);
+
+  // Metrics state
+  const [metrics, setMetrics] = useState<PickerItem[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [selectedMetrics, setSelectedMetrics] = useState<PickerItem[]>([]);
+
+  // Tab state
+  type TabType = "config" | "runs";
+  const [activeTab, setActiveTab] = useState<TabType>("config");
+
+  // Tab display names for page title
+  const tabDisplayNames: Record<TabType, string> = {
+    config: "Config",
+    runs: "Runs",
+  };
+
+  // Set page title when simulation or tab changes
+  useEffect(() => {
+    if (simulation?.name) {
+      const tabName = tabDisplayNames[activeTab];
+      document.title = `${simulation.name} - ${tabName} | Calibrate`;
+    } else {
+      document.title = "Simulation | Calibrate";
+    }
+  }, [simulation?.name, activeTab]);
+
+  // Configuration state (whether config has been saved/created)
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Name editing state
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [renameNameConflictError, setRenameNameConflictError] = useState<
+    string | null
+  >(null);
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  // Launch dropdown state
+  const [launchDropdownOpen, setLaunchDropdownOpen] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
+  const launchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close launch dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        launchDropdownRef.current &&
+        !launchDropdownRef.current.contains(event.target as Node)
+      ) {
+        setLaunchDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle personas change with limit check
+  const handlePersonasChange = (items: PickerItem[]) => {
+    if (items.length > LIMITS.SIMULATION_MAX_PERSONAS) {
+      showLimitToast(`You can only select up to ${LIMITS.SIMULATION_MAX_PERSONAS} personas at a time.`);
+      return;
+    }
+    setSelectedPersonas(items);
+  };
+
+  // Handle scenarios change with limit check
+  const handleScenariosChange = (items: PickerItem[]) => {
+    if (items.length > LIMITS.SIMULATION_MAX_SCENARIOS) {
+      showLimitToast(`You can only select up to ${LIMITS.SIMULATION_MAX_SCENARIOS} scenarios at a time.`);
+      return;
+    }
+    setSelectedScenarios(items);
+  };
+
+  // Set active tab from query parameter
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "runs" || tab === "config") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleLaunch = async (type: "text" | "voice") => {
+    setLaunchDropdownOpen(false);
+    setIsLaunching(true);
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/simulations/${uuid}/run`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify({
+          type: type === "voice" ? "voice" : "text",
+        }),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        // Surface the backend's message verbatim. A text simulation for an
+        // agent that has custom fields (default_inputs) returns 400 with
+        // "Simulations are not supported for agents with default inputs. Run
+        // an agent test instead." — show that so the user knows to use tests.
+        let message = "Failed to launch simulation";
+        try {
+          const body = await response.json();
+          if (typeof body?.detail === "string" && body.detail.trim()) {
+            message = body.detail;
+          }
+        } catch {
+          // response had no JSON body; keep the generic message
+        }
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      const runId = data.run_id || data.task_id || data.id;
+
+      if (!runId) {
+        throw new Error("No run ID returned from API");
+      }
+
+      router.push(`/simulations/${uuid}/runs/${runId}`);
+    } catch (err) {
+      reportError("Error launching simulation:", err);
+      alert(err instanceof Error ? err.message : "Failed to launch simulation");
+    } finally {
+      setIsLaunching(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!simulation) return;
+
+    try {
+      setIsCreating(true);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      // `SimulationUpdate` on the backend uses `model_config = ConfigDict(extra="forbid")`,
+      // so any extra keys (including the legacy `metric_uuids`) now produce a
+      // 422. Evaluator rows must be sent under `evaluators` as
+      // `[{ evaluator_uuid: <evaluators.uuid> }, ...]` — passing a legacy
+      // metric UUID here returns a 400 with the migrated evaluator UUID.
+      const payload = {
+        name: simulation.name,
+        agent_uuid: selectedAgent?.uuid,
+        persona_uuids: selectedPersonas.map((p) => p.uuid),
+        scenario_uuids: selectedScenarios.map((s) => s.uuid),
+        evaluators: selectedMetrics.map((m) => ({ evaluator_uuid: m.uuid })),
+      };
+
+      const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
+        method: "PUT",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to update simulation");
+      }
+
+      setIsConfigured(true);
+    } catch (err) {
+      reportError("Error updating simulation:", err);
+      alert(err instanceof Error ? err.message : "Failed to update simulation");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Fetch simulation
+  useEffect(() => {
+    const fetchSimulation = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        resetErrorCode();
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) {
+          throw new Error("BACKEND_URL environment variable is not set");
+        }
+
+        const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (captureResponse(response)) return;
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch simulation");
+        }
+
+        const data: SimulationData = await response.json();
+        setSimulation(data);
+
+        // Pre-populate agent if present
+        if (data.agent) {
+          const agentType = data.agent.type === "connection" ? "connection" : "agent";
+          setSelectedAgent({
+            uuid: data.agent.uuid,
+            name: data.agent.name,
+            type: agentType,
+            verified:
+              agentType === "connection"
+                ? data.agent.config?.connection_verified === true
+                : true,
+          });
+        }
+
+        // Check if simulation is already configured (has personas, scenarios, or metrics)
+        const hasPersonas = data.personas && data.personas.length > 0;
+        const hasScenarios = data.scenarios && data.scenarios.length > 0;
+        const hasEvaluators = data.evaluators && data.evaluators.length > 0;
+
+        if (hasPersonas || hasScenarios || hasEvaluators) {
+          setIsConfigured(true);
+
+          // Pre-populate selected items from the simulation data
+          if (data.personas) {
+            setSelectedPersonas(
+              data.personas.map((p) => ({
+                uuid: p.uuid,
+                name: p.name,
+                description: p.description,
+              }))
+            );
+          }
+          if (data.scenarios) {
+            setSelectedScenarios(
+              data.scenarios.map((s) => ({
+                uuid: s.uuid,
+                name: s.name,
+                description: s.description,
+              }))
+            );
+          }
+          if (data.evaluators) {
+            setSelectedMetrics(
+              data.evaluators.map((m) => ({
+                uuid: m.uuid,
+                name: m.name,
+                description: m.description,
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        reportError("Error fetching simulation:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load simulation"
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (uuid && backendAccessToken) {
+      fetchSimulation();
+    }
+  }, [uuid, backendAccessToken, resetErrorCode, captureResponse]);
+
+  // Fetch personas
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        setPersonasLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) return;
+
+        const response = await fetch(`${backendUrl}/personas`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch personas");
+        }
+
+        const data = await response.json();
+        const formattedPersonas: PickerItem[] = Array.isArray(data)
+          ? data.map((p: any) => ({
+              uuid: p.uuid,
+              name: p.name,
+              description: p.description,
+            }))
+          : [];
+        setPersonas(formattedPersonas);
+      } catch (err) {
+        reportError("Error fetching personas:", err);
+      } finally {
+        setPersonasLoading(false);
+      }
+    };
+
+    fetchPersonas();
+  }, [backendAccessToken]);
+
+  // Fetch scenarios
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        setScenariosLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) return;
+
+        const response = await fetch(`${backendUrl}/scenarios`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch scenarios");
+        }
+
+        const data = await response.json();
+        const formattedScenarios: PickerItem[] = Array.isArray(data)
+          ? data.map((s: any) => ({
+              uuid: s.uuid,
+              name: s.name,
+              description: s.description,
+            }))
+          : [];
+        setScenarios(formattedScenarios);
+      } catch (err) {
+        reportError("Error fetching scenarios:", err);
+      } finally {
+        setScenariosLoading(false);
+      }
+    };
+
+    fetchScenarios();
+  }, [backendAccessToken]);
+
+  // Fetch evaluators — only `evaluator_type === "conversation"` is offered as a
+  // metric for simulations. Other use cases (LLM, TTS, STT) are filtered out
+  // here so the picker doesn't expose evaluators that can't run on a full
+  // conversation.
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        setMetricsLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) return;
+
+        const response = await fetch(
+          `${backendUrl}/evaluators?include_defaults=true`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          },
+        );
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch evaluators");
+        }
+
+        const data = await response.json();
+        const formattedMetrics: PickerItem[] = unwrapList<{
+          uuid: string;
+          name: string;
+          description?: string;
+          evaluator_type?: string;
+        }>(data)
+          .filter((m) => m.evaluator_type === "conversation")
+          .map((m) => ({
+            uuid: m.uuid,
+            name: m.name,
+            description: m.description,
+          }));
+        setMetrics(formattedMetrics);
+      } catch (err) {
+        reportError("Error fetching evaluators:", err);
+      } finally {
+        setMetricsLoading(false);
+      }
+    };
+
+    fetchMetrics();
+  }, [backendAccessToken]);
+
+  // Name editing handlers
+  const handleOpenEditName = () => {
+    if (simulation) {
+      setEditedName(simulation.name);
+      setRenameNameConflictError(null);
+      setIsEditNameDialogOpen(true);
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!simulation || !editedName.trim() || editedName.trim() === simulation.name) {
+      setIsEditNameDialogOpen(false);
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      setRenameNameConflictError(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
+        method: "PUT",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify({ name: editedName.trim() }),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setRenameNameConflictError(conflict);
+          setIsSavingName(false);
+          return;
+        }
+        throw new Error("Failed to update simulation name");
+      }
+
+      setSimulation({ ...simulation, name: editedName.trim() });
+      setIsEditNameDialogOpen(false);
+      toast.success("Simulation name updated");
+    } catch (err) {
+      reportError("Error saving simulation name:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to save name");
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditNameDialogOpen(false);
+    setEditedName("");
+    setRenameNameConflictError(null);
+  };
+
+  // Header with back button and simulation name
+  const customHeader = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => router.push("/simulations")}
+        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+        title="Back to simulations"
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15.75 19.5L8.25 12l7.5-7.5"
+          />
+        </svg>
+      </button>
+      {!errorCode && (
+        <span
+          className={`text-base font-semibold text-foreground ${
+            !isLoading && simulation ? "cursor-pointer hover:opacity-70 transition-opacity" : ""
+          }`}
+          onClick={!isLoading && simulation ? handleOpenEditName : undefined}
+          title={!isLoading && simulation ? "Click to edit name" : undefined}
+        >
+          {isLoading ? "Loading..." : simulation?.name || "Simulation"}
+        </span>
+      )}
+    </div>
+  );
+
+  const isAgentUnverified = selectedAgent?.verified === false;
+  const verify = useVerifyConnection();
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+
+  const handleVerifyClick = () => {
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerifyConfirm = async (messages: MessageRow[]) => {
+    if (!selectedAgent) return;
+    const success = await verify.verifySavedAgent(selectedAgent.uuid, messages);
+    if (success) {
+      setSelectedAgent({ ...selectedAgent, verified: true });
+      toast.success("Agent connection verified successfully");
+      setVerifyDialogOpen(false);
+    }
+  };
+
+  // Launch button for header actions
+  const headerActions =
+    !isLoading && !error && simulation && isConfigured ? (
+      <div className="flex items-center gap-2 mr-2">
+        {isAgentUnverified && (
+          <div className="relative">
+            <button
+              onClick={handleVerifyClick}
+              disabled={verify.isVerifying}
+              className="h-8 px-4 rounded-md text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {verify.isVerifying ? (
+                <>
+                  <SpinnerIcon className="w-4 h-4 animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-4 h-4" />
+                  <span>Verify</span>
+                </>
+              )}
+            </button>
+            <VerifyErrorPopover
+              error={verify.verifyError}
+              sampleResponse={verify.verifySampleResponse}
+              onDismiss={verify.dismiss}
+            />
+          </div>
+        )}
+        <div className="relative group" ref={launchDropdownRef}>
+        <button
+          onClick={() => !isAgentUnverified && setLaunchDropdownOpen(!launchDropdownOpen)}
+          disabled={isLaunching || isAgentUnverified}
+          className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isLaunching ? (
+            <>
+              <SpinnerIcon className="w-4 h-4 animate-spin" />
+              <span>Launching...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span>Launch</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${
+                  launchDropdownOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                />
+              </svg>
+            </>
+          )}
+        </button>
+
+        {isAgentUnverified && (
+          <div className="absolute right-0 top-full mt-1 w-56 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+            Agent must be verified before launching a simulation
+          </div>
+        )}
+
+        {/* Dropdown Menu */}
+        {launchDropdownOpen && (
+          <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[180px]">
+            <div className="relative group/text">
+              <button
+                onClick={() => handleLaunch("text")}
+                disabled={isLaunching || selectedAgent?.hasDefaultInputs}
+                className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                  />
+                </svg>
+                Text Simulation
+              </button>
+              {selectedAgent?.hasDefaultInputs && (
+                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/text:opacity-100 pointer-events-none transition-opacity z-[60]">
+                  Text simulation is not supported for connections with custom
+                  fields
+                </div>
+              )}
+            </div>
+            <div className="relative group/voice">
+              <button
+                onClick={() => handleLaunch("voice")}
+                disabled={isLaunching || selectedAgent?.type === "connection"}
+                className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-3 rounded-b-xl"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                  />
+                </svg>
+                Voice Simulation
+              </button>
+              {selectedAgent?.type === "connection" && (
+                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/voice:opacity-100 pointer-events-none transition-opacity z-[60]">
+                  Agent connections don&apos;t support voice simulations yet
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        </div>
+      </div>
+    ) : null;
+
+  return (
+    <AppLayout
+      activeItem="simulations"
+      onItemChange={(itemId) => router.push(`/${itemId}`)}
+      sidebarOpen={sidebarOpen}
+      onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
+      headerActions={headerActions}
+    >
+      <div className="space-y-4 md:space-y-6 py-4 md:py-6">
+        {/* Content */}
+        {errorCode ? (
+          <NotFoundState errorCode={errorCode} />
+        ) : isLoading ? (
+          <div className="flex items-center justify-center gap-3 py-8">
+            <SpinnerIcon className="w-5 h-5 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+            <p className="text-sm md:text-base text-red-500 mb-2">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : simulation ? (
+          <div className="space-y-4 md:space-y-6">
+            {/* Tabs - only shown when configured */}
+            {isConfigured && (
+              <div className="flex gap-4 md:gap-6 border-b border-border overflow-x-auto">
+                <button
+                  onClick={() => {
+                    setActiveTab("config");
+                    replaceUrl(`/simulations/${uuid}?tab=config`);
+                  }}
+                  className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === "config"
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Config
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("runs");
+                    replaceUrl(`/simulations/${uuid}?tab=runs`);
+                  }}
+                  className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === "runs"
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Runs
+                </button>
+              </div>
+            )}
+
+            {/* Config Tab Content - shown when not configured OR when Config tab is active */}
+            {(!isConfigured || activeTab === "config") && (
+              <SimulationConfigTab
+                selectedAgent={selectedAgent}
+                onSelectAgent={setSelectedAgent}
+                personas={personas}
+                selectedPersonas={selectedPersonas}
+                onPersonasChange={handlePersonasChange}
+                personasLoading={personasLoading}
+                scenarios={scenarios}
+                selectedScenarios={selectedScenarios}
+                onScenariosChange={handleScenariosChange}
+                scenariosLoading={scenariosLoading}
+                metrics={metrics}
+                selectedMetrics={selectedMetrics}
+                onMetricsChange={setSelectedMetrics}
+                metricsLoading={metricsLoading}
+                isConfigured={isConfigured}
+                isCreating={isCreating}
+                onCreateClick={handleCreate}
+                isAgentConnection={selectedAgent?.type === "connection"}
+              />
+            )}
+
+            {/* Runs Tab Content - only shown when configured */}
+            {isConfigured && activeTab === "runs" && (
+              <SimulationRunsTab simulationUuid={uuid} />
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Edit Name Dialog */}
+      {isEditNameDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={handleCancelEditName}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-5 md:p-6 max-w-md w-full shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
+              Edit Simulation Name
+            </h2>
+            <input
+              type="text"
+              value={editedName}
+              onChange={(e) => {
+                setEditedName(e.target.value);
+                if (renameNameConflictError) {
+                  setRenameNameConflictError(null);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSaveName();
+                } else if (e.key === "Escape") {
+                  handleCancelEditName();
+                }
+              }}
+              className={`w-full h-9 md:h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                renameNameConflictError
+                  ? "border-red-500 mb-1"
+                  : "border-border mb-4"
+              }`}
+              maxLength={50}
+              autoFocus
+            />
+            {renameNameConflictError && (
+              <p className="text-sm text-red-500 mb-4">
+                {renameNameConflictError}
+              </p>
+            )}
+            <div className="flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={handleCancelEditName}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveName}
+                disabled={!editedName.trim() || isSavingName}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingName ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <VerifyRequestPreviewDialog
+        open={verifyDialogOpen}
+        onClose={() => setVerifyDialogOpen(false)}
+        onConfirm={handleVerifyConfirm}
+        isVerifying={verify.isVerifying}
+        verifyError={verify.verifyError}
+        verifySampleResponse={verify.verifySampleResponse}
+      />
+    </AppLayout>
+  );
+}

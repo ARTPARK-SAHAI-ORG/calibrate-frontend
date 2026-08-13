@@ -12,7 +12,7 @@
 // its Tools / Tests / Evaluators / Settings / Connection tab content), and
 // agent deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Create an agent through the "New agent" dialog and land on its detail page.
@@ -30,7 +30,9 @@ async function createAgent(
   await page.goto("/agents");
   await waitForOrgReady(page);
   await page.getByRole("button", { name: "New agent" }).first().click();
-  await expect(page.getByRole("heading", { name: "New agent" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "New agent", exact: true }),
+  ).toBeVisible();
 
   await page.getByPlaceholder("Enter agent name").fill(name);
   if (kind === "connection") {
@@ -44,18 +46,21 @@ async function createAgent(
     if (await createBtn.isVisible().catch(() => false)) {
       await createBtn.click();
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
   }).toPass({ timeout: 30000 });
 }
 
 // Delete an agent from the /agents list via its titled delete button.
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
+  await waitForOrgReady(page);
   const row = page.locator("div.grid").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete agent" }),
+    page.getByRole("heading", { name: "Delete agent", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -101,7 +106,7 @@ test.describe("Agent detail (authenticated, real backend)", () => {
       .click();
     // Assert the dialog mounted (heading + search box).
     await expect(
-      page.getByRole("heading", { name: "Add evaluators" }),
+      page.getByRole("heading", { name: "Add evaluators", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     const evalSearch = page.getByPlaceholder("Search evaluators");
     await expect(evalSearch).toBeVisible();
@@ -111,9 +116,7 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     // action) is present. Otherwise just close the dialog — either path
     // still executes the dialog + attach code. (Full vs. open-only depends
     // on whether the seeded account has any library evaluators.)
-    const evalCheckboxes = page.locator(
-      '.fixed.z-50 input[type="checkbox"]',
-    );
+    const evalCheckboxes = page.locator('.fixed.z-50 input[type="checkbox"]');
     const evalCount = await evalCheckboxes.count();
     if (evalCount > 0) {
       await evalCheckboxes.first().check();
@@ -121,7 +124,7 @@ test.describe("Agent detail (authenticated, real backend)", () => {
       await page.getByRole("button", { name: /^Add \(/ }).click();
       // Dialog closes on success; an attached evaluator card exposes "Remove".
       await expect(
-        page.getByRole("heading", { name: "Add evaluators" }),
+        page.getByRole("heading", { name: "Add evaluators", exact: true }),
       ).toHaveCount(0, { timeout: 15000 });
       await expect(
         page.getByRole("button", { name: "Remove" }).first(),
@@ -129,7 +132,7 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     } else {
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       await expect(
-        page.getByRole("heading", { name: "Add evaluators" }),
+        page.getByRole("heading", { name: "Add evaluators", exact: true }),
       ).toHaveCount(0, { timeout: 15000 });
     }
 
@@ -146,15 +149,15 @@ test.describe("Agent detail (authenticated, real backend)", () => {
       .click();
     // Intro picker heading confirms the dialog mounted with the agent context.
     await expect(
-      page.getByRole("heading", { name: "Create a test" }),
+      page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     // Choose a type to run the seeding effect (agent evaluators seed the new
     // test). The intro box title is "Next reply test".
     await page.getByText("Next reply test", { exact: true }).first().click();
     // Editor mounted: it shows a name input placeholder like "Your test name".
-    await expect(
-      page.getByPlaceholder(/Your .* name/i).first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder(/Your .* name/i).first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // Navigating away to the list unmounts the dialog cleanly (avoids the
     // "Discard changes?" guard) and lets us delete the agent.
@@ -209,7 +212,10 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     async function switchConnectionTab(label: string, tabParam: string) {
       await page.getByRole("button", { name: label, exact: true }).click();
       // If the benchmark-provider unsaved-changes guard fired, save & proceed.
-      const unsaved = page.getByRole("heading", { name: "Unsaved changes" });
+      const unsaved = page.getByRole("heading", {
+        name: "Unsaved changes",
+        exact: true,
+      });
       if (await unsaved.isVisible().catch(() => false)) {
         await page.getByRole("button", { name: "Save", exact: true }).click();
       }

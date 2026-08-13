@@ -3,7 +3,7 @@ import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";

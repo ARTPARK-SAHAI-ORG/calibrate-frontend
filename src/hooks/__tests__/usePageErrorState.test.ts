@@ -1,11 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { signOut } from "next-auth/react";
 import { usePageErrorState } from "@/hooks/usePageErrorState";
-import {
-  ACTIVE_ORG_CHANGED_EVENT,
-  ACTIVE_ORG_UUID_KEY,
-  setActiveOrgUuid,
-} from "@/lib/orgs";
 
 jest.mock("next-auth/react", () => ({
   __esModule: true,
@@ -22,7 +17,11 @@ import { getErrorStatusCode } from "@/lib/parseBackendError";
 const mockSignOut = signOut as jest.Mock;
 const mockGetErrorStatusCode = getErrorStatusCode as jest.Mock;
 
-const reload = jest.fn();
+/** Workspace ids are always uuids, so the tests use uuid-shaped ones. */
+const ORG_A = "11111111-1111-4111-8111-111111111111";
+const ORG_B = "22222222-2222-4222-8222-222222222222";
+
+const replace = jest.fn();
 
 /** A 404 whose body is readable, like a real `fetch` response. */
 function notFoundWith(body: unknown): Response {
@@ -35,7 +34,13 @@ function notFoundWith(body: unknown): Response {
 beforeAll(() => {
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, pathname: "/agents/agent-1", reload },
+    value: {
+      ...window.location,
+      pathname: `/${ORG_A}/agents/agent-1`,
+      search: "",
+      hash: "",
+      replace,
+    },
   });
 });
 
@@ -43,10 +48,9 @@ describe("usePageErrorState", () => {
   beforeEach(() => {
     mockSignOut.mockReset();
     mockGetErrorStatusCode.mockReset();
-    reload.mockClear();
+    replace.mockClear();
+    window.location.pathname = `/${ORG_A}/agents/agent-1`;
     window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGED_EVENT));
   });
 
   it("initializes with a null errorCode", () => {
@@ -117,7 +121,9 @@ describe("usePageErrorState", () => {
 
       let handled: boolean | undefined;
       act(() => {
-        handled = result.current.captureError(new Error("Request failed: 403 - nope"));
+        handled = result.current.captureError(
+          new Error("Request failed: 403 - nope"),
+        );
       });
 
       expect(handled).toBe(true);
@@ -130,7 +136,9 @@ describe("usePageErrorState", () => {
 
       let handled: boolean | undefined;
       act(() => {
-        handled = result.current.captureError(new Error("Request failed: 404 - nope"));
+        handled = result.current.captureError(
+          new Error("Request failed: 404 - nope"),
+        );
       });
 
       expect(handled).toBe(true);
@@ -143,7 +151,9 @@ describe("usePageErrorState", () => {
 
       let handled: boolean | undefined;
       act(() => {
-        handled = result.current.captureError(new Error("Request failed: 500 - oops"));
+        handled = result.current.captureError(
+          new Error("Request failed: 500 - oops"),
+        );
       });
 
       expect(handled).toBe(false);
@@ -165,21 +175,21 @@ describe("usePageErrorState", () => {
   });
 
   describe("a link that belongs to another workspace", () => {
-    it("switches workspace and reloads when the 404 names one", async () => {
-      setActiveOrgUuid("org-current");
+    it("opens the page under the workspace the 404 names", async () => {
       const { result } = renderHook(() => usePageErrorState());
 
       act(() => {
         result.current.captureResponse(
-          notFoundWith({ detail: "Agent not found", organization_uuid: "org-other" }),
+          notFoundWith({ detail: "Agent not found", organization_uuid: ORG_B }),
         );
       });
 
       // Shows the spinner, not "Not Found", while the body is being read.
       expect(result.current.errorCode).toBe("switching");
 
-      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
-      expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe("org-other");
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith(`/${ORG_B}/agents/agent-1`),
+      );
       expect(result.current.errorCode).toBe("switching");
     });
 
@@ -187,11 +197,26 @@ describe("usePageErrorState", () => {
       const { result } = renderHook(() => usePageErrorState());
 
       act(() => {
-        result.current.captureResponse(notFoundWith({ detail: "Agent not found" }));
+        result.current.captureResponse(
+          notFoundWith({ detail: "Agent not found" }),
+        );
       });
 
       await waitFor(() => expect(result.current.errorCode).toBe(404));
-      expect(reload).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("shows Not Found when the 404 names the workspace already on screen", async () => {
+      const { result } = renderHook(() => usePageErrorState());
+
+      act(() => {
+        result.current.captureResponse(
+          notFoundWith({ detail: "Agent not found", organization_uuid: ORG_A }),
+        );
+      });
+
+      await waitFor(() => expect(result.current.errorCode).toBe(404));
+      expect(replace).not.toHaveBeenCalled();
     });
 
     it("shows Not Found when the 404 body cannot be read", async () => {
@@ -210,7 +235,7 @@ describe("usePageErrorState", () => {
       });
 
       await waitFor(() => expect(result.current.errorCode).toBe(404));
-      expect(reload).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
     });
 
     it("never switches on a 403", () => {
@@ -219,16 +244,15 @@ describe("usePageErrorState", () => {
       act(() => {
         result.current.captureResponse({
           status: 403,
-          clone: () => ({ json: async () => ({ organization_uuid: "org-other" }) }),
+          clone: () => ({ json: async () => ({ organization_uuid: ORG_B }) }),
         } as unknown as Response);
       });
 
       expect(result.current.errorCode).toBe(403);
-      expect(reload).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
     });
 
     it("switches on an apiClient 404 that names a workspace", () => {
-      setActiveOrgUuid("org-current");
       mockGetErrorStatusCode.mockReturnValue(404);
       const { result } = renderHook(() => usePageErrorState());
 
@@ -236,14 +260,13 @@ describe("usePageErrorState", () => {
       act(() => {
         handled = result.current.captureError(
           new Error(
-            'Request failed: 404 - {"detail":"Task not found","organization_uuid":"org-other"}',
+            `Request failed: 404 - {"detail":"Task not found","organization_uuid":"${ORG_B}"}`,
           ),
         );
       });
 
       expect(handled).toBe(true);
-      expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe("org-other");
-      expect(reload).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith(`/${ORG_B}/agents/agent-1`);
       expect(result.current.errorCode).toBe("switching");
     });
 
@@ -258,7 +281,7 @@ describe("usePageErrorState", () => {
       });
 
       expect(result.current.errorCode).toBe(404);
-      expect(reload).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 

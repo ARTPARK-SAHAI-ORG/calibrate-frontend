@@ -15,11 +15,11 @@ const config = {
     "!src/**/*.d.ts",
     "!src/app/**",
     // Re-include the STT/TTS evaluation list pages: they have dedicated
-    // component tests (src/app/{stt,tts}/__tests__/page.test.tsx) rendering the
-    // job-list rows, so they belong in component coverage even though the rest
-    // of src/app is E2E-only.
-    "src/app/stt/page.tsx",
-    "src/app/tts/page.tsx",
+    // component tests (src/app/[org]/{stt,tts}/__tests__/page.test.tsx)
+    // rendering the job-list rows, so they belong in component coverage even
+    // though the rest of src/app is E2E-only.
+    "src/app/[[]org[]]/stt/page.tsx",
+    "src/app/[[]org[]]/tts/page.tsx",
     "!src/instrumentation*.ts",
     "!src/middleware.ts",
     // NextAuth v5 config — providers, callbacks, and the backend token

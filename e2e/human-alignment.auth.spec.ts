@@ -7,7 +7,7 @@
 // navigation is followed by waitForOrgReady. Import from ./fixtures for E2E
 // coverage. Run with `npm run test:e2e:integration` (needs a backend).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 test.describe("Human alignment page (authenticated, real backend)", () => {
   test("creates a labelling task via the dialog, then deletes it", async ({
@@ -20,7 +20,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await page.goto("/human-alignment?tab=tasks");
     await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Human alignment" }),
+      page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Open the create dialog. The header button is always present; on an empty
@@ -33,7 +33,10 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
 
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "Create labelling task" }),
+      dialog.getByRole("heading", {
+        name: "Create labelling task",
+        exact: true,
+      }),
     ).toBeVisible({ timeout: 20000 });
 
     // Step 1 — Details. Only Name is required (placeholder uses an em dash, so
@@ -55,9 +58,12 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await dialog.getByRole("button", { name: "Create task" }).click();
 
     // On success onCreated() navigates to the new task's detail route.
-    await expect(page).toHaveURL(/\/human-alignment\/tasks\/[0-9a-f-]+/, {
-      timeout: 20000,
-    });
+    await expect(page).toHaveURL(
+      workspacePath(/\/human-alignment\/tasks\/[0-9a-f-]+/),
+      {
+        timeout: 20000,
+      },
+    );
 
     // Back to the Tasks list to verify + delete. The row exposes a titled
     // delete button (aria-label `Delete <name>`) in both desktop and mobile
@@ -74,7 +80,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     // Confirm in the shared DeleteConfirmationDialog (title → heading,
     // confirmText → button).
     await expect(
-      page.getByRole("heading", { name: "Delete labelling task" }),
+      page.getByRole("heading", { name: "Delete labelling task", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Delete", exact: true }).click();
 
@@ -91,7 +97,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await page.goto("/human-alignment?tab=annotators");
     await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Human alignment" }),
+      page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Add annotator via the inline form (input placeholder "Annotator name" +
@@ -123,7 +129,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     // Confirm removal (title "Remove annotator" → heading, confirmText
     // "Remove" → button).
     await expect(
-      page.getByRole("heading", { name: "Remove annotator" }),
+      page.getByRole("heading", { name: "Remove annotator", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Remove", exact: true }).click();
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
 import type { PageErrorState } from "@/hooks";

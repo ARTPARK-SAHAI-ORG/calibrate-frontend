@@ -3,7 +3,7 @@ import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import {
   useAccessToken,

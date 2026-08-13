@@ -5,6 +5,7 @@
 // only override the Name to keep reruns unique. Run with
 // `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Shared create flow: run the two-step "Speech to Text" wizard and land on the
@@ -13,18 +14,24 @@ import type { Page } from "@playwright/test";
 // card locator so callers can open or delete it.
 async function createEvaluator(page: Page, name: string) {
   await page.goto("/evaluators");
-  await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
+  await waitForOrgReady(page);
+  await expect(
+    page.getByRole("heading", { name: "Evaluators", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Add evaluator" }).first().click();
   const picker = page.locator(".fixed.inset-0.z-50");
   await expect(
-    picker.getByRole("heading", { name: "What is this evaluator for?" }),
+    picker.getByRole("heading", {
+      name: "What is this evaluator for?",
+      exact: true,
+    }),
   ).toBeVisible();
   await picker.getByText("Speech to Text", { exact: true }).click();
   await picker.getByRole("button", { name: "Continue" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Add evaluator" }),
+    page.getByRole("heading", { name: "Add evaluator", exact: true }),
   ).toBeVisible();
   // Wait for the async default-prompt prefill (it clobbers the Name field, so
   // set our unique name only after it lands; also gates a real create).
@@ -45,6 +52,7 @@ async function createEvaluator(page: Page, name: string) {
 async function deleteEvaluator(page: Page, name: string) {
   const card = page.getByRole("link", { name: `Open ${name}` });
   await page.goto("/evaluators");
+  await waitForOrgReady(page);
   await expect(card).toBeVisible({ timeout: 20000 });
   await page
     .locator(`[aria-label="Open ${name}"]`)
@@ -52,7 +60,7 @@ async function deleteEvaluator(page: Page, name: string) {
     .getByRole("button", { name: "Delete evaluator" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Delete evaluator" }),
+    page.getByRole("heading", { name: "Delete evaluator", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(card).toHaveCount(0, { timeout: 15000 });
@@ -63,8 +71,9 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     const name = `E2E Eval ${Date.now()}`;
 
     await page.goto("/evaluators");
+    await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Evaluators" }),
+      page.getByRole("heading", { name: "Evaluators", exact: true }),
     ).toBeVisible();
 
     // Step 1: use-case picker. Scope to the picker dialog — "Speech to Text"
@@ -72,7 +81,10 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await page.getByRole("button", { name: "Add evaluator" }).first().click();
     const picker = page.locator(".fixed.inset-0.z-50");
     await expect(
-      picker.getByRole("heading", { name: "What is this evaluator for?" }),
+      picker.getByRole("heading", {
+        name: "What is this evaluator for?",
+        exact: true,
+      }),
     ).toBeVisible();
     await picker.getByText("Speech to Text", { exact: true }).click();
     await picker.getByRole("button", { name: "Continue" }).click();
@@ -84,7 +96,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     // just flags validation without creating). The model button reads "Select
     // judge model" until the prefill resolves.
     await expect(
-      page.getByRole("heading", { name: "Add evaluator" }),
+      page.getByRole("heading", { name: "Add evaluator", exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Select judge model")).toHaveCount(0, {
       timeout: 20000,
@@ -102,7 +114,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     // never exercised by E2E), confirm it loaded, then return to the list to
     // delete. The heading renders the evaluator's name once the fetch resolves.
     await card.click();
-    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+    await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
     await expect(
@@ -111,6 +123,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
 
     await page.goto("/evaluators");
+    await waitForOrgReady(page);
     await expect(card).toBeVisible({ timeout: 20000 });
 
     // Delete via the card's titled delete button + confirmation dialog.
@@ -120,7 +133,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       .getByRole("button", { name: "Delete evaluator" })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Delete evaluator" }),
+      page.getByRole("heading", { name: "Delete evaluator", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(card).toHaveCount(0, { timeout: 15000 });
@@ -137,7 +150,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
 
     // Open the detail / versioning page and confirm it loaded.
     await card.click();
-    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+    await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
     await expect(
@@ -155,7 +168,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await page.getByRole("button", { name: "New version" }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "New version" }),
+      dialog.getByRole("heading", { name: "New version", exact: true }),
     ).toBeVisible();
 
     // openNewVersionDialog synchronously seeds the judge prompt, model and
@@ -179,7 +192,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
 
     // Dialog closes and the new v2 card appears in the versions list.
     await expect(
-      dialog.getByRole("heading", { name: "New version" }),
+      dialog.getByRole("heading", { name: "New version", exact: true }),
     ).toHaveCount(0, { timeout: 20000 });
     await expect(page.getByText("v2", { exact: true })).toBeVisible({
       timeout: 20000,
