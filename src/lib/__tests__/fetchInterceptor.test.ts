@@ -7,6 +7,12 @@ jest.mock("../orgs", () => ({
   getActiveOrgUuid: jest.fn(),
 }));
 
+jest.mock("../workspaceRedirect", () => ({
+  readOwningOrgUuid: jest.requireActual("../workspaceRedirect")
+    .readOwningOrgUuid,
+  switchToOwningWorkspace: jest.fn(),
+}));
+
 const ORIGINAL_ENV = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 /**
@@ -18,14 +24,31 @@ const ORIGINAL_ENV = process.env.NEXT_PUBLIC_BACKEND_URL;
  * would bind to a stale pre-reset instance.
  */
 async function freshModules() {
-  const [fetchInterceptorModule, orgsModule] = await Promise.all([
-    import("../fetchInterceptor"),
-    import("../orgs"),
-  ]);
+  const [fetchInterceptorModule, orgsModule, redirectModule] =
+    await Promise.all([
+      import("../fetchInterceptor"),
+      import("../orgs"),
+      import("../workspaceRedirect"),
+    ]);
   return {
     installOrgFetchInterceptor: fetchInterceptorModule.installOrgFetchInterceptor,
     getActiveOrgUuid: orgsModule.getActiveOrgUuid as jest.Mock,
+    switchToOwningWorkspace: redirectModule.switchToOwningWorkspace as jest.Mock,
   };
+}
+
+/** Let the interceptor's un-awaited body read settle. */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** A 404 whose body is read through `.clone()`, as the interceptor does. */
+function notFoundResponse(body: unknown): Response {
+  const response = {
+    status: 404,
+    clone: () => ({ json: async () => body }),
+  };
+  return response as unknown as Response;
 }
 
 describe("installOrgFetchInterceptor", () => {
@@ -128,6 +151,75 @@ describe("installOrgFetchInterceptor", () => {
     await window.fetch(new URL("http://backend.test/agents"));
     const [calledInput] = (original as jest.Mock).mock.calls[0];
     expect(calledInput).toBeInstanceOf(URL);
+  });
+
+  it("switches workspaces when a 404 names another workspace of the user's", async () => {
+    const { installOrgFetchInterceptor, getActiveOrgUuid, switchToOwningWorkspace } =
+      await freshModules();
+    getActiveOrgUuid.mockReturnValue("org-1");
+    (window.fetch as jest.Mock).mockResolvedValue(
+      notFoundResponse({ detail: "Agent not found", organization_uuid: "org-2" }),
+    );
+    installOrgFetchInterceptor();
+
+    await window.fetch("http://backend.test/agent-tools/agent/abc/tools");
+
+    await flushMicrotasks();
+    expect(switchToOwningWorkspace).toHaveBeenCalledWith("org-2");
+  });
+
+  it("leaves a plain 404 alone", async () => {
+    const { installOrgFetchInterceptor, getActiveOrgUuid, switchToOwningWorkspace } =
+      await freshModules();
+    getActiveOrgUuid.mockReturnValue("org-1");
+    (window.fetch as jest.Mock).mockResolvedValue(
+      notFoundResponse({ detail: "Agent not found" }),
+    );
+    installOrgFetchInterceptor();
+
+    await window.fetch("http://backend.test/agents/abc");
+
+    await flushMicrotasks();
+    expect(switchToOwningWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("returns the response untouched when its body is not readable", async () => {
+    const { installOrgFetchInterceptor, getActiveOrgUuid, switchToOwningWorkspace } =
+      await freshModules();
+    getActiveOrgUuid.mockReturnValue("org-1");
+    const broken = {
+      status: 404,
+      clone: () => ({
+        json: async () => {
+          throw new Error("not json");
+        },
+      }),
+    } as unknown as Response;
+    (window.fetch as jest.Mock).mockResolvedValue(broken);
+    installOrgFetchInterceptor();
+
+    await expect(
+      window.fetch("http://backend.test/agents/abc"),
+    ).resolves.toBe(broken);
+    await flushMicrotasks();
+    expect(switchToOwningWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("does not read the body of a successful response", async () => {
+    const { installOrgFetchInterceptor, getActiveOrgUuid, switchToOwningWorkspace } =
+      await freshModules();
+    getActiveOrgUuid.mockReturnValue("org-1");
+    const clone = jest.fn();
+    (window.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      clone,
+    } as unknown as Response);
+    installOrgFetchInterceptor();
+
+    await window.fetch("http://backend.test/agents");
+
+    expect(clone).not.toHaveBeenCalled();
+    expect(switchToOwningWorkspace).not.toHaveBeenCalled();
   });
 
   it("handles a Request-like object (non-string, non-URL) input via its .url", async () => {
