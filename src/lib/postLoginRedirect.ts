@@ -10,19 +10,32 @@ export const DEFAULT_POST_LOGIN_PATH = "/agents";
 
 export const CALLBACK_PARAM = "callbackUrl";
 
+// Any host, only used to work out whether the address stays on this site.
+const PROBE_ORIGIN = "https://calibrate.invalid";
+
 /**
  * Accept only a path on this site, so a crafted link cannot send someone
  * somewhere else after they sign in.
+ *
+ * The address is read by the same parser browsers use, and rebuilt from the
+ * parts it produced. Checking the text by hand is not enough: browsers drop
+ * tabs and line breaks first, so "/<tab>/other-site.example" turns into an
+ * address on another site even though it starts with a single slash.
  */
 export function safeCallbackUrl(raw: string | null | undefined): string {
   if (!raw) return DEFAULT_POST_LOGIN_PATH;
-  // "//host" and "/\host" are read by browsers as another site.
-  if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw, PROBE_ORIGIN);
+  } catch {
     return DEFAULT_POST_LOGIN_PATH;
   }
-  const path = raw.split(/[?#]/)[0];
-  if (path === "/login" || path === "/signup") return DEFAULT_POST_LOGIN_PATH;
-  return raw;
+  if (parsed.origin !== PROBE_ORIGIN) return DEFAULT_POST_LOGIN_PATH;
+  if (parsed.pathname === "/login" || parsed.pathname === "/signup") {
+    return DEFAULT_POST_LOGIN_PATH;
+  }
+  return parsed.pathname + parsed.search + parsed.hash;
 }
 
 /** Read the wanted page out of a query string, e.g. `window.location.search`. */

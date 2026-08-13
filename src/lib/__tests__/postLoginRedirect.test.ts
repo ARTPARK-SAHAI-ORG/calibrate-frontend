@@ -31,6 +31,26 @@ describe("safeCallbackUrl", () => {
     expect(safeCallbackUrl("agents")).toBe(DEFAULT_POST_LOGIN_PATH);
   });
 
+  it("refuses a path hiding another site behind a tab or line break", () => {
+    // Browsers drop these characters, turning the value into "//other-site".
+    expect(safeCallbackUrl("/\t/evil.example/steal")).toBe(
+      DEFAULT_POST_LOGIN_PATH
+    );
+    expect(safeCallbackUrl("/\n/evil.example/steal")).toBe(
+      DEFAULT_POST_LOGIN_PATH
+    );
+    expect(safeCallbackUrl("/\r/evil.example/steal")).toBe(
+      DEFAULT_POST_LOGIN_PATH
+    );
+    expect(safeCallbackUrl("/\\\\evil.example/steal")).toBe(
+      DEFAULT_POST_LOGIN_PATH
+    );
+  });
+
+  it("refuses the login page even when a tab is hidden in it", () => {
+    expect(safeCallbackUrl("/lo\tgin")).toBe(DEFAULT_POST_LOGIN_PATH);
+  });
+
   it("refuses the login and signup pages so signing in cannot loop", () => {
     expect(safeCallbackUrl("/login")).toBe(DEFAULT_POST_LOGIN_PATH);
     expect(safeCallbackUrl("/signup?callbackUrl=%2Flogin")).toBe(
