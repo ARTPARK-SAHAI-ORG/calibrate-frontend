@@ -42,7 +42,6 @@ function parseApiError(err: unknown, fallback: string): string {
 type AssignAnnotatorsDialogProps = {
   isOpen: boolean;
   accessToken: string;
-  selectedItemCount: number;
   /** Evaluators linked to the task — the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
   onClose: () => void;
@@ -59,7 +58,6 @@ type AssignAnnotatorsDialogProps = {
 export function AssignAnnotatorsDialog({
   isOpen,
   accessToken,
-  selectedItemCount,
   evaluators,
   onClose,
   onConfirm,

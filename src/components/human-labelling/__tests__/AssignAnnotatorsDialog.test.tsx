@@ -27,7 +27,6 @@ function renderDialog(
     <AssignAnnotatorsDialog
       isOpen
       accessToken="tok"
-      selectedItemCount={3}
       evaluators={evaluators}
       onClose={onClose}
       onConfirm={onConfirm}
@@ -47,7 +46,6 @@ describe("AssignAnnotatorsDialog", () => {
       <AssignAnnotatorsDialog
         isOpen={false}
         accessToken="tok"
-        selectedItemCount={1}
         evaluators={evaluators}
         onClose={jest.fn()}
         onConfirm={jest.fn()}
@@ -441,7 +439,6 @@ describe("AssignAnnotatorsDialog", () => {
       <AssignAnnotatorsDialog
         isOpen={false}
         accessToken="tok"
-        selectedItemCount={1}
         evaluators={evaluators}
         onClose={jest.fn()}
         onConfirm={jest.fn()}
@@ -451,7 +448,6 @@ describe("AssignAnnotatorsDialog", () => {
       <AssignAnnotatorsDialog
         isOpen
         accessToken="tok"
-        selectedItemCount={1}
         evaluators={evaluators}
         onClose={jest.fn()}
         onConfirm={jest.fn()}
@@ -473,7 +469,6 @@ describe("AssignAnnotatorsDialog", () => {
       <AssignAnnotatorsDialog
         isOpen={false}
         accessToken="tok"
-        selectedItemCount={3}
         evaluators={evaluators}
         onClose={jest.fn()}
         onConfirm={jest.fn()}

@@ -1622,6 +1622,51 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("Binary Evaluator v1")).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  describe("review slot", () => {
+    // The disagreement toggle, the filter, and the review button share one
+    // strip. Its own class list is what tells it apart from the rows around it.
+    const filterStrips = () =>
+      document.querySelectorAll("div.py-2\\.5.flex-wrap");
+
+    // No disagreements, and a rating evaluator with no bounds offers no
+    // values to filter on, so only the review slot can draw the strip.
+    const jobWithNoFilters = () =>
+      makeJob({
+        evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
+        runs: [],
+      });
+
+    it("shows what the review slot returns, with the items on screen", () => {
+      render(
+        <EvaluatorRunDetailView
+          job={jobWithNoFilters()}
+          task={makeTask()}
+          versionLabels={{}}
+          reviewSlot={(visible) => (
+            <button>Send {visible.length} items for review</button>
+          )}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Send 2 items for review" }),
+      ).toBeInTheDocument();
+      expect(filterStrips()).toHaveLength(1);
+    });
+
+    it("leaves no empty strip when the review slot returns nothing", () => {
+      render(
+        <EvaluatorRunDetailView
+          job={jobWithNoFilters()}
+          task={makeTask()}
+          versionLabels={{}}
+          reviewSlot={() => null}
+        />,
+      );
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(filterStrips()).toHaveLength(0);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
