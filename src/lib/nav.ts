@@ -99,14 +99,4 @@ export function replaceUrl(path: string): void {
   );
 }
 
-/** As `replaceUrl`, but adds a step to the back button. */
-export function pushUrl(path: string): void {
-  if (typeof window === "undefined") return;
-  window.history.pushState(
-    null,
-    "",
-    withWorkspace(path, orgFromPath(window.location.pathname)),
-  );
-}
-
 export { useParams, useSearchParams, redirect, notFound } from "next/navigation";
