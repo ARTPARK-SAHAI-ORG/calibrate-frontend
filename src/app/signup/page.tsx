@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
+import { postLoginPath, withCallback } from "@/lib/postLoginRedirect";
 
 type PasswordStrength = "weak" | "fair" | "good" | "strong";
 
@@ -58,9 +59,12 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  // The page a shared link pointed at, kept on the URL by the middleware
+  const [authSearch, setAuthSearch] = useState("");
 
   useEffect(() => {
     document.title = "Sign Up | Calibrate";
+    setAuthSearch(window.location.search);
   }, []);
 
   const passwordAnalysis = useMemo(() => getPasswordStrength(password), [password]);
@@ -138,7 +142,7 @@ export default function SignupPage() {
       // Set cookie for middleware to read (httpOnly: false so JS can set it)
       document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
       // Use window.location for hard redirect
-      window.location.href = "/agents";
+      window.location.href = postLoginPath(window.location.search);
     } catch (err) {
       if (err instanceof TypeError && err.message === "Failed to fetch") {
         setError("Unable to connect to server. Please try again later.");
@@ -151,7 +155,7 @@ export default function SignupPage() {
   };
 
   const handleGoogleSignIn = () => {
-    signIn("google", { callbackUrl: "/agents" });
+    signIn("google", { callbackUrl: postLoginPath(window.location.search) });
   };
 
   const strengthColors: Record<PasswordStrength, string> = {
@@ -459,7 +463,7 @@ export default function SignupPage() {
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{" "}
             <Link
-              href="/login"
+              href={withCallback("/login", authSearch)}
               className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
             >
               Sign in

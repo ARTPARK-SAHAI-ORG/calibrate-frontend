@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
+import { postLoginPath, withCallback } from "@/lib/postLoginRedirect";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,9 +12,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // The page a shared link pointed at, kept on the URL by the middleware
+  const [authSearch, setAuthSearch] = useState("");
 
   useEffect(() => {
     document.title = "Login | Calibrate";
+    setAuthSearch(window.location.search);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,7 +73,7 @@ export default function LoginPage() {
       // Set cookie for middleware to read (httpOnly: false so JS can set it)
       document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
       // Use window.location for hard redirect
-      window.location.href = "/agents";
+      window.location.href = postLoginPath(window.location.search);
     } catch (err) {
       if (err instanceof TypeError && err.message === "Failed to fetch") {
         setError("Unable to connect to server. Please try again later.");
@@ -82,7 +86,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = () => {
-    signIn("google", { callbackUrl: "/agents" });
+    signIn("google", { callbackUrl: postLoginPath(window.location.search) });
   };
 
   return (
@@ -266,7 +270,7 @@ export default function LoginPage() {
           <p className="mt-6 text-center text-sm text-gray-600">
             Don&apos;t have an account?{" "}
             <Link
-              href="/signup"
+              href={withCallback("/signup", authSearch)}
               className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
             >
               Sign up
