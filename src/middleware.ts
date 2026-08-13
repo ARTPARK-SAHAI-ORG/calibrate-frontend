@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
 
 // Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
@@ -45,14 +46,21 @@ export default auth((req) => {
   const isSignupPage = req.nextUrl.pathname === "/signup";
   const isAuthPage = isLoginPage || isSignupPage;
 
-  // Redirect logged-in users away from login/signup pages
+  // Redirect logged-in users away from login/signup pages, to the page they asked for
   if (isAuthPage && isLoggedIn) {
-    return NextResponse.redirect(new URL("/agents", req.url));
+    const wanted = safeCallbackUrl(req.nextUrl.searchParams.get(CALLBACK_PARAM));
+    return NextResponse.redirect(new URL(wanted, req.url));
   }
 
-  // Redirect unauthenticated users to login page (except for auth pages)
+  // Redirect unauthenticated users to login page (except for auth pages),
+  // remembering the page they asked for so a shared link survives signing in
   if (!isAuthPage && !isLoggedIn) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set(
+      CALLBACK_PARAM,
+      req.nextUrl.pathname + req.nextUrl.search
+    );
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
