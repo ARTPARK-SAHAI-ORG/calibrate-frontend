@@ -8,7 +8,7 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
-import { Link, useOrgUuid, usePathname } from "@/lib/nav";
+import { Link, usePathname } from "@/lib/nav";
 import { landingPathAfterSwitch, withWorkspace } from "@/lib/routes";
 import { type Organization } from "@/lib/orgs";
 
@@ -220,10 +220,6 @@ function DropdownPanel({
   onSelect,
   onCreateClick,
 }: DropdownPanelProps) {
-  // These two are plain links, not in-app navigation, so they need the
-  // workspace put on by hand.
-  const org = useOrgUuid();
-
   return (
     <div
       role="menu"
@@ -281,8 +277,8 @@ function DropdownPanel({
 
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
-          <a
-            href={withWorkspace("/workspace-settings?tab=admin", org)}
+          <Link
+            href="/workspace-settings?tab=admin"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -304,11 +300,11 @@ function DropdownPanel({
               />
             </svg>
             Workspace settings
-          </a>
+          </Link>
         )}
         {activeOrg && (
-          <a
-            href={withWorkspace("/workspace-settings?tab=api-keys", org)}
+          <Link
+            href="/workspace-settings?tab=api-keys"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -325,7 +321,7 @@ function DropdownPanel({
               />
             </svg>
             API keys
-          </a>
+          </Link>
         )}
         <button
           type="button"

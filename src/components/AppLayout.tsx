@@ -1,6 +1,6 @@
 "use client";
 
-import { Link, useOrgUuid, useRouter } from "@/lib/nav";
+import { Link, useRouter } from "@/lib/nav";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
@@ -12,7 +12,6 @@ import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
 import { clearOrgsCache, useAuth, useOrganizations } from "@/hooks";
 import { clearActiveOrgUuid } from "@/lib/orgs";
-import { withWorkspace } from "@/lib/routes";
 // Imported straight from the file, not the ui barrel: the barrel pulls in
 // SlidePanel, which imports back from here.
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -315,9 +314,6 @@ export function AppLayout({
 }: AppLayoutProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  // The API keys entry is a plain link, not in-app navigation, so it needs the
-  // workspace put on by hand.
-  const orgUuid = useOrgUuid();
   // Every page is scoped to the active workspace, so hold the page until the
   // workspace list is in.
   const { accessToken, isLoading: authLoading } = useAuth();
@@ -910,11 +906,8 @@ export function AppLayout({
 
                   {/* API keys — jumps straight to that tab of workspace settings. */}
                   <div className="p-2 border-b border-border">
-                    <a
-                      href={withWorkspace(
-                        "/workspace-settings?tab=api-keys",
-                        orgUuid,
-                      )}
+                    <Link
+                      href="/workspace-settings?tab=api-keys"
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
                     >
                       <svg
@@ -931,7 +924,7 @@ export function AppLayout({
                         />
                       </svg>
                       API keys
-                    </a>
+                    </Link>
                   </div>
 
                   {/* Take a tour — desktop-only, so hidden on phones. */}
