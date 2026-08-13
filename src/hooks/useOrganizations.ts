@@ -103,8 +103,12 @@ export async function fetchOrganizationsDedup(
 export function useOrganizations(
   accessToken: string | null | undefined,
 ): UseOrganizationsReturn {
+  // A null token here means the auth hook is still reading storage, not that
+  // the user is signed out (sign-out clears the cache), so a cached list still
+  // counts. Without this, every mount would start empty and loading for a
+  // render, which callers see as a flash of the loading state on every page.
   const hasCache =
-    !!accessToken && accessToken === cachedForToken && cachedOrgs !== null;
+    cachedOrgs !== null && (!accessToken || accessToken === cachedForToken);
   const [organizations, setOrganizations] = useState<Organization[]>(
     hasCache ? (cachedOrgs as Organization[]) : [],
   );
@@ -144,9 +148,16 @@ export function useOrganizations(
   // this token. The bootstrapper fetches once at app start and seeds the
   // cache; subsequent mounts of useOrganizations (sidebar switcher,
   // workspace settings) hydrate from cache and skip the duplicate fetch.
+  // A mount whose token was still null in the first render started with an
+  // empty list and isLoading true, so hydrating from the cache here is what
+  // ends that loading state — returning early would leave it stuck on forever.
   useEffect(() => {
     if (!accessToken) return;
-    if (accessToken === cachedForToken && cachedOrgs !== null) return;
+    if (accessToken === cachedForToken && cachedOrgs !== null) {
+      setOrganizations(cachedOrgs);
+      setIsLoading(false);
+      return;
+    }
     refetch();
   }, [refetch, accessToken]);
 

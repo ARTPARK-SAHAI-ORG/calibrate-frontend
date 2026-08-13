@@ -9,6 +9,30 @@ jest.mock("../WorkspaceSwitcher", () => ({
   ),
 }));
 
+// The layout waits on the workspace list before it renders anything, so drive
+// that hook from the test instead of hitting the network.
+let mockWorkspaces: { uuid: string }[] = [{ uuid: "org-1" }];
+let mockWorkspacesLoading = false;
+let mockAccessToken: string | null = "token-1";
+let mockAuthLoading = false;
+
+jest.mock("../../hooks", () => ({
+  __esModule: true,
+  useAuth: () => ({ accessToken: mockAccessToken, isLoading: mockAuthLoading }),
+  useOrganizations: () => ({
+    organizations: mockWorkspaces,
+    isLoading: mockWorkspacesLoading,
+  }),
+  clearOrgsCache: jest.fn(),
+}));
+
+beforeEach(() => {
+  mockWorkspaces = [{ uuid: "org-1" }];
+  mockWorkspacesLoading = false;
+  mockAccessToken = "token-1";
+  mockAuthLoading = false;
+});
+
 // jsdom has no matchMedia; AppLayout reads it when applying the "device" theme.
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -54,6 +78,45 @@ describe("AppLayout", () => {
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
     expect(screen.getByTestId("workspace-switcher-expanded")).toBeInTheDocument();
+  });
+
+  it("shows only a spinner while the workspace list is still loading", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    renderLayout();
+    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.queryByText("Page content")).not.toBeInTheDocument();
+  });
+
+  it("shows only a spinner while the sign-in details are still being read", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    mockAccessToken = null;
+    mockAuthLoading = true;
+    renderLayout();
+    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.queryByText("Page content")).not.toBeInTheDocument();
+  });
+
+  it("renders a cached workspace list at once, with no spinner in between", () => {
+    mockAuthLoading = true;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
+  });
+
+  it("renders the page while the workspace list refreshes in the background", () => {
+    mockWorkspacesLoading = true;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+  });
+
+  it("renders the page when there is no access token to load workspaces with", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    mockAccessToken = null;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
   });
 
   it("renders nav items as links to their routes", () => {

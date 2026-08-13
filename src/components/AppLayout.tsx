@@ -11,7 +11,10 @@ import {
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
-import { clearOrgsCache } from "@/hooks";
+import { clearOrgsCache, useAuth, useOrganizations } from "@/hooks";
+// Imported straight from the file, not the ui barrel: the barrel pulls in
+// SlidePanel, which imports back from here.
+import { LoadingState } from "@/components/ui/LoadingState";
 
 // Re-export the hook so existing imports continue to work
 export { useHideFloatingButton } from "@/components/providers/FloatingButtonProvider";
@@ -311,6 +314,11 @@ export function AppLayout({
 }: AppLayoutProps) {
   const { data: session } = useSession();
   const router = useRouter();
+  // Every page is scoped to the active workspace, so hold the page until the
+  // workspace list is in.
+  const { accessToken, isLoading: authLoading } = useAuth();
+  const { organizations, isLoading: workspacesLoading } =
+    useOrganizations(accessToken);
 
   // Launch the guided walkthrough from any entry point (sidebar or profile
   // menu). It auto-drives from the Agents page, so always land there first;
@@ -426,6 +434,17 @@ export function AppLayout({
     if (!name) return "U";
     return name.trim()[0].toUpperCase();
   };
+
+  // Only hold the page while the list is actually on its way: a cached list
+  // renders at once (no blink when moving between pages), and a signed-out
+  // user renders as before instead of waiting on a list that never arrives.
+  if (
+    (accessToken || authLoading) &&
+    workspacesLoading &&
+    !organizations.length
+  ) {
+    return <LoadingState className="h-screen bg-background" />;
+  }
 
   return (
     <div className="flex h-screen bg-background">
