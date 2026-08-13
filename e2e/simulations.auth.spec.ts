@@ -3,7 +3,7 @@
 // NewSimulationDialog, the simulations list + detail route, and the delete
 // path. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { workspacePath } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 test.describe("Simulations page (authenticated, real backend)", () => {
   test("loads, creates a simulation (redirects to detail), then deletes it", async ({
@@ -12,6 +12,7 @@ test.describe("Simulations page (authenticated, real backend)", () => {
     const name = `E2E Sim ${Date.now()}`;
 
     await page.goto("/simulations");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("heading", { name: "Simulations" }),
     ).toBeVisible();
@@ -35,6 +36,7 @@ test.describe("Simulations page (authenticated, real backend)", () => {
 
     // Back to the list; the new simulation shows up as a row.
     await page.goto("/simulations");
+    await waitForOrgReady(page);
     const row = page.locator("div.grid").filter({ hasText: name });
     await expect(row).toBeVisible({ timeout: 15000 });
 

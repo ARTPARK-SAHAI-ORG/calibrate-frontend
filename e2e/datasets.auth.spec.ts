@@ -4,7 +4,7 @@
 // /datasets/[id] detail route (which mounts STTDatasetEditor / TTSDatasetEditor),
 // and dataset deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { workspacePath } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 /**
  * After landing on a freshly-created (empty) dataset's detail page, exercise the
@@ -87,6 +87,7 @@ async function createExerciseDeleteDataset(
   },
 ) {
   await page.goto(`${listPath}?tab=datasets`);
+  await waitForOrgReady(page);
   await expect(page.getByRole("heading", { name: pageHeading })).toBeVisible();
 
   await page.getByRole("button", { name: "New dataset" }).first().click();
@@ -111,6 +112,7 @@ async function createExerciseDeleteDataset(
   // titled icon button + confirmation dialog. Note the shared dialog's confirm
   // button defaults to "Remove" here (the datasets page doesn't override it).
   await page.goto(`${listPath}?tab=datasets`);
+  await waitForOrgReady(page);
   const row = page.locator("div.cursor-pointer").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete dataset" }).click();

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "@/lib/nav";
+import { HOME_PATH } from "@/lib/routes";
 import { SpinnerIcon } from "@/components/icons";
 
 type LoadingStateProps = {
@@ -53,6 +54,13 @@ type NotFoundStateProps = {
    * never flashes "Not Found" first.
    */
   errorCode?: 401 | 403 | 404 | "switching";
+  /**
+   * What "Go to home" does. The default opens the agents page in the workspace
+   * on screen, which is right everywhere except when the screen is showing
+   * because that workspace is not the user's, and going back to it would show
+   * the same screen again.
+   */
+  onGoHome?: () => void;
 };
 
 const errorContent: Record<number, { title: string; message: string }> = {
@@ -74,6 +82,7 @@ const errorContent: Record<number, { title: string; message: string }> = {
 export function NotFoundState({
   className = "",
   errorCode = 404,
+  onGoHome,
 }: NotFoundStateProps) {
   const router = useRouter();
 
@@ -97,7 +106,7 @@ export function NotFoundState({
         {message}
       </p>
       <button
-        onClick={() => router.push("/agents")}
+        onClick={onGoHome ?? (() => router.push(HOME_PATH))}
         className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
       >
         Go to home

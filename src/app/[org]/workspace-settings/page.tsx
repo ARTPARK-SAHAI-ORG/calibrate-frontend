@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/lib/nav";
+import { useRouter as useNextRouter } from "next/navigation";
+import { HOME_PATH, withWorkspace } from "@/lib/routes";
 import {
   useAccessToken,
   useActiveOrgUuid,
@@ -249,6 +251,7 @@ function MembersSection({
   orgName: string;
 }) {
   const router = useRouter();
+  const nextRouter = useNextRouter();
   const accessToken = useAccessToken();
   const currentUserId = useCurrentUserId();
   const {
@@ -312,6 +315,10 @@ function MembersSection({
       // /organizations list, pick a new active workspace, seed the module
       // cache so the next mount on /agents doesn't briefly show the
       // just-left workspace, then navigate.
+      //
+      // With no workspace to land in, go to the plain address: the opening
+      // page picks one, or sign-in takes over if there are none left.
+      let landOn = HOME_PATH;
       if (accessToken) {
         try {
           const orgs = await apiGet<Organization[]>(
@@ -322,6 +329,7 @@ function MembersSection({
           const chosen = pickDefaultOrg(orgs);
           if (chosen) {
             setActiveOrgUuid(chosen.uuid);
+            landOn = withWorkspace(HOME_PATH, chosen.uuid);
           } else {
             clearActiveOrgUuid();
           }
@@ -332,7 +340,10 @@ function MembersSection({
         clearActiveOrgUuid();
       }
       notifyOrganizationsChanged();
-      router.replace("/agents");
+      // Land in the workspace picked above, not the one just left. The plain
+      // router is used because the wrapper would put the workspace from the
+      // address back on, and that is the one the user no longer belongs to.
+      nextRouter.replace(landOn);
     }
   };
 

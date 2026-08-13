@@ -29,6 +29,7 @@ test.describe("Authenticated navigation (real backend)", () => {
   for (const { path, heading } of PAGES) {
     test(`${path} renders for a logged-in user`, async ({ page }) => {
       await page.goto(path);
+      await waitForOrgReady(page);
       // Middleware let us through (seeded token) — we stayed on the route.
       await expect(page).toHaveURL(workspacePath(path));
       await expect(
@@ -39,6 +40,7 @@ test.describe("Authenticated navigation (real backend)", () => {
 
   test("the sidebar navigates between sections", async ({ page }) => {
     await page.goto("/agents");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("button", { name: "New agent" }).first(),
     ).toBeVisible();

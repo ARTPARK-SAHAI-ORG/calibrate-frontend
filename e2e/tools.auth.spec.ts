@@ -4,6 +4,7 @@
 // dialog plus the shared list/delete + Form⇆JSON view toggle. Run with
 // `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { waitForOrgReady } from "./helpers";
 
 test.describe("Tools page (authenticated, real backend)", () => {
   test("loads, creates a structured-output tool, then deletes it", async ({
@@ -12,6 +13,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Tool ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     // Open the structured-output create panel (simplest: no URL/method).
@@ -56,6 +58,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Webhook ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     // Open the webhook create panel (the "webhook" tool type). Two buttons with
@@ -112,6 +115,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page
@@ -157,6 +161,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Webhook Params ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page
@@ -236,6 +241,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Schema ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page
@@ -294,6 +300,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const newDescription = `Edited notification service ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     // --- Create a webhook tool to edit (POST → body required). ------------
@@ -372,6 +379,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page
@@ -412,6 +420,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Dup ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     // --- First create succeeds. ------------------------------------------
@@ -487,6 +496,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E JSON Webhook ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page
@@ -549,6 +559,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     const name = `E2E Array Schema ${Date.now()}`;
 
     await page.goto("/tools");
+    await waitForOrgReady(page);
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     await page

@@ -51,6 +51,7 @@ async function createBuildAgent(page: Page, name: string): Promise<void> {
 
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
+  await waitForOrgReady(page);
   const row = page.locator("div.grid").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();

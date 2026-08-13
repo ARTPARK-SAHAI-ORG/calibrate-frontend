@@ -5,7 +5,7 @@
 // only override the Name to keep reruns unique. Run with
 // `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { workspacePath } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Shared create flow: run the two-step "Speech to Text" wizard and land on the
@@ -14,6 +14,7 @@ import type { Page } from "@playwright/test";
 // card locator so callers can open or delete it.
 async function createEvaluator(page: Page, name: string) {
   await page.goto("/evaluators");
+  await waitForOrgReady(page);
   await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
 
   await page.getByRole("button", { name: "Add evaluator" }).first().click();
@@ -46,6 +47,7 @@ async function createEvaluator(page: Page, name: string) {
 async function deleteEvaluator(page: Page, name: string) {
   const card = page.getByRole("link", { name: `Open ${name}` });
   await page.goto("/evaluators");
+  await waitForOrgReady(page);
   await expect(card).toBeVisible({ timeout: 20000 });
   await page
     .locator(`[aria-label="Open ${name}"]`)
@@ -64,6 +66,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     const name = `E2E Eval ${Date.now()}`;
 
     await page.goto("/evaluators");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("heading", { name: "Evaluators" }),
     ).toBeVisible();
@@ -112,6 +115,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
 
     await page.goto("/evaluators");
+    await waitForOrgReady(page);
     await expect(card).toBeVisible({ timeout: 20000 });
 
     // Delete via the card's titled delete button + confirmation dialog.

@@ -12,6 +12,7 @@ test.describe("Agents page (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/agents");
+    await waitForOrgReady(page);
 
     // Seeded token → middleware lets us through, so we stay on /agents.
     await expect(page).toHaveURL(workspacePath("/agents"));

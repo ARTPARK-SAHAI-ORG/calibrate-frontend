@@ -42,10 +42,8 @@ describe("splitWorkspace", () => {
     expect(orgFromPath(`/agents/${ORG}`)).toBeNull();
   });
 
-  it("accepts an upper case workspace id", () => {
-    expect(orgFromPath(`/${ORG.toUpperCase()}/agents`)).toBe(
-      ORG.toUpperCase(),
-    );
+  it("reads an upper case workspace id back in lower case, so it still matches", () => {
+    expect(orgFromPath(`/${ORG.toUpperCase()}/agents`)).toBe(ORG);
   });
 });
 
@@ -61,6 +59,21 @@ describe("isPublicPath", () => {
     "/privacy",
   ])("treats %s as public", (path) => {
     expect(isPublicPath(path)).toBe(true);
+  });
+
+  it.each([
+    "/login?callbackUrl=%2Fagents",
+    "/login#top",
+    "/signup?callbackUrl=%2Ftests%3Ftab%3Druns",
+    "/public/stt/tok?x=1",
+    "/?ref=email",
+    "/#open-source",
+  ])("still treats %s as public with a query or a section on it", (path) => {
+    expect(isPublicPath(path)).toBe(true);
+  });
+
+  it("leaves a link to a spot on the home page alone", () => {
+    expect(withWorkspace("/#open-source", "abc")).toBe("/#open-source");
   });
 
   it.each(["/agents", "/tests", "/workspace-settings", "/publications"])(
@@ -89,6 +102,20 @@ describe("withWorkspace", () => {
   it("leaves public addresses alone", () => {
     expect(withWorkspace("/login", ORG)).toBe("/login");
     expect(withWorkspace("/public/stt/tok", ORG)).toBe("/public/stt/tok");
+  });
+
+  it("leaves a public address alone when it carries a query", () => {
+    expect(withWorkspace("/login?callbackUrl=%2Fagents", ORG)).toBe(
+      "/login?callbackUrl=%2Fagents",
+    );
+  });
+
+  it("reads a workspace on its own carrying a query", () => {
+    expect(splitWorkspace(`/${ORG}?tab=runs`)).toEqual({
+      org: ORG,
+      path: "/?tab=runs",
+    });
+    expect(withWorkspace(`/${ORG}?tab=runs`, OTHER)).toBe(`/${ORG}?tab=runs`);
   });
 
   it("does nothing when there is no workspace", () => {

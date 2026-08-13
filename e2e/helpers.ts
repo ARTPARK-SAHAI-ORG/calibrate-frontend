@@ -23,7 +23,7 @@ export function workspacePath(path: string | RegExp): RegExp {
       ? path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
       : path.source;
   return new RegExp(
-    `^https?://[^/]+(?:/${WORKSPACE_SEGMENT})?${body}(?:[?#].*)?$`,
+    `^https?://[^/]+/${WORKSPACE_SEGMENT}${body}(?:[?#].*)?$`,
   );
 }
 
@@ -34,20 +34,18 @@ export function workspaceUuidFromUrl(url: string): string | null {
 }
 
 /**
- * Wait until the OrganizationBootstrapper has resolved an active workspace.
+ * Wait until the address names a workspace.
  *
- * On first authenticated load the bootstrapper fetches `/organizations` and
- * stashes the default workspace uuid in localStorage under `activeOrgUuid`.
- * The WorkspaceSwitcher dropdown and the workspace-settings admin/API-keys
- * tabs only render their data once that's set — and in CI (cold Next dev
- * compile) it can take several seconds. Call this after navigating, before
- * interacting with any org-dependent UI, so those steps don't race the boot.
+ * Opening a page without one shows the opening screen in its place, which reads
+ * the sign-in token, fetches the workspace list and only then moves to the same
+ * page under that workspace. In CI, with the dev server compiling each route on
+ * first hit, that whole chain can take several seconds. Call this straight
+ * after a goto that leaves the workspace out, before asserting on anything the
+ * page renders.
  */
 export async function waitForOrgReady(page: Page): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("activeOrgUuid")), {
-      timeout: 30_000,
-    })
+    .poll(() => workspaceUuidFromUrl(page.url()), { timeout: 30_000 })
     .not.toBeNull();
 }
 

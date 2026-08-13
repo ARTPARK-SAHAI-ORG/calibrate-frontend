@@ -12,6 +12,7 @@
 //
 // Run with `npm run test:e2e:integration` (needs a backend, see e2e/README.md).
 import { test, expect } from "./fixtures";
+import { waitForOrgReady } from "./helpers";
 
 test.describe("Tests page (authenticated, real backend)", () => {
   test("opens the Create test dialog through to the editor, then closes", async ({
@@ -20,6 +21,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
     const name = `E2E Test ${Date.now()}`;
 
     await page.goto("/tests");
+    await waitForOrgReady(page);
     // Page header from src/app/tests/page.tsx (<h1>LLM Tests</h1>).
     await expect(
       page.getByRole("heading", { name: "LLM Tests" }),
@@ -61,6 +63,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
 
   test("opens the Bulk upload modal, then closes", async ({ page }) => {
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("heading", { name: "LLM Tests" }),
     ).toBeVisible({ timeout: 20000 });
@@ -100,6 +103,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("heading", { name: "LLM Tests" }),
     ).toBeVisible({ timeout: 20000 });
@@ -186,6 +190,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
     const name = `E2E Editor ${Date.now()}`;
 
     await page.goto("/tests");
+    await waitForOrgReady(page);
     await expect(
       page.getByRole("heading", { name: "LLM Tests" }),
     ).toBeVisible({ timeout: 20000 });

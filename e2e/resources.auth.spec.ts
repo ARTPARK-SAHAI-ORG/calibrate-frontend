@@ -4,7 +4,7 @@
 //
 // Run with `npm run test:e2e:integration` (needs a backend, see e2e/README.md).
 import { test, expect } from "./fixtures";
-import { workspacePath } from "./helpers";
+import { waitForOrgReady, workspacePath } from "./helpers";
 
 /**
  * Drives create → verify-in-list → edit (rename) → verify → delete for a
@@ -36,6 +36,7 @@ async function createEditDeleteResource(
   },
 ) {
   await page.goto(path);
+  await waitForOrgReady(page);
   await expect(page).toHaveURL(workspacePath(path));
   await expect(page.getByRole("heading", { name: heading })).toBeVisible();
 

@@ -9,10 +9,23 @@ import {
   pickDefaultOrg,
   setActiveOrgUuid,
 } from "@/lib/orgs";
-import { OPENING_TARGET_PARAM } from "@/lib/opening";
-import { HOME_PATH, withWorkspace } from "@/lib/routes";
-import { safeCallbackUrl } from "@/lib/postLoginRedirect";
+import { withWorkspace } from "@/lib/routes";
+import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
 import { ErrorState, LoadingState } from "@/components/ui/LoadingState";
+
+/**
+ * The page someone asked for, taken from the address.
+ *
+ * This page is shown *in place of* that page, with the address left as the
+ * person typed it, so the address itself is what they wanted. Only a page on
+ * this site is accepted, so a crafted link cannot use this page to send
+ * someone somewhere else.
+ */
+function wantedPage(): string {
+  return safeCallbackUrl(
+    window.location.pathname + window.location.search + window.location.hash,
+  );
+}
 
 /**
  * Works out which workspace the address belongs to, then puts it in the
@@ -27,17 +40,19 @@ export default function OpeningPage() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (isAuthLoading || !accessToken) return;
-    let cancelled = false;
+    if (isAuthLoading) return;
 
-    // Read the wanted page from the address rather than useSearchParams, which
-    // would need a Suspense boundary around this page to build.
-    // Only a page on this site is accepted, so a crafted link cannot use this
-    // page to send someone somewhere else.
-    const target = safeCallbackUrl(
-      new URLSearchParams(window.location.search).get(OPENING_TARGET_PARAM) ??
-        HOME_PATH,
-    );
+    // The middleware only shows this page to someone signed in, so a missing
+    // token means the sign-in lapsed in between. Send them to sign in, keeping
+    // the page they asked for, rather than leaving them on a spinner forever.
+    if (!accessToken) {
+      const wanted = encodeURIComponent(wantedPage());
+      router.replace(`/login?${CALLBACK_PARAM}=${wanted}`);
+      return;
+    }
+
+    let cancelled = false;
+    const target = wantedPage();
 
     (async () => {
       const orgs = await fetchOrganizationsDedup(accessToken);

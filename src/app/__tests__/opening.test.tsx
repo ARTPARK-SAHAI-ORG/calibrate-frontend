@@ -1,9 +1,10 @@
 /**
  * The page shown in place of an address that does not name a workspace.
  *
- * It works out which workspace the person should land in, remembers it, and
- * replaces the address with the wanted page under that workspace. The network
- * call and sign-in state are mocked, so nothing here talks to the backend.
+ * The middleware keeps the address the person typed, so the address on screen
+ * IS the page they asked for. These tests set that address, then check the page
+ * puts the workspace in front of it. The network call and sign-in state are
+ * mocked, so nothing here talks to the backend.
  */
 import { render, screen, waitFor } from "@/test-utils";
 import { ACTIVE_ORG_UUID_KEY, type Organization } from "@/lib/orgs";
@@ -13,8 +14,8 @@ const replace = jest.fn();
 jest.mock("next/navigation", () => ({
   __esModule: true,
   useRouter: () => ({ push: jest.fn(), replace, prefetch: jest.fn() }),
-  usePathname: () => "/opening",
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => window.location.pathname,
+  useSearchParams: () => new URLSearchParams(window.location.search),
   useParams: () => ({}),
   redirect: jest.fn(),
   notFound: jest.fn(),
@@ -55,9 +56,13 @@ const org = (uuid: string, is_personal = false): Organization => ({
 
 const ORGS = [org(PERSONAL, true), org(TEAM)];
 
-function openAt(search: string) {
-  window.history.replaceState(null, "", `/opening${search}`);
+/** Put the page the person asked for in the address, as the middleware leaves it. */
+function askedFor(address: string) {
+  window.history.replaceState(null, "", address);
 }
+
+/** A page that is nothing like the /agents fallback, so a fallback cannot pass as a pass. */
+const DEEP_PAGE = "/simulations/abc/runs/def";
 
 beforeEach(() => {
   replace.mockClear();
@@ -65,47 +70,77 @@ beforeEach(() => {
   fetchOrganizationsDedup.mockResolvedValue(ORGS);
   authState = { accessToken: "token-1", isLoading: false };
   window.localStorage.clear();
-  openAt("");
+  askedFor(DEEP_PAGE);
 });
 
-it("opens the wanted page in the workspace last used", async () => {
+it("opens the page in the address, in the workspace last used", async () => {
   window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, TEAM);
-  openAt("?to=%2Ftests%3Ftab%3Druns");
+  askedFor("/tests");
 
   render(<OpeningPage />);
 
-  await waitFor(() =>
-    expect(replace).toHaveBeenCalledWith(`/${TEAM}/tests?tab=runs`),
-  );
+  await waitFor(() => expect(replace).toHaveBeenCalledWith(`/${TEAM}/tests`));
   expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe(TEAM);
 });
 
-it("falls back to the personal workspace when the last one used is gone", async () => {
-  window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, "e4d5c6b7-a8b9-4c0d-8e1f-2a3b4c5d6e7f");
-  openAt("?to=%2Ftools");
+it("keeps the query and the # part of the page asked for", async () => {
+  window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, TEAM);
+  askedFor(`${DEEP_PAGE}?tab=x&scores=e1:pass#item-4`);
 
   render(<OpeningPage />);
 
-  await waitFor(() => expect(replace).toHaveBeenCalledWith(`/${PERSONAL}/tools`));
+  await waitFor(() =>
+    expect(replace).toHaveBeenCalledWith(
+      `/${TEAM}${DEEP_PAGE}?tab=x&scores=e1:pass#item-4`,
+    ),
+  );
+});
+
+it("falls back to the personal workspace when the last one used is gone", async () => {
+  window.localStorage.setItem(
+    ACTIVE_ORG_UUID_KEY,
+    "e4d5c6b7-a8b9-4c0d-8e1f-2a3b4c5d6e7f",
+  );
+  askedFor("/tools");
+
+  render(<OpeningPage />);
+
+  await waitFor(() =>
+    expect(replace).toHaveBeenCalledWith(`/${PERSONAL}/tools`),
+  );
   expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBe(PERSONAL);
 });
 
-it("opens the agents page when no page was asked for", async () => {
+it("opens a plain agents visit in the workspace", async () => {
+  window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, TEAM);
+  askedFor("/agents");
+
   render(<OpeningPage />);
 
-  await waitFor(() =>
-    expect(replace).toHaveBeenCalledWith(`/${PERSONAL}/agents`),
-  );
+  await waitFor(() => expect(replace).toHaveBeenCalledWith(`/${TEAM}/agents`));
 });
 
-it("ignores a page on another site and opens the agents page", async () => {
-  openAt("?to=https%3A%2F%2Fevil.example%2Fsteal");
+it("opens the agents page when someone types the opening address itself", async () => {
+  window.localStorage.setItem(ACTIVE_ORG_UUID_KEY, TEAM);
+  askedFor("/opening");
+
+  render(<OpeningPage />);
+
+  await waitFor(() => expect(replace).toHaveBeenCalledWith(`/${TEAM}/agents`));
+});
+
+it("sends someone with no sign-in to login, carrying the page they asked for", async () => {
+  authState = { accessToken: null, isLoading: false };
+  askedFor(`${DEEP_PAGE}?tab=x`);
 
   render(<OpeningPage />);
 
   await waitFor(() =>
-    expect(replace).toHaveBeenCalledWith(`/${PERSONAL}/agents`),
+    expect(replace).toHaveBeenCalledWith(
+      `/login?callbackUrl=${encodeURIComponent(`${DEEP_PAGE}?tab=x`)}`,
+    ),
   );
+  expect(fetchOrganizationsDedup).not.toHaveBeenCalled();
 });
 
 it("shows the error screen when the person has no workspace", async () => {
@@ -136,7 +171,7 @@ it("reloads the page when the person retries after the error", async () => {
   const original = window.location;
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...original, search: "", reload },
+    value: { ...original, pathname: DEEP_PAGE, search: "", hash: "", reload },
   });
 
   try {
@@ -153,16 +188,6 @@ it("reloads the page when the person retries after the error", async () => {
 
 it("waits while sign-in is still loading", async () => {
   authState = { accessToken: null, isLoading: true };
-
-  render(<OpeningPage />);
-
-  await Promise.resolve();
-  expect(fetchOrganizationsDedup).not.toHaveBeenCalled();
-  expect(replace).not.toHaveBeenCalled();
-});
-
-it("waits when there is no signed-in person", async () => {
-  authState = { accessToken: null, isLoading: false };
 
   render(<OpeningPage />);
 

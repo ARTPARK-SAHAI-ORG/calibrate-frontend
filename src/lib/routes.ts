@@ -57,11 +57,22 @@ export const SECTION_LIST_PAGES = new Set([
 /** The page every workspace can show. */
 export const HOME_PATH = "/agents";
 
+/**
+ * Just the page part, without the query or the part after "#". Every check
+ * below has to ignore those: "/login?callbackUrl=/agents" is the sign-in page
+ * and must be treated as one.
+ */
+function pagePart(path: string): string {
+  const cut = path.search(/[?#]/);
+  return cut === -1 ? path : path.slice(0, cut);
+}
+
 /** True for an address that must never gain a workspace. */
 export function isPublicPath(path: string): boolean {
-  if (path === "/") return true;
+  const page = pagePart(path);
+  if (page === "/") return true;
   return PUBLIC_PREFIXES.some(
-    (p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`),
+    (p) => page === p || page.startsWith(p.endsWith("/") ? p : `${p}/`),
   );
 }
 
@@ -73,10 +84,15 @@ export function splitWorkspace(path: string): {
   org: string | null;
   path: string;
 } {
-  const first = path.split("/")[1] ?? "";
+  const first = pagePart(path).split("/")[1] ?? "";
   if (!UUID.test(first)) return { org: null, path };
+  // Lower case, because every workspace id the backend gives out is, and the
+  // places that compare one match character for character.
+  const org = first.toLowerCase();
+  // What is left after the workspace. A workspace on its own leaves nothing,
+  // or just a query, so put the leading slash back.
   const rest = path.slice(first.length + 1);
-  return { org: first, path: rest === "" ? "/" : rest };
+  return { org, path: rest.startsWith("/") ? rest : `/${rest}` };
 }
 
 /** The workspace an address names, or null. */
@@ -93,7 +109,7 @@ export function withWorkspace(path: string, org: string | null): string {
   if (!org || !path.startsWith("/")) return path;
   if (isPublicPath(path)) return path;
   if (splitWorkspace(path).org) return path;
-  return path === "/" ? `/${org}` : `/${org}${path}`;
+  return `/${org}${path}`;
 }
 
 /**

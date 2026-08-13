@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAccessToken";
 import { fetchOrganizationsDedup } from "@/hooks/useOrganizations";
 import { setActiveOrgUuid } from "@/lib/orgs";
 import { NotFoundState } from "@/components/ui";
+import { HOME_PATH } from "@/lib/routes";
 
 /**
  * Every page behind sign-in lives under the workspace it belongs to.
@@ -46,7 +47,11 @@ export default function WorkspaceLayout({
   if (isMember === false) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <NotFoundState />
+        {/* Home has to leave this workspace behind, so it goes to the plain
+            address and lets the opening page pick one the user belongs to. */}
+        <NotFoundState
+          onGoHome={() => window.location.assign(HOME_PATH)}
+        />
       </div>
     );
   }
