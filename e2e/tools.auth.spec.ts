@@ -14,7 +14,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     // Open the structured-output create panel (simplest: no URL/method).
     await page
@@ -23,7 +25,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible();
 
     // Tool name (required). Description is optional for structured-output tools.
@@ -48,7 +53,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // Delete via the row's icon button + confirmation dialog.
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -59,7 +64,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     // Open the webhook create panel (the "webhook" tool type). Two buttons with
     // this label exist (header + empty-state); the header one is always present.
@@ -69,7 +76,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     // Required webhook fields: Name, Description, a valid URL, and — because the
@@ -105,7 +112,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // Delete via the row's icon button + confirmation dialog.
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -116,7 +123,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
   }) => {
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add webhook tool" })
@@ -124,12 +133,12 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     // Default method POST renders the Body parameters section.
     await expect(
-      panel.getByRole("heading", { name: "Body parameters" }),
+      panel.getByRole("heading", { name: "Body parameters", exact: true }),
     ).toBeVisible();
 
     // Toggle to the JSON editor view — mounts the raw-JSON textarea branch.
@@ -147,7 +156,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // no request body), exercising the method-dependent rendering branch.
     await panel.locator("select").selectOption("GET");
     await expect(
-      panel.getByRole("heading", { name: "Body parameters" }),
+      panel.getByRole("heading", { name: "Body parameters", exact: true }),
     ).toBeHidden();
 
     // Close without saving.
@@ -162,7 +171,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add webhook tool" })
@@ -170,7 +181,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     // Base required fields (mirrors the minimal-create test above).
@@ -242,7 +253,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add structured output tool" })
@@ -250,7 +263,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible();
 
     // Tool name (required). Structured-output param descriptions are optional
@@ -287,7 +303,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -301,7 +317,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     // --- Create a webhook tool to edit (POST → body required). ------------
     await page
@@ -310,7 +328,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     await panel
@@ -341,7 +359,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // which triggers loadToolData → GET /tools/{uuid} and rehydrates the form.
     await row.getByText(name).click();
     await expect(
-      panel.getByRole("heading", { name: "Edit webhook tool" }),
+      panel.getByRole("heading", { name: "Edit webhook tool", exact: true }),
     ).toBeVisible({ timeout: 15000 });
 
     // Existing values are loaded back into the form (proves loadToolData ran).
@@ -369,7 +387,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -380,7 +398,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
   }) => {
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add webhook tool" })
@@ -388,7 +408,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     // Submit with everything blank. handleSubmit → collectIncompleteFields
@@ -396,9 +416,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
     await panel.getByRole("button", { name: "Add tool" }).click();
 
     // Name + webhook URL both flag their required errors.
-    await expect(
-      panel.getByText("Name cannot be empty").first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(panel.getByText("Name cannot be empty").first()).toBeVisible({
+      timeout: 15000,
+    });
     await expect(panel.getByText("URL is required")).toBeVisible();
     // POST is the default method, so the body Description error also renders.
     await expect(
@@ -407,7 +427,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     // Dialog stays open (nothing was created).
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     await panel.getByRole("button", { name: "Cancel" }).click();
@@ -421,7 +441,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     // --- First create succeeds. ------------------------------------------
     await page
@@ -430,7 +452,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible();
     await panel
       .getByPlaceholder(
@@ -452,7 +477,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .first()
       .click();
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible();
     await panel
       .getByPlaceholder(
@@ -465,7 +493,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // The dialog stays open (the conflict blocked the create). Give the POST a
     // round trip; on success it would have hidden the panel.
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible({ timeout: 15000 });
     await expect(panel).toBeVisible();
 
@@ -478,7 +509,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
     // Cleanup.
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -497,7 +528,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add webhook tool" })
@@ -505,7 +538,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add webhook tool" }),
+      panel.getByRole("heading", { name: "Add webhook tool", exact: true }),
     ).toBeVisible();
 
     // Toggle to the JSON editor and paste a complete, valid webhook definition.
@@ -547,7 +580,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -560,7 +593,9 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await page.goto("/tools");
     await waitForOrgReady(page);
-    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Tools", exact: true }),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Add structured output tool" })
@@ -568,7 +603,10 @@ test.describe("Tools page (authenticated, real backend)", () => {
       .click();
     const panel = page.locator(".fixed.inset-0.z-50");
     await expect(
-      panel.getByRole("heading", { name: "Add structured output tool" }),
+      panel.getByRole("heading", {
+        name: "Add structured output tool",
+        exact: true,
+      }),
     ).toBeVisible();
 
     await panel
@@ -594,7 +632,7 @@ test.describe("Tools page (authenticated, real backend)", () => {
 
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete tool" }),
+      page.getByRole("heading", { name: "Delete tool", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });

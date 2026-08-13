@@ -14,13 +14,16 @@ test.describe("Simulations page (authenticated, real backend)", () => {
     await page.goto("/simulations");
     await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Simulations" }),
+      page.getByRole("heading", { name: "Simulations", exact: true }),
     ).toBeVisible();
 
     // Create: "Add simulation" opens NewSimulationDialog.
     await page.getByRole("button", { name: "Add simulation" }).first().click();
     await expect(
-      page.getByRole("heading", { name: "Create your simulation" }),
+      page.getByRole("heading", {
+        name: "Create your simulation",
+        exact: true,
+      }),
     ).toBeVisible();
     await page.getByPlaceholder("Enter simulation name").fill(name);
     await page.getByRole("button", { name: "Create Simulation" }).click();
@@ -43,7 +46,7 @@ test.describe("Simulations page (authenticated, real backend)", () => {
     // Delete via the row's icon button + confirmation dialog.
     await row.getByRole("button").click();
     await expect(
-      page.getByRole("heading", { name: "Delete simulation" }),
+      page.getByRole("heading", { name: "Delete simulation", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(row).toHaveCount(0, { timeout: 15000 });

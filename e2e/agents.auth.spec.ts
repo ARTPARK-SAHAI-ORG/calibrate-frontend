@@ -35,7 +35,10 @@ test.describe("Agents page (authenticated, real backend)", () => {
 
     // Wait for the initial fetch to settle: either the empty state or the
     // desktop table header ("Last updated at") is showing.
-    const emptyState = page.getByRole("heading", { name: "No agents found" });
+    const emptyState = page.getByRole("heading", {
+      name: "No agents found",
+      exact: true,
+    });
     const sortButton = page.getByRole("button", { name: "Last updated at" });
     await expect(async () => {
       const empty = await emptyState.isVisible().catch(() => false);

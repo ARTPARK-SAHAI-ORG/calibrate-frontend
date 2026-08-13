@@ -72,13 +72,14 @@ test.describe("Workspace in the address (authenticated, real backend)", () => {
     const name = `E2E URL WS ${Date.now()}`;
     await page.goto("/tools");
     await waitForOrgReady(page);
+    const before = activeWorkspace(page.url());
 
     const trigger = page.locator('button[aria-haspopup="menu"]').first();
     await expect(trigger).toBeVisible({ timeout: 20000 });
     await trigger.click();
     await page.getByRole("button", { name: "Create workspace" }).click();
     await expect(
-      page.getByRole("heading", { name: "Create workspace" }),
+      page.getByRole("heading", { name: "Create workspace", exact: true }),
     ).toBeVisible();
     await page.getByPlaceholder("e.g. Acme Health").fill(name);
     await page
@@ -86,10 +87,14 @@ test.describe("Workspace in the address (authenticated, real backend)", () => {
       .last()
       .click();
 
-    // The new workspace becomes active, which reloads the section the user was
-    // in under it.
+    // The new workspace becomes active, and the user stays in the same section
+    // under it. Waiting on the workspace CHANGING matters: the address already
+    // named a workspace, so waiting only for "/tools" would pass straight away
+    // and the rest of the test would run against the old workspace.
+    await expect
+      .poll(() => workspaceUuidFromUrl(page.url()), { timeout: 30000 })
+      .not.toBe(before);
     await expect(page).toHaveURL(workspacePath("/tools"), { timeout: 30000 });
-    await waitForOrgReady(page);
     const created = activeWorkspace(page.url());
 
     // Now pick a different workspace from the switcher.
@@ -105,7 +110,9 @@ test.describe("Workspace in the address (authenticated, real backend)", () => {
     await other.click();
 
     // Same section, different workspace in the address.
+    await expect
+      .poll(() => workspaceUuidFromUrl(page.url()), { timeout: 30000 })
+      .not.toBe(created);
     await expect(page).toHaveURL(workspacePath("/tools"), { timeout: 30000 });
-    expect(activeWorkspace(page.url())).not.toBe(created);
   });
 });

@@ -38,7 +38,9 @@ async function createEditDeleteResource(
   await page.goto(path);
   await waitForOrgReady(page);
   await expect(page).toHaveURL(workspacePath(path));
-  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: heading, exact: true }),
+  ).toBeVisible();
 
   // Open the create panel (header button; may also appear in the empty state).
   await page.getByRole("button", { name: addButton }).first().click();
@@ -67,7 +69,9 @@ async function createEditDeleteResource(
   // title switches to "Edit X" and the submit button becomes "Save". ---
   await row.click();
   await expect(panel).toBeVisible({ timeout: 15000 });
-  await expect(panel.getByRole("heading", { name: editHeading })).toBeVisible({
+  await expect(
+    panel.getByRole("heading", { name: editHeading, exact: true }),
+  ).toBeVisible({
     timeout: 15000,
   });
 
@@ -91,7 +95,7 @@ async function createEditDeleteResource(
   // then confirm in the shared DeleteConfirmationDialog.
   await editedRow.getByRole("button").click();
   await expect(
-    page.getByRole("heading", { name: deleteHeading }),
+    page.getByRole("heading", { name: deleteHeading, exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
 

@@ -29,7 +29,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     await page.getByRole("button", { name: "Create key" }).first().click();
     await expect(
-      page.getByRole("heading", { name: "Create API key" }),
+      page.getByRole("heading", { name: "Create API key", exact: true }),
     ).toBeVisible();
     await page.getByPlaceholder("e.g. GitHub Actions").fill(keyName);
     await page
@@ -39,7 +39,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     // Phase 2: the plaintext key is revealed once. Close the dialog.
     await expect(
-      page.getByRole("heading", { name: "API key created" }),
+      page.getByRole("heading", { name: "API key created", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Done" }).click();
 
@@ -51,7 +51,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     // row's own "Revoke" button behind it.
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "Revoke API key" }),
+      dialog.getByRole("heading", { name: "Revoke API key", exact: true }),
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
   });
@@ -66,9 +66,11 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     await page.getByRole("button", { name: "Create workspace" }).click();
     await expect(
-      page.getByRole("heading", { name: "Create workspace" }),
+      page.getByRole("heading", { name: "Create workspace", exact: true }),
     ).toBeVisible();
-    await page.getByPlaceholder("e.g. Acme Health").fill(`E2E New WS ${Date.now()}`);
+    await page
+      .getByPlaceholder("e.g. Acme Health")
+      .fill(`E2E New WS ${Date.now()}`);
     await page
       .getByRole("button", { name: "Create workspace", exact: true })
       .last()
@@ -76,7 +78,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
     // Creating a workspace closes the dialog (the switcher then reflects it).
     await expect(
-      page.getByRole("heading", { name: "Create workspace" }),
+      page.getByRole("heading", { name: "Create workspace", exact: true }),
     ).toBeHidden({ timeout: 15000 });
   });
 });

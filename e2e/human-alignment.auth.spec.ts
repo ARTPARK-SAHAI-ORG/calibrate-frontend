@@ -20,7 +20,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await page.goto("/human-alignment?tab=tasks");
     await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Human alignment" }),
+      page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Open the create dialog. The header button is always present; on an empty
@@ -33,7 +33,10 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
 
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "Create labelling task" }),
+      dialog.getByRole("heading", {
+        name: "Create labelling task",
+        exact: true,
+      }),
     ).toBeVisible({ timeout: 20000 });
 
     // Step 1 — Details. Only Name is required (placeholder uses an em dash, so
@@ -77,7 +80,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     // Confirm in the shared DeleteConfirmationDialog (title → heading,
     // confirmText → button).
     await expect(
-      page.getByRole("heading", { name: "Delete labelling task" }),
+      page.getByRole("heading", { name: "Delete labelling task", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Delete", exact: true }).click();
 
@@ -94,7 +97,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await page.goto("/human-alignment?tab=annotators");
     await waitForOrgReady(page);
     await expect(
-      page.getByRole("heading", { name: "Human alignment" }),
+      page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
     // Add annotator via the inline form (input placeholder "Annotator name" +
@@ -126,7 +129,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     // Confirm removal (title "Remove annotator" → heading, confirmText
     // "Remove" → button).
     await expect(
-      page.getByRole("heading", { name: "Remove annotator" }),
+      page.getByRole("heading", { name: "Remove annotator", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Remove", exact: true }).click();
 

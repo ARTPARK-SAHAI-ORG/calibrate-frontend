@@ -33,7 +33,7 @@ test.describe("Authenticated navigation (real backend)", () => {
       // Middleware let us through (seeded token) — we stayed on the route.
       await expect(page).toHaveURL(workspacePath(path));
       await expect(
-        page.getByRole("heading", { name: heading }).first(),
+        page.getByRole("heading", { name: heading, exact: true }).first(),
       ).toBeVisible();
     });
   }

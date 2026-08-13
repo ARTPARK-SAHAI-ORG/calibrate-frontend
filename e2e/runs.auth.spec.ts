@@ -29,7 +29,10 @@ async function createBuildAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
   await waitForOrgReady(page);
 
-  const dialogHeading = page.getByRole("heading", { name: "New agent" });
+  const dialogHeading = page.getByRole("heading", {
+    name: "New agent",
+    exact: true,
+  });
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
 
   // The dialog's access token comes from a hook effect, so the very first
@@ -56,7 +59,7 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete agent" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete agent" }),
+    page.getByRole("heading", { name: "Delete agent", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0, { timeout: 15000 });
@@ -77,7 +80,7 @@ async function createNextReplyTestOnAgent(
 
   await page.getByRole("button", { name: "Create test", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Create a test" }),
+    page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 15000 });
   await page.getByText("Next reply test", { exact: true }).first().click();
 
@@ -103,6 +106,7 @@ async function createNextReplyTestOnAgent(
   // Run/Compare buttons. (isVisible() doesn't wait, so assert-then-click.)
   const evalPrompt = page.getByRole("heading", {
     name: "Update default evaluators?",
+    exact: true,
   });
   await expect(evalPrompt).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Not now" }).click();

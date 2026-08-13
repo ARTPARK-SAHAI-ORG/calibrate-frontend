@@ -88,10 +88,14 @@ async function createExerciseDeleteDataset(
 ) {
   await page.goto(`${listPath}?tab=datasets`);
   await waitForOrgReady(page);
-  await expect(page.getByRole("heading", { name: pageHeading })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: pageHeading, exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "New dataset" }).first().click();
-  await expect(page.getByRole("heading", { name: modalHeading })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: modalHeading, exact: true }),
+  ).toBeVisible();
   await page.getByPlaceholder(namePlaceholder).fill(name);
   await page.getByRole("button", { name: "Create", exact: true }).click();
 
@@ -117,7 +121,7 @@ async function createExerciseDeleteDataset(
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole("button", { name: "Delete dataset" }).click();
   await expect(
-    page.getByRole("heading", { name: "Delete dataset" }),
+    page.getByRole("heading", { name: "Delete dataset", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: /^(Remove|Delete)$/ }).click();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0, {
