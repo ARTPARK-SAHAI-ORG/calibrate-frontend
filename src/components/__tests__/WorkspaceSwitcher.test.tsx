@@ -122,7 +122,7 @@ describe("WorkspaceSwitcher", () => {
         screen.getByRole("button", { name: "Create workspace" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("link", { name: "Settings" }),
+        screen.getByRole("link", { name: "Workspace settings" }),
       ).toHaveAttribute("href", "/workspace-settings?tab=admin");
       expect(
         screen.getByRole("link", { name: "API keys" }),
@@ -288,7 +288,7 @@ describe("WorkspaceSwitcher", () => {
       expect(screen.getByText("No workspaces yet.")).toBeInTheDocument();
       // With no active org, the settings and API keys links are hidden.
       expect(
-        screen.queryByRole("link", { name: "Settings" }),
+        screen.queryByRole("link", { name: "Workspace settings" }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("link", { name: "API keys" }),
