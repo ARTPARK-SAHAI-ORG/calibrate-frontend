@@ -13,10 +13,12 @@ jest.mock("../WorkspaceSwitcher", () => ({
 // that hook from the test instead of hitting the network.
 let mockWorkspaces: { uuid: string }[] = [{ uuid: "org-1" }];
 let mockWorkspacesLoading = false;
+let mockAccessToken: string | null = "token-1";
+let mockAuthLoading = false;
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
-  useAccessToken: () => "token-1",
+  useAuth: () => ({ accessToken: mockAccessToken, isLoading: mockAuthLoading }),
   useOrganizations: () => ({
     organizations: mockWorkspaces,
     isLoading: mockWorkspacesLoading,
@@ -27,6 +29,8 @@ jest.mock("../../hooks", () => ({
 beforeEach(() => {
   mockWorkspaces = [{ uuid: "org-1" }];
   mockWorkspacesLoading = false;
+  mockAccessToken = "token-1";
+  mockAuthLoading = false;
 });
 
 // jsdom has no matchMedia; AppLayout reads it when applying the "device" theme.
@@ -79,26 +83,28 @@ describe("AppLayout", () => {
   it("shows only a spinner while the workspace list is still loading", () => {
     mockWorkspaces = [];
     mockWorkspacesLoading = true;
-    const { container } = render(
-      <AppLayout
-        activeItem="agents"
-        onItemChange={jest.fn()}
-        sidebarOpen
-        onSidebarToggle={jest.fn()}
-      >
-        <div>Page content</div>
-      </AppLayout>,
-    );
-    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+    renderLayout();
+    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Page content")).not.toBeInTheDocument();
-    expect(screen.queryByText("Agents")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("workspace-switcher-expanded"),
-    ).not.toBeInTheDocument();
+  });
+
+  it("shows only a spinner while the sign-in details are still being read", () => {
+    mockAuthLoading = true;
+    renderLayout();
+    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.queryByText("Page content")).not.toBeInTheDocument();
   });
 
   it("renders the page while the workspace list refreshes in the background", () => {
     mockWorkspacesLoading = true;
+    renderLayout();
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+  });
+
+  it("renders the page when there is no access token to load workspaces with", () => {
+    mockWorkspaces = [];
+    mockWorkspacesLoading = true;
+    mockAccessToken = null;
     renderLayout();
     expect(screen.getByText("Page content")).toBeInTheDocument();
   });

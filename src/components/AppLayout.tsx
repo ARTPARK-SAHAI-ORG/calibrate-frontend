@@ -11,8 +11,8 @@ import {
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
-import { clearOrgsCache, useAccessToken, useOrganizations } from "@/hooks";
-import { SpinnerIcon } from "@/components/icons";
+import { clearOrgsCache, useAuth, useOrganizations } from "@/hooks";
+import { LoadingState } from "@/components/ui";
 
 // Re-export the hook so existing imports continue to work
 export { useHideFloatingButton } from "@/components/providers/FloatingButtonProvider";
@@ -312,11 +312,9 @@ export function AppLayout({
 }: AppLayoutProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  // The whole app is scoped to the active workspace, so nothing below can be
-  // rendered honestly until the workspace list is in. Hold the page on one
-  // spinner instead of drawing the sidebar and the page around an empty
-  // workspace switcher.
-  const accessToken = useAccessToken();
+  // Every page is scoped to the active workspace, so hold the page until the
+  // workspace list is in.
+  const { accessToken, isLoading: authLoading } = useAuth();
   const { organizations, isLoading: workspacesLoading } =
     useOrganizations(accessToken);
 
@@ -435,12 +433,10 @@ export function AppLayout({
     return name.trim()[0].toUpperCase();
   };
 
-  if (workspacesLoading && organizations.length === 0) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <SpinnerIcon className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  // Signed out or storage cleared: render as before so the user can still sign
+  // out and back in, rather than waiting on a list that will never arrive.
+  if (authLoading || (accessToken && workspacesLoading && !organizations.length)) {
+    return <LoadingState className="h-screen bg-background" />;
   }
 
   return (
