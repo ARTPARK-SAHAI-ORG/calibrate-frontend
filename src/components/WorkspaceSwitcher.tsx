@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAccessToken,
   useActiveOrgUuid,
@@ -94,6 +94,22 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     organizations[0] ??
     null;
 
+  const navigateAfterSwitch = useCallback(() => {
+    // Stay on workspace settings if that's where the user is — switching
+    // workspaces from there should just reload settings for the new one.
+    const path = window.location.pathname;
+    if (path === "/workspace-settings") {
+      window.location.reload();
+      return;
+    }
+    // Land on the root sidebar page for the section the user is in, so e.g.
+    // a tools page stays on tools and a simulation run page reopens the
+    // simulations list. Unknown sections fall back to /agents.
+    const section = path.split("/")[1] ?? "";
+    const target = ROOT_SIDEBAR_ROUTES.has(section) ? `/${section}` : "/agents";
+    window.location.assign(target);
+  }, []);
+
   // Reconcile the stored active uuid against the fetched workspaces. If the
   // user got removed from the active workspace (or it was deleted) while the
   // app was open, the stored uuid no longer matches anything in the list.
@@ -111,26 +127,13 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     const persisted = getActiveOrgUuid();
     if (persisted && organizations.some((o) => o.uuid === persisted)) return;
     const fallback = pickDefaultOrg(organizations);
-    if (fallback && fallback.uuid !== persisted) {
-      setActiveUuid(fallback.uuid);
-    }
-  }, [organizations, activeUuid, setActiveUuid]);
-
-  const navigateAfterSwitch = () => {
-    // Stay on workspace settings if that's where the user is — switching
-    // workspaces from there should just reload settings for the new one.
-    const path = window.location.pathname;
-    if (path === "/workspace-settings") {
-      window.location.reload();
-      return;
-    }
-    // Land on the root sidebar page for the section the user is in, so e.g.
-    // a tools page stays on tools and a simulation run page reopens the
-    // simulations list. Unknown sections fall back to /agents.
-    const section = path.split("/")[1] ?? "";
-    const target = ROOT_SIDEBAR_ROUTES.has(section) ? `/${section}` : "/agents";
-    window.location.assign(target);
-  };
+    if (!fallback || fallback.uuid === persisted) return;
+    setActiveUuid(fallback.uuid);
+    // The page already loaded its data under the stale workspace and got an
+    // error back, and nothing on the page refetches on a workspace change.
+    // Navigate so everything reloads under the workspace we just picked.
+    if (persisted) navigateAfterSwitch();
+  }, [organizations, activeUuid, setActiveUuid, navigateAfterSwitch]);
 
   const handleSelect = (uuid: string) => {
     if (uuid !== activeUuid) {

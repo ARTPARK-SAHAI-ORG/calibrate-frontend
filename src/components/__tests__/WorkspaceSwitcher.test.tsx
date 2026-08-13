@@ -320,5 +320,28 @@ describe("WorkspaceSwitcher", () => {
         expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
       );
     });
+
+    it("reloads the section under the new workspace so the page refetches", async () => {
+      mockActiveUuid = "stale-uuid";
+      getActiveOrgUuidMock.mockReturnValue("stale-uuid");
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      setLocation("/tools");
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() => expect(assignMock).toHaveBeenCalledWith("/tools"));
+    });
+
+    it("does not navigate when no workspace was stored yet", async () => {
+      mockActiveUuid = null;
+      getActiveOrgUuidMock.mockReturnValue(null);
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() =>
+        expect(setActiveUuidMock).toHaveBeenCalledWith("org-1"),
+      );
+      expect(assignMock).not.toHaveBeenCalled();
+      expect(reloadMock).not.toHaveBeenCalled();
+    });
   });
 });
