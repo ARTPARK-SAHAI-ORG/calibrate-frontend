@@ -263,6 +263,22 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
+  describe("the settings links", () => {
+    it("closes the menu, because moving to settings no longer reloads the page", async () => {
+      const user = setupUser();
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await user.click(screen.getByRole("button", { name: /Personal/ }));
+      await user.click(
+        screen.getByRole("link", { name: "Workspace settings" }),
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
+      );
+    });
+  });
+
   describe("dropdown edge cases", () => {
     it("shows an empty state when there are no workspaces", async () => {
       const user = setupUser();

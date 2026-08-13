@@ -133,6 +133,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
                   activeUuid={activeUuid}
                   activeOrg={activeOrg}
                   onSelect={handleSelect}
+                  onNavigate={() => setOpen(false)}
                   onCreateClick={() => {
                     setOpen(false);
                     setCreateOpen(true);
@@ -188,6 +189,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
               activeUuid={activeUuid}
               activeOrg={activeOrg}
               onSelect={handleSelect}
+              onNavigate={() => setOpen(false)}
               onCreateClick={() => {
                 setOpen(false);
                 setCreateOpen(true);
@@ -211,6 +213,9 @@ type DropdownPanelProps = {
   activeOrg: Organization | null;
   onSelect: (uuid: string) => void;
   onCreateClick: () => void;
+  /** Close the menu. The links below navigate without reloading the page, so
+      nothing else would take the menu off the screen. */
+  onNavigate: () => void;
 };
 
 function DropdownPanel({
@@ -219,6 +224,7 @@ function DropdownPanel({
   activeOrg,
   onSelect,
   onCreateClick,
+  onNavigate,
 }: DropdownPanelProps) {
   return (
     <div
@@ -278,6 +284,7 @@ function DropdownPanel({
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
           <Link
+            onClick={onNavigate}
             href="/workspace-settings?tab=admin"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
@@ -304,6 +311,7 @@ function DropdownPanel({
         )}
         {activeOrg && (
           <Link
+            onClick={onNavigate}
             href="/workspace-settings?tab=api-keys"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
