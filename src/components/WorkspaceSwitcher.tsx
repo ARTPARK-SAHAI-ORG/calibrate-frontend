@@ -335,7 +335,7 @@ function DropdownPanel({
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
           <Link
-            href="/workspace-settings"
+            href="/workspace-settings?tab=admin"
             onClick={onSettingsClick}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >

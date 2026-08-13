@@ -123,7 +123,7 @@ describe("WorkspaceSwitcher", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: "Settings" }),
-      ).toHaveAttribute("href", "/workspace-settings");
+      ).toHaveAttribute("href", "/workspace-settings?tab=admin");
       expect(
         screen.getByRole("link", { name: "API keys" }),
       ).toHaveAttribute("href", "/workspace-settings?tab=api-keys");
