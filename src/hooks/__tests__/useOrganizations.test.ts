@@ -179,6 +179,31 @@ describe("useOrganizations hooks", () => {
       await waitFor(() => expect(mockApiGet).not.toHaveBeenCalled());
     });
 
+    it("hydrates from the cache while the token is still being read", async () => {
+      // The first render of every mount has a null token; a cached list must
+      // show at once, or callers flash their loading state on every page.
+      seedOrgsCache([org1], "cached-tok");
+      const { result } = renderHook(() => useOrganizations(null));
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.organizations).toEqual([org1]);
+    });
+
+    it("adopts a cache that lands after mount, instead of loading forever", async () => {
+      const { result, rerender } = renderHook(
+        ({ token }: { token: string | null }) => useOrganizations(token),
+        { initialProps: { token: null as string | null } },
+      );
+      expect(result.current.isLoading).toBe(true);
+
+      // The bootstrapper's fetch lands while this instance sits tokenless.
+      seedOrgsCache([org1], "cached-tok");
+      rerender({ token: "cached-tok" });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.organizations).toEqual([org1]);
+      expect(mockApiGet).not.toHaveBeenCalled();
+    });
+
     it("createOrganization posts, updates state/cache, and notifies other instances", async () => {
       mockApiGet.mockResolvedValueOnce([org1]);
       const { result } = renderHook(() => useOrganizations("tok"));
