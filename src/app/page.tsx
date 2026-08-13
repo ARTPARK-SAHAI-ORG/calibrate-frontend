@@ -42,7 +42,8 @@ const USE_CASES: {
   name: string;
   logo: string;
   whatTheyDo: string;
-  useCase: string[];
+  /** A point is plain text, or text that links out to supporting material. */
+  useCase: (string | { text: string; href: string })[];
   quote?: string;
   quoteHref?: string;
 }[] = [
@@ -69,8 +70,13 @@ const USE_CASES: {
       "Align LLM judges with experts for continuously monitoring AI response quality",
       "Creating structured tests to evaluate all AI modules and preventing regressions when deploying changes",
       "Evaluating TTS model outputs across different languages",
-      "Running human labelling workshops with experts to gather evidence on user agency",
+      {
+        text: "Running human labelling workshops with experts to gather evidence on user agency",
+        href: "https://agency-fund.github.io/taf-nairobi-agency-measurement-slides/",
+      },
     ],
+    quote:
+      "Calibrate was intuitive to use by an old professor who has trouble navigating Zoom.",
   },
   {
     name: "ARMMAN",
@@ -1175,18 +1181,35 @@ export default function HomePage() {
                   Use case
                 </p>
                 <ul className="space-y-2">
-                  {useCase.useCase.map((point) => (
-                    <li
-                      key={point}
-                      className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
-                    >
-                      <span
-                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
-                        aria-hidden
-                      />
-                      <span>{point}</span>
-                    </li>
-                  ))}
+                  {useCase.useCase.map((point) => {
+                    const text =
+                      typeof point === "string" ? point : point.text;
+                    return (
+                      <li
+                        key={text}
+                        className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
+                      >
+                        <span
+                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
+                          aria-hidden
+                        />
+                        <span>
+                          {typeof point === "string" ? (
+                            text
+                          ) : (
+                            <a
+                              href={point.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 transition-colors cursor-pointer"
+                            >
+                              {text}
+                            </a>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
                 {useCase.quote && (
                   <figure className="mt-6 pt-5 border-t border-gray-100">
