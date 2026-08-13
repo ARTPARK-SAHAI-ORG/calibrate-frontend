@@ -132,7 +132,13 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     // The page already loaded its data under the stale workspace and got an
     // error back, and nothing on the page refetches on a workspace change.
     // Navigate so everything reloads under the workspace we just picked.
-    if (persisted) navigateAfterSwitch();
+    //
+    // Only once the choice is actually stored: setActiveOrgUuid swallows a
+    // storage failure, and loading the page again without it would land on
+    // the same stale workspace and navigate again, with no way out.
+    if (persisted && getActiveOrgUuid() === fallback.uuid) {
+      navigateAfterSwitch();
+    }
   }, [organizations, activeUuid, setActiveUuid, navigateAfterSwitch]);
 
   const handleSelect = (uuid: string) => {
