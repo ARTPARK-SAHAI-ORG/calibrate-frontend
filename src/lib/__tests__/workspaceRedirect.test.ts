@@ -110,6 +110,16 @@ describe("switchToOwningWorkspace", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps saying yes to the other requests on a page that is already switching", () => {
+    setActiveOrgUuid("org-current");
+    // A page makes several requests, so more than one can come back with the
+    // same 404 before the page reloads. Every one of them has to be told the
+    // switch is happening, or the page shows "Not Found" while it waits.
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+    expect(switchToOwningWorkspace("org-other")).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it("does not switch the same page twice out of the same workspace", () => {
     setActiveOrgUuid("org-current");
     expect(switchToOwningWorkspace("org-other")).toBe(true);

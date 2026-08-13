@@ -16,6 +16,7 @@ let mockIsLoading = false;
 let mockActiveUuid: string | null = null;
 
 const createOrganizationMock = jest.fn();
+const refetchMock = jest.fn();
 const setActiveUuidMock = jest.fn();
 const getActiveOrgUuidMock = jest.fn();
 const pickDefaultOrgMock = jest.fn();
@@ -28,6 +29,7 @@ jest.mock("../../hooks", () => ({
     organizations: mockOrganizations,
     isLoading: mockIsLoading,
     createOrganization: createOrganizationMock,
+    refetch: refetchMock,
   }),
 }));
 
@@ -81,6 +83,8 @@ describe("WorkspaceSwitcher", () => {
     mockActiveUuid = "org-1";
     getActiveOrgUuidMock.mockReturnValue("org-1");
     pickDefaultOrgMock.mockReturnValue(personalOrg);
+    // The server agrees with the list this tab already has.
+    refetchMock.mockImplementation(async () => mockOrganizations);
     setLocation("/agents");
   });
 
@@ -333,6 +337,33 @@ describe("WorkspaceSwitcher", () => {
       render(<WorkspaceSwitcher collapsed={false} />);
 
       await waitFor(() => expect(assignMock).toHaveBeenCalledWith("/tools"));
+    });
+
+    it("keeps the stored workspace when the server still has it", async () => {
+      // Another tab created this workspace after this tab loaded its list.
+      mockOrganizations = [personalOrg];
+      mockActiveUuid = "org-2";
+      getActiveOrgUuidMock.mockReturnValue("org-2");
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      refetchMock.mockResolvedValue([personalOrg, acmeOrg]);
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() => expect(refetchMock).toHaveBeenCalled());
+      expect(setActiveUuidMock).not.toHaveBeenCalled();
+      expect(assignMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the stored workspace when the list could not be checked", async () => {
+      mockOrganizations = [personalOrg];
+      mockActiveUuid = "org-2";
+      getActiveOrgUuidMock.mockReturnValue("org-2");
+      pickDefaultOrgMock.mockReturnValue(personalOrg);
+      refetchMock.mockResolvedValue(null);
+      render(<WorkspaceSwitcher collapsed={false} />);
+
+      await waitFor(() => expect(refetchMock).toHaveBeenCalled());
+      expect(setActiveUuidMock).not.toHaveBeenCalled();
+      expect(assignMock).not.toHaveBeenCalled();
     });
 
     it("stays put when the new choice could not be stored", async () => {

@@ -58,10 +58,21 @@ const SWITCHED_KEY = "calibrate:workspace-switched-path";
  */
 let workspaceKnownToThisTab: string | null = null;
 
+/**
+ * The workspace this page is reloading into, once a switch has started. A
+ * page makes several requests, so several of them can come back with the same
+ * 404 while the reload is still pending.
+ */
+let switchingTo: string | null = null;
+
 if (typeof window !== "undefined") {
   workspaceKnownToThisTab = getActiveOrgUuid();
   window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, () => {
     workspaceKnownToThisTab = getActiveOrgUuid();
+    // The workspace moved somewhere else, so the switch we started is stale.
+    if (switchingTo && workspaceKnownToThisTab !== switchingTo) {
+      switchingTo = null;
+    }
   });
 }
 
@@ -72,9 +83,18 @@ if (typeof window !== "undefined") {
  * reloading would not help.
  */
 export function switchToOwningWorkspace(uuid: string | null): boolean {
+  if (!uuid) return false;
+
+  // A switch into this workspace is already under way, from an earlier
+  // request on the same page: the reload is coming, so tell this caller the
+  // same thing we told the first one. Without it the page would take the
+  // "already active" exit below and show the dead-end screen in the moment
+  // before the page reloads.
+  if (uuid === switchingTo) return true;
+
   // Already active: a reload would change nothing and repeat this 404.
   const active = getActiveOrgUuid();
-  if (!uuid || uuid === active) return false;
+  if (uuid === active) return false;
 
   // Another tab changed the workspace after this page loaded. That is a newer
   // decision than anything this page can infer from a 404, so leave it alone:
@@ -103,6 +123,7 @@ export function switchToOwningWorkspace(uuid: string | null): boolean {
   try {
     window.sessionStorage.setItem(SWITCHED_KEY, `${path}@${uuid}`);
   } catch {}
+  switchingTo = uuid;
   window.location.reload();
   return true;
 }

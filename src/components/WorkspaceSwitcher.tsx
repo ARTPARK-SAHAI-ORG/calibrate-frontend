@@ -65,13 +65,16 @@ function WorkspaceAvatar({
 
 export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   const accessToken = useAccessToken();
-  const { organizations, isLoading, createOrganization } =
+  const { organizations, isLoading, createOrganization, refetch } =
     useOrganizations(accessToken);
   const [activeUuid, setActiveUuid] = useActiveOrgUuid();
 
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The stored workspace we have already checked against the server, so the
+  // check below runs once per stored choice rather than on every render.
+  const checkedRef = useRef<string | null | undefined>(undefined);
 
   // Close on outside click
   useEffect(() => {
@@ -126,20 +129,34 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     if (organizations.length === 0) return;
     const persisted = getActiveOrgUuid();
     if (persisted && organizations.some((o) => o.uuid === persisted)) return;
-    const fallback = pickDefaultOrg(organizations);
-    if (!fallback || fallback.uuid === persisted) return;
-    setActiveUuid(fallback.uuid);
-    // The page already loaded its data under the stale workspace and got an
-    // error back, and nothing on the page refetches on a workspace change.
-    // Navigate so everything reloads under the workspace we just picked.
-    //
-    // Only once the choice is actually stored: setActiveOrgUuid swallows a
-    // storage failure, and loading the page again without it would land on
-    // the same stale workspace and navigate again, with no way out.
-    if (persisted && getActiveOrgUuid() === fallback.uuid) {
-      navigateAfterSwitch();
-    }
-  }, [organizations, activeUuid, setActiveUuid, navigateAfterSwitch]);
+    // One check per stored workspace, so a workspace that really is gone
+    // cannot put this in a loop.
+    if (checkedRef.current === persisted) return;
+    checkedRef.current = persisted;
+
+    void (async () => {
+      // This tab's list can be out of date: the workspace may have been
+      // created, or the user added to it, in another tab since this one
+      // loaded. Ask the server before treating the stored choice as gone,
+      // otherwise we take the user out of the workspace they picked there.
+      const list = persisted ? await refetch() : organizations;
+      if (!list) return; // could not check, so leave the choice alone
+      if (persisted && list.some((o) => o.uuid === persisted)) return;
+      const fallback = pickDefaultOrg(list);
+      if (!fallback || fallback.uuid === persisted) return;
+      setActiveUuid(fallback.uuid);
+      // The page already loaded its data under the stale workspace and got an
+      // error back, and nothing on the page refetches on a workspace change.
+      // Navigate so everything reloads under the workspace we just picked.
+      //
+      // Only once the choice is actually stored: setActiveOrgUuid swallows a
+      // storage failure, and loading the page again without it would land on
+      // the same stale workspace and navigate again, with no way out.
+      if (persisted && getActiveOrgUuid() === fallback.uuid) {
+        navigateAfterSwitch();
+      }
+    })();
+  }, [organizations, activeUuid, setActiveUuid, navigateAfterSwitch, refetch]);
 
   const handleSelect = (uuid: string) => {
     if (uuid !== activeUuid) {
