@@ -22,6 +22,9 @@ import type { Page, Route } from "@playwright/test";
 const SEEN_KEY = "calibrate:onboarding:v1:first-eval";
 const START_EVENT = "calibrate:start-tour";
 const AGENT_UUID = "agent-e2e-123";
+// Shaped like a real workspace id, because the app only reads the first part
+// of the address as a workspace when it looks like one.
+const ORG_UUID = "e2e00000-0000-4000-8000-000000000001";
 
 const popoverTitle = (page: Page) => page.locator(".driver-popover-title");
 const nextButton = (page: Page) => page.locator(".driver-popover-next-btn");
@@ -275,7 +278,7 @@ async function installFakeBackend(
       // --- Boot ---
       if (method === "GET" && pathname === "/organizations") {
         return json(route, [
-          { uuid: "org-1", name: "Personal", is_personal: true },
+          { uuid: ORG_UUID, name: "Personal", is_personal: true },
         ]);
       }
       if (method === "GET" && pathname === "/providers") {
@@ -460,21 +463,21 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
       },
     ]);
     await page.addInitScript(
-      ([seenKey]) => {
+      ([seenKey, orgUuid]) => {
         try {
           localStorage.setItem("access_token", "fake-e2e-token");
           localStorage.setItem(
             "user",
             JSON.stringify({ email: "demo@e2e.local", name: "Demo" }),
           );
-          localStorage.setItem("activeOrgUuid", "org-1");
+          localStorage.setItem("activeOrgUuid", orgUuid);
           // Mark the tour "seen" so it does NOT auto-start; we dispatch it.
           localStorage.setItem(seenKey, "completed");
         } catch {
           /* ignore */
         }
       },
-      [SEEN_KEY],
+      [SEEN_KEY, ORG_UUID],
     );
   });
 
