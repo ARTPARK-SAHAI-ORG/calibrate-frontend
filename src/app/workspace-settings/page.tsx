@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useAccessToken,
   useActiveOrgUuid,
@@ -36,7 +36,17 @@ const SETTINGS_TABS = [
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 export default function WorkspaceSettingsPage() {
+  // useSearchParams needs a Suspense boundary during prerender.
+  return (
+    <Suspense>
+      <WorkspaceSettingsContent />
+    </Suspense>
+  );
+}
+
+function WorkspaceSettingsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [activeTab, setActiveTab] = useState<SettingsTab>("admin");
@@ -45,33 +55,27 @@ export default function WorkspaceSettingsPage() {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
-  // Restore the selected tab from `?tab=` on load, so a reload or shared link
-  // keeps the user on the same tab. We read the URL directly instead of
-  // `useSearchParams()` to avoid forcing a Suspense boundary on this
-  // otherwise-static page. Init defaults to "admin" so the first client render
-  // matches the prerendered HTML (no hydration mismatch); this effect then
-  // syncs to the URL. The popstate listener covers external URL changes (e.g.
-  // editing the address bar); tab clicks use replaceState below, so they don't
-  // add their own back/forward history entries.
+  // Restore the selected tab from `?tab=` so a reload, a shared link, or a link
+  // into this page from elsewhere (the API keys shortcuts) lands on the right
+  // tab. Init defaults to "admin" so the first client render matches the
+  // prerendered HTML (no hydration mismatch); this effect then syncs to the URL.
+  // Tab clicks use router.replace below, so they don't add their own
+  // back/forward history entries.
+  const tabParam = searchParams.get("tab");
   useEffect(() => {
-    const syncFromUrl = () => {
-      const tab = new URLSearchParams(window.location.search).get("tab");
-      if (SETTINGS_TABS.some((t) => t.id === tab)) {
-        setActiveTab(tab as SettingsTab);
-      }
-    };
-    syncFromUrl();
-    window.addEventListener("popstate", syncFromUrl);
-    return () => window.removeEventListener("popstate", syncFromUrl);
-  }, []);
+    if (SETTINGS_TABS.some((t) => t.id === tabParam)) {
+      setActiveTab(tabParam as SettingsTab);
+    }
+  }, [tabParam]);
 
   const handleTabChange = (tab: SettingsTab) => {
     setActiveTab(tab);
-    // replaceState (not pushState): switching tabs updates the URL for reload /
-    // share, without pushing a history entry per click.
-    const params = new URLSearchParams(window.location.search);
+    // replace (not push): switching tabs updates the URL for reload / share,
+    // without pushing a history entry per click. Going through the router keeps
+    // the value this page reads back from `?tab=` in step with the address bar.
+    const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
-    window.history.replaceState(null, "", `?${params.toString()}`);
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   const {

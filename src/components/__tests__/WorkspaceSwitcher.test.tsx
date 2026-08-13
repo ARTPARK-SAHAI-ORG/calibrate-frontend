@@ -122,8 +122,11 @@ describe("WorkspaceSwitcher", () => {
         screen.getByRole("button", { name: "Create workspace" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("link", { name: "Workspace settings" }),
+        screen.getByRole("link", { name: "Settings" }),
       ).toHaveAttribute("href", "/workspace-settings");
+      expect(
+        screen.getByRole("link", { name: "API keys" }),
+      ).toHaveAttribute("href", "/workspace-settings?tab=api-keys");
     });
 
     it("closes the dropdown on an outside click", async () => {
@@ -283,9 +286,12 @@ describe("WorkspaceSwitcher", () => {
 
       await user.click(screen.getByRole("button", { name: /Workspace/ }));
       expect(screen.getByText("No workspaces yet.")).toBeInTheDocument();
-      // With no active org, the settings link is hidden.
+      // With no active org, the settings and API keys links are hidden.
       expect(
-        screen.queryByRole("link", { name: "Workspace settings" }),
+        screen.queryByRole("link", { name: "Settings" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "API keys" }),
       ).not.toBeInTheDocument();
     });
 

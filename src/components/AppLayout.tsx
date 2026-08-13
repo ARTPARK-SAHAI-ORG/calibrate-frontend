@@ -819,6 +819,7 @@ export function AppLayout({
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
+                aria-label="Open profile menu"
                 className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-sm hover:bg-purple-700 transition-colors cursor-pointer overflow-hidden"
               >
                 {userImage ? (
@@ -882,6 +883,30 @@ export function AppLayout({
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* API keys — jumps straight to that tab of workspace settings. */}
+                  <div className="p-2 border-b border-border">
+                    <Link
+                      href="/workspace-settings?tab=api-keys"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+                        />
+                      </svg>
+                      API keys
+                    </Link>
                   </div>
 
                   {/* Take a tour — desktop-only, so hidden on phones. */}
