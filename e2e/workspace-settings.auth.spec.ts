@@ -23,6 +23,27 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     });
   });
 
+  test("the API keys entry in the sidebar menu switches the tab from Admin", async ({
+    page,
+  }) => {
+    // Opening API keys while already on this page changes only the part of the
+    // address after the "?", which leaves the page itself on screen. The page
+    // has to notice that and switch tab; a check that fails if it only ever
+    // reads the address when it first opens.
+    await openWorkspaceSettings(page, "Admin");
+    await expect(
+      page.getByRole("textbox").first(),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('button[aria-haspopup="menu"]').first().click();
+    await page.getByRole("link", { name: "API keys", exact: true }).click();
+
+    await expect(page).toHaveURL(/tab=api-keys/, { timeout: 15000 });
+    await expect(
+      page.getByRole("button", { name: "Create key" }).first(),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
   test("creates then revokes a workspace API key", async ({ page }) => {
     const keyName = `E2E Key ${Date.now()}`;
     await openWorkspaceSettings(page, "API keys");

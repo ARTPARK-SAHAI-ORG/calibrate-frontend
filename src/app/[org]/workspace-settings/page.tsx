@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "@/lib/nav";
+import { useRouter, useSearchParams } from "@/lib/nav";
 import { useRouter as useNextRouter } from "next/navigation";
 import { HOME_PATH, withWorkspace } from "@/lib/routes";
 import {
@@ -39,6 +39,7 @@ type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [activeTab, setActiveTab] = useState<SettingsTab>("admin");
@@ -47,14 +48,20 @@ export default function WorkspaceSettingsPage() {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
-  // Restore the selected tab from `?tab=` on load, so a reload or shared link
-  // keeps the user on the same tab. We read the URL directly instead of
-  // `useSearchParams()` to avoid forcing a Suspense boundary on this
-  // otherwise-static page. Init defaults to "admin" so the first client render
+  // Open the tab named by `?tab=`, so a reload or a shared link keeps the user
+  // on the same one. Init defaults to "admin" so the first client render
   // matches the prerendered HTML (no hydration mismatch); this effect then
-  // syncs to the URL. The popstate listener covers external URL changes (e.g.
-  // editing the address bar); tab clicks use replaceState below, so they don't
-  // add their own back/forward history entries.
+  // syncs to the address.
+  //
+  // `searchParams` is what makes this work while the page is already open: the
+  // API keys entry in the sidebar and profile menus points at
+  // `?tab=api-keys`, and opening it from the settings page changes only the
+  // part after the "?", which leaves the page itself mounted. Reading the
+  // address once on load would leave the user staring at the Admin tab.
+  //
+  // The popstate listener covers the back button and address-bar edits. Tab
+  // clicks use replaceState below, which neither of these two sees, so they
+  // cannot fight over the tab.
   useEffect(() => {
     const syncFromUrl = () => {
       const tab = new URLSearchParams(window.location.search).get("tab");
@@ -65,7 +72,7 @@ export default function WorkspaceSettingsPage() {
     syncFromUrl();
     window.addEventListener("popstate", syncFromUrl);
     return () => window.removeEventListener("popstate", syncFromUrl);
-  }, []);
+  }, [searchParams]);
 
   const handleTabChange = (tab: SettingsTab) => {
     setActiveTab(tab);
