@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   useAccessToken,
@@ -185,7 +184,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
                     setOpen(false);
                     setCreateOpen(true);
                   }}
-                  onSettingsClick={() => setOpen(false)}
                 />
               </div>
             )}
@@ -242,7 +240,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
                 setOpen(false);
                 setCreateOpen(true);
               }}
-              onSettingsClick={() => setOpen(false)}
             />
           </div>
         )}
@@ -263,7 +260,6 @@ type DropdownPanelProps = {
   activeOrg: Organization | null;
   onSelect: (uuid: string) => void;
   onCreateClick: () => void;
-  onSettingsClick: () => void;
 };
 
 function DropdownPanel({
@@ -273,7 +269,6 @@ function DropdownPanel({
   activeOrg,
   onSelect,
   onCreateClick,
-  onSettingsClick,
 }: DropdownPanelProps) {
   return (
     <div
@@ -334,9 +329,8 @@ function DropdownPanel({
 
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
-          <Link
+          <a
             href="/workspace-settings?tab=admin"
-            onClick={onSettingsClick}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -358,12 +352,11 @@ function DropdownPanel({
               />
             </svg>
             Settings
-          </Link>
+          </a>
         )}
         {activeOrg && (
-          <Link
+          <a
             href="/workspace-settings?tab=api-keys"
-            onClick={onSettingsClick}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -380,7 +373,7 @@ function DropdownPanel({
               />
             </svg>
             API keys
-          </Link>
+          </a>
         )}
         <button
           type="button"

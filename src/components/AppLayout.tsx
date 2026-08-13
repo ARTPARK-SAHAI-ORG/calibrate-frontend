@@ -887,9 +887,8 @@ export function AppLayout({
 
                   {/* API keys — jumps straight to that tab of workspace settings. */}
                   <div className="p-2 border-b border-border">
-                    <Link
+                    <a
                       href="/workspace-settings?tab=api-keys"
-                      onClick={() => setProfileOpen(false)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
                     >
                       <svg
@@ -906,7 +905,7 @@ export function AppLayout({
                         />
                       </svg>
                       API keys
-                    </Link>
+                    </a>
                   </div>
 
                   {/* Take a tour — desktop-only, so hidden on phones. */}
