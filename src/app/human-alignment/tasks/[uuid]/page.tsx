@@ -44,6 +44,11 @@ import {
   JobsCreatedDialog,
   type CreatedJob,
 } from "@/components/human-labelling/JobsCreatedDialog";
+import { BulkItemEvaluatorsDialog } from "@/components/human-labelling/BulkItemEvaluatorsDialog";
+import {
+  effectiveEvaluatorIds,
+  isCustomisedItem,
+} from "@/components/human-labelling/itemEvaluators";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import {
@@ -230,6 +235,12 @@ type LabellingItem = {
   updated_at?: string;
   deleted_at: string | null;
   agreement?: ItemAgreement;
+  // Per-item evaluators. `evaluator_ids` is what was saved (null when the item
+  // follows the task) and only tells us whether the user narrowed this item.
+  // `effective_evaluator_ids` is what actually applies now, and is the one to
+  // render and to send back. See `itemEvaluators.ts`.
+  evaluator_ids?: string[] | null;
+  effective_evaluator_ids?: string[] | null;
 };
 
 type LabellingJob = {
@@ -898,6 +909,60 @@ function ItemRowActions({
 }
 
 
+/**
+ * Marks a row whose evaluators were narrowed, so it no longer follows the
+ * task. Adding an evaluator to the task later does not reach these rows.
+ */
+/**
+ * Whether we actually read this item's evaluators. An item that is in the
+ * summary but missing from the task's item list arrives without either field,
+ * and we must not write over a list we never saw.
+ */
+function knowsItemEvaluators(item: LabellingItem): boolean {
+  return (
+    item.evaluator_ids !== undefined ||
+    item.effective_evaluator_ids !== undefined
+  );
+}
+
+function OwnEvaluatorsPill({
+  item,
+  taskEvaluatorCount,
+}: {
+  item: LabellingItem;
+  taskEvaluatorCount: number;
+}) {
+  if (!isCustomisedItem(item)) return null;
+  const count = item.effective_evaluator_ids?.length;
+  return (
+    <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+      {typeof count === "number" && taskEvaluatorCount > 0
+        ? `Uses ${count} of ${taskEvaluatorCount} evaluators`
+        : "Does not use every evaluator"}
+    </span>
+  );
+}
+
+/**
+ * The evaluator field to send when creating an item. Left out entirely when
+ * the item should follow the task, which is the default.
+ */
+function createEvaluatorField(ids: string[] | null | undefined) {
+  return Array.isArray(ids) ? { evaluator_ids: ids } : {};
+}
+
+/**
+ * The evaluator field to send when updating an item. Three distinct cases:
+ * a list replaces the item's own list, an explicit null puts the item back on
+ * the task's list, and undefined leaves the key out so the item's evaluators
+ * are not touched. Undefined is what we send when the user did not change the
+ * selection, or when we could not read the item's current list at all, since
+ * sending null in either case would silently wipe a narrowed item.
+ */
+function updateEvaluatorField(ids: string[] | null | undefined) {
+  return ids === undefined ? {} : { evaluator_ids: ids };
+}
+
 function LabelledByCell({
   labellers,
   annotatorNameById,
@@ -1252,6 +1317,7 @@ function LabellingTaskPageInner() {
   );
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
+  const [bulkEvaluatorsOpen, setBulkEvaluatorsOpen] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
 
   const [selectedJobUuids, setSelectedJobUuids] = useState<Set<string>>(
@@ -1709,6 +1775,80 @@ function LabellingTaskPageInner() {
     }
     return out;
   }, [taskSummary, itemMetaByUuid]);
+  // The task's evaluators in display order, as a stable reference: the item
+  // dialogs re-seed their picker whenever this identity changes.
+  const taskEvaluatorOptions = useMemo(
+    () =>
+      (task?.evaluators ?? []).map((ev) => ({
+        uuid: ev.uuid,
+        name: ev.name,
+        description: ev.description,
+      })),
+    [task?.evaluators],
+  );
+  const taskEvaluatorIds = useMemo(
+    () => taskEvaluatorOptions.map((ev) => ev.uuid),
+    [taskEvaluatorOptions],
+  );
+  /**
+   * What to seed an edit dialog's evaluator picker with: the item's own list
+   * when it has one, or null when it follows the task. Always the effective
+   * list, never the saved one, since a saved list can name an evaluator the
+   * task has since dropped and sending that back is rejected.
+   */
+  const initialEvaluatorIdsFor = useCallback(
+    (item: LabellingItem | null | undefined): string[] | null =>
+      item && isCustomisedItem(item)
+        ? effectiveEvaluatorIds(item, taskEvaluatorIds)
+        : null,
+    [taskEvaluatorIds],
+  );
+
+  /**
+   * The first row an edit dialog is about to show. The evaluator picker in
+   * those dialogs applies to every row being edited at once, so it is seeded
+   * from the first row and saved to all of them.
+   */
+  const firstEditedItem = useCallback(
+    (singleUuid: string | null): LabellingItem | null =>
+      items.find((it) =>
+        singleUuid ? it.uuid === singleUuid : selectedItemIds.has(it.uuid),
+      ) ?? null,
+    [items, selectedItemIds],
+  );
+
+  /**
+   * The llm and conversation item dialog already lets the user attach and
+   * detach evaluators, seeded from the task's list. Treat the result as the
+   * item's own list only when it differs from the task's; otherwise the item
+   * keeps following the task.
+   */
+  const itemEvaluatorIdsFromAttached = useCallback(
+    (
+      attached: { evaluator_uuid: string }[],
+      /**
+       * The item being edited. When we cannot read its current evaluators, we
+       * report undefined so the write leaves them untouched rather than
+       * resetting a list we never saw.
+       */
+      item?: LabellingItem | null,
+    ): string[] | null | undefined => {
+      if (item && !knowsItemEvaluators(item)) return undefined;
+      const picked = attached
+        .map((ev) => ev.evaluator_uuid)
+        .filter((id) => taskEvaluatorIds.includes(id));
+      // Nothing recognised: the dialog blocks saving with no evaluators, so
+      // this only happens when every attached evaluator has been unlinked from
+      // the task. Following the task is the only list left that can be saved.
+      if (picked.length === 0) return null;
+      const sameAsTask =
+        picked.length === taskEvaluatorIds.length &&
+        taskEvaluatorIds.every((id) => picked.includes(id));
+      return sameAsTask ? null : picked;
+    },
+    [taskEvaluatorIds],
+  );
+
   const jobs = task?.jobs ?? [];
   // First-load spinner only — paginated refetches keep the table
   // visible and surface their loading state via the refresh button.
@@ -2002,10 +2142,27 @@ function LabellingTaskPageInner() {
         status: string;
         evaluator_count: number;
         item_count: number;
+        skipped_pair_count?: number;
+        evaluators_with_no_items?: string[];
       }>(`/annotation-tasks/${uuid}/evaluator-runs`, accessToken, {
         method: "POST",
         body,
       });
+      // Pairs are skipped when the item does not use that evaluator. Say so,
+      // otherwise the run looks like it quietly did less than was asked.
+      const skippedPairs = result.skipped_pair_count ?? 0;
+      const idleEvaluatorNames = (result.evaluators_with_no_items ?? [])
+        .map((id) => task?.evaluators?.find((ev) => ev.uuid === id)?.name)
+        .filter((name): name is string => !!name);
+      if (idleEvaluatorNames.length > 0) {
+        toast.warning(
+          `${idleEvaluatorNames.join(", ")} ${idleEvaluatorNames.length === 1 ? "does" : "do"} not apply to any of the selected items, so ${idleEvaluatorNames.length === 1 ? "it was" : "they were"} left out.`,
+        );
+      } else if (skippedPairs > 0) {
+        toast.warning(
+          `${skippedPairs} item and evaluator ${skippedPairs === 1 ? "pair was" : "pairs were"} left out because those items do not use those evaluators.`,
+        );
+      }
       setRunDialogOpen(false);
       router.push(
         `/human-alignment/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
@@ -2198,8 +2355,17 @@ function LabellingTaskPageInner() {
   // dialog can still render and pre-fill them.
   const buildInitialEvaluators = (
     savedValues: Record<string, Record<string, string>>,
+    /**
+     * The item's own evaluators when it has narrowed them. Without this the
+     * dialog would open showing every task evaluator, and saving would put a
+     * narrowed item back on the task's list without the user asking.
+     */
+    onlyEvaluatorIds?: string[] | null,
   ): AttachedEvaluatorInit[] => {
-    const linked = task?.evaluators ?? [];
+    const all = task?.evaluators ?? [];
+    const linked = Array.isArray(onlyEvaluatorIds)
+      ? all.filter((ev) => onlyEvaluatorIds.includes(ev.uuid))
+      : all;
     return linked.map((ev) => {
       const saved = savedValues[ev.uuid] ?? null;
       let variables: EvaluatorVariableDef[] = ev.variables ?? [];
@@ -2219,6 +2385,7 @@ function LabellingTaskPageInner() {
 
   const editingInitialEvaluators = buildInitialEvaluators(
     readEvaluatorVariables(editingPayload),
+    initialEvaluatorIdsFor(editingItem),
   );
   // When duplicating, seed the create dialog's evaluators from the source
   // item; otherwise start with the task's linked evaluators (empty values).
@@ -2312,6 +2479,7 @@ function LabellingTaskPageInner() {
 
   const [createdJobs, setCreatedJobs] = useState<CreatedJob[]>([]);
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
+  const [jobsSkippedItemCount, setJobsSkippedItemCount] = useState(0);
 
   const [itemDetailUuid, setItemDetailUuid] = useState<string | null>(null);
   const openItemDetail = useCallback((itemUuid: string) => {
@@ -2340,15 +2508,21 @@ function LabellingTaskPageInner() {
           }
         : { item_ids: Array.from(selectedItemIds) }),
     };
-    const result = await apiClient<{ count: number; jobs: CreatedJob[] }>(
-      `/annotation-tasks/${uuid}/jobs`,
-      accessToken,
-      { method: "POST", body },
-    );
+    const result = await apiClient<{
+      count: number;
+      jobs: CreatedJob[];
+      skipped_item_count?: number;
+    }>(`/annotation-tasks/${uuid}/jobs`, accessToken, {
+      method: "POST",
+      body,
+    });
     setAssignOpen(false);
     setSelectedItemIds(new Set());
     setSelectAllTotal(false);
     setCreatedJobs(result.jobs ?? []);
+    // An item is left out when its own evaluators and the chosen evaluators
+    // have nothing in common, so there is nothing on it to label.
+    setJobsSkippedItemCount(result.skipped_item_count ?? 0);
     setJobsCreatedOpen(true);
     fetchTask();
   };
@@ -3203,6 +3377,14 @@ function LabellingTaskPageInner() {
                     >
                       Delete
                     </button>
+                    {(task?.evaluators?.length ?? 0) > 0 && (
+                      <button
+                        onClick={() => setBulkEvaluatorsOpen(true)}
+                        className="h-8 px-3 rounded-md text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        Evaluators
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (selectAllTotal) {
@@ -3332,9 +3514,15 @@ function LabellingTaskPageInner() {
                             aria-label={`Select item ${item.id}`}
                             className="w-5 h-5 cursor-pointer accent-foreground"
                           />
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {name || "—"}
-                          </p>
+                          <div className="min-w-0">
+                            <p className="text-sm text-foreground line-clamp-2">
+                              {name || "—"}
+                            </p>
+                            <OwnEvaluatorsPill
+                              item={item}
+                              taskEvaluatorCount={taskEvaluatorIds.length}
+                            />
+                          </div>
                           <LabelledByCell
                             labellers={labellerIds}
                             annotatorNameById={annotatorNameById}
@@ -3518,9 +3706,15 @@ function LabellingTaskPageInner() {
                             aria-label={`Select item ${item.id}`}
                             className="w-5 h-5 cursor-pointer accent-foreground"
                           />
-                          <p className="text-sm text-foreground line-clamp-1">
-                            {previewItemPayload(item.payload, taskType)}
-                          </p>
+                          <div className="min-w-0">
+                            <p className="text-sm text-foreground line-clamp-1">
+                              {previewItemPayload(item.payload, taskType)}
+                            </p>
+                            <OwnEvaluatorsPill
+                              item={item}
+                              taskEvaluatorCount={taskEvaluatorIds.length}
+                            />
+                          </div>
                           <p
                             className="text-sm text-muted-foreground line-clamp-2"
                             title={itemDescription || undefined}
@@ -3994,7 +4188,16 @@ function LabellingTaskPageInner() {
             try {
               await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
                 method: "POST",
-                body: { items: [{ payload }] },
+                body: {
+                  items: [
+                    {
+                      payload,
+                      ...createEvaluatorField(
+                        itemEvaluatorIdsFromAttached(evaluators),
+                      ),
+                    },
+                  ],
+                },
               });
               setAddItemOpen(false);
               setDuplicateSourcePayload(null);
@@ -4106,7 +4309,15 @@ function LabellingTaskPageInner() {
                 {
                   method: "PUT",
                   body: {
-                    updates: [{ uuid: editLlmItemUuid, payload }],
+                    updates: [
+                      {
+                        uuid: editLlmItemUuid,
+                        payload,
+                        ...updateEvaluatorField(
+                          itemEvaluatorIdsFromAttached(evaluators, editingItem),
+                        ),
+                      },
+                    ],
                   },
                 },
               );
@@ -4221,6 +4432,7 @@ function LabellingTaskPageInner() {
 
       <AddSttItemsDialog
         isOpen={addSttItemsOpen}
+        taskEvaluators={taskEvaluatorOptions}
         initialRows={duplicateSttRows ?? undefined}
         onClose={() => {
           setAddSttItemsOpen(false);
@@ -4237,6 +4449,7 @@ function LabellingTaskPageInner() {
                   reference_transcript: r.actual_transcript,
                   predicted_transcript: r.predicted_transcript,
                 },
+                ...createEvaluatorField(r.evaluatorIds),
               })),
             },
           });
@@ -4250,6 +4463,10 @@ function LabellingTaskPageInner() {
       <AddSttItemsDialog
         isOpen={editSttItemsOpen}
         mode="edit"
+        taskEvaluators={taskEvaluatorOptions}
+        initialEvaluatorIds={initialEvaluatorIdsFor(
+          firstEditedItem(editSttSingleItemUuid),
+        )}
         initialRows={items
           .filter((it) =>
             editSttSingleItemUuid
@@ -4292,6 +4509,7 @@ function LabellingTaskPageInner() {
                       reference_transcript: r.actual_transcript,
                       predicted_transcript: r.predicted_transcript,
                     },
+                    ...updateEvaluatorField(r.evaluatorIds),
                   })),
               },
             },
@@ -4307,6 +4525,7 @@ function LabellingTaskPageInner() {
       <AddTtsItemsDialog
         isOpen={addTtsItemsOpen}
         accessToken={accessToken}
+        taskEvaluators={taskEvaluatorOptions}
         initialRows={duplicateTtsRows ?? undefined}
         onClose={() => {
           setAddTtsItemsOpen(false);
@@ -4323,6 +4542,7 @@ function LabellingTaskPageInner() {
                   text: r.text,
                   audio_path: r.audio_path,
                 },
+                ...createEvaluatorField(r.evaluatorIds),
               })),
             },
           });
@@ -4337,6 +4557,10 @@ function LabellingTaskPageInner() {
         isOpen={editTtsItemsOpen}
         mode="edit"
         accessToken={accessToken}
+        taskEvaluators={taskEvaluatorOptions}
+        initialEvaluatorIds={initialEvaluatorIdsFor(
+          firstEditedItem(editTtsSingleItemUuid),
+        )}
         initialRows={items
           .filter((it) =>
             editTtsSingleItemUuid
@@ -4373,6 +4597,7 @@ function LabellingTaskPageInner() {
                       text: r.text,
                       audio_path: r.audio_path,
                     },
+                    ...updateEvaluatorField(r.evaluatorIds),
                   })),
               },
             },
@@ -4408,6 +4633,7 @@ function LabellingTaskPageInner() {
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
                 },
+                ...createEvaluatorField(r.evaluatorIds),
               })),
             },
           });
@@ -4422,6 +4648,9 @@ function LabellingTaskPageInner() {
         isOpen={editLlmGeneralItemsOpen}
         mode="edit"
         evaluators={llmGeneralEvaluatorDefs}
+        initialEvaluatorIds={initialEvaluatorIdsFor(
+          firstEditedItem(editLlmGeneralSingleItemUuid),
+        )}
         initialRows={items
           .filter((it) =>
             editLlmGeneralSingleItemUuid
@@ -4465,6 +4694,7 @@ function LabellingTaskPageInner() {
                         ? { evaluator_variables: r.evaluator_variables }
                         : {}),
                     },
+                    ...updateEvaluatorField(r.evaluatorIds),
                   })),
               },
             },
@@ -4514,9 +4744,45 @@ function LabellingTaskPageInner() {
         />
       )}
 
+      {accessToken && (
+        <BulkItemEvaluatorsDialog
+          isOpen={bulkEvaluatorsOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          evaluators={taskEvaluatorOptions}
+          selectedItemCount={
+            selectAllTotal ? itemsTotal : selectedItemIds.size
+          }
+          scope={
+            selectAllTotal
+              ? { select_all: true, ...(itemsSearch ? { q: itemsSearch } : {}) }
+              : { item_ids: Array.from(selectedItemIds) }
+          }
+          onClose={() => setBulkEvaluatorsOpen(false)}
+          onDone={async (action, updatedCount) => {
+            setBulkEvaluatorsOpen(false);
+            // Adding to an item that already follows the task changes nothing,
+            // so a count of zero here is the normal outcome, not a failure.
+            if (updatedCount === 0 && action === "add") {
+              toast.success(
+                "Nothing to change. Those items already use the task's evaluators.",
+              );
+            } else {
+              toast.success(
+                `${updatedCount} item${updatedCount === 1 ? "" : "s"} updated`,
+              );
+            }
+            setSelectedItemIds(new Set());
+            setSelectAllTotal(false);
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
+          }}
+        />
+      )}
+
       <JobsCreatedDialog
         isOpen={jobsCreatedOpen}
         jobs={createdJobs}
+        skippedItemCount={jobsSkippedItemCount}
         onClose={() => setJobsCreatedOpen(false)}
       />
 

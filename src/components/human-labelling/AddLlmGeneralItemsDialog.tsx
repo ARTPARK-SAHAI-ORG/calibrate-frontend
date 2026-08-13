@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import ItemEvaluatorPicker from "./ItemEvaluatorPicker";
+import { useItemEvaluatorSelection } from "./itemEvaluators";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
   DiscardChangesDialog,
@@ -27,6 +29,9 @@ export type LlmGeneralItemRowSubmission = {
   input: string;
   output: string;
   evaluator_variables: VarValues;
+  // The evaluators picked for this item: undefined when the choice was left
+  // alone, null when the item follows the task.
+  evaluatorIds: string[] | null | undefined;
 };
 
 type AddLlmGeneralItemsDialogProps = {
@@ -35,6 +40,9 @@ type AddLlmGeneralItemsDialogProps = {
   // Linked evaluators with their variable definitions, used to render the
   // per-item variable inputs and seed defaults.
   evaluators?: LlmGeneralEvaluatorDef[];
+  // The item's current evaluators in edit mode. null or undefined means the
+  // item follows the task's evaluators.
+  initialEvaluatorIds?: string[] | null;
   // A single item to seed the dialog with (edit / duplicate). Kept as an
   // array for backwards-compatible call sites; only the first entry is used
   // since the dialog edits one item at a time.
@@ -74,6 +82,7 @@ export function AddLlmGeneralItemsDialog({
   isOpen,
   mode = "add",
   evaluators = [],
+  initialEvaluatorIds,
   initialRows,
   onClose,
   onSubmit,
@@ -81,6 +90,12 @@ export function AddLlmGeneralItemsDialog({
   useHideFloatingButton(isOpen);
 
   const isEdit = mode === "edit";
+  const evaluatorChoice = useItemEvaluatorSelection(
+    evaluators,
+    initialEvaluatorIds,
+    isOpen,
+  );
+  const selectedIds = evaluatorChoice.selectedIds;
   const evaluatorsWithVariables = evaluators.filter(
     (e) => e.variables.length > 0,
   );
@@ -131,7 +146,12 @@ export function AddLlmGeneralItemsDialog({
   // Unsaved-changes check: any field differs from what the dialog was seeded
   // with (blank for add, the item's values for edit).
   const baseVarValues = seedVarValues(seed?.varValues);
+  // Only the picked evaluators are shown, filled in and submitted.
+  const selectedWithVariables = evaluatorsWithVariables.filter((e) =>
+    selectedIds.includes(e.uuid),
+  );
   const isDirty =
+    evaluatorChoice.changed ||
     name.trim() !== (seed?.name ?? "").trim() ||
     description.trim() !== (seed?.description ?? "").trim() ||
     input.trim() !== (seed?.input ?? "").trim() ||
@@ -171,17 +191,21 @@ export function AddLlmGeneralItemsDialog({
     }));
   };
 
-  // Every variable on every evaluator must have a non-empty value.
-  const varsComplete = evaluatorsWithVariables.every((e) =>
+  // Every variable on every picked evaluator must have a non-empty value.
+  const varsComplete = selectedWithVariables.every((e) =>
     e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
   );
   const valid =
-    !!name.trim() && !!input.trim() && !!output.trim() && varsComplete;
+    !!name.trim() &&
+    !!input.trim() &&
+    !!output.trim() &&
+    varsComplete &&
+    evaluatorChoice.canSubmit;
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
     const evaluator_variables: VarValues = {};
-    for (const e of evaluatorsWithVariables) {
+    for (const e of selectedWithVariables) {
       const evVals: Record<string, string> = {};
       for (const v of e.variables) {
         evVals[v.name] = (varValues[e.uuid]?.[v.name] ?? "").trim();
@@ -200,6 +224,7 @@ export function AddLlmGeneralItemsDialog({
           input: input.trim(),
           output: output.trim(),
           evaluator_variables,
+          evaluatorIds: evaluatorChoice.submitValue,
         },
       ]);
     } catch (err) {
@@ -301,12 +326,17 @@ export function AddLlmGeneralItemsDialog({
             </div>
 
             {evaluators.length > 0 && (
-              <div>
-                <label className="block text-base font-medium text-foreground mb-2">
-                  Evaluators
-                </label>
+              <div className="space-y-4">
+                <ItemEvaluatorPicker
+                  evaluators={evaluators}
+                  selectedIds={selectedIds}
+                  onChange={evaluatorChoice.select}
+                  isCustomised={evaluatorChoice.isCustomised}
+                  onFollowTask={evaluatorChoice.followTask}
+                  disabled={submitting}
+                />
                 <div className="space-y-4">
-                  {evaluators.map((e) => (
+                  {selectedWithVariables.map((e) => (
                     <div
                       key={e.uuid}
                       className="border border-border rounded-lg p-4 bg-background"
@@ -315,11 +345,6 @@ export function AddLlmGeneralItemsDialog({
                         <div className="text-sm font-semibold text-foreground">
                           {e.name}
                         </div>
-                        {e.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                            {e.description}
-                          </div>
-                        )}
                       </div>
                       {e.variables.length > 0 && (
                         <div className="space-y-3">

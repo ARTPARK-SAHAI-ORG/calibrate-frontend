@@ -523,7 +523,7 @@ describe("AnnotationJobView", () => {
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
       expect(
-        screen.getByText("No evaluators are attached to this task."),
+        screen.getByText("There are no evaluators to review for this item."),
       ).toBeInTheDocument(),
     );
   });
@@ -985,6 +985,145 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
       expect(screen.queryByText("Correctness is Wrong")).not.toBeInTheDocument();
       expect(screen.queryByText("Quality is 5")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("per-item evaluators", () => {
+    const subsetItem = { ...items[0], evaluator_ids: ["ev-1"] };
+
+    it("renders only the evaluators listed on the item", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ items: [subsetItem] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Quality")).not.toBeInTheDocument();
+    });
+
+    it("enables submit once the item's own evaluators are answered and sends only those", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(jobResponse({ items: [subsetItem] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      const submitButton = screen.getByRole("button", {
+        name: "Mark as complete",
+      });
+      expect(submitButton).toBeDisabled();
+
+      // Only ev-1 is on this item, so answering it alone is enough.
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(submitButton).toBeEnabled();
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1"], count: 1, status: "completed" }),
+      );
+      await user.click(submitButton);
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.annotations).toEqual([
+        { evaluator_id: "ev-1", value: { value: true } },
+      ]);
+    });
+
+    it("treats an item as complete once its own smaller set is answered", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            items: [subsetItem, items[1]],
+            annotations: [
+              {
+                uuid: "a1",
+                job_id: "job-1",
+                item_id: "item-1",
+                evaluator_id: "ev-1",
+                value: { value: true },
+                created_at: "",
+                updated_at: "",
+              },
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      // Item 1 counts as done on ev-1 alone, so the load skips to item 2 and
+      // the item 1 dot reads as completed.
+      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(
+        0,
+      );
+      expect(screen.getAllByTitle("Item 2").length).toBeGreaterThan(0);
+      // Item 2 is the only unsaved item left.
+      expect(
+        screen.getByRole("button", { name: "Mark as complete" }),
+      ).toBeInTheDocument();
+    });
+
+    it("lets the annotator submit an item that has no evaluators", async () => {
+      const user = setupUser();
+      const emptyItem = { ...items[0], evaluator_ids: [] };
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(jobResponse({ items: [emptyItem] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(
+          screen.getByText("There are no evaluators to review for this item."),
+        ).toBeInTheDocument(),
+      );
+      // The dot, the count, and the button agree: nothing is outstanding, and
+      // the button is still usable so the annotator is not stuck.
+      expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(
+        0,
+      );
+      const submitButton = screen.getByRole("button", { name: "Update" });
+      expect(submitButton).toBeEnabled();
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 0, status: "completed" }),
+      );
+      await user.click(submitButton);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body).annotations).toEqual(
+        [],
+      );
+    });
+
+    it("moves past an item with no evaluators to the one that still needs work", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({ items: [{ ...items[0], evaluator_ids: [] }, items[1]] }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+      );
+      // Item 1 needs nothing, so item 2 is the only one left.
+      expect(
+        screen.getByRole("button", { name: "Mark as complete" }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows every evaluator for an item with no evaluator_ids field", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ items: [items[0]] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Quality")).toBeInTheDocument();
     });
   });
 

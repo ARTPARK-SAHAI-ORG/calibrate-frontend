@@ -111,7 +111,8 @@ describe("AddLlmGeneralItemsDialog", () => {
   it("renders evaluators with variable inputs, seeding defaults", () => {
     renderDialog({ evaluators: [evaluatorWithVars, evaluatorNoVars] });
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
-    expect(screen.getByText("Relevance")).toBeInTheDocument();
+    // Once in the picker, once as the heading of its variable inputs.
+    expect(screen.getAllByText("Relevance")).toHaveLength(2);
     expect(screen.getByText("Checks relevance")).toBeInTheDocument();
     expect(screen.getByText("Fluency")).toBeInTheDocument();
     // Default-seeded variable value shown as textarea content.
@@ -188,6 +189,7 @@ describe("AddLlmGeneralItemsDialog", () => {
         input: "in",
         output: "out",
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
+        evaluatorIds: undefined,
       },
     ]);
   });
@@ -338,6 +340,178 @@ describe("AddLlmGeneralItemsDialog", () => {
     const { onClose } = renderDialog();
     await user.click(screen.getByRole("heading", { name: "Add item" }));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  describe("picking the item's evaluators", () => {
+    const fillRequired = async (user: ReturnType<typeof setupUser>) => {
+      await user.type(screen.getByPlaceholderText("Your item name"), "Item 1");
+      await user.type(
+        screen.getByPlaceholderText("The prompt or input given to the LLM"),
+        "in",
+      );
+      await user.type(
+        screen.getByPlaceholderText("The output the LLM produced"),
+        "out",
+      );
+    };
+
+    it("gives every evaluator a tick box, all ticked when the item follows the task", () => {
+      renderDialog({ evaluators: [evaluatorWithVars, evaluatorNoVars] });
+      const boxes = screen.getAllByRole("checkbox");
+      expect(boxes).toHaveLength(2);
+      boxes.forEach((box) => expect(box).toBeChecked());
+      expect(
+        screen.queryByRole("button", { name: "Use the task's evaluators" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides the variable inputs of an evaluator that is turned off, and stops it blocking submit", async () => {
+      const user = setupUser();
+      renderDialog({ evaluators: [evaluatorWithVars, evaluatorNoVars] });
+      await fillRequired(user);
+
+      const addButton = screen.getByRole("button", { name: "Add item" });
+      // topic is still blank, so the item cannot be added yet.
+      expect(addButton).toBeDisabled();
+
+      await user.click(screen.getAllByRole("checkbox")[0]);
+
+      expect(
+        screen.queryByPlaceholderText("The topic"),
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByText("Relevance")).toHaveLength(1);
+      expect(addButton).not.toBeDisabled();
+    });
+
+    it("submits without the excluded evaluator's variables and with the reduced evaluator list", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        evaluators: [evaluatorWithVars, evaluatorNoVars],
+        onSubmit,
+      });
+      await fillRequired(user);
+      await user.click(screen.getAllByRole("checkbox")[0]);
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit).toHaveBeenCalledWith([
+        expect.objectContaining({
+          evaluator_variables: {},
+          evaluatorIds: ["ev-2"],
+        }),
+      ]);
+    });
+
+    it("does not let the last remaining evaluator be turned off", async () => {
+      const user = setupUser();
+      renderDialog({ evaluators: [evaluatorWithVars, evaluatorNoVars] });
+
+      await user.click(screen.getAllByRole("checkbox")[0]);
+      const remaining = screen.getAllByRole("checkbox")[1];
+      expect(remaining).toBeChecked();
+      expect(remaining).toBeDisabled();
+
+      await user.click(remaining);
+      expect(screen.getAllByRole("checkbox")[1]).toBeChecked();
+    });
+
+    it("puts the item back on the task's evaluators and leaves them alone", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        evaluators: [evaluatorWithVars, evaluatorNoVars],
+        onSubmit,
+      });
+      await fillRequired(user);
+      await user.click(screen.getAllByRole("checkbox")[0]);
+
+      await user.click(
+        screen.getByRole("button", { name: "Use the task's evaluators" }),
+      );
+      screen
+        .getAllByRole("checkbox")
+        .forEach((box) => expect(box).toBeChecked());
+
+      await user.type(screen.getByPlaceholderText("The topic"), "sports");
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit).toHaveBeenCalledWith([
+        expect.objectContaining({
+          evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
+          evaluatorIds: undefined,
+        }),
+      ]);
+    });
+
+    it("seeds the tick boxes from initialEvaluatorIds in edit mode", () => {
+      renderDialog({
+        mode: "edit",
+        evaluators: [evaluatorWithVars, evaluatorNoVars],
+        initialEvaluatorIds: ["ev-2"],
+        initialRows: [
+          { uuid: "item-1", name: "Item 1", input: "in", output: "out" },
+        ],
+      });
+      const boxes = screen.getAllByRole("checkbox");
+      expect(boxes[0]).not.toBeChecked();
+      expect(boxes[1]).toBeChecked();
+      expect(
+        screen.getByRole("button", { name: "Use the task's evaluators" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("The topic")).not.toBeInTheDocument();
+    });
+
+    it("leaves the evaluators alone when only a field was edited", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        evaluators: [evaluatorWithVars, evaluatorNoVars],
+        initialEvaluatorIds: ["ev-2"],
+        initialRows: [
+          { uuid: "item-1", name: "Item 1", input: "in", output: "out" },
+        ],
+        onSubmit,
+      });
+      await user.type(screen.getByDisplayValue("Item 1"), " renamed");
+      await user.click(screen.getByRole("button", { name: "Save item" }));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
+
+    it("falls back to the task's evaluators when the item's saved ones are all gone", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        evaluators: [evaluatorWithVars, evaluatorNoVars],
+        initialEvaluatorIds: ["gone"],
+        initialRows: [
+          {
+            uuid: "item-1",
+            name: "Item 1",
+            input: "in",
+            output: "out",
+            varValues: { "ev-1": { topic: "sports", tone: "neutral" } },
+          },
+        ],
+        onSubmit,
+      });
+      screen
+        .getAllByRole("checkbox")
+        .forEach((box) => expect(box).toBeChecked());
+      // Nothing survived, so the item follows the task rather than showing an
+      // empty, unsavable choice.
+      expect(
+        screen.queryByRole("button", { name: "Use the task's evaluators" }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Save item" }));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].evaluatorIds).toBeUndefined();
+    });
   });
 
   describe("edit mode", () => {

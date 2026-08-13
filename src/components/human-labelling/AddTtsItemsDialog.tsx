@@ -5,6 +5,11 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import ItemEvaluatorPicker from "./ItemEvaluatorPicker";
+import {
+  useItemEvaluatorSelection,
+  type TaskEvaluatorOption,
+} from "./itemEvaluators";
 import {
   parseItemNameConflictFromError,
   rowNameErrorsFromConflict,
@@ -36,6 +41,11 @@ export type TtsItemRowSubmission = {
   name: string;
   text: string;
   audio_path: string;
+  /**
+   * undefined means the evaluators were left alone, null means the item
+   * follows the task's evaluators.
+   */
+  evaluatorIds: string[] | null | undefined;
 };
 
 type AddTtsItemsDialogProps = {
@@ -49,6 +59,10 @@ type AddTtsItemsDialogProps = {
     /** Existing stored audio (s3 path / signed URL). */
     audio: string;
   }[];
+  /** The task's linked evaluators, in display order. */
+  taskEvaluators?: TaskEvaluatorOption[];
+  /** Edit mode: the item's current evaluators. null means it follows the task. */
+  initialEvaluatorIds?: string[] | null;
   onClose: () => void;
   onSubmit: (rows: TtsItemRowSubmission[]) => Promise<void> | void;
 };
@@ -107,6 +121,8 @@ export function AddTtsItemsDialog({
   mode = "add",
   accessToken,
   initialRows,
+  taskEvaluators,
+  initialEvaluatorIds,
   onClose,
   onSubmit,
 }: AddTtsItemsDialogProps) {
@@ -116,6 +132,13 @@ export function AddTtsItemsDialog({
 
   const [rows, setRows] = useState<TtsRowDraft[]>(() =>
     rowsFromInitial(initialRows),
+  );
+  // One evaluator choice for the whole dialog: it applies to every row being
+  // added, or to the single row being edited.
+  const evaluatorChoice = useItemEvaluatorSelection(
+    taskEvaluators,
+    initialEvaluatorIds,
+    isOpen,
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,16 +208,19 @@ export function AddTtsItemsDialog({
     return scheduleScrollToFirstFieldError(scrollContainerRef.current);
   }, [errorScrollTick]);
 
-  const isDirty = isEdit
-    ? rows.some((r, i) => {
-        const init = initialRows?.[i];
-        return (
-          r.name.trim() !== (init?.name ?? "").trim() ||
-          r.text.trim() !== (init?.text ?? "").trim() ||
-          !!r.audioFile // any replacement audio counts as an edit
-        );
-      })
-    : rows.some((r) => r.name.trim() || r.text.trim() || r.audioFile);
+  // Changing the evaluators is unsaved work in either mode.
+  const isDirty =
+    evaluatorChoice.changed ||
+    (isEdit
+      ? rows.some((r, i) => {
+          const init = initialRows?.[i];
+          return (
+            r.name.trim() !== (init?.name ?? "").trim() ||
+            r.text.trim() !== (init?.text ?? "").trim() ||
+            !!r.audioFile // any replacement audio counts as an edit
+          );
+        })
+      : rows.some((r) => r.name.trim() || r.text.trim() || r.audioFile));
 
   const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
     useUnsavedCloseGuard({
@@ -259,9 +285,7 @@ export function AddTtsItemsDialog({
   };
 
   const isRowValid = (r: TtsRowDraft) =>
-    !!r.name.trim() &&
-    !!r.text.trim() &&
-    (!!r.audioFile || !!r.existingAudio);
+    !!r.name.trim() && !!r.text.trim() && (!!r.audioFile || !!r.existingAudio);
 
   const validRows = rows.filter(isRowValid);
   const allComplete = rows.every(isRowValid);
@@ -281,7 +305,7 @@ export function AddTtsItemsDialog({
   };
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    if (submitting || !evaluatorChoice.canSubmit) return;
     // Surface per-field errors instead of silently dropping incomplete rows.
     if (!allComplete) {
       setValidationAttempted(true);
@@ -326,6 +350,7 @@ export function AddTtsItemsDialog({
         name: r.name.trim(),
         text: r.text.trim(),
         audio_path: uploaded[r.id] ?? r.existingAudio ?? "",
+        evaluatorIds: evaluatorChoice.submitValue,
       }));
       await onSubmit(resolved);
     } catch (err) {
@@ -405,6 +430,22 @@ export function AddTtsItemsDialog({
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
         >
+          {/* One evaluator choice for the dialog: it applies to every item
+              being added, or to the item being edited. */}
+          {taskEvaluators && taskEvaluators.length > 0 && (
+            <div className="border border-border rounded-xl bg-muted/50 p-5">
+              <ItemEvaluatorPicker
+                evaluators={taskEvaluators}
+                selectedIds={evaluatorChoice.selectedIds}
+                onChange={evaluatorChoice.select}
+                isCustomised={evaluatorChoice.isCustomised}
+                onFollowTask={evaluatorChoice.followTask}
+                disabled={submitting}
+                itemCount={rows.length}
+              />
+            </div>
+          )}
+
           {rows.map((row, idx) => {
             const playSrc = row.previewUrl ?? row.existingAudio;
             const fileName = row.audioFile?.name;
@@ -458,7 +499,9 @@ export function AddTtsItemsDialog({
                   <input
                     type="text"
                     value={row.name}
-                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { name: e.target.value })
+                    }
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
                     className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${nameInvalid ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
@@ -476,7 +519,9 @@ export function AddTtsItemsDialog({
                   </label>
                   <textarea
                     value={row.text}
-                    onChange={(e) => updateRow(row.id, { text: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { text: e.target.value })
+                    }
                     placeholder="The reference text that was spoken"
                     disabled={submitting}
                     rows={2}
@@ -547,7 +592,9 @@ export function AddTtsItemsDialog({
                     </div>
                   )}
                   {audioErrors[row.id] && (
-                    <p className="text-xs text-red-500">{audioErrors[row.id]}</p>
+                    <p className="text-xs text-red-500">
+                      {audioErrors[row.id]}
+                    </p>
                   )}
                   <FieldError show={audioMissing && !audioErrors[row.id]}>
                     Audio is required
@@ -602,7 +649,12 @@ export function AddTtsItemsDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !evaluatorChoice.canSubmit}
+            title={
+              evaluatorChoice.canSubmit
+                ? undefined
+                : "Pick at least one evaluator"
+            }
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitLabel}

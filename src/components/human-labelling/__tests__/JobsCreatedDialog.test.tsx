@@ -100,4 +100,49 @@ describe("JobsCreatedDialog", () => {
     await user.click(screen.getByRole("button", { name: "Done" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe("items left out", () => {
+    it("says nothing when no item was left out", () => {
+      render(<JobsCreatedDialog isOpen jobs={jobs} onClose={jest.fn()} />);
+      expect(screen.queryByText(/left out/)).not.toBeInTheDocument();
+    });
+
+    it("says nothing when the count is zero", () => {
+      render(
+        <JobsCreatedDialog
+          isOpen
+          jobs={jobs}
+          skippedItemCount={0}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText(/left out/)).not.toBeInTheDocument();
+    });
+
+    it("names how many items were left out", () => {
+      render(
+        <JobsCreatedDialog
+          isOpen
+          jobs={jobs}
+          skippedItemCount={4}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(
+        screen.getByText(/4 items were left out\./),
+      ).toBeInTheDocument();
+    });
+
+    it("uses singular wording for one item", () => {
+      render(
+        <JobsCreatedDialog
+          isOpen
+          jobs={jobs}
+          skippedItemCount={1}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(/1 item was left out\./)).toBeInTheDocument();
+    });
+  });
 });
