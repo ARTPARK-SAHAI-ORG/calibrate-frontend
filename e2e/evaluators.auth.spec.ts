@@ -7,13 +7,27 @@
 import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
 
+// Land on the evaluators list and wait for its authenticated fetch to come
+// back. The access token is read from localStorage on mount, and the create
+// wizard's default-prompt prefill silently does nothing when it runs before
+// that lands — which leaves the form empty and every later step failing. The
+// list request needs the same token, so its response is the ready signal.
+async function openEvaluatorsList(page: Page) {
+  const listed = page.waitForResponse(
+    (r) => r.url().includes("/evaluators?") && r.request().method() === "GET",
+    { timeout: 30000 },
+  );
+  await page.goto("/evaluators");
+  await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
+  await listed;
+}
+
 // Shared create flow: run the two-step "Speech to Text" wizard and land on the
 // "My evaluators" list with a card for `name`. Mirrors the standalone create
 // test below (see its inline comments for why each wait is needed). Returns the
 // card locator so callers can open or delete it.
 async function createEvaluator(page: Page, name: string) {
-  await page.goto("/evaluators");
-  await expect(page.getByRole("heading", { name: "Evaluators" })).toBeVisible();
+  await openEvaluatorsList(page);
 
   await page.getByRole("button", { name: "Add evaluator" }).first().click();
   const picker = page.locator(".fixed.inset-0.z-50");
@@ -62,10 +76,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
   test("loads, creates an evaluator, then deletes it", async ({ page }) => {
     const name = `E2E Eval ${Date.now()}`;
 
-    await page.goto("/evaluators");
-    await expect(
-      page.getByRole("heading", { name: "Evaluators" }),
-    ).toBeVisible();
+    await openEvaluatorsList(page);
 
     // Step 1: use-case picker. Scope to the picker dialog — "Speech to Text"
     // also matches a "Filter by purpose" <option> on the page behind it.
@@ -201,6 +212,97 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
     await expect(markCurrent).toHaveCount(0, { timeout: 20000 });
+
+    // Clean up.
+    await deleteEvaluator(page, name);
+  });
+
+  // Every failed write on the detail page reports a toast (the message used to
+  // render inside the dialog body, where a long judge prompt hid it). The
+  // backend succeeds on these calls, so the failures are forced with route
+  // interception, one per write: new version, mark as current, edit.
+  test("shows a toast when a detail page write fails", async ({ page }) => {
+    const name = `E2E Eval Fail ${Date.now()}`;
+
+    const card = await createEvaluator(page, name);
+    await card.click();
+    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+      timeout: 20000,
+    });
+    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
+
+    // 1. Create version fails with a JSON detail — the toast shows that detail,
+    // not the raw response body, and the dialog stays open.
+    await page.route("**/evaluators/*/versions", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Forced version failure" }),
+      });
+    });
+    await page.getByRole("button", { name: "New version" }).click();
+    const dialog = page.locator(".fixed.inset-0.z-50");
+    await expect(
+      dialog.getByRole("heading", { name: "New version" }),
+    ).toBeVisible();
+    await expect(dialog.getByText("Select judge model")).toHaveCount(0, {
+      timeout: 20000,
+    });
+    await dialog.getByRole("checkbox").uncheck();
+    await dialog.getByRole("button", { name: "Create version" }).click();
+    await expect(page.getByText("Forced version failure")).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      dialog.getByRole("heading", { name: "New version" }),
+    ).toBeVisible();
+
+    // 2. Let the same submit through so there is a non-live v2 to promote.
+    await page.unroute("**/evaluators/*/versions");
+    await dialog.getByRole("button", { name: "Create version" }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "New version" }),
+    ).toHaveCount(0, { timeout: 20000 });
+    await expect(page.getByText("v2", { exact: true })).toBeVisible({
+      timeout: 20000,
+    });
+
+    // 3. "Mark as current" fails — this used to fail silently.
+    await page.route("**/evaluators/*/versions/live", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "nope" }),
+      }),
+    );
+    const v2Card = page
+      .locator("div.rounded-xl")
+      .filter({ has: page.getByText("v2", { exact: true }) });
+    await v2Card.getByRole("button", { name: "Mark as current" }).click();
+    await expect(page.getByText("Failed to set live version")).toBeVisible({
+      timeout: 20000,
+    });
+    await page.unroute("**/evaluators/*/versions/live");
+
+    // 4. Saving the edit dialog fails.
+    await page.route("**/evaluators/*", async (route) => {
+      if (route.request().method() !== "PUT") return route.fallback();
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Forced save failure" }),
+      });
+    });
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Edit evaluator" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Forced save failure")).toBeVisible({
+      timeout: 20000,
+    });
+    await page.unroute("**/evaluators/*");
 
     // Clean up.
     await deleteEvaluator(page, name);

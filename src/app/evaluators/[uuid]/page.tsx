@@ -39,6 +39,11 @@ import {
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
+import { toast } from "sonner";
+import {
+  parseBackendErrorMessage,
+  parseBackendErrorResponse,
+} from "@/lib/parseBackendError";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -220,7 +225,6 @@ function EvaluatorDetailPageInner() {
     useState<BinaryScaleRow[]>(defaultBinaryScale());
   const [newVersionLlmModalOpen, setNewVersionLlmModalOpen] = useState(false);
   const [newVersionSaving, setNewVersionSaving] = useState(false);
-  const [newVersionError, setNewVersionError] = useState<string | null>(null);
   const [newVersionValidated, setNewVersionValidated] = useState(false);
   const [newVersionChangelog, setNewVersionChangelog] = useState("");
   const [newVersionMarkLive, setNewVersionMarkLive] = useState(true);
@@ -325,6 +329,7 @@ function EvaluatorDetailPageInner() {
       }
     } catch (err) {
       reportError("Error setting live version:", err);
+      toast.error(parseBackendErrorMessage(err, "Failed to set live version"));
     } finally {
       setSettingLiveUuid(null);
     }
@@ -390,9 +395,7 @@ function EvaluatorDetailPageInner() {
       setEditOpen(false);
     } catch (err) {
       reportError("Error saving evaluator:", err);
-      setEditError(
-        err instanceof Error ? err.message : "Failed to save evaluator",
-      );
+      toast.error(parseBackendErrorMessage(err, "Failed to save evaluator"));
     } finally {
       setEditSaving(false);
     }
@@ -445,7 +448,6 @@ function EvaluatorDetailPageInner() {
         },
       ]);
     }
-    setNewVersionError(null);
     setNewVersionValidated(false);
     setNewVersionChangelog("");
     setNewVersionMarkLive(true);
@@ -484,7 +486,6 @@ function EvaluatorDetailPageInner() {
     }
     try {
       setNewVersionSaving(true);
-      setNewVersionError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
@@ -564,8 +565,7 @@ function EvaluatorDetailPageInner() {
         return;
       }
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Failed to create version");
+        throw new Error(await parseBackendErrorResponse(res, "create version"));
       }
       // Refresh evaluator so the new version appears with the selected live state
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
@@ -587,9 +587,7 @@ function EvaluatorDetailPageInner() {
       }
     } catch (err) {
       reportError("Error creating version:", err);
-      setNewVersionError(
-        err instanceof Error ? err.message : "Failed to create version",
-      );
+      toast.error(parseBackendErrorMessage(err, "Failed to create version"));
     } finally {
       setNewVersionSaving(false);
     }
@@ -1317,10 +1315,6 @@ function EvaluatorDetailPageInner() {
                   })()}
                 </div>
               </div>
-
-              {newVersionError && (
-                <p className="text-sm text-red-500">{newVersionError}</p>
-              )}
             </div>
 
             {/* Footer */}
