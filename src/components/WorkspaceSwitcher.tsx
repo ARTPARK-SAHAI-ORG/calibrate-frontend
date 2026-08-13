@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   useAccessToken,
@@ -185,7 +184,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
                     setOpen(false);
                     setCreateOpen(true);
                   }}
-                  onSettingsClick={() => setOpen(false)}
                 />
               </div>
             )}
@@ -242,7 +240,6 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
                 setOpen(false);
                 setCreateOpen(true);
               }}
-              onSettingsClick={() => setOpen(false)}
             />
           </div>
         )}
@@ -263,7 +260,6 @@ type DropdownPanelProps = {
   activeOrg: Organization | null;
   onSelect: (uuid: string) => void;
   onCreateClick: () => void;
-  onSettingsClick: () => void;
 };
 
 function DropdownPanel({
@@ -273,7 +269,6 @@ function DropdownPanel({
   activeOrg,
   onSelect,
   onCreateClick,
-  onSettingsClick,
 }: DropdownPanelProps) {
   return (
     <div
@@ -334,9 +329,8 @@ function DropdownPanel({
 
       <div className="border-t border-border p-2 space-y-0.5">
         {activeOrg && (
-          <Link
-            href="/workspace-settings"
-            onClick={onSettingsClick}
+          <a
+            href="/workspace-settings?tab=admin"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg
@@ -358,7 +352,28 @@ function DropdownPanel({
               />
             </svg>
             Workspace settings
-          </Link>
+          </a>
+        )}
+        {activeOrg && (
+          <a
+            href="/workspace-settings?tab=api-keys"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
+          >
+            <svg
+              className="w-4 h-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+              />
+            </svg>
+            API keys
+          </a>
         )}
         <button
           type="button"

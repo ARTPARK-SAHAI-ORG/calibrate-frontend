@@ -99,6 +99,16 @@ describe("AppLayout", () => {
     expect(screen.getByRole("button", { name: "Talk to us" })).toBeInTheDocument();
   });
 
+  it("links to the API keys tab from the profile dropdown", async () => {
+    const user = setupUser();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Open profile menu" }));
+    expect(screen.getByRole("link", { name: "API keys" })).toHaveAttribute(
+      "href",
+      "/workspace-settings?tab=api-keys",
+    );
+  });
+
   it("renders custom header and header actions when provided", () => {
     renderLayout({
       customHeader: <div>Custom header</div>,
