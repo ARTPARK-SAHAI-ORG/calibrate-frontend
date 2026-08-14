@@ -4,8 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTraces, TraceSummary } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
-export const TRACES_PAGE_SIZE = 50;
-
 type UseTracesArgs = {
   /** Backend JWT; the hook is idle until it's available. */
   accessToken: string | null;
@@ -26,7 +24,7 @@ export function useTraces({
   accessToken,
   agentId,
   q,
-  pageSize = TRACES_PAGE_SIZE,
+  pageSize = 50,
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -39,7 +37,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, q]);
+  }, [agentId, q, pageSize]);
 
   const load = useCallback(
     async (targetOffset: number) => {

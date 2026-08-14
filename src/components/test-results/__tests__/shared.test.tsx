@@ -663,15 +663,16 @@ describe("TestDetailView", () => {
     expect(screen.getByText("Final answer")).toBeInTheDocument();
   });
 
-  it("renders a system turn", () => {
+  it("never draws the instructions the agent was given", () => {
     render(
       <TestDetailView
         history={[{ role: "system", content: "Be brief." }, ...baseHistory]}
         passed={true}
       />,
     );
-    expect(screen.getByText("System")).toBeInTheDocument();
-    expect(screen.getByText("Be brief.")).toBeInTheDocument();
+    // Annotators judge the exchange, not what the agent was told to do.
+    expect(screen.queryByText("Be brief.")).not.toBeInTheDocument();
+    expect(screen.queryByText("System")).not.toBeInTheDocument();
   });
 
   it("emphasises the final output without pass/fail chrome when showVerdict is false", () => {

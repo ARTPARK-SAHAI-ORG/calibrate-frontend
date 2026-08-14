@@ -146,8 +146,10 @@ it("uses the last user turn as the heading and the shared conversation view", as
   expect(
     screen.getByRole("heading", { name: "When is the next vaccination?" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("You are a vaccination assistant.")).toBeInTheDocument();
-  expect(screen.getByText("System")).toBeInTheDocument();
+  // The agent's instructions are stored on the trace but never drawn.
+  expect(
+    screen.queryByText("You are a vaccination assistant."),
+  ).not.toBeInTheDocument();
   expect(screen.getAllByText("get_schedule")).toHaveLength(2);
   expect(screen.getByText("child_age_weeks")).toBeInTheDocument();
   expect(screen.getByText("14")).toBeInTheDocument();

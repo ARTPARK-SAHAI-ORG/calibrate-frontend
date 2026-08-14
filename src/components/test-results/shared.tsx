@@ -75,6 +75,10 @@ export type TestCaseOutput = {
 };
 
 export type TestCaseHistory = {
+  // A conversation can carry a "system" turn: the instructions the agent was
+  // given before anyone spoke. It is deliberately never drawn. Annotators
+  // should judge the exchange, not what the agent was told to do, and the
+  // instructions are long enough to push the exchange off screen.
   role: "assistant" | "user" | "tool" | "system";
   content?: string;
   tool_calls?: Array<{
@@ -1040,18 +1044,6 @@ export function TestDetailView({
                     : ""
                 }`}
               >
-                {message.role === "system" && message.content && (
-                  <div className="max-w-[88%] md:max-w-3/4">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      System
-                    </span>
-                    <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted/50 border border-border mt-1">
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    </div>
-                  </div>
-                )}
                 {/* User Message */}
                 {message.role === "user" && (
                   <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">

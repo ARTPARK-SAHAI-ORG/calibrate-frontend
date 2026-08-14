@@ -17,3 +17,4 @@ export { RetryIcon } from "./RetryIcon";
 export { DeleteIconButton } from "./DeleteIconButton";
 export { DuplicateIconButton } from "./DuplicateIconButton";
 export { RerunIconButton } from "./RerunIconButton";
+export { PageSizeSelect } from "./PageSizeSelect";

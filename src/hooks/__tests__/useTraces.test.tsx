@@ -124,6 +124,31 @@ describe("useTraces", () => {
     );
   });
 
+  it("resets to the first page when the page size changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
+    const { result, rerender } = renderHook(
+      ({ pageSize }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId: "ag-1",
+          q: "",
+          pageSize,
+        }),
+      { initialProps: { pageSize: 2 } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(2));
+
+    rerender({ pageSize: 5 });
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ limit: 5, offset: 0 }),
+    );
+  });
+
   it("resets to the first page and refetches when the agent changes", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
     const { result, rerender } = renderHook(

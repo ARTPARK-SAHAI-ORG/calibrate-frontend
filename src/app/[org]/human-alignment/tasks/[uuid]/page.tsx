@@ -62,7 +62,14 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { useAccessToken, useItemPager, usePageErrorState } from "@/hooks";
+import { PageSizeSelect } from "@/components/ui/PageSizeSelect";
+import {
+  useAccessToken,
+  useItemPager,
+  usePageErrorState,
+  usePageSize,
+  PAGE_SIZE_OPTIONS,
+} from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -166,8 +173,6 @@ type TaskSummaryResponse = {
   };
 };
 
-const ITEMS_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
-const ITEMS_PAGE_SIZE_KEY = "calibrate:items-page-size";
 const ITEMS_SORT_KEY = "calibrate:items-sort-updated-at";
 /** Per-batch page size used by "Export CSV" to pull the full task
  * scope. Matches the backend `/summary` endpoint's current `limit`
@@ -1330,21 +1335,10 @@ function LabellingTaskPageInner() {
   // /summary endpoint's new params (PR #60). Limit is persisted so the
   // user's preferred page size sticks across visits; offset and search
   // are session-scoped.
-  const [itemsLimit, setItemsLimit] = useState<number>(50);
+  const [itemsLimit, setItemsLimit] = usePageSize();
   const [itemsOffset, setItemsOffset] = useState<number>(0);
   const [itemsSearchInput, setItemsSearchInput] = useState<string>("");
   const [itemsSearch, setItemsSearch] = useState<string>("");
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(ITEMS_PAGE_SIZE_KEY);
-    const parsed = stored ? Number(stored) : NaN;
-    if (
-      Number.isFinite(parsed) &&
-      (ITEMS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
-    ) {
-      setItemsLimit(parsed);
-    }
-  }, []);
   // Debounce the search input so we don't hammer the API on every keystroke.
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -1735,7 +1729,7 @@ function LabellingTaskPageInner() {
   // even the smallest page size fits every item on one page. Above that
   // threshold we keep the footer (so the Per-page selector stays reachable)
   // but hide the prev/next page nav whenever there's only a single page.
-  const showItemsPagination = itemsTotal > ITEMS_PAGE_SIZE_OPTIONS[0];
+  const showItemsPagination = itemsTotal > PAGE_SIZE_OPTIONS[0];
   /** True when the task itself has any items (regardless of the
    * current search). Used to distinguish the "no items yet" empty state
    * from the "no search matches" state. */
@@ -3290,46 +3284,13 @@ function LabellingTaskPageInner() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2">
-                    <span>Per page</span>
-                    <div className="relative">
-                      <select
-                        value={itemsLimit}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              ITEMS_PAGE_SIZE_KEY,
-                              String(next),
-                            );
-                          }
-                          setItemsLimit(next);
-                          setItemsOffset(0);
-                        }}
-                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <svg
-                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </label>
+                  <PageSizeSelect
+                    value={itemsLimit}
+                    onChange={(next) => {
+                      setItemsLimit(next);
+                      setItemsOffset(0);
+                    }}
+                  />
                   {itemsPageCount > 1 && (
                   <div className="flex items-center gap-1">
                     <button

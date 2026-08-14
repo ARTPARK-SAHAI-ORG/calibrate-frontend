@@ -16,12 +16,14 @@ import {
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
-import { LoadingState, SearchInput } from "@/components/ui";
+import { LoadingState, PageSizeSelect, SearchInput } from "@/components/ui";
 import {
   useAccessToken,
   useDialogUrlParam,
+  usePageSize,
   useTraceDeletion,
   useTraces,
+  PAGE_SIZE_OPTIONS,
 } from "@/hooks";
 import {
   bulkDeleteMatchingTraces,
@@ -65,6 +67,8 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const [pageSize, setPageSize] = usePageSize();
+
   const {
     items,
     total,
@@ -80,6 +84,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     accessToken,
     agentId: agentUuid,
     q: debouncedQuery,
+    pageSize,
   });
 
   const deletion = useTraceDeletion({
@@ -180,6 +185,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   };
 
   const showEmptyState = !isLoading && !error && total === 0 && !filtersActive;
+  // Below the smallest option every trace already fits on one page, so the
+  // choice would only be noise.
+  const showPageSize = total > PAGE_SIZE_OPTIONS[0];
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
@@ -274,8 +282,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             onOpen={openTrace}
             onDelete={deletion.openDeleteDialog}
           />
-          {(hasPrev || hasNext) && (
-            <div className="flex items-center justify-end gap-2">
+          {(showPageSize || hasPrev || hasNext) && (
+            <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-muted-foreground">
+              {showPageSize && (
+                <PageSizeSelect value={pageSize} onChange={setPageSize} />
+              )}
+              {(hasPrev || hasNext) && (
+                <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={prevPage}
@@ -292,6 +305,8 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
               >
                 Next
               </button>
+                </div>
+              )}
             </div>
           )}
         </>

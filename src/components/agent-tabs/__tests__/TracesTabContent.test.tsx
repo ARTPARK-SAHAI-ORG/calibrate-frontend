@@ -22,6 +22,10 @@ jest.mock("../../../hooks", () => ({
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
     .useTraceDeletion,
   useDialogUrlParam: (args: unknown) => mockUseDialogUrlParam(args),
+  // The remembered page size is real, so choosing one is exercised end to end.
+  usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
+  PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
+    .PAGE_SIZE_OPTIONS,
 }));
 
 const bulkDeleteMatchingTraces = jest.fn();
@@ -183,6 +187,7 @@ function tracesResult(items: TraceSummary[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.localStorage.clear();
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
   bulkDeleteMatchingTraces.mockResolvedValue({ deleted: 1 });
 });
@@ -229,6 +234,27 @@ describe("TracesTabContent", () => {
     expect(mockUseDialogUrlParam).not.toHaveBeenCalledWith(
       expect.objectContaining({ param: "conversation_id" }),
     );
+  });
+
+  it("hides the per page choice while every trace fits on one page", () => {
+    mockUseTraces.mockReturnValue({ ...tracesResult([trace()]), total: 10 });
+    render(<TracesTabContent agentUuid="agent-1" />);
+    expect(screen.queryByLabelText("Per page")).not.toBeInTheDocument();
+  });
+
+  it("lets the reader change how many traces a page holds", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue({
+      ...tracesResult([trace()]),
+      total: 11,
+      hasNext: true,
+    });
+
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.selectOptions(screen.getByLabelText("Per page"), "25");
+    await waitFor(() => expect(lastTracesArgs().pageSize).toBe(25));
+    expect(window.localStorage.getItem("calibrate:items-page-size")).toBe("25");
   });
 
   it("shows the server total above the rows and pagination below them", async () => {
