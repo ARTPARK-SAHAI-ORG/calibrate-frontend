@@ -127,19 +127,11 @@ describe("TracesTable", () => {
   it("shows only the simplified desktop columns", () => {
     renderTable();
 
-    expect(
-      screen.getByRole("columnheader", { name: "Input" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: "Output" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("columnheader", { name: "Response" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.queryByText("Response")).not.toBeInTheDocument();
     for (const name of ["Conversation", "Turns", "Tools"]) {
-      expect(
-        screen.queryByRole("columnheader", { name }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(name)).not.toBeInTheDocument();
     }
     expect(screen.queryByText("conv-1")).not.toBeInTheDocument();
     expect(screen.queryByText("3 turns")).not.toBeInTheDocument();

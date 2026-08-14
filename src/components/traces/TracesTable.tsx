@@ -51,9 +51,13 @@ export function traceOutputPreview(trace: {
   return names.length > 0 ? names.join(", ") : null;
 }
 
+const ROW_GRID =
+  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_160px_auto] gap-4 px-4 py-2";
+
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
- * detail view.
+ * detail view. Desktop markup matches the other resource lists (CSS grid,
+ * not an HTML table).
  */
 export function TracesTable({
   traces,
@@ -68,74 +72,62 @@ export function TracesTable({
     <>
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <table className="w-full table-fixed">
-          <thead>
-            <tr className="bg-muted/50 border-b border-border">
-              <th className="w-12 px-4 py-3">
-                <SelectCheckbox
-                  checked={allSelected}
-                  onToggle={onToggleSelectAll}
-                  disabled={!hasSelectableItems}
-                  label="Select all traces"
+        <div className={`${ROW_GRID} border-b border-border bg-muted/30 items-center`}>
+          <div className="flex items-center">
+            <SelectCheckbox
+              checked={allSelected}
+              onToggle={onToggleSelectAll}
+              disabled={!hasSelectableItems}
+              label="Select all traces"
+            />
+          </div>
+          <div className="text-sm font-medium text-muted-foreground">Input</div>
+          <div className="text-sm font-medium text-muted-foreground">Output</div>
+          <div className="text-sm font-medium text-muted-foreground">Created</div>
+          <div className="w-8" />
+        </div>
+        {traces.map((trace) => {
+          const outputPreview = traceOutputPreview(trace);
+          return (
+            <div
+              key={trace.uuid}
+              onClick={() => onOpen(trace.uuid)}
+              className={`${ROW_GRID} border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+            >
+              <div className="flex items-center">
+                <SelectCheckbox {...checkboxProps(trace)} />
+              </div>
+              <div className="min-w-0">
+                {trace.input_preview && (
+                  <div className="text-sm font-medium text-foreground truncate">
+                    {trace.input_preview}
+                  </div>
+                )}
+                {trace.message_id && (
+                  <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
+                    {trace.message_id}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                {outputPreview && (
+                  <div className="text-sm text-foreground truncate">
+                    {outputPreview}
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground whitespace-nowrap">
+                {formatTraceDate(trace.created_at)}
+              </div>
+              <div className="flex items-center">
+                <DeleteIconButton
+                  onClick={() => onDelete(trace)}
+                  title="Delete trace"
                 />
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-[40%]">
-                Input
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Output
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-40">
-                Created
-              </th>
-              <th className="w-14 px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {traces.map((trace) => {
-              const outputPreview = traceOutputPreview(trace);
-              return (
-              <tr
-                key={trace.uuid}
-                onClick={() => onOpen(trace.uuid)}
-                className="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
-              >
-                <td className="px-4 py-3">
-                  <SelectCheckbox {...checkboxProps(trace)} />
-                </td>
-                <td className="px-4 py-3">
-                  {trace.input_preview && (
-                    <div className="text-[13px] text-foreground truncate">
-                      {trace.input_preview}
-                    </div>
-                  )}
-                  {trace.message_id && (
-                    <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
-                      {trace.message_id}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  {outputPreview && (
-                    <div className="text-[13px] text-foreground truncate">
-                      {outputPreview}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-[13px] text-muted-foreground whitespace-nowrap">
-                  {formatTraceDate(trace.created_at)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <DeleteIconButton
-                    onClick={() => onDelete(trace)}
-                    title="Delete trace"
-                  />
-                </td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Mobile cards */}
@@ -145,34 +137,30 @@ export function TracesTable({
           return (
           <div
             key={trace.uuid}
-            className="border border-border rounded-lg overflow-hidden bg-background"
+            onClick={() => onOpen(trace.uuid)}
+            className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
           >
-            <div
-              className="p-4 cursor-pointer"
-              onClick={() => onOpen(trace.uuid)}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  {trace.input_preview && (
-                    <p className="text-sm text-foreground line-clamp-2">
-                      {trace.input_preview}
-                    </p>
-                  )}
-                  {trace.message_id && (
-                    <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
-                      {trace.message_id}
-                    </div>
-                  )}
-                </div>
-                <SelectCheckbox {...checkboxProps(trace)} />
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                {trace.input_preview && (
+                  <p className="text-sm font-medium text-foreground line-clamp-2">
+                    {trace.input_preview}
+                  </p>
+                )}
+                {trace.message_id && (
+                  <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
+                    {trace.message_id}
+                  </div>
+                )}
               </div>
-              {outputPreview && (
-                <p className="text-sm text-foreground mt-1 line-clamp-2">
-                  {outputPreview}
-                </p>
-              )}
+              <SelectCheckbox {...checkboxProps(trace)} />
             </div>
-            <div className="flex items-center gap-2 px-4 pb-3 pt-0">
+            {outputPreview && (
+              <p className="text-sm text-foreground mt-1 line-clamp-2">
+                {outputPreview}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-muted-foreground">
                 {formatTraceDate(trace.created_at)}
               </span>

@@ -160,12 +160,12 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent agentUuid="agent-1" />);
 
     const count = screen.getByText("3 traces");
-    const table = screen.getByRole("table");
+    const list = count.nextElementSibling;
     const nextButton = screen.getByRole("button", { name: "Next" });
 
-    expect(count.nextElementSibling).toContainElement(table);
+    expect(list).toHaveTextContent("Input");
     expect(
-      table.compareDocumentPosition(nextButton) &
+      list!.compareDocumentPosition(nextButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
