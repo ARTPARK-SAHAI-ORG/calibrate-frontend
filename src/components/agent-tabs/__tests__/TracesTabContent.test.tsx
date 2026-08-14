@@ -376,6 +376,21 @@ describe("TracesTabContent", () => {
     expect(screen.getByText("Loading traces...")).toBeInTheDocument();
   });
 
+  it("does not blame a failed load on the search", () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { error: "Failed to load traces. Please try again." }),
+    );
+
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    expect(
+      screen.getByText("Failed to load traces. Please try again."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No traces match your search."),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when the agent has no traces", () => {
     mockUseTraces.mockReturnValue(tracesResult([]));
 

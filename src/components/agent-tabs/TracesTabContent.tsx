@@ -318,7 +318,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             </div>
           )}
 
-          {total === 0 ? (
+          {total === 0 && isSearching ? (
             <p className="text-sm text-muted-foreground">
               No traces match your search.
             </p>
