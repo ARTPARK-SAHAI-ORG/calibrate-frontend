@@ -151,6 +151,26 @@ it("shows both an agent reply and a tool call in the output", async () => {
   }
 });
 
+it("keeps the optional fields out of cURL and marks them in the rest", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  // cURL's body is JSON, which cannot carry an "optional" comment, so it shows
+  // the required fields only.
+  expect(snippetText()).toContain("agent_id");
+  expect(snippetText()).not.toContain("message_id");
+  expect(snippetText()).not.toContain("metadata");
+
+  for (const language of ["Python", "JavaScript"]) {
+    await user.click(screen.getByRole("button", { name: language }));
+    expect(snippetText()).toContain("Optional");
+    expect(snippetText()).toContain("message_id");
+    expect(snippetText()).toContain("conversation_id");
+    expect(snippetText()).toContain("metadata");
+  }
+});
+
 it("explains every part of the request beside it", async () => {
   const user = setupUser();
   setup();

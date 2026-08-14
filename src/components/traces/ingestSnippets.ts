@@ -12,6 +12,10 @@ export const SNIPPET_LANGUAGES: { id: SnippetLanguage; label: string }[] = [
   { id: "javascript", label: "JavaScript" },
 ];
 
+// The cURL example is the required fields only: its body is JSON, which has no
+// comments, so an "optional" marker cannot go in it. The optional fields appear
+// in the Python and JavaScript snippets, which can carry one, and in the
+// Optional section of the field list beside the code.
 export type SnippetValues = {
   backendUrl: string;
   agentUuid: string;
@@ -40,15 +44,7 @@ function curl({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
           }
         }
       ]
-    },
-    "message_id": "msg-001",
-    "conversation_id": "conv-001",
-    "metadata": [
-      {
-        "key": "env",
-        "value": "production"
-      }
-    ]
+    }
   }'`;
 }
 
@@ -162,6 +158,6 @@ export const SNIPPET_FIELDS: {
     name: "metadata",
     optional: true,
     meaning:
-      "Additional metadata about the trace",
+      "Additional metadata about the trace as key-value pairs",
   },
 ];
