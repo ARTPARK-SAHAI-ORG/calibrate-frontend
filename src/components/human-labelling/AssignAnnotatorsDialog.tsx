@@ -326,6 +326,38 @@ export function AssignAnnotatorsDialog({
                     ? "All labels will be shown in the labelling jobs created"
                     : "Pick one or more labels to show in the labelling jobs created"}
                 </p>
+                {!includeAllEvaluators && evaluators.length > 1 && (
+                  <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={pickedEvaluators.size === evaluators.length}
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            pickedEvaluators.size > 0 &&
+                            pickedEvaluators.size < evaluators.length;
+                      }}
+                      onChange={() =>
+                        setPickedEvaluators(
+                          pickedEvaluators.size > 0
+                            ? new Set()
+                            : new Set(evaluators.map((ev) => ev.uuid)),
+                        )
+                      }
+                      aria-label={
+                        pickedEvaluators.size > 0
+                          ? "Unselect all labels"
+                          : "Select all labels"
+                      }
+                      className="w-4 h-4 cursor-pointer accent-foreground"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {pickedEvaluators.size > 0
+                        ? "Unselect all"
+                        : "Select all"}
+                    </span>
+                  </label>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
                   {evaluators.map((ev) => {
                     const checked =

@@ -261,6 +261,22 @@ describe("AssignAnnotatorsDialog", () => {
     expect(showAllCheckbox).toBeChecked();
   });
 
+  it("clears and restores the label picks in one click", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Show all labels" }));
+
+    await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
+    // With no label picked the dialog cannot be submitted.
+    await user.click(screen.getByText("Alice"));
+    expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+
+    await user.click(screen.getByRole("checkbox", { name: "Select all labels" }));
+    expect(screen.getByRole("button", { name: "Assign" })).not.toBeDisabled();
+  });
+
   it("switching off 'show all' seeds explicit picks with every evaluator", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
