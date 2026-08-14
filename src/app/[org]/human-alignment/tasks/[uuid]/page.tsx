@@ -62,13 +62,12 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { PageSizeSelect } from "@/components/ui/PageSizeSelect";
+import { ServerPaginatedListBar } from "@/components/ui/ServerPaginatedListBar";
 import {
   useAccessToken,
   useItemPager,
   usePageErrorState,
   usePageSize,
-  PAGE_SIZE_OPTIONS,
 } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -1722,13 +1721,6 @@ function LabellingTaskPageInner() {
   const loadedItemsOffset = taskSummary?.pagination?.offset ?? itemsOffset;
   const itemsCurrentPage =
     itemsLimit > 0 ? Math.floor(loadedItemsOffset / itemsLimit) + 1 : 1;
-  const itemsRangeStart = itemsTotal === 0 ? 0 : loadedItemsOffset + 1;
-  const itemsRangeEnd = Math.min(loadedItemsOffset + items.length, itemsTotal);
-  // Hide the whole pagination footer when pagination can never apply — i.e.
-  // even the smallest page size fits every item on one page. Above that
-  // threshold we keep the footer (so the Per-page selector stays reachable)
-  // but hide the prev/next page nav whenever there's only a single page.
-  const showItemsPagination = itemsTotal > PAGE_SIZE_OPTIONS[0];
   /** True when the task itself has any items (regardless of the
    * current search). Used to distinguish the "no items yet" empty state
    * from the "no search matches" state. */
@@ -3260,114 +3252,28 @@ function LabellingTaskPageInner() {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-2 text-sm text-muted-foreground">
-                {/* The count is always here. It used to sit on the tab, and a
-                    task that fits on one page was left with no count at all. */}
-                <div>
-                  {itemsTotal === 0 ? (
-                    "0 items"
-                  ) : !showItemsPagination ? (
-                    <>
-                      <span className="text-foreground font-medium">
-                        {itemsTotal}
-                      </span>{" "}
-                      item{itemsTotal === 1 ? "" : "s"}
-                    </>
-                  ) : (
-                    <>
-                      Showing{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsRangeStart}
-                      </span>
-                      –
-                      <span className="text-foreground font-medium">
-                        {itemsRangeEnd}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsTotal}
-                      </span>{" "}
-                      item{itemsTotal === 1 ? "" : "s"}
-                    </>
-                  )}
-                </div>
-                {showItemsPagination && (
-                <div className="flex items-center gap-3">
-                  <PageSizeSelect
-                    value={itemsLimit}
-                    onChange={(next) => {
-                      setItemsLimit(next);
-                      setItemsOffset(0);
-                    }}
-                  />
-                  {itemsPageCount > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) =>
-                          Math.max(0, prev - itemsLimit),
-                        )
-                      }
-                      disabled={itemsOffset === 0 || summaryLoading}
-                      aria-label="Previous page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <span className="px-2 text-sm">
-                      Page{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsCurrentPage}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsPageCount}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) => prev + itemsLimit)
-                      }
-                      disabled={
-                        itemsOffset + itemsLimit >= itemsTotal ||
-                        summaryLoading
-                      }
-                      aria-label="Next page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  )}
-                </div>
-                )}
-              </div>
+              <div className="space-y-1 pt-4">
+              <ServerPaginatedListBar
+                total={itemsTotal}
+                offset={loadedItemsOffset}
+                loadedCount={items.length}
+                pageSize={itemsLimit}
+                onPageSizeChange={(next) => {
+                  setItemsLimit(next);
+                  setItemsOffset(0);
+                }}
+                currentPage={itemsCurrentPage}
+                pageCount={itemsPageCount}
+                onPrev={() =>
+                  setItemsOffset((prev) => Math.max(0, prev - itemsLimit))
+                }
+                onNext={() => setItemsOffset((prev) => prev + itemsLimit)}
+                prevDisabled={itemsOffset === 0 || summaryLoading}
+                nextDisabled={
+                  itemsOffset + itemsLimit >= itemsTotal || summaryLoading
+                }
+                itemNoun="item"
+              />
               {items.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   {itemsSearch
@@ -3724,6 +3630,7 @@ function LabellingTaskPageInner() {
                   })}
                 </div>
               )}
+              </div>
               {/* Bottom padding clears the fixed Talk-to-us FAB (bottom-6 right-6). */}
               <div className="pb-20" />
             </div>

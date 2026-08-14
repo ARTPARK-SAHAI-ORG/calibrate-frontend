@@ -174,11 +174,6 @@ export function TracesTable({
                     {trace.input_preview}
                   </div>
                 )}
-                {trace.message_id && (
-                  <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
-                    {trace.message_id}
-                  </div>
-                )}
               </div>
               <div className="min-w-0">
                 <TraceOutputCell trace={trace} />
@@ -212,11 +207,6 @@ export function TracesTable({
                   <p className="text-sm font-medium text-foreground line-clamp-2">
                     {trace.input_preview}
                   </p>
-                )}
-                {trace.message_id && (
-                  <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
-                    {trace.message_id}
-                  </div>
                 )}
               </div>
               <SelectCheckbox {...checkboxProps(trace)} />

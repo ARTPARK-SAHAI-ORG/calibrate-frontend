@@ -3,8 +3,8 @@
 import React from "react";
 import { PAGE_SIZE_OPTIONS } from "@/hooks/usePageSize";
 
-/** The "Per page" picker shown next to a list's page controls. The caller
- *  sends the reader back to the first page when the choice changes. */
+/** The "Per page" picker for the server-paginated list bar (Traces tab,
+ *  human-alignment items tab). See CLAUDE.md → Server-paginated list bar. */
 export function PageSizeSelect({
   value,
   onChange,

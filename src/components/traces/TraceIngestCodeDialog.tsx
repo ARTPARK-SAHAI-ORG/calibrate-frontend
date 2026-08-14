@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { Link } from "@/lib/nav";
 import { TraceIngestSnippet } from "./TraceIngestSnippet";
 
 /**
@@ -28,18 +27,11 @@ export function TraceIngestCodeDialog({
       <div className="bg-background rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Send a trace
+            Send your first trace
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Call this from your app every time your agent replies. Your address
-            and this agent are already filled in. Put in a key from{" "}
-            <Link
-              href="/workspace-settings"
-              className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60 transition-colors"
-            >
-              workspace settings
-            </Link>
-            .
+            Add the following code snippet to your app to capture the agent's
+            input and output response
           </p>
         </div>
 

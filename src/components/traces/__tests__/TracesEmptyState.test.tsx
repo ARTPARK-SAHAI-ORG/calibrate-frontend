@@ -1,4 +1,8 @@
 import { render, screen, setupUser } from "@/test-utils";
+jest.mock("sonner", () => ({
+  toast: jest.fn(),
+}));
+import { toast } from "sonner";
 import { TracesEmptyState } from "../TracesEmptyState";
 
 jest.mock("../../../lib/api", () => ({
@@ -27,6 +31,7 @@ beforeEach(() => {
   createApiKey.mockReset();
   onCheckForTraces.mockReset();
   validateApiKeyForAgent.mockReset();
+  jest.mocked(toast).mockReset();
 });
 
 function setup(agentUuid = "ag-1") {
@@ -106,6 +111,26 @@ it("will not open a step you have not reached", async () => {
   ).not.toBeInTheDocument();
 });
 
+it("shows an API key callout beside the snippet when no key is filled in", async () => {
+  const user = setupUser();
+  setup();
+
+  await user.click(screen.getByText("Send your first trace"));
+
+  expect(snippetText()).toContain("YOUR_API_KEY");
+  expect(
+    screen.getByRole("link", { name: "API keys" }),
+  ).toHaveAttribute("href", "/workspace-settings?tab=api-keys");
+});
+
+it("hides the API key callout once a key is filled in", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  expect(screen.queryByRole("link", { name: "API keys" })).not.toBeInTheDocument();
+});
+
 it("does not tick the key step when no key was made", async () => {
   const user = setupUser();
   setup();
@@ -114,7 +139,7 @@ it("does not tick the key step when no key was made", async () => {
   // because the code in step two still has a fill-in in place of a key.
   await user.click(screen.getByText("Send your first trace"));
   // The code still carries a fill-in in place of a key.
-  expect(screen.getByText(/sk_\.\.\./)).toBeInTheDocument();
+  expect(snippetText()).toContain("YOUR_API_KEY");
 
   await user.click(screen.getByRole("button", { name: "I have added this" }));
 
@@ -185,16 +210,26 @@ it("shows both an agent reply and a tool call in the output", async () => {
   }
 });
 
-it("keeps the optional fields out of cURL and marks them in the rest", async () => {
+it("hides optional fields by default and can show them with a toggle", async () => {
   const user = setupUser();
   setup();
   await openStepTwo(user);
 
-  // cURL's body is JSON, which cannot carry an "optional" comment, so it shows
-  // the required fields only.
+  // Required fields only by default in every language.
   expect(snippetText()).toContain("agent_id");
   expect(snippetText()).not.toContain("message_id");
   expect(snippetText()).not.toContain("metadata");
+
+  for (const language of ["Python", "JavaScript", "cURL"]) {
+    await user.click(screen.getByRole("button", { name: language }));
+    expect(snippetText()).not.toContain("message_id");
+    expect(snippetText()).not.toContain("conversation_id");
+    expect(snippetText()).not.toContain("metadata");
+  }
+
+  await user.click(
+    screen.getByRole("switch", { name: "Include optional fields" }),
+  );
 
   for (const language of ["Python", "JavaScript"]) {
     await user.click(screen.getByRole("button", { name: language }));
@@ -203,6 +238,11 @@ it("keeps the optional fields out of cURL and marks them in the rest", async () 
     expect(snippetText()).toContain("conversation_id");
     expect(snippetText()).toContain("metadata");
   }
+
+  // cURL's body is JSON, which cannot carry an "optional" comment.
+  await user.click(screen.getByRole("button", { name: "cURL" }));
+  expect(snippetText()).toContain("message_id");
+  expect(snippetText()).not.toContain("Optional");
 });
 
 it("explains every part of the request beside it", async () => {
@@ -248,7 +288,7 @@ it("creates a key in step one and fills it into the snippet", async () => {
   // Closing the reveal finishes step one and opens step two with the key in it.
   expect(screen.getByText("agent_id")).toBeInTheDocument();
   expect(snippetText()).toContain("sk_live_secret");
-  expect(snippetText()).not.toContain("sk_...");
+  expect(snippetText()).not.toContain("YOUR_API_KEY");
 });
 
 it("lets an existing key be pasted and checked, then fills the snippet", async () => {
@@ -256,7 +296,9 @@ it("lets an existing key be pasted and checked, then fills the snippet", async (
   const user = setupUser();
   setup("ag-1");
 
-  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.click(
+    screen.getByRole("button", { name: "I have a key already" }),
+  );
   expect(screen.getByRole("button", { name: "Check key" })).toBeDisabled();
 
   await user.type(screen.getByPlaceholderText("Paste your key"), "sk_existing");
@@ -266,7 +308,7 @@ it("lets an existing key be pasted and checked, then fills the snippet", async (
   // Same landing as creating a key: step two is open, the key is in the request.
   expect(await screen.findByText("agent_id")).toBeInTheDocument();
   expect(snippetText()).toContain("sk_existing");
-  expect(snippetText()).not.toContain("sk_...");
+  expect(snippetText()).not.toContain("YOUR_API_KEY");
   expect(screen.queryByText("Confirmed")).not.toBeInTheDocument();
 
   await user.click(screen.getByText("Create an API key"));
@@ -281,15 +323,13 @@ it("stays on step one when the pasted key does not work", async () => {
   const user = setupUser();
   setup();
 
-  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.click(
+    screen.getByRole("button", { name: "I have a key already" }),
+  );
   await user.type(screen.getByPlaceholderText("Paste your key"), "sk_bad");
   await user.click(screen.getByRole("button", { name: "Check key" }));
 
-  expect(
-    await screen.findByText(
-      "This key did not work. Check it is for this workspace.",
-    ),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("Invalid API key")).toBeInTheDocument();
   expect(screen.queryByText("agent_id")).not.toBeInTheDocument();
 });
 
@@ -298,7 +338,9 @@ it("says when the key could not be checked, and cancel returns to the start", as
   const user = setupUser();
   setup();
 
-  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.click(
+    screen.getByRole("button", { name: "I have a key already" }),
+  );
   await user.type(screen.getByPlaceholderText("Paste your key"), "sk_live");
   await user.click(screen.getByRole("button", { name: "Check key" }));
 
@@ -320,18 +362,18 @@ it("still opens the sending code when the pasted key does not work", async () =>
   const user = setupUser();
   setup();
 
-  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.click(
+    screen.getByRole("button", { name: "I have a key already" }),
+  );
   await user.type(screen.getByPlaceholderText("Paste your key"), "sk_bad");
   await user.click(screen.getByRole("button", { name: "Check key" }));
-  await screen.findByText(
-    "This key did not work. Check it is for this workspace.",
-  );
+  await screen.findByText("Invalid API key");
 
   // The key check failing must not lock away the code that sends a trace: the
   // reader can put a key into it by hand.
   await user.click(screen.getByText("Send your first trace"));
   expect(screen.getByText("agent_id")).toBeInTheDocument();
-  expect(snippetText()).toContain("sk_...");
+  expect(snippetText()).toContain("YOUR_API_KEY");
 });
 
 it("stays where you are when the new key dialog is cancelled", async () => {
@@ -344,7 +386,9 @@ it("stays where you are when the new key dialog is cancelled", async () => {
   ).toBeInTheDocument();
 
   await user.click(screen.getByText("Create an API key"));
-  await user.click(screen.getByRole("button", { name: "Create a new API key" }));
+  await user.click(
+    screen.getByRole("button", { name: "Create a new API key" }),
+  );
   await user.click(screen.getByRole("button", { name: "Cancel" }));
 
   // No key was made this time, so the reader is left on the step they opened
@@ -371,6 +415,13 @@ it("keeps the address in the request as code, not as a greyed out note", async (
   for (const language of ["Python", "JavaScript"]) {
     await user.click(screen.getByRole("button", { name: language }));
     expect(commentedText()).not.toContain("api.example.com");
+  }
+
+  await user.click(
+    screen.getByRole("switch", { name: "Include optional fields" }),
+  );
+  for (const language of ["Python", "JavaScript"]) {
+    await user.click(screen.getByRole("button", { name: language }));
     // The one real note is still greyed out, so the change did not turn the
     // marking off altogether.
     expect(commentedText()).toContain("Optional");
@@ -382,6 +433,10 @@ it("uses fill-in ids in the two optional ids, not ones to ship as they are", asy
   setup();
   await openStepTwo(user);
 
+  await user.click(
+    screen.getByRole("switch", { name: "Include optional fields" }),
+  );
+
   for (const language of ["Python", "JavaScript"]) {
     await user.click(screen.getByRole("button", { name: language }));
     expect(snippetText()).toContain("your-message-id");
@@ -391,10 +446,10 @@ it("uses fill-in ids in the two optional ids, not ones to ship as they are", asy
   }
 
   // cURL cannot carry a note, so it leaves both ids out rather than show one
-  // that looks ready to send.
+  // that looks ready to send — until optional fields are turned on.
   await user.click(screen.getByRole("button", { name: "cURL" }));
-  expect(snippetText()).not.toContain("message_id");
-  expect(snippetText()).not.toContain("conversation_id");
+  expect(snippetText()).toContain("your-message-id");
+  expect(snippetText()).toContain("your-conversation-id");
 });
 
 it("copies the snippet that is on screen, key and agent included", async () => {
@@ -417,7 +472,8 @@ it("copies the snippet that is on screen, key and agent included", async () => {
   expect(button.className).toContain("emerald");
 });
 
-it("looks for traces when asked, and says when none arrived", async () => {
+it("looks for traces when asked, and briefly says when none arrived", async () => {
+  onCheckForTraces.mockResolvedValue(true);
   const user = setupUser();
   setup();
   await openStepTwo(user);
@@ -426,9 +482,25 @@ it("looks for traces when asked, and says when none arrived", async () => {
   await user.click(screen.getByRole("button", { name: "Check for traces" }));
 
   expect(onCheckForTraces).toHaveBeenCalledTimes(1);
+  expect(toast).toHaveBeenCalledWith(
+    "No traces yet. Send one from your app and check again.",
+  );
   expect(
-    await screen.findByText("Still nothing for this agent."),
-  ).toBeInTheDocument();
+    screen.queryByText("No traces yet. Send one from your app and check again."),
+  ).not.toBeInTheDocument();
+});
+
+it("does not say anything when a check finds traces", async () => {
+  onCheckForTraces.mockResolvedValue(false);
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+  await user.click(screen.getByRole("button", { name: "I have added this" }));
+
+  await user.click(screen.getByRole("button", { name: "Check for traces" }));
+
+  expect(onCheckForTraces).toHaveBeenCalledTimes(1);
+  expect(toast).not.toHaveBeenCalled();
 });
 
 it("falls back to a placeholder host when the backend URL is unset", async () => {

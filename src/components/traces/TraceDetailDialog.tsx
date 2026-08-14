@@ -118,9 +118,7 @@ function MetaBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="block text-sm font-semibold text-foreground">{label}</span>
-      <span className="block text-xs text-foreground break-all">
-        {value}
-      </span>
+      <span className="block text-xs text-foreground break-all">{value}</span>
     </div>
   );
 }
@@ -138,6 +136,7 @@ function TraceMetaPanel({
   metadata: TraceMetadataEntry[] | null;
 }) {
   const entries = metadata ?? [];
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       {messageId && <MetaBlock label="Name" value={messageId} />}
@@ -145,13 +144,28 @@ function TraceMetaPanel({
         <MetaBlock label="Conversation" value={conversationId} />
       )}
       <MetaBlock label="Created" value={formatTraceDate(createdAt)} />
-      {entries.map((entry, index) => (
-        <MetaBlock
-          key={`${entry.key}-${index}`}
-          label={entry.key}
-          value={entry.value}
-        />
-      ))}
+      {entries.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
+          <div className="border border-border rounded-lg overflow-hidden text-xs">
+            <div className="grid grid-cols-2 gap-3 px-3 py-2 border-b border-border bg-muted/30 font-medium text-muted-foreground">
+              <div>Field</div>
+              <div>Value</div>
+            </div>
+            {entries.map((entry, index) => (
+              <div
+                key={`${entry.key}-${index}`}
+                className="grid grid-cols-2 gap-3 px-3 py-2 border-b border-border last:border-b-0"
+              >
+                <div className="font-medium text-foreground break-all">
+                  {entry.key}
+                </div>
+                <div className="text-foreground break-all">{entry.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -265,7 +279,7 @@ export function TraceDetailDialog({
             )}
           </div>
           {trace && (
-            <div className="md:w-56 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
+            <div className="md:w-96 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
               <TraceMetaPanel
                 messageId={trace.message_id}
                 conversationId={trace.conversation_id}

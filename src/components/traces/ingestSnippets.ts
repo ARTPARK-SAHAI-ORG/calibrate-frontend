@@ -12,17 +12,36 @@ export const SNIPPET_LANGUAGES: { id: SnippetLanguage; label: string }[] = [
   { id: "javascript", label: "JavaScript" },
 ];
 
-// The cURL example is the required fields only: its body is JSON, which has no
-// comments, so an "optional" marker cannot go in it. The optional fields appear
-// in the Python and JavaScript snippets, which can carry one, and in the
-// Optional section of the field list beside the code.
 export type SnippetValues = {
   backendUrl: string;
   agentUuid: string;
   apiKey: string;
+  /** When false (default), optional ids and metadata are left out of the code. */
+  includeOptional?: boolean;
 };
 
-function curl({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
+const OPTIONAL_PYTHON = `        # Optional
+        "message_id": "your-message-id",
+        "conversation_id": "your-conversation-id",
+        "metadata": [{"key": "env", "value": "production"}],`;
+
+const OPTIONAL_JAVASCRIPT = `    // Optional
+    message_id: "your-message-id",
+    conversation_id: "your-conversation-id",
+    metadata: [{ key: "env", value: "production" }],`;
+
+function curl({
+  backendUrl,
+  agentUuid,
+  apiKey,
+  includeOptional = false,
+}: SnippetValues): string {
+  const optionalBlock = includeOptional
+    ? `,
+    "message_id": "your-message-id",
+    "conversation_id": "your-conversation-id",
+    "metadata": [{"key": "env", "value": "production"}]`
+    : "";
   return `curl -X POST ${backendUrl}/traces \\
   -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json" \\
@@ -44,11 +63,17 @@ function curl({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
           }
         }
       ]
-    }
+    }${optionalBlock}
   }'`;
 }
 
-function python({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
+function python({
+  backendUrl,
+  agentUuid,
+  apiKey,
+  includeOptional = false,
+}: SnippetValues): string {
+  const optionalBlock = includeOptional ? `,\n${OPTIONAL_PYTHON}` : "";
   return `requests.post(
     "${backendUrl}/traces",
     headers={"X-API-Key": "${apiKey}"},
@@ -68,16 +93,18 @@ function python({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
                     "arguments": {"date": "2026-03-14"},
                 }
             ],
-        },
-        # Optional
-        "message_id": "your-message-id",
-        "conversation_id": "your-conversation-id",
-        "metadata": [{"key": "env", "value": "production"}],
+        }${optionalBlock}
     },
 )`;
 }
 
-function javascript({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
+function javascript({
+  backendUrl,
+  agentUuid,
+  apiKey,
+  includeOptional = false,
+}: SnippetValues): string {
+  const optionalBlock = includeOptional ? `,\n${OPTIONAL_JAVASCRIPT}` : "";
   return `await fetch("${backendUrl}/traces", {
   method: "POST",
   headers: {
@@ -100,11 +127,7 @@ function javascript({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
           arguments: { date: "2026-03-14" },
         },
       ],
-    },
-    // Optional
-    message_id: "your-message-id",
-    conversation_id: "your-conversation-id",
-    metadata: [{ key: "env", value: "production" }],
+    }${optionalBlock}
   }),
 });`;
 }

@@ -99,20 +99,13 @@ describe("traceOutputPreview", () => {
 });
 
 describe("TracesTable", () => {
-  it("renders the input preview before the optional message id", () => {
+  it("renders the input preview in the Input column", () => {
     renderTable();
 
-    const inputPreviews = screen.getAllByText(
-      "When is the next vaccination?",
-    );
-    const messageIds = screen.getAllByText("msg-1");
-    expect(inputPreviews).toHaveLength(2);
-    expect(messageIds).toHaveLength(2);
-    inputPreviews.forEach((inputPreview, index) => {
-      expect(
-        inputPreview.compareDocumentPosition(messageIds[index]),
-      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    });
+    expect(
+      screen.getAllByText("When is the next vaccination?"),
+    ).toHaveLength(2);
+    expect(screen.queryByText("msg-1")).not.toBeInTheDocument();
     expect(screen.getAllByText("At 14 weeks.").length).toBeGreaterThan(0);
   });
 
@@ -163,7 +156,7 @@ describe("TracesTable", () => {
     expect(screen.queryByText("Tool calls only")).not.toBeInTheDocument();
   });
 
-  it("omits message id copy when the id is missing", () => {
+  it("still renders input when message id is missing", () => {
     renderTable({
       traces: [trace({ message_id: null, conversation_id: null })],
     });
@@ -190,7 +183,7 @@ describe("TracesTable", () => {
     const user = setupUser();
     const { onOpen } = renderTable();
     // The desktop row shows the created date; click it.
-    await user.click(screen.getAllByText("msg-1")[0]);
+    await user.click(screen.getAllByText("When is the next vaccination?")[0]);
     expect(onOpen).toHaveBeenCalledWith("t1");
   });
 

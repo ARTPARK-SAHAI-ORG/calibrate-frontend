@@ -16,14 +16,14 @@ import {
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
-import { LoadingState, PageSizeSelect } from "@/components/ui";
+import { RefreshButton } from "@/components/RefreshButton";
+import { Button, LoadingState, ServerPaginatedListBar } from "@/components/ui";
 import {
   useAccessToken,
   useDialogUrlParam,
   usePageSize,
   useTraceDeletion,
   useTraces,
-  PAGE_SIZE_OPTIONS,
 } from "@/hooks";
 import { fetchTrace, type TraceDetail } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -41,6 +41,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const {
     items,
     total,
+    offset,
     isLoading,
     error,
     handleDeleted,
@@ -168,6 +169,16 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   // The setup steps go away once the first trace lands, so the code that sends
   // one stays reachable from here: to add another service, or to check a field.
   const [codeOpen, setCodeOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const [openTraceUuid, setOpenTraceUuid] = useState<string | null>(null);
   const { setParam: setTraceParam } = useDialogUrlParam({
@@ -198,63 +209,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const isEmptyRef = useRef(false);
   if (!isLoading && !error) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
-  // Below the smallest option every trace already fits on one page, so the
-  // choice would only be noise.
-  const showPageSize = total > PAGE_SIZE_OPTIONS[0];
+  const pageCount =
+    pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  const currentPage = Math.floor(offset / pageSize) + 1;
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      {!showEmptyState && (
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="flex items-center gap-2 md:ml-auto">
-            <button
-              type="button"
-              onClick={() => setCodeOpen(true)}
-              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              View code
-            </button>
-            {/* Outside the selection block: unticking rows while the traces
-                load must not make the wait disappear. */}
-            {isPreparingLabelling && (
-              <button
-                type="button"
-                disabled
-                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background transition-colors cursor-not-allowed opacity-50"
-              >
-                Loading traces...
-              </button>
-            )}
-            {selected.size > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setConvertOpen(true)}
-                  className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Add to tests ({selected.size})
-                </button>
-                {!isPreparingLabelling && (
-                  <SubmitForLabellingButton
-                    count={selected.size}
-                    emptyMessage="Select at least one trace to submit for labelling."
-                    onOpen={() => setEvaluatorStepOpen(true)}
-                    className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={deletion.openBulkDeleteDialog}
-                  className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer"
-                >
-                  Delete selected ({selected.size})
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {error && (
         <div className="border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
           {error}
@@ -266,47 +226,92 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       ) : showEmptyState ? (
         <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
       ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            {total.toLocaleString()} {total === 1 ? "trace" : "traces"}
-          </p>
-          <TracesTable
-            traces={items}
-            checkboxProps={deletion.checkboxProps}
-            allSelected={deletion.allSelected}
-            hasSelectableItems={deletion.hasSelectableItems}
-            onToggleSelectAll={deletion.toggleSelectAll}
-            onOpen={openTrace}
-            onDelete={deletion.openDeleteDialog}
-          />
-          {(showPageSize || hasPrev || hasNext) && (
-            <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-muted-foreground">
-              {showPageSize && (
-                <PageSizeSelect value={pageSize} onChange={setPageSize} />
-              )}
-              {(hasPrev || hasNext) && (
-                <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={prevPage}
-                disabled={!hasPrev}
-                className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={nextPage}
-                disabled={!hasNext}
-                className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <RefreshButton
+              loading={isRefreshing}
+              onClick={() => void handleRefresh()}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setCodeOpen(true)}
+            >
+              View code
+            </Button>
+          </div>
+
+          {(selected.size > 0 || isPreparingLabelling) && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+              <span className="text-sm text-muted-foreground">
+                {isPreparingLabelling ? (
+                  "Loading traces..."
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">
+                      {selected.size}
+                    </span>{" "}
+                    {selected.size === 1 ? "trace" : "traces"} selected
+                  </>
+                )}
+              </span>
+              {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setConvertOpen(true)}
+                  >
+                    Add to tests ({selected.size})
+                  </Button>
+                  {!isPreparingLabelling && (
+                    <SubmitForLabellingButton
+                      count={selected.size}
+                      emptyMessage="Select at least one trace to submit for labelling."
+                      onOpen={() => setEvaluatorStepOpen(true)}
+                      className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                    />
+                  )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={deletion.openBulkDeleteDialog}
+                    className="text-red-600 dark:text-red-400"
+                  >
+                    Delete selected ({selected.size})
+                  </Button>
                 </div>
               )}
             </div>
           )}
-        </>
+
+          <div className="space-y-1 pt-4">
+            <ServerPaginatedListBar
+              total={total}
+              offset={offset}
+              loadedCount={items.length}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              currentPage={currentPage}
+              pageCount={pageCount}
+              onPrev={prevPage}
+              onNext={nextPage}
+              prevDisabled={!hasPrev || isLoading}
+              nextDisabled={!hasNext || isLoading}
+              itemNoun="trace"
+            />
+
+            <TracesTable
+              traces={items}
+              checkboxProps={deletion.checkboxProps}
+              allSelected={deletion.allSelected}
+              hasSelectableItems={deletion.hasSelectableItems}
+              onToggleSelectAll={deletion.toggleSelectAll}
+              onOpen={openTrace}
+              onDelete={deletion.openDeleteDialog}
+            />
+          </div>
+        </div>
       )}
 
       <TraceIngestCodeDialog

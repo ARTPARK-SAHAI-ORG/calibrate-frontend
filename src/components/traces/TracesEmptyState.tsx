@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { toast } from "sonner";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { CheckCircleIcon, ChevronDownIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
@@ -77,8 +78,8 @@ function Step({
 
 type TracesEmptyStateProps = {
   agentUuid: string;
-  /** Ask the backend for this agent's traces again. */
-  onCheckForTraces: () => void;
+  /** Ask the backend for this agent's traces again. Returns true if still empty. */
+  onCheckForTraces: () => Promise<boolean>;
 };
 
 /**
@@ -95,7 +96,6 @@ export function TracesEmptyState({
    *  a later opening does not move the reader back to step two. */
   const madeKeyThisTime = useRef(false);
   const [isChecking, setIsChecking] = useState(false);
-  const [checkedAndEmpty, setCheckedAndEmpty] = useState(false);
   // `reached` is how far they have got, `openStep` is what is expanded, which
   // is the current step unless they reopen a finished one.
   const [reached, setReached] = useState(1);
@@ -148,9 +148,7 @@ export function TracesEmptyState({
     try {
       const ok = await validateApiKeyForAgent(trimmed, agentUuid);
       if (!ok) {
-        setKeyCheckError(
-          "This key did not work. Check it is for this workspace.",
-        );
+        setKeyCheckError("Invalid API key");
         return;
       }
       setCreatedKey(trimmed);
@@ -164,16 +162,17 @@ export function TracesEmptyState({
     }
   };
 
-  // The tab swaps this whole screen for the list when traces come back, so the
-  // only outcome to handle here is "still nothing".
+  // The tab swaps this whole screen for the list when traces come back. If we
+  // are still here after a check, nothing arrived — say so briefly and move on.
   const handleCheck = async () => {
     setIsChecking(true);
-    setCheckedAndEmpty(false);
     try {
-      await onCheckForTraces();
+      const stillEmpty = await onCheckForTraces();
+      if (stillEmpty) {
+        toast("No traces yet. Send one from your app and check again.");
+      }
     } finally {
       setIsChecking(false);
-      setCheckedAndEmpty(true);
     }
   };
 
@@ -296,11 +295,6 @@ export function TracesEmptyState({
         isOpen={openStep === 3}
         onToggle={() => toggleStep(3)}
       >
-        {checkedAndEmpty && !isChecking && (
-          <p className="text-sm text-muted-foreground">
-            Still nothing for this agent.
-          </p>
-        )}
         <Button
           size="sm"
           onClick={handleCheck}
