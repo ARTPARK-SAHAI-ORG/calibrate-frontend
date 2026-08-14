@@ -62,7 +62,7 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { useAccessToken, usePageErrorState } from "@/hooks";
+import { useAccessToken, useItemPager, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -1330,13 +1330,6 @@ function LabellingTaskPageInner() {
   // are session-scoped.
   const [itemsLimit, setItemsLimit] = useState<number>(50);
   const [itemsOffset, setItemsOffset] = useState<number>(0);
-  /** Set when previous/next in the open item steps past the end of the
-   * page on screen: the page moves, and once the items for that page
-   * arrive the item at this edge of them opens. */
-  const [pendingItemEdge, setPendingItemEdge] = useState<{
-    offset: number;
-    edge: "first" | "last";
-  } | null>(null);
   const [itemsSearchInput, setItemsSearchInput] = useState<string>("");
   const [itemsSearch, setItemsSearch] = useState<string>("");
   useEffect(() => {
@@ -1740,20 +1733,6 @@ function LabellingTaskPageInner() {
   // threshold we keep the footer (so the Per-page selector stays reachable)
   // but hide the prev/next page nav whenever there's only a single page.
   const showItemsPagination = itemsTotal > ITEMS_PAGE_SIZE_OPTIONS[0];
-  // The items for the page the open item stepped into have arrived: open
-  // the one at the edge it came from. Waits for the summary whose offset
-  // matches, so the item on screen is never swapped for one on the old page.
-  useEffect(() => {
-    if (!pendingItemEdge) return;
-    const loadedOffset = taskSummary?.pagination?.offset;
-    if (loadedOffset !== pendingItemEdge.offset || items.length === 0) return;
-    setItemDetailUuid(
-      pendingItemEdge.edge === "first"
-        ? items[0].uuid
-        : items[items.length - 1].uuid,
-    );
-    setPendingItemEdge(null);
-  }, [pendingItemEdge, taskSummary, items]);
   /** True when the task itself has any items (regardless of the
    * current search). Used to distinguish the "no items yet" empty state
    * from the "no search matches" state. */
@@ -2340,12 +2319,18 @@ function LabellingTaskPageInner() {
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
 
   const [itemDetailUuid, setItemDetailUuid] = useState<string | null>(null);
-  // Opening a specific item cancels a page step that has not landed yet,
-  // so an in-flight step cannot pull the reader off the item they chose.
-  const openItemDetail = useCallback((itemUuid: string) => {
-    setItemDetailUuid(itemUuid);
-    setPendingItemEdge(null);
-  }, []);
+  // Previous / next in the open item walks the whole task, loading the
+  // neighbouring page when it steps past either end of the page on screen.
+  const itemPager = useItemPager({
+    items,
+    openUuid: itemDetailUuid,
+    pageStart: loadedItemsOffset,
+    pageSize: itemsLimit,
+    total: itemsTotal,
+    onOpen: setItemDetailUuid,
+    onPageStartChange: setItemsOffset,
+  });
+  const openItemDetail = itemPager.open;
 
   const handleAssignAnnotators = async (
     annotatorIds: string[],
@@ -4636,7 +4621,7 @@ function LabellingTaskPageInner() {
         isOpen={!!itemDetailUuid}
         onClose={() => {
           setItemDetailUuid(null);
-          setPendingItemEdge(null);
+          itemPager.cancel();
         }}
         task={
           task &&
@@ -4667,50 +4652,11 @@ function LabellingTaskPageInner() {
           };
         })()}
         accessToken={accessToken}
-        hasPrev={(() => {
-          if (!itemDetailUuid) return false;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          return idx > 0 || (idx === 0 && loadedItemsOffset > 0);
-        })()}
-        hasNext={(() => {
-          if (!itemDetailUuid) return false;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx < 0) return false;
-          return loadedItemsOffset + idx < itemsTotal - 1;
-        })()}
-        onPrev={() => {
-          if (!itemDetailUuid) return;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx > 0) {
-            openItemDetail(items[idx - 1].uuid);
-          } else if (idx === 0 && loadedItemsOffset > 0) {
-            // First item on the page: step back a page and open its last item.
-            const nextOffset = Math.max(0, loadedItemsOffset - itemsLimit);
-            setItemsOffset(nextOffset);
-            setPendingItemEdge({ offset: nextOffset, edge: "last" });
-          }
-        }}
-        onNext={() => {
-          if (!itemDetailUuid) return;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx < 0) return;
-          if (idx < items.length - 1) {
-            openItemDetail(items[idx + 1].uuid);
-          } else if (loadedItemsOffset + idx < itemsTotal - 1) {
-            // Last item on the page: step forward a page and open its first item.
-            const nextOffset = loadedItemsOffset + itemsLimit;
-            setItemsOffset(nextOffset);
-            setPendingItemEdge({ offset: nextOffset, edge: "first" });
-          }
-        }}
-        position={(() => {
-          if (!itemDetailUuid) return undefined;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx < 0) return undefined;
-          // Count across the whole task, not just the items on the
-          // current page, so the number matches "of 200" in the footer.
-          return { index: loadedItemsOffset + idx, total: itemsTotal };
-        })()}
+        hasPrev={itemPager.hasPrev}
+        hasNext={itemPager.hasNext}
+        onPrev={itemPager.prev}
+        onNext={itemPager.next}
+        position={itemPager.position}
       />
     </AppLayout>
   );
