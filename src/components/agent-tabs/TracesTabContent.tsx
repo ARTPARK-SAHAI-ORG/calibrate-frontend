@@ -249,7 +249,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             value={searchInput}
             onChange={setSearchInput}
             placeholder="Search traces"
-            className="w-full sm:w-64 sm:mr-auto"
+            className="w-full sm:flex-1 sm:min-w-64"
           />
           <RefreshButton
             loading={isRefreshing}
