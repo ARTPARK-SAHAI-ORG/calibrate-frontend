@@ -320,13 +320,12 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    mockUseTraces.mockReturnValue(tracesResult([]));
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
+    // It names what was searched for, like the other lists do.
     await waitFor(() =>
-      expect(
-        screen.getByText("No traces match your search."),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/No traces match .polio./)).toBeInTheDocument(),
     );
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
     // The search box has to stay, or there is no way back to the full list.
@@ -342,9 +341,7 @@ describe("TracesTabContent", () => {
     const box = screen.getByPlaceholderText("Search traces");
     await user.type(box, "polio");
     await waitFor(() =>
-      expect(
-        screen.getByText("No traces match your search."),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/No traces match/)).toBeInTheDocument(),
     );
 
     // The box is cleared, but the full list has not come back yet.
@@ -369,9 +366,7 @@ describe("TracesTabContent", () => {
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() =>
-      expect(
-        screen.getByText("No traces match your search."),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/No traces match/)).toBeInTheDocument(),
     );
     expect(screen.getByText("Loading traces...")).toBeInTheDocument();
   });
@@ -386,9 +381,7 @@ describe("TracesTabContent", () => {
     expect(
       screen.getByText("Failed to load traces. Please try again."),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText("No traces match your search."),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/No traces match/)).not.toBeInTheDocument();
   });
 
   it("shows the empty state when the agent has no traces", () => {

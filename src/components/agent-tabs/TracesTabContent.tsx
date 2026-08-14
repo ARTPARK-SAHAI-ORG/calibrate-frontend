@@ -227,6 +227,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   // screen are still the old search until the full list has loaded back.
   const isSearching =
     searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
+  // The rows on screen came from `loadedQ`, so that is the text to name when
+  // nothing matched, even while a newer search or a cleared box is loading.
+  const searchedFor = loadedQ.trim() || search.trim() || searchInput.trim();
   const isEmptyRef = useRef(false);
   if (!isLoading && !error && !isSearching) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
@@ -319,9 +322,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           )}
 
           {total === 0 && isSearching ? (
-            <p className="text-sm text-muted-foreground">
-              No traces match your search.
-            </p>
+            <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+              No traces match &ldquo;{searchedFor}&rdquo;.
+            </div>
           ) : (
             <div className="space-y-1 pt-4">
               <ServerPaginatedListBar
