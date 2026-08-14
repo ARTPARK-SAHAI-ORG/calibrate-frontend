@@ -131,11 +131,4 @@ describe("EvaluatorPicker", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses the caller's search placeholder when given", () => {
-    setup({ evaluators: [], searchPlaceholder: "Find an evaluator" });
-
-    expect(
-      screen.getByPlaceholderText("Find an evaluator"),
-    ).toBeInTheDocument();
-  });
 });

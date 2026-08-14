@@ -78,7 +78,6 @@ export function TraceLabellingEvaluatorsDialog({
                   onToggle={(uuid) =>
                     setPicked((prev) => toggle(prev ?? preselectedUuids, uuid))
                   }
-                  emptyMessage="No evaluators can judge a reply yet. Create one on the Evaluators page."
                 />
               </div>
 

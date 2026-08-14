@@ -13,10 +13,8 @@ type EvaluatorPickerProps = {
   evaluators: EvaluatorData[];
   selectedIds: Set<string>;
   onToggle: (uuid: string) => void;
-  searchPlaceholder?: string;
-  /** Shown when `evaluators` is empty — the caller's wording. */
-  emptyMessage: string;
-  className?: string;
+  /** Shown when `evaluators` is empty. Override where the reason differs. */
+  emptyMessage?: string;
 };
 
 /**
@@ -28,9 +26,7 @@ export function EvaluatorPicker({
   evaluators,
   selectedIds,
   onToggle,
-  searchPlaceholder = "Search evaluators",
-  emptyMessage,
-  className,
+  emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
 
@@ -114,7 +110,7 @@ export function EvaluatorPicker({
   };
 
   return (
-    <div className={className ?? "space-y-3"}>
+    <div className="space-y-3">
       {/* Search */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -136,7 +132,7 @@ export function EvaluatorPicker({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchPlaceholder}
+          placeholder="Search evaluators"
           className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
         />
       </div>

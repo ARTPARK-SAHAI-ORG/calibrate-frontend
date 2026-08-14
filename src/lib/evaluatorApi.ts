@@ -50,17 +50,6 @@ export type EvaluatorData = {
 };
 
 /**
- * True when the evaluator's prompt expects variables. An evaluator with
- * variables needs a value per variable when it is attached to a test, so any
- * picker that cannot ask for those values must leave it out.
- */
-export function hasEvaluatorVariables(e: {
-  live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
-}): boolean {
-  return (e.live_version?.variables?.length ?? 0) > 0;
-}
-
-/**
  * Whether this is an org default (a forked seed). `is_default` is the sole
  * discriminator — `owner_user_id` is now set on every evaluator (defaults are
  * per-org forks) so it can't be used. This is the ONE place the default vs

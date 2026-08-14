@@ -8,7 +8,6 @@ import {
 import {
   fetchAgentEvaluators,
   fetchAllEvaluators,
-  hasEvaluatorVariables,
   EvaluatorData,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
@@ -68,7 +67,13 @@ export function useAgentLlmEvaluators({
         ]);
         if (cancelled) return;
         const llm = evs.filter(
-          (e) => e.evaluator_type === "llm" && !hasEvaluatorVariables(e),
+          // An evaluator whose prompt expects variables needs a value per
+          // variable when it is attached to a test. Neither trace request
+          // carries those values and neither dialog can ask for them, so such
+          // an evaluator is left out rather than attached half-filled.
+          (e) =>
+            e.evaluator_type === "llm" &&
+            (e.live_version?.variables?.length ?? 0) === 0,
         );
         setEvaluators(llm);
         // Start from the agent's own evaluators, limited to the ones on offer.

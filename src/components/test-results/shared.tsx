@@ -966,7 +966,7 @@ export function TestDetailView({
   // visible chunk is whatever the agent's final reply is.
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ block: "end" });
+    bottomRef.current?.scrollIntoView({ block: "end" });
   }, [history.length, output?.response]);
   const effectiveJudgeResults =
     Array.isArray(judgeResults) && judgeResults.length > 0
