@@ -16,7 +16,6 @@ import {
   useTraces,
 } from "@/hooks";
 import { bulkDeleteMatchingTraces } from "@/lib/tracesApi";
-import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -134,14 +133,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + items.length, total);
 
-  // While the setup steps are on screen, keep asking for traces so the list
-  // appears on its own the moment the first one arrives. Nothing polls once
-  // there are traces, or while another tab is showing.
-  useEffect(() => {
-    if (!showEmptyState) return;
-    const timer = setInterval(refetch, POLLING_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [showEmptyState, refetch]);
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
@@ -205,7 +196,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       {isLoading ? (
         <LoadingState />
       ) : showEmptyState ? (
-        <TracesEmptyState agentUuid={agentUuid} />
+        <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
       ) : items.length === 0 ? (
         <div className="border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
           No traces match your filters.

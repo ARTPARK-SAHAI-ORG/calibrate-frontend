@@ -116,9 +116,9 @@ export function buildSnippet(
 /** What each part of the request means, in the order it appears. */
 export const SNIPPET_FIELDS: { name: string; meaning: string }[] = [
   {
-    name: "The address",
+    name: "POST /traces",
     meaning:
-      "Where Calibrate receives traces. It is the same address this app talks to.",
+      "Where Calibrate receives traces, already filled in with your Calibrate address.",
   },
   {
     name: "X-API-Key",

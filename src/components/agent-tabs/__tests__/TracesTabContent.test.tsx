@@ -1,5 +1,4 @@
-import { render, screen, waitFor, setupUser, act } from "@/test-utils";
-import { POLLING_INTERVAL_MS } from "@/constants/polling";
+import { render, screen, waitFor, setupUser } from "@/test-utils";
 import { TracesTabContent } from "../TracesTabContent";
 import type { TraceSummary } from "@/lib/tracesApi";
 
@@ -24,8 +23,16 @@ jest.mock("../../../lib/tracesApi", () => ({
     bulkDeleteMatchingTraces(...args),
 }));
 
+// The stub exposes the check callback so a test can prove the tab wires its
+// own refetch into the setup steps.
 jest.mock("../../traces/TracesEmptyState", () => ({
-  TracesEmptyState: () => <div data-testid="traces-empty-state" />,
+  TracesEmptyState: ({ onCheckForTraces }: { onCheckForTraces: () => void }) => (
+    <div data-testid="traces-empty-state">
+      <button type="button" onClick={onCheckForTraces}>
+        check
+      </button>
+    </div>
+  ),
 }));
 // The stubs print the props that carry the agent and the trace, so a test can
 // check the dialogs were opened for the right one instead of only that they
@@ -138,40 +145,16 @@ describe("TracesTabContent", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps checking for traces while the setup steps are showing", () => {
-    jest.useFakeTimers();
-    try {
-      mockUseTraces.mockReturnValue(tracesResult([]));
-      const { unmount } = render(<TracesTabContent agentUuid="agent-1" />);
+  it("gives the setup steps a way to look for traces again", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(tracesResult([]));
+    render(<TracesTabContent agentUuid="agent-1" />);
 
-      expect(refetch).not.toHaveBeenCalled();
-      act(() => {
-        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 2);
-      });
-      expect(refetch).toHaveBeenCalledTimes(2);
+    // Nothing happens until the reader asks: no timers, no background checks.
+    expect(refetch).not.toHaveBeenCalled();
 
-      // And it stops when the tab goes away, so nothing keeps polling.
-      unmount();
-      act(() => {
-        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 2);
-      });
-      expect(refetch).toHaveBeenCalledTimes(2);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it("stops checking once the agent has traces", () => {
-    jest.useFakeTimers();
-    try {
-      render(<TracesTabContent agentUuid="agent-1" />);
-      act(() => {
-        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 3);
-      });
-      expect(refetch).not.toHaveBeenCalled();
-    } finally {
-      jest.useRealTimers();
-    }
+    await user.click(screen.getByText("check"));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("reveals the convert and delete actions once a trace is selected", async () => {
