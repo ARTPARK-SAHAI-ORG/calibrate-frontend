@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
@@ -38,8 +37,17 @@ import { reportError } from "@/lib/reportError";
  * The Traces tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
-export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
-  const router = useRouter();
+export function TracesTabContent({
+  agentUuid,
+  onTestsCreated,
+  onViewTests,
+}: {
+  agentUuid: string;
+  /** Called after traces are turned into tests, so the Tests tab reloads. */
+  onTestsCreated: () => void;
+  /** Opens the Tests tab, where the created tests are listed. */
+  onViewTests: () => void;
+}) {
   const accessToken = useAccessToken();
 
   const [pageSize, setPageSize] = usePageSize();
@@ -386,10 +394,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           setConvertOpen(false);
           deletion.clearSelection();
           const created = result.created;
+          // The created tests belong to this agent, so reload the Tests tab
+          // and send the reader there rather than to the whole test library.
+          onTestsCreated();
           toast.success(`Created ${created} test${created === 1 ? "" : "s"}`, {
             action: {
               label: "View tests",
-              onClick: () => router.push("/tests"),
+              onClick: onViewTests,
             },
           });
         }}

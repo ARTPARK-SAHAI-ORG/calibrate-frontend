@@ -159,6 +159,10 @@ export function AgentDetail({
   const shouldRenderTab = (tab: TabType) =>
     activeTab === tab || visitedTabs.has(tab);
 
+  // Bumped when the Traces tab turns traces into tests, so the Tests tab shows
+  // them even when it was already open earlier in this visit.
+  const [testsReloadKey, setTestsReloadKey] = useState(0);
+
   // Name editing dialog state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -1217,6 +1221,9 @@ export function AgentDetail({
         {shouldRenderTab("tests") && (
           <div className={activeTab === "tests" ? undefined : "hidden"}>
             <TestsTabContent
+              // Adding traces to tests creates tests linked to this agent. The
+              // Tests tab loads its list once, so remount it to pick them up.
+              key={testsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
               agentType={agent.type}
@@ -1266,7 +1273,11 @@ export function AgentDetail({
         {/* Traces Tab Content */}
         {shouldRenderTab("traces") && (
           <div className={activeTab === "traces" ? undefined : "hidden"}>
-            <TracesTabContent agentUuid={agentUuid} />
+            <TracesTabContent
+              agentUuid={agentUuid}
+              onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
+              onViewTests={() => performTabSwitch("tests")}
+            />
           </div>
         )}
 
