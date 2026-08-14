@@ -8,6 +8,7 @@ jest.mock("../../../lib/api", () => ({
 
 const createApiKey = jest.fn();
 const onCheckForTraces = jest.fn();
+const validateApiKeyForAgent = jest.fn();
 
 jest.mock("../../../hooks", () => ({
   __esModule: true,
@@ -16,9 +17,16 @@ jest.mock("../../../hooks", () => ({
   useWorkspaceApiKeys: () => ({ createApiKey }),
 }));
 
+jest.mock("../../../lib/tracesApi", () => ({
+  __esModule: true,
+  validateApiKeyForAgent: (...args: unknown[]) =>
+    validateApiKeyForAgent(...args),
+}));
+
 beforeEach(() => {
   createApiKey.mockReset();
   onCheckForTraces.mockReset();
+  validateApiKeyForAgent.mockReset();
 });
 
 function setup(agentUuid = "ag-1") {
@@ -36,9 +44,9 @@ function snippetText(): string {
 }
 
 /**
- * Step two only opens once step one is finished, and the only way to finish
- * step one is to create a key, so every test that needs the request goes
- * through the real flow.
+ * Step two only opens once step one is finished. Creating a key is one way;
+ * pasting an existing one is the other. Tests that need the request use this
+ * create path unless they are specifically covering the paste path.
  */
 async function openStepTwo(user: ReturnType<typeof setupUser>) {
   createApiKey.mockResolvedValue({
@@ -67,6 +75,9 @@ it("lists all three steps, but only opens the one to do now", async () => {
   // Only step one is open: the later steps show nothing but their heading.
   expect(
     screen.getByRole("button", { name: "Create API key" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "I have a key already" }),
   ).toBeInTheDocument();
   expect(screen.queryByText("agent_id")).not.toBeInTheDocument();
   expect(
@@ -215,6 +226,70 @@ it("creates a key in step one and fills it into the snippet", async () => {
   expect(screen.getByText("agent_id")).toBeInTheDocument();
   expect(snippetText()).toContain("sk_live_secret");
   expect(snippetText()).not.toContain("sk_...");
+});
+
+it("lets an existing key be pasted and checked, then fills the snippet", async () => {
+  validateApiKeyForAgent.mockResolvedValue(true);
+  const user = setupUser();
+  setup("ag-1");
+
+  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  expect(screen.getByRole("button", { name: "Check key" })).toBeDisabled();
+
+  await user.type(screen.getByPlaceholderText("Paste your key"), "sk_existing");
+  await user.click(screen.getByRole("button", { name: "Check key" }));
+
+  expect(validateApiKeyForAgent).toHaveBeenCalledWith("sk_existing", "ag-1");
+  // Same landing as creating a key: step two is open, the key is in the request.
+  expect(await screen.findByText("agent_id")).toBeInTheDocument();
+  expect(snippetText()).toContain("sk_existing");
+  expect(snippetText()).not.toContain("sk_...");
+  expect(screen.queryByText("Confirmed")).not.toBeInTheDocument();
+
+  await user.click(screen.getByText("Create an API key"));
+  expect(screen.getByText("sk_existing")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Create a new API key" }),
+  ).toBeInTheDocument();
+});
+
+it("stays on step one when the pasted key does not work", async () => {
+  validateApiKeyForAgent.mockResolvedValue(false);
+  const user = setupUser();
+  setup();
+
+  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.type(screen.getByPlaceholderText("Paste your key"), "sk_bad");
+  await user.click(screen.getByRole("button", { name: "Check key" }));
+
+  expect(
+    await screen.findByText(
+      "This key did not work. Check it is for this workspace.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("agent_id")).not.toBeInTheDocument();
+});
+
+it("says when the key could not be checked, and cancel returns to the start", async () => {
+  validateApiKeyForAgent.mockRejectedValue(new Error("network"));
+  const user = setupUser();
+  setup();
+
+  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.type(screen.getByPlaceholderText("Paste your key"), "sk_live");
+  await user.click(screen.getByRole("button", { name: "Check key" }));
+
+  expect(
+    await screen.findByText("Could not check this key. Try again."),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(
+    screen.getByRole("button", { name: "I have a key already" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByPlaceholderText("Paste your key"),
+  ).not.toBeInTheDocument();
 });
 
 it("copies the snippet that is on screen, key and agent included", async () => {

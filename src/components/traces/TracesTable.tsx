@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
+import { ToolIcon } from "@/components/icons";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
-import type { TraceSummary } from "@/lib/tracesApi";
+import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
 
 type CheckboxProps = {
   checked: boolean;
@@ -38,6 +39,27 @@ export function formatTraceDate(value: string): string {
   });
 }
 
+/** Compact `key: value` line for a tool's arguments. */
+export function formatToolArgs(
+  args?: Record<string, unknown> | null,
+): string | null {
+  if (!args || typeof args !== "object" || Array.isArray(args)) return null;
+  const parts = Object.entries(args).map(([key, value]) => {
+    let display: string;
+    if (value === null || value === undefined) display = "null";
+    else if (typeof value === "string") display = value;
+    else {
+      try {
+        display = JSON.stringify(value);
+      } catch {
+        display = String(value);
+      }
+    }
+    return `${key}: ${display}`;
+  });
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 /** Text reply, else the tool names, so the Output column is never a placeholder. */
 export function traceOutputPreview(trace: {
   response_preview: string | null;
@@ -51,8 +73,58 @@ export function traceOutputPreview(trace: {
   return names.length > 0 ? names.join(", ") : null;
 }
 
+function ToolCallPreview({ call }: { call: TraceToolCall }) {
+  const argsLine = formatToolArgs(call.arguments);
+  return (
+    <div className="min-w-0 rounded-md bg-muted/50 px-2 py-1">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <ToolIcon className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+        <span className="text-xs font-medium font-mono text-foreground truncate">
+          {call.tool}
+        </span>
+      </div>
+      {argsLine && (
+        <p
+          className="text-xs text-muted-foreground truncate mt-0.5 pl-5"
+          title={argsLine}
+        >
+          {argsLine}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TraceOutputCell({ trace }: { trace: TraceSummary }) {
+  const reply = trace.response_preview?.trim();
+  if (reply) {
+    return (
+      <div className="text-sm text-foreground truncate" title={reply}>
+        {reply}
+      </div>
+    );
+  }
+  const calls = (trace.tool_calls ?? []).filter((call) => call.tool?.trim());
+  if (calls.length > 0) {
+    return (
+      <div className="space-y-1 min-w-0">
+        {calls.map((call, index) => (
+          <ToolCallPreview key={`${call.tool}-${index}`} call={call} />
+        ))}
+      </div>
+    );
+  }
+  const names = traceOutputPreview(trace);
+  if (!names) return null;
+  return (
+    <div className="text-sm text-foreground truncate" title={names}>
+      {names}
+    </div>
+  );
+}
+
 const ROW_GRID =
-  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_160px_auto] gap-4 px-4 py-2";
+  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_160px_auto] gap-4 px-4";
 
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
@@ -72,7 +144,7 @@ export function TracesTable({
     <>
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className={`${ROW_GRID} border-b border-border bg-muted/30 items-center`}>
+        <div className={`${ROW_GRID} py-2 border-b border-border bg-muted/30 items-center`}>
           <div className="flex items-center">
             <SelectCheckbox
               checked={allSelected}
@@ -87,12 +159,11 @@ export function TracesTable({
           <div className="w-8" />
         </div>
         {traces.map((trace) => {
-          const outputPreview = traceOutputPreview(trace);
           return (
             <div
               key={trace.uuid}
               onClick={() => onOpen(trace.uuid)}
-              className={`${ROW_GRID} border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              className={`${ROW_GRID} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
             >
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />
@@ -110,11 +181,7 @@ export function TracesTable({
                 )}
               </div>
               <div className="min-w-0">
-                {outputPreview && (
-                  <div className="text-sm text-foreground truncate">
-                    {outputPreview}
-                  </div>
-                )}
+                <TraceOutputCell trace={trace} />
               </div>
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 {formatTraceDate(trace.created_at)}
@@ -133,7 +200,6 @@ export function TracesTable({
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
         {traces.map((trace) => {
-          const outputPreview = traceOutputPreview(trace);
           return (
           <div
             key={trace.uuid}
@@ -155,11 +221,9 @@ export function TracesTable({
               </div>
               <SelectCheckbox {...checkboxProps(trace)} />
             </div>
-            {outputPreview && (
-              <p className="text-sm text-foreground mt-1 line-clamp-2">
-                {outputPreview}
-              </p>
-            )}
+            <div className="mt-2">
+              <TraceOutputCell trace={trace} />
+            </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-muted-foreground">
                 {formatTraceDate(trace.created_at)}

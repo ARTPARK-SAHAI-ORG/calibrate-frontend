@@ -3,6 +3,7 @@ import {
   fetchTrace,
   bulkDeleteMatchingTraces,
   convertTracesToTests,
+  validateApiKeyForAgent,
 } from "../tracesApi";
 import { apiGet, apiPost } from "../api";
 
@@ -10,6 +11,7 @@ jest.mock("../api", () => ({
   __esModule: true,
   apiGet: jest.fn(),
   apiPost: jest.fn(),
+  getBackendUrl: jest.fn(() => "https://api.example.com"),
 }));
 
 const mockApiGet = apiGet as jest.Mock;
@@ -87,6 +89,68 @@ describe("fetchTrace", () => {
 
     expect(mockApiGet).toHaveBeenCalledWith("/traces/t1", "tok");
     expect(result).toEqual({ uuid: "t1" });
+  });
+});
+
+describe("validateApiKeyForAgent", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function mockResponse(status: number) {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+    });
+  }
+
+  it("GETs the agent with only the pasted key, trimmed", async () => {
+    mockResponse(200);
+
+    await expect(validateApiKeyForAgent("  sk_live  ", "ag-1")).resolves.toBe(
+      true,
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.example.com/agents/ag-1",
+      {
+        headers: {
+          accept: "application/json",
+          "X-API-Key": "sk_live",
+        },
+      },
+    );
+    const headers = (global.fetch as jest.Mock).mock.calls[0][1].headers;
+    expect(headers).not.toHaveProperty("Authorization");
+  });
+
+  it("returns false when the key is rejected", async () => {
+    mockResponse(401);
+    await expect(validateApiKeyForAgent("sk_bad", "ag-1")).resolves.toBe(false);
+
+    mockResponse(403);
+    await expect(validateApiKeyForAgent("sk_bad", "ag-1")).resolves.toBe(false);
+
+    mockResponse(404);
+    await expect(validateApiKeyForAgent("sk_bad", "ag-1")).resolves.toBe(false);
+  });
+
+  it("throws when the check cannot complete", async () => {
+    mockResponse(500);
+    await expect(validateApiKeyForAgent("sk_live", "ag-1")).rejects.toThrow(
+      "Request failed: 500",
+    );
+
+    (global.fetch as jest.Mock).mockRejectedValue(new Error("network"));
+    await expect(validateApiKeyForAgent("sk_live", "ag-1")).rejects.toThrow(
+      "network",
+    );
   });
 });
 

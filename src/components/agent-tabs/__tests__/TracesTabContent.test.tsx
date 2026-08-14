@@ -9,7 +9,9 @@ import type { TraceSummary } from "@/lib/tracesApi";
 // The list itself comes from `useTraces`; this test drives it directly so the
 // tab's own behaviour (toolbar, selection, empty state) is what's exercised.
 const mockUseTraces = jest.fn();
-const mockUseDialogUrlParam = jest.fn(() => ({ setParam: jest.fn() }));
+const mockUseDialogUrlParam = jest.fn((_args: unknown) => ({
+  setParam: jest.fn(),
+}));
 const handleDeleted = jest.fn();
 
 jest.mock("../../../hooks", () => ({

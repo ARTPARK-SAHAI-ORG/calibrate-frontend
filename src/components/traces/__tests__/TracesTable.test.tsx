@@ -1,5 +1,10 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { TracesTable, formatTraceDate, traceOutputPreview } from "../TracesTable";
+import {
+  TracesTable,
+  formatTraceDate,
+  formatToolArgs,
+  traceOutputPreview,
+} from "../TracesTable";
 import type { TraceSummary } from "@/lib/tracesApi";
 
 function trace(overrides: Partial<TraceSummary> = {}): TraceSummary {
@@ -49,6 +54,23 @@ describe("formatTraceDate", () => {
   });
   it("returns the raw value for an unparseable date", () => {
     expect(formatTraceDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatToolArgs", () => {
+  it("joins keys and values on one line", () => {
+    expect(
+      formatToolArgs({
+        extraction: { awc_code: null },
+        errors: "AWC code ke ank spasht nahi the.",
+      }),
+    ).toBe(
+      'extraction: {"awc_code":null} · errors: AWC code ke ank spasht nahi the.',
+    );
+  });
+  it("returns null when there are no arguments", () => {
+    expect(formatToolArgs(null)).toBeNull();
+    expect(formatToolArgs({})).toBeNull();
   });
 });
 
@@ -105,6 +127,33 @@ describe("TracesTable", () => {
     });
     expect(screen.getAllByText("process_user_turn").length).toBeGreaterThan(0);
     expect(screen.queryByText("Tool calls only")).not.toBeInTheDocument();
+  });
+
+  it("shows tool arguments under the name when the list includes them", () => {
+    renderTable({
+      traces: [
+        trace({
+          response_preview: null,
+          tool_names: ["process_user_turn"],
+          tool_calls: [
+            {
+              tool: "process_user_turn",
+              arguments: {
+                extraction: { awc_code: null },
+                errors: "AWC code ke ank spasht nahi the.",
+              },
+            },
+          ],
+        }),
+      ],
+    });
+    expect(screen.getAllByText("process_user_turn").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/extraction: \{"awc_code":null\}/).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/errors: AWC code ke ank spasht nahi the\./).length,
+    ).toBeGreaterThan(0);
   });
 
   it("does not show a placeholder when there is no reply and no tool names", () => {

@@ -6,6 +6,7 @@ import { CheckCircleIcon, ChevronDownIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useAccessToken, useActiveOrgUuid, useWorkspaceApiKeys } from "@/hooks";
 import { getBackendUrl } from "@/lib/api";
+import { validateApiKeyForAgent } from "@/lib/tracesApi";
 import {
   buildSnippet,
   SNIPPET_FIELDS,
@@ -163,8 +164,13 @@ export function TracesEmptyState({
 
   // The backend returns the key itself only when it is created, so this is the
   // one moment it can be filled into the request. Held in memory only, and gone
-  // as soon as the traces arrive and this screen goes away.
+  // as soon as the traces arrive and this screen goes away. Pasting an existing
+  // key and checking it lands in the same place.
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [isPastingKey, setIsPastingKey] = useState(false);
+  const [pastedKey, setPastedKey] = useState("");
+  const [isCheckingKey, setIsCheckingKey] = useState(false);
+  const [keyCheckError, setKeyCheckError] = useState<string | null>(null);
 
   const accessToken = useAccessToken();
   const [orgUuid] = useActiveOrgUuid();
@@ -187,6 +193,31 @@ export function TracesEmptyState({
     await copyText(snippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCheckExistingKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = pastedKey.trim();
+    if (!trimmed || isCheckingKey) return;
+    setIsCheckingKey(true);
+    setKeyCheckError(null);
+    try {
+      const ok = await validateApiKeyForAgent(trimmed, agentUuid);
+      if (!ok) {
+        setKeyCheckError(
+          "This key did not work. Check it is for this workspace.",
+        );
+        return;
+      }
+      setCreatedKey(trimmed);
+      setIsPastingKey(false);
+      setPastedKey("");
+      goToStep(2);
+    } catch {
+      setKeyCheckError("Could not check this key. Try again.");
+    } finally {
+      setIsCheckingKey(false);
+    }
   };
 
   // The tab swaps this whole screen for the list when traces come back, so the
@@ -224,23 +255,77 @@ export function TracesEmptyState({
       >
         {createdKey ? (
           <>
-            {/* Coming back to this step, the key you made is still here: it
-                is the one already in the request below. */}
+            {/* Coming back to this step, the key you made or checked is still
+                here: it is the one already in the request below. */}
             <code className="block px-3 py-2 rounded-md border border-border bg-muted/40 text-xs font-mono text-foreground whitespace-nowrap overflow-x-auto">
               {createdKey}
             </code>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setIsCreateKeyOpen(true)}
-            >
+            <Button size="sm" onClick={() => setIsCreateKeyOpen(true)}>
               Create a new API key
             </Button>
           </>
+        ) : isPastingKey ? (
+          <form onSubmit={handleCheckExistingKey} className="space-y-3">
+            <label className="block">
+              <span className="sr-only">API key</span>
+              <input
+                type="text"
+                value={pastedKey}
+                onChange={(e) => {
+                  setPastedKey(e.target.value);
+                  setKeyCheckError(null);
+                }}
+                placeholder="Paste your key"
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                disabled={isCheckingKey}
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm font-mono text-foreground placeholder:font-sans placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 disabled:opacity-50"
+              />
+            </label>
+            {keyCheckError && (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {keyCheckError}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!pastedKey.trim()}
+                isLoading={isCheckingKey}
+                loadingText="Checking..."
+              >
+                Check key
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={isCheckingKey}
+                onClick={() => {
+                  setIsPastingKey(false);
+                  setPastedKey("");
+                  setKeyCheckError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
         ) : (
-          <Button size="sm" onClick={() => setIsCreateKeyOpen(true)}>
-            Create API key
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setIsCreateKeyOpen(true)}>
+              Create API key
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsPastingKey(true)}
+            >
+              I have a key already
+            </Button>
+          </div>
         )}
       </Step>
 

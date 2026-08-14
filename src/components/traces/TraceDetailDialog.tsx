@@ -118,9 +118,9 @@ export function toTestCaseOutput(output: TraceOutput): TestCaseOutput | undefine
 
 function MetaBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="overflow-x-auto">
+    <div>
       <span className="block text-sm font-semibold text-foreground">{label}</span>
-      <span className="block text-xs text-foreground whitespace-nowrap">
+      <span className="block text-xs text-foreground break-all">
         {value}
       </span>
     </div>
@@ -260,7 +260,7 @@ export function TraceDetailDialog({
             )}
           </div>
           {trace && (
-            <div className="md:w-[22rem] lg:w-[28rem] border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
+            <div className="md:w-56 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
               <TraceMetaPanel
                 messageId={trace.message_id}
                 conversationId={trace.conversation_id}

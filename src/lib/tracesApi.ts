@@ -1,4 +1,4 @@
-import { apiGet, apiPost, Paginated } from "./api";
+import { apiGet, apiPost, getBackendUrl, Paginated } from "./api";
 
 /** One turn of stored conversation history, OpenAI chat format. Extra keys
  *  (`tool_calls`, `tool_call_id`, `name`, ...) are preserved by the backend
@@ -35,9 +35,12 @@ export type TraceSummary = {
   conversation_id: string | null;
   input_preview: string | null;
   response_preview: string | null;
-  /** Tool names on the output, when the list row includes them. Used as the
-   * Output-column fallback when there is no text reply. */
+  /** Tools the agent called on this turn, in order. Empty when the turn was
+   * a text reply only. Used as the Output-column fallback when `tool_calls`
+   * is absent. */
   tool_names?: string[] | null;
+  /** Slim tool calls (name + arguments) for the Output column. */
+  tool_calls?: TraceToolCall[] | null;
   turn_count: number;
   tool_call_count: number;
   metadata_count: number;
@@ -91,6 +94,36 @@ export async function fetchTrace(
   traceUuid: string,
 ): Promise<TraceDetail> {
   return apiGet<TraceDetail>(`/traces/${traceUuid}`, accessToken);
+}
+
+/**
+ * Check a pasted workspace API key without touching the signed-in session.
+ * `apiGet` would attach the JWT and sign the user out on 401, so this is a
+ * raw fetch with only `X-API-Key`. A 2xx for this agent means the key is real
+ * and can see this workspace; 401/403/404 mean it is not.
+ */
+export async function validateApiKeyForAgent(
+  apiKey: string,
+  agentUuid: string,
+): Promise<boolean> {
+  const response = await fetch(
+    `${getBackendUrl()}/agents/${encodeURIComponent(agentUuid)}`,
+    {
+      headers: {
+        accept: "application/json",
+        "X-API-Key": apiKey.trim(),
+      },
+    },
+  );
+  if (response.ok) return true;
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    response.status === 404
+  ) {
+    return false;
+  }
+  throw new Error(`Request failed: ${response.status}`);
 }
 
 export type BulkDeleteTracesResult = {
