@@ -8,6 +8,14 @@ import { TracesTable } from "@/components/traces/TracesTable";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
+import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
+import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
+import {
+  AddRunToLabellingTaskDialog,
+  type SourceEvaluatorRef,
+  type TraceLabellingItem,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { LoadingState, SearchInput } from "@/components/ui";
 import {
   useAccessToken,
@@ -15,10 +23,29 @@ import {
   useTraceDeletion,
   useTraces,
 } from "@/hooks";
-import { bulkDeleteMatchingTraces } from "@/lib/tracesApi";
+import {
+  bulkDeleteMatchingTraces,
+  fetchTrace,
+  type TraceDetail,
+} from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** What a trace is called in the labelling task: its message id, else the
+ *  first thing the caller said, else a plain word. */
+function traceLabellingName(trace: TraceDetail): string {
+  if (trace.message_id) return trace.message_id;
+  const firstUser = trace.input?.find(
+    (turn) =>
+      turn.role === "user" &&
+      typeof turn.content === "string" &&
+      turn.content.trim(),
+  );
+  return typeof firstUser?.content === "string"
+    ? firstUser.content.trim()
+    : "Trace";
+}
 
 /**
  * The Traces tab on the agent detail page: the production conversations sent
@@ -97,6 +124,46 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       ? "tool_call"
       : "response";
 
+  // Send selected traces for labelling. Step one asks which evaluators the
+  // annotators score against; step two needs the full traces, which the list
+  // rows only preview, so they are fetched before the task dialog opens.
+  const [evaluatorStepOpen, setEvaluatorStepOpen] = useState(false);
+  const [isPreparingLabelling, setIsPreparingLabelling] = useState(false);
+  const [labellingEvaluators, setLabellingEvaluators] = useState<
+    SourceEvaluatorRef[]
+  >([]);
+  const [labellingTraces, setLabellingTraces] = useState<
+    TraceLabellingItem[] | null
+  >(null);
+
+  const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
+    setEvaluatorStepOpen(false);
+    if (!accessToken) return;
+    setIsPreparingLabelling(true);
+    try {
+      const details = await Promise.all(
+        Array.from(selected).map((uuid) => fetchTrace(accessToken, uuid)),
+      );
+      setLabellingEvaluators(chosen);
+      setLabellingTraces(
+        details.map((trace) => ({
+          name: traceLabellingName(trace),
+          input: trace.input,
+          output: trace.output,
+        })),
+      );
+    } catch (err) {
+      reportError("Error loading traces for labelling:", err);
+      toast.error("Could not load the selected traces. Please try again.");
+    } finally {
+      setIsPreparingLabelling(false);
+    }
+  };
+
+  // The setup steps go away once the first trace lands, so the code that sends
+  // one stays reachable from here: to add another service, or to check a field.
+  const [codeOpen, setCodeOpen] = useState(false);
+
   const [openTraceUuid, setOpenTraceUuid] = useState<string | null>(null);
   const { setParam: setTraceParam } = useDialogUrlParam({
     param: "traceId",
@@ -125,6 +192,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             className="w-full md:max-w-md"
           />
           <div className="flex items-center gap-2 md:ml-auto">
+            <button
+              type="button"
+              onClick={() => setCodeOpen(true)}
+              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              View code
+            </button>
             {selected.size > 0 && (
               <>
                 <button
@@ -134,6 +208,22 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
                 >
                   Add to tests ({selected.size})
                 </button>
+                {isPreparingLabelling ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background transition-colors cursor-not-allowed opacity-50"
+                  >
+                    Loading traces...
+                  </button>
+                ) : (
+                  <SubmitForLabellingButton
+                    count={selected.size}
+                    emptyMessage="Select at least one trace to submit for labelling."
+                    onOpen={() => setEvaluatorStepOpen(true)}
+                    className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                  />
+                )}
                 <button
                   type="button"
                   onClick={deletion.openBulkDeleteDialog}
@@ -207,6 +297,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         </>
       )}
 
+      <TraceIngestCodeDialog
+        isOpen={codeOpen}
+        onClose={() => setCodeOpen(false)}
+        agentUuid={agentUuid}
+      />
+
       <TraceDetailDialog
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
@@ -236,6 +332,35 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           );
         }}
       />
+
+      {/* Mounted only while open, so each visit starts from the agent's own
+          evaluators rather than the last visit's ticks. */}
+      {evaluatorStepOpen && (
+        <TraceLabellingEvaluatorsDialog
+          isOpen
+          onClose={() => setEvaluatorStepOpen(false)}
+          agentUuid={agentUuid}
+          accessToken={accessToken}
+          onChosen={prepareLabelling}
+        />
+      )}
+
+      {labellingTraces && (
+        <AddRunToLabellingTaskDialog
+          isOpen
+          onClose={() => setLabellingTraces(null)}
+          source={{
+            type: "traces",
+            agentUuid,
+            traces: labellingTraces,
+            evaluators: labellingEvaluators,
+          }}
+          onAdded={() => {
+            setLabellingTraces(null);
+            deletion.clearSelection();
+          }}
+        />
+      )}
 
       <DeleteConfirmationDialog
         isOpen={deletion.deleteDialogOpen}

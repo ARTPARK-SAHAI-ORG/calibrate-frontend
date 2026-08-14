@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { LoadingState } from "@/components/ui";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
-import {
-  DEFAULT_LLM_NEXT_REPLY_SLUG,
-  defaultOriginSlug,
-} from "@/lib/defaultEvaluators";
-import { fetchAllEvaluators, EvaluatorData } from "@/lib/evaluatorApi";
+import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
 import {
   convertTracesToTests,
@@ -54,49 +51,32 @@ export function ConvertTracesToTestsDialog({
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
 
-  const [evaluators, setEvaluators] = useState<EvaluatorData[]>([]);
-  const [selectedEvaluators, setSelectedEvaluators] = useState<Set<string>>(
-    new Set(),
+  const {
+    evaluators,
+    preselectedUuids,
+    isLoading: loading,
+    error: loadError,
+  } = useAgentLlmEvaluators({
+    agentUuid,
+    accessToken,
+    enabled: isOpen && testType === "response",
+  });
+  // Null until the reader ticks something: until then the agent's own
+  // evaluators are what is selected, and reopening starts from them again.
+  const [pickedEvaluators, setPickedEvaluators] = useState<Set<string> | null>(
+    null,
   );
+  const selectedEvaluators = pickedEvaluators ?? preselectedUuids;
   const [acceptAnyArgs, setAcceptAnyArgs] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
+    setPickedEvaluators(null);
     setAcceptAnyArgs(false);
     setError(null);
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !accessToken || testType !== "response") return;
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const evs = await fetchAllEvaluators(accessToken);
-        if (cancelled) return;
-        const llm = evs.filter((e) => e.evaluator_type === "llm");
-        setEvaluators(llm);
-        // Seed the default LLM-reply evaluator, matching how the tests UI seeds.
-        const preselect = llm.find(
-          (e) => defaultOriginSlug(e) === DEFAULT_LLM_NEXT_REPLY_SLUG,
-        );
-        setSelectedEvaluators(preselect ? new Set([preselect.uuid]) : new Set());
-      } catch (err) {
-        reportError("Error loading convert options:", err);
-        if (!cancelled) setError("Failed to load evaluators.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, accessToken, testType]);
 
   if (!isOpen) return null;
 
@@ -158,33 +138,16 @@ export function ConvertTracesToTestsDialog({
                     Pick at least one. Each created test judges the reply with
                     these.
                   </p>
-                  {evaluators.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">
-                      No LLM evaluators available.
-                    </p>
-                  ) : (
-                    <div className="border border-border rounded-lg max-h-44 overflow-y-auto divide-y divide-border">
-                      {evaluators.map((e) => (
-                        <label
-                          key={e.uuid}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/30"
-                        >
-                          <SelectCheckbox
-                            checked={selectedEvaluators.has(e.uuid)}
-                            onToggle={() =>
-                              setSelectedEvaluators((prev) =>
-                                toggle(prev, e.uuid),
-                              )
-                            }
-                            label={`Select evaluator ${e.name}`}
-                          />
-                          <span className="text-sm text-foreground truncate">
-                            {e.name}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                  <EvaluatorPicker
+                    evaluators={evaluators}
+                    selectedIds={selectedEvaluators}
+                    onToggle={(uuid) =>
+                      setPickedEvaluators((prev) =>
+                        toggle(prev ?? preselectedUuids, uuid),
+                      )
+                    }
+                    emptyMessage="No evaluators can judge a reply yet. Create one on the Evaluators page."
+                  />
                 </div>
               ) : (
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -199,8 +162,10 @@ export function ConvertTracesToTestsDialog({
                 </label>
               )}
 
-              {error && (
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              {(error ?? loadError) && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {error ?? loadError}
+                </p>
               )}
             </>
           )}

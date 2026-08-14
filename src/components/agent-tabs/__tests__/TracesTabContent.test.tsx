@@ -25,9 +25,74 @@ jest.mock("../../../hooks", () => ({
 }));
 
 const bulkDeleteMatchingTraces = jest.fn();
+const fetchTrace = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
   bulkDeleteMatchingTraces: (...args: unknown[]) =>
     bulkDeleteMatchingTraces(...args),
+  fetchTrace: (...args: unknown[]) => fetchTrace(...args),
+}));
+
+const reportError = jest.fn();
+jest.mock("../../../lib/reportError", () => ({
+  reportError: (...args: unknown[]) => reportError(...args),
+}));
+
+// The evaluator step is stubbed down to its one outcome: the reader picks
+// evaluators and continues.
+jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
+  TraceLabellingEvaluatorsDialog: ({
+    isOpen,
+    agentUuid,
+    onChosen,
+  }: {
+    isOpen: boolean;
+    agentUuid: string;
+    onChosen: (evaluators: { uuid: string; name?: string }[]) => void;
+  }) =>
+    isOpen ? (
+      <div data-testid="labelling-evaluators">
+        <span data-testid="labelling-evaluators-agent">{agentUuid}</span>
+        <button
+          type="button"
+          onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }])}
+        >
+          choose evaluators
+        </button>
+      </div>
+    ) : null,
+}));
+// The stub prints what the dialog was handed, so the mapping from traces to
+// labelling items is exercised rather than assumed.
+jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
+  AddRunToLabellingTaskDialog: ({
+    isOpen,
+    source,
+    onAdded,
+  }: {
+    isOpen: boolean;
+    source: {
+      type: string;
+      agentUuid: string;
+      traces: { name: string; input: unknown[]; output: unknown }[];
+      evaluators?: { uuid: string }[];
+    };
+    onAdded?: (taskUuid: string, itemsCreated: number) => void;
+  }) =>
+    isOpen ? (
+      <div data-testid="labelling-task">
+        <span data-testid="labelling-source">{source.type}</span>
+        <span data-testid="labelling-agent">{source.agentUuid}</span>
+        <span data-testid="labelling-payload">
+          {JSON.stringify(source.traces)}
+        </span>
+        <span data-testid="labelling-evaluator-uuids">
+          {(source.evaluators ?? []).map((e) => e.uuid).join(",")}
+        </span>
+        <button type="button" onClick={() => onAdded?.("task-1", 1)}>
+          finish labelling
+        </button>
+      </div>
+    ) : null,
 }));
 
 // The stub exposes the check callback so a test can prove the tab wires its
@@ -128,6 +193,23 @@ function lastTracesArgs() {
 }
 
 describe("TracesTabContent", () => {
+  it("keeps the sending code reachable once traces exist", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    // The setup steps are gone at this point, so this is the only way back to
+    // the request: no selection needed.
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "View code" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Send a trace" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector("pre")?.textContent).toContain(
+      '"agent_id": "agent-1"',
+    );
+  });
+
   it("lists the loaded traces for this agent", () => {
     render(<TracesTabContent agentUuid="agent-1" />);
 
@@ -313,6 +395,143 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (2)"));
 
     expect(screen.getByTestId("convert-type")).toHaveTextContent("response");
+  });
+
+  describe("submitting traces for labelling", () => {
+    const detail = (over: Record<string, unknown> = {}) => ({
+      uuid: "trace-1",
+      message_id: "msg-001",
+      input: [{ role: "user", content: "When is the next vaccination?" }],
+      output: { response: "At 14 weeks.", tool_calls: null },
+      ...over,
+    });
+
+    beforeEach(() => {
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
+        detail({ uuid, message_id: uuid === "trace-2" ? null : "msg-001" }),
+      );
+    });
+
+    it("offers the labelling action only once a trace is selected", async () => {
+      const user = setupUser();
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      expect(
+        screen.queryByText(/Submit for labelling/),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+
+      expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
+    });
+
+    it("asks for evaluators, then hands the full traces to the task dialog", async () => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace(),
+          trace({ uuid: "trace-2", message_id: null, input_preview: "Second" }),
+        ]),
+      );
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getByLabelText("Select all traces"));
+      await user.click(screen.getByText("Submit for labelling (2)"));
+
+      expect(screen.getByTestId("labelling-evaluators-agent")).toHaveTextContent(
+        "agent-1",
+      );
+      // Nothing is fetched until the evaluators are settled.
+      expect(fetchTrace).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText("choose evaluators"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
+      // One fetch per selected trace, because the rows only hold previews.
+      expect(fetchTrace).toHaveBeenCalledTimes(2);
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-1");
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-2");
+
+      expect(screen.getByTestId("labelling-source")).toHaveTextContent("traces");
+      expect(screen.getByTestId("labelling-agent")).toHaveTextContent("agent-1");
+      expect(screen.getByTestId("labelling-evaluator-uuids")).toHaveTextContent(
+        "ev-1",
+      );
+      expect(
+        JSON.parse(screen.getByTestId("labelling-payload").textContent!),
+      ).toEqual([
+        {
+          name: "msg-001",
+          input: [{ role: "user", content: "When is the next vaccination?" }],
+          output: { response: "At 14 weeks.", tool_calls: null },
+        },
+        {
+          // No message id, so the first thing the caller said names it.
+          name: "When is the next vaccination?",
+          input: [{ role: "user", content: "When is the next vaccination?" }],
+          output: { response: "At 14 weeks.", tool_calls: null },
+        },
+      ]);
+    });
+
+    it("shows the traces are being loaded before the task dialog opens", async () => {
+      const user = setupUser();
+      fetchTrace.mockReturnValue(new Promise(() => {}));
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+
+      expect(screen.getByText("Loading traces...")).toBeInTheDocument();
+      expect(screen.getByText("Loading traces...")).toBeDisabled();
+      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+    });
+
+    it("clears the selection once the traces are added to a task", async () => {
+      const user = setupUser();
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByText("finish labelling"));
+
+      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Submit for labelling (1)"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says so when the traces cannot be loaded, instead of opening an empty task", async () => {
+      const user = setupUser();
+      fetchTrace.mockRejectedValue(new Error("boom"));
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Could not load the selected traces. Please try again.",
+        ),
+      );
+      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+      expect(reportError).toHaveBeenCalledWith(
+        "Error loading traces for labelling:",
+        expect.any(Error),
+      );
+      // The selection survives so the reader can try again.
+      expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
+    });
   });
 
   it("opens the detail view for the trace that was clicked", async () => {

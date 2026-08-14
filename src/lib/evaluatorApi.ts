@@ -4,6 +4,16 @@ import { createRequestCache } from "@/lib/requestCache";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 /**
+ * One variable an evaluator's prompt expects a value for. Matches the shape
+ * `AddTestDialog` already declares so the two can be passed around freely.
+ */
+export type EvaluatorVariableDef = {
+  name: string;
+  description?: string;
+  default?: string;
+};
+
+/**
  * The list-level shape of an evaluator, shared by the `/evaluators` page, the
  * create/duplicate flows, and the agent Evaluators tab. Deliberately a subset
  * of the full evaluator record — enough to render cards, pills, and run
@@ -35,7 +45,20 @@ export type EvaluatorData = {
   kind?: "single" | "side_by_side";
   output_type?: "binary" | "rating";
   evaluator_type?: EvaluatorType;
+  /** Returned by `GET /evaluators?include_defaults=true`. */
+  live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
 };
+
+/**
+ * True when the evaluator's prompt expects variables. An evaluator with
+ * variables needs a value per variable when it is attached to a test, so any
+ * picker that cannot ask for those values must leave it out.
+ */
+export function hasEvaluatorVariables(e: {
+  live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
+}): boolean {
+  return (e.live_version?.variables?.length ?? 0) > 0;
+}
 
 /**
  * Whether this is an org default (a forked seed). `is_default` is the sole

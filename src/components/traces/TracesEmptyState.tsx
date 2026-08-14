@@ -5,61 +5,8 @@ import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { CheckCircleIcon, ChevronDownIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useAccessToken, useActiveOrgUuid, useWorkspaceApiKeys } from "@/hooks";
-import { getBackendUrl } from "@/lib/api";
 import { validateApiKeyForAgent } from "@/lib/tracesApi";
-import {
-  buildSnippet,
-  SNIPPET_FIELDS,
-  SNIPPET_LANGUAGES,
-  type SnippetLanguage,
-} from "./ingestSnippets";
-
-/** Stand-in shown until a key is created here, so the shape is still clear. */
-const KEY_PLACEHOLDER = "sk_...";
-
-async function copyText(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const el = document.createElement("textarea");
-    el.value = text;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand("copy");
-    document.body.removeChild(el);
-  }
-}
-
-// Strings and comments are the only things worth colouring in the snippet:
-// they are what tell a reader "this is a value you replace" versus "this is an
-// explanation". A full highlighter would be a dependency for four snippets.
-const TOKENS = /("(?:[^"\\]|\\.)*")|((?:#|\/\/)[^\n]*)/g;
-
-function highlight(code: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  let last = 0;
-  let match: RegExpExecArray | null;
-  TOKENS.lastIndex = 0;
-  while ((match = TOKENS.exec(code)) !== null) {
-    if (match.index > last) out.push(code.slice(last, match.index));
-    const [text, str, comment] = match;
-    out.push(
-      <span
-        key={match.index}
-        className={
-          str
-            ? "text-emerald-700 dark:text-emerald-400"
-            : "text-muted-foreground italic"
-        }
-      >
-        {str ?? comment ?? text}
-      </span>,
-    );
-    last = match.index + text.length;
-  }
-  if (last < code.length) out.push(code.slice(last));
-  return out;
-}
+import { TraceIngestSnippet } from "./TraceIngestSnippet";
 
 type StepState = "done" | "current" | "upcoming";
 
@@ -143,7 +90,6 @@ export function TracesEmptyState({
   agentUuid,
   onCheckForTraces,
 }: TracesEmptyStateProps) {
-  const [copied, setCopied] = useState(false);
   const [isCreateKeyOpen, setIsCreateKeyOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [checkedAndEmpty, setCheckedAndEmpty] = useState(false);
@@ -175,25 +121,6 @@ export function TracesEmptyState({
   const accessToken = useAccessToken();
   const [orgUuid] = useActiveOrgUuid();
   const { createApiKey } = useWorkspaceApiKeys(accessToken, orgUuid);
-
-  let backendUrl = "https://<backend>";
-  try {
-    backendUrl = getBackendUrl();
-  } catch {
-    // Missing env var only happens in misconfigured dev; keep the placeholder.
-  }
-  const [language, setLanguage] = useState<SnippetLanguage>("curl");
-  const snippet = buildSnippet(language, {
-    backendUrl,
-    agentUuid,
-    apiKey: createdKey ?? KEY_PLACEHOLDER,
-  });
-
-  const handleCopy = async () => {
-    await copyText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleCheckExistingKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,77 +264,7 @@ export function TracesEmptyState({
         isOpen={openStep === 2}
         onToggle={() => toggleStep(2)}
       >
-        {/* The code gets the larger share: a key and a URL on one line need
-            the room more than the explanations do. */}
-        <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4">
-          {/* The snippet and its controls are one object: tabs on the left of
-              the header bar, copy on the right, code below. */}
-          <div className="min-w-0 border border-border rounded-lg overflow-hidden bg-muted/40">
-            <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
-              <div className="flex items-center gap-0.5 overflow-x-auto">
-                {SNIPPET_LANGUAGES.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setLanguage(option.id)}
-                    className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      language === option.id
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className={`flex-shrink-0 h-7 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                  copied
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <pre className="w-full text-left font-mono text-xs leading-relaxed text-foreground p-4 overflow-x-auto">
-              <code>{highlight(snippet)}</code>
-            </pre>
-          </div>
-
-          <div className="min-w-0 space-y-3">
-            <dl className="space-y-2">
-              {SNIPPET_FIELDS.filter((f) => !f.optional).map((field) => (
-                <div key={field.name}>
-                  <dt className="font-mono text-xs text-foreground">
-                    {field.name}
-                  </dt>
-                  <dd className="text-xs text-muted-foreground mt-0.5">
-                    {field.meaning}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-foreground">Optional</p>
-              <dl className="space-y-2">
-                {SNIPPET_FIELDS.filter((f) => f.optional).map((field) => (
-                  <div key={field.name}>
-                    <dt className="font-mono text-xs text-foreground">
-                      {field.name}
-                    </dt>
-                    <dd className="text-xs text-muted-foreground mt-0.5">
-                      {field.meaning}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
-        </div>
+        <TraceIngestSnippet agentUuid={agentUuid} apiKey={createdKey} />
 
         <Button size="sm" onClick={() => goToStep(3)}>
           I have added this

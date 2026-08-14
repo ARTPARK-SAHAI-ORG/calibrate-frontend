@@ -3,6 +3,8 @@ import {
   AddRunToLabellingTaskDialog,
   buildItemsFromSource,
   isLabellingEligibleRaw,
+  itemNounForSource,
+  targetTaskTypeForSource,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
 
@@ -294,6 +296,86 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       { role: "user", content: "I need a refund." },
     ]);
     expect(result.evaluatorUuids.has("sim-ev-1")).toBe(true);
+  });
+
+  it("builds one llm item per trace and targets an llm task", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Refund question",
+          input: [{ role: "user", content: "where is my refund?" }],
+          output: { response: "Let me check that." },
+        },
+        {
+          name: "Greeting",
+          input: [{ role: "user", content: "hi" }],
+          output: { response: "hello!" },
+        },
+      ],
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    const result = buildItemsFromSource(source);
+    // Fails if the mapping drops `evaluation: { type: "response" }` — every
+    // trace would be counted as skipped instead of built.
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
+    expect(result.items[0].payload.name).toBe("Refund question");
+    expect(result.items[0].payload.chat_history).toEqual([
+      { role: "user", content: "where is my refund?" },
+    ]);
+    expect(result.items[0].payload.agent_response).toBe("Let me check that.");
+    expect(result.items[0].payload.evaluator_variables).toEqual({});
+    expect(result.items[1].payload.name).toBe("Greeting");
+    expect(Array.from(result.evaluatorUuids)).toEqual(["trace-ev-1"]);
+    expect(targetTaskTypeForSource(source)).toBe("llm");
+    expect(itemNounForSource(source)).toEqual({ one: "trace", many: "traces" });
+  });
+
+  it("appends a trace's output tool calls to chat_history as the final turns", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Books an appointment",
+          input: [{ role: "user", content: "book me in" }],
+          output: {
+            response: "",
+            tool_calls: [
+              {
+                tool: "book_appointment",
+                arguments: { day: "Monday" },
+                output: { ok: true },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const result = buildItemsFromSource(source);
+    const history = result.items[0].payload.chat_history as Array<
+      Record<string, unknown>
+    >;
+    expect(history).toHaveLength(3);
+    expect(history[0]).toEqual({ role: "user", content: "book me in" });
+    expect(history[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        {
+          type: "function",
+          function: {
+            name: "book_appointment",
+            arguments: JSON.stringify({ day: "Monday" }),
+          },
+        },
+      ],
+    });
+    expect(history[2]).toMatchObject({
+      role: "tool",
+      content: JSON.stringify({ ok: true }),
+    });
   });
 });
 
@@ -594,6 +676,92 @@ describe("AddRunToLabellingTaskDialog", () => {
               name: "ElevenLabs #1 — tts-run-",
               text: "hello world",
               audio_path: "https://example.com/a.wav",
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("creates an llm task from traces using the evaluators the caller passed", async () => {
+    const user = setupUser();
+    const tracesSource: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Refund question",
+          input: [{ role: "user", content: "where is my refund?" }],
+          output: { response: "Let me check that." },
+        },
+      ],
+      evaluators: [
+        { uuid: "trace-ev-1", name: "Helpfulness" },
+        { uuid: "trace-ev-2", name: "Tone" },
+      ],
+    };
+    const postedItemsBodies: unknown[] = [];
+    apiClientMock.mockImplementation(
+      (
+        path: string,
+        _token: string,
+        opts?: { method?: string; body?: unknown },
+      ) => {
+        if (path === "/annotation-tasks" && (!opts || !opts.method)) {
+          return Promise.resolve({ items: [] });
+        }
+        if (path === "/annotation-tasks" && opts?.method === "POST") {
+          return Promise.resolve({ uuid: "traces-task-uuid" });
+        }
+        if (path === "/annotation-tasks/traces-task-uuid/items") {
+          postedItemsBodies.push(opts?.body);
+          return Promise.resolve({});
+        }
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
+    unwrapListMock.mockReturnValue([]);
+
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={tracesSource}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText(/e.g. Copilot review/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Submit 1 trace for labelling/)).toBeInTheDocument();
+    await user.type(
+      screen.getByPlaceholderText(/e.g. Copilot review/),
+      "Trace batch",
+    );
+    await user.click(screen.getByRole("button", { name: /Create task & add/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Added 1 trace/)).toBeInTheDocument(),
+    );
+
+    const postCall = apiClientMock.mock.calls.find(
+      (c) => c[0] === "/annotation-tasks" && c[2]?.method === "POST",
+    );
+    expect(postCall[2].body).toMatchObject({
+      name: "Trace batch",
+      type: "llm",
+      evaluator_ids: ["trace-ev-1", "trace-ev-2"],
+    });
+    expect(postedItemsBodies).toEqual([
+      {
+        items: [
+          {
+            payload: {
+              name: "Refund question",
+              chat_history: [{ role: "user", content: "where is my refund?" }],
+              agent_response: "Let me check that.",
+              evaluator_variables: {},
             },
           },
         ],
