@@ -24,8 +24,6 @@ type TracesTableProps = {
   onOpen: (traceUuid: string) => void;
   /** Ask to delete a single trace. */
   onDelete: (trace: TraceSummary) => void;
-  /** Filter the list down to one conversation. */
-  onFilterConversation: (conversationId: string) => void;
 };
 
 export function formatTraceDate(value: string): string {
@@ -40,31 +38,22 @@ export function formatTraceDate(value: string): string {
   });
 }
 
-function ConversationButton({
-  conversationId,
-  onClick,
-}: {
-  conversationId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      title="Show this conversation"
-      className="max-w-full truncate font-mono text-xs px-2 py-0.5 rounded-full border border-border bg-muted/50 hover:bg-muted text-foreground transition-colors cursor-pointer"
-    >
-      {conversationId}
-    </button>
-  );
+/** Text reply, else the tool names, so the Output column is never a placeholder. */
+export function traceOutputPreview(trace: {
+  response_preview: string | null;
+  tool_names?: string[] | null;
+}): string | null {
+  const reply = trace.response_preview?.trim();
+  if (reply) return reply;
+  const names = (trace.tool_names ?? [])
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 /**
- * The traces list: a table on desktop, cards on mobile. Rows open the detail
- * view; the conversation pill narrows the list to that conversation.
+ * The traces list: a table on desktop and cards on mobile. Rows open the
+ * detail view.
  */
 export function TracesTable({
   traces,
@@ -74,7 +63,6 @@ export function TracesTable({
   onToggleSelectAll,
   onOpen,
   onDelete,
-  onFilterConversation,
 }: TracesTableProps) {
   return (
     <>
@@ -91,20 +79,11 @@ export function TracesTable({
                   label="Select all traces"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-[26%]">
-                Message
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-[40%]">
+                Input
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Response
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-[16%]">
-                Conversation
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground w-16">
-                Turns
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground w-16">
-                Tools
+                Output
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-40">
                 Created
@@ -113,7 +92,9 @@ export function TracesTable({
             </tr>
           </thead>
           <tbody>
-            {traces.map((trace) => (
+            {traces.map((trace) => {
+              const outputPreview = traceOutputPreview(trace);
+              return (
               <tr
                 key={trace.uuid}
                 onClick={() => onOpen(trace.uuid)}
@@ -123,37 +104,23 @@ export function TracesTable({
                   <SelectCheckbox {...checkboxProps(trace)} />
                 </td>
                 <td className="px-4 py-3">
-                  <div className="font-mono text-xs text-foreground truncate">
-                    {trace.message_id}
-                  </div>
                   {trace.input_preview && (
-                    <div className="text-[13px] text-muted-foreground truncate mt-0.5">
+                    <div className="text-[13px] text-foreground truncate">
                       {trace.input_preview}
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-3">
-                  {trace.response_preview ? (
-                    <div className="text-[13px] text-foreground truncate">
-                      {trace.response_preview}
-                    </div>
-                  ) : (
-                    <div className="text-[13px] text-muted-foreground italic">
-                      Tool calls only
+                  {trace.message_id && (
+                    <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
+                      {trace.message_id}
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <ConversationButton
-                    conversationId={trace.conversation_id}
-                    onClick={() => onFilterConversation(trace.conversation_id)}
-                  />
-                </td>
-                <td className="px-4 py-3 text-right text-[13px] text-muted-foreground">
-                  {trace.turn_count}
-                </td>
-                <td className="px-4 py-3 text-right text-[13px] text-muted-foreground">
-                  {trace.tool_call_count}
+                  {outputPreview && (
+                    <div className="text-[13px] text-foreground truncate">
+                      {outputPreview}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-[13px] text-muted-foreground whitespace-nowrap">
                   {formatTraceDate(trace.created_at)}
@@ -165,14 +132,17 @@ export function TracesTable({
                   />
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {traces.map((trace) => (
+        {traces.map((trace) => {
+          const outputPreview = traceOutputPreview(trace);
+          return (
           <div
             key={trace.uuid}
             className="border border-border rounded-lg overflow-hidden bg-background"
@@ -182,34 +152,27 @@ export function TracesTable({
               onClick={() => onOpen(trace.uuid)}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="font-mono text-xs text-foreground truncate">
-                  {trace.message_id}
+                <div className="min-w-0">
+                  {trace.input_preview && (
+                    <p className="text-sm text-foreground line-clamp-2">
+                      {trace.input_preview}
+                    </p>
+                  )}
+                  {trace.message_id && (
+                    <div className="font-mono text-xs text-muted-foreground truncate mt-0.5">
+                      {trace.message_id}
+                    </div>
+                  )}
                 </div>
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              {trace.input_preview && (
-                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                  {trace.input_preview}
-                </p>
-              )}
-              {trace.response_preview ? (
+              {outputPreview && (
                 <p className="text-sm text-foreground mt-1 line-clamp-2">
-                  {trace.response_preview}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic mt-1">
-                  Tool calls only
+                  {outputPreview}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2 px-4 pb-3 pt-0">
-              <ConversationButton
-                conversationId={trace.conversation_id}
-                onClick={() => onFilterConversation(trace.conversation_id)}
-              />
-              <span className="text-xs text-muted-foreground">
-                {trace.turn_count} turns
-              </span>
               <span className="text-xs text-muted-foreground">
                 {formatTraceDate(trace.created_at)}
               </span>
@@ -221,7 +184,8 @@ export function TracesTable({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

@@ -75,7 +75,7 @@ export type TestCaseOutput = {
 };
 
 export type TestCaseHistory = {
-  role: "assistant" | "user" | "tool";
+  role: "assistant" | "user" | "tool" | "system";
   content?: string;
   tool_calls?: Array<{
     id: string;
@@ -906,6 +906,7 @@ export function TestDetailView({
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
+  showVerdict = true,
 }: {
   history: TestCaseHistory[];
   output?: TestCaseOutput;
@@ -929,6 +930,10 @@ export function TestDetailView({
    * target" pill. Used by the LLM labelling pane to indicate which
    * message annotators are scoring. */
   highlightEvalTarget?: boolean;
+  /** When false, the agent's final output is still the emphasised last
+   * turn (left border) but pass/fail chrome is omitted. Used by traces,
+   * which are not scored. */
+  showVerdict?: boolean;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -961,7 +966,7 @@ export function TestDetailView({
   // visible chunk is whatever the agent's final reply is.
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    bottomRef.current?.scrollIntoView?.({ block: "end" });
   }, [history.length, output?.response]);
   const effectiveJudgeResults =
     Array.isArray(judgeResults) && judgeResults.length > 0
@@ -977,6 +982,11 @@ export function TestDetailView({
   const showLegacyReasoningToggle =
     !hasJudgeResults && !!reasoning?.trim();
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
+  const outputAccent = showVerdict
+    ? passed
+      ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
+      : "border-l-4 border-l-red-500 pl-2 md:pl-3"
+    : "border-l-4 border-l-foreground pl-2 md:pl-3";
   const historyJson = useMemo(() => {
     // Mirror what the UI shows: the prior turns (`history`) followed by the
     // agent's evaluated response (`output`) appended as the final turn(s),
@@ -1030,6 +1040,18 @@ export function TestDetailView({
                     : ""
                 }`}
               >
+                {message.role === "system" && message.content && (
+                  <div className="max-w-[88%] md:max-w-3/4">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      System
+                    </span>
+                    <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted/50 border border-border mt-1">
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {/* User Message */}
                 {message.role === "user" && (
                   <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
@@ -1132,19 +1154,13 @@ export function TestDetailView({
         <div className="space-y-4">
           {/* Text Response */}
           {output.response && (
-            <div
-              className={`${
-                passed
-                  ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
-                  : "border-l-4 border-l-red-500 pl-2 md:pl-3"
-              }`}
-            >
+            <div className={outputAccent}>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
                     Agent
                   </span>
-                  <SmallStatusBadge passed={passed} />
+                  {showVerdict && <SmallStatusBadge passed={passed} />}
                 </div>
                 {showLegacyReasoningToggle && (
                   <ReasoningToggleButton
@@ -1175,18 +1191,12 @@ export function TestDetailView({
 
           {/* Tool Calls Output */}
           {output.tool_calls && output.tool_calls.length > 0 && (
-            <div
-              className={`${
-                passed
-                  ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
-                  : "border-l-4 border-l-red-500 pl-2 md:pl-3"
-              }`}
-            >
+            <div className={outputAccent}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-sm font-medium text-foreground">
                   Agent Tool Call
                 </span>
-                <SmallStatusBadge passed={passed} />
+                {showVerdict && <SmallStatusBadge passed={passed} />}
               </div>
               <div className="space-y-3">
                 {output.tool_calls.map((toolCall, index) => {

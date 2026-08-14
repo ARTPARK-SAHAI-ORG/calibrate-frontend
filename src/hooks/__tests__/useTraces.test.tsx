@@ -29,7 +29,7 @@ describe("useTraces", () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
 
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", agentId: "ag-1", q: "", conversationId: null }),
+      useTraces({ accessToken: "tok", agentId: "ag-1", q: "" }),
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -40,13 +40,12 @@ describe("useTraces", () => {
       offset: 0,
       agentId: "ag-1",
       q: undefined,
-      conversationId: undefined,
     });
   });
 
   it("stays idle without an access token", async () => {
     const { result } = renderHook(() =>
-      useTraces({ accessToken: null, agentId: "ag-1", q: "", conversationId: null }),
+      useTraces({ accessToken: null, agentId: "ag-1", q: "" }),
     );
     // A tick to let effects run.
     await act(async () => {});
@@ -62,7 +61,6 @@ describe("useTraces", () => {
         accessToken: "tok",
         agentId: "ag-1",
         q: "",
-        conversationId: null,
         pageSize: 2,
       }),
     );
@@ -91,7 +89,6 @@ describe("useTraces", () => {
         accessToken: "tok",
         agentId: "ag-1",
         q: "",
-        conversationId: null,
         pageSize: 2,
       }),
     );
@@ -110,7 +107,6 @@ describe("useTraces", () => {
           accessToken: "tok",
           agentId: "ag-1",
           q,
-          conversationId: null,
           pageSize: 2,
         }),
       { initialProps: { q: "" } },
@@ -136,7 +132,6 @@ describe("useTraces", () => {
           accessToken: "tok",
           agentId,
           q: "",
-          conversationId: null,
           pageSize: 2,
         }),
       { initialProps: { agentId: "ag-1" } },
@@ -161,7 +156,6 @@ describe("useTraces", () => {
         accessToken: "tok",
         agentId: "ag-1",
         q: "",
-        conversationId: null,
         pageSize: 2,
       }),
     );
@@ -181,7 +175,6 @@ describe("useTraces", () => {
         accessToken: "tok",
         agentId: "ag-1",
         q: "",
-        conversationId: null,
         pageSize: 2,
       }),
     );
@@ -198,7 +191,7 @@ describe("useTraces", () => {
   it("reports and surfaces an error when the fetch throws", async () => {
     mockFetchTraces.mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", agentId: "ag-1", q: "", conversationId: null }),
+      useTraces({ accessToken: "tok", agentId: "ag-1", q: "" }),
     );
     await waitFor(() => expect(result.current.error).toMatch(/Failed to load/));
     expect(mockReportError).toHaveBeenCalled();
@@ -217,7 +210,6 @@ describe("useTraces", () => {
         accessToken: "tok",
         agentId: "ag-1",
         q: "",
-        conversationId: null,
         pageSize: 2,
       }),
     );

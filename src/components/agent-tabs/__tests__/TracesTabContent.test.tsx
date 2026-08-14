@@ -9,16 +9,17 @@ import type { TraceSummary } from "@/lib/tracesApi";
 // The list itself comes from `useTraces`; this test drives it directly so the
 // tab's own behaviour (toolbar, selection, empty state) is what's exercised.
 const mockUseTraces = jest.fn();
+const mockUseDialogUrlParam = jest.fn(() => ({ setParam: jest.fn() }));
 const handleDeleted = jest.fn();
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useTraces: (args: unknown) => mockUseTraces(args),
   // Selection is real: the convert/delete buttons only appear once a row is
-  // ticked, which is what the last test checks.
+  // ticked, which the selection tests exercise.
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
     .useTraceDeletion,
-  useDialogUrlParam: () => ({ setParam: jest.fn() }),
+  useDialogUrlParam: (args: unknown) => mockUseDialogUrlParam(args),
 }));
 
 const bulkDeleteMatchingTraces = jest.fn();
@@ -57,22 +58,25 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     isOpen,
     agentUuid,
     traceUuids,
+    testType,
     onConverted,
   }: {
     isOpen: boolean;
     agentUuid: string;
     traceUuids: string[];
+    testType: "response" | "tool_call";
     onConverted: (result: { test_uuids: string[] }) => void;
   }) =>
     isOpen ? (
       <div data-testid="convert-dialog">
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
+        <span data-testid="convert-type">{testType}</span>
         <button
           type="button"
           onClick={() => onConverted({ test_uuids: ["t1", "t2"] })}
         >
-          finish convert
+          finish adding
         </button>
       </div>
     ) : null,
@@ -129,10 +133,44 @@ describe("TracesTabContent", () => {
     expect(
       screen.getAllByText("When is the next vaccination?").length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("Showing 1–1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("1 trace")).toBeInTheDocument();
+    expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
     expect(mockUseTraces).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "agent-1", q: "" }),
     );
+    expect(lastTracesArgs()).not.toHaveProperty("conversationId");
+    expect(mockUseDialogUrlParam).toHaveBeenCalledWith(
+      expect.objectContaining({ param: "traceId" }),
+    );
+    expect(mockUseDialogUrlParam).not.toHaveBeenCalledWith(
+      expect.objectContaining({ param: "conversation_id" }),
+    );
+  });
+
+  it("shows the server total above the rows and pagination below them", async () => {
+    const user = setupUser();
+    const nextPage = jest.fn();
+    mockUseTraces.mockReturnValue({
+      ...tracesResult([trace()]),
+      total: 3,
+      hasNext: true,
+      nextPage,
+    });
+
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    const count = screen.getByText("3 traces");
+    const table = screen.getByRole("table");
+    const nextButton = screen.getByRole("button", { name: "Next" });
+
+    expect(count.nextElementSibling).toContainElement(table);
+    expect(
+      table.compareDocumentPosition(nextButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(nextButton);
+    expect(nextPage).toHaveBeenCalledTimes(1);
   });
 
   it("passes what was typed in the search box to the trace list", async () => {
@@ -171,16 +209,40 @@ describe("TracesTabContent", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("reveals the convert and delete actions once a trace is selected", async () => {
+  it("reveals the add and delete actions once a trace is selected", async () => {
     const user = setupUser();
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    expect(screen.queryByText(/Convert to tests/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Add to tests/)).not.toBeInTheDocument();
 
     await user.click(screen.getAllByLabelText("Select trace")[0]);
 
-    expect(screen.getByText("Convert to tests (1)")).toBeInTheDocument();
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
     expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
+  });
+
+  it("warns that single and bulk deletion cannot be undone", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getAllByTitle("Delete trace")[0]);
+    expect(screen.getByText("Delete this trace?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Deleting frees workspace capacity. This cannot be undone.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Delete selected (1)"));
+
+    expect(screen.getByText("Delete 1 trace?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Deleting frees workspace capacity. This cannot be undone.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("says how many tests were created, counting what came back", async () => {
@@ -188,27 +250,67 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent agentUuid="agent-1" />);
 
     await user.click(screen.getAllByLabelText("Select trace")[0]);
-    await user.click(screen.getByText("Convert to tests (1)"));
-    await user.click(screen.getByText("finish convert"));
+    await user.click(screen.getByText("Add to tests (1)"));
+    await user.click(screen.getByText("finish adding"));
 
     // Two uuids came back, so the message says two, and the selection clears.
     expect(toast.success).toHaveBeenCalledWith(
       "Created 2 tests",
       expect.anything(),
     );
-    expect(screen.queryByText("Convert to tests (1)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
   });
 
-  it("opens the convert dialog for this agent and the selected traces", async () => {
+  it("opens the add dialog with response type when a selected trace has a response", async () => {
     const user = setupUser();
     render(<TracesTabContent agentUuid="agent-1" />);
 
     await user.click(screen.getAllByLabelText("Select trace")[0]);
-    await user.click(screen.getByText("Convert to tests (1)"));
+    await user.click(screen.getByText("Add to tests (1)"));
 
     expect(screen.getByTestId("convert-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("convert-agent")).toHaveTextContent("agent-1");
     expect(screen.getByTestId("convert-traces")).toHaveTextContent("trace-1");
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("response");
+  });
+
+  it("uses tool-call type only when every selected trace is tool-call-only", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace({
+          response_preview: null,
+          tool_call_count: 1,
+        }),
+      ]),
+    );
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("tool_call");
+  });
+
+  it("uses response type for a mixed response and tool-call-only selection", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace(),
+        trace({
+          uuid: "trace-2",
+          message_id: "msg-002",
+          response_preview: null,
+          tool_call_count: 1,
+        }),
+      ]),
+    );
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Add to tests (2)"));
+
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("response");
   });
 
   it("opens the detail view for the trace that was clicked", async () => {
@@ -228,49 +330,50 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });
 
-  it("deletes every trace matching the filter for this agent", async () => {
+  it("deletes every trace matching the current search for this agent", async () => {
     const user = setupUser();
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    // The "delete everything matching" button only appears once a filter is on.
-    await user.click(screen.getAllByTitle("Show this conversation")[0]);
+    await user.type(screen.getByPlaceholderText("Search traces"), "vaccine");
+    await waitFor(() =>
+      expect(mockUseTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "agent-1", q: "vaccine" }),
+      ),
+    );
+
     await user.click(screen.getByText("Delete all 1 matching"));
+    expect(
+      screen.getByText(
+        "Every trace matching the current search will be deleted, including traces not shown on this page. This frees workspace capacity and cannot be undone.",
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete all" }));
 
     await waitFor(() =>
       expect(bulkDeleteMatchingTraces).toHaveBeenCalledWith(
         "test-token",
-        expect.objectContaining({
+        {
           agentId: "agent-1",
-          conversationId: "conv-001",
-        }),
+          q: "vaccine",
+        },
       ),
     );
   });
 
-  it("narrows the list to one conversation, and clears it again", async () => {
+  it("keeps an empty search result separate from the agent empty state", async () => {
     const user = setupUser();
-    render(<TracesTabContent agentUuid="agent-1" />);
-
-    expect(lastTracesArgs().conversationId).toBeNull();
-
-    await user.click(screen.getAllByTitle("Show this conversation")[0]);
-    expect(lastTracesArgs().conversationId).toBe("conv-001");
-
-    await user.click(screen.getByTitle("Clear conversation filter"));
-    expect(lastTracesArgs().conversationId).toBeNull();
-  });
-
-  it("says nothing matched when a filter leaves no traces", async () => {
-    const user = setupUser();
-    mockUseTraces.mockImplementation((args: { conversationId: string | null }) =>
-      tracesResult(args.conversationId ? [] : [trace()]),
+    mockUseTraces.mockImplementation((args: { q: string }) =>
+      tracesResult(args.q ? [] : [trace()]),
     );
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    await user.click(screen.getAllByTitle("Show this conversation")[0]);
+    await user.type(screen.getByPlaceholderText("Search traces"), "missing");
 
-    expect(screen.getByText("No traces match your filters.")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your search."),
+      ).toBeInTheDocument(),
+    );
     // Not the "this agent has no traces at all" screen.
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
   });

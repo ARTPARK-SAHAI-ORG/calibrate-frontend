@@ -13,22 +13,19 @@ type UseTracesArgs = {
   agentId: string;
   /** Server-side search query. Pass the debounced value, not each keystroke. */
   q: string;
-  /** Restrict the list to one conversation, or null for all. */
-  conversationId: string | null;
   pageSize?: number;
 };
 
 /**
  * Server-paginated trace list. Every other list page fetches everything and
  * filters client-side; traces are machine-written and can be far larger than
- * the client should download, so paging, search, and the conversation filter
- * all round-trip to `GET /traces` and this hook only ever holds one page.
+ * the client should download, so paging and search round-trip to `GET /traces`
+ * and this hook only ever holds one page.
  */
 export function useTraces({
   accessToken,
   agentId,
   q,
-  conversationId,
   pageSize = TRACES_PAGE_SIZE,
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
@@ -42,7 +39,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, q, conversationId]);
+  }, [agentId, q]);
 
   const load = useCallback(
     async (targetOffset: number) => {
@@ -56,7 +53,6 @@ export function useTraces({
           offset: targetOffset,
           agentId,
           q: q || undefined,
-          conversationId: conversationId || undefined,
         });
         if (requestId !== requestIdRef.current) return;
         setItems(page.items ?? []);
@@ -69,7 +65,7 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId, q, conversationId],
+    [accessToken, pageSize, agentId, q],
   );
 
   useEffect(() => {

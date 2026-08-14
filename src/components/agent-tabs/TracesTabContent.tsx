@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -38,28 +38,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // The conversation filter lives in the address (?conversation_id=...) so the
-  // filtered view is shareable and survives a reload, and Back undoes it. Same
-  // hook as the open trace below: it only rewrites the query, so the agent and
-  // the open tab (?tab=traces) stay exactly as they are.
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const { setParam: setConversationParam } = useDialogUrlParam({
-    param: "conversation_id",
-    onOpen: (value) => setConversationId(value),
-    onClose: () => setConversationId(null),
-  });
-  const setConversationFilter = useCallback(
-    (value: string | null) => {
-      setConversationId(value);
-      setConversationParam(value);
-    },
-    [setConversationParam],
-  );
-
   const {
     items,
     total,
-    offset,
     isLoading,
     error,
     handleDeleted,
@@ -72,7 +53,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     accessToken,
     agentId: agentUuid,
     q: debouncedQuery,
-    conversationId,
   });
 
   const deletion = useTraceDeletion({
@@ -81,9 +61,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     accessToken,
   });
 
-  // "Delete everything matching this filter" — the select_all path covers
+  // "Delete everything matching this search" — the select_all path covers
   // rows beyond the loaded page, which checkbox selection can't reach.
-  const filtersActive = Boolean(debouncedQuery.trim() || conversationId);
+  const filtersActive = Boolean(debouncedQuery.trim());
   const [deleteMatchingOpen, setDeleteMatchingOpen] = useState(false);
   const [isDeletingMatching, setIsDeletingMatching] = useState(false);
   const deleteMatching = async () => {
@@ -93,7 +73,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       const result = await bulkDeleteMatchingTraces(accessToken, {
         agentId: agentUuid,
         q: debouncedQuery,
-        conversationId: conversationId ?? undefined,
       });
       setDeleteMatchingOpen(false);
       handleDeleted(result.deleted);
@@ -104,15 +83,19 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     }
   };
 
-  // Convert selected traces to tests. tool_call conversion needs every selected
-  // trace to have recorded tool calls, so gate it on the loaded summaries.
+  // Add selected traces as tests. A recorded response always becomes a response
+  // test; tool-call tests are used only when every selected trace has calls and
+  // no text response.
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
-  const allSelectedHaveToolCalls =
-    selected.size > 0 &&
-    items
-      .filter((t) => selected.has(t.uuid))
-      .every((t) => t.tool_call_count > 0);
+  const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
+  const selectedTestType =
+    selectedTraces.length > 0 &&
+    selectedTraces.every(
+      (trace) => !trace.response_preview && trace.tool_call_count > 0,
+    )
+      ? "tool_call"
+      : "response";
 
   const [openTraceUuid, setOpenTraceUuid] = useState<string | null>(null);
   const { setParam: setTraceParam } = useDialogUrlParam({
@@ -130,9 +113,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   };
 
   const showEmptyState = !isLoading && !error && total === 0 && !filtersActive;
-  const rangeStart = total === 0 ? 0 : offset + 1;
-  const rangeEnd = Math.min(offset + items.length, total);
-
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
@@ -144,17 +124,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             placeholder="Search traces"
             className="w-full md:max-w-md"
           />
-          {conversationId && (
-            <button
-              type="button"
-              onClick={() => setConversationFilter(null)}
-              title="Clear conversation filter"
-              className="flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-full border border-border bg-muted/50 hover:bg-muted text-foreground transition-colors cursor-pointer max-w-full"
-            >
-              <span className="truncate">{conversationId}</span>
-              <span aria-hidden>×</span>
-            </button>
-          )}
           <div className="flex items-center gap-2 md:ml-auto">
             {selected.size > 0 && (
               <>
@@ -163,7 +132,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
                   onClick={() => setConvertOpen(true)}
                   className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  Convert to tests ({selected.size})
+                  Add to tests ({selected.size})
                 </button>
                 <button
                   type="button"
@@ -199,10 +168,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
       ) : items.length === 0 ? (
         <div className="border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
-          No traces match your filters.
+          No traces match your search.
         </div>
       ) : (
         <>
+          <p className="text-sm text-muted-foreground">
+            {total.toLocaleString()} {total === 1 ? "trace" : "traces"}
+          </p>
           <TracesTable
             traces={items}
             checkboxProps={deletion.checkboxProps}
@@ -211,34 +183,27 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             onToggleSelectAll={deletion.toggleSelectAll}
             onOpen={openTrace}
             onDelete={deletion.openDeleteDialog}
-            onFilterConversation={(value) => setConversationFilter(value)}
           />
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()}{" "}
-              of {total.toLocaleString()}
-            </p>
-            {(hasPrev || hasNext) && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={prevPage}
-                  disabled={!hasPrev}
-                  className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={nextPage}
-                  disabled={!hasNext}
-                  className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
+          {(hasPrev || hasNext) && (
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={prevPage}
+                disabled={!hasPrev}
+                className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={nextPage}
+                disabled={!hasNext}
+                className="h-9 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -254,7 +219,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         onClose={() => setConvertOpen(false)}
         accessToken={accessToken}
         traceUuids={Array.from(selected)}
-        allHaveToolCalls={allSelectedHaveToolCalls}
+        testType={selectedTestType}
         agentUuid={agentUuid}
         onConverted={(result) => {
           setConvertOpen(false);
@@ -283,7 +248,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         }
         message={
           deletion.deleteError ??
-          "Deleting frees workspace capacity and lets the same message be ingested again."
+          "Deleting frees workspace capacity. This cannot be undone."
         }
         confirmText="Delete"
         isDeleting={deletion.isDeleting}
@@ -296,7 +261,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         }}
         onConfirm={deleteMatching}
         title={`Delete all ${total.toLocaleString()} matching traces?`}
-        message="Every trace matching the current search and conversation filter will be deleted, including ones not shown on this page."
+        message="Every trace matching the current search will be deleted, including traces not shown on this page. This frees workspace capacity and cannot be undone."
         confirmText="Delete all"
         isDeleting={isDeletingMatching}
       />

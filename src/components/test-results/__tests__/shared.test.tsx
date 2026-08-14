@@ -663,6 +663,32 @@ describe("TestDetailView", () => {
     expect(screen.getByText("Final answer")).toBeInTheDocument();
   });
 
+  it("renders a system turn", () => {
+    render(
+      <TestDetailView
+        history={[{ role: "system", content: "Be brief." }, ...baseHistory]}
+        passed={true}
+      />,
+    );
+    expect(screen.getByText("System")).toBeInTheDocument();
+    expect(screen.getByText("Be brief.")).toBeInTheDocument();
+  });
+
+  it("emphasises the final output without pass/fail chrome when showVerdict is false", () => {
+    const { container } = render(
+      <TestDetailView
+        history={[]}
+        passed={false}
+        showVerdict={false}
+        output={{ response: "Final answer" }}
+      />,
+    );
+    expect(screen.getByText("Final answer")).toBeInTheDocument();
+    expect(container.querySelector(".bg-red-500\\/20")).toBeNull();
+    expect(container.querySelector(".border-l-red-500")).toBeNull();
+    expect(container.querySelector(".border-l-foreground")).not.toBeNull();
+  });
+
   it("shows the legacy reasoning toggle when there's no judgeResults but reasoning text exists", async () => {
     const user = setupUser();
     render(

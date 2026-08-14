@@ -22,9 +22,8 @@ type ConvertTracesToTestsDialogProps = {
   accessToken: string | null;
   /** The selected trace uuids to convert. */
   traceUuids: string[];
-  /** Whether every selected trace recorded at least one tool call — gates the
-   *  `tool_call` type (a tool-call test needs calls to assert). */
-  allHaveToolCalls: boolean;
+  /** The test type derived from the selected traces. */
+  testType: ConvertTestType;
   /** The agent whose traces these are — created tests link to it. */
   agentUuid: string;
   /** Called with the backend result after a successful conversion. */
@@ -49,13 +48,12 @@ export function ConvertTracesToTestsDialog({
   onClose,
   accessToken,
   traceUuids,
-  allHaveToolCalls,
+  testType,
   agentUuid,
   onConverted,
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
 
-  const [type, setType] = useState<ConvertTestType>("response");
   const [evaluators, setEvaluators] = useState<EvaluatorData[]>([]);
   const [selectedEvaluators, setSelectedEvaluators] = useState<Set<string>>(
     new Set(),
@@ -67,13 +65,12 @@ export function ConvertTracesToTestsDialog({
 
   useEffect(() => {
     if (!isOpen) return;
-    setType("response");
     setAcceptAnyArgs(false);
     setError(null);
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !accessToken) return;
+    if (!isOpen || !accessToken || testType !== "response") return;
     let cancelled = false;
     const load = async () => {
       setLoading(true);
@@ -99,14 +96,14 @@ export function ConvertTracesToTestsDialog({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, accessToken]);
+  }, [isOpen, accessToken, testType]);
 
   if (!isOpen) return null;
 
-  const needsEvaluator = type === "response";
+  const needsEvaluator = testType === "response";
   const canSubmit =
     !submitting &&
-    !loading &&
+    (!needsEvaluator || !loading) &&
     traceUuids.length > 0 &&
     (!needsEvaluator || selectedEvaluators.size > 0);
 
@@ -117,16 +114,16 @@ export function ConvertTracesToTestsDialog({
     try {
       const result = await convertTracesToTests(accessToken, {
         traceIds: traceUuids,
-        type,
+        type: testType,
         evaluatorUuids:
-          type === "response" ? Array.from(selectedEvaluators) : undefined,
+          testType === "response" ? Array.from(selectedEvaluators) : undefined,
         agentUuids: [agentUuid],
         acceptAnyArguments: acceptAnyArgs,
       });
       onConverted(result);
     } catch (err) {
       reportError("Error converting traces to tests:", err);
-      setError("Something went wrong while converting. Please try again.");
+      setError("Something went wrong while adding to tests. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -139,8 +136,7 @@ export function ConvertTracesToTestsDialog({
       <div className="bg-background rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Convert {count} trace{count === 1 ? "" : "s"} to test
-            {count === 1 ? "" : "s"}
+            Add {count} trace{count === 1 ? "" : "s"} to tests
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Create regression tests you can run, benchmark, and send for
@@ -149,63 +145,11 @@ export function ConvertTracesToTestsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
-          {loading ? (
+          {needsEvaluator && loading ? (
             <LoadingState />
           ) : (
             <>
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-semibold text-foreground mb-1">
-                  Test type
-                </legend>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="convert-type"
-                    checked={type === "response"}
-                    onChange={() => setType("response")}
-                    className="mt-1 cursor-pointer"
-                  />
-                  <span className="text-sm">
-                    <span className="text-foreground font-medium">Response</span>
-                    <span className="text-muted-foreground">
-                      {" "}
-                      — re-run the agent and judge its reply with evaluators
-                    </span>
-                  </span>
-                </label>
-                <label
-                  className={`flex items-start gap-2 ${
-                    allHaveToolCalls
-                      ? "cursor-pointer"
-                      : "cursor-not-allowed opacity-50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="convert-type"
-                    checked={type === "tool_call"}
-                    disabled={!allHaveToolCalls}
-                    onChange={() => setType("tool_call")}
-                    className="mt-1 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm">
-                    <span className="text-foreground font-medium">
-                      Tool call
-                    </span>
-                    <span className="text-muted-foreground">
-                      {" "}
-                      — assert the tool calls the trace recorded
-                    </span>
-                  </span>
-                </label>
-                {!allHaveToolCalls && (
-                  <p className="text-xs text-muted-foreground pl-6">
-                    Available only when every selected trace has tool calls.
-                  </p>
-                )}
-              </fieldset>
-
-              {type === "response" ? (
+              {testType === "response" ? (
                 <div className="space-y-2">
                   <div className="text-sm font-semibold text-foreground">
                     Evaluators
@@ -277,7 +221,7 @@ export function ConvertTracesToTestsDialog({
             disabled={!canSubmit}
             className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? "Converting..." : "Convert"}
+            {submitting ? "Adding..." : "Add to tests"}
           </button>
         </div>
       </div>

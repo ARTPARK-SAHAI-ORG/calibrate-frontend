@@ -31,10 +31,13 @@ export type TraceMetadataEntry = {
 export type TraceSummary = {
   uuid: string;
   agent_id: string;
-  message_id: string;
-  conversation_id: string;
+  message_id: string | null;
+  conversation_id: string | null;
   input_preview: string | null;
   response_preview: string | null;
+  /** Tool names on the output, when the list row includes them. Used as the
+   * Output-column fallback when there is no text reply. */
+  tool_names?: string[] | null;
   turn_count: number;
   tool_call_count: number;
   metadata_count: number;
@@ -44,8 +47,8 @@ export type TraceSummary = {
 export type TraceDetail = {
   uuid: string;
   agent_id: string;
-  message_id: string;
-  conversation_id: string;
+  message_id: string | null;
+  conversation_id: string | null;
   input: TraceTurn[];
   output: TraceOutput;
   metadata: TraceMetadataEntry[] | null;
@@ -59,25 +62,23 @@ export type TraceListParams = {
   /** Traces belong to one agent; every read is scoped to it. */
   agentId: string;
   q?: string;
-  conversationId?: string;
 };
 
 /**
  * Fetch one page of traces for one agent. Unlike the other list pages,
  * filtering and search run server-side (the trace store can hold far more rows
- * than the client should ever download), so `q`/`conversation_id` go out as
- * query params instead of being applied over a fully-fetched list.
+ * than the client should ever download), so `q` goes out as a query param
+ * instead of being applied over a fully-fetched list.
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q, conversationId }: TraceListParams,
+  { limit, offset, agentId, q }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
   if (q && q.trim()) params.set("q", q.trim());
-  if (conversationId) params.set("conversation_id", conversationId);
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,
@@ -104,15 +105,10 @@ export type BulkDeleteTracesResult = {
  */
 export async function bulkDeleteMatchingTraces(
   accessToken: string,
-  {
-    agentId,
-    q,
-    conversationId,
-  }: { agentId: string; q?: string; conversationId?: string },
+  { agentId, q }: { agentId: string; q?: string },
 ): Promise<BulkDeleteTracesResult> {
   const body: Record<string, unknown> = { select_all: true, agent_id: agentId };
   if (q && q.trim()) body.q = q.trim();
-  if (conversationId) body.conversation_id = conversationId;
   return apiPost<BulkDeleteTracesResult>("/traces/bulk-delete", accessToken, body);
 }
 

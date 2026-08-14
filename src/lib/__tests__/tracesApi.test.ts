@@ -36,7 +36,7 @@ describe("fetchTraces", () => {
     expect(query.has("conversation_id")).toBe(false);
   });
 
-  it("passes a trimmed q and the conversation filter through", async () => {
+  it("passes a trimmed q without a conversation filter", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
     await fetchTraces("tok", {
@@ -44,12 +44,11 @@ describe("fetchTraces", () => {
       offset: 0,
       agentId: "ag-1",
       q: "  polio  ",
-      conversationId: "conv-1",
     });
 
     const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
     expect(query.get("q")).toBe("polio");
-    expect(query.get("conversation_id")).toBe("conv-1");
+    expect(query.has("conversation_id")).toBe(false);
     expect(query.get("agent_id")).toBe("ag-1");
   });
 
@@ -92,20 +91,18 @@ describe("fetchTrace", () => {
 });
 
 describe("bulkDeleteMatchingTraces", () => {
-  it("POSTs select_all with the agent and trimmed filters", async () => {
+  it("POSTs select_all with the agent and a trimmed query", async () => {
     mockApiPost.mockResolvedValue({ deleted: 3 });
 
     const result = await bulkDeleteMatchingTraces("tok", {
       agentId: "ag-1",
       q: "  polio  ",
-      conversationId: "conv-1",
     });
 
     expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
       select_all: true,
       agent_id: "ag-1",
       q: "polio",
-      conversation_id: "conv-1",
     });
     expect(result).toEqual({ deleted: 3 });
   });
@@ -116,7 +113,6 @@ describe("bulkDeleteMatchingTraces", () => {
     await bulkDeleteMatchingTraces("tok", {
       agentId: "ag-1",
       q: "  ",
-      conversationId: undefined,
     });
 
     expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
@@ -128,7 +124,7 @@ describe("bulkDeleteMatchingTraces", () => {
 
 describe("convertTracesToTests", () => {
   it("shapes a response conversion with evaluators and agents", async () => {
-    mockApiPost.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+    mockApiPost.mockResolvedValue({ test_uuids: ["t1", "t2"] });
 
     const result = await convertTracesToTests("tok", {
       traceIds: ["a", "b"],
@@ -143,11 +139,11 @@ describe("convertTracesToTests", () => {
       evaluators: [{ evaluator_uuid: "ev1" }, { evaluator_uuid: "ev2" }],
       agent_uuids: ["ag1"],
     });
-    expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
+    expect(result).toEqual({ test_uuids: ["t1", "t2"] });
   });
 
   it("sends accept_any_arguments only for tool_call and omits empty evaluators/agents", async () => {
-    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+    mockApiPost.mockResolvedValue({ test_uuids: ["t1"] });
 
     await convertTracesToTests("tok", {
       traceIds: ["a"],
@@ -163,7 +159,7 @@ describe("convertTracesToTests", () => {
   });
 
   it("does not send accept_any_arguments for a response conversion", async () => {
-    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+    mockApiPost.mockResolvedValue({ test_uuids: ["t1"] });
 
     await convertTracesToTests("tok", {
       traceIds: ["a"],
