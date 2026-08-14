@@ -35,49 +35,83 @@ function snippetText(): string {
   return document.querySelector("pre")?.textContent ?? "";
 }
 
-/** Step two is where the request lives; get there without creating a key. */
+/**
+ * Step two only opens once step one is finished, and the only way to finish
+ * step one is to create a key, so every test that needs the request goes
+ * through the real flow.
+ */
 async function openStepTwo(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByRole("button", { name: "I already have a key" }));
+  createApiKey.mockResolvedValue({
+    uuid: "k1",
+    name: "Traces",
+    key: "sk_live_secret",
+    masked_key: "sk_live_...",
+    last_four: "cret",
+  });
+  await user.click(screen.getByRole("button", { name: "Create API key" }));
+  await user.type(screen.getByPlaceholderText("e.g. GitHub Actions"), "Traces");
+  await user.click(screen.getByRole("button", { name: "Create key" }));
+  await screen.findByText("API key created");
+  await user.click(screen.getByRole("button", { name: "Done" }));
 }
 
-it("shows only the first step until it is finished", async () => {
+it("lists all three steps, but only opens the one to do now", async () => {
   const user = setupUser();
   setup();
 
-  expect(screen.getByText(/1\. Create an API key/)).toBeInTheDocument();
-  expect(screen.queryByText(/2\. Send one request/)).not.toBeInTheDocument();
-  expect(
-    screen.queryByText(/3\. Check that it arrived/),
-  ).not.toBeInTheDocument();
+  // Every step is on screen from the start, so the whole path is visible.
+  expect(screen.getByText("Create an API key")).toBeInTheDocument();
+  expect(screen.getByText("Send your first trace")).toBeInTheDocument();
+  expect(screen.getByText("Check that it arrived")).toBeInTheDocument();
 
-  await openStepTwo(user);
-  expect(screen.getByText(/2\. Send one request/)).toBeInTheDocument();
-  expect(
-    screen.queryByText(/3\. Check that it arrived/),
-  ).not.toBeInTheDocument();
-
-  await user.click(screen.getByRole("button", { name: "I have added this" }));
-  expect(screen.getByText(/3\. Check that it arrived/)).toBeInTheDocument();
-});
-
-it("collapses a finished step, and opens it again when asked", async () => {
-  const user = setupUser();
-  setup();
-  await openStepTwo(user);
-
-  // Step one is now a heading only: its buttons are gone.
-  expect(
-    screen.queryByRole("button", { name: "Create API key" }),
-  ).not.toBeInTheDocument();
-
-  await user.click(screen.getByText(/1\. Create an API key/));
+  // Only step one is open: the later steps show nothing but their heading.
   expect(
     screen.getByRole("button", { name: "Create API key" }),
   ).toBeInTheDocument();
-  // Opening step one closes step two, so only one is expanded at a time.
+  expect(screen.queryByText("agent_id")).not.toBeInTheDocument();
   expect(
-    screen.queryByText("What goes in the request"),
+    screen.queryByRole("button", { name: "Check for traces" }),
   ).not.toBeInTheDocument();
+
+  await openStepTwo(user);
+  expect(
+    screen.queryByRole("button", { name: "Check for traces" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "I have added this" }));
+  expect(
+    screen.getByRole("button", { name: "Check for traces" }),
+  ).toBeInTheDocument();
+});
+
+it("will not open a step you have not reached", async () => {
+  const user = setupUser();
+  setup();
+
+  // Step three is greyed out until step two is done: clicking does nothing.
+  await user.click(screen.getByText("Check that it arrived"));
+  expect(
+    screen.queryByRole("button", { name: "Check for traces" }),
+  ).not.toBeInTheDocument();
+});
+
+it("reopens the key step showing the key, and offers another", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  // Step one is shut now: what was inside it is gone.
+  expect(
+    screen.queryByRole("button", { name: "Create a new API key" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByText("Create an API key"));
+
+  // The key made a moment ago is still on show, with a way to make another.
+  expect(screen.getByText("sk_live_secret")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Create a new API key" }),
+  ).toBeInTheDocument();
 });
 
 it("shows the request against the resolved backend, with this agent in it", async () => {
@@ -95,26 +129,33 @@ it("switches the snippet between languages, keeping the agent in each", async ()
   expect(snippetText()).toContain("curl -X POST");
 
   await user.click(screen.getByRole("button", { name: "Python" }));
-  expect(snippetText()).toContain("import requests");
+  expect(snippetText()).toContain("requests.post(");
   expect(snippetText()).toContain("ag-42");
 
   await user.click(screen.getByRole("button", { name: "JavaScript" }));
   expect(snippetText()).toContain("await fetch");
   expect(snippetText()).toContain("ag-42");
+});
 
-  await user.click(screen.getByRole("button", { name: "Go" }));
-  expect(snippetText()).toContain("http.NewRequest");
-  expect(snippetText()).toContain("ag-42");
+it("shows both an agent reply and a tool call in the output", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  // Someone whose agent calls tools has to see the shape, not guess it.
+  for (const language of ["cURL", "Python", "JavaScript"]) {
+    await user.click(screen.getByRole("button", { name: language }));
+    expect(snippetText()).toContain("response");
+    expect(snippetText()).toContain("tool_calls");
+    expect(snippetText()).toContain("book_appointment");
+  }
 });
 
 it("explains every part of the request beside it", async () => {
   const user = setupUser();
   setup();
   await openStepTwo(user);
-  expect(screen.getByText("What goes in the request")).toBeInTheDocument();
   for (const name of [
-    "POST /traces",
-    "X-API-Key",
     "agent_id",
     "message_id",
     "conversation_id",
@@ -123,6 +164,12 @@ it("explains every part of the request beside it", async () => {
   ]) {
     expect(screen.getByText(name)).toBeInTheDocument();
   }
+  // The two ids a caller can leave out sit under their own heading, so it is
+  // clear at a glance which fields are required.
+  const optional = screen.getByText("Optional").parentElement;
+  expect(optional).toHaveTextContent("message_id");
+  expect(optional).toHaveTextContent("conversation_id");
+  expect(optional).not.toHaveTextContent("agent_id");
 });
 
 it("creates a key in step one and fills it into the snippet", async () => {
@@ -145,7 +192,7 @@ it("creates a key in step one and fills it into the snippet", async () => {
   await user.click(screen.getByRole("button", { name: "Done" }));
 
   // Closing the reveal finishes step one and opens step two with the key in it.
-  expect(screen.getByText(/2\. Send one request/)).toBeInTheDocument();
+  expect(screen.getByText("agent_id")).toBeInTheDocument();
   expect(snippetText()).toContain("sk_live_secret");
   expect(snippetText()).not.toContain("sk_...");
 });
@@ -163,9 +210,11 @@ it("copies the snippet that is on screen, key and agent included", async () => {
   await user.click(screen.getByRole("button", { name: "Copy" }));
 
   const copied = writeText.mock.calls[0][0];
-  expect(copied).toContain("import requests");
+  expect(copied).toContain("requests.post(");
   expect(copied).toContain('"agent_id": "ag-42"');
-  expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+  // It says Copied and looks different, so the click clearly did something.
+  const button = screen.getByRole("button", { name: "Copied" });
+  expect(button.className).toContain("emerald");
 });
 
 it("looks for traces when asked, and says when none arrived", async () => {
@@ -174,23 +223,12 @@ it("looks for traces when asked, and says when none arrived", async () => {
   await openStepTwo(user);
   await user.click(screen.getByRole("button", { name: "I have added this" }));
 
-  expect(
-    screen.getByText("No traces for this agent yet"),
-  ).toBeInTheDocument();
-
   await user.click(screen.getByRole("button", { name: "Check for traces" }));
 
   expect(onCheckForTraces).toHaveBeenCalledTimes(1);
   expect(
-    await screen.findByText("Still nothing for this agent"),
+    await screen.findByText("Still nothing for this agent."),
   ).toBeInTheDocument();
-});
-
-it("links to workspace settings for a key created earlier", () => {
-  setup();
-  expect(
-    screen.getByRole("link", { name: /workspace settings/i }),
-  ).toHaveAttribute("href", "/workspace-settings");
 });
 
 it("falls back to a placeholder host when the backend URL is unset", async () => {

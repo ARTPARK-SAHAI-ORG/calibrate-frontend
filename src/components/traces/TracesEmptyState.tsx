@@ -1,13 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Link } from "@/lib/nav";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
-import { CheckCircleIcon } from "@/components/icons";
+import { CheckCircleIcon, ChevronDownIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useAccessToken, useActiveOrgUuid, useWorkspaceApiKeys } from "@/hooks";
 import { getBackendUrl } from "@/lib/api";
-import { CodeBlock } from "./CodeBlock";
 import {
   buildSnippet,
   SNIPPET_FIELDS,
@@ -31,16 +29,48 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
+// Strings and comments are the only things worth colouring in the snippet:
+// they are what tell a reader "this is a value you replace" versus "this is an
+// explanation". A full highlighter would be a dependency for four snippets.
+const TOKENS = /("(?:[^"\\]|\\.)*")|((?:#|\/\/)[^\n]*)/g;
+
+function highlight(code: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  TOKENS.lastIndex = 0;
+  while ((match = TOKENS.exec(code)) !== null) {
+    if (match.index > last) out.push(code.slice(last, match.index));
+    const [text, str, comment] = match;
+    out.push(
+      <span
+        key={match.index}
+        className={
+          str
+            ? "text-emerald-700 dark:text-emerald-400"
+            : "text-muted-foreground italic"
+        }
+      >
+        {str ?? comment ?? text}
+      </span>,
+    );
+    last = match.index + text.length;
+  }
+  if (last < code.length) out.push(code.slice(last));
+  return out;
+}
+
+type StepState = "done" | "current" | "upcoming";
+
 /**
- * One numbered card, matching the Connection check card on the agent tab.
- * A finished step collapses to its heading and can be opened again; only one
- * step is open at a time, so there is only ever one thing to read.
+ * One step, open or collapsed. Header and body share the same padding so the
+ * heading, the text and the buttons all sit on one left edge.
  */
 function Step({
   number,
   title,
   description,
-  isDone,
+  state,
   isOpen,
   onToggle,
   children,
@@ -48,37 +78,51 @@ function Step({
   number: number;
   title: string;
   description: string;
-  isDone: boolean;
+  state: StepState;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-xl p-3 md:p-4 space-y-3">
+    <div
+      className={`border border-border rounded-xl ${
+        state === "upcoming" ? "opacity-50" : ""
+      }`}
+    >
+      {/* A step you have not reached cannot be opened. A finished one can, to
+          look at what you did. */}
       <button
         type="button"
         onClick={onToggle}
-        disabled={!isDone}
+        disabled={state === "upcoming"}
         aria-expanded={isOpen}
-        className="w-full flex items-start gap-2 text-left cursor-pointer disabled:cursor-default"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer disabled:cursor-not-allowed"
       >
-        {isDone ? (
-          <CheckCircleIcon className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+        {/* The counter becomes a tick once the step is done. */}
+        {state === "done" ? (
+          <CheckCircleIcon className="flex-shrink-0 w-6 h-6 text-green-500" />
         ) : (
-          <span className="w-4 h-4 flex-shrink-0" />
-        )}
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm md:text-base font-medium text-foreground">
-            {number}. {title}
+          <span className="flex-shrink-0 w-6 h-6 rounded-full border border-border bg-background flex items-center justify-center text-xs font-medium text-foreground">
+            {number}
           </span>
-          {isOpen && (
-            <span className="block text-xs text-muted-foreground mt-0.5">
-              {description}
-            </span>
-          )}
+        )}
+        <span className="flex-1 min-w-0 text-sm md:text-base font-medium text-foreground">
+          {title}
         </span>
+        {state !== "upcoming" && (
+          <ChevronDownIcon
+            className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
+              isOpen ? "" : "-rotate-90"
+            }`}
+          />
+        )}
       </button>
-      {isOpen && children}
+      {isOpen && (
+        <div className="px-4 pb-4 pl-13 space-y-3">
+          <p className="text-sm text-muted-foreground">{description}</p>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -90,9 +134,9 @@ type TracesEmptyStateProps = {
 };
 
 /**
- * Shown until this agent's first trace arrives: the three things someone has to
- * do to start sending traces, ending with a check button. Nothing polls; the
- * reader says when to look.
+ * Shown until this agent's first trace arrives: the three things to do to
+ * start sending traces. Every step is listed, but only the one to do now is
+ * open. Nothing polls; the reader says when to look.
  */
 export function TracesEmptyState({
   agentUuid,
@@ -102,18 +146,21 @@ export function TracesEmptyState({
   const [isCreateKeyOpen, setIsCreateKeyOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [checkedAndEmpty, setCheckedAndEmpty] = useState(false);
-  // Only one step is on screen at a time: later ones do not exist yet, earlier
-  // ones collapse to a line. `reached` is how far they have got, `openStep` is
-  // what is expanded, which is the current step unless they reopen an old one.
+  // `reached` is how far they have got, `openStep` is what is expanded, which
+  // is the current step unless they reopen a finished one.
   const [reached, setReached] = useState(1);
   const [openStep, setOpenStep] = useState(1);
   const goToStep = (step: number) => {
     setReached((furthest) => Math.max(furthest, step));
     setOpenStep(step);
   };
+  /** The header chevron: shut the open step, or open a reached one. */
   const toggleStep = (step: number) => {
-    setOpenStep((open) => (open === step ? reached : step));
+    setOpenStep((open) => (open === step ? 0 : step));
   };
+  const stepState = (step: number): StepState =>
+    step < reached ? "done" : step === reached ? "current" : "upcoming";
+
   // The backend returns the key itself only when it is created, so this is the
   // one moment it can be filled into the request. Held in memory only, and gone
   // as soon as the traces arrive and this screen goes away.
@@ -156,67 +203,71 @@ export function TracesEmptyState({
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3">
       <div>
-        <h2 className="text-base md:text-lg font-medium text-foreground">
-          Start sending traces
+        <h2 className="text-base md:text-lg font-semibold text-foreground">
+          Getting started
         </h2>
-        <p className="text-xs md:text-sm text-muted-foreground mt-0.5 max-w-3xl">
-          A trace is one turn of a real conversation this agent had. Send them
-          from your own backend and you can turn the interesting ones into
-          tests.
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Bring your agent's live conversations to Calibrate to continuously
+          monitor its quality
         </p>
       </div>
 
       <Step
         number={1}
         title="Create an API key"
-        description="Your backend signs each request with a workspace API key. Create one here and it goes straight into the request in the next step."
-        isDone={reached > 1}
+        description="Your app needs this key to connect to your Calibrate workspace"
+        state={stepState(1)}
         isOpen={openStep === 1}
         onToggle={() => toggleStep(1)}
       >
-        <div className="flex flex-wrap items-center gap-3">
+        {createdKey ? (
+          <>
+            {/* Coming back to this step, the key you made is still here: it
+                is the one already in the request below. */}
+            <code className="block px-3 py-2 rounded-md border border-border bg-muted/40 text-xs font-mono text-foreground whitespace-nowrap overflow-x-auto">
+              {createdKey}
+            </code>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsCreateKeyOpen(true)}
+            >
+              Create a new API key
+            </Button>
+          </>
+        ) : (
           <Button size="sm" onClick={() => setIsCreateKeyOpen(true)}>
             Create API key
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => goToStep(2)}>
-            I already have a key
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Manage keys in{" "}
-            <Link
-              href="/workspace-settings"
-              className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60 transition-colors"
-            >
-              workspace settings
-            </Link>
-            .
-          </p>
-        </div>
+        )}
       </Step>
 
-      {reached >= 2 && (
-        <Step
-          number={2}
-          title="Send one request per turn"
-          description="Call this from your backend right after your agent replies. Your Calibrate address and this agent are already filled in."
-          isDone={reached > 2}
-          isOpen={openStep === 2}
-          onToggle={() => toggleStep(2)}
-        >
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-6">
-          <div className="min-w-0 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/30">
+      <Step
+        number={2}
+        title="Send your first trace"
+        description="Add the following code snippet to your app to capture the agent's input and output response"
+        state={stepState(2)}
+        isOpen={openStep === 2}
+        onToggle={() => toggleStep(2)}
+      >
+        {/* The code gets the larger share: a key and a URL on one line need
+            the room more than the explanations do. */}
+        <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4">
+          {/* The snippet and its controls are one object: tabs on the left of
+              the header bar, copy on the right, code below. */}
+          <div className="min-w-0 border border-border rounded-lg overflow-hidden bg-muted/40">
+            <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
+              <div className="flex items-center gap-0.5 overflow-x-auto">
                 {SNIPPET_LANGUAGES.map((option) => (
                   <button
                     key={option.id}
                     type="button"
                     onClick={() => setLanguage(option.id)}
-                    className={`h-8 px-3 rounded-md text-xs md:text-sm font-medium transition-colors cursor-pointer ${
+                    className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                       language === option.id
-                        ? "bg-foreground text-background"
+                        ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -224,20 +275,27 @@ export function TracesEmptyState({
                   </button>
                 ))}
               </div>
-              <Button size="sm" variant="secondary" onClick={handleCopy}>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`flex-shrink-0 h-7 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  copied
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
                 {copied ? "Copied" : "Copy"}
-              </Button>
+              </button>
             </div>
-            <CodeBlock code={snippet} />
+            <pre className="w-full text-left font-mono text-xs leading-relaxed text-foreground p-4 overflow-x-auto">
+              <code>{highlight(snippet)}</code>
+            </pre>
           </div>
 
-          <div className="min-w-0 space-y-2">
-            <h4 className="text-sm md:text-base font-medium text-foreground">
-              What goes in the request
-            </h4>
-            <dl className="border border-border rounded-xl divide-y divide-border overflow-hidden">
-              {SNIPPET_FIELDS.map((field) => (
-                <div key={field.name} className="px-3 py-2">
+          <div className="min-w-0 space-y-3">
+            <dl className="space-y-2">
+              {SNIPPET_FIELDS.filter((f) => !f.optional).map((field) => (
+                <div key={field.name}>
                   <dt className="font-mono text-xs text-foreground">
                     {field.name}
                   </dt>
@@ -246,51 +304,53 @@ export function TracesEmptyState({
                   </dd>
                 </div>
               ))}
+            </dl>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground">Optional</p>
+              <dl className="space-y-2">
+                {SNIPPET_FIELDS.filter((f) => f.optional).map((field) => (
+                  <div key={field.name}>
+                    <dt className="font-mono text-xs text-foreground">
+                      {field.name}
+                    </dt>
+                    <dd className="text-xs text-muted-foreground mt-0.5">
+                      {field.meaning}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             </div>
           </div>
+        </div>
 
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => goToStep(3)}>
-              I have added this
-            </Button>
-          </div>
-        </Step>
-      )}
+        <Button size="sm" onClick={() => goToStep(3)}>
+          I have added this
+        </Button>
+      </Step>
 
-      {reached >= 3 && (
-        <Step
-          number={3}
-          title="Check that it arrived"
-          description="Once your backend has sent a trace, check here. The traces show up on this tab as soon as there are any."
-          isDone={false}
-          isOpen={openStep === 3}
-          onToggle={() => toggleStep(3)}
+      <Step
+        number={3}
+        title="Check that it arrived"
+        description="Traces show up on this tab as soon as your app sends one."
+        state={stepState(3)}
+        isOpen={openStep === 3}
+        onToggle={() => toggleStep(3)}
+      >
+        {checkedAndEmpty && !isChecking && (
+          <p className="text-sm text-muted-foreground">
+            Still nothing for this agent.
+          </p>
+        )}
+        <Button
+          size="sm"
+          onClick={handleCheck}
+          isLoading={isChecking}
+          loadingText="Checking..."
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {/* Pulsing dot: listening, nothing has landed yet. */}
-              <span className="relative flex w-2 h-2 flex-shrink-0">
-                <span className="absolute inline-flex w-full h-full rounded-full bg-amber-500 opacity-60 animate-ping" />
-                <span className="relative inline-flex w-2 h-2 rounded-full bg-amber-500" />
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {checkedAndEmpty && !isChecking
-                  ? "Still nothing for this agent"
-                  : "No traces for this agent yet"}
-              </span>
-            </div>
-            <Button
-              onClick={handleCheck}
-              isLoading={isChecking}
-              loadingText="Checking..."
-              className="flex-shrink-0 h-9 md:h-10 text-xs md:text-sm"
-            >
-              Check for traces
-            </Button>
-          </div>
-        </Step>
-      )}
+          Check for traces
+        </Button>
+      </Step>
 
       {/* The same key-creation dialog workspace settings uses. It hands the
           created key back, which is what fills the request above. */}
