@@ -100,7 +100,7 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue([]);
     renderDialog();
     expect(
-      await screen.findByText("No annotators added yet, add one below"),
+      await screen.findByText("No annotators added yet"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("New annotator name")).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue({ not: "an array" });
     renderDialog();
     expect(
-      await screen.findByText("No annotators added yet, add one below"),
+      await screen.findByText("No annotators added yet"),
     ).toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     const { onConfirm } = renderDialog();
-    await screen.findByText("No annotators added yet, add one below");
+    await screen.findByText("No annotators added yet");
 
     mockedApiClient.mockResolvedValueOnce({ uuid: "a-9", message: "ok" });
     await user.type(screen.getByLabelText("New annotator name"), "Carol");
@@ -141,7 +141,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     renderDialog();
-    await screen.findByText("No annotators added yet, add one below");
+    await screen.findByText("No annotators added yet");
 
     mockedApiClient.mockRejectedValueOnce(
       new Error('Request failed: 400 - {"detail":"Name already used"}'),

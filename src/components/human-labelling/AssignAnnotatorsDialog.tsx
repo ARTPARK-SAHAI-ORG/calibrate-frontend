@@ -216,11 +216,6 @@ export function AssignAnnotatorsDialog({
                   Annotators
                 </p>
               )}
-              {noAnnotators && (
-                <p className="text-sm text-muted-foreground text-center mb-4">
-                  No annotators added yet, add one below
-                </p>
-              )}
               <AddAnnotatorInline
                 accessToken={accessToken}
                 // Disabled until the list has loaded, otherwise the in-flight
@@ -295,6 +290,11 @@ export function AssignAnnotatorsDialog({
                         </div>
                       </label>
                     ))}
+                    {noAnnotators && (
+                      <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
+                        No annotators added yet
+                      </p>
+                    )}
                   </>
                 )}
               </div>
