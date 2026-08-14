@@ -2324,7 +2324,7 @@ function LabellingTaskPageInner() {
 
   const handleAssignAnnotators = async (
     annotatorIds: string[],
-    evaluatorIds: string[] | null,
+    evaluatorIds: string[],
   ) => {
     if (
       (selectedItemIds.size === 0 && !selectAllTotal) ||
@@ -2334,9 +2334,7 @@ function LabellingTaskPageInner() {
       return;
     const body: Record<string, unknown> = {
       annotator_ids: annotatorIds,
-      ...(evaluatorIds && evaluatorIds.length > 0
-        ? { evaluator_ids: evaluatorIds }
-        : {}),
+      ...(evaluatorIds.length > 0 ? { evaluator_ids: evaluatorIds } : {}),
       ...(selectAllTotal
         ? {
             select_all: true,
