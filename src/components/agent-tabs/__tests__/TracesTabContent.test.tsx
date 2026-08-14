@@ -1,4 +1,5 @@
-import { render, screen, waitFor, setupUser } from "@/test-utils";
+import { render, screen, waitFor, setupUser, act } from "@/test-utils";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { TracesTabContent } from "../TracesTabContent";
 import type { TraceSummary } from "@/lib/tracesApi";
 
@@ -9,8 +10,6 @@ const handleDeleted = jest.fn();
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
-  useMaxTraces: () => 10000,
-  useTraceCount: () => 2,
   useTraces: (args: unknown) => mockUseTraces(args),
   // Selection is real: the convert/delete buttons only appear once a row is
   // ticked, which is what the last test checks.
@@ -72,6 +71,8 @@ const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
   ...over,
 });
 
+const refetch = jest.fn();
+
 function tracesResult(items: TraceSummary[]) {
   return {
     items,
@@ -80,6 +81,7 @@ function tracesResult(items: TraceSummary[]) {
     isLoading: false,
     error: null,
     handleDeleted,
+    refetch,
     hasPrev: false,
     hasNext: false,
     prevPage: jest.fn(),
@@ -134,6 +136,42 @@ describe("TracesTabContent", () => {
     expect(
       screen.queryByPlaceholderText("Search traces"),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps checking for traces while the setup steps are showing", () => {
+    jest.useFakeTimers();
+    try {
+      mockUseTraces.mockReturnValue(tracesResult([]));
+      const { unmount } = render(<TracesTabContent agentUuid="agent-1" />);
+
+      expect(refetch).not.toHaveBeenCalled();
+      act(() => {
+        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 2);
+      });
+      expect(refetch).toHaveBeenCalledTimes(2);
+
+      // And it stops when the tab goes away, so nothing keeps polling.
+      unmount();
+      act(() => {
+        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 2);
+      });
+      expect(refetch).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("stops checking once the agent has traces", () => {
+    jest.useFakeTimers();
+    try {
+      render(<TracesTabContent agentUuid="agent-1" />);
+      act(() => {
+        jest.advanceTimersByTime(POLLING_INTERVAL_MS * 3);
+      });
+      expect(refetch).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("reveals the convert and delete actions once a trace is selected", async () => {

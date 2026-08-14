@@ -84,21 +84,6 @@ export async function fetchTraces(
   );
 }
 
-/**
- * How many traces the whole workspace is storing, across every agent. This is
- * the number the storage limit applies to, so it deliberately does not filter
- * by agent: it reads only the `total` off a one-row page.
- */
-export async function fetchWorkspaceTraceCount(
-  accessToken: string,
-): Promise<number> {
-  const page = await apiGet<Paginated<TraceSummary>>(
-    "/traces?limit=1&offset=0",
-    accessToken,
-  );
-  return page.total ?? 0;
-}
-
 /** Fetch one trace with its full conversation history, output, and metadata. */
 export async function fetchTrace(
   accessToken: string,

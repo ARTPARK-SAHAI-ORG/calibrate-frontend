@@ -1,12 +1,11 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useTraces, useTraceCount } from "@/hooks/useTraces";
-import { fetchTraces, fetchWorkspaceTraceCount } from "@/lib/tracesApi";
+import { useTraces } from "@/hooks/useTraces";
+import { fetchTraces } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraces: jest.fn(),
-  fetchWorkspaceTraceCount: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -14,7 +13,6 @@ jest.mock("../../lib/reportError", () => ({
 }));
 
 const mockFetchTraces = fetchTraces as jest.Mock;
-const mockCount = fetchWorkspaceTraceCount as jest.Mock;
 const mockReportError = reportError as jest.Mock;
 
 function page(items: Array<{ uuid: string }>, total: number) {
@@ -23,7 +21,6 @@ function page(items: Array<{ uuid: string }>, total: number) {
 
 beforeEach(() => {
   mockFetchTraces.mockReset();
-  mockCount.mockReset();
   mockReportError.mockReset();
 });
 
@@ -234,44 +231,5 @@ describe("useTraces", () => {
 
     await waitFor(() => expect(result.current.items).toEqual([{ uuid: "new" }]));
     expect(result.current.total).toBe(1);
-  });
-});
-
-describe("useTraceCount", () => {
-  it("counts the whole workspace, not one agent", async () => {
-    mockCount.mockResolvedValue(4242);
-    const { result } = renderHook(() => useTraceCount("tok"));
-    await waitFor(() => expect(result.current).toBe(4242));
-    // The limit shown beside this number is a workspace limit, so the count
-    // must never be narrowed to one agent: it goes through the workspace-wide
-    // read, never the agent-scoped list.
-    expect(mockCount).toHaveBeenCalledWith("tok");
-    expect(mockFetchTraces).not.toHaveBeenCalled();
-  });
-
-  it("returns null and reports when the probe fails", async () => {
-    mockCount.mockRejectedValue(new Error("nope"));
-    const { result } = renderHook(() => useTraceCount("tok", 1));
-    await waitFor(() => expect(mockReportError).toHaveBeenCalled());
-    expect(result.current).toBeNull();
-  });
-
-  it("stays null without an access token", async () => {
-    const { result } = renderHook(() => useTraceCount(null));
-    await act(async () => {});
-    expect(mockCount).not.toHaveBeenCalled();
-    expect(result.current).toBeNull();
-  });
-
-  it("re-reads the count when the refresh key changes", async () => {
-    mockCount.mockResolvedValueOnce(5);
-    mockCount.mockResolvedValueOnce(4);
-    const { result, rerender } = renderHook(
-      ({ key }) => useTraceCount("tok", key),
-      { initialProps: { key: 0 } },
-    );
-    await waitFor(() => expect(result.current).toBe(5));
-    rerender({ key: 1 });
-    await waitFor(() => expect(result.current).toBe(4));
   });
 });

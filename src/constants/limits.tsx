@@ -19,7 +19,6 @@ export const LIMITS = {
   DEFAULT_MAX_ROWS_PER_EVAL: 20,
 
   // Fallback when the workspace trace-limit API is unreachable
-  DEFAULT_MAX_TRACES: 50000,
 
   // Max concurrent S3 uploads when bulk-uploading audio (ZIP import)
   STT_UPLOAD_CONCURRENCY: 8,

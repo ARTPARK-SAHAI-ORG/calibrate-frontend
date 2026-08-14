@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  fetchTraces,
-  fetchWorkspaceTraceCount,
-  TraceSummary,
-} from "@/lib/tracesApi";
+import { fetchTraces, TraceSummary } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 export const TRACES_PAGE_SIZE = 50;
@@ -125,34 +121,4 @@ export function useTraces({
     prevPage,
     nextPage,
   };
-}
-
-/**
- * Live count of every trace in the workspace, across all agents. The storage
- * limit it is shown against is a workspace limit, so this deliberately does NOT
- * filter by agent: an agent-only number next to a workspace limit reads as
- * plenty of room left when the workspace is in fact full. A `limit=1` read is
- * enough, the count comes from the envelope `total`. Bump `refreshKey` after
- * deletes or ingests to re-read.
- */
-export function useTraceCount(accessToken: string | null, refreshKey = 0) {
-  const [count, setCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-    fetchWorkspaceTraceCount(accessToken)
-      .then((total) => {
-        if (!cancelled) setCount(total);
-      })
-      .catch((err) => {
-        reportError("Error fetching trace count:", err);
-        if (!cancelled) setCount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, refreshKey]);
-
-  return count;
 }

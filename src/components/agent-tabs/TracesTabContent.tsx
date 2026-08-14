@@ -12,12 +12,11 @@ import { LoadingState, SearchInput } from "@/components/ui";
 import {
   useAccessToken,
   useDialogUrlParam,
-  useMaxTraces,
-  useTraceCount,
   useTraceDeletion,
   useTraces,
 } from "@/hooks";
 import { bulkDeleteMatchingTraces } from "@/lib/tracesApi";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -69,6 +68,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     hasNext,
     prevPage,
     nextPage,
+    refetch,
   } = useTraces({
     accessToken,
     agentId: agentUuid,
@@ -76,16 +76,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     conversationId,
   });
 
-  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
-  const traceCount = useTraceCount(accessToken, usageRefreshKey);
-  const maxTraces = useMaxTraces();
-
   const deletion = useTraceDeletion({
     traces: items,
-    onDeleted: (uuids) => {
-      handleDeleted(uuids.length);
-      setUsageRefreshKey((key) => key + 1);
-    },
+    onDeleted: (uuids) => handleDeleted(uuids.length),
     accessToken,
   });
 
@@ -105,7 +98,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       });
       setDeleteMatchingOpen(false);
       handleDeleted(result.deleted);
-      setUsageRefreshKey((key) => key + 1);
     } catch (err) {
       reportError("Error deleting matching traces:", err);
     } finally {
@@ -142,15 +134,17 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + items.length, total);
 
+  // While the setup steps are on screen, keep asking for traces so the list
+  // appears on its own the moment the first one arrives. Nothing polls once
+  // there are traces, or while another tab is showing.
+  useEffect(() => {
+    if (!showEmptyState) return;
+    const timer = setInterval(refetch, POLLING_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [showEmptyState, refetch]);
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      {traceCount != null && (
-        <p className="text-xs text-muted-foreground">
-          This workspace has stored {traceCount.toLocaleString()} traces across
-          all its agents, out of the {maxTraces.toLocaleString()} it can hold.
-        </p>
-      )}
-
       {!showEmptyState && (
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <SearchInput

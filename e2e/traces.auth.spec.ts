@@ -153,11 +153,6 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await page.goto(`/agents/${agentUuid}`);
     await waitForOrgReady(page);
     await openTracesTab(page);
-    // The usage indicator reads a live trace count over the cap. Only the
-    // stable end of the sentence is matched, not the whole wording.
-    await expect(
-      page.getByText(/out of the .* it can hold/).first(),
-    ).toBeVisible({ timeout: 15000 });
 
     // The list is server-paginated and scoped to this agent; search narrows it
     // to the seeded row.
