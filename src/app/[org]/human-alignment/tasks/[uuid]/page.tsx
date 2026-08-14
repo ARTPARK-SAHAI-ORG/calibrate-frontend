@@ -3251,6 +3251,140 @@ function LabellingTaskPageInner() {
                 </div>
               )}
 
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-2 text-sm text-muted-foreground">
+                {showItemsPagination && (
+                  <>
+                <div>
+                  {itemsTotal === 0 ? (
+                    "0 items"
+                  ) : (
+                    <>
+                      Showing{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsRangeStart}
+                      </span>
+                      –
+                      <span className="text-foreground font-medium">
+                        {itemsRangeEnd}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsTotal}
+                      </span>{" "}
+                      item{itemsTotal === 1 ? "" : "s"}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2">
+                    <span>Per page</span>
+                    <div className="relative">
+                      <select
+                        value={itemsLimit}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(
+                              ITEMS_PAGE_SIZE_KEY,
+                              String(next),
+                            );
+                          }
+                          setItemsLimit(next);
+                          setItemsOffset(0);
+                        }}
+                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </label>
+                  {itemsPageCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemsOffset((prev) =>
+                          Math.max(0, prev - itemsLimit),
+                        )
+                      }
+                      disabled={itemsOffset === 0 || summaryLoading}
+                      aria-label="Previous page"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                    </button>
+                    <span className="px-2 text-sm">
+                      Page{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsCurrentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsPageCount}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemsOffset((prev) => prev + itemsLimit)
+                      }
+                      disabled={
+                        itemsOffset + itemsLimit >= itemsTotal ||
+                        summaryLoading
+                      }
+                      aria-label="Next page"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  )}
+                </div>
+                  </>
+                )}
+              </div>
               {items.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   {itemsSearch
@@ -3629,143 +3763,8 @@ function LabellingTaskPageInner() {
                   })}
                 </div>
               )}
-              {/* Bottom padding clears the fixed Talk-to-us FAB
-                  (bottom-6 right-6) so the prev/next controls stay
-                  visible when the user scrolls to the bottom. */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
-                {showItemsPagination && (
-                  <>
-                <div>
-                  {itemsTotal === 0 ? (
-                    "0 items"
-                  ) : (
-                    <>
-                      Showing{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsRangeStart}
-                      </span>
-                      –
-                      <span className="text-foreground font-medium">
-                        {itemsRangeEnd}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsTotal}
-                      </span>{" "}
-                      item{itemsTotal === 1 ? "" : "s"}
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2">
-                    <span>Per page</span>
-                    <div className="relative">
-                      <select
-                        value={itemsLimit}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              ITEMS_PAGE_SIZE_KEY,
-                              String(next),
-                            );
-                          }
-                          setItemsLimit(next);
-                          setItemsOffset(0);
-                        }}
-                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <svg
-                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </label>
-                  {itemsPageCount > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) =>
-                          Math.max(0, prev - itemsLimit),
-                        )
-                      }
-                      disabled={itemsOffset === 0 || summaryLoading}
-                      aria-label="Previous page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <span className="px-2 text-sm">
-                      Page{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsCurrentPage}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsPageCount}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) => prev + itemsLimit)
-                      }
-                      disabled={
-                        itemsOffset + itemsLimit >= itemsTotal ||
-                        summaryLoading
-                      }
-                      aria-label="Next page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  )}
-                </div>
-                  </>
-                )}
-              </div>
+              {/* Bottom padding clears the fixed Talk-to-us FAB (bottom-6 right-6). */}
+              <div className="pb-20" />
             </div>
           ))}
 
