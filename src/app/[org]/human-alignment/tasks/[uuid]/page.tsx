@@ -2339,8 +2339,11 @@ function LabellingTaskPageInner() {
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
 
   const [itemDetailUuid, setItemDetailUuid] = useState<string | null>(null);
+  // Opening a specific item cancels a page step that has not landed yet,
+  // so an in-flight step cannot pull the reader off the item they chose.
   const openItemDetail = useCallback((itemUuid: string) => {
     setItemDetailUuid(itemUuid);
+    setPendingItemEdge(null);
   }, []);
 
   const handleAssignAnnotators = async (
@@ -4678,7 +4681,7 @@ function LabellingTaskPageInner() {
           if (!itemDetailUuid) return;
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
           if (idx > 0) {
-            setItemDetailUuid(items[idx - 1].uuid);
+            openItemDetail(items[idx - 1].uuid);
           } else if (idx === 0 && loadedItemsOffset > 0) {
             // First item on the page: step back a page and open its last item.
             const nextOffset = Math.max(0, loadedItemsOffset - itemsLimit);
@@ -4691,7 +4694,7 @@ function LabellingTaskPageInner() {
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
           if (idx < 0) return;
           if (idx < items.length - 1) {
-            setItemDetailUuid(items[idx + 1].uuid);
+            openItemDetail(items[idx + 1].uuid);
           } else if (loadedItemsOffset + idx < itemsTotal - 1) {
             // Last item on the page: step forward a page and open its first item.
             const nextOffset = loadedItemsOffset + itemsLimit;
