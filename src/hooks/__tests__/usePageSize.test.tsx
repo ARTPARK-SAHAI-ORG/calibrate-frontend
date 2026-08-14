@@ -48,4 +48,27 @@ describe("usePageSize", () => {
     expect(result.current[0]).toBe(100);
     expect(window.localStorage.getItem(KEY)).toBe("100");
   });
+
+  it("still works when the browser blocks site data", () => {
+    // A browser set to block site data throws on both calls. Forgetting the
+    // choice is fine; taking the page down with it is not.
+    const blocked = () => {
+      throw new DOMException("denied", "SecurityError");
+    };
+    const getItem = jest
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(blocked);
+    const setItem = jest
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(blocked);
+
+    const { result } = renderHook(() => usePageSize());
+    expect(result.current[0]).toBe(50);
+
+    act(() => result.current[1](25));
+    expect(result.current[0]).toBe(25);
+
+    getItem.mockRestore();
+    setItem.mockRestore();
+  });
 });

@@ -111,12 +111,19 @@ export function TracesEmptyState({
   // Step two is always open to the reader, whether or not step one worked out:
   // the key can be typed into the code by hand, so nothing about a failed key
   // check should hide the code that does the sending.
+  // Step one is done when there is a key, not when the reader has walked past
+  // it: skipping it leaves the code below with a placeholder in place of a key,
+  // so a tick there would say a key was made when none was.
   const stepState = (step: number): StepState =>
-    step < reached
-      ? "done"
-      : step === reached || step === 2
-        ? "current"
-        : "upcoming";
+    step === 1
+      ? createdKey
+        ? "done"
+        : "current"
+      : step < reached
+        ? "done"
+        : step === reached || step === 2
+          ? "current"
+          : "upcoming";
 
   // The backend returns the key itself only when it is created, so this is the
   // one moment it can be filled into the request. Held in memory only, and gone
