@@ -1727,13 +1727,14 @@ function LabellingTaskPageInner() {
   const itemsCount = itemsTotal;
   const itemsPageCount =
     itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
-  const itemsCurrentPage =
-    itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
   // Where the items on screen actually start. `itemsOffset` is the page
-  // that was asked for, which runs ahead of the items until they arrive.
+  // that was asked for, which runs ahead of the items until they arrive,
+  // so every number describing the rows on screen counts from this one.
   const loadedItemsOffset = taskSummary?.pagination?.offset ?? itemsOffset;
-  const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
-  const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
+  const itemsCurrentPage =
+    itemsLimit > 0 ? Math.floor(loadedItemsOffset / itemsLimit) + 1 : 1;
+  const itemsRangeStart = itemsTotal === 0 ? 0 : loadedItemsOffset + 1;
+  const itemsRangeEnd = Math.min(loadedItemsOffset + items.length, itemsTotal);
   // Hide the whole pagination footer when pagination can never apply — i.e.
   // even the smallest page size fits every item on one page. Above that
   // threshold we keep the footer (so the Per-page selector stays reachable)
