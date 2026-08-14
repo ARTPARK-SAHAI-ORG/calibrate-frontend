@@ -4,7 +4,8 @@ import { useState } from "react";
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
-/** One remembered "per page" choice, shared by every list that offers it. */
+/** One remembered "per page" choice for server-paginated lists (Traces tab,
+ *  human-alignment items). UI rules: CLAUDE.md → Server-paginated list bar. */
 const PAGE_SIZE_KEY = "calibrate:items-page-size";
 
 const DEFAULT_PAGE_SIZE = 50;

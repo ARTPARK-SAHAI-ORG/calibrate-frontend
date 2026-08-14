@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Link } from "@/lib/nav";
 import { getBackendUrl } from "@/lib/api";
 import {
   buildSnippet,
@@ -10,7 +11,7 @@ import {
 } from "./ingestSnippets";
 
 /** Stand-in shown when we have no key to hand, so the shape is still clear. */
-export const KEY_PLACEHOLDER = "sk_...";
+export const KEY_PLACEHOLDER = "YOUR_API_KEY";
 
 async function copyText(text: string): Promise<void> {
   try {
@@ -90,6 +91,7 @@ export function TraceIngestSnippet({
 }) {
   const [copied, setCopied] = useState(false);
   const [language, setLanguage] = useState<SnippetLanguage>("curl");
+  const [includeOptional, setIncludeOptional] = useState(false);
 
   let backendUrl = "https://<backend>";
   try {
@@ -102,6 +104,7 @@ export function TraceIngestSnippet({
     backendUrl,
     agentUuid,
     apiKey: apiKey ?? KEY_PLACEHOLDER,
+    includeOptional,
   });
 
   const handleCopy = async () => {
@@ -114,44 +117,98 @@ export function TraceIngestSnippet({
     // The code gets the larger share: a key and a URL on one line need the room
     // more than the explanations do.
     <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4">
-      {/* The snippet and its controls are one object: tabs on the left of the
-          header bar, copy on the right, code below. */}
-      <div className="min-w-0 border border-border rounded-lg overflow-hidden bg-muted/40">
-        <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
-          <div className="flex items-center gap-0.5 overflow-x-auto">
-            {SNIPPET_LANGUAGES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setLanguage(option.id)}
-                className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                  language === option.id
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+      <div className="min-w-0 space-y-2">
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">
+            Include optional fields
+          </span>
           <button
             type="button"
-            onClick={handleCopy}
-            className={`flex-shrink-0 h-7 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              copied
-                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            role="switch"
+            aria-checked={includeOptional}
+            aria-label="Include optional fields"
+            onClick={() => setIncludeOptional((value) => !value)}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+              includeOptional ? "bg-foreground" : "bg-muted-foreground/40"
             }`}
           >
-            {copied ? "Copied" : "Copy"}
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                includeOptional ? "translate-x-4" : "translate-x-1"
+              }`}
+            />
           </button>
         </div>
-        <pre className="w-full text-left font-mono text-xs leading-relaxed text-foreground p-4 overflow-x-auto">
-          <code>{highlight(snippet)}</code>
-        </pre>
+        {/* Tabs on the left of the header bar, copy on the right, code below. */}
+        <div className="border border-border rounded-lg overflow-hidden bg-muted/40">
+          <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
+            <div className="flex items-center gap-0.5 overflow-x-auto">
+              {SNIPPET_LANGUAGES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setLanguage(option.id)}
+                  className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    language === option.id
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`flex-shrink-0 h-7 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                copied
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <pre className="w-full text-left font-mono text-xs leading-relaxed text-foreground p-4 overflow-x-auto">
+            <code>{highlight(snippet)}</code>
+          </pre>
+        </div>
       </div>
 
       <div className="min-w-0 space-y-3">
+        {!apiKey && (
+          <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-muted-foreground">
+            <svg
+              className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+              />
+            </svg>
+            <p>
+              Replace{" "}
+              <span className="font-mono text-foreground">
+                {KEY_PLACEHOLDER}
+              </span>{" "}
+              with an API key for your workspace from the{" "}
+              <Link
+                href="/workspace-settings?tab=api-keys"
+                className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60 transition-colors"
+              >
+                API keys
+              </Link>{" "}
+              page
+            </p>
+          </div>
+        )}
         <FieldList optional={false} />
         <div className="space-y-2">
           <p className="text-xs font-medium text-foreground">Optional</p>

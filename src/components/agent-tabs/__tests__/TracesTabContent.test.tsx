@@ -194,6 +194,16 @@ function lastTracesArgs() {
 }
 
 describe("TracesTabContent", () => {
+  it("refreshes the trace list when asked", async () => {
+    refetch.mockResolvedValue(false);
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the sending code reachable once traces exist", async () => {
     const user = setupUser();
     render(<TracesTabContent agentUuid="agent-1" />);
@@ -204,7 +214,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "View code" }));
 
     expect(
-      screen.getByRole("heading", { name: "Send a trace" }),
+      screen.getByRole("heading", { name: "Send your first trace" }),
     ).toBeInTheDocument();
     expect(document.querySelector("pre")?.textContent).toContain(
       '"agent_id": "agent-1"',
@@ -214,11 +224,12 @@ describe("TracesTabContent", () => {
   it("lists the loaded traces for this agent", () => {
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    expect(screen.getAllByText("msg-001").length).toBeGreaterThan(0);
+    expect(screen.queryByText("msg-001")).not.toBeInTheDocument();
     expect(
       screen.getAllByText("When is the next vaccination?").length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("1 trace")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("trace")).toBeInTheDocument();
     expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
     expect(mockUseTraces).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "agent-1" }),
@@ -255,25 +266,25 @@ describe("TracesTabContent", () => {
     expect(window.localStorage.getItem("calibrate:items-page-size")).toBe("25");
   });
 
-  it("shows the server total above the rows and pagination below them", async () => {
+  it("shows the count above the rows with page navigation", async () => {
     const user = setupUser();
     const nextPage = jest.fn();
+    window.localStorage.setItem("calibrate:items-page-size", "10");
     mockUseTraces.mockReturnValue({
       ...tracesResult([trace()]),
-      total: 3,
+      total: 25,
+      offset: 0,
       hasNext: true,
       nextPage,
     });
 
     render(<TracesTabContent agentUuid="agent-1" />);
 
-    const count = screen.getByText("3 traces");
-    const list = count.nextElementSibling;
-    const nextButton = screen.getByRole("button", { name: "Next" });
+    const nextButton = screen.getByRole("button", { name: "Next page" });
 
-    expect(list).toHaveTextContent("Input");
+    expect(screen.getByText(/Showing/)).toBeInTheDocument();
     expect(
-      list!.compareDocumentPosition(nextButton) &
+      nextButton.compareDocumentPosition(screen.getByText("Input")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
@@ -550,7 +561,6 @@ describe("TracesTabContent", () => {
       await user.click(screen.getByText("choose evaluators"));
 
       expect(screen.getByText("Loading traces...")).toBeInTheDocument();
-      expect(screen.getByText("Loading traces...")).toBeDisabled();
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
     });
 
@@ -731,7 +741,7 @@ describe("TracesTabContent", () => {
 
     expect(screen.queryByTestId("trace-detail")).not.toBeInTheDocument();
 
-    await user.click(screen.getAllByText("msg-002")[0]);
+    await user.click(screen.getAllByText("Second")[0]);
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });

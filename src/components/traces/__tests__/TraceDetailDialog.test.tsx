@@ -170,6 +170,7 @@ it("puts ids, created time, and metadata in the side column and omits missing id
   );
 
   await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+  expect(screen.getByRole("heading", { name: "Metadata" })).toBeInTheDocument();
   expect(screen.getByText("Name")).toBeInTheDocument();
   expect(screen.getByText("Conversation")).toBeInTheDocument();
   expect(screen.getByText("conv-1")).toBeInTheDocument();
@@ -276,6 +277,7 @@ it("renders a tool-call-only output without a missing-reply placeholder", async 
     />,
   );
   await waitFor(() => expect(screen.getByText("x")).toBeInTheDocument());
+  expect(screen.queryByRole("heading", { name: "Metadata" })).not.toBeInTheDocument();
   expect(screen.queryByText("No text response")).not.toBeInTheDocument();
   expect(screen.getAllByText("Agent Tool Call").length).toBeGreaterThan(0);
 });

@@ -37,8 +37,8 @@ export function useTraces({
   }, [agentId, pageSize]);
 
   const load = useCallback(
-    async (targetOffset: number) => {
-      if (!accessToken) return;
+    async (targetOffset: number): Promise<number> => {
+      if (!accessToken) return 0;
       const requestId = ++requestIdRef.current;
       setIsLoading(true);
       setError(null);
@@ -48,17 +48,20 @@ export function useTraces({
           offset: targetOffset,
           agentId,
         });
-        if (requestId !== requestIdRef.current) return;
+        if (requestId !== requestIdRef.current) return 0;
+        const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
-        setTotal(page.total ?? 0);
+        setTotal(nextTotal);
+        return nextTotal;
       } catch (err) {
-        if (requestId !== requestIdRef.current) return;
+        if (requestId !== requestIdRef.current) return 0;
         reportError("Error fetching traces:", err);
         // Drop the last page too: leaving it on screen next to the message
         // would let the reader tick and delete rows from a failed load.
         setItems([]);
         setTotal(0);
         setError("Failed to load traces. Please try again.");
+        return 0;
       } finally {
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
@@ -70,7 +73,10 @@ export function useTraces({
     load(offset);
   }, [load, offset]);
 
-  const refetch = useCallback(() => load(offset), [load, offset]);
+  const refetch = useCallback(async () => {
+    const nextTotal = await load(offset);
+    return nextTotal === 0;
+  }, [load, offset]);
 
   /** Re-sync after `count` rows were deleted, clamping the page back into
    *  range when the current offset would land past the new end. */
