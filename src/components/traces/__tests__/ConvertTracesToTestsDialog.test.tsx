@@ -96,7 +96,7 @@ it("does not offer an agent picker", async () => {
 });
 
 it("converts a response test with the selected evaluator and links the agent it is on", async () => {
-  mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+  mockConvert.mockResolvedValue({ test_uuids: ["t1", "t2"] });
   const user = setupUser();
   const { onConverted } = setup();
   await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
@@ -111,10 +111,7 @@ it("converts a response test with the selected evaluator and links the agent it 
     agentUuids: ["ag-1"],
     acceptAnyArguments: false,
   });
-  expect(onConverted).toHaveBeenCalledWith({
-    created: 2,
-    test_uuids: ["t1", "t2"],
-  });
+  expect(onConverted).toHaveBeenCalledWith({ test_uuids: ["t1", "t2"] });
 });
 
 it("disables Convert for a response test when no evaluator is selected", async () => {
@@ -127,7 +124,7 @@ it("disables Convert for a response test when no evaluator is selected", async (
 });
 
 it("switches to tool_call and sends accept_any_arguments", async () => {
-  mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+  mockConvert.mockResolvedValue({ test_uuids: ["t1", "t2"] });
   const user = setupUser();
   setup();
   await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());

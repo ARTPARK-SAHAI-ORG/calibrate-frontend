@@ -1,4 +1,8 @@
 import { render, screen, waitFor, setupUser } from "@/test-utils";
+jest.mock("sonner", () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
+import { toast } from "sonner";
 import { TracesTabContent } from "../TracesTabContent";
 import type { TraceSummary } from "@/lib/tracesApi";
 
@@ -46,20 +50,30 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     traceUuid: string | null;
   }) => (isOpen ? <div data-testid="trace-detail">{traceUuid}</div> : null),
 }));
+// The stub also exposes onConverted, so the "created N tests" message the tab
+// builds from the response is exercised rather than assumed.
 jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
   ConvertTracesToTestsDialog: ({
     isOpen,
     agentUuid,
     traceUuids,
+    onConverted,
   }: {
     isOpen: boolean;
     agentUuid: string;
     traceUuids: string[];
+    onConverted: (result: { test_uuids: string[] }) => void;
   }) =>
     isOpen ? (
       <div data-testid="convert-dialog">
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
+        <button
+          type="button"
+          onClick={() => onConverted({ test_uuids: ["t1", "t2"] })}
+        >
+          finish convert
+        </button>
       </div>
     ) : null,
 }));
@@ -167,6 +181,22 @@ describe("TracesTabContent", () => {
 
     expect(screen.getByText("Convert to tests (1)")).toBeInTheDocument();
     expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
+  });
+
+  it("says how many tests were created, counting what came back", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Convert to tests (1)"));
+    await user.click(screen.getByText("finish convert"));
+
+    // Two uuids came back, so the message says two, and the selection clears.
+    expect(toast.success).toHaveBeenCalledWith(
+      "Created 2 tests",
+      expect.anything(),
+    );
+    expect(screen.queryByText("Convert to tests (1)")).not.toBeInTheDocument();
   });
 
   it("opens the convert dialog for this agent and the selected traces", async () => {

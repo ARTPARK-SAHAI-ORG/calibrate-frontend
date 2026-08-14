@@ -130,7 +130,8 @@ export type ConvertTracesToTestsBody = {
 };
 
 export type ConvertTracesToTestsResult = {
-  created: number;
+  /** The tests that were created. Count them for a "created N tests" message:
+   *  the backend does not send a count of its own. */
   test_uuids: string[];
 };
 

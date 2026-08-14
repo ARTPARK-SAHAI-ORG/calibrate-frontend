@@ -259,8 +259,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         onConverted={(result) => {
           setConvertOpen(false);
           deletion.clearSelection();
+          const created = result.test_uuids.length;
           toast.success(
-            `Created ${result.created} test${result.created === 1 ? "" : "s"}`,
+            `Created ${created} test${created === 1 ? "" : "s"}`,
             {
               action: {
                 label: "View tests",
