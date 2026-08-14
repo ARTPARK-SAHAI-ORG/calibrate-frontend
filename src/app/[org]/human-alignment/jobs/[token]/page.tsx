@@ -9,9 +9,23 @@ import {
   jobStatusPillClass,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
+import { buildSendForReviewSlot } from "@/components/human-labelling/SendForReviewFlow";
 import { ShareButton } from "@/components/ShareButton";
 import { useAccessToken } from "@/hooks";
+import { apiClient } from "@/lib/api";
+import { reportError } from "@/lib/reportError";
 import { useSidebarState } from "@/lib/sidebar";
+
+/**
+ * The parts of the task this page needs to send items for review. The job
+ * carries its own copy of the items and labels, frozen at the moment it was
+ * created, so an item or a label removed from the task since then is still
+ * on screen. Only what is still on the task can go into a new job.
+ */
+type TaskForReview = {
+  items?: { uuid: string }[];
+  evaluators?: { uuid: string; name: string; description?: string | null }[];
+};
 
 export default function AdminAnnotateJobPage() {
   const router = useRouter();
@@ -32,6 +46,27 @@ export default function AdminAnnotateJobPage() {
   }, []);
 
   const handleLoaded = useCallback((m: AnnotationJobMeta) => setMeta(m), []);
+
+  // Fetched only to work out what can still be sent for review, so a failure
+  // here just hides that button and leaves the rest of the page alone.
+  const [task, setTask] = useState<TaskForReview | null>(null);
+  const taskUuid = meta?.task.uuid ?? "";
+  useEffect(() => {
+    if (!accessToken || !taskUuid) return;
+    let cancelled = false;
+    apiClient<TaskForReview>(`/annotation-tasks/${taskUuid}`, accessToken)
+      .then((data) => {
+        if (!cancelled) setTask(data);
+      })
+      .catch((err) => {
+        reportError("Failed to load task for the review button", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, taskUuid]);
+
+  const taskItemIds = new Set((task?.items ?? []).map((it) => it.uuid));
 
   // Copy the annotator-facing URL (/annotate-job/{token}) to the clipboard.
   // Mirrors the per-job copy button used in the tasks detail jobs table.
@@ -85,7 +120,10 @@ export default function AdminAnnotateJobPage() {
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
       customHeader={customHeader}
     >
-      <div className="py-4 md:py-6 flex flex-col gap-4" style={{ height: "calc(100dvh - 56px)" }}>
+      <div
+        className="py-4 md:py-6 flex flex-col gap-4"
+        style={{ height: "calc(100dvh - 56px)" }}
+      >
         {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
         <button
           onClick={() => router.back()}
@@ -204,6 +242,16 @@ export default function AdminAnnotateJobPage() {
             mode="admin"
             fillViewport={false}
             onLoaded={handleLoaded}
+            reviewSlot={
+              task
+                ? buildSendForReviewSlot({
+                    accessToken,
+                    taskUuid,
+                    taskItemIds,
+                    evaluators: task.evaluators ?? [],
+                  })
+                : undefined
+            }
           />
         </div>
       </div>

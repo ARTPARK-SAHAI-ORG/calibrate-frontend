@@ -4506,9 +4506,6 @@ function LabellingTaskPageInner() {
         <AssignAnnotatorsDialog
           isOpen={assignOpen}
           accessToken={accessToken}
-          selectedItemCount={
-            selectAllTotal ? itemsTotal : selectedItemIds.size
-          }
           evaluators={task?.evaluators ?? []}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}

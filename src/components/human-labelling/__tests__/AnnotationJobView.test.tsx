@@ -988,6 +988,40 @@ describe("AnnotationJobView", () => {
     });
   });
 
+  describe("review slot", () => {
+    // The filter row and the review button share one strip. Its own class
+    // list is the only thing that tells it apart from the rows around it.
+    const filterStrips = () =>
+      document.querySelectorAll("div.py-2\\.5.flex-wrap");
+
+    it("shows what the review slot returns, with the items on screen", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const reviewSlot = jest.fn(
+        (visible: { uuid: string }[]) => (
+          <button>Send {visible.length} items for review</button>
+        ),
+      );
+      render(
+        <AnnotationJobView token="tok" mode="public" reviewSlot={reviewSlot} />,
+      );
+      expect(
+        await screen.findByRole("button", { name: "Send 2 items for review" }),
+      ).toBeInTheDocument();
+      expect(filterStrips()).toHaveLength(1);
+    });
+
+    it("leaves no empty strip when the review slot returns nothing", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      render(
+        <AnnotationJobView token="tok" mode="public" reviewSlot={() => null} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      expect(filterStrips()).toHaveLength(0);
+    });
+  });
+
   it("shows the item description when the payload has one", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(

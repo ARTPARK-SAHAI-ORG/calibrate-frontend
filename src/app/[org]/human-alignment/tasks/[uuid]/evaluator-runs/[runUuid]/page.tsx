@@ -32,6 +32,7 @@ import {
   runOutputType,
   snapshotToItem,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
+import { buildSendForReviewSlot } from "@/components/human-labelling/SendForReviewFlow";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 
 /**
@@ -224,6 +225,16 @@ export default function EvaluatorRunDetailPage() {
     }
     return m;
   }, [job]);
+
+  /**
+   * The items still part of the task. This page can also show items from the
+   * run's own saved copy, and some of those may have been removed from the
+   * task since. Those cannot go into a new labelling job.
+   */
+  const taskItemIds = useMemo(
+    () => new Set((task?.items ?? []).map((it) => it.uuid)),
+    [task?.items],
+  );
 
   /** Item UUIDs covered by this job, used to pre-target a re-run. */
   const rerunItemIds = useMemo<string[]>(
@@ -640,6 +651,12 @@ export default function EvaluatorRunDetailPage() {
                 )}
               </div>
             }
+            reviewSlot={buildSendForReviewSlot({
+              accessToken,
+              taskUuid,
+              taskItemIds,
+              evaluators: task.evaluators ?? [],
+            })}
             topError={exportError ? `Export failed: ${exportError}` : null}
           />
         ) : null}
