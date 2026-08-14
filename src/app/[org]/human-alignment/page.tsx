@@ -458,8 +458,10 @@ function HumanLabellingPageInner() {
               Human alignment
             </h1>
             <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1 max-w-3xl">
-              Collect human labels, measure consistency between labellers and
-              track human alignment with your evaluators
+              Collect human labels, check how often labellers agree with each
+              other, and see how well your evaluators match them. You can also
+              run evaluators on their own and read the scores they give, with no
+              people involved.
             </p>
           </div>
           <button

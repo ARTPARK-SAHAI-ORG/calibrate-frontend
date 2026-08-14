@@ -2727,7 +2727,7 @@ function LabellingTaskPageInner() {
             { id: "overview" as Tab, label: "Overview" },
             {
               id: "items" as Tab,
-              label: itemsCount > 0 ? `Items (${itemsCount})` : "Items",
+              label: itemsCount > 0 ? `Dataset (${itemsCount})` : "Dataset",
             },
             {
               id: "jobs" as Tab,

@@ -139,7 +139,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Unit Tests",
+    title: "Component Tests",
     items: [
       {
         id: "stt",
