@@ -120,13 +120,16 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     // the ingest body carries the agent's uuid as `agent_id`.
     const stamp = Date.now();
     const targetMsgId = `e2e-${stamp}-a`;
+    // Rows show the caller's question, not the message id, so the id goes in
+    // the question itself to make each row easy to pick out.
+    const targetInput = `Tell me about booster doses ${targetMsgId}`;
     await page.request.post(`${BACKEND}/traces`, {
       headers,
       data: {
         agent_id: agentUuid,
         message_id: targetMsgId,
         conversation_id: `e2e-conv-${stamp}`,
-        input: [{ role: "user", content: "Tell me about booster doses" }],
+        input: [{ role: "user", content: targetInput }],
         output: { response: "Boosters are due at 16 months." },
         metadata: [{ key: "env", value: "e2e" }],
       },
@@ -137,7 +140,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         agent_id: agentUuid,
         message_id: `e2e-${stamp}-b`,
         conversation_id: `e2e-conv-${stamp}`,
-        input: [{ role: "user", content: "unrelated question" }],
+        input: [{ role: "user", content: `unrelated question e2e-${stamp}-b` }],
         output: { tool_calls: [{ tool: "lookup", arguments: {} }] },
       },
     });
@@ -154,7 +157,9 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         agent_id: otherAgentUuid,
         message_id: otherMsgId,
         conversation_id: `e2e-conv-other-${stamp}`,
-        input: [{ role: "user", content: "Tell me about booster doses" }],
+        input: [
+          { role: "user", content: `Tell me about booster doses ${otherMsgId}` },
+        ],
         output: { response: "A different agent's answer." },
       },
     });
@@ -165,7 +170,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await openTracesTab(page);
 
     // The agent was created for this run, so both seeded traces are on the
-    // first page. The message id renders in both the desktop table and the
+    // first page. The question renders in both the desktop table and the
     // mobile cards (both in the DOM), so scope to the first match.
     const row = page.getByText(targetMsgId).first();
     await expect(row).toBeVisible({ timeout: 15000 });
@@ -178,10 +183,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await row.click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", {
-        name: "Tell me about booster doses",
-        exact: true,
-      }),
+      dialog.getByRole("heading", { name: targetInput, exact: true }),
     ).toBeVisible();
     await expect(
       dialog.getByText("Boosters are due at 16 months."),
@@ -195,8 +197,8 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await expect(dialog).toBeHidden();
 
     // Delete that same trace via its own row's trash icon + confirmation.
-    // Without search the page holds more than one row, so pick the row by the
-    // message id rather than taking the first trash icon on the page.
+    // Without search the page holds more than one row, so pick the row by its
+    // question rather than taking the first trash icon on the page.
     await page
       .locator("div.grid")
       .filter({ hasText: targetMsgId })
@@ -232,7 +234,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         agent_id: agentUuid,
         message_id: msgId,
         conversation_id: `e2e-conv-grp-${stamp}`,
-        input: [{ role: "user", content: "A question worth testing." }],
+        input: [{ role: "user", content: `A question worth testing. ${msgId}` }],
         output: { response: "An answer." },
       },
     });
