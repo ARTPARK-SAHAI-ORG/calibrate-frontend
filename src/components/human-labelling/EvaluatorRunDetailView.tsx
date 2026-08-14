@@ -8,7 +8,7 @@
  * data-agnostic — caller fetches the job & task and passes them in.
  */
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@/lib/nav";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
@@ -36,7 +36,7 @@ import {
   useUrlValueFilters,
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
-import type { ReviewSlot } from "./SendForReviewFlow";
+import type { ReviewItem } from "./SendForReviewFlow";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1640,10 +1640,10 @@ export interface EvaluatorRunDetailViewProps {
    * surfaces it (e.g. public pages render it in the title bar via
    * PublicPageLayout's `pills` slot). */
   hideStatusPill?: boolean;
-  /** Slot rendered next to the item filters, handed the items the filters
-   * leave visible. Only the signed-in route passes it, so the public
-   * shared-link page never shows it. */
-  reviewSlot?: ReviewSlot;
+  /** Called with the items the filters leave visible, so the signed-in page
+   * can offer to send exactly those for review. Only that page passes it, so
+   * the public shared-link page never acts on it. */
+  onVisibleItemsChange?: (items: ReviewItem[]) => void;
 }
 
 /**
@@ -1660,7 +1660,7 @@ export function EvaluatorRunDetailView({
   actionsSlot,
   topError,
   hideStatusPill = false,
-  reviewSlot,
+  onVisibleItemsChange,
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   // Both filters live in the address bar, so a reload or a shared link opens
@@ -1843,10 +1843,17 @@ export function EvaluatorRunDetailView({
     [itemsForRun],
   );
 
-  // Built here rather than inline so the toolbar row can skip itself when it
-  // would be empty: the review button renders nothing while the page is still
-  // loading, or when there is nothing left to send.
-  const reviewButton = reviewSlot?.(filteredItemsForRun);
+  // Report the filtered list up so the signed-in page can offer to send
+  // exactly those items for review. The run is polled, so the list is rebuilt
+  // often; only report when the items themselves actually differ, otherwise
+  // every poll would re-render the page around us.
+  const reportedItemsRef = React.useRef<string>("");
+  useEffect(() => {
+    const key = filteredItemsForRun.map((it) => it.uuid).join(",");
+    if (key === reportedItemsRef.current) return;
+    reportedItemsRef.current = key;
+    onVisibleItemsChange?.(filteredItemsForRun);
+  }, [filteredItemsForRun, onVisibleItemsChange]);
 
   const total = filteredItemsForRun.length;
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
@@ -1985,7 +1992,7 @@ export function EvaluatorRunDetailView({
 
       <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
         <div className="flex flex-col flex-1 min-h-0">
-          {(hasDisagreements || canFilterByValue || reviewButton) && (
+          {(hasDisagreements || canFilterByValue) && (
             <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
               {hasDisagreements && (
                 <button
@@ -2008,7 +2015,6 @@ export function EvaluatorRunDetailView({
                   onChange={setValueFilters}
                 />
               )}
-              {reviewButton}
             </div>
           )}
           <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">

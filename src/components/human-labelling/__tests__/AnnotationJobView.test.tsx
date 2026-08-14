@@ -988,32 +988,84 @@ describe("AnnotationJobView", () => {
     });
   });
 
-  describe("review slot", () => {
-    // The filter row and the review button share one strip. Its own class
-    // list is the only thing that tells it apart from the rows around it.
+  describe("reporting the items on screen", () => {
+    // The filter row is the only thing that draws this strip. Its own class
+    // list is what tells it apart from the rows around it.
     const filterStrips = () =>
       document.querySelectorAll("div.py-2\\.5.flex-wrap");
 
-    it("shows what the review slot returns, with the items on screen", async () => {
-      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
-      const reviewSlot = jest.fn(
-        (visible: { uuid: string }[]) => (
-          <button>Send {visible.length} items for review</button>
-        ),
-      );
-      render(
-        <AnnotationJobView token="tok" mode="public" reviewSlot={reviewSlot} />,
-      );
-      expect(
-        await screen.findByRole("button", { name: "Send 2 items for review" }),
-      ).toBeInTheDocument();
-      expect(filterStrips()).toHaveLength(1);
+    const ann = (item: string, ev: string, value: unknown) => ({
+      uuid: `${item}-${ev}`,
+      job_id: "job-1",
+      item_id: item,
+      evaluator_id: ev,
+      value: { value },
+      created_at: "",
+      updated_at: "",
     });
 
-    it("leaves no empty strip when the review slot returns nothing", async () => {
+    it("reports every item when nothing is filtered out", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const onVisibleItemsChange = jest.fn();
+      render(
+        <AnnotationJobView
+          token="tok"
+          mode="public"
+          onVisibleItemsChange={onVisibleItemsChange}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      expect(
+        onVisibleItemsChange.mock.calls.at(-1)![0].map((it: { uuid: string }) => it.uuid),
+      ).toEqual(["item-1", "item-2"]);
+    });
+
+    it("reports the narrowed list when a filter is applied", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            read_only: true,
+            annotations: [
+              ann("item-1", "ev-2", 3),
+              ann("item-2", "ev-2", 5),
+            ],
+          }),
+        ),
+      );
+      const onVisibleItemsChange = jest.fn();
+      const user = setupUser();
+      render(
+        <AnnotationJobView
+          token="tok"
+          mode="admin"
+          fillViewport={false}
+          onVisibleItemsChange={onVisibleItemsChange}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+      await user.click(screen.getByRole("button", { name: "Quality ›" }));
+      await user.click(screen.getByRole("button", { name: "5" }));
+
+      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(
+        onVisibleItemsChange.mock.calls.at(-1)![0].map((it: { uuid: string }) => it.uuid),
+      ).toEqual(["item-2"]);
+    });
+
+    it("draws no filter strip in the annotator view", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       render(
-        <AnnotationJobView token="tok" mode="public" reviewSlot={() => null} />,
+        <AnnotationJobView
+          token="tok"
+          mode="public"
+          onVisibleItemsChange={jest.fn()}
+        />,
       );
       await waitFor(() =>
         expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),

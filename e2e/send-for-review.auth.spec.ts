@@ -1,7 +1,7 @@
-// "Send for review" — the button next to the item filters on the evaluation
+// "Send for review" — the button in the header action row on the evaluation
 // run page and the signed-in labelling job page. It takes the items the
-// filters leave visible, lets you untick any of them, then creates labelling
-// jobs for the annotators you pick.
+// filters leave visible and creates labelling jobs for the annotators you
+// pick, going straight to the annotator picker.
 //
 // The pages this covers need a labelling task with items, human answers, a
 // finished labelling job and a finished evaluation run. Building all of that
@@ -82,13 +82,20 @@ async function seed(request: APIRequestContext): Promise<Seeded> {
     request,
     "/evaluators?include_defaults=true",
   );
-  type Evaluator = { uuid: string; evaluator_type?: string; output_type?: string };
+  type Evaluator = {
+    uuid: string;
+    evaluator_type?: string;
+    output_type?: string;
+  };
   const all: Evaluator[] = Array.isArray(evaluatorList)
     ? evaluatorList
     : (evaluatorList.items ?? []);
   const llm = all.filter((e) => e.evaluator_type === "llm");
   const evaluator = llm.find((e) => e.output_type === "binary") ?? llm[0];
-  expect(evaluator, "no built-in LLM evaluator to build the task on").toBeTruthy();
+  expect(
+    evaluator,
+    "no built-in LLM evaluator to build the task on",
+  ).toBeTruthy();
 
   const task = await api<{ uuid: string }>(request, "/annotation-tasks", {
     method: "POST",
@@ -131,7 +138,10 @@ async function seed(request: APIRequestContext): Promise<Seeded> {
     `/annotation-tasks/${task.uuid}/jobs`,
   );
   const job = jobs.find((j) => j.uuid === created.annotation_job_id);
-  expect(job, "the seeded answers did not produce a labelling job").toBeTruthy();
+  expect(
+    job,
+    "the seeded answers did not produce a labelling job",
+  ).toBeTruthy();
 
   const run = await api<{ job_uuid: string }>(
     request,
@@ -171,20 +181,8 @@ async function seed(request: APIRequestContext): Promise<Seeded> {
 }
 
 /**
- * The item picker the "Send for review" button opens. Scoped, because both
- * pages behind it have a "Next" button of their own for moving between items.
- */
-function itemPicker(page: Page) {
-  return page
-    .locator(".fixed.inset-0.z-50")
-    .filter({
-      has: page.getByRole("heading", { name: "Send for review", exact: true }),
-    });
-}
-
-/**
- * Walk the picker through to a created job: tick the annotator, confirm, and
- * check the links dialog names it.
+ * Walk the annotator picker through to a created job: tick the annotator,
+ * confirm, and check the links dialog names it.
  */
 async function assignTo(page: Page, annotatorName: string): Promise<void> {
   await expect(
@@ -229,28 +227,12 @@ test.describe("Send for review (authenticated, real backend)", () => {
     await waitForOrgReady(page);
 
     const sendButton = page.getByRole("button", {
-      name: "Send 3 items for review",
+      name: "Send for review 3",
     });
     await expect(sendButton).toBeVisible({ timeout: 30000 });
     await sendButton.click();
 
-    // The picker opens with every item ticked.
-    const picker = itemPicker(page);
-    await expect(picker).toBeVisible({ timeout: 15000 });
-    for (const name of ITEM_NAMES) {
-      await expect(picker.getByText(name, { exact: true })).toBeVisible();
-    }
-    await expect(picker.getByText("3 of 3 selected")).toBeVisible();
-
-    // Unticking one lowers the count.
-    await picker
-      .locator("label")
-      .filter({ hasText: ITEM_NAMES[0] })
-      .locator('input[type="checkbox"]')
-      .uncheck();
-    await expect(picker.getByText("2 of 3 selected")).toBeVisible();
-
-    await picker.getByRole("button", { name: "Next", exact: true }).click();
+    // Clicking goes straight to choosing annotators.
     await assignTo(page, seeded.annotatorName);
   });
 
@@ -263,7 +245,7 @@ test.describe("Send for review (authenticated, real backend)", () => {
     await waitForOrgReady(page);
 
     await expect(
-      page.getByRole("button", { name: "Send 3 items for review" }),
+      page.getByRole("button", { name: "Send for review 3" }),
     ).toBeVisible({ timeout: 30000 });
 
     // The evaluator scored every item "yes"; the annotator answered "no" on
@@ -273,10 +255,10 @@ test.describe("Send for review (authenticated, real backend)", () => {
       .click();
 
     await expect(
-      page.getByRole("button", { name: "Send 1 item for review" }),
+      page.getByRole("button", { name: "Send for review 1" }),
     ).toBeVisible({ timeout: 15000 });
     await expect(
-      page.getByRole("button", { name: "Send 3 items for review" }),
+      page.getByRole("button", { name: "Send for review 3" }),
     ).toHaveCount(0);
   });
 
@@ -287,16 +269,11 @@ test.describe("Send for review (authenticated, real backend)", () => {
     await waitForOrgReady(page);
 
     const sendButton = page.getByRole("button", {
-      name: "Send 3 items for review",
+      name: "Send for review 3",
     });
     await expect(sendButton).toBeVisible({ timeout: 30000 });
     await sendButton.click();
 
-    const picker = itemPicker(page);
-    await expect(picker).toBeVisible({ timeout: 15000 });
-    await expect(picker.getByText("3 of 3 selected")).toBeVisible();
-
-    await picker.getByRole("button", { name: "Next", exact: true }).click();
     await assignTo(page, seeded.annotatorName);
   });
 

@@ -1623,44 +1623,68 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  describe("review slot", () => {
-    // The disagreement toggle, the filter, and the review button share one
-    // strip. Its own class list is what tells it apart from the rows around it.
+  describe("reporting the items on screen", () => {
+    // The disagreement toggle and the filter share one strip. Its own class
+    // list is what tells it apart from the rows around it.
     const filterStrips = () =>
       document.querySelectorAll("div.py-2\\.5.flex-wrap");
 
     // No disagreements, and a rating evaluator with no bounds offers no
-    // values to filter on, so only the review slot can draw the strip.
+    // values to filter on, so nothing draws the strip.
     const jobWithNoFilters = () =>
       makeJob({
         evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
         runs: [],
       });
 
-    it("shows what the review slot returns, with the items on screen", () => {
+    const uuidsFromLastCall = (fn: jest.Mock) =>
+      fn.mock.calls.at(-1)![0].map((it: { uuid: string }) => it.uuid);
+
+    it("reports every item when nothing is filtered out", () => {
+      const onVisibleItemsChange = jest.fn();
       render(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
           versionLabels={{}}
-          reviewSlot={(visible) => (
-            <button>Send {visible.length} items for review</button>
-          )}
+          onVisibleItemsChange={onVisibleItemsChange}
         />,
       );
-      expect(
-        screen.getByRole("button", { name: "Send 2 items for review" }),
-      ).toBeInTheDocument();
-      expect(filterStrips()).toHaveLength(1);
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual([
+        "item-1",
+        "item-2",
+      ]);
     });
 
-    it("leaves no empty strip when the review slot returns nothing", () => {
+    it("reports the narrowed list when a value filter is applied", async () => {
+      const user = setupUser();
+      const onVisibleItemsChange = jest.fn();
+      render(
+        <EvaluatorRunDetailView
+          job={makeValueFilterJob()}
+          task={makeTask()}
+          versionLabels={{}}
+          onVisibleItemsChange={onVisibleItemsChange}
+        />,
+      );
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual([
+        "item-1",
+        "item-2",
+      ]);
+
+      await addFilter(user, "Binary Evaluator", "Correct");
+
+      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual(["item-1"]);
+    });
+
+    it("draws no filter strip when there is nothing to filter on", () => {
       render(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
           versionLabels={{}}
-          reviewSlot={() => null}
+          onVisibleItemsChange={jest.fn()}
         />,
       );
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();

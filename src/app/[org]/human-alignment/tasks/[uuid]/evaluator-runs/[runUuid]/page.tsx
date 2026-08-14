@@ -32,7 +32,10 @@ import {
   runOutputType,
   snapshotToItem,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
-import { buildSendForReviewSlot } from "@/components/human-labelling/SendForReviewFlow";
+import {
+  SendForReviewFlow,
+  type ReviewItem,
+} from "@/components/human-labelling/SendForReviewFlow";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 
 /**
@@ -234,6 +237,14 @@ export default function EvaluatorRunDetailPage() {
   const taskItemIds = useMemo(
     () => new Set((task?.items ?? []).map((it) => it.uuid)),
     [task?.items],
+  );
+
+  // The items the run view's filters currently leave visible, reported up so
+  // the header can offer to send exactly those for review.
+  const [visibleItems, setVisibleItems] = useState<ReviewItem[]>([]);
+  const handleVisibleItemsChange = useCallback(
+    (items: ReviewItem[]) => setVisibleItems(items),
+    [],
   );
 
   /** Item UUIDs covered by this job, used to pre-target a re-run. */
@@ -568,8 +579,9 @@ export default function EvaluatorRunDetailPage() {
             linkEvaluators
             actionsSlot={
               /* Button order is fixed across all results pages so users
-                 build the same muscle memory: Re-run (leftmost, page-
-                 specific action), then Export results, then Share. The
+                 build the same muscle memory: the page-specific actions
+                 first (Re-run, then Send for review), then Export results,
+                 then Share. The
                  Export ↔ Share ordering matches TestRunnerDialog,
                  BenchmarkResultsDialog, and the auth/public STT & TTS
                  pages. */
@@ -589,6 +601,13 @@ export default function EvaluatorRunDetailPage() {
                     Re-run
                   </button>
                 )}
+                <SendForReviewFlow
+                  accessToken={accessToken}
+                  taskUuid={taskUuid}
+                  visibleItems={visibleItems}
+                  taskItemIds={taskItemIds}
+                  evaluators={task.evaluators ?? []}
+                />
                 {job.status === "completed" && itemsForRun.length > 0 && (
                   /* Tinted teal styling matches `ExportResultsButton` and
                      `ExportZipButton` so the export affordance reads the
@@ -651,12 +670,7 @@ export default function EvaluatorRunDetailPage() {
                 )}
               </div>
             }
-            reviewSlot={buildSendForReviewSlot({
-              accessToken,
-              taskUuid,
-              taskItemIds,
-              evaluators: task.evaluators ?? [],
-            })}
+            onVisibleItemsChange={handleVisibleItemsChange}
             topError={exportError ? `Export failed: ${exportError}` : null}
           />
         ) : null}

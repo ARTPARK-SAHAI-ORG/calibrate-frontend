@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import {
@@ -9,7 +9,10 @@ import {
   jobStatusPillClass,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
-import { buildSendForReviewSlot } from "@/components/human-labelling/SendForReviewFlow";
+import {
+  SendForReviewFlow,
+  type ReviewItem,
+} from "@/components/human-labelling/SendForReviewFlow";
 import { ShareButton } from "@/components/ShareButton";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
@@ -66,7 +69,18 @@ export default function AdminAnnotateJobPage() {
     };
   }, [accessToken, taskUuid]);
 
-  const taskItemIds = new Set((task?.items ?? []).map((it) => it.uuid));
+  const taskItemIds = useMemo(
+    () => new Set((task?.items ?? []).map((it) => it.uuid)),
+    [task?.items],
+  );
+
+  // The items the job view's filters currently leave visible, reported up so
+  // the header can offer to send exactly those for review.
+  const [visibleItems, setVisibleItems] = useState<ReviewItem[]>([]);
+  const handleVisibleItemsChange = useCallback(
+    (items: ReviewItem[]) => setVisibleItems(items),
+    [],
+  );
 
   // Copy the annotator-facing URL (/annotate-job/{token}) to the clipboard.
   // Mirrors the per-job copy button used in the tasks detail jobs table.
@@ -176,6 +190,13 @@ export default function AdminAnnotateJobPage() {
                 </FieldRow>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <SendForReviewFlow
+                  accessToken={accessToken}
+                  taskUuid={taskUuid}
+                  visibleItems={visibleItems}
+                  taskItemIds={taskItemIds}
+                  evaluators={task?.evaluators ?? []}
+                />
                 <button
                   type="button"
                   onClick={handleCopyJobLink}
@@ -242,16 +263,7 @@ export default function AdminAnnotateJobPage() {
             mode="admin"
             fillViewport={false}
             onLoaded={handleLoaded}
-            reviewSlot={
-              task
-                ? buildSendForReviewSlot({
-                    accessToken,
-                    taskUuid,
-                    taskItemIds,
-                    evaluators: task.evaluators ?? [],
-                  })
-                : undefined
-            }
+            onVisibleItemsChange={handleVisibleItemsChange}
           />
         </div>
       </div>
