@@ -326,6 +326,27 @@ describe("TracesTabContent", () => {
     expect(container.querySelector("svg.animate-spin")).not.toBeInTheDocument();
   });
 
+  it("keeps the setup steps on screen when the check fails", async () => {
+    const user = setupUser();
+    let failed = false;
+    mockUseTraces.mockImplementation(() => ({
+      ...tracesResult([]),
+      error: failed ? "Failed to load traces. Please try again." : null,
+    }));
+    const { rerender } = render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getByText("check"));
+    failed = true;
+    rerender(<TracesTabContent agentUuid="agent-1" />);
+
+    // The API key the reader just made lives only on this screen and is shown
+    // once, so a failed check must not take it away.
+    expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed to load traces. Please try again."),
+    ).toBeInTheDocument();
+  });
+
   it("shows the spinner on the first load only", () => {
     mockUseTraces.mockReturnValue({ ...tracesResult([]), isLoading: true });
     const { container } = render(<TracesTabContent agentUuid="agent-1" />);
@@ -504,14 +525,15 @@ describe("TracesTabContent", () => {
       expect(
         JSON.parse(screen.getByTestId("labelling-payload").textContent!),
       ).toEqual([
+        // Every trace is named by its own id, so two calls that open with the
+        // same line cannot collide and lose the whole submission.
         {
-          name: "msg-001",
+          name: "trace-1",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
         },
         {
-          // No message id, so the first thing the caller said names it.
-          name: "When is the next vaccination?",
+          name: "trace-2",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
         },
@@ -574,7 +596,7 @@ describe("TracesTabContent", () => {
         JSON.parse(screen.getByTestId("labelling-payload").textContent!),
       ).toEqual([
         {
-          name: "msg-001",
+          name: "trace-1",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
         },
@@ -640,6 +662,10 @@ describe("TracesTabContent", () => {
 
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
       expect(screen.queryByText("Loading traces...")).not.toBeInTheDocument();
+      // And it says why, instead of the wait quietly disappearing.
+      expect(toast.error).toHaveBeenCalledWith(
+        "The selected traces changed while they were loading, so nothing was submitted. Try again.",
+      );
     });
 
     it("clears only the traces that were submitted", async () => {

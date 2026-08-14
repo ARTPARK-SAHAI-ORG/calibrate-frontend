@@ -13,10 +13,16 @@ const DEFAULT_PAGE_SIZE = 50;
  *  or there is no browser (rendering on the server). */
 function savedPageSize(): number {
   if (typeof window === "undefined") return DEFAULT_PAGE_SIZE;
-  const stored = Number(window.localStorage.getItem(PAGE_SIZE_KEY));
-  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(stored)
-    ? stored
-    : DEFAULT_PAGE_SIZE;
+  // A browser set to block site data throws on both reading and writing here.
+  // Forgetting the choice is fine; taking the page down with it is not.
+  try {
+    const stored = Number(window.localStorage.getItem(PAGE_SIZE_KEY));
+    return (PAGE_SIZE_OPTIONS as readonly number[]).includes(stored)
+      ? stored
+      : DEFAULT_PAGE_SIZE;
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
 }
 
 /**
@@ -29,7 +35,11 @@ export function usePageSize(): [number, (next: number) => void] {
   const [pageSize, setPageSize] = useState(savedPageSize);
 
   const change = (next: number) => {
-    window.localStorage.setItem(PAGE_SIZE_KEY, String(next));
+    try {
+      window.localStorage.setItem(PAGE_SIZE_KEY, String(next));
+    } catch {
+      // Site data is blocked, so the choice lasts for this visit only.
+    }
     setPageSize(next);
   };
 

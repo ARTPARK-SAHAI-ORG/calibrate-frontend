@@ -28,21 +28,6 @@ import {
 import { fetchTrace, type TraceDetail } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
-/** What a trace is called in the labelling task: its message id, else the
- *  first thing the caller said, else a plain word. */
-function traceLabellingName(trace: TraceDetail): string {
-  if (trace.message_id) return trace.message_id;
-  const firstUser = trace.input?.find(
-    (turn) =>
-      turn.role === "user" &&
-      typeof turn.content === "string" &&
-      turn.content.trim(),
-  );
-  return typeof firstUser?.content === "string"
-    ? firstUser.content.trim()
-    : "Trace";
-}
-
 /**
  * The Traces tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
@@ -123,6 +108,9 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       // now would work on rows the reader no longer picked.
       const now = selectedRef.current;
       if (uuids.length !== now.size || uuids.some((uuid) => !now.has(uuid))) {
+        toast.error(
+          "The selected traces changed while they were loading, so nothing was submitted. Try again.",
+        );
         return;
       }
       const loaded = settled
@@ -152,7 +140,10 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       setLabellingEvaluators(chosen);
       setLabellingTraces(
         loaded.map((trace) => ({
-          name: traceLabellingName(trace),
+          // Names are unique within a task, so the trace's own id names it.
+          // Anything drawn from the conversation repeats across calls that
+          // open the same way, which the backend rejects for the whole batch.
+          name: trace.uuid,
           // The agent's own instructions are not part of the conversation the
           // annotators read, so they are never stored with the item.
           input: (trace.input ?? []).filter((turn) => turn.role !== "system"),
@@ -201,10 +192,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const hasLoaded = hasLoadedRef.current;
 
   // With no search, an empty list means exactly one thing: this agent has
-  // never been sent a trace. Deliberately NOT gated on `isLoading`: pressing
-  // "Check for traces" sets that true, and hiding the steps mid-check throws
-  // away the key the reader just made.
-  const showEmptyState = hasLoaded && !error && total === 0;
+  // never been sent a trace. Held from the last load that worked, so neither a
+  // check in flight nor a failed one swaps the setup steps out: the key the
+  // reader just created lives only on that screen and is shown once.
+  const isEmptyRef = useRef(false);
+  if (!isLoading && !error) isEmptyRef.current = total === 0;
+  const showEmptyState = hasLoaded && isEmptyRef.current;
   // Below the smallest option every trace already fits on one page, so the
   // choice would only be noise.
   const showPageSize = total > PAGE_SIZE_OPTIONS[0];

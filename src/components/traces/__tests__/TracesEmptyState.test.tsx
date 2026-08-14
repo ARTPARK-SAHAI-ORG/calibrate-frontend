@@ -106,6 +106,29 @@ it("will not open a step you have not reached", async () => {
   ).not.toBeInTheDocument();
 });
 
+it("does not tick the key step when no key was made", async () => {
+  const user = setupUser();
+  setup();
+
+  // Walking past step one without making a key: the step keeps its number,
+  // because the code in step two still has a fill-in in place of a key.
+  await user.click(screen.getByText("Send your first trace"));
+  // The code still carries a fill-in in place of a key.
+  expect(screen.getByText(/sk_\.\.\./)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "I have added this" }));
+
+  expect(screen.getByText("1")).toBeInTheDocument();
+});
+
+it("ticks the key step once a key is made", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  expect(screen.queryByText("1")).not.toBeInTheDocument();
+});
+
 it("reopens the key step showing the key, and offers another", async () => {
   const user = setupUser();
   setup();

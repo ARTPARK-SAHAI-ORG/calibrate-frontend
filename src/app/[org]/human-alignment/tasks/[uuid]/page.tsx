@@ -3261,11 +3261,18 @@ function LabellingTaskPageInner() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 pb-2 text-sm text-muted-foreground">
-                {showItemsPagination && (
-                  <>
+                {/* The count is always here. It used to sit on the tab, and a
+                    task that fits on one page was left with no count at all. */}
                 <div>
                   {itemsTotal === 0 ? (
                     "0 items"
+                  ) : !showItemsPagination ? (
+                    <>
+                      <span className="text-foreground font-medium">
+                        {itemsTotal}
+                      </span>{" "}
+                      item{itemsTotal === 1 ? "" : "s"}
+                    </>
                   ) : (
                     <>
                       Showing{" "}
@@ -3284,6 +3291,7 @@ function LabellingTaskPageInner() {
                     </>
                   )}
                 </div>
+                {showItemsPagination && (
                 <div className="flex items-center gap-3">
                   <PageSizeSelect
                     value={itemsLimit}
@@ -3358,7 +3366,6 @@ function LabellingTaskPageInner() {
                   </div>
                   )}
                 </div>
-                  </>
                 )}
               </div>
               {items.length === 0 ? (
