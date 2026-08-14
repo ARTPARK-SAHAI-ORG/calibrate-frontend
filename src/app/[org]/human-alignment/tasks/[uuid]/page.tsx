@@ -913,7 +913,9 @@ function LabelledByCell({
   if (!labellers || labellers.size === 0) {
     return (
       <div className="flex flex-wrap gap-1 min-w-0">
-        <span className="text-sm text-muted-foreground">—</span>
+        <span className="text-sm text-muted-foreground/70">
+          Not labelled yet
+        </span>
       </div>
     );
   }
@@ -1533,7 +1535,8 @@ function LabellingTaskPageInner() {
   );
   const [summaryLoading, setSummaryLoading] = useState(false);
   /** False until the first summary fetch for this task completes (so the
-   * Items tab's "Labelled by" column doesn't flash "—" before populating). */
+   * Items tab's "Labelled by" column doesn't flash "Not labelled yet" before
+   * populating). */
   const [summaryFetchCompleted, setSummaryFetchCompleted] = useState(false);
 
   const fetchTaskSummary = useCallback(async () => {
@@ -2334,7 +2337,7 @@ function LabellingTaskPageInner() {
 
   const handleAssignAnnotators = async (
     annotatorIds: string[],
-    evaluatorIds: string[] | null,
+    evaluatorIds: string[],
   ) => {
     if (
       (selectedItemIds.size === 0 && !selectAllTotal) ||
@@ -2344,9 +2347,7 @@ function LabellingTaskPageInner() {
       return;
     const body: Record<string, unknown> = {
       annotator_ids: annotatorIds,
-      ...(evaluatorIds && evaluatorIds.length > 0
-        ? { evaluator_ids: evaluatorIds }
-        : {}),
+      ...(evaluatorIds.length > 0 ? { evaluator_ids: evaluatorIds } : {}),
       ...(selectAllTotal
         ? {
             select_all: true,
@@ -3448,7 +3449,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -3461,9 +3462,6 @@ function LabellingTaskPageInner() {
                     />
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Description
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Labelled by
@@ -3485,15 +3483,6 @@ function LabellingTaskPageInner() {
                     const isSelected =
                       selectAllTotal || selectedItemIds.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
-                    const itemPayloadObj =
-                      item.payload && typeof item.payload === "object"
-                        ? (item.payload as Record<string, unknown>)
-                        : null;
-                    const itemDescription =
-                      itemPayloadObj &&
-                      typeof itemPayloadObj.description === "string"
-                        ? (itemPayloadObj.description as string)
-                        : "";
                     return (
                       <Fragment key={item.uuid}>
                         <div
@@ -3510,7 +3499,7 @@ function LabellingTaskPageInner() {
                             }
                             openItemDetail(item.uuid);
                           }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -3534,16 +3523,6 @@ function LabellingTaskPageInner() {
                           />
                           <p className="text-sm text-foreground line-clamp-1">
                             {previewItemPayload(item.payload, taskType)}
-                          </p>
-                          <p
-                            className="text-sm text-muted-foreground line-clamp-2"
-                            title={itemDescription || undefined}
-                          >
-                            {itemDescription || (
-                              <span className="text-muted-foreground/60">
-                                —
-                              </span>
-                            )}
                           </p>
                           <LabelledByCell
                             labellers={labellerIds}

@@ -230,6 +230,26 @@ describe("RunEvaluatorsDialog", () => {
     ).toBeChecked();
   });
 
+  it("clears a partial selection in one click", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog();
+    await screen.findByText("Relevance");
+
+    // Leave only Relevance picked, then the header checkbox should clear it
+    // rather than picking everything.
+    await user.click(screen.getByRole("checkbox", { name: "Pick Fluency" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Unselect all evaluators" }),
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Pick Relevance" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Pick Fluency" }),
+    ).not.toBeChecked();
+  });
+
   it("hides the select-all control with a single evaluator", async () => {
     mockedApiClient.mockResolvedValue([detailResponse[0]]);
     renderDialog({ evaluators: [evaluators[0]] });

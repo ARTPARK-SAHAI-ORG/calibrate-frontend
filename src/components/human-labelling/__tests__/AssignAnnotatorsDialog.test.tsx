@@ -100,7 +100,7 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue([]);
     renderDialog();
     expect(
-      await screen.findByText("No annotators added yet, add one below"),
+      await screen.findByText("No annotators added yet"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("New annotator name")).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue({ not: "an array" });
     renderDialog();
     expect(
-      await screen.findByText("No annotators added yet, add one below"),
+      await screen.findByText("No annotators added yet"),
     ).toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     const { onConfirm } = renderDialog();
-    await screen.findByText("No annotators added yet, add one below");
+    await screen.findByText("No annotators added yet");
 
     mockedApiClient.mockResolvedValueOnce({ uuid: "a-9", message: "ok" });
     await user.type(screen.getByLabelText("New annotator name"), "Carol");
@@ -132,7 +132,7 @@ describe("AssignAnnotatorsDialog", () => {
     const assign = screen.getByRole("button", { name: "Assign" });
     expect(assign).not.toBeDisabled();
     await user.click(assign);
-    expect(onConfirm).toHaveBeenCalledWith(["a-9"], null);
+    expect(onConfirm).toHaveBeenCalledWith(["a-9"], ["ev-1", "ev-2"]);
     // Input is cleared for the next one.
     expect(screen.getByLabelText("New annotator name")).toHaveValue("");
   });
@@ -141,7 +141,7 @@ describe("AssignAnnotatorsDialog", () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     renderDialog();
-    await screen.findByText("No annotators added yet, add one below");
+    await screen.findByText("No annotators added yet");
 
     mockedApiClient.mockRejectedValueOnce(
       new Error('Request failed: 400 - {"detail":"Name already used"}'),
@@ -216,6 +216,19 @@ describe("AssignAnnotatorsDialog", () => {
     ).not.toBeChecked();
   });
 
+  it("clears a partial selection in one click", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Unselect all annotators" }),
+    );
+    expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+  });
+
   it("does not show the select-all control with a single annotator", async () => {
     mockedApiClient.mockResolvedValue([annotators[0]]);
     renderDialog();
@@ -229,42 +242,55 @@ describe("AssignAnnotatorsDialog", () => {
     mockedApiClient.mockResolvedValue(annotators);
     renderDialog({ evaluators: [evaluators[0]] });
     await screen.findByText("Alice");
-    expect(screen.queryByText("Show all labels")).not.toBeInTheDocument();
+    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
   });
 
   it("shows the evaluator-choice column with more than 1 evaluator, defaulting to all", async () => {
     mockedApiClient.mockResolvedValue(annotators);
     renderDialog();
     await screen.findByText("Alice");
-    expect(screen.getByText("Show all labels")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "All labels will be shown in the labelling jobs created",
-      ),
-    ).toBeInTheDocument();
-    const showAllCheckbox = screen.getByRole("checkbox", {
-      name: "Show all labels",
-    });
-    expect(showAllCheckbox).toBeChecked();
-  });
-
-  it("switching off 'show all' seeds explicit picks with every evaluator", async () => {
-    const user = setupUser();
-    mockedApiClient.mockResolvedValue(annotators);
-    renderDialog();
-    await screen.findByText("Alice");
-
-    await user.click(screen.getByRole("checkbox", { name: "Show all labels" }));
+    expect(screen.getByText("Labels")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Pick one or more labels to show in the labelling jobs created",
       ),
     ).toBeInTheDocument();
-    // Seeded picks mean both evaluator checkboxes appear checked.
+    // Every label starts picked, so the toggle offers to clear them.
     expect(
-      screen.getByRole("checkbox", { name: /Relevance/ }) ??
-        screen.getAllByRole("checkbox")[2],
-    ).toBeTruthy();
+      screen.getByRole("checkbox", { name: "Unselect all labels" }),
+    ).toBeChecked();
+  });
+
+  it("can still assign when the task has no labels", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const onConfirm = jest.fn().mockResolvedValue(undefined);
+    renderDialog({ evaluators: [], onConfirm });
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(["a-1"], []));
+  });
+
+  it("clears and restores the label picks in one click", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Unselect all labels" }),
+    );
+    // With no label picked the dialog cannot be submitted.
+    await user.click(screen.getByText("Alice"));
+    expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select all labels" }),
+    );
+    expect(screen.getByRole("button", { name: "Assign" })).not.toBeDisabled();
   });
 
   it("toggling an individual evaluator off then requires at least one picked to confirm", async () => {
@@ -275,7 +301,6 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
 
     await user.click(screen.getByText("Alice"));
-    await user.click(screen.getByRole("checkbox", { name: "Show all labels" }));
 
     const evaluatorCheckboxes = screen
       .getAllByRole("checkbox")
@@ -293,7 +318,7 @@ describe("AssignAnnotatorsDialog", () => {
     expect(screen.getByRole("button", { name: "Assign" })).not.toBeDisabled();
   });
 
-  it("confirms with picked annotator ids and null evaluatorIds when 'show all' is on", async () => {
+  it("confirms with the picked annotator ids and every label by default", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
     const onConfirm = jest.fn().mockResolvedValue(undefined);
@@ -304,10 +329,10 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
-    expect(onConfirm).toHaveBeenCalledWith(["a-1"], null);
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"]);
   });
 
-  it("confirms with explicit evaluator ids when 'show all' is off", async () => {
+  it("confirms with only the labels left picked", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
     const onConfirm = jest.fn().mockResolvedValue(undefined);
@@ -315,13 +340,15 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
 
     await user.click(screen.getByText("Alice"));
-    await user.click(screen.getByRole("checkbox", { name: "Show all labels" }));
+    const fluencyCheckbox = screen
+      .getAllByRole("checkbox")
+      .filter((cb) => cb.getAttribute("aria-label") === null)
+      .slice(-1)[0]; // evaluator card checkboxes have no aria-label
+    await user.click(fluencyCheckbox);
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
-    const [ids, evalIds] = onConfirm.mock.calls[0];
-    expect(ids).toEqual(["a-1"]);
-    expect(evalIds).toEqual(expect.arrayContaining(["ev-1", "ev-2"]));
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1"]);
   });
 
   it("shows a submit error when confirm rejects, parsed from a structured detail", async () => {

@@ -59,7 +59,7 @@ export function SendForReviewFlow({
 
   const handleConfirm = async (
     annotatorIds: string[],
-    evaluatorIds: string[] | null,
+    evaluatorIds: string[],
   ) => {
     if (!accessToken) return;
     // Errors thrown here are caught and shown by AssignAnnotatorsDialog.
@@ -70,9 +70,7 @@ export function SendForReviewFlow({
         method: "POST",
         body: {
           annotator_ids: annotatorIds,
-          ...(evaluatorIds && evaluatorIds.length > 0
-            ? { evaluator_ids: evaluatorIds }
-            : {}),
+          ...(evaluatorIds.length > 0 ? { evaluator_ids: evaluatorIds } : {}),
           item_ids: sendable.map((it) => it.uuid),
         },
       },

@@ -146,6 +146,7 @@ describe("SendForReviewFlow", () => {
     expect(call[2].method).toBe("POST");
     expect(call[2].body).toEqual({
       annotator_ids: ["a-1"],
+      evaluator_ids: ["ev-1"],
       item_ids: ["item-1", "item-3"],
     });
 
@@ -165,7 +166,6 @@ describe("SendForReviewFlow", () => {
 
     await user.click(sendButton());
     await user.click(await screen.findByRole("checkbox", { name: "Alice" }));
-    await user.click(screen.getByRole("checkbox", { name: "Show all labels" }));
     await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
     await user.click(screen.getByRole("button", { name: "Assign" }));
 

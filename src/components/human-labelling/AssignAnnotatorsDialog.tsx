@@ -45,13 +45,10 @@ type AssignAnnotatorsDialogProps = {
   /** Evaluators linked to the task — the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
   onClose: () => void;
-  /**
-   * `evaluatorIds` is `null` to include every task evaluator, or an explicit
-   * subset to show only those evaluators in the created labelling jobs.
-   */
+  /** The evaluators to show in the created labelling jobs. */
   onConfirm: (
     annotatorIds: string[],
-    evaluatorIds: string[] | null,
+    evaluatorIds: string[],
   ) => Promise<void> | void;
 };
 
@@ -69,7 +66,7 @@ export function AssignAnnotatorsDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [includeAllEvaluators, setIncludeAllEvaluators] = useState(true);
+  // Every label is shown in a job unless the user narrows it down.
   const [pickedEvaluators, setPickedEvaluators] = useState<Set<string>>(
     new Set(),
   );
@@ -79,8 +76,6 @@ export function AssignAnnotatorsDialog({
   useEffect(() => {
     if (!isOpen) return;
     setPicked(new Set());
-    setIncludeAllEvaluators(true);
-    setPickedEvaluators(new Set());
     setSubmitError(null);
     let cancelled = false;
     const run = async () => {
@@ -102,14 +97,23 @@ export function AssignAnnotatorsDialog({
     };
   }, [isOpen, accessToken]);
 
+  // Start with every label picked, and re-seed if the task's labels arrive
+  // (or change) while the dialog is open.
+  const evaluatorIdsKey = evaluators.map((ev) => ev.uuid).join(",");
+  useEffect(() => {
+    if (!isOpen) return;
+    setPickedEvaluators(new Set(evaluatorIdsKey ? evaluatorIdsKey.split(",") : []));
+  }, [isOpen, evaluatorIdsKey]);
+
   if (!isOpen) return null;
 
   const toggle = (id: string) => setPicked((prev) => toggleInSet(prev, id));
 
   const allPicked = annotators.length > 0 && picked.size === annotators.length;
   const somePicked = picked.size > 0 && !allPicked;
+  // Anything picked (all or just some) → clearing is the useful action.
   const toggleSelectAll = () => {
-    if (allPicked) {
+    if (picked.size > 0) {
       setPicked(new Set());
     } else {
       setPicked(new Set(annotators.map((a) => a.uuid)));
@@ -134,8 +138,12 @@ export function AssignAnnotatorsDialog({
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
+  // A task with no labels at all can still be assigned; one with labels needs
+  // at least one picked.
   const evaluatorSelectionValid =
-    includeAllEvaluators || pickedEvaluators.size > 0;
+    evaluators.length === 0 || pickedEvaluators.size > 0;
+  const allEvaluatorsPicked =
+    evaluators.length > 0 && pickedEvaluators.size === evaluators.length;
 
   // Only worth offering an evaluator choice (and the wider layout) when the
   // task has more than one evaluator to pick between.
@@ -146,10 +154,7 @@ export function AssignAnnotatorsDialog({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await onConfirm(
-        Array.from(picked),
-        includeAllEvaluators ? null : Array.from(pickedEvaluators),
-      );
+      await onConfirm(Array.from(picked), Array.from(pickedEvaluators));
     } catch (err) {
       setSubmitError(parseApiError(err, "Failed to create jobs"));
     } finally {
@@ -215,11 +220,6 @@ export function AssignAnnotatorsDialog({
                   Annotators
                 </p>
               )}
-              {noAnnotators && (
-                <p className="text-sm text-muted-foreground text-center mb-4">
-                  No annotators added yet, add one below
-                </p>
-              )}
               <AddAnnotatorInline
                 accessToken={accessToken}
                 // Disabled until the list has loaded, otherwise the in-flight
@@ -265,14 +265,14 @@ export function AssignAnnotatorsDialog({
                           }}
                           onChange={toggleSelectAll}
                           aria-label={
-                            allPicked
+                            picked.size > 0
                               ? "Unselect all annotators"
                               : "Select all annotators"
                           }
                           className="w-4 h-4 cursor-pointer accent-foreground"
                         />
                         <span className="text-xs font-medium text-muted-foreground">
-                          {allPicked ? "Unselect all" : "Select all"}
+                          {picked.size > 0 ? "Unselect all" : "Select all"}
                         </span>
                       </label>
                     )}
@@ -294,6 +294,11 @@ export function AssignAnnotatorsDialog({
                         </div>
                       </label>
                     ))}
+                    {noAnnotators && (
+                      <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
+                        No annotators added yet
+                      </p>
+                    )}
                   </>
                 )}
               </div>
@@ -301,49 +306,56 @@ export function AssignAnnotatorsDialog({
 
             {showEvaluatorChoice && (
               <div className="space-y-2 md:col-span-2 flex flex-col min-h-0">
-                <label className="flex items-center gap-3 pr-3 pb-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeAllEvaluators}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIncludeAllEvaluators(checked);
-                      // Seed the explicit picks with everything so unchecking
-                      // "all" doesn't visually flip every card off at once.
-                      if (!checked && pickedEvaluators.size === 0) {
-                        setPickedEvaluators(
-                          new Set(evaluators.map((ev) => ev.uuid)),
-                        );
-                      }
-                    }}
-                    className="w-4 h-4 cursor-pointer accent-foreground"
-                  />
-                  <span className="text-sm font-medium">Show all labels</span>
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  {includeAllEvaluators
-                    ? "All labels will be shown in the labelling jobs created"
-                    : "Pick one or more labels to show in the labelling jobs created"}
+                <p className="text-xs font-medium text-muted-foreground">
+                  Labels
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Pick one or more labels to show in the labelling jobs created
+                </p>
+                {evaluators.length > 1 && (
+                  <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allEvaluatorsPicked}
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            pickedEvaluators.size > 0 && !allEvaluatorsPicked;
+                      }}
+                      onChange={() =>
+                        setPickedEvaluators(
+                          pickedEvaluators.size > 0
+                            ? new Set()
+                            : new Set(evaluators.map((ev) => ev.uuid)),
+                        )
+                      }
+                      aria-label={
+                        pickedEvaluators.size > 0
+                          ? "Unselect all labels"
+                          : "Select all labels"
+                      }
+                      className="w-4 h-4 cursor-pointer accent-foreground"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {pickedEvaluators.size > 0
+                        ? "Unselect all"
+                        : "Select all"}
+                    </span>
+                  </label>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
                   {evaluators.map((ev) => {
-                    const checked =
-                      includeAllEvaluators || pickedEvaluators.has(ev.uuid);
+                    const checked = pickedEvaluators.has(ev.uuid);
                     return (
                       <label
                         key={ev.uuid}
-                        className={`flex items-start gap-3 px-3 py-2 rounded-md border border-border transition-colors ${
-                          includeAllEvaluators
-                            ? "opacity-60 cursor-not-allowed"
-                            : "hover:bg-muted/30 cursor-pointer"
-                        }`}
+                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
                       >
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={includeAllEvaluators}
                           onChange={() => toggleEvaluator(ev.uuid)}
-                          className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer disabled:cursor-not-allowed"
+                          className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
