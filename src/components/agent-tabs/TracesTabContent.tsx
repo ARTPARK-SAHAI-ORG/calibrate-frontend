@@ -16,6 +16,7 @@ import {
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
+import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
   Button,
@@ -227,9 +228,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   // screen are still the old search until the full list has loaded back.
   const isSearching =
     searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
-  // The rows on screen came from `loadedQ`, so that is the text to name when
-  // nothing matched, even while a newer search or a cleared box is loading.
-  const searchedFor = loadedQ.trim() || search.trim() || searchInput.trim();
   const isEmptyRef = useRef(false);
   if (!isLoading && !error && !isSearching) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
@@ -322,8 +320,16 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           )}
 
           {total === 0 && isSearching ? (
-            <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
-              No traces match &ldquo;{searchedFor}&rdquo;.
+            <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
+                <SearchIcon className="w-6 h-6 md:w-7 md:h-7 text-muted-foreground" />
+              </div>
+              <h3 className="text-base md:text-lg font-semibold text-foreground mb-1">
+                No traces found
+              </h3>
+              <p className="text-sm md:text-base text-muted-foreground text-center">
+                No traces match your search
+              </p>
             </div>
           ) : (
             <div className="space-y-1 pt-4">
