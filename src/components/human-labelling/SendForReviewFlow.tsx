@@ -90,12 +90,14 @@ export function SendForReviewFlow({
         onClick={() => setAssignOpen(true)}
         title={
           droppedCount > 0
-            ? `Send the ${sendable.length} item${sendable.length === 1 ? "" : "s"} shown to annotators. ${droppedCount} more ${droppedCount === 1 ? "was" : "were"} removed from this task and cannot be sent.`
-            : `Send the ${sendable.length} item${sendable.length === 1 ? "" : "s"} shown to annotators`
+            ? `Send the items shown to annotators. ${droppedCount} more ${droppedCount === 1 ? "is" : "are"} no longer in this task and cannot be sent.`
+            : "Send the items shown to annotators"
         }
-        /* Tinted like its neighbours (Export is teal, Share is violet) so the
-           row reads as one family of actions rather than one odd one out. */
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border bg-indigo-500/14 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/26 dark:hover:bg-indigo-500/20 transition-colors cursor-pointer"
+        /* Pink, chosen against every colour already on these two rows: teal
+           Export, violet Share, blue Public, amber Copy link, and the amber
+           warning mark on the cards below. Red and orange are out because
+           they read as an error, green because it reads as a status. */
+        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-medium border bg-pink-500/14 border-pink-500/45 text-pink-950 dark:text-pink-100 hover:bg-pink-500/26 dark:hover:bg-pink-500/20 transition-colors cursor-pointer"
       >
         <svg
           className="w-3.5 h-3.5"
@@ -116,7 +118,7 @@ export function SendForReviewFlow({
             verb phrase like its neighbours, while still showing that the
             page's filters changed how much would be sent. */}
         Send for review{" "}
-        <span className="text-[11px] leading-none px-1.5 py-0.5 rounded-full bg-indigo-500/25 text-indigo-950 dark:text-indigo-100">
+        <span className="text-[11px] leading-none px-1.5 py-0.5 rounded-full bg-pink-500/25 text-pink-950 dark:text-pink-100">
           {sendable.length}
         </span>
       </button>

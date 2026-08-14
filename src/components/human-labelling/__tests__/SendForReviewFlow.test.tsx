@@ -109,7 +109,7 @@ describe("SendForReviewFlow", () => {
     renderFlow({ taskItemIds: new Set(["item-1"]) });
     expect(sendButton()).toHaveAttribute(
       "title",
-      "Send the 1 item shown to annotators. 2 more were removed from this task and cannot be sent.",
+      "Send the items shown to annotators. 2 more are no longer in this task and cannot be sent.",
     );
   });
 
@@ -117,7 +117,7 @@ describe("SendForReviewFlow", () => {
     renderFlow({ taskItemIds: new Set(["item-1", "item-2"]) });
     expect(sendButton()).toHaveAttribute(
       "title",
-      "Send the 2 items shown to annotators. 1 more was removed from this task and cannot be sent.",
+      "Send the items shown to annotators. 1 more is no longer in this task and cannot be sent.",
     );
   });
 
@@ -125,7 +125,7 @@ describe("SendForReviewFlow", () => {
     renderFlow();
     expect(sendButton()).toHaveAttribute(
       "title",
-      "Send the 3 items shown to annotators",
+      "Send the items shown to annotators",
     );
   });
 

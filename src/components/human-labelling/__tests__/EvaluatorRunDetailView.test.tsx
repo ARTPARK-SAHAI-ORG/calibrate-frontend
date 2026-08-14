@@ -1349,7 +1349,7 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("shows the 'no human labels yet' banner when agreement data exists but is empty", () => {
+  it("marks each evaluator that has no human labels yet", () => {
     const job = makeJob({
       runs: [makeRun()],
       human_agreement: {
@@ -1363,8 +1363,8 @@ describe("EvaluatorRunDetailView", () => {
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
-      screen.getByText(/No human labels found on the items in this run yet/),
-    ).toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
+    ).toBeGreaterThan(0);
   });
 
   it("renders human agreement stat cards when agreement data is present", () => {
@@ -1431,15 +1431,15 @@ describe("EvaluatorRunDetailView", () => {
     );
     expect(screen.getByText("100%")).toBeInTheDocument();
     expect(
-      screen.getByText(/No human labels found on the items in this run yet/),
-    ).toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
+    ).toBeGreaterThan(0);
     // Nothing to compare against yet, so the card leaves the human agreement
     // column out instead of showing an empty one.
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
-  it("warns that only some evaluators have human labels", () => {
+  it("marks only the evaluators that have no human labels yet", () => {
     const job = makeJob({
       evaluators: [
         evaluatorBinary,
@@ -1469,17 +1469,15 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
+    // Exactly one of the two evaluators is unlabelled, so exactly one mark.
     expect(
-      screen.getByText(/No human labels yet for some of the evaluators/),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/No human labels found on the items in this run yet/),
-    ).not.toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/),
+    ).toHaveLength(1);
     // The labelled evaluator still shows its agreement number.
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
-  it("hides the warning once every evaluator has human labels", () => {
+  it("shows no mark once every evaluator has human labels", () => {
     const job = makeJob({
       runs: [makeRun()],
       human_agreement: {
@@ -1498,7 +1496,9 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    expect(screen.queryByText(/No human labels/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/No human labels for this evaluator yet/),
+    ).not.toBeInTheDocument();
   });
 
   it("does not render the human agreement summary while the job is still in progress", () => {

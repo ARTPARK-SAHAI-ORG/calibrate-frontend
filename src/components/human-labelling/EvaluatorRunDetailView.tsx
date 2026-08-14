@@ -1494,6 +1494,7 @@ function EvaluatorSummary({
   versionLabels,
   linkEvaluators,
   headerActions,
+  statusPill,
   runs,
   getJobEvaluator,
 }: {
@@ -1513,9 +1514,12 @@ function EvaluatorSummary({
   evaluatorNamesById: Record<string, string>;
   versionLabels: Record<string, string>;
   linkEvaluators: boolean;
-  /** Status pill + action buttons, rendered on the heading row when the
+  /** Action buttons, rendered right-aligned on the heading row when the
    * agreement cards show (so they don't sit on their own line above). */
   headerActions?: React.ReactNode;
+  /** Run status, shown beside the heading rather than among the buttons: it
+   * is something you read, not something you click. */
+  statusPill?: React.ReactNode;
 }) {
   if (jobStatus !== "completed") return null;
   if (evaluators.length === 0) return null;
@@ -1523,48 +1527,24 @@ function EvaluatorSummary({
   const agreementById = new Map(
     (agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
   );
-  // Human labels can land on some evaluators and not others (an annotator
-  // labelled one evaluator, or a newly added evaluator has not been labelled
-  // yet). Warn in both cases, with wording that says whether it is all of
-  // them or only some.
-  const unlabelled = evaluators.filter(
-    (ev) => agreementById.get(ev.evaluator_id)?.agreement == null,
-  );
-
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-sm font-semibold">Evaluator results</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            What each evaluator scored across the items in this run, and how
-            closely that matches the human annotations on the same items
+        {/* Shrinks rather than pushing the buttons onto their own row. The
+            buttons keep themselves right-aligned, so this does not need to
+            grow, which would squeeze the heading off narrow screens. */}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-sm font-semibold">Evaluator results</h2>
+            {statusPill}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+            What each evaluator scored, and how often it matched the people who
+            labelled the same items
           </p>
         </div>
         {headerActions}
       </div>
-      {unlabelled.length > 0 && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
-          <svg
-            className="w-4 h-4 mt-0.5 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
-            />
-          </svg>
-          <span>
-            {unlabelled.length === evaluators.length
-              ? "No human labels found on the items in this run yet. Once labelled, each evaluator's alignment with humans will be shown."
-              : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
-          </span>
-        </div>
-      )}
       <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
         {evaluators.map((ev) => {
           const row = agreementById.get(ev.evaluator_id);
@@ -1576,12 +1556,18 @@ function EvaluatorSummary({
               : null;
           // No human labels on these items means there is nothing to put in
           // the human agreement column, so the card leaves it out entirely
-          // rather than showing a dash. The note above the cards says why.
+          // rather than showing a dash. The mark on the card says why.
           const value =
             row?.agreement != null
               ? `${Math.round(row.agreement * 100)}%`
               : null;
           const valueClassName = agreementColor(row?.agreement);
+          // Said on the card itself, on hover, rather than in a banner above
+          // every card: this way it names which evaluator is missing labels.
+          const warning =
+            row?.agreement == null
+              ? "No human labels for this evaluator yet. Agreement will show once they are added."
+              : null;
           const result = summariseEvaluatorRuns(
             runs,
             ev,
@@ -1600,6 +1586,7 @@ function EvaluatorSummary({
                 value={value}
                 valueClassName={valueClassName}
                 result={result}
+                warning={warning}
               />
             );
           }
@@ -1612,6 +1599,7 @@ function EvaluatorSummary({
               value={value}
               valueClassName={valueClassName}
               result={result}
+              warning={warning}
             />
           );
         })}
@@ -1911,9 +1899,8 @@ export function EvaluatorRunDetailView({
   ) : null;
 
   const headerActions =
-    statusPill || shareSlot || actionsSlot ? (
-      <div className="flex items-center gap-2 flex-wrap shrink-0">
-        {statusPill}
+    shareSlot || actionsSlot ? (
+      <div className="flex items-center gap-2 flex-wrap shrink-0 ml-auto">
         {shareSlot}
         {actionsSlot}
       </div>
@@ -1968,6 +1955,7 @@ export function EvaluatorRunDetailView({
                     );
                   })
             )}
+            {statusPill}
           </div>
           {headerActions}
         </div>
@@ -1988,6 +1976,7 @@ export function EvaluatorRunDetailView({
         versionLabels={versionLabels}
         linkEvaluators={linkEvaluators}
         headerActions={cardsWillRender ? headerActions : null}
+        statusPill={cardsWillRender ? statusPill : null}
       />
 
       <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
