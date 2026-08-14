@@ -663,6 +663,33 @@ describe("TestDetailView", () => {
     expect(screen.getByText("Final answer")).toBeInTheDocument();
   });
 
+  it("never draws the instructions the agent was given", () => {
+    render(
+      <TestDetailView
+        history={[{ role: "system", content: "Be brief." }, ...baseHistory]}
+        passed={true}
+      />,
+    );
+    // Annotators judge the exchange, not what the agent was told to do.
+    expect(screen.queryByText("Be brief.")).not.toBeInTheDocument();
+    expect(screen.queryByText("System")).not.toBeInTheDocument();
+  });
+
+  it("emphasises the final output without pass/fail chrome when showVerdict is false", () => {
+    const { container } = render(
+      <TestDetailView
+        history={[]}
+        passed={false}
+        showVerdict={false}
+        output={{ response: "Final answer" }}
+      />,
+    );
+    expect(screen.getByText("Final answer")).toBeInTheDocument();
+    expect(container.querySelector(".bg-red-500\\/20")).toBeNull();
+    expect(container.querySelector(".border-l-red-500")).toBeNull();
+    expect(container.querySelector(".border-l-foreground")).not.toBeNull();
+  });
+
   it("shows the legacy reasoning toggle when there's no judgeResults but reasoning text exists", async () => {
     const user = setupUser();
     render(

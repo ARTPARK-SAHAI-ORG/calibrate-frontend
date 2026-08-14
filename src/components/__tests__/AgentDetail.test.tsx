@@ -70,6 +70,9 @@ jest.mock("../agent-tabs", () => ({
       TestsTabContent-{props.agentType}
     </div>
   ),
+  TracesTabContent: (props: any) => (
+    <div data-testid="traces-tab-content">TracesTabContent-{props.agentUuid}</div>
+  ),
   SettingsTabContent: () => (
     <div data-testid="settings-tab-content">SettingsTabContent</div>
   ),
@@ -107,6 +110,19 @@ function jsonResponse(body: any, overrides: Partial<Response> = {}) {
   } as unknown as Response;
 }
 
+
+// A visited tab stays mounted and is merely hidden, so "is on the page" proves
+// nothing about which tab is showing. AgentDetail wraps each tab's content in a
+// div that gets the `hidden` class while that tab is not the active one, and
+// jsdom does not apply Tailwind, so the class is what we check.
+function tabWrapper(testId: string) {
+  return screen.getByTestId(testId).parentElement as HTMLElement;
+}
+
+function expectVisibleTab(testId: string, hiddenTestId: string) {
+  expect(tabWrapper(testId)).not.toHaveClass("hidden");
+  expect(tabWrapper(hiddenTestId)).toHaveClass("hidden");
+}
 
 async function clickLastSaveButton(user: ReturnType<typeof setupUser>) {
   const saveBtns = screen.getAllByRole("button", { name: "Save" });
@@ -218,6 +234,7 @@ describe("AgentDetail", () => {
     // Data extraction tab is temporarily hidden (extraction UI removed for now)
     expect(screen.queryByText("Data extraction")).not.toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
+    expect(screen.getByText("Traces")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
@@ -231,6 +248,9 @@ describe("AgentDetail", () => {
     expect(screen.getByTestId("connection-tab-content")).toBeInTheDocument();
     expect(screen.getByText("Verify")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
+    expect(screen.getByText("Tests")).toBeInTheDocument();
+    expect(screen.getByText("Traces")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
 
@@ -245,17 +265,57 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Tools"));
     expect(screen.getByTestId("tools-tab-content")).toBeInTheDocument();
+    expectVisibleTab("tools-tab-content", "agent-tab-content");
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
       "TestsTabContent-agent",
     );
+    expectVisibleTab("tests-tab-content", "tools-tab-content");
+
+    await user.click(screen.getByText("Traces"));
+    expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
+      `TracesTabContent-${buildAgent.uuid}`,
+    );
+    expectVisibleTab("traces-tab-content", "tests-tab-content");
 
     await user.click(screen.getByText("Settings"));
     expect(screen.getByTestId("settings-tab-content")).toBeInTheDocument();
+    expectVisibleTab("settings-tab-content", "traces-tab-content");
 
+    // The Agent tab is the one the page opened on, so it has been on the page
+    // the whole time: only the `hidden` class says it is showing again.
     await user.click(screen.getByText("Agent"));
     expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument();
+    expectVisibleTab("agent-tab-content", "settings-tab-content");
+  });
+
+  it("switches tabs on click for a connection agent", async () => {
+    mockFetchSequenceForAgent(connectionAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("Traces"));
+    expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
+      `TracesTabContent-${connectionAgent.uuid}`,
+    );
+    expectVisibleTab("traces-tab-content", "connection-tab-content");
+
+    await user.click(screen.getByText("Tests"));
+    expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
+      "TestsTabContent-connection",
+    );
+    expectVisibleTab("tests-tab-content", "traces-tab-content");
+
+    // The Connection tab is the one the page opened on, so it has been on the
+    // page the whole time: only the `hidden` class says it is showing again.
+    await user.click(screen.getByText("Connection"));
+    expect(screen.getByTestId("connection-tab-content")).toBeInTheDocument();
+    expectVisibleTab("connection-tab-content", "tests-tab-content");
   });
 
   it("drops the open test and run from the address when leaving the Tests tab", async () => {

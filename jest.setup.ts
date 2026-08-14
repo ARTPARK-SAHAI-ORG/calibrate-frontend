@@ -48,3 +48,11 @@ afterEach(() => {
   // test's URL.
   window.history.replaceState(null, "", "/");
 });
+
+// jsdom has no layout, so it ships no scrollIntoView. Components that scroll a
+// conversation to the newest turn call it on a real element; stub it here
+// rather than making the product code guard for a browser feature that always
+// exists outside tests.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = jest.fn();
+}

@@ -79,7 +79,7 @@ export default function PublicTestRunPage() {
     "summary",
   );
 
-  useEffect(() => { document.title = "LLM unit test | Calibrate"; }, []);
+  useEffect(() => { document.title = "LLM component test | Calibrate"; }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -128,7 +128,7 @@ export default function PublicTestRunPage() {
   );
 
   return (
-    <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
+    <PublicPageLayout title="LLM component test" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">

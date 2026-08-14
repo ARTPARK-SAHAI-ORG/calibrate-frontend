@@ -9,7 +9,12 @@ export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
 export { useMaxRowsPerEval } from "./useMaxRowsPerEval";
+export { useTraces } from "./useTraces";
+export { usePageSize, PAGE_SIZE_OPTIONS } from "./usePageSize";
+export { useTraceDeletion } from "./useTraceDeletion";
 export { useDialogUrlParam } from "./useDialogUrlParam";
+export { useAgentLlmEvaluators } from "./useAgentLlmEvaluators";
+export type { UseAgentLlmEvaluatorsResult } from "./useAgentLlmEvaluators";
 export { usePageErrorState } from "./usePageErrorState";
 export type { PageErrorCode, PageErrorState } from "./usePageErrorState";
 export {

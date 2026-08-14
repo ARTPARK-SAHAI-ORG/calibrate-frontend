@@ -16,6 +16,8 @@ export { TestsTabContent } from "./TestsTabContent";
 export { EvaluatorsTabContent } from "./EvaluatorsTabContent";
 export { AddEvaluatorsDialog } from "./AddEvaluatorsDialog";
 
+export { TracesTabContent } from "./TracesTabContent";
+
 export { SettingsTabContent } from "./SettingsTabContent";
 
 // Sub-components

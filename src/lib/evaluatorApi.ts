@@ -4,6 +4,16 @@ import { createRequestCache } from "@/lib/requestCache";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 /**
+ * One variable an evaluator's prompt expects a value for. Matches the shape
+ * `AddTestDialog` already declares so the two can be passed around freely.
+ */
+export type EvaluatorVariableDef = {
+  name: string;
+  description?: string;
+  default?: string;
+};
+
+/**
  * The list-level shape of an evaluator, shared by the `/evaluators` page, the
  * create/duplicate flows, and the agent Evaluators tab. Deliberately a subset
  * of the full evaluator record — enough to render cards, pills, and run
@@ -23,10 +33,20 @@ export type EvaluatorData = {
   owner_user_id?: string | null;
   /** True for org default (forked seed) evaluators. The ONLY default marker. */
   is_default?: boolean;
+  /**
+   * Provenance of a forked default: the seed it came from (`source_default_slug`)
+   * or, for a legacy unforked seed, its own `slug`. Use `defaultOriginSlug` to
+   * resolve WHICH built-in default this is (e.g. seed a picker with
+   * `default-llm-next-reply`) — `is_default` only says it is one.
+   */
+  slug?: string | null;
+  source_default_slug?: string | null;
   data_type?: "text" | "audio";
   kind?: "single" | "side_by_side";
   output_type?: "binary" | "rating";
   evaluator_type?: EvaluatorType;
+  /** Returned by `GET /evaluators?include_defaults=true`. */
+  live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
 };
 
 /**

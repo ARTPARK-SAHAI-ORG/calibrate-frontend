@@ -65,6 +65,17 @@ export type ConversationLabellingResult = {
   }>;
 };
 
+/**
+ * One trace, pre-mapped by the Traces tab. Deliberately not imported from the
+ * traces module so this dialog stays independent of it (as with the stt / tts
+ * / simulation rows): the caller maps its own rows into this shape.
+ */
+export type TraceLabellingItem = {
+  name: string;
+  input: unknown[];
+  output: { response?: string | null; tool_calls?: unknown[] | null };
+};
+
 export type AddRunToLabellingTaskSource =
   | {
       type: "test_run";
@@ -100,6 +111,12 @@ export type AddRunToLabellingTaskSource =
       runName?: string;
       results: ConversationLabellingResult[];
       evaluators?: SourceEvaluatorRef[];
+    }
+  | {
+      type: "traces";
+      agentUuid: string;
+      traces: TraceLabellingItem[];
+      evaluators?: SourceEvaluatorRef[];
     };
 
 /** The single task type each source kind targets. */
@@ -113,6 +130,7 @@ export function targetTaskTypeForSource(
       return "tts";
     case "simulation_run":
       return "conversation";
+    // test_run / benchmark_run / traces all target "llm".
     default:
       return "llm";
   }
@@ -129,6 +147,8 @@ export function itemNounForSource(source: AddRunToLabellingTaskSource): {
       return { one: "result", many: "results" };
     case "simulation_run":
       return { one: "conversation", many: "conversations" };
+    case "traces":
+      return { one: "trace", many: "traces" };
     default:
       return { one: "test", many: "tests" };
   }
@@ -402,6 +422,35 @@ export function buildItemsFromSource(
           },
         });
       }
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+      }
+      return { items, skippedCount, evaluatorUuids };
+    }
+    case "traces": {
+      for (const t of source.traces) {
+        const built = buildOneItem({
+          test_case: {
+            name: t.name,
+            history: t.input as TestCaseHistory[],
+            // Required: buildOneItem drops anything whose evaluation type is
+            // not "response", so without this every trace is silently skipped.
+            evaluation: { type: "response" },
+          },
+          output: t.output as {
+            response?: string;
+            tool_calls?: ToolCallOutput[];
+          },
+        });
+        if (!built) {
+          skippedCount += 1;
+          continue;
+        }
+        items.push(built.item);
+      }
+      // A trace has no run and therefore no judge results, so its items carry
+      // no evaluator variables. The evaluators come wholesale from the source
+      // (the caller asks the user to pick them).
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
