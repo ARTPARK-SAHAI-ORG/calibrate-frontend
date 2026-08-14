@@ -792,8 +792,11 @@ export function AddRunToLabellingTaskDialog({
       <div className="w-full max-w-md rounded-xl bg-background border border-border p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Submit {items.length} {items.length === 1 ? noun.one : noun.many} for
-            labelling
+            {success
+              ? "Submitted for labelling"
+              : `Submit ${items.length} ${
+                  items.length === 1 ? noun.one : noun.many
+                } for labelling`}
           </h2>
           <button
             onClick={onClose}
@@ -829,8 +832,7 @@ export function AddRunToLabellingTaskDialog({
                   } already in the task ${
                     success.itemsSkipped === 1 ? "was" : "were"
                   } skipped.`
-                : ""}{" "}
-              View the task to start labelling.
+                : ""}
             </p>
             <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
