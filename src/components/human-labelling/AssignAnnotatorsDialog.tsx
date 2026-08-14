@@ -138,7 +138,10 @@ export function AssignAnnotatorsDialog({
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
-  const evaluatorSelectionValid = pickedEvaluators.size > 0;
+  // A task with no labels at all can still be assigned; one with labels needs
+  // at least one picked.
+  const evaluatorSelectionValid =
+    evaluators.length === 0 || pickedEvaluators.size > 0;
   const allEvaluatorsPicked =
     evaluators.length > 0 && pickedEvaluators.size === evaluators.length;
 

@@ -261,6 +261,19 @@ describe("AssignAnnotatorsDialog", () => {
     ).toBeChecked();
   });
 
+  it("can still assign when the task has no labels", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const onConfirm = jest.fn().mockResolvedValue(undefined);
+    renderDialog({ evaluators: [], onConfirm });
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(["a-1"], []));
+  });
+
   it("clears and restores the label picks in one click", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
