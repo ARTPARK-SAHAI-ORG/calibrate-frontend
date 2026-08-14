@@ -49,6 +49,12 @@ import {
   JobsCreatedDialog,
   type CreatedJob,
 } from "@/components/human-labelling/JobsCreatedDialog";
+import {
+  EMPTY_LABELLED_BY_FILTER,
+  LabelledByFilterControl,
+  isLabelledByFilterActive,
+  type LabelledByFilter,
+} from "@/components/human-labelling/LabelledByFilter";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import {
@@ -169,6 +175,8 @@ type TaskSummaryResponse = {
 const ITEMS_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const ITEMS_PAGE_SIZE_KEY = "calibrate:items-page-size";
 const ITEMS_SORT_KEY = "calibrate:items-sort-updated-at";
+/** The two columns the items table can be sorted on. */
+type ItemsSortColumn = "updated_at" | "labelled_by";
 /** Per-batch page size used by "Export CSV" to pull the full task
  * scope. Matches the backend `/summary` endpoint's current `limit`
  * cap; if a task ever exceeds this, the export loops to drain the
@@ -284,12 +292,7 @@ type LabellingTask = {
 };
 
 type TaskKind =
-  | "llm"
-  | "llm-general"
-  | "stt"
-  | "tts"
-  | "conversation"
-  | undefined;
+  "llm" | "llm-general" | "stt" | "tts" | "conversation" | undefined;
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -336,7 +339,9 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
 }
 
 function sanitizeCsvName(s: string): string {
-  return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
+  return (
+    s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed"
+  );
 }
 
 function buildItemsCsv(
@@ -379,8 +384,10 @@ function buildItemsCsv(
     const set = versionsByEval.get(ev.uuid);
     if (!set || set.size === 0) return [null];
     return [...set].sort((a, b) => {
-      const an: number = (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
-      const bn: number = (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
+      const an: number =
+        (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
+      const bn: number =
+        (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
       return an - bn;
     });
   };
@@ -801,11 +808,7 @@ function EvaluatorRunsList({
   );
 }
 
-function SortIndicator({
-  direction,
-}: {
-  direction: "asc" | "desc" | null;
-}) {
+function SortIndicator({ direction }: { direction: "asc" | "desc" | null }) {
   return (
     <svg
       className={`w-3 h-3 transition-transform ${
@@ -817,11 +820,7 @@ function SortIndicator({
       strokeWidth={2}
       aria-hidden="true"
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 9l-7 7-7-7"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
   );
 }
@@ -902,7 +901,6 @@ function ItemRowActions({
   );
 }
 
-
 function LabelledByCell({
   labellers,
   annotatorNameById,
@@ -918,11 +916,9 @@ function LabelledByCell({
     );
   }
   const ids = Array.from(labellers);
-  const nameFor = (id: string) =>
-    annotatorNameById.get(id) ?? id.slice(0, 8);
+  const nameFor = (id: string) => annotatorNameById.get(id) ?? id.slice(0, 8);
   const visibleIds = ids.length <= 2 ? ids : ids.slice(0, 1);
-  const remainingNames =
-    ids.length <= 2 ? [] : ids.slice(1).map(nameFor);
+  const remainingNames = ids.length <= 2 ? [] : ids.slice(1).map(nameFor);
   return (
     <div className="flex flex-wrap gap-1 min-w-0">
       {visibleIds.map((id) => (
@@ -1222,8 +1218,11 @@ function LabellingTaskPageInner() {
   const [task, setTask] = useState<LabellingTask | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureError } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureError,
+  } = usePageErrorState();
   /** False until the first task GET for this route finishes (avoids empty-state flash on Items/Jobs). */
   const [taskFetchCompleted, setTaskFetchCompleted] = useState(false);
 
@@ -1294,35 +1293,50 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
-    {
-      uuid: string;
-      name: string;
-      description?: string;
-      input: string;
-      output: string;
-      varValues?: Record<string, Record<string, string>>;
-    }[]
+    | {
+        uuid: string;
+        name: string;
+        description?: string;
+        input: string;
+        output: string;
+        varValues?: Record<string, Record<string, string>>;
+      }[]
     | null
   >(null);
 
-  // Sort direction for the items table's Updated at column. Always
-  // applied to `updated_at` on the backend; defaults to desc (newest
-  // first). Persisted so the user's choice carries across visits.
+  // Which column the items table is sorted on, and in which direction.
+  // Both are applied by the backend; the default is newest updated first.
+  // The direction is remembered across visits; the column deliberately is
+  // not, so a server that does not know a column can never leave the tab
+  // stuck on an error with no control left to change it back.
+  const [itemsSortBy, setItemsSortBy] = useState<ItemsSortColumn>("updated_at");
   const [itemsSort, setItemsSort] = useState<"asc" | "desc">("desc");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(ITEMS_SORT_KEY);
     if (stored === "asc" || stored === "desc") setItemsSort(stored);
   }, []);
-  const toggleItemsSort = () => {
-    setItemsSort((prev) => {
-      const next = prev === "desc" ? "asc" : "desc";
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(ITEMS_SORT_KEY, next);
-      }
-      return next;
-    });
+  // Clicking the column already sorted on flips the direction; clicking the
+  // other column moves the sort there and starts at descending (newest
+  // first, or most labellers first).
+  const sortItemsBy = (column: ItemsSortColumn) => {
+    const nextOrder =
+      column === itemsSortBy ? (itemsSort === "desc" ? "asc" : "desc") : "desc";
+    setItemsSortBy(column);
+    setItemsSort(nextOrder);
+    setItemsOffset(0);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ITEMS_SORT_KEY, nextOrder);
+    }
   };
+
+  // "Show only items labelled by these people" — either anyone, or a
+  // specific set of annotators. Applied by the backend so it covers every
+  // page, not just the rows on screen.
+  const [labelledBy, setLabelledBy] = useState<LabelledByFilter>(
+    EMPTY_LABELLED_BY_FILTER,
+  );
+  const labelledByActive = isLabelledByFilterActive(labelledBy);
 
   // Server-side pagination / search for the items tab — driven by the
   // /summary endpoint's new params (PR #60). Limit is persisted so the
@@ -1403,9 +1417,7 @@ function LabellingTaskPageInner() {
       const optimistic = targetOrder
         .map((id) => byUuid.get(id))
         .filter((e): e is NonNullable<typeof e> => !!e);
-      setTask((prev) =>
-        prev ? { ...prev, evaluators: optimistic } : prev,
-      );
+      setTask((prev) => (prev ? { ...prev, evaluators: optimistic } : prev));
       try {
         const result = await apiClient<{
           message: string;
@@ -1479,9 +1491,7 @@ function LabellingTaskPageInner() {
   // scale that turns them into "82%" or "3.9 / 5" comes from the task's own
   // evaluator list, so the two are joined here by evaluator uuid.
   const evaluatorResultStats = useMemo(() => {
-    const scaleById = new Map(
-      (task?.evaluators ?? []).map((e) => [e.uuid, e]),
-    );
+    const scaleById = new Map((task?.evaluators ?? []).map((e) => [e.uuid, e]));
     const out: Record<string, EvaluatorResultStat | null> = {};
     for (const ev of agreement?.evaluators ?? []) {
       const scale = scaleById.get(ev.evaluator_id);
@@ -1528,9 +1538,7 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
-    null,
-  );
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   /** False until the first summary fetch for this task completes (so the
    * Items tab's "Labelled by" column doesn't flash "—" before populating). */
@@ -1543,10 +1551,16 @@ function LabellingTaskPageInner() {
     const params = new URLSearchParams({
       limit: String(itemsLimit),
       offset: String(itemsOffset),
-      sort_by: "updated_at",
+      sort_by: itemsSortBy,
       order: itemsSort,
     });
     if (itemsSearch) params.set("q", itemsSearch);
+    // The two modes are exclusive: naming people already means labelled.
+    if (labelledBy.anyone) {
+      params.set("labelled_only", "true");
+    } else if (labelledBy.annotatorIds.length > 0) {
+      params.set("annotator_ids", labelledBy.annotatorIds.join(","));
+    }
     try {
       const data = await apiClient<TaskSummaryResponse>(
         `/annotation-tasks/${uuid}/summary?${params.toString()}`,
@@ -1559,7 +1573,16 @@ function LabellingTaskPageInner() {
       setSummaryLoading(false);
       setSummaryFetchCompleted(true);
     }
-  }, [accessToken, uuid, itemsLimit, itemsOffset, itemsSort, itemsSearch]);
+  }, [
+    accessToken,
+    uuid,
+    itemsLimit,
+    itemsOffset,
+    itemsSortBy,
+    itemsSort,
+    itemsSearch,
+    labelledBy,
+  ]);
 
   useEffect(() => {
     fetchTaskSummary();
@@ -1633,7 +1656,9 @@ function LabellingTaskPageInner() {
     const out = new Map<string, Set<string>>();
     if (!taskSummary) return out;
     for (const row of taskSummary.rows) {
-      for (const [annotatorUuid, ann] of Object.entries(row.annotations ?? {})) {
+      for (const [annotatorUuid, ann] of Object.entries(
+        row.annotations ?? {},
+      )) {
         if (ann && ann.value !== null && ann.value !== undefined) {
           if (!out.has(row.item_id)) out.set(row.item_id, new Set());
           out.get(row.item_id)!.add(annotatorUuid);
@@ -1737,8 +1762,7 @@ function LabellingTaskPageInner() {
     (taskSummary?.pagination?.total ?? 0) > 0 ||
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
-  const taskType =
-    task?.type ?? task?.evaluators?.[0]?.evaluator_type;
+  const taskType = task?.type ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
     taskType === "llm" ||
     taskType === "conversation" ||
@@ -1822,9 +1846,7 @@ function LabellingTaskPageInner() {
       return;
     }
     const [start, end] =
-      anchorIdx <= targetIdx
-        ? [anchorIdx, targetIdx]
-        : [targetIdx, anchorIdx];
+      anchorIdx <= targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
     setSelectedItemIds((prev) => {
       const next = new Set(prev);
       for (let i = start; i <= end; i++) next.add(items[i].uuid);
@@ -1881,14 +1903,14 @@ function LabellingTaskPageInner() {
   };
 
   /**
-   * A change to the search query redefines what "all" means, so the
-   * across-pages select needs to be re-confirmed by the user. Pagination
-   * (`itemsOffset`) does NOT reset it — navigating between pages of the
-   * same filter shouldn't clear the user's "select all" intent.
+   * A change to the search query or the "Labelled by" filter redefines what
+   * "all" means, so the across-pages select needs to be re-confirmed by the
+   * user. Pagination (`itemsOffset`) does NOT reset it — navigating between
+   * pages of the same filter shouldn't clear the user's "select all" intent.
    */
   useEffect(() => {
     setSelectAllTotal(false);
-  }, [itemsSearch]);
+  }, [itemsSearch, labelledBy]);
 
   // Drop selections that no longer exist in the items list (after delete or refetch).
   useEffect(() => {
@@ -1901,9 +1923,7 @@ function LabellingTaskPageInner() {
       });
       return next.size === prev.size ? prev : next;
     });
-    setLastSelectedItemUuid((prev) =>
-      prev && !ids.has(prev) ? null : prev,
-    );
+    setLastSelectedItemUuid((prev) => (prev && !ids.has(prev) ? null : prev));
   }, [items]);
 
   const toggleJob = (jobUuid: string) => {
@@ -2125,8 +2145,7 @@ function LabellingTaskPageInner() {
   };
 
   const handleDeleteSelected = async () => {
-    if ((selectedItemIds.size === 0 && !selectAllTotal) || !accessToken)
-      return;
+    if ((selectedItemIds.size === 0 && !selectAllTotal) || !accessToken) return;
     setDeletingSelected(true);
     try {
       const body: Record<string, unknown> = selectAllTotal
@@ -2903,7 +2922,6 @@ function LabellingTaskPageInner() {
                 </section>
               </div>
             )}
-
           </div>
         )}
 
@@ -3010,28 +3028,38 @@ function LabellingTaskPageInner() {
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="relative flex-1 min-w-[200px] max-w-sm">
-                  <svg
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                <div className="flex items-center gap-2 flex-wrap flex-1 min-w-[200px]">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <svg
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                      />
+                    </svg>
+                    <input
+                      type="search"
+                      value={itemsSearchInput}
+                      onChange={(e) => setItemsSearchInput(e.target.value)}
+                      placeholder="Search by name"
+                      aria-label="Search items by name"
+                      className="h-9 w-full pl-8 pr-3 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
-                  </svg>
-                  <input
-                    type="search"
-                    value={itemsSearchInput}
-                    onChange={(e) => setItemsSearchInput(e.target.value)}
-                    placeholder="Search by name"
-                    aria-label="Search items by name"
-                    className="h-9 w-full pl-8 pr-3 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  </div>
+                  <LabelledByFilterControl
+                    annotators={taskSummary?.annotators ?? []}
+                    filter={labelledBy}
+                    onChange={(next) => {
+                      setLabelledBy(next);
+                      setItemsOffset(0);
+                    }}
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -3080,10 +3108,12 @@ function LabellingTaskPageInner() {
                         Math.ceil(total / ITEMS_EXPORT_BATCH_SIZE) + 1,
                       );
                       for (let i = 0; i < maxIterations; i++) {
+                        // Same order the table is showing, so the file reads
+                        // the way the screen does.
                         const params = new URLSearchParams({
                           limit: String(ITEMS_EXPORT_BATCH_SIZE),
                           offset: String(offset),
-                          sort_by: "updated_at",
+                          sort_by: itemsSortBy,
                           order: itemsSort,
                         });
                         const batch = await apiClient<TaskSummaryResponse>(
@@ -3098,7 +3128,10 @@ function LabellingTaskPageInner() {
                           const meta = itemMetaByUuid.get(row.item_id);
                           allItems.push(
                             meta
-                              ? { ...meta, payload: row.payload ?? meta.payload }
+                              ? {
+                                  ...meta,
+                                  payload: row.payload ?? meta.payload,
+                                }
                               : {
                                   id: 0,
                                   uuid: row.item_id,
@@ -3152,9 +3185,7 @@ function LabellingTaskPageInner() {
                 >
                   <div
                     className={`flex items-center gap-2 text-sm ${
-                      selectAllTotal
-                        ? "text-amber-700 dark:text-amber-300"
-                        : ""
+                      selectAllTotal ? "text-amber-700 dark:text-amber-300" : ""
                     }`}
                   >
                     <span>
@@ -3162,9 +3193,8 @@ function LabellingTaskPageInner() {
                         {selectAllTotal ? itemsTotal : selectedItemIds.size}
                       </span>{" "}
                       item
-                      {(selectAllTotal
-                        ? itemsTotal
-                        : selectedItemIds.size) === 1
+                      {(selectAllTotal ? itemsTotal : selectedItemIds.size) ===
+                      1
                         ? ""
                         : "s"}{" "}
                       selected
@@ -3175,7 +3205,12 @@ function LabellingTaskPageInner() {
                         </span>
                       ) : null}
                     </span>
+                    {/* Selecting across pages sends only the name search to
+                        the bulk endpoints, so it would reach items the
+                        "Labelled by" filter is hiding. Offer it only when
+                        that filter is off. */}
                     {!selectAllTotal &&
+                      !labelledByActive &&
                       allSelected &&
                       itemsTotal > items.length && (
                         <button
@@ -3255,7 +3290,9 @@ function LabellingTaskPageInner() {
                 <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   {itemsSearch
                     ? `No items match "${itemsSearch}".`
-                    : "No items on this page."}
+                    : labelledByActive
+                      ? "No items match the Labelled by filter."
+                      : "No items on this page."}
                 </div>
               ) : taskType === "stt" || taskType === "tts" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
@@ -3273,17 +3310,31 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
                     </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
                     <button
                       type="button"
-                      onClick={toggleItemsSort}
+                      onClick={() => sortItemsBy("labelled_by")}
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                      aria-label="Sort by labelled by"
+                    >
+                      <span>Labelled by</span>
+                      <SortIndicator
+                        direction={
+                          itemsSortBy === "labelled_by" ? itemsSort : null
+                        }
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sortItemsBy("updated_at")}
                       className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
                       aria-label="Sort by updated at"
                     >
                       <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
+                      <SortIndicator
+                        direction={
+                          itemsSortBy === "updated_at" ? itemsSort : null
+                        }
+                      />
                     </button>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
@@ -3452,17 +3503,31 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Description
                     </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
                     <button
                       type="button"
-                      onClick={toggleItemsSort}
+                      onClick={() => sortItemsBy("labelled_by")}
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                      aria-label="Sort by labelled by"
+                    >
+                      <span>Labelled by</span>
+                      <SortIndicator
+                        direction={
+                          itemsSortBy === "labelled_by" ? itemsSort : null
+                        }
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sortItemsBy("updated_at")}
                       className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
                       aria-label="Sort by updated at"
                     >
                       <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
+                      <SortIndicator
+                        direction={
+                          itemsSortBy === "updated_at" ? itemsSort : null
+                        }
+                      />
                     </button>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
@@ -3635,134 +3700,134 @@ function LabellingTaskPageInner() {
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
                 {showItemsPagination && (
                   <>
-                <div>
-                  {itemsTotal === 0 ? (
-                    "0 items"
-                  ) : (
-                    <>
-                      Showing{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsRangeStart}
-                      </span>
-                      –
-                      <span className="text-foreground font-medium">
-                        {itemsRangeEnd}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsTotal}
-                      </span>{" "}
-                      item{itemsTotal === 1 ? "" : "s"}
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2">
-                    <span>Per page</span>
-                    <div className="relative">
-                      <select
-                        value={itemsLimit}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              ITEMS_PAGE_SIZE_KEY,
-                              String(next),
-                            );
-                          }
-                          setItemsLimit(next);
-                          setItemsOffset(0);
-                        }}
-                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <svg
-                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
+                    <div>
+                      {itemsTotal === 0 ? (
+                        "0 items"
+                      ) : (
+                        <>
+                          Showing{" "}
+                          <span className="text-foreground font-medium">
+                            {itemsRangeStart}
+                          </span>
+                          –
+                          <span className="text-foreground font-medium">
+                            {itemsRangeEnd}
+                          </span>{" "}
+                          of{" "}
+                          <span className="text-foreground font-medium">
+                            {itemsTotal}
+                          </span>{" "}
+                          item{itemsTotal === 1 ? "" : "s"}
+                        </>
+                      )}
                     </div>
-                  </label>
-                  {itemsPageCount > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) =>
-                          Math.max(0, prev - itemsLimit),
-                        )
-                      }
-                      disabled={itemsOffset === 0 || summaryLoading}
-                      aria-label="Previous page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <span className="px-2 text-sm">
-                      Page{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsCurrentPage}
-                      </span>{" "}
-                      of{" "}
-                      <span className="text-foreground font-medium">
-                        {itemsPageCount}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItemsOffset((prev) => prev + itemsLimit)
-                      }
-                      disabled={
-                        itemsOffset + itemsLimit >= itemsTotal ||
-                        summaryLoading
-                      }
-                      aria-label="Next page"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  )}
-                </div>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2">
+                        <span>Per page</span>
+                        <div className="relative">
+                          <select
+                            value={itemsLimit}
+                            onChange={(e) => {
+                              const next = Number(e.target.value);
+                              if (typeof window !== "undefined") {
+                                window.localStorage.setItem(
+                                  ITEMS_PAGE_SIZE_KEY,
+                                  String(next),
+                                );
+                              }
+                              setItemsLimit(next);
+                              setItemsOffset(0);
+                            }}
+                            className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                          <svg
+                            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </label>
+                      {itemsPageCount > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setItemsOffset((prev) =>
+                                Math.max(0, prev - itemsLimit),
+                              )
+                            }
+                            disabled={itemsOffset === 0 || summaryLoading}
+                            aria-label="Previous page"
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M15 19l-7-7 7-7"
+                              />
+                            </svg>
+                          </button>
+                          <span className="px-2 text-sm">
+                            Page{" "}
+                            <span className="text-foreground font-medium">
+                              {itemsCurrentPage}
+                            </span>{" "}
+                            of{" "}
+                            <span className="text-foreground font-medium">
+                              {itemsPageCount}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setItemsOffset((prev) => prev + itemsLimit)
+                            }
+                            disabled={
+                              itemsOffset + itemsLimit >= itemsTotal ||
+                              summaryLoading
+                            }
+                            aria-label="Next page"
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -4013,114 +4078,114 @@ function LabellingTaskPageInner() {
       {!!editLlmItemUuid &&
         taskType !== "stt" &&
         taskType !== "llm-general" && (
-        <AddTestDialog
-          key={editLlmItemUuid}
-          isOpen={true}
-          onClose={() => {
-            if (!savingLlmItem) setEditLlmItemUuid(null);
-          }}
-          isEditing={true}
-          isLoading={false}
-          isCreating={savingLlmItem}
-          createError={editLlmError}
-          testName={editLlmItemName}
-          setTestName={setEditLlmItemName}
-          itemDescription={editLlmItemDescription}
-          setItemDescription={setEditLlmItemDescription}
-          validationAttempted={false}
-          mode="labelItem"
-          allowAgentLastMessage={taskType === "conversation"}
-          requireAssistantLastMessage={taskType === "llm"}
-          initialConfig={editingInitialConfig}
-          initialEvaluators={editingInitialEvaluators}
-          onSubmit={async (
-            config: TestConfig,
-            evaluators: EvaluatorRefPayload[],
-          ) => {
-            if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
-              return;
-            const history = (config.history ?? []).filter((h) => {
-              if (h.role === "assistant") {
-                if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
-                  return true;
-                return typeof h.content === "string" && h.content.length > 0;
+          <AddTestDialog
+            key={editLlmItemUuid}
+            isOpen={true}
+            onClose={() => {
+              if (!savingLlmItem) setEditLlmItemUuid(null);
+            }}
+            isEditing={true}
+            isLoading={false}
+            isCreating={savingLlmItem}
+            createError={editLlmError}
+            testName={editLlmItemName}
+            setTestName={setEditLlmItemName}
+            itemDescription={editLlmItemDescription}
+            setItemDescription={setEditLlmItemDescription}
+            validationAttempted={false}
+            mode="labelItem"
+            allowAgentLastMessage={taskType === "conversation"}
+            requireAssistantLastMessage={taskType === "llm"}
+            initialConfig={editingInitialConfig}
+            initialEvaluators={editingInitialEvaluators}
+            onSubmit={async (
+              config: TestConfig,
+              evaluators: EvaluatorRefPayload[],
+            ) => {
+              if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
+                return;
+              const history = (config.history ?? []).filter((h) => {
+                if (h.role === "assistant") {
+                  if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
+                    return true;
+                  return typeof h.content === "string" && h.content.length > 0;
+                }
+                if (h.role === "user") {
+                  return typeof h.content === "string" && h.content.length > 0;
+                }
+                if (h.role === "tool") {
+                  return typeof h.content === "string";
+                }
+                return false;
+              });
+              const evaluator_variables: Record<
+                string,
+                Record<string, string>
+              > = {};
+              for (const e of evaluators) {
+                if (e.variable_values) {
+                  evaluator_variables[e.evaluator_uuid] = {
+                    ...e.variable_values,
+                  };
+                }
               }
-              if (h.role === "user") {
-                return typeof h.content === "string" && h.content.length > 0;
-              }
-              if (h.role === "tool") {
-                return typeof h.content === "string";
-              }
-              return false;
-            });
-            const evaluator_variables: Record<
-              string,
-              Record<string, string>
-            > = {};
-            for (const e of evaluators) {
-              if (e.variable_values) {
-                evaluator_variables[e.evaluator_uuid] = {
-                  ...e.variable_values,
+              const trimmedDescription = editLlmItemDescription.trim();
+              const descriptionField = { description: trimmedDescription };
+
+              let payload: Record<string, unknown>;
+              if (taskType === "conversation") {
+                payload = {
+                  name: editLlmItemName.trim(),
+                  ...descriptionField,
+                  transcript: history,
+                  evaluator_variables,
+                };
+              } else {
+                let chat_history = history;
+                let agent_response = "";
+                const last = history[history.length - 1];
+                if (
+                  last &&
+                  last.role === "assistant" &&
+                  !(
+                    Array.isArray(last.tool_calls) && last.tool_calls.length > 0
+                  ) &&
+                  typeof last.content === "string"
+                ) {
+                  chat_history = history.slice(0, -1);
+                  agent_response = last.content;
+                }
+                payload = {
+                  name: editLlmItemName.trim(),
+                  ...descriptionField,
+                  chat_history,
+                  agent_response,
+                  evaluator_variables,
                 };
               }
-            }
-            const trimmedDescription = editLlmItemDescription.trim();
-            const descriptionField = { description: trimmedDescription };
-
-            let payload: Record<string, unknown>;
-            if (taskType === "conversation") {
-              payload = {
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                transcript: history,
-                evaluator_variables,
-              };
-            } else {
-              let chat_history = history;
-              let agent_response = "";
-              const last = history[history.length - 1];
-              if (
-                last &&
-                last.role === "assistant" &&
-                !(
-                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
-                ) &&
-                typeof last.content === "string"
-              ) {
-                chat_history = history.slice(0, -1);
-                agent_response = last.content;
-              }
-              payload = {
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                chat_history,
-                agent_response,
-                evaluator_variables,
-              };
-            }
-            setSavingLlmItem(true);
-            setEditLlmError(null);
-            try {
-              await apiClient<{ updated_count: number }>(
-                `/annotation-tasks/${uuid}/items`,
-                accessToken,
-                {
-                  method: "PUT",
-                  body: {
-                    updates: [{ uuid: editLlmItemUuid, payload }],
+              setSavingLlmItem(true);
+              setEditLlmError(null);
+              try {
+                await apiClient<{ updated_count: number }>(
+                  `/annotation-tasks/${uuid}/items`,
+                  accessToken,
+                  {
+                    method: "PUT",
+                    body: {
+                      updates: [{ uuid: editLlmItemUuid, payload }],
+                    },
                   },
-                },
-              );
-              setEditLlmItemUuid(null);
-              await Promise.all([fetchTask(), fetchTaskSummary()]);
-            } catch (err) {
-              setEditLlmError(parseApiError(err, "Failed to save item"));
-            } finally {
-              setSavingLlmItem(false);
-            }
-          }}
-        />
-      )}
+                );
+                setEditLlmItemUuid(null);
+                await Promise.all([fetchTask(), fetchTaskSummary()]);
+              } catch (err) {
+                setEditLlmError(parseApiError(err, "Failed to save item"));
+              } finally {
+                setSavingLlmItem(false);
+              }
+            }}
+          />
+        )}
 
       {accessToken && task && (
         <EditTaskDialog
@@ -4533,9 +4598,7 @@ function LabellingTaskPageInner() {
               ? "Any annotations on this item will also be lost."
               : "Any annotations on these items will also be lost.";
           const scopeClause =
-            selectAllTotal && itemsSearch
-              ? ` matching "${itemsSearch}"`
-              : "";
+            selectAllTotal && itemsSearch ? ` matching "${itemsSearch}"` : "";
           return `Delete ${count} ${itemWord}${scopeClause}? ${annotationsClause} This cannot be undone.`;
         })()}
         confirmText="Delete"
