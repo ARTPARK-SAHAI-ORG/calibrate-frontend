@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getBinaryLabel } from "@/lib/binaryLabels";
+import { diffLines } from "@/lib/lineDiff";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
 // max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
@@ -37,6 +38,9 @@ type VersionCardProps = {
   isSettingLive: boolean;
   onSetLive: (versionUuid: string) => void;
   formatDateTime: (date: string) => string;
+  /** Prompt of the version made just before this one, if there is one. */
+  previousPrompt?: string;
+  previousVersionNumber?: number;
 };
 
 export function VersionCard({
@@ -47,6 +51,8 @@ export function VersionCard({
   isSettingLive,
   onSetLive,
   formatDateTime,
+  previousPrompt,
+  previousVersionNumber,
 }: VersionCardProps) {
   const [promptVisible, setPromptVisible] = useState(isLive || isDefault);
   const [copied, setCopied] = useState(false);
@@ -55,7 +61,21 @@ export function VersionCard({
   // Measured (not derived from \n count) so prompts with long wrapping
   // lines and no line breaks still get the toggle.
   const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
   const promptRef = useRef<HTMLPreElement>(null);
+
+  const canCompare =
+    typeof previousPrompt === "string" &&
+    typeof previousVersionNumber === "number" &&
+    previousPrompt !== version.system_prompt;
+
+  const changes = useMemo(
+    () =>
+      canCompare && showChanges
+        ? diffLines(previousPrompt as string, version.system_prompt)
+        : null,
+    [canCompare, showChanges, previousPrompt, version.system_prompt],
+  );
 
   useLayoutEffect(() => {
     if (!promptVisible) return;
@@ -71,7 +91,7 @@ export function VersionCard({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [promptVisible, version.system_prompt]);
+  }, [promptVisible, version.system_prompt, showChanges]);
 
   useEffect(() => {
     setPromptVisible(isLive || isDefault);
@@ -149,7 +169,17 @@ export function VersionCard({
       {promptVisible && <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</span>
-          {(
+          <div className="flex items-center gap-2">
+            {canCompare && (
+              <button
+                onClick={() => setShowChanges((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                {showChanges
+                  ? "Hide changes"
+                  : `Compare with v${previousVersionNumber}`}
+              </button>
+            )}
             <button
               onClick={handleCopy}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
@@ -170,8 +200,14 @@ export function VersionCard({
                 </>
               )}
             </button>
-          )}
+          </div>
         </div>
+        {changes && (
+          <p className="text-xs text-muted-foreground">
+            Green lines were added in v{version.version_number}, red lines were
+            removed from v{previousVersionNumber}.
+          </p>
+        )}
         <div className="relative">
           <pre
             ref={promptRef}
@@ -181,7 +217,24 @@ export function VersionCard({
                 : ""
             }`}
           >
-            {version.system_prompt}
+            {changes
+              ? changes.map((line, i) => (
+                  <div
+                    key={i}
+                    data-testid={`diff-line-${line.type}`}
+                    className={
+                      line.type === "added"
+                        ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                        : line.type === "removed"
+                          ? "bg-red-500/10 text-red-700 dark:text-red-400"
+                          : ""
+                    }
+                  >
+                    {line.type === "same" ? "  " : line.type === "added" ? "+ " : "- "}
+                    {line.text}
+                  </div>
+                ))
+              : version.system_prompt}
           </pre>
           {isPromptOverflowing && !promptExpanded && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
