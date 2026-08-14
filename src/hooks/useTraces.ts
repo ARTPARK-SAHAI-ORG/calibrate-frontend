@@ -10,18 +10,21 @@ type UseTracesArgs = {
   /** The agent whose traces to list. */
   agentId: string;
   pageSize?: number;
+  /** Search text, already debounced by the caller. Blank searches everything. */
+  q?: string;
 };
 
 /**
  * Server-paginated trace list. Every other list page fetches everything and
  * filters client-side; traces are machine-written and can be far larger than
- * the client should download, so paging round-trips to `GET /traces` and this
- * hook only ever holds one page. The endpoint takes no search term.
+ * the client should download, so paging and search both round-trip to
+ * `GET /traces` and this hook only ever holds one page.
  */
 export function useTraces({
   accessToken,
   agentId,
   pageSize = 50,
+  q = "",
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -34,7 +37,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize]);
+  }, [agentId, pageSize, q]);
 
   const load = useCallback(
     async (targetOffset: number): Promise<number> => {
@@ -47,6 +50,7 @@ export function useTraces({
           limit: pageSize,
           offset: targetOffset,
           agentId,
+          q,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
@@ -66,7 +70,7 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId],
+    [accessToken, pageSize, agentId, q],
   );
 
   useEffect(() => {

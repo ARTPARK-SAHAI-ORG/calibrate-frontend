@@ -39,7 +39,31 @@ describe("useTraces", () => {
       limit: 50,
       offset: 0,
       agentId: "ag-1",
+      q: "",
     });
+  });
+
+  it("sends the search text and returns to the first page when it changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 9));
+
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", pageSize: 2, q }),
+      { initialProps: { q: "" } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(2));
+
+    rerender({ q: "polio" });
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ q: "polio", offset: 0 }),
+      ),
+    );
+    expect(result.current.offset).toBe(0);
   });
 
   it("stays idle without an access token", async () => {

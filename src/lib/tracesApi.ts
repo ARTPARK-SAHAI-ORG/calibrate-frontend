@@ -67,22 +67,27 @@ export type TraceListParams = {
   offset: number;
   /** Traces belong to one agent; every read is scoped to it. */
   agentId: string;
+  /** Plain "contains this text" match, case-insensitive, over the message id,
+   *  conversation id, conversation history, reply, and metadata. Blank is
+   *  ignored by the backend, and left off here. */
+  q?: string;
 };
 
 /**
  * Fetch one page of traces for one agent. Unlike the other list pages this one
- * pages on the server: the trace store can hold far more rows than the client
- * should ever download. There is no search — the backend takes no query term —
- * and it refuses a page larger than `MAX_TRACES_PAGE_SIZE`.
+ * pages and searches on the server: the trace store can hold far more rows than
+ * the client should ever download. It refuses a page larger than
+ * `MAX_TRACES_PAGE_SIZE`.
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId }: TraceListParams,
+  { limit, offset, agentId, q }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
+  if (q?.trim()) params.set("q", q.trim());
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,

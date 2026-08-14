@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -17,7 +17,12 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { RefreshButton } from "@/components/RefreshButton";
-import { Button, LoadingState, ServerPaginatedListBar } from "@/components/ui";
+import {
+  Button,
+  LoadingState,
+  SearchInput,
+  ServerPaginatedListBar,
+} from "@/components/ui";
 import {
   useAccessToken,
   useDialogUrlParam,
@@ -38,6 +43,15 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
 
   const [pageSize, setPageSize] = usePageSize();
 
+  // The search runs on the backend, so wait for a pause in typing before
+  // asking for a new page.
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const handle = window.setTimeout(() => setSearch(searchInput), 300);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
+
   const {
     items,
     total,
@@ -54,6 +68,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     accessToken,
     agentId: agentUuid,
     pageSize,
+    q: search,
   });
 
   const deletion = useTraceDeletion({
@@ -202,15 +217,18 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   if (!isLoading) hasLoadedRef.current = true;
   const hasLoaded = hasLoadedRef.current;
 
-  // With no search, an empty list means exactly one thing: this agent has
-  // never been sent a trace. Held from the last load that worked, so neither a
-  // check in flight nor a failed one swaps the setup steps out: the key the
-  // reader just created lives only on that screen and is shown once.
+  // The setup steps are for an agent that has never been sent a trace, so only
+  // a load with no search text can decide that. Held from the last load that
+  // worked, so neither a check in flight nor a failed one swaps the steps out:
+  // the key the reader just created lives only on that screen and is shown once.
+  // Both the typed text and the text the list was loaded with count: the moment
+  // anything is typed an empty list can no longer mean "never sent a trace", and
+  // while the box is being cleared the rows on screen are still the search.
+  const isSearching = searchInput.trim() !== "" || search.trim() !== "";
   const isEmptyRef = useRef(false);
-  if (!isLoading && !error) isEmptyRef.current = total === 0;
+  if (!isLoading && !error && !isSearching) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
-  const pageCount =
-    pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
   return (
@@ -221,26 +239,40 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         </div>
       )}
 
+      {/* Above the list rather than inside it, so a search that matches nothing
+          still leaves the box that got there. */}
+      {hasLoaded && !showEmptyState && (
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search traces"
+            className="w-full sm:w-64 sm:mr-auto"
+          />
+          <RefreshButton
+            loading={isRefreshing}
+            onClick={() => void handleRefresh()}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setCodeOpen(true)}
+          >
+            View code
+          </Button>
+        </div>
+      )}
+
       {!hasLoaded ? (
         <LoadingState />
       ) : showEmptyState ? (
         <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
+      ) : total === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No traces match your search.
+        </p>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <RefreshButton
-              loading={isRefreshing}
-              onClick={() => void handleRefresh()}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setCodeOpen(true)}
-            >
-              View code
-            </Button>
-          </div>
-
           {(selected.size > 0 || isPreparingLabelling) && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
               <span className="text-sm text-muted-foreground">
@@ -338,15 +370,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           setConvertOpen(false);
           deletion.clearSelection();
           const created = result.created;
-          toast.success(
-            `Created ${created} test${created === 1 ? "" : "s"}`,
-            {
-              action: {
-                label: "View tests",
-                onClick: () => router.push("/tests"),
-              },
+          toast.success(`Created ${created} test${created === 1 ? "" : "s"}`, {
+            action: {
+              label: "View tests",
+              onClick: () => router.push("/tests"),
             },
-          );
+          });
         }}
       />
 
@@ -372,10 +401,10 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             traces: labellingTraces,
             evaluators: labellingEvaluators,
           }}
-          onAdded={() => {
-            setLabellingTraces(null);
-            clearSubmitted();
-          }}
+          // The dialog stays open on its own confirmation, which is where the
+          // reader opens the task or closes it, same as every other submit for
+          // labelling flow. Only the ticks the submit used are cleared here.
+          onAdded={clearSubmitted}
         />
       )}
 
@@ -395,7 +424,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         confirmText="Delete"
         isDeleting={deletion.isDeleting}
       />
-
     </div>
   );
 }

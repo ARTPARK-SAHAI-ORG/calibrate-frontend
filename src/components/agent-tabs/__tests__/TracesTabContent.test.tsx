@@ -69,6 +69,7 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
     isOpen,
     source,
     onAdded,
+    onClose,
   }: {
     isOpen: boolean;
     source: {
@@ -78,6 +79,7 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
       evaluators?: { uuid: string }[];
     };
     onAdded?: (taskUuid: string, itemsCreated: number) => void;
+    onClose: () => void;
   }) =>
     isOpen ? (
       <div data-testid="labelling-task">
@@ -91,6 +93,9 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
         </span>
         <button type="button" onClick={() => onAdded?.("task-1", 1)}>
           finish labelling
+        </button>
+        <button type="button" onClick={onClose}>
+          close labelling
         </button>
       </div>
     ) : null,
@@ -234,8 +239,8 @@ describe("TracesTabContent", () => {
     expect(mockUseTraces).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "agent-1" }),
     );
-    // The endpoint takes no search term, so the tab must not send one.
-    expect(lastTracesArgs()).not.toHaveProperty("q");
+    // Nothing typed yet, so the whole list is asked for.
+    expect(lastTracesArgs().q).toBe("");
     expect(lastTracesArgs()).not.toHaveProperty("conversationId");
     expect(mockUseDialogUrlParam).toHaveBeenCalledWith(
       expect.objectContaining({ param: "traceId" }),
@@ -290,6 +295,31 @@ describe("TracesTabContent", () => {
 
     await user.click(nextButton);
     expect(nextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("searches on the backend once typing pauses", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    expect(lastTracesArgs().q).toBe("");
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() => expect(lastTracesArgs().q).toBe("polio"));
+  });
+
+  it("says nothing matched instead of showing the setup steps", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    mockUseTraces.mockReturnValue(tracesResult([]));
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() =>
+      expect(screen.getByText("No traces match your search.")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
+    // The search box has to stay, or there is no way back to the full list.
+    expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
   });
 
   it("shows the empty state when the agent has no traces", () => {
@@ -564,7 +594,7 @@ describe("TracesTabContent", () => {
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
     });
 
-    it("clears the selection once the traces are added to a task", async () => {
+    it("clears the selection but leaves the task dialog open on its confirmation", async () => {
       const user = setupUser();
       render(<TracesTabContent agentUuid="agent-1" />);
 
@@ -577,10 +607,15 @@ describe("TracesTabContent", () => {
 
       await user.click(screen.getByText("finish labelling"));
 
-      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+      // The dialog keeps showing its own confirmation, which is where the
+      // reader opens the task or closes it.
+      expect(screen.getByTestId("labelling-task")).toBeInTheDocument();
       expect(
         screen.queryByText("Submit for labelling (1)"),
       ).not.toBeInTheDocument();
+
+      await user.click(screen.getByText("close labelling"));
+      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
     });
 
     it("leaves the agent's own instructions out of what is stored", async () => {
