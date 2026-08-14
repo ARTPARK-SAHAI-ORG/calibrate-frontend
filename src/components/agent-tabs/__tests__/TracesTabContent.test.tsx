@@ -104,7 +104,11 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
 // The stub exposes the check callback so a test can prove the tab wires its
 // own refetch into the setup steps.
 jest.mock("../../traces/TracesEmptyState", () => ({
-  TracesEmptyState: ({ onCheckForTraces }: { onCheckForTraces: () => void }) => (
+  TracesEmptyState: ({
+    onCheckForTraces,
+  }: {
+    onCheckForTraces: () => void;
+  }) => (
     <div data-testid="traces-empty-state">
       <button type="button" onClick={onCheckForTraces}>
         check
@@ -171,10 +175,14 @@ const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
 
 const refetch = jest.fn();
 
-function tracesResult(items: TraceSummary[]) {
+function tracesResult(
+  items: TraceSummary[],
+  over: Record<string, unknown> = {},
+) {
   return {
     items,
     total: items.length,
+    loadedQ: "",
     offset: 0,
     isLoading: false,
     error: null,
@@ -184,6 +192,7 @@ function tracesResult(items: TraceSummary[]) {
     hasNext: false,
     prevPage: jest.fn(),
     nextPage: jest.fn(),
+    ...over,
   };
 }
 
@@ -315,11 +324,56 @@ describe("TracesTabContent", () => {
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() =>
-      expect(screen.getByText("No traces match your search.")).toBeInTheDocument(),
+      expect(
+        screen.getByText("No traces match your search."),
+      ).toBeInTheDocument(),
     );
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
     // The search box has to stay, or there is no way back to the full list.
     expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
+  });
+
+  it("keeps the setup steps away while a cleared search loads the full list back", async () => {
+    const user = setupUser();
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    // The search found nothing, so the rows on screen belong to "polio".
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
+    const box = screen.getByPlaceholderText("Search traces");
+    await user.type(box, "polio");
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your search."),
+      ).toBeInTheDocument(),
+    );
+
+    // The box is cleared, but the full list has not come back yet.
+    await user.clear(box);
+    await waitFor(() => expect(lastTracesArgs().q).toBe(""));
+
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
+  });
+
+  it("keeps the wait on screen when a search empties the list mid-load", async () => {
+    const user = setupUser();
+    fetchTrace.mockReturnValue(new Promise(() => {}));
+    render(<TracesTabContent agentUuid="agent-1" />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Submit for labelling (1)"));
+    await user.click(screen.getByText("choose evaluators"));
+    expect(screen.getByText("Loading traces...")).toBeInTheDocument();
+
+    // A search lands while the traces are still loading and matches nothing.
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your search."),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Loading traces...")).toBeInTheDocument();
   });
 
   it("shows the empty state when the agent has no traces", () => {
@@ -353,7 +407,9 @@ describe("TracesTabContent", () => {
       ...tracesResult([]),
       isLoading: loading,
     }));
-    const { container, rerender } = render(<TracesTabContent agentUuid="agent-1" />);
+    const { container, rerender } = render(
+      <TracesTabContent agentUuid="agent-1" />,
+    );
 
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
 
@@ -541,9 +597,9 @@ describe("TracesTabContent", () => {
       await user.click(screen.getByLabelText("Select all traces"));
       await user.click(screen.getByText("Submit for labelling (2)"));
 
-      expect(screen.getByTestId("labelling-evaluators-agent")).toHaveTextContent(
-        "agent-1",
-      );
+      expect(
+        screen.getByTestId("labelling-evaluators-agent"),
+      ).toHaveTextContent("agent-1");
       // Nothing is fetched until the evaluators are settled.
       expect(fetchTrace).not.toHaveBeenCalled();
 
@@ -552,14 +608,20 @@ describe("TracesTabContent", () => {
       await waitFor(() =>
         expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
       );
-      expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("labelling-evaluators"),
+      ).not.toBeInTheDocument();
       // One fetch per selected trace, because the rows only hold previews.
       expect(fetchTrace).toHaveBeenCalledTimes(2);
       expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-1");
       expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-2");
 
-      expect(screen.getByTestId("labelling-source")).toHaveTextContent("traces");
-      expect(screen.getByTestId("labelling-agent")).toHaveTextContent("agent-1");
+      expect(screen.getByTestId("labelling-source")).toHaveTextContent(
+        "traces",
+      );
+      expect(screen.getByTestId("labelling-agent")).toHaveTextContent(
+        "agent-1",
+      );
       expect(screen.getByTestId("labelling-evaluator-uuids")).toHaveTextContent(
         "ev-1",
       );
@@ -653,7 +715,11 @@ describe("TracesTabContent", () => {
       mockUseTraces.mockReturnValue(
         tracesResult([
           trace(),
-          trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+          trace({
+            uuid: "trace-2",
+            message_id: "msg-002",
+            input_preview: "Second",
+          }),
         ]),
       );
       fetchTrace.mockImplementation(async (_token: string, uuid: string) => {
@@ -718,8 +784,16 @@ describe("TracesTabContent", () => {
       mockUseTraces.mockReturnValue(
         tracesResult([
           trace(),
-          trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
-          trace({ uuid: "trace-3", message_id: "msg-003", input_preview: "Third" }),
+          trace({
+            uuid: "trace-2",
+            message_id: "msg-002",
+            input_preview: "Second",
+          }),
+          trace({
+            uuid: "trace-3",
+            message_id: "msg-003",
+            input_preview: "Third",
+          }),
         ]),
       );
       render(<TracesTabContent agentUuid="agent-1" />);
@@ -769,7 +843,11 @@ describe("TracesTabContent", () => {
     mockUseTraces.mockReturnValue(
       tracesResult([
         trace(),
-        trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+        trace({
+          uuid: "trace-2",
+          message_id: "msg-002",
+          input_preview: "Second",
+        }),
       ]),
     );
     render(<TracesTabContent agentUuid="agent-1" />);
@@ -780,5 +858,4 @@ describe("TracesTabContent", () => {
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });
-
 });

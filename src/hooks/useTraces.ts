@@ -31,6 +31,10 @@ export function useTraces({
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The search text the rows on screen came from. It lags `q` while a new
+  // search loads, and callers need it to tell "this agent has no traces" from
+  // "this search found none".
+  const [loadedQ, setLoadedQ] = useState("");
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
@@ -56,6 +60,7 @@ export function useTraces({
         const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
         setTotal(nextTotal);
+        setLoadedQ(q);
         return nextTotal;
       } catch (err) {
         if (requestId !== requestIdRef.current) return 0;
@@ -114,6 +119,7 @@ export function useTraces({
   return {
     items,
     total,
+    loadedQ,
     offset,
     pageSize,
     isLoading,

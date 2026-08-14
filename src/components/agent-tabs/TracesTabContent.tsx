@@ -55,6 +55,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const {
     items,
     total,
+    loadedQ,
     offset,
     isLoading,
     error,
@@ -221,10 +222,11 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   // a load with no search text can decide that. Held from the last load that
   // worked, so neither a check in flight nor a failed one swaps the steps out:
   // the key the reader just created lives only on that screen and is shown once.
-  // Both the typed text and the text the list was loaded with count: the moment
-  // anything is typed an empty list can no longer mean "never sent a trace", and
-  // while the box is being cleared the rows on screen are still the search.
-  const isSearching = searchInput.trim() !== "" || search.trim() !== "";
+  // All three texts count: the moment anything is typed an empty list can no
+  // longer mean "never sent a trace", and after the box is cleared the rows on
+  // screen are still the old search until the full list has loaded back.
+  const isSearching =
+    searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
   const isEmptyRef = useRef(false);
   if (!isLoading && !error && !isSearching) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
@@ -267,12 +269,11 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         <LoadingState />
       ) : showEmptyState ? (
         <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
-      ) : total === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No traces match your search.
-        </p>
       ) : (
         <div className="space-y-3">
+          {/* Above the no-match message too: rows ticked before the search was
+              typed are still ticked, and the wait while traces load for
+              labelling must not disappear either. */}
           {(selected.size > 0 || isPreparingLabelling) && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
               <span className="text-sm text-muted-foreground">
@@ -317,32 +318,38 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             </div>
           )}
 
-          <div className="space-y-1 pt-4">
-            <ServerPaginatedListBar
-              total={total}
-              offset={offset}
-              loadedCount={items.length}
-              pageSize={pageSize}
-              onPageSizeChange={setPageSize}
-              currentPage={currentPage}
-              pageCount={pageCount}
-              onPrev={prevPage}
-              onNext={nextPage}
-              prevDisabled={!hasPrev || isLoading}
-              nextDisabled={!hasNext || isLoading}
-              itemNoun="trace"
-            />
+          {total === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No traces match your search.
+            </p>
+          ) : (
+            <div className="space-y-1 pt-4">
+              <ServerPaginatedListBar
+                total={total}
+                offset={offset}
+                loadedCount={items.length}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                currentPage={currentPage}
+                pageCount={pageCount}
+                onPrev={prevPage}
+                onNext={nextPage}
+                prevDisabled={!hasPrev || isLoading}
+                nextDisabled={!hasNext || isLoading}
+                itemNoun="trace"
+              />
 
-            <TracesTable
-              traces={items}
-              checkboxProps={deletion.checkboxProps}
-              allSelected={deletion.allSelected}
-              hasSelectableItems={deletion.hasSelectableItems}
-              onToggleSelectAll={deletion.toggleSelectAll}
-              onOpen={openTrace}
-              onDelete={deletion.openDeleteDialog}
-            />
-          </div>
+              <TracesTable
+                traces={items}
+                checkboxProps={deletion.checkboxProps}
+                allSelected={deletion.allSelected}
+                hasSelectableItems={deletion.hasSelectableItems}
+                onToggleSelectAll={deletion.toggleSelectAll}
+                onOpen={openTrace}
+                onDelete={deletion.openDeleteDialog}
+              />
+            </div>
+          )}
         </div>
       )}
 

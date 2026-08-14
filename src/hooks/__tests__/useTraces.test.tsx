@@ -66,6 +66,32 @@ describe("useTraces", () => {
     expect(result.current.offset).toBe(0);
   });
 
+  it("reports the search text the rows on screen came from", async () => {
+    let resolvePage: (value: unknown) => void = () => {};
+    mockFetchTraces.mockResolvedValueOnce(page([{ uuid: "a" }], 1));
+
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", q }),
+      { initialProps: { q: "" } },
+    );
+    await waitFor(() => expect(result.current.loadedQ).toBe(""));
+
+    mockFetchTraces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePage = resolve;
+      }),
+    );
+    rerender({ q: "polio" });
+    // The new search is in flight, so the rows are still the old ones.
+    expect(result.current.loadedQ).toBe("");
+
+    await act(async () => {
+      resolvePage(page([], 0));
+    });
+    expect(result.current.loadedQ).toBe("polio");
+  });
+
   it("stays idle without an access token", async () => {
     const { result } = renderHook(() =>
       useTraces({ accessToken: null, agentId: "ag-1" }),
