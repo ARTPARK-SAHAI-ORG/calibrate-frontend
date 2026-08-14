@@ -5,6 +5,7 @@ import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { RetryIcon } from "@/components/ui";
+import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
@@ -32,7 +33,10 @@ import {
   runOutputType,
   snapshotToItem,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
-import { buildSendForReviewSlot } from "@/components/human-labelling/SendForReviewFlow";
+import {
+  SendForReviewFlow,
+  type ReviewItem,
+} from "@/components/human-labelling/SendForReviewFlow";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 
 /**
@@ -234,6 +238,14 @@ export default function EvaluatorRunDetailPage() {
   const taskItemIds = useMemo(
     () => new Set((task?.items ?? []).map((it) => it.uuid)),
     [task?.items],
+  );
+
+  // The items the run view's filters currently leave visible, reported up so
+  // the header can offer to send exactly those for review.
+  const [visibleItems, setVisibleItems] = useState<ReviewItem[]>([]);
+  const handleVisibleItemsChange = useCallback(
+    (items: ReviewItem[]) => setVisibleItems(items),
+    [],
   );
 
   /** Item UUIDs covered by this job, used to pre-target a re-run. */
@@ -568,77 +580,89 @@ export default function EvaluatorRunDetailPage() {
             linkEvaluators
             actionsSlot={
               /* Button order is fixed across all results pages so users
-                 build the same muscle memory: Re-run (leftmost, page-
-                 specific action), then Export results, then Share. The
-                 Export ↔ Share ordering matches TestRunnerDialog,
-                 BenchmarkResultsDialog, and the auth/public STT & TTS
-                 pages. */
+                 build the same muscle memory: the page-specific actions
+                 first (Re-run, then Send for review), then Export, then
+                 Share. Re-run and Export carry their words in a tooltip
+                 instead of on the button: four labelled buttons in one row
+                 left nothing standing out. */
               <div className="flex items-center gap-2 flex-wrap">
                 {accessToken && rerunItemIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRerunError(null);
-                      setRerunOpen(true);
-                    }}
-                    disabled={rerunSubmitting}
-                    title="Run a new evaluation on the same items"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <RetryIcon />
-                    Re-run
-                  </button>
+                  <Tooltip content="Run again on the same items" position="bottom">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRerunError(null);
+                        setRerunOpen(true);
+                      }}
+                      disabled={rerunSubmitting}
+                      aria-label="Run again on the same items"
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RetryIcon />
+                    </button>
+                  </Tooltip>
                 )}
+                <SendForReviewFlow
+                  accessToken={accessToken}
+                  taskUuid={taskUuid}
+                  visibleItems={visibleItems}
+                  taskItemIds={taskItemIds}
+                  evaluators={task.evaluators ?? []}
+                />
                 {job.status === "completed" && itemsForRun.length > 0 && (
                   /* Tinted teal styling matches `ExportResultsButton` and
                      `ExportZipButton` so the export affordance reads the
                      same on every results page. Stays inline (not the
                      shared component) because the XLSX builder is
                      page-specific. */
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={exporting}
-                    title="Download spreadsheet (XLSX)"
-                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18"
+                  <Tooltip
+                    content="Download as a spreadsheet"
+                    position="bottom"
                   >
-                    {exporting ? (
-                      <svg
-                        className="w-4 h-4 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      disabled={exporting}
+                      aria-label="Download as a spreadsheet"
+                      className="flex items-center justify-center h-8 w-8 rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18"
+                    >
+                      {exporting ? (
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
                           stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                        />
-                      </svg>
-                    )}
-                    {exporting ? "Exporting…" : "Export results"}
-                  </button>
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </Tooltip>
                 )}
                 {job.status === "completed" && accessToken && (
                   <ShareButton
@@ -651,12 +675,7 @@ export default function EvaluatorRunDetailPage() {
                 )}
               </div>
             }
-            reviewSlot={buildSendForReviewSlot({
-              accessToken,
-              taskUuid,
-              taskItemIds,
-              evaluators: task.evaluators ?? [],
-            })}
+            onVisibleItemsChange={handleVisibleItemsChange}
             topError={exportError ? `Export failed: ${exportError}` : null}
           />
         ) : null}

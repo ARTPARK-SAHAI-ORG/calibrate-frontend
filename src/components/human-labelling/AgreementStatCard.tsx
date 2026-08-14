@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/lib/nav";
+import { Tooltip } from "@/components/Tooltip";
 
 export function agreementColor(v: number | null | undefined): string {
   if (v == null) return "text-muted-foreground";
@@ -81,6 +82,10 @@ export function AgreementStatCard(
      * name and its number. Ignored when the human agreement number is also
      * on the card: two numbers side by side always need their own names. */
     showResultLabel?: boolean;
+    /** Why this evaluator has no human agreement number. Shown as a small
+     * mark beside the name that explains itself on hover, so a run with
+     * unlabelled evaluators does not need a banner above the cards. */
+    warning?: string | null;
   },
 ) {
   const {
@@ -88,16 +93,43 @@ export function AgreementStatCard(
     valueClassName = "",
     result = null,
     showResultLabel = true,
+    warning = null,
   } = props;
+  const warningMark = warning ? (
+    <Tooltip content={warning} position="top">
+      <span
+        role="img"
+        aria-label={warning}
+        className="inline-flex shrink-0 text-amber-600 dark:text-amber-400 cursor-pointer"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+          />
+        </svg>
+      </span>
+    </Tooltip>
+  ) : null;
   return (
     <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
       {"staticPillText" in props ? (
-        <span
-          className={`${agreementStatPillBase} cursor-default`}
-          title={props.staticPillText}
-        >
-          <span className="truncate">{props.staticPillText}</span>
-        </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`${agreementStatPillBase} cursor-default`}
+            title={props.staticPillText}
+          >
+            <span className="truncate">{props.staticPillText}</span>
+          </span>
+          {warningMark}
+        </div>
       ) : (
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <Link
@@ -119,6 +151,7 @@ export function AgreementStatCard(
               alignment
             </span>
           )}
+          {warningMark}
         </div>
       )}
       {result && (value != null || showResultLabel) ? (

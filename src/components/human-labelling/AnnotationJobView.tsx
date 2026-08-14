@@ -23,7 +23,7 @@ import {
   type ValueFilter,
 } from "./ItemValueFilter";
 import { useUrlValueFilters } from "./valueFilterUrl";
-import type { ReviewSlot } from "./SendForReviewFlow";
+import type { ReviewItem } from "./SendForReviewFlow";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -226,7 +226,7 @@ export function AnnotationJobView({
   mode,
   fillViewport = true,
   onLoaded,
-  reviewSlot,
+  onVisibleItemsChange,
 }: {
   token: string;
   mode: AnnotationJobMode;
@@ -235,11 +235,11 @@ export function AnnotationJobView({
   /** Called once the job data is fetched. Useful for the admin wrapper to render task/annotator info above the card. */
   onLoaded?: (meta: AnnotationJobMeta) => void;
   /**
-   * Rendered next to the item filters and handed the items the filters leave
-   * visible. Only the signed-in routes pass it, so the annotator links that
-   * anyone can open never show it.
+   * Called with the items the filters leave visible, so a signed-in page can
+   * offer to send exactly those for review. Only those pages pass it, so the
+   * annotator links that anyone can open never act on it.
    */
-  reviewSlot?: ReviewSlot;
+  onVisibleItemsChange?: (items: ReviewItem[]) => void;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -392,6 +392,18 @@ export function AnnotationJobView({
     );
   }, [allItems, allEvaluators, fields, canFilterByValue, valueFilters]);
 
+  // Report the filtered list up so a signed-in page can offer to send exactly
+  // those items for review. The list is rebuilt whenever an answer changes,
+  // which would re-render the page around us on every keystroke, so only
+  // report when the items themselves actually differ.
+  const reportedItemsRef = useRef<string>("");
+  useEffect(() => {
+    const key = visibleItems.map((it) => it.uuid).join(",");
+    if (key === reportedItemsRef.current) return;
+    reportedItemsRef.current = key;
+    onVisibleItemsChange?.(visibleItems);
+  }, [visibleItems, onVisibleItemsChange]);
+
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
     : "flex flex-col flex-1 min-h-0";
@@ -462,7 +474,6 @@ export function AnnotationJobView({
       valueFilters={valueFilters}
       canFilterByValue={canFilterByValue}
       onValueFilterChange={handleValueFilterChange}
-      reviewSlot={reviewSlot}
       isAdmin={isAdmin}
       currentIndex={safeIndex}
       onJumpTo={setCurrentIndex}
@@ -495,8 +506,6 @@ type ViewProps = {
   /** Admin view only — the shared read-only link gets no filter. */
   canFilterByValue: boolean;
   onValueFilterChange: (next: ValueFilter[]) => void;
-  /** Rendered next to the filters, with the items the filters leave visible. */
-  reviewSlot?: ReviewSlot;
   isAdmin: boolean;
   fillViewport: boolean;
   currentIndex: number;
@@ -527,7 +536,6 @@ function AnnotateView({
   valueFilters,
   canFilterByValue,
   onValueFilterChange,
-  reviewSlot,
   isAdmin,
   fillViewport,
   currentIndex,
@@ -556,10 +564,6 @@ function AnnotateView({
     usableValueFilters(valueFilters, data.evaluators).length > 0;
   const showValueFilter =
     canFilterByValue && valueFilterEvaluators(data.evaluators).length > 0;
-  // Built here rather than inline so the toolbar row can skip itself when it
-  // would be empty: the review button renders nothing while the page is still
-  // loading, or when there is nothing to send.
-  const reviewButton = reviewSlot?.(items);
   // 1-based position in the unfiltered list, so a filtered strip still shows
   // each item's real number.
   const originalIndexByUuid = useMemo(
@@ -887,18 +891,13 @@ function AnnotateView({
           </div>
         </header>
 
-        {/* The row also shows on its own for the review button, so that stays
-            reachable on a job with no filters to apply. */}
-        {(showValueFilter || reviewButton) && (
+        {showValueFilter && (
           <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
-            {showValueFilter && (
-              <ItemValueFilter
-                evaluators={data.evaluators}
-                filters={valueFilters}
-                onChange={onValueFilterChange}
-              />
-            )}
-            {reviewButton}
+            <ItemValueFilter
+              evaluators={data.evaluators}
+              filters={valueFilters}
+              onChange={onValueFilterChange}
+            />
           </div>
         )}
 

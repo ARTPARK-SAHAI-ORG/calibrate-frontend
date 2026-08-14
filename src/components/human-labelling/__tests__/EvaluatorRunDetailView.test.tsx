@@ -1349,7 +1349,7 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("shows the 'no human labels yet' banner when agreement data exists but is empty", () => {
+  it("marks each evaluator that has no human labels yet", () => {
     const job = makeJob({
       runs: [makeRun()],
       human_agreement: {
@@ -1363,8 +1363,8 @@ describe("EvaluatorRunDetailView", () => {
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
-      screen.getByText(/No human labels found on the items in this run yet/),
-    ).toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
+    ).toBeGreaterThan(0);
   });
 
   it("renders human agreement stat cards when agreement data is present", () => {
@@ -1431,15 +1431,15 @@ describe("EvaluatorRunDetailView", () => {
     );
     expect(screen.getByText("100%")).toBeInTheDocument();
     expect(
-      screen.getByText(/No human labels found on the items in this run yet/),
-    ).toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
+    ).toBeGreaterThan(0);
     // Nothing to compare against yet, so the card leaves the human agreement
     // column out instead of showing an empty one.
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
-  it("warns that only some evaluators have human labels", () => {
+  it("marks only the evaluators that have no human labels yet", () => {
     const job = makeJob({
       evaluators: [
         evaluatorBinary,
@@ -1469,17 +1469,15 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
+    // Exactly one of the two evaluators is unlabelled, so exactly one mark.
     expect(
-      screen.getByText(/No human labels yet for some of the evaluators/),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/No human labels found on the items in this run yet/),
-    ).not.toBeInTheDocument();
+      screen.getAllByLabelText(/No human labels for this evaluator yet/),
+    ).toHaveLength(1);
     // The labelled evaluator still shows its agreement number.
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
-  it("hides the warning once every evaluator has human labels", () => {
+  it("shows no mark once every evaluator has human labels", () => {
     const job = makeJob({
       runs: [makeRun()],
       human_agreement: {
@@ -1498,7 +1496,9 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    expect(screen.queryByText(/No human labels/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/No human labels for this evaluator yet/),
+    ).not.toBeInTheDocument();
   });
 
   it("does not render the human agreement summary while the job is still in progress", () => {
@@ -1623,44 +1623,68 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  describe("review slot", () => {
-    // The disagreement toggle, the filter, and the review button share one
-    // strip. Its own class list is what tells it apart from the rows around it.
+  describe("reporting the items on screen", () => {
+    // The disagreement toggle and the filter share one strip. Its own class
+    // list is what tells it apart from the rows around it.
     const filterStrips = () =>
       document.querySelectorAll("div.py-2\\.5.flex-wrap");
 
     // No disagreements, and a rating evaluator with no bounds offers no
-    // values to filter on, so only the review slot can draw the strip.
+    // values to filter on, so nothing draws the strip.
     const jobWithNoFilters = () =>
       makeJob({
         evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
         runs: [],
       });
 
-    it("shows what the review slot returns, with the items on screen", () => {
+    const uuidsFromLastCall = (fn: jest.Mock) =>
+      fn.mock.calls.at(-1)![0].map((it: { uuid: string }) => it.uuid);
+
+    it("reports every item when nothing is filtered out", () => {
+      const onVisibleItemsChange = jest.fn();
       render(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
           versionLabels={{}}
-          reviewSlot={(visible) => (
-            <button>Send {visible.length} items for review</button>
-          )}
+          onVisibleItemsChange={onVisibleItemsChange}
         />,
       );
-      expect(
-        screen.getByRole("button", { name: "Send 2 items for review" }),
-      ).toBeInTheDocument();
-      expect(filterStrips()).toHaveLength(1);
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual([
+        "item-1",
+        "item-2",
+      ]);
     });
 
-    it("leaves no empty strip when the review slot returns nothing", () => {
+    it("reports the narrowed list when a value filter is applied", async () => {
+      const user = setupUser();
+      const onVisibleItemsChange = jest.fn();
+      render(
+        <EvaluatorRunDetailView
+          job={makeValueFilterJob()}
+          task={makeTask()}
+          versionLabels={{}}
+          onVisibleItemsChange={onVisibleItemsChange}
+        />,
+      );
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual([
+        "item-1",
+        "item-2",
+      ]);
+
+      await addFilter(user, "Binary Evaluator", "Correct");
+
+      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(uuidsFromLastCall(onVisibleItemsChange)).toEqual(["item-1"]);
+    });
+
+    it("draws no filter strip when there is nothing to filter on", () => {
       render(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
           versionLabels={{}}
-          reviewSlot={() => null}
+          onVisibleItemsChange={jest.fn()}
         />,
       );
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
