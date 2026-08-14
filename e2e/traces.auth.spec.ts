@@ -173,16 +173,23 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     // The other agent's trace is not listed here.
     await expect(page.getByText(otherMsgId)).toHaveCount(0);
 
-    // Open the detail dialog and confirm it renders the output.
+    // Open the detail dialog and confirm it renders the output. The dialog is
+    // titled with the last thing the caller said, not the word "Trace".
     await row.click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: "Trace", exact: true }),
+      dialog.getByRole("heading", {
+        name: "Tell me about booster doses",
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
       dialog.getByText("Boosters are due at 16 months."),
     ).toBeVisible();
-    await expect(dialog.getByText("Conversation history")).toBeVisible();
+    // The details underneath name the trace, its conversation, and the
+    // metadata the customer sent with it.
+    await expect(dialog.getByText(`e2e-conv-${stamp}`)).toBeVisible();
+    await expect(dialog.getByText("env")).toBeVisible();
     // Close the dialog.
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
@@ -235,19 +242,28 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await expect(page.getByText(msgId).first()).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "Select trace" }).first().click();
 
-    // Open the add-to-tests dialog and submit (response type, the agent's
-    // evaluators preselected — no evaluator click needed).
+    // Open the add-to-tests dialog and submit. The agent is new so it has no
+    // evaluators of its own, and the built-in reply evaluator asks for a
+    // criteria value, which puts it out of reach here. So nothing starts
+    // ticked and the first evaluator on offer has to be picked by hand.
     await page.getByRole("button", { name: /^Add to tests \(/ }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
       dialog.getByRole("heading", { name: /Add 1 trace to tests/ }),
     ).toBeVisible();
+    const submit = dialog.getByRole("button", {
+      name: "Add to tests",
+      exact: true,
+    });
+    // Wait for the evaluators to arrive before reading the button, otherwise
+    // it is only disabled because the list is still loading.
+    const firstEvaluator = dialog.getByRole("checkbox").first();
+    await expect(firstEvaluator).toBeVisible({ timeout: 15000 });
+    if (!(await submit.isEnabled())) await firstEvaluator.check();
     // The dialog no longer asks which agents to link: the created tests always
     // belong to the agent whose tab this is.
     await expect(dialog.getByText("Link to agents")).toHaveCount(0);
-    await dialog
-      .getByRole("button", { name: "Add to tests", exact: true })
-      .click();
+    await submit.click();
 
     // Success toast with a link to the tests page.
     await expect(page.getByText(/Created \d+ test/)).toBeVisible({
