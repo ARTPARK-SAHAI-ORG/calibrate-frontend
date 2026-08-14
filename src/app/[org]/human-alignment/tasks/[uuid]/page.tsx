@@ -62,7 +62,7 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { useAccessToken, usePageErrorState } from "@/hooks";
+import { useAccessToken, useItemPager, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -1720,10 +1720,14 @@ function LabellingTaskPageInner() {
   const itemsCount = itemsTotal;
   const itemsPageCount =
     itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
+  // Where the items on screen actually start. `itemsOffset` is the page
+  // that was asked for, which runs ahead of the items until they arrive,
+  // so every number describing the rows on screen counts from this one.
+  const loadedItemsOffset = taskSummary?.pagination?.offset ?? itemsOffset;
   const itemsCurrentPage =
-    itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
-  const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
-  const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
+    itemsLimit > 0 ? Math.floor(loadedItemsOffset / itemsLimit) + 1 : 1;
+  const itemsRangeStart = itemsTotal === 0 ? 0 : loadedItemsOffset + 1;
+  const itemsRangeEnd = Math.min(loadedItemsOffset + items.length, itemsTotal);
   // Hide the whole pagination footer when pagination can never apply — i.e.
   // even the smallest page size fits every item on one page. Above that
   // threshold we keep the footer (so the Per-page selector stays reachable)
@@ -2315,9 +2319,18 @@ function LabellingTaskPageInner() {
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
 
   const [itemDetailUuid, setItemDetailUuid] = useState<string | null>(null);
-  const openItemDetail = useCallback((itemUuid: string) => {
-    setItemDetailUuid(itemUuid);
-  }, []);
+  // Previous / next in the open item walks the whole task, loading the
+  // neighbouring page when it steps past either end of the page on screen.
+  const itemPager = useItemPager({
+    items,
+    openUuid: itemDetailUuid,
+    pageStart: loadedItemsOffset,
+    pageSize: itemsLimit,
+    total: itemsTotal,
+    onOpen: setItemDetailUuid,
+    onPageStartChange: setItemsOffset,
+  });
+  const openItemDetail = itemPager.open;
 
   const handleAssignAnnotators = async (
     annotatorIds: string[],
@@ -4606,7 +4619,10 @@ function LabellingTaskPageInner() {
 
       <ItemDetailDialog
         isOpen={!!itemDetailUuid}
-        onClose={() => setItemDetailUuid(null)}
+        onClose={() => {
+          setItemDetailUuid(null);
+          itemPager.cancel();
+        }}
         task={
           task &&
           (task.type === "llm" ||
@@ -4636,33 +4652,11 @@ function LabellingTaskPageInner() {
           };
         })()}
         accessToken={accessToken}
-        hasPrev={(() => {
-          if (!itemDetailUuid) return false;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          return idx > 0;
-        })()}
-        hasNext={(() => {
-          if (!itemDetailUuid) return false;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          return idx >= 0 && idx < items.length - 1;
-        })()}
-        onPrev={() => {
-          if (!itemDetailUuid) return;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx > 0) setItemDetailUuid(items[idx - 1].uuid);
-        }}
-        onNext={() => {
-          if (!itemDetailUuid) return;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx >= 0 && idx < items.length - 1)
-            setItemDetailUuid(items[idx + 1].uuid);
-        }}
-        position={(() => {
-          if (!itemDetailUuid) return undefined;
-          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          if (idx < 0) return undefined;
-          return { index: idx, total: items.length };
-        })()}
+        hasPrev={itemPager.hasPrev}
+        hasNext={itemPager.hasNext}
+        onPrev={itemPager.prev}
+        onNext={itemPager.next}
+        position={itemPager.position}
       />
     </AppLayout>
   );

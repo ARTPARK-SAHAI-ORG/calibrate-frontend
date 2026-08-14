@@ -20,3 +20,4 @@ export {
   clearOrgsCache,
   seedOrgsCache,
 } from "./useOrganizations";
+export { useItemPager } from "./useItemPager";
