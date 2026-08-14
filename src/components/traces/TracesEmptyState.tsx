@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { getBackendUrl } from "@/lib/api";
 
 function ingestSnippet(backendUrl: string): string {
