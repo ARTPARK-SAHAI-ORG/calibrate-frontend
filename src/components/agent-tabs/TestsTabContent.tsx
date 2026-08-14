@@ -701,6 +701,18 @@ export function TestsTabContent({
     }
   }, [agentUuid, backendAccessToken]);
 
+  // A `?runId=` this agent has no run for (deleted run, or a link from another
+  // agent or workspace) would otherwise open a run window that never fills in
+  // and keeps asking the backend for it. Once the run list has loaded, close it
+  // and drop the id from the address. An empty list means the fetch failed or
+  // has not landed, so it is not treated as proof the run is gone.
+  useEffect(() => {
+    if (!openTestRunId || pastRunsLoading || pastRuns.length === 0) return;
+    if (pastRuns.some((run) => run.uuid === openTestRunId)) return;
+    closeTestRun();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTestRunId, pastRuns, pastRunsLoading]);
+
   // Poll pending runs (excluding the one being viewed in dialog)
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;

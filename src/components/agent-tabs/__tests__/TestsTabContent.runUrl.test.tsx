@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { TestsTabContent } from "../TestsTabContent";
 
 const BACKEND = "http://test-backend";
@@ -103,5 +103,39 @@ describe("TestsTabContent run deep-link", () => {
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:run-7",
     );
+  });
+
+  it("closes and forgets a run the agent does not have", async () => {
+    window.history.replaceState(null, "", "/?runId=run-gone");
+    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+
+    // The list loads without that run, so the window closes and the address
+    // stops naming it.
+    await waitFor(() => expect(runIdInUrl()).toBeNull());
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+  });
+
+  it("keeps the run open while the run list has not loaded", async () => {
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        return jsonResponse({}, false, 500);
+      }
+      return jsonResponse({ items: [], total: 0 });
+    });
+    window.history.replaceState(null, "", "/?runId=run-7");
+    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+
+    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
+    // Let the failed list fetch settle: an empty list is not proof the run is
+    // gone, so the window stays open and the address keeps the run.
+    await waitFor(() =>
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+          String(url).includes(`/agent-tests/agent/${AGENT_UUID}/runs`),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByTestId("test-runner")).toBeInTheDocument();
+    expect(runIdInUrl()).toBe("run-7");
   });
 });
