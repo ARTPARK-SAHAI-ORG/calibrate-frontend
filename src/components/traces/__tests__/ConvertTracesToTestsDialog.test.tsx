@@ -116,6 +116,8 @@ it("uses Add to tests copy and pluralizes the trace count", async () => {
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled(),
   );
+  // The evaluator instruction is said once, in the header.
+  expect(screen.getAllByText(/Pick at least one/)).toHaveLength(1);
 });
 
 it("lists only llm evaluators without variables, and preselects the default LLM-reply one", async () => {
@@ -228,6 +230,10 @@ it("shows only tool-call options and submits the given tool_call type", async ()
 
   expect(mockFetchEvals).not.toHaveBeenCalled();
   expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Pick at least one evaluator/)).toBeNull();
+  expect(
+    screen.getByText(/same tool calls happen again/),
+  ).toBeInTheDocument();
   expect(screen.queryAllByRole("radio")).toHaveLength(0);
   expect(screen.queryByText("Test type")).not.toBeInTheDocument();
   expect(

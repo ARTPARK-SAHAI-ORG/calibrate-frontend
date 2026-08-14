@@ -125,8 +125,9 @@ export function ConvertTracesToTestsDialog({
             Add {count} trace{count === 1 ? "" : "s"} to tests
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Create regression tests you can run, benchmark, and send for
-            labelling.
+            {testType === "response"
+              ? "Pick at least one evaluator. Each created test judges the reply with these."
+              : "Each created test checks that the same tool calls happen again."}
           </p>
         </div>
 
@@ -140,10 +141,6 @@ export function ConvertTracesToTestsDialog({
                   <div className="text-sm font-semibold text-foreground">
                     Evaluators
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Pick at least one. Each created test judges the reply with
-                    these.
-                  </p>
                   <EvaluatorPicker
                     evaluators={evaluators}
                     selectedIds={selectedEvaluators}
