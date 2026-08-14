@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("fetchTraces", () => {
-  it("sends limit, offset and the agent, and no search term", async () => {
+  it("sends limit, offset and the agent, and no search term when none is given", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
     await fetchTraces("tok", { limit: 50, offset: 100, agentId: "ag-1" });
@@ -37,6 +37,25 @@ describe("fetchTraces", () => {
     expect(query.get("agent_id")).toBe("ag-1");
     expect(query.has("q")).toBe(false);
     expect(query.has("conversation_id")).toBe(false);
+  });
+
+  it("sends the trimmed search term, and leaves a blank one off", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      q: "  polio  ",
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get("q"),
+    ).toBe("polio");
+
+    await fetchTraces("tok", { limit: 50, offset: 0, agentId: "ag-1", q: "  " });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has("q"),
+    ).toBe(false);
   });
 
   it("clamps a too-large page to what the backend accepts", async () => {

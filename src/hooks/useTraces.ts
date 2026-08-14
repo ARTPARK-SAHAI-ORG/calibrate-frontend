@@ -10,31 +10,38 @@ type UseTracesArgs = {
   /** The agent whose traces to list. */
   agentId: string;
   pageSize?: number;
+  /** Search text, already debounced by the caller. Blank searches everything. */
+  q?: string;
 };
 
 /**
  * Server-paginated trace list. Every other list page fetches everything and
  * filters client-side; traces are machine-written and can be far larger than
- * the client should download, so paging round-trips to `GET /traces` and this
- * hook only ever holds one page. The endpoint takes no search term.
+ * the client should download, so paging and search both round-trip to
+ * `GET /traces` and this hook only ever holds one page.
  */
 export function useTraces({
   accessToken,
   agentId,
   pageSize = 50,
+  q = "",
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The search text the rows on screen came from. It lags `q` while a new
+  // search loads, and callers need it to tell "this agent has no traces" from
+  // "this search found none".
+  const [loadedQ, setLoadedQ] = useState("");
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize]);
+  }, [agentId, pageSize, q]);
 
   const load = useCallback(
     async (targetOffset: number): Promise<number> => {
@@ -47,11 +54,13 @@ export function useTraces({
           limit: pageSize,
           offset: targetOffset,
           agentId,
+          q,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
         setTotal(nextTotal);
+        setLoadedQ(q);
         return nextTotal;
       } catch (err) {
         if (requestId !== requestIdRef.current) return 0;
@@ -66,7 +75,7 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId],
+    [accessToken, pageSize, agentId, q],
   );
 
   useEffect(() => {
@@ -110,6 +119,7 @@ export function useTraces({
   return {
     items,
     total,
+    loadedQ,
     offset,
     pageSize,
     isLoading,
