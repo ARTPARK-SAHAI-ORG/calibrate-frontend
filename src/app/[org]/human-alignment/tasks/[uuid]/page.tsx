@@ -4661,7 +4661,9 @@ function LabellingTaskPageInner() {
           if (!itemDetailUuid) return undefined;
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
           if (idx < 0) return undefined;
-          return { index: idx, total: items.length };
+          // Count across the whole task, not just the items on the
+          // current page, so the number matches "of 200" in the footer.
+          return { index: itemsOffset + idx, total: itemsTotal };
         })()}
       />
     </AppLayout>
