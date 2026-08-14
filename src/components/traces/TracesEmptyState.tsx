@@ -4,7 +4,7 @@ import React from "react";
 import { Link } from "@/lib/nav";
 import { getBackendUrl } from "@/lib/api";
 
-function ingestSnippet(backendUrl: string): string {
+function ingestSnippet(backendUrl: string, agentUuid: string): string {
   return [
     `curl -X POST ${backendUrl}/traces \\`,
     `  -H "X-API-Key: sk_..." \\`,
@@ -12,6 +12,7 @@ function ingestSnippet(backendUrl: string): string {
     `  -d '{`,
     `    "message_id": "msg-001",`,
     `    "conversation_id": "conv-001",`,
+    `    "agent_id": "${agentUuid}",`,
     `    "input": [{"role": "user", "content": "When is the next vaccination?"}],`,
     `    "output": {"response": "At 14 weeks, for OPV and DPT."}`,
     `  }'`,
@@ -19,11 +20,11 @@ function ingestSnippet(backendUrl: string): string {
 }
 
 /**
- * Shown when the workspace has no traces at all: explains the feature and
- * gives a copy-paste ingestion call, pointing at workspace settings for the
- * API key it needs.
+ * Shown when this agent has no traces at all: explains the feature and gives a
+ * copy-paste ingestion call carrying the agent, pointing at workspace settings
+ * for the API key it needs.
  */
-export function TracesEmptyState() {
+export function TracesEmptyState({ agentUuid }: { agentUuid: string }) {
   let backendUrl = "https://<backend>";
   try {
     backendUrl = getBackendUrl();
@@ -52,7 +53,7 @@ export function TracesEmptyState() {
         No traces yet
       </h3>
       <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-lg">
-        Send your agent&apos;s production conversations here, one request per
+        Send this agent&apos;s production conversations here, one request per
         turn, then curate them into tests. Create an API key in{" "}
         <Link
           href="/workspace-settings"
@@ -63,7 +64,7 @@ export function TracesEmptyState() {
         and POST each turn:
       </p>
       <pre className="w-full max-w-xl text-left font-mono text-xs text-foreground bg-muted/50 border border-border rounded-lg p-4 overflow-x-auto">
-        {ingestSnippet(backendUrl)}
+        {ingestSnippet(backendUrl, agentUuid)}
       </pre>
     </div>
   );

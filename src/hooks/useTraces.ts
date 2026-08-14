@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTraces, TraceSummary } from "@/lib/tracesApi";
+import {
+  fetchTraces,
+  fetchWorkspaceTraceCount,
+  TraceSummary,
+} from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 export const TRACES_PAGE_SIZE = 50;
@@ -9,6 +13,8 @@ export const TRACES_PAGE_SIZE = 50;
 type UseTracesArgs = {
   /** Backend JWT; the hook is idle until it's available. */
   accessToken: string | null;
+  /** The agent whose traces to list. */
+  agentId: string;
   /** Server-side search query. Pass the debounced value, not each keystroke. */
   q: string;
   /** Restrict the list to one conversation, or null for all. */
@@ -24,6 +30,7 @@ type UseTracesArgs = {
  */
 export function useTraces({
   accessToken,
+  agentId,
   q,
   conversationId,
   pageSize = TRACES_PAGE_SIZE,
@@ -39,7 +46,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [q, conversationId]);
+  }, [agentId, q, conversationId]);
 
   const load = useCallback(
     async (targetOffset: number) => {
@@ -51,6 +58,7 @@ export function useTraces({
         const page = await fetchTraces(accessToken, {
           limit: pageSize,
           offset: targetOffset,
+          agentId,
           q: q || undefined,
           conversationId: conversationId || undefined,
         });
@@ -65,7 +73,7 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, q, conversationId],
+    [accessToken, pageSize, agentId, q, conversationId],
   );
 
   useEffect(() => {
@@ -120,9 +128,12 @@ export function useTraces({
 }
 
 /**
- * Workspace-wide live trace count for the usage indicator, independent of the
- * list's active filters (a `limit=1` fetch reads just the envelope `total`).
- * Bump `refreshKey` after deletes or ingests to re-read.
+ * Live count of every trace in the workspace, across all agents. The storage
+ * limit it is shown against is a workspace limit, so this deliberately does NOT
+ * filter by agent: an agent-only number next to a workspace limit reads as
+ * plenty of room left when the workspace is in fact full. A `limit=1` read is
+ * enough, the count comes from the envelope `total`. Bump `refreshKey` after
+ * deletes or ingests to re-read.
  */
 export function useTraceCount(accessToken: string | null, refreshKey = 0) {
   const [count, setCount] = useState<number | null>(null);
@@ -130,9 +141,9 @@ export function useTraceCount(accessToken: string | null, refreshKey = 0) {
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    fetchTraces(accessToken, { limit: 1, offset: 0 })
-      .then((page) => {
-        if (!cancelled) setCount(page.total ?? 0);
+    fetchWorkspaceTraceCount(accessToken)
+      .then((total) => {
+        if (!cancelled) setCount(total);
       })
       .catch((err) => {
         reportError("Error fetching trace count:", err);

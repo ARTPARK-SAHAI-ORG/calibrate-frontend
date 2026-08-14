@@ -15,6 +15,7 @@ const tabDisplayNames: Record<string, string> = {
   tools: "Tools",
   "data-extraction": "Data Extraction",
   tests: "Tests",
+  traces: "Traces",
   evaluators: "Evaluators",
   settings: "Settings",
 };

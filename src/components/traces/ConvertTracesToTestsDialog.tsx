@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { LoadingState } from "@/components/ui";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
-import { apiGet, unwrapList } from "@/lib/api";
 import {
   DEFAULT_LLM_NEXT_REPLY_SLUG,
   defaultOriginSlug,
@@ -17,8 +16,6 @@ import {
   ConvertTracesToTestsResult,
 } from "@/lib/tracesApi";
 
-type AgentOption = { uuid: string; name: string };
-
 type ConvertTracesToTestsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -28,6 +25,8 @@ type ConvertTracesToTestsDialogProps = {
   /** Whether every selected trace recorded at least one tool call — gates the
    *  `tool_call` type (a tool-call test needs calls to assert). */
   allHaveToolCalls: boolean;
+  /** The agent whose traces these are — created tests link to it. */
+  agentUuid: string;
   /** Called with the backend result after a successful conversion. */
   onConverted: (result: ConvertTracesToTestsResult) => void;
 };
@@ -42,8 +41,8 @@ function toggle(set: Set<string>, uuid: string): Set<string> {
 /**
  * Convert selected traces into regression tests. `response` re-runs the agent
  * and judges the reply (requires ≥1 evaluator, defaulted to the workspace's
- * LLM-reply evaluator); `tool_call` asserts the recorded tool calls. Optionally
- * links the created tests to agents so they're runnable right away.
+ * LLM-reply evaluator); `tool_call` asserts the recorded tool calls. Created
+ * tests link to the agent the user is on, so they're runnable right away.
  */
 export function ConvertTracesToTestsDialog({
   isOpen,
@@ -51,17 +50,16 @@ export function ConvertTracesToTestsDialog({
   accessToken,
   traceUuids,
   allHaveToolCalls,
+  agentUuid,
   onConverted,
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
 
   const [type, setType] = useState<ConvertTestType>("response");
   const [evaluators, setEvaluators] = useState<EvaluatorData[]>([]);
-  const [agents, setAgents] = useState<AgentOption[]>([]);
   const [selectedEvaluators, setSelectedEvaluators] = useState<Set<string>>(
     new Set(),
   );
-  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const [acceptAnyArgs, setAcceptAnyArgs] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -71,7 +69,6 @@ export function ConvertTracesToTestsDialog({
     if (!isOpen) return;
     setType("response");
     setAcceptAnyArgs(false);
-    setSelectedAgents(new Set());
     setError(null);
   }, [isOpen]);
 
@@ -82,10 +79,7 @@ export function ConvertTracesToTestsDialog({
       setLoading(true);
       setError(null);
       try {
-        const [evs, agentData] = await Promise.all([
-          fetchAllEvaluators(accessToken),
-          apiGet<unknown>("/agents", accessToken),
-        ]);
+        const evs = await fetchAllEvaluators(accessToken);
         if (cancelled) return;
         const llm = evs.filter((e) => e.evaluator_type === "llm");
         setEvaluators(llm);
@@ -94,10 +88,9 @@ export function ConvertTracesToTestsDialog({
           (e) => defaultOriginSlug(e) === DEFAULT_LLM_NEXT_REPLY_SLUG,
         );
         setSelectedEvaluators(preselect ? new Set([preselect.uuid]) : new Set());
-        setAgents(unwrapList<AgentOption>(agentData));
       } catch (err) {
         reportError("Error loading convert options:", err);
-        if (!cancelled) setError("Failed to load evaluators and agents.");
+        if (!cancelled) setError("Failed to load evaluators.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -127,7 +120,7 @@ export function ConvertTracesToTestsDialog({
         type,
         evaluatorUuids:
           type === "response" ? Array.from(selectedEvaluators) : undefined,
-        agentUuids: Array.from(selectedAgents),
+        agentUuids: [agentUuid],
         acceptAnyArguments: acceptAnyArgs,
       });
       onConverted(result);
@@ -261,43 +254,6 @@ export function ConvertTracesToTestsDialog({
                   </span>
                 </label>
               )}
-
-              <div className="space-y-2">
-                <div className="text-sm font-semibold text-foreground">
-                  Link to agents{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Linked tests are runnable right away.
-                </p>
-                {agents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    No agents to link.
-                  </p>
-                ) : (
-                  <div className="border border-border rounded-lg max-h-36 overflow-y-auto divide-y divide-border">
-                    {agents.map((a) => (
-                      <label
-                        key={a.uuid}
-                        className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/30"
-                      >
-                        <SelectCheckbox
-                          checked={selectedAgents.has(a.uuid)}
-                          onToggle={() =>
-                            setSelectedAgents((prev) => toggle(prev, a.uuid))
-                          }
-                          label={`Link to agent ${a.name}`}
-                        />
-                        <span className="text-sm text-foreground truncate">
-                          {a.name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               {error && (
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>

@@ -30,6 +30,7 @@ export type TraceMetadataEntry = {
  *  bodies live on the detail endpoint. */
 export type TraceSummary = {
   uuid: string;
+  agent_id: string;
   message_id: string;
   conversation_id: string;
   input_preview: string | null;
@@ -42,6 +43,7 @@ export type TraceSummary = {
 
 export type TraceDetail = {
   uuid: string;
+  agent_id: string;
   message_id: string;
   conversation_id: string;
   input: TraceTurn[];
@@ -54,29 +56,47 @@ export type TraceDetail = {
 export type TraceListParams = {
   limit: number;
   offset: number;
+  /** Traces belong to one agent; every read is scoped to it. */
+  agentId: string;
   q?: string;
   conversationId?: string;
 };
 
 /**
- * Fetch one page of traces. Unlike the other list pages, filtering and search
- * run server-side (the trace store can hold far more rows than the client
- * should ever download), so `q`/`conversation_id` go out as query params
- * instead of being applied over a fully-fetched list.
+ * Fetch one page of traces for one agent. Unlike the other list pages,
+ * filtering and search run server-side (the trace store can hold far more rows
+ * than the client should ever download), so `q`/`conversation_id` go out as
+ * query params instead of being applied over a fully-fetched list.
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, q, conversationId }: TraceListParams,
+  { limit, offset, agentId, q, conversationId }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
   params.set("offset", String(offset));
+  params.set("agent_id", agentId);
   if (q && q.trim()) params.set("q", q.trim());
   if (conversationId) params.set("conversation_id", conversationId);
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,
   );
+}
+
+/**
+ * How many traces the whole workspace is storing, across every agent. This is
+ * the number the storage limit applies to, so it deliberately does not filter
+ * by agent: it reads only the `total` off a one-row page.
+ */
+export async function fetchWorkspaceTraceCount(
+  accessToken: string,
+): Promise<number> {
+  const page = await apiGet<Paginated<TraceSummary>>(
+    "/traces?limit=1&offset=0",
+    accessToken,
+  );
+  return page.total ?? 0;
 }
 
 /** Fetch one trace with its full conversation history, output, and metadata. */
@@ -92,16 +112,20 @@ export type BulkDeleteTracesResult = {
 };
 
 /**
- * Soft-delete every trace matching the given filters via the backend's
- * `select_all` contract — the recovery path when a misbehaving client floods
- * the store and the matching set spans more pages than are loaded. Explicit
- * per-row deletion goes through `useTraceDeletion` instead.
+ * Soft-delete every trace of one agent matching the given filters via the
+ * backend's `select_all` contract — the recovery path when a misbehaving client
+ * floods the store and the matching set spans more pages than are loaded.
+ * Explicit per-row deletion goes through `useTraceDeletion` instead.
  */
 export async function bulkDeleteMatchingTraces(
   accessToken: string,
-  { q, conversationId }: { q?: string; conversationId?: string },
+  {
+    agentId,
+    q,
+    conversationId,
+  }: { agentId: string; q?: string; conversationId?: string },
 ): Promise<BulkDeleteTracesResult> {
-  const body: Record<string, unknown> = { select_all: true };
+  const body: Record<string, unknown> = { select_all: true, agent_id: agentId };
   if (q && q.trim()) body.q = q.trim();
   if (conversationId) body.conversation_id = conversationId;
   return apiPost<BulkDeleteTracesResult>("/traces/bulk-delete", accessToken, body);

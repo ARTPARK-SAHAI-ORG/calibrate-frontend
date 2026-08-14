@@ -12,6 +12,7 @@ function trace(uuid: string): TraceSummary {
     uuid,
     message_id: `msg-${uuid}`,
     conversation_id: "conv-1",
+    agent_id: "ag-1",
     input_preview: null,
     response_preview: null,
     turn_count: 1,

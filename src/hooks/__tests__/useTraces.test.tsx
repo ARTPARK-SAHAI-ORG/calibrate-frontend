@@ -1,11 +1,12 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTraces, useTraceCount } from "@/hooks/useTraces";
-import { fetchTraces } from "@/lib/tracesApi";
+import { fetchTraces, fetchWorkspaceTraceCount } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraces: jest.fn(),
+  fetchWorkspaceTraceCount: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -13,6 +14,7 @@ jest.mock("../../lib/reportError", () => ({
 }));
 
 const mockFetchTraces = fetchTraces as jest.Mock;
+const mockCount = fetchWorkspaceTraceCount as jest.Mock;
 const mockReportError = reportError as jest.Mock;
 
 function page(items: Array<{ uuid: string }>, total: number) {
@@ -21,6 +23,7 @@ function page(items: Array<{ uuid: string }>, total: number) {
 
 beforeEach(() => {
   mockFetchTraces.mockReset();
+  mockCount.mockReset();
   mockReportError.mockReset();
 });
 
@@ -29,7 +32,7 @@ describe("useTraces", () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
 
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", q: "", conversationId: null }),
+      useTraces({ accessToken: "tok", agentId: "ag-1", q: "", conversationId: null }),
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -38,6 +41,7 @@ describe("useTraces", () => {
     expect(mockFetchTraces).toHaveBeenCalledWith("tok", {
       limit: 50,
       offset: 0,
+      agentId: "ag-1",
       q: undefined,
       conversationId: undefined,
     });
@@ -45,7 +49,7 @@ describe("useTraces", () => {
 
   it("stays idle without an access token", async () => {
     const { result } = renderHook(() =>
-      useTraces({ accessToken: null, q: "", conversationId: null }),
+      useTraces({ accessToken: null, agentId: "ag-1", q: "", conversationId: null }),
     );
     // A tick to let effects run.
     await act(async () => {});
@@ -59,6 +63,7 @@ describe("useTraces", () => {
     const { result } = renderHook(() =>
       useTraces({
         accessToken: "tok",
+        agentId: "ag-1",
         q: "",
         conversationId: null,
         pageSize: 2,
@@ -87,6 +92,7 @@ describe("useTraces", () => {
     const { result } = renderHook(() =>
       useTraces({
         accessToken: "tok",
+        agentId: "ag-1",
         q: "",
         conversationId: null,
         pageSize: 2,
@@ -102,7 +108,14 @@ describe("useTraces", () => {
   it("resets to the first page when the query changes", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
     const { result, rerender } = renderHook(
-      ({ q }) => useTraces({ accessToken: "tok", q, conversationId: null, pageSize: 2 }),
+      ({ q }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId: "ag-1",
+          q,
+          conversationId: null,
+          pageSize: 2,
+        }),
       { initialProps: { q: "" } },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -118,11 +131,38 @@ describe("useTraces", () => {
     );
   });
 
+  it("resets to the first page and refetches when the agent changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
+    const { result, rerender } = renderHook(
+      ({ agentId }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId,
+          q: "",
+          conversationId: null,
+          pageSize: 2,
+        }),
+      { initialProps: { agentId: "ag-1" } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(2));
+
+    rerender({ agentId: "ag-2" });
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ agentId: "ag-2", offset: 0 }),
+    );
+  });
+
   it("clamps back a page when a delete empties the current one", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 4));
     const { result } = renderHook(() =>
       useTraces({
         accessToken: "tok",
+        agentId: "ag-1",
         q: "",
         conversationId: null,
         pageSize: 2,
@@ -142,6 +182,7 @@ describe("useTraces", () => {
     const { result } = renderHook(() =>
       useTraces({
         accessToken: "tok",
+        agentId: "ag-1",
         q: "",
         conversationId: null,
         pageSize: 2,
@@ -160,7 +201,7 @@ describe("useTraces", () => {
   it("reports and surfaces an error when the fetch throws", async () => {
     mockFetchTraces.mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", q: "", conversationId: null }),
+      useTraces({ accessToken: "tok", agentId: "ag-1", q: "", conversationId: null }),
     );
     await waitFor(() => expect(result.current.error).toMatch(/Failed to load/));
     expect(mockReportError).toHaveBeenCalled();
@@ -177,6 +218,7 @@ describe("useTraces", () => {
     const { result } = renderHook(() =>
       useTraces({
         accessToken: "tok",
+        agentId: "ag-1",
         q: "",
         conversationId: null,
         pageSize: 2,
@@ -196,15 +238,19 @@ describe("useTraces", () => {
 });
 
 describe("useTraceCount", () => {
-  it("reads the envelope total with a limit=1 probe", async () => {
-    mockFetchTraces.mockResolvedValue(page([], 4242));
+  it("counts the whole workspace, not one agent", async () => {
+    mockCount.mockResolvedValue(4242);
     const { result } = renderHook(() => useTraceCount("tok"));
     await waitFor(() => expect(result.current).toBe(4242));
-    expect(mockFetchTraces).toHaveBeenCalledWith("tok", { limit: 1, offset: 0 });
+    // The limit shown beside this number is a workspace limit, so the count
+    // must never be narrowed to one agent: it goes through the workspace-wide
+    // read, never the agent-scoped list.
+    expect(mockCount).toHaveBeenCalledWith("tok");
+    expect(mockFetchTraces).not.toHaveBeenCalled();
   });
 
   it("returns null and reports when the probe fails", async () => {
-    mockFetchTraces.mockRejectedValue(new Error("nope"));
+    mockCount.mockRejectedValue(new Error("nope"));
     const { result } = renderHook(() => useTraceCount("tok", 1));
     await waitFor(() => expect(mockReportError).toHaveBeenCalled());
     expect(result.current).toBeNull();
@@ -213,7 +259,19 @@ describe("useTraceCount", () => {
   it("stays null without an access token", async () => {
     const { result } = renderHook(() => useTraceCount(null));
     await act(async () => {});
-    expect(mockFetchTraces).not.toHaveBeenCalled();
+    expect(mockCount).not.toHaveBeenCalled();
     expect(result.current).toBeNull();
+  });
+
+  it("re-reads the count when the refresh key changes", async () => {
+    mockCount.mockResolvedValueOnce(5);
+    mockCount.mockResolvedValueOnce(4);
+    const { result, rerender } = renderHook(
+      ({ key }) => useTraceCount("tok", key),
+      { initialProps: { key: 0 } },
+    );
+    await waitFor(() => expect(result.current).toBe(5));
+    rerender({ key: 1 });
+    await waitFor(() => expect(result.current).toBe(4));
   });
 });

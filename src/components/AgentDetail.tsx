@@ -12,6 +12,7 @@ import {
   ToolsTabContent,
   // DataExtractionTabContent, // TODO: temporarily disabled — extraction UI removed for now
   TestsTabContent,
+  TracesTabContent,
   EvaluatorsTabContent,
   SettingsTabContent,
 } from "@/components/agent-tabs";
@@ -79,6 +80,7 @@ type TabType =
   | "tools"
   | "data-extraction"
   | "tests"
+  | "traces"
   | "evaluators"
   | "settings";
 
@@ -88,6 +90,7 @@ const tabLabels: Record<TabType, string> = {
   tools: "Tools",
   "data-extraction": "Data extraction",
   tests: "Tests",
+  traces: "Traces",
   evaluators: "Evaluators",
   settings: "Settings",
 };
@@ -98,12 +101,14 @@ const calibrateTabs: TabType[] = [
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
   "evaluators",
   "tests",
+  "traces",
   "settings",
 ];
 const connectionTabs: TabType[] = [
   "connection",
   "evaluators",
   "tests",
+  "traces",
   "settings",
 ];
 
@@ -1246,6 +1251,13 @@ export function AgentDetail({
               }
               onGoToConnectionSettings={() => performTabSwitch("connection")}
             />
+          </div>
+        )}
+
+        {/* Traces Tab Content */}
+        {shouldRenderTab("traces") && (
+          <div className={activeTab === "traces" ? undefined : "hidden"}>
+            <TracesTabContent agentUuid={agentUuid} />
           </div>
         )}
 

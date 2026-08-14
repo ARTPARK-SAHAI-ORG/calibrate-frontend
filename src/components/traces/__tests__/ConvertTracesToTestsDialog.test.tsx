@@ -2,7 +2,6 @@ import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { ConvertTracesToTestsDialog } from "../ConvertTracesToTestsDialog";
 import { fetchAllEvaluators } from "@/lib/evaluatorApi";
 import { convertTracesToTests } from "@/lib/tracesApi";
-import { apiGet } from "@/lib/api";
 
 jest.mock("../../../lib/evaluatorApi", () => ({
   __esModule: true,
@@ -12,12 +11,6 @@ jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
   convertTracesToTests: jest.fn(),
 }));
-jest.mock("../../../lib/api", () => ({
-  __esModule: true,
-  apiGet: jest.fn(),
-  unwrapList: (d: unknown) =>
-    Array.isArray(d) ? d : ((d as { items?: unknown[] })?.items ?? []),
-}));
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
   reportError: jest.fn(),
@@ -25,7 +18,6 @@ jest.mock("../../../lib/reportError", () => ({
 
 const mockFetchEvals = fetchAllEvaluators as jest.Mock;
 const mockConvert = convertTracesToTests as jest.Mock;
-const mockApiGet = apiGet as jest.Mock;
 
 const EVALUATORS = [
   {
@@ -38,7 +30,6 @@ const EVALUATORS = [
   { uuid: "ev-custom", name: "My Judge", evaluator_type: "llm", is_default: false },
   { uuid: "ev-conv", name: "Conversation", evaluator_type: "conversation" },
 ];
-const AGENTS = { items: [{ uuid: "ag-1", name: "Support Bot" }] };
 
 function setup(overrides: Partial<React.ComponentProps<typeof ConvertTracesToTestsDialog>> = {}) {
   const onConverted = jest.fn();
@@ -50,6 +41,7 @@ function setup(overrides: Partial<React.ComponentProps<typeof ConvertTracesToTes
       accessToken="tok"
       traceUuids={["tr-1", "tr-2"]}
       allHaveToolCalls
+      agentUuid="ag-1"
       onConverted={onConverted}
       {...overrides}
     />,
@@ -59,7 +51,6 @@ function setup(overrides: Partial<React.ComponentProps<typeof ConvertTracesToTes
 
 beforeEach(() => {
   mockFetchEvals.mockResolvedValue(EVALUATORS);
-  mockApiGet.mockResolvedValue(AGENTS);
   mockConvert.mockReset();
 });
 
@@ -71,6 +62,7 @@ it("renders nothing when closed and never fetches", () => {
       accessToken="tok"
       traceUuids={["tr-1"]}
       allHaveToolCalls={false}
+      agentUuid="ag-1"
       onConverted={jest.fn()}
     />,
   );
@@ -90,14 +82,25 @@ it("lists only llm evaluators and preselects the default LLM-reply one", async (
   );
 });
 
-it("converts a response test with the selected evaluator and links an agent", async () => {
+it("does not offer an agent picker", async () => {
+  setup();
+  await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+  expect(screen.queryByText(/Link to agents/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/^Link to agent /)).not.toBeInTheDocument();
+  // Footer keeps exactly the two actions.
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter((b) => !b.getAttribute("aria-label")?.startsWith("Select ")),
+  ).toHaveLength(2);
+});
+
+it("converts a response test with the selected evaluator and links the agent it is on", async () => {
   mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
   const user = setupUser();
   const { onConverted } = setup();
-  await waitFor(() => expect(screen.getByText("Support Bot")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
 
-  // Link the agent.
-  await user.click(screen.getByLabelText("Link to agent Support Bot"));
   await user.click(screen.getByRole("button", { name: "Convert" }));
 
   await waitFor(() => expect(mockConvert).toHaveBeenCalled());
@@ -138,7 +141,7 @@ it("switches to tool_call and sends accept_any_arguments", async () => {
     traceIds: ["tr-1", "tr-2"],
     type: "tool_call",
     evaluatorUuids: undefined,
-    agentUuids: [],
+    agentUuids: ["ag-1"],
     acceptAnyArguments: true,
   });
 });

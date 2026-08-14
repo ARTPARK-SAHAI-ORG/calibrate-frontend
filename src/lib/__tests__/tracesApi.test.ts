@@ -21,16 +21,17 @@ beforeEach(() => {
 });
 
 describe("fetchTraces", () => {
-  it("sends limit and offset, omitting blank filters", async () => {
+  it("sends limit, offset and the agent, omitting blank filters", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
-    await fetchTraces("tok", { limit: 50, offset: 100 });
+    await fetchTraces("tok", { limit: 50, offset: 100, agentId: "ag-1" });
 
     const [url, token] = mockApiGet.mock.calls[0];
     expect(token).toBe("tok");
     const query = new URLSearchParams(url.split("?")[1]);
     expect(query.get("limit")).toBe("50");
     expect(query.get("offset")).toBe("100");
+    expect(query.get("agent_id")).toBe("ag-1");
     expect(query.has("q")).toBe(false);
     expect(query.has("conversation_id")).toBe(false);
   });
@@ -41,6 +42,7 @@ describe("fetchTraces", () => {
     await fetchTraces("tok", {
       limit: 25,
       offset: 0,
+      agentId: "ag-1",
       q: "  polio  ",
       conversationId: "conv-1",
     });
@@ -48,12 +50,13 @@ describe("fetchTraces", () => {
     const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
     expect(query.get("q")).toBe("polio");
     expect(query.get("conversation_id")).toBe("conv-1");
+    expect(query.get("agent_id")).toBe("ag-1");
   });
 
   it("does not send a whitespace-only q", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
-    await fetchTraces("tok", { limit: 25, offset: 0, q: "   " });
+    await fetchTraces("tok", { limit: 25, offset: 0, agentId: "ag-1", q: "   " });
 
     const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
     expect(query.has("q")).toBe(false);
@@ -68,7 +71,11 @@ describe("fetchTraces", () => {
     };
     mockApiGet.mockResolvedValue(envelope);
 
-    const result = await fetchTraces("tok", { limit: 50, offset: 0 });
+    const result = await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+    });
     expect(result).toBe(envelope);
   });
 });
@@ -85,29 +92,36 @@ describe("fetchTrace", () => {
 });
 
 describe("bulkDeleteMatchingTraces", () => {
-  it("POSTs select_all with trimmed filters", async () => {
+  it("POSTs select_all with the agent and trimmed filters", async () => {
     mockApiPost.mockResolvedValue({ deleted: 3 });
 
     const result = await bulkDeleteMatchingTraces("tok", {
+      agentId: "ag-1",
       q: "  polio  ",
       conversationId: "conv-1",
     });
 
-    expect(mockApiPost).toHaveBeenCalledWith(
-      "/traces/bulk-delete",
-      "tok",
-      { select_all: true, q: "polio", conversation_id: "conv-1" },
-    );
+    expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
+      select_all: true,
+      agent_id: "ag-1",
+      q: "polio",
+      conversation_id: "conv-1",
+    });
     expect(result).toEqual({ deleted: 3 });
   });
 
-  it("omits empty filters, keeping only select_all", async () => {
+  it("omits empty filters, keeping select_all and the agent", async () => {
     mockApiPost.mockResolvedValue({ deleted: 0 });
 
-    await bulkDeleteMatchingTraces("tok", { q: "  ", conversationId: undefined });
+    await bulkDeleteMatchingTraces("tok", {
+      agentId: "ag-1",
+      q: "  ",
+      conversationId: undefined,
+    });
 
     expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
       select_all: true,
+      agent_id: "ag-1",
     });
   });
 });

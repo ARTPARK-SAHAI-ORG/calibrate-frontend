@@ -17,6 +17,7 @@ const detail: TraceDetail = {
   uuid: "t1",
   message_id: "msg-1",
   conversation_id: "conv-1",
+  agent_id: "ag-1",
   input: [
     { role: "system", content: "You are a vaccination assistant." },
     { role: "user", content: "When is the next vaccination?" },

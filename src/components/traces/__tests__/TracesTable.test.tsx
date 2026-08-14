@@ -7,6 +7,7 @@ function trace(overrides: Partial<TraceSummary> = {}): TraceSummary {
     uuid: "t1",
     message_id: "msg-1",
     conversation_id: "conv-1",
+    agent_id: "ag-1",
     input_preview: "When is the next vaccination?",
     response_preview: "At 14 weeks.",
     turn_count: 3,
