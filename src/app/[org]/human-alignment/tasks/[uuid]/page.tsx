@@ -1729,6 +1729,9 @@ function LabellingTaskPageInner() {
     itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
   const itemsCurrentPage =
     itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
+  // Where the items on screen actually start. `itemsOffset` is the page
+  // that was asked for, which runs ahead of the items until they arrive.
+  const loadedItemsOffset = taskSummary?.pagination?.offset ?? itemsOffset;
   const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
   const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
   // Hide the whole pagination footer when pagination can never apply — i.e.
@@ -4663,22 +4666,22 @@ function LabellingTaskPageInner() {
         hasPrev={(() => {
           if (!itemDetailUuid) return false;
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
-          return idx > 0 || (idx === 0 && itemsOffset > 0);
+          return idx > 0 || (idx === 0 && loadedItemsOffset > 0);
         })()}
         hasNext={(() => {
           if (!itemDetailUuid) return false;
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
           if (idx < 0) return false;
-          return itemsOffset + idx < itemsTotal - 1;
+          return loadedItemsOffset + idx < itemsTotal - 1;
         })()}
         onPrev={() => {
           if (!itemDetailUuid) return;
           const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
           if (idx > 0) {
             setItemDetailUuid(items[idx - 1].uuid);
-          } else if (idx === 0 && itemsOffset > 0) {
+          } else if (idx === 0 && loadedItemsOffset > 0) {
             // First item on the page: step back a page and open its last item.
-            const nextOffset = Math.max(0, itemsOffset - itemsLimit);
+            const nextOffset = Math.max(0, loadedItemsOffset - itemsLimit);
             setItemsOffset(nextOffset);
             setPendingItemEdge({ offset: nextOffset, edge: "last" });
           }
@@ -4689,9 +4692,9 @@ function LabellingTaskPageInner() {
           if (idx < 0) return;
           if (idx < items.length - 1) {
             setItemDetailUuid(items[idx + 1].uuid);
-          } else if (itemsOffset + idx < itemsTotal - 1) {
+          } else if (loadedItemsOffset + idx < itemsTotal - 1) {
             // Last item on the page: step forward a page and open its first item.
-            const nextOffset = itemsOffset + itemsLimit;
+            const nextOffset = loadedItemsOffset + itemsLimit;
             setItemsOffset(nextOffset);
             setPendingItemEdge({ offset: nextOffset, edge: "first" });
           }
@@ -4702,7 +4705,7 @@ function LabellingTaskPageInner() {
           if (idx < 0) return undefined;
           // Count across the whole task, not just the items on the
           // current page, so the number matches "of 200" in the footer.
-          return { index: itemsOffset + idx, total: itemsTotal };
+          return { index: loadedItemsOffset + idx, total: itemsTotal };
         })()}
       />
     </AppLayout>
