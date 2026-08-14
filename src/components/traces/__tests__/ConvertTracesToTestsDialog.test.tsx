@@ -16,6 +16,10 @@ jest.mock("../../../lib/evaluatorApi", () => ({
 }));
 jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
+  // Only the request is faked; reading the failure it comes back with is the
+  // real thing, so this covers what the reader is actually shown.
+  convertTracesErrorMessage: jest.requireActual("../../../lib/tracesApi")
+    .convertTracesErrorMessage,
   convertTracesToTests: jest.fn(),
 }));
 jest.mock("../../../lib/reportError", () => ({
@@ -144,7 +148,7 @@ it("preselects the agent's own evaluators, skipping ones that need variables", a
       live_version: { variables: [{ name: "topic" }] },
     },
   ]);
-  mockConvert.mockResolvedValue({ test_uuids: ["t1"] });
+  mockConvert.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
   const user = setupUser();
   setup();
   await waitFor(() => expect(screen.getByText("My Judge")).toBeInTheDocument());
@@ -186,8 +190,8 @@ it("does not offer an agent picker", async () => {
   ).toHaveLength(2);
 });
 
-it("submits a response test with the selected evaluator and linked agent", async () => {
-  mockConvert.mockResolvedValue({ test_uuids: ["t1", "t2"] });
+it("submits a response test with the selected evaluator", async () => {
+  mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
   const user = setupUser();
   const { onConverted } = setup();
   await waitFor(() =>
@@ -201,10 +205,9 @@ it("submits a response test with the selected evaluator and linked agent", async
     traceIds: ["tr-1", "tr-2"],
     type: "response",
     evaluatorUuids: ["ev-default"],
-    agentUuids: ["ag-1"],
     acceptAnyArguments: false,
   });
-  expect(onConverted).toHaveBeenCalledWith({ test_uuids: ["t1", "t2"] });
+  expect(onConverted).toHaveBeenCalledWith({ created: 2, test_uuids: ["t1", "t2"] });
 });
 
 it("requires an evaluator for a response test", async () => {
@@ -219,7 +222,7 @@ it("requires an evaluator for a response test", async () => {
 });
 
 it("shows only tool-call options and submits the given tool_call type", async () => {
-  mockConvert.mockResolvedValue({ test_uuids: ["t1", "t2"] });
+  mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
   const user = setupUser();
   setup({ testType: "tool_call" });
 
@@ -242,7 +245,6 @@ it("shows only tool-call options and submits the given tool_call type", async ()
     traceIds: ["tr-1", "tr-2"],
     type: "tool_call",
     evaluatorUuids: undefined,
-    agentUuids: ["ag-1"],
     acceptAnyArguments: true,
   });
 });
@@ -289,4 +291,28 @@ it("surfaces an adding error while preserving the technical report", async () =>
     expect.any(Error),
   );
   expect(onConverted).not.toHaveBeenCalled();
+});
+
+it("shows what the backend says went wrong, when it says", async () => {
+  mockConvert.mockRejectedValue(
+    new Error(
+      `Request failed: 400 - ${JSON.stringify({
+        detail: {
+          error: "Some evaluators cannot be used.",
+          evaluators: ["Tone needs values for its variables."],
+        },
+      })}`,
+    ),
+  );
+  const user = setupUser();
+  setup();
+  await waitFor(() =>
+    expect(screen.getByText("Correctness")).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole("button", { name: "Add to tests" }));
+  await waitFor(() =>
+    expect(
+      screen.getByText("Tone needs values for its variables."),
+    ).toBeInTheDocument(),
+  );
 });

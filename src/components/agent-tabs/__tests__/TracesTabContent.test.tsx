@@ -133,7 +133,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call";
-    onConverted: (result: { test_uuids: string[] }) => void;
+    onConverted: (result: { created: number; test_uuids: string[] }) => void;
   }) =>
     isOpen ? (
       <div data-testid="convert-dialog">
@@ -142,7 +142,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-type">{testType}</span>
         <button
           type="button"
-          onClick={() => onConverted({ test_uuids: ["t1", "t2"] })}
+          onClick={() => onConverted({ created: 2, test_uuids: ["t1", "t2"] })}
         >
           finish adding
         </button>

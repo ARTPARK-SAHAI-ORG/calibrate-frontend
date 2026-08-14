@@ -130,22 +130,23 @@ export type ConvertTracesToTestsBody = {
   type: ConvertTestType;
   /** Evaluators to link to each created test. Required (and used) for `response`. */
   evaluatorUuids?: string[];
-  /** Agents to link every created test to, so they're runnable immediately. */
-  agentUuids?: string[];
   /** For `tool_call`: match only the tool name, ignore the recorded arguments. */
   acceptAnyArguments?: boolean;
 };
 
 export type ConvertTracesToTestsResult = {
-  /** The tests that were created. Count them for a "created N tests" message:
-   *  the backend does not send a count of its own. */
+  /** How many tests were created. */
+  created: number;
+  /** Their ids, in the order the traces were sent. */
   test_uuids: string[];
 };
 
 /**
  * Convert selected traces into regression tests. `response` tests re-run the
  * agent and judge the reply (needs ≥1 evaluator); `tool_call` tests assert the
- * recorded tool calls. Backed by `POST /traces/convert-to-tests`.
+ * recorded tool calls. Each created test is linked to the agent that produced
+ * its trace, so nothing here names an agent. Backed by
+ * `POST /traces/convert-to-tests`.
  */
 export async function convertTracesToTests(
   accessToken: string,
@@ -153,19 +154,53 @@ export async function convertTracesToTests(
     traceIds,
     type,
     evaluatorUuids,
-    agentUuids,
     acceptAnyArguments,
   }: ConvertTracesToTestsBody,
 ): Promise<ConvertTracesToTestsResult> {
   const body: Record<string, unknown> = { trace_ids: traceIds, type };
   if (evaluatorUuids && evaluatorUuids.length) {
-    body.evaluators = evaluatorUuids.map((uuid) => ({ evaluator_uuid: uuid }));
+    body.evaluators = evaluatorUuids;
   }
-  if (agentUuids && agentUuids.length) body.agent_uuids = agentUuids;
   if (type === "tool_call") body.accept_any_arguments = !!acceptAnyArguments;
   return apiPost<ConvertTracesToTestsResult>(
     "/traces/convert-to-tests",
     accessToken,
     body,
   );
+}
+
+/**
+ * When a conversion fails, the backend names what went wrong: which evaluators
+ * cannot be used, or which traces have no tool calls or no longer exist. The
+ * shared client throws that body inside its message, so dig it back out and
+ * show it. Returns null when there is nothing better than a general message.
+ */
+export function convertTracesErrorMessage(error: unknown): string | null {
+  const text = error instanceof Error ? error.message : "";
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let detail: unknown;
+  try {
+    detail = (JSON.parse(text.slice(start)) as { detail?: unknown }).detail;
+  } catch {
+    return null;
+  }
+  if (typeof detail === "string") return detail;
+  if (!detail || typeof detail !== "object") return null;
+  const { error: summary, evaluators, trace_ids: traceIds } = detail as {
+    error?: unknown;
+    evaluators?: unknown;
+    trace_ids?: unknown;
+  };
+  if (Array.isArray(evaluators) && evaluators.length) {
+    return evaluators.filter((m) => typeof m === "string").join(" ");
+  }
+  const parts: string[] = [];
+  if (typeof summary === "string") parts.push(summary);
+  if (Array.isArray(traceIds) && traceIds.length) {
+    parts.push(
+      `${traceIds.length} trace${traceIds.length === 1 ? "" : "s"} could not be used.`,
+    );
+  }
+  return parts.length ? parts.join(" ") : null;
 }

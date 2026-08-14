@@ -9,6 +9,7 @@ import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
 import {
   convertTracesToTests,
+  convertTracesErrorMessage,
   ConvertTestType,
   ConvertTracesToTestsResult,
 } from "@/lib/tracesApi";
@@ -21,7 +22,7 @@ type ConvertTracesToTestsDialogProps = {
   traceUuids: string[];
   /** The test type derived from the selected traces. */
   testType: ConvertTestType;
-  /** The agent whose traces these are — created tests link to it. */
+  /** The agent whose traces these are, for the evaluators offered here. */
   agentUuid: string;
   /** Called with the backend result after a successful conversion. */
   onConverted: (result: ConvertTracesToTestsResult) => void;
@@ -38,7 +39,8 @@ function toggle(set: Set<string>, uuid: string): Set<string> {
  * Convert selected traces into regression tests. `response` re-runs the agent
  * and judges the reply (requires ≥1 evaluator, defaulted to the workspace's
  * LLM-reply evaluator); `tool_call` asserts the recorded tool calls. Created
- * tests link to the agent the user is on, so they're runnable right away.
+ * tests are linked by the backend to the agent that produced each trace, so
+ * they're runnable right away.
  */
 export function ConvertTracesToTestsDialog({
   isOpen,
@@ -97,13 +99,17 @@ export function ConvertTracesToTestsDialog({
         type: testType,
         evaluatorUuids:
           testType === "response" ? Array.from(selectedEvaluators) : undefined,
-        agentUuids: [agentUuid],
         acceptAnyArguments: acceptAnyArgs,
       });
       onConverted(result);
     } catch (err) {
       reportError("Error converting traces to tests:", err);
-      setError("Something went wrong while adding to tests. Please try again.");
+      // Nothing is created when a conversion fails, so the reader can fix what
+      // the backend names and press the button again.
+      setError(
+        convertTracesErrorMessage(err) ??
+          "Something went wrong while adding to tests. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }

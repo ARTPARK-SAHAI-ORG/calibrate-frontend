@@ -2,6 +2,7 @@ import {
   fetchTraces,
   fetchTrace,
   convertTracesToTests,
+  convertTracesErrorMessage,
   validateApiKeyForAgent,
   MAX_TRACES_PAGE_SIZE,
 } from "../tracesApi";
@@ -164,14 +165,13 @@ describe("validateApiKeyForAgent", () => {
 });
 
 describe("convertTracesToTests", () => {
-  it("shapes a response conversion with evaluators and agents", async () => {
-    mockApiPost.mockResolvedValue({ test_uuids: ["t1", "t2"] });
+  it("shapes a response conversion with plain evaluator ids", async () => {
+    mockApiPost.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
 
     const result = await convertTracesToTests("tok", {
       traceIds: ["a", "b"],
       type: "response",
       evaluatorUuids: ["ev1", "ev2"],
-      agentUuids: ["ag1"],
     });
 
     expect(mockApiPost).toHaveBeenCalledWith(
@@ -180,15 +180,14 @@ describe("convertTracesToTests", () => {
       {
         trace_ids: ["a", "b"],
         type: "response",
-        evaluators: [{ evaluator_uuid: "ev1" }, { evaluator_uuid: "ev2" }],
-        agent_uuids: ["ag1"],
+        evaluators: ["ev1", "ev2"],
       },
     );
-    expect(result).toEqual({ test_uuids: ["t1", "t2"] });
+    expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
   });
 
-  it("sends accept_any_arguments only for tool_call and omits empty evaluators/agents", async () => {
-    mockApiPost.mockResolvedValue({ test_uuids: ["t1"] });
+  it("sends accept_any_arguments only for tool_call and omits empty evaluators", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
 
     await convertTracesToTests("tok", {
       traceIds: ["a"],
@@ -208,7 +207,7 @@ describe("convertTracesToTests", () => {
   });
 
   it("does not send accept_any_arguments for a response conversion", async () => {
-    mockApiPost.mockResolvedValue({ test_uuids: ["t1"] });
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
 
     await convertTracesToTests("tok", {
       traceIds: ["a"],
@@ -218,6 +217,50 @@ describe("convertTracesToTests", () => {
 
     const body = mockApiPost.mock.calls[0][2];
     expect(body).not.toHaveProperty("accept_any_arguments");
+    // The backend links each created test to the trace's own agent.
     expect(body).not.toHaveProperty("agent_uuids");
+  });
+});
+
+describe("convertTracesErrorMessage", () => {
+  const failure = (detail: unknown) =>
+    new Error(`Request failed: 400 - ${JSON.stringify({ detail })}`);
+
+  it("reads the messages naming the evaluators that cannot be used", () => {
+    expect(
+      convertTracesErrorMessage(
+        failure({
+          error: "Some evaluators cannot be used.",
+          evaluators: ["Tone needs values for its variables."],
+        }),
+      ),
+    ).toBe("Tone needs values for its variables.");
+  });
+
+  it("counts the traces the backend rejected", () => {
+    expect(
+      convertTracesErrorMessage(
+        failure({
+          error: "These traces recorded no tool calls.",
+          trace_ids: ["t1", "t2"],
+        }),
+      ),
+    ).toBe("These traces recorded no tool calls. 2 traces could not be used.");
+  });
+
+  it("reads a plain text detail", () => {
+    expect(
+      convertTracesErrorMessage(
+        failure("response tests require at least one evaluator"),
+      ),
+    ).toBe("response tests require at least one evaluator");
+  });
+
+  it("gives nothing back when there is no readable detail", () => {
+    expect(convertTracesErrorMessage(new Error("network"))).toBeNull();
+    expect(
+      convertTracesErrorMessage(new Error("Request failed: 500 - {oops")),
+    ).toBeNull();
+    expect(convertTracesErrorMessage(failure({ other: 1 }))).toBeNull();
   });
 });
