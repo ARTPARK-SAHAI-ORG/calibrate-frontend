@@ -373,6 +373,23 @@ export function TestsTabContent({
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
+  // Deep-link the open test run to `?runId=<uuid>` so a reload re-opens the
+  // same run dialog and the URL can be shared. Only test runs use this;
+  // benchmark results keep their own dialog state.
+  const { setParam: setRunIdParam } = useDialogUrlParam({
+    param: "runId",
+    onOpen: (uuid) => setOpenTestRunId(uuid),
+    onClose: () => setOpenTestRunId(null),
+  });
+  // Open/close the run dialog and keep `?runId=` in step.
+  const openTestRun = (uuid: string) => {
+    setOpenTestRunId(uuid);
+    setRunIdParam(uuid);
+  };
+  const closeTestRun = () => {
+    setOpenTestRunId(null);
+    setRunIdParam(null);
+  };
   // Key of the run control whose "create run" call is in flight ("all",
   // "bulk", or a test uuid). Non-null disables every run control.
   const [startingRun, setStartingRun] = useState<string | null>(null);
@@ -1110,7 +1127,7 @@ export function TestsTabContent({
       );
       if (!taskId) return null;
       addOptimisticTestRun(taskId, tests);
-      setOpenTestRunId(taskId);
+      openTestRun(taskId);
       return taskId;
     } finally {
       setStartingRun(null);
@@ -1468,7 +1485,7 @@ export function TestsTabContent({
   // Handle clicking on a past run row
   const handlePastRunClick = (run: TestRun) => {
     if (run.type === "llm-unit-test") {
-      setOpenTestRunId(run.uuid);
+      openTestRun(run.uuid);
       return;
     }
     setSelectedPastRun(run);
@@ -2768,7 +2785,7 @@ export function TestsTabContent({
       {openTestRunId && (
         <TestRunnerDialog
           isOpen
-          onClose={() => setOpenTestRunId(null)}
+          onClose={closeTestRun}
           agentUuid={agentUuid}
           agentName={agentName}
           taskId={openTestRunId}
@@ -2778,7 +2795,7 @@ export function TestsTabContent({
               taskId,
               agentTests.filter((t) => uuids.has(t.uuid)),
             );
-            setOpenTestRunId(taskId);
+            openTestRun(taskId);
           }}
         />
       )}
