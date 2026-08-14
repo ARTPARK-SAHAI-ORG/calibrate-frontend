@@ -825,13 +825,13 @@ export function AddRunToLabellingTaskDialog({
             <p className="text-sm text-foreground">
               Added {success.itemsCreated}{" "}
               {success.itemsCreated === 1 ? noun.one : noun.many} to{" "}
-              <span className="font-medium">{success.taskName}</span>.
+              <span className="font-medium">{success.taskName}</span>
               {success.itemsSkipped > 0
-                ? ` ${success.itemsSkipped} ${
+                ? `. ${success.itemsSkipped} ${
                     success.itemsSkipped === 1 ? noun.one : noun.many
                   } already in the task ${
                     success.itemsSkipped === 1 ? "was" : "were"
-                  } skipped.`
+                  } skipped`
                 : ""}
             </p>
             <div className="flex items-center justify-end gap-2 md:gap-3">
