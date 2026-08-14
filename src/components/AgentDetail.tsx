@@ -175,11 +175,20 @@ export function AgentDetail({
   // Hide the floating "Talk to Us" button when the edit name dialog is open
   useHideFloatingButton(isEditNameDialogOpen);
 
-  // Helper to perform the actual tab switch + URL update
+  // Helper to perform the actual tab switch + URL update. Read from the live
+  // address, not the router snapshot, so params the Tests tab just wrote are
+  // never dropped or resurrected.
   const performTabSwitch = (tab: TabType) => {
     setActiveTab(tab);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(window.location.search);
     params.set("tab", tab);
+    // `testId` and `runId` belong to the Tests tab. Leaving them on the address
+    // while the user is elsewhere would re-open that test or run the next time
+    // the Tests tab is shown, and after a reload nothing would clear them.
+    if (tab !== "tests") {
+      params.delete("testId");
+      params.delete("runId");
+    }
     window.history.replaceState(null, "", `?${params.toString()}`);
   };
 

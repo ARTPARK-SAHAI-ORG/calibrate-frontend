@@ -18,6 +18,8 @@ const useMaxRowsPerEvalMock = jest.fn();
 
 // Capture the deep-link hook's args (esp. onOpen) and expose a spy setParam so
 // we can assert URL writes/clears and drive the "open from URL" path directly.
+// The tab uses the hook twice (`testId` for the open test, `runId` for the open
+// run), so the args are kept per param and this file drives the `testId` one.
 let dialogUrlParamArgs: any = null;
 const setTestIdParamMock = jest.fn();
 
@@ -26,6 +28,7 @@ jest.mock("../../../hooks", () => ({
   useAccessToken: () => useAccessTokenMock(),
   useMaxRowsPerEval: () => useMaxRowsPerEvalMock(),
   useDialogUrlParam: (args: any) => {
+    if (args.param !== "testId") return { setParam: jest.fn() };
     dialogUrlParamArgs = args;
     return { setParam: setTestIdParamMock };
   },

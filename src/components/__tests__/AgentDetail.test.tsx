@@ -258,6 +258,34 @@ describe("AgentDetail", () => {
     expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument();
   });
 
+  it("drops the open test and run from the address when leaving the Tests tab", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?tab=tests&testId=test-1&runId=run-7",
+    );
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("Tools"));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("tab")).toBe("tools");
+    expect(params.get("testId")).toBeNull();
+    expect(params.get("runId")).toBeNull();
+
+    // Back on Tests they are simply absent, not restored.
+    await user.click(screen.getByText("Tests"));
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe(
+      "tests",
+    );
+    expect(window.location.search).not.toContain("runId");
+  });
+
   it("renders NotFoundState when the fetch hook captures a 403/404", async () => {
     usePageErrorStateMock.mockReturnValue({
       ...defaultPageErrorState,
