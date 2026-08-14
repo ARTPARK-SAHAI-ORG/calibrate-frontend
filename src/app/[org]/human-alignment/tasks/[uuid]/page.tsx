@@ -1714,7 +1714,6 @@ function LabellingTaskPageInner() {
   const itemsError = error;
   const itemsTotal =
     taskSummary?.pagination?.total ?? task?.item_count ?? items.length;
-  const itemsCount = itemsTotal;
   const itemsPageCount =
     itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
   // Where the items on screen actually start. `itemsOffset` is the page
@@ -2721,7 +2720,9 @@ function LabellingTaskPageInner() {
             { id: "overview" as Tab, label: "Overview" },
             {
               id: "items" as Tab,
-              label: itemsCount > 0 ? `Dataset (${itemsCount})` : "Dataset",
+              // No count here: "Dataset (42)" reads as 42 datasets. The number
+              // sits above the rows instead, where it says what it counts.
+              label: "Dataset",
             },
             {
               id: "jobs" as Tab,

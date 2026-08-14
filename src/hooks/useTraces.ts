@@ -9,21 +9,18 @@ type UseTracesArgs = {
   accessToken: string | null;
   /** The agent whose traces to list. */
   agentId: string;
-  /** Server-side search query. Pass the debounced value, not each keystroke. */
-  q: string;
   pageSize?: number;
 };
 
 /**
  * Server-paginated trace list. Every other list page fetches everything and
  * filters client-side; traces are machine-written and can be far larger than
- * the client should download, so paging and search round-trip to `GET /traces`
- * and this hook only ever holds one page.
+ * the client should download, so paging round-trips to `GET /traces` and this
+ * hook only ever holds one page. The endpoint takes no search term.
  */
 export function useTraces({
   accessToken,
   agentId,
-  q,
   pageSize = 50,
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
@@ -37,7 +34,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, q, pageSize]);
+  }, [agentId, pageSize]);
 
   const load = useCallback(
     async (targetOffset: number) => {
@@ -50,7 +47,6 @@ export function useTraces({
           limit: pageSize,
           offset: targetOffset,
           agentId,
-          q: q || undefined,
         });
         if (requestId !== requestIdRef.current) return;
         setItems(page.items ?? []);
@@ -58,12 +54,16 @@ export function useTraces({
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
         reportError("Error fetching traces:", err);
+        // Drop the last page too: leaving it on screen next to the message
+        // would let the reader tick and delete rows from a failed load.
+        setItems([]);
+        setTotal(0);
         setError("Failed to load traces. Please try again.");
       } finally {
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId, q],
+    [accessToken, pageSize, agentId],
   );
 
   useEffect(() => {

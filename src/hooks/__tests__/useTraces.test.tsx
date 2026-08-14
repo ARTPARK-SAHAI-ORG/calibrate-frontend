@@ -29,7 +29,7 @@ describe("useTraces", () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
 
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", agentId: "ag-1", q: "" }),
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -39,13 +39,12 @@ describe("useTraces", () => {
       limit: 50,
       offset: 0,
       agentId: "ag-1",
-      q: undefined,
     });
   });
 
   it("stays idle without an access token", async () => {
     const { result } = renderHook(() =>
-      useTraces({ accessToken: null, agentId: "ag-1", q: "" }),
+      useTraces({ accessToken: null, agentId: "ag-1" }),
     );
     // A tick to let effects run.
     await act(async () => {});
@@ -60,7 +59,6 @@ describe("useTraces", () => {
       useTraces({
         accessToken: "tok",
         agentId: "ag-1",
-        q: "",
         pageSize: 2,
       }),
     );
@@ -88,7 +86,6 @@ describe("useTraces", () => {
       useTraces({
         accessToken: "tok",
         agentId: "ag-1",
-        q: "",
         pageSize: 2,
       }),
     );
@@ -99,31 +96,6 @@ describe("useTraces", () => {
     expect(result.current.offset).toBe(0);
   });
 
-  it("resets to the first page when the query changes", async () => {
-    mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
-    const { result, rerender } = renderHook(
-      ({ q }) =>
-        useTraces({
-          accessToken: "tok",
-          agentId: "ag-1",
-          q,
-          pageSize: 2,
-        }),
-      { initialProps: { q: "" } },
-    );
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    await act(async () => result.current.nextPage());
-    await waitFor(() => expect(result.current.offset).toBe(2));
-
-    rerender({ q: "polio" });
-    await waitFor(() => expect(result.current.offset).toBe(0));
-    expect(mockFetchTraces).toHaveBeenLastCalledWith(
-      "tok",
-      expect.objectContaining({ q: "polio", offset: 0 }),
-    );
-  });
-
   it("resets to the first page when the page size changes", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 10));
     const { result, rerender } = renderHook(
@@ -131,7 +103,6 @@ describe("useTraces", () => {
         useTraces({
           accessToken: "tok",
           agentId: "ag-1",
-          q: "",
           pageSize,
         }),
       { initialProps: { pageSize: 2 } },
@@ -156,7 +127,6 @@ describe("useTraces", () => {
         useTraces({
           accessToken: "tok",
           agentId,
-          q: "",
           pageSize: 2,
         }),
       { initialProps: { agentId: "ag-1" } },
@@ -180,7 +150,6 @@ describe("useTraces", () => {
       useTraces({
         accessToken: "tok",
         agentId: "ag-1",
-        q: "",
         pageSize: 2,
       }),
     );
@@ -199,7 +168,6 @@ describe("useTraces", () => {
       useTraces({
         accessToken: "tok",
         agentId: "ag-1",
-        q: "",
         pageSize: 2,
       }),
     );
@@ -216,10 +184,27 @@ describe("useTraces", () => {
   it("reports and surfaces an error when the fetch throws", async () => {
     mockFetchTraces.mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() =>
-      useTraces({ accessToken: "tok", agentId: "ag-1", q: "" }),
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
     );
     await waitFor(() => expect(result.current.error).toMatch(/Failed to load/));
     expect(mockReportError).toHaveBeenCalled();
+  });
+
+  it("clears the rows and the count when a load fails", async () => {
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a" }, { uuid: "b" }], 2),
+    );
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+
+    mockFetchTraces.mockRejectedValue(new Error("boom"));
+    await act(async () => result.current.refetch());
+
+    await waitFor(() => expect(result.current.error).toMatch(/Failed to load/));
+    expect(result.current.items).toEqual([]);
+    expect(result.current.total).toBe(0);
   });
 
   it("ignores a superseded response so stale data never clobbers newer state", async () => {
@@ -234,7 +219,6 @@ describe("useTraces", () => {
       useTraces({
         accessToken: "tok",
         agentId: "ag-1",
-        q: "",
         pageSize: 2,
       }),
     );
@@ -246,7 +230,9 @@ describe("useTraces", () => {
       await first;
     });
 
-    await waitFor(() => expect(result.current.items).toEqual([{ uuid: "new" }]));
+    await waitFor(() =>
+      expect(result.current.items).toEqual([{ uuid: "new" }]),
+    );
     expect(result.current.total).toBe(1);
   });
 });

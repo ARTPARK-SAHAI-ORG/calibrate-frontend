@@ -1,9 +1,9 @@
 import {
   fetchTraces,
   fetchTrace,
-  bulkDeleteMatchingTraces,
   convertTracesToTests,
   validateApiKeyForAgent,
+  MAX_TRACES_PAGE_SIZE,
 } from "../tracesApi";
 import { apiGet, apiPost } from "../api";
 
@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 describe("fetchTraces", () => {
-  it("sends limit, offset and the agent, omitting blank filters", async () => {
+  it("sends limit, offset and the agent, and no search term", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
     await fetchTraces("tok", { limit: 50, offset: 100, agentId: "ag-1" });
@@ -38,29 +38,32 @@ describe("fetchTraces", () => {
     expect(query.has("conversation_id")).toBe(false);
   });
 
-  it("passes a trimmed q without a conversation filter", async () => {
-    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
-
-    await fetchTraces("tok", {
-      limit: 25,
+  it("clamps a too-large page to what the backend accepts", async () => {
+    mockApiGet.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 200,
       offset: 0,
-      agentId: "ag-1",
-      q: "  polio  ",
     });
 
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
-    expect(query.get("q")).toBe("polio");
-    expect(query.has("conversation_id")).toBe(false);
-    expect(query.get("agent_id")).toBe("ag-1");
+    await fetchTraces("tok", { limit: 500, offset: 0, agentId: "ag-1" });
+
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
+    expect(query.get("limit")).toBe(String(MAX_TRACES_PAGE_SIZE));
+    expect(MAX_TRACES_PAGE_SIZE).toBe(200);
   });
 
-  it("does not send a whitespace-only q", async () => {
-    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+  it("leaves a page under the cap alone", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
 
-    await fetchTraces("tok", { limit: 25, offset: 0, agentId: "ag-1", q: "   " });
+    await fetchTraces("tok", { limit: 25, offset: 0, agentId: "ag-1" });
 
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
-    expect(query.has("q")).toBe(false);
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
+    expect(query.get("limit")).toBe("25");
   });
 
   it("returns the paginated envelope unchanged", async () => {
@@ -136,9 +139,15 @@ describe("validateApiKeyForAgent", () => {
 
     mockResponse(403);
     await expect(validateApiKeyForAgent("sk_bad", "ag-1")).resolves.toBe(false);
+  });
 
+  it("throws on a missing agent rather than blaming the key", async () => {
+    // A good key on an agent that is gone is not a bad key, so the caller must
+    // be able to say "could not check" instead of "this key did not work".
     mockResponse(404);
-    await expect(validateApiKeyForAgent("sk_bad", "ag-1")).resolves.toBe(false);
+    await expect(validateApiKeyForAgent("sk_live", "ag-gone")).rejects.toThrow(
+      "Request failed: 404",
+    );
   });
 
   it("throws when the check cannot complete", async () => {
@@ -154,38 +163,6 @@ describe("validateApiKeyForAgent", () => {
   });
 });
 
-describe("bulkDeleteMatchingTraces", () => {
-  it("POSTs select_all with the agent and a trimmed query", async () => {
-    mockApiPost.mockResolvedValue({ deleted: 3 });
-
-    const result = await bulkDeleteMatchingTraces("tok", {
-      agentId: "ag-1",
-      q: "  polio  ",
-    });
-
-    expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
-      select_all: true,
-      agent_id: "ag-1",
-      q: "polio",
-    });
-    expect(result).toEqual({ deleted: 3 });
-  });
-
-  it("omits empty filters, keeping select_all and the agent", async () => {
-    mockApiPost.mockResolvedValue({ deleted: 0 });
-
-    await bulkDeleteMatchingTraces("tok", {
-      agentId: "ag-1",
-      q: "  ",
-    });
-
-    expect(mockApiPost).toHaveBeenCalledWith("/traces/bulk-delete", "tok", {
-      select_all: true,
-      agent_id: "ag-1",
-    });
-  });
-});
-
 describe("convertTracesToTests", () => {
   it("shapes a response conversion with evaluators and agents", async () => {
     mockApiPost.mockResolvedValue({ test_uuids: ["t1", "t2"] });
@@ -197,12 +174,16 @@ describe("convertTracesToTests", () => {
       agentUuids: ["ag1"],
     });
 
-    expect(mockApiPost).toHaveBeenCalledWith("/traces/convert-to-tests", "tok", {
-      trace_ids: ["a", "b"],
-      type: "response",
-      evaluators: [{ evaluator_uuid: "ev1" }, { evaluator_uuid: "ev2" }],
-      agent_uuids: ["ag1"],
-    });
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/traces/convert-to-tests",
+      "tok",
+      {
+        trace_ids: ["a", "b"],
+        type: "response",
+        evaluators: [{ evaluator_uuid: "ev1" }, { evaluator_uuid: "ev2" }],
+        agent_uuids: ["ag1"],
+      },
+    );
     expect(result).toEqual({ test_uuids: ["t1", "t2"] });
   });
 
@@ -215,11 +196,15 @@ describe("convertTracesToTests", () => {
       acceptAnyArguments: true,
     });
 
-    expect(mockApiPost).toHaveBeenCalledWith("/traces/convert-to-tests", "tok", {
-      trace_ids: ["a"],
-      type: "tool_call",
-      accept_any_arguments: true,
-    });
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/traces/convert-to-tests",
+      "tok",
+      {
+        trace_ids: ["a"],
+        type: "tool_call",
+        accept_any_arguments: true,
+      },
+    );
   });
 
   it("does not send accept_any_arguments for a response conversion", async () => {

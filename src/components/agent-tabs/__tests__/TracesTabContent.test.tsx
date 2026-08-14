@@ -1,4 +1,4 @@
-import { render, screen, waitFor, setupUser } from "@/test-utils";
+import { act, render, screen, waitFor, setupUser } from "@/test-utils";
 jest.mock("sonner", () => ({
   toast: { error: jest.fn(), success: jest.fn() },
 }));
@@ -28,11 +28,8 @@ jest.mock("../../../hooks", () => ({
     .PAGE_SIZE_OPTIONS,
 }));
 
-const bulkDeleteMatchingTraces = jest.fn();
 const fetchTrace = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
-  bulkDeleteMatchingTraces: (...args: unknown[]) =>
-    bulkDeleteMatchingTraces(...args),
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
 }));
 
@@ -189,7 +186,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
-  bulkDeleteMatchingTraces.mockResolvedValue({ deleted: 1 });
 });
 
 /** The last arguments `useTraces` was called with, i.e. what is on screen now. */
@@ -225,8 +221,10 @@ describe("TracesTabContent", () => {
     expect(screen.getByText("1 trace")).toBeInTheDocument();
     expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
     expect(mockUseTraces).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: "agent-1", q: "" }),
+      expect.objectContaining({ agentId: "agent-1" }),
     );
+    // The endpoint takes no search term, so the tab must not send one.
+    expect(lastTracesArgs()).not.toHaveProperty("q");
     expect(lastTracesArgs()).not.toHaveProperty("conversationId");
     expect(mockUseDialogUrlParam).toHaveBeenCalledWith(
       expect.objectContaining({ param: "traceId" }),
@@ -283,27 +281,15 @@ describe("TracesTabContent", () => {
     expect(nextPage).toHaveBeenCalledTimes(1);
   });
 
-  it("passes what was typed in the search box to the trace list", async () => {
-    const user = setupUser();
-    render(<TracesTabContent agentUuid="agent-1" />);
-
-    await user.type(screen.getByPlaceholderText("Search traces"), "vaccine");
-
-    await waitFor(() =>
-      expect(mockUseTraces).toHaveBeenCalledWith(
-        expect.objectContaining({ agentId: "agent-1", q: "vaccine" }),
-      ),
-    );
-  });
-
   it("shows the empty state when the agent has no traces", () => {
     mockUseTraces.mockReturnValue(tracesResult([]));
 
     render(<TracesTabContent agentUuid="agent-1" />);
 
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+    expect(screen.queryByText("1 trace")).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Search traces"),
+      screen.queryByRole("button", { name: "View code" }),
     ).not.toBeInTheDocument();
   });
 
@@ -317,6 +303,35 @@ describe("TracesTabContent", () => {
 
     await user.click(screen.getByText("check"));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the setup steps on screen while it checks for traces again", async () => {
+    const user = setupUser();
+    let loading = false;
+    mockUseTraces.mockImplementation(() => ({
+      ...tracesResult([]),
+      isLoading: loading,
+    }));
+    const { container, rerender } = render(<TracesTabContent agentUuid="agent-1" />);
+
+    expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+
+    await user.click(screen.getByText("check"));
+    // The check is running now.
+    loading = true;
+    rerender(<TracesTabContent agentUuid="agent-1" />);
+
+    // The steps, and everything the reader filled in on them, are still there.
+    expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+    expect(container.querySelector("svg.animate-spin")).not.toBeInTheDocument();
+  });
+
+  it("shows the spinner on the first load only", () => {
+    mockUseTraces.mockReturnValue({ ...tracesResult([]), isLoading: true });
+    const { container } = render(<TracesTabContent agentUuid="agent-1" />);
+
+    expect(container.querySelector("svg.animate-spin")).toBeInTheDocument();
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
   });
 
   it("reveals the add and delete actions once a trace is selected", async () => {
@@ -536,6 +551,124 @@ describe("TracesTabContent", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("leaves the agent's own instructions out of what is stored", async () => {
+      const user = setupUser();
+      fetchTrace.mockResolvedValue(
+        detail({
+          input: [
+            { role: "system", content: "You are a helpful health worker." },
+            { role: "user", content: "When is the next vaccination?" },
+          ],
+        }),
+      );
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+      expect(
+        JSON.parse(screen.getByTestId("labelling-payload").textContent!),
+      ).toEqual([
+        {
+          name: "msg-001",
+          input: [{ role: "user", content: "When is the next vaccination?" }],
+          output: { response: "At 14 weeks.", tool_calls: null },
+        },
+      ]);
+    });
+
+    it("carries on with the traces that loaded and says how many were left out", async () => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace(),
+          trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+        ]),
+      );
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) => {
+        if (uuid === "trace-2") throw new Error("boom");
+        return detail({ uuid });
+      });
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getByLabelText("Select all traces"));
+      await user.click(screen.getByText("Submit for labelling (2)"));
+      await user.click(screen.getByText("choose evaluators"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+      // The one that loaded still goes to the task.
+      expect(
+        JSON.parse(screen.getByTestId("labelling-payload").textContent!),
+      ).toHaveLength(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        "1 trace could not be loaded and was left out.",
+      );
+      expect(reportError).toHaveBeenCalledWith(
+        "Error loading traces for labelling:",
+        expect.any(Error),
+      );
+    });
+
+    it("keeps the wait on screen and does not open the task if the ticks change", async () => {
+      const user = setupUser();
+      let resolveTrace: (value: unknown) => void = () => {};
+      fetchTrace.mockReturnValue(
+        new Promise((resolve) => {
+          resolveTrace = resolve;
+        }),
+      );
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+      expect(screen.getByText("Loading traces...")).toBeInTheDocument();
+
+      // The reader unticks the row while the trace is still loading.
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      expect(screen.getByText("Loading traces...")).toBeInTheDocument();
+
+      await act(async () => {
+        resolveTrace(detail());
+      });
+
+      expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+      expect(screen.queryByText("Loading traces...")).not.toBeInTheDocument();
+    });
+
+    it("clears only the traces that were submitted", async () => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace(),
+          trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+          trace({ uuid: "trace-3", message_id: "msg-003", input_preview: "Third" }),
+        ]),
+      );
+      render(<TracesTabContent agentUuid="agent-1" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+
+      // Two more get ticked while the task dialog is open.
+      await user.click(screen.getAllByLabelText("Select trace")[1]);
+      await user.click(screen.getAllByLabelText("Select trace")[2]);
+      await user.click(screen.getByText("finish labelling"));
+
+      // Only the submitted one is unticked; the other two are still ticked.
+      expect(screen.getByText("Submit for labelling (2)")).toBeInTheDocument();
+    });
+
     it("says so when the traces cannot be loaded, instead of opening an empty task", async () => {
       const user = setupUser();
       fetchTrace.mockRejectedValue(new Error("boom"));
@@ -577,51 +710,4 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });
 
-  it("deletes every trace matching the current search for this agent", async () => {
-    const user = setupUser();
-    render(<TracesTabContent agentUuid="agent-1" />);
-
-    await user.type(screen.getByPlaceholderText("Search traces"), "vaccine");
-    await waitFor(() =>
-      expect(mockUseTraces).toHaveBeenCalledWith(
-        expect.objectContaining({ agentId: "agent-1", q: "vaccine" }),
-      ),
-    );
-
-    await user.click(screen.getByText("Delete all 1 matching"));
-    expect(
-      screen.getByText(
-        "Every trace matching the current search will be deleted, including traces not shown on this page. This frees workspace capacity and cannot be undone.",
-      ),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Delete all" }));
-
-    await waitFor(() =>
-      expect(bulkDeleteMatchingTraces).toHaveBeenCalledWith(
-        "test-token",
-        {
-          agentId: "agent-1",
-          q: "vaccine",
-        },
-      ),
-    );
-  });
-
-  it("keeps an empty search result separate from the agent empty state", async () => {
-    const user = setupUser();
-    mockUseTraces.mockImplementation((args: { q: string }) =>
-      tracesResult(args.q ? [] : [trace()]),
-    );
-    render(<TracesTabContent agentUuid="agent-1" />);
-
-    await user.type(screen.getByPlaceholderText("Search traces"), "missing");
-
-    await waitFor(() =>
-      expect(
-        screen.getByText("No traces match your search."),
-      ).toBeInTheDocument(),
-    );
-    // Not the "this agent has no traces at all" screen.
-    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
-  });
 });

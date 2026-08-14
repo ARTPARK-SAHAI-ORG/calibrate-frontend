@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -16,7 +16,7 @@ import {
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
-import { LoadingState, PageSizeSelect, SearchInput } from "@/components/ui";
+import { LoadingState, PageSizeSelect } from "@/components/ui";
 import {
   useAccessToken,
   useDialogUrlParam,
@@ -25,14 +25,8 @@ import {
   useTraces,
   PAGE_SIZE_OPTIONS,
 } from "@/hooks";
-import {
-  bulkDeleteMatchingTraces,
-  fetchTrace,
-  type TraceDetail,
-} from "@/lib/tracesApi";
+import { fetchTrace, type TraceDetail } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 /** What a trace is called in the labelling task: its message id, else the
  *  first thing the caller said, else a plain word. */
@@ -57,16 +51,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const router = useRouter();
   const accessToken = useAccessToken();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(
-      () => setDebouncedQuery(searchQuery),
-      SEARCH_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
   const [pageSize, setPageSize] = usePageSize();
 
   const {
@@ -83,7 +67,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   } = useTraces({
     accessToken,
     agentId: agentUuid,
-    q: debouncedQuery,
     pageSize,
   });
 
@@ -92,28 +75,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     onDeleted: (uuids) => handleDeleted(uuids.length),
     accessToken,
   });
-
-  // "Delete everything matching this search" — the select_all path covers
-  // rows beyond the loaded page, which checkbox selection can't reach.
-  const filtersActive = Boolean(debouncedQuery.trim());
-  const [deleteMatchingOpen, setDeleteMatchingOpen] = useState(false);
-  const [isDeletingMatching, setIsDeletingMatching] = useState(false);
-  const deleteMatching = async () => {
-    if (!accessToken) return;
-    setIsDeletingMatching(true);
-    try {
-      const result = await bulkDeleteMatchingTraces(accessToken, {
-        agentId: agentUuid,
-        q: debouncedQuery,
-      });
-      setDeleteMatchingOpen(false);
-      handleDeleted(result.deleted);
-    } catch (err) {
-      reportError("Error deleting matching traces:", err);
-    } finally {
-      setIsDeletingMatching(false);
-    }
-  };
 
   // Add selected traces as tests. A recorded response always becomes a response
   // test; tool-call tests are used only when every selected trace has calls and
@@ -141,28 +102,76 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     TraceLabellingItem[] | null
   >(null);
 
+  // What was selected when the reader pressed submit. The fetches take time and
+  // the ticks can change underneath, so the submitted set is what everything
+  // afterwards works from.
+  const [submittedUuids, setSubmittedUuids] = useState<string[]>([]);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
   const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
+    const uuids = Array.from(selected);
+    setSubmittedUuids(uuids);
     setIsPreparingLabelling(true);
     try {
-      const details = await Promise.all(
-        Array.from(selected).map((uuid) => fetchTrace(accessToken, uuid)),
+      const settled = await Promise.allSettled(
+        uuids.map((uuid) => fetchTrace(accessToken, uuid)),
       );
+      // The ticks changed while the traces were loading, so opening the task
+      // now would work on rows the reader no longer picked.
+      const now = selectedRef.current;
+      if (uuids.length !== now.size || uuids.some((uuid) => !now.has(uuid))) {
+        return;
+      }
+      const loaded = settled
+        .filter(
+          (result): result is PromiseFulfilledResult<TraceDetail> =>
+            result.status === "fulfilled",
+        )
+        .map((result) => result.value);
+      const failed = settled.length - loaded.length;
+      if (failed > 0) {
+        const firstError = settled.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
+        reportError("Error loading traces for labelling:", firstError?.reason);
+      }
+      // Nothing loaded, so there is nothing to label.
+      if (loaded.length === 0) {
+        toast.error("Could not load the selected traces. Please try again.");
+        return;
+      }
+      if (failed > 0) {
+        toast.error(
+          `${failed} trace${failed === 1 ? "" : "s"} could not be loaded and ${failed === 1 ? "was" : "were"} left out.`,
+        );
+      }
       setLabellingEvaluators(chosen);
       setLabellingTraces(
-        details.map((trace) => ({
+        loaded.map((trace) => ({
           name: traceLabellingName(trace),
-          input: trace.input,
+          // The agent's own instructions are not part of the conversation the
+          // annotators read, so they are never stored with the item.
+          input: (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
         })),
       );
-    } catch (err) {
-      reportError("Error loading traces for labelling:", err);
-      toast.error("Could not load the selected traces. Please try again.");
     } finally {
       setIsPreparingLabelling(false);
     }
+  };
+
+  /** Untick only the traces that were actually submitted. */
+  const clearSubmitted = () => {
+    const submitted = new Set(submittedUuids);
+    items.forEach((item) => {
+      if (submitted.has(item.uuid) && selectedRef.current.has(item.uuid)) {
+        deletion.checkboxProps(item).onToggle();
+      }
+    });
   };
 
   // The setup steps go away once the first trace lands, so the code that sends
@@ -184,7 +193,18 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     setTraceParam(null);
   };
 
-  const showEmptyState = !isLoading && !error && total === 0 && !filtersActive;
+  // The full-page spinner belongs to the very first load only. A later check
+  // must not replace what is on screen, or the setup steps would be thrown
+  // away mid-check along with the key the reader just created.
+  const hasLoadedRef = useRef(false);
+  if (!isLoading) hasLoadedRef.current = true;
+  const hasLoaded = hasLoadedRef.current;
+
+  // With no search, an empty list means exactly one thing: this agent has
+  // never been sent a trace. Deliberately NOT gated on `isLoading`: pressing
+  // "Check for traces" sets that true, and hiding the steps mid-check throws
+  // away the key the reader just made.
+  const showEmptyState = hasLoaded && !error && total === 0;
   // Below the smallest option every trace already fits on one page, so the
   // choice would only be noise.
   const showPageSize = total > PAGE_SIZE_OPTIONS[0];
@@ -193,12 +213,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
     <div className="flex flex-col space-y-4 md:space-y-6">
       {!showEmptyState && (
         <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search traces"
-            className="w-full md:max-w-md"
-          />
           <div className="flex items-center gap-2 md:ml-auto">
             <button
               type="button"
@@ -207,6 +221,17 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
             >
               View code
             </button>
+            {/* Outside the selection block: unticking rows while the traces
+                load must not make the wait disappear. */}
+            {isPreparingLabelling && (
+              <button
+                type="button"
+                disabled
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background transition-colors cursor-not-allowed opacity-50"
+              >
+                Loading traces...
+              </button>
+            )}
             {selected.size > 0 && (
               <>
                 <button
@@ -216,15 +241,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
                 >
                   Add to tests ({selected.size})
                 </button>
-                {isPreparingLabelling ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background transition-colors cursor-not-allowed opacity-50"
-                  >
-                    Loading traces...
-                  </button>
-                ) : (
+                {!isPreparingLabelling && (
                   <SubmitForLabellingButton
                     count={selected.size}
                     emptyMessage="Select at least one trace to submit for labelling."
@@ -241,15 +258,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
                 </button>
               </>
             )}
-            {filtersActive && total > 0 && (
-              <button
-                type="button"
-                onClick={() => setDeleteMatchingOpen(true)}
-                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer"
-              >
-                Delete all {total.toLocaleString()} matching
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -260,14 +268,10 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         </div>
       )}
 
-      {isLoading ? (
+      {!hasLoaded ? (
         <LoadingState />
       ) : showEmptyState ? (
         <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
-      ) : items.length === 0 ? (
-        <div className="border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
-          No traces match your search.
-        </div>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
@@ -372,7 +376,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           }}
           onAdded={() => {
             setLabellingTraces(null);
-            deletion.clearSelection();
+            clearSubmitted();
           }}
         />
       )}
@@ -394,17 +398,6 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
         isDeleting={deletion.isDeleting}
       />
 
-      <DeleteConfirmationDialog
-        isOpen={deleteMatchingOpen}
-        onClose={() => {
-          if (!isDeletingMatching) setDeleteMatchingOpen(false);
-        }}
-        onConfirm={deleteMatching}
-        title={`Delete all ${total.toLocaleString()} matching traces?`}
-        message="Every trace matching the current search will be deleted, including traces not shown on this page. This frees workspace capacity and cannot be undone."
-        confirmText="Delete all"
-        isDeleting={isDeletingMatching}
-      />
     </div>
   );
 }

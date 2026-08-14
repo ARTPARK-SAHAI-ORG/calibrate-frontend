@@ -59,29 +59,30 @@ export type TraceDetail = {
   updated_at: string;
 };
 
+/** The backend caps a page at 200 rows. */
+export const MAX_TRACES_PAGE_SIZE = 200;
+
 export type TraceListParams = {
   limit: number;
   offset: number;
   /** Traces belong to one agent; every read is scoped to it. */
   agentId: string;
-  q?: string;
 };
 
 /**
- * Fetch one page of traces for one agent. Unlike the other list pages,
- * filtering and search run server-side (the trace store can hold far more rows
- * than the client should ever download), so `q` goes out as a query param
- * instead of being applied over a fully-fetched list.
+ * Fetch one page of traces for one agent. Unlike the other list pages this one
+ * pages on the server: the trace store can hold far more rows than the client
+ * should ever download. There is no search — the backend takes no query term —
+ * and it refuses a page larger than `MAX_TRACES_PAGE_SIZE`.
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q }: TraceListParams,
+  { limit, offset, agentId }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
-  params.set("limit", String(limit));
+  params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
-  if (q && q.trim()) params.set("q", q.trim());
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,
@@ -100,7 +101,9 @@ export async function fetchTrace(
  * Check a pasted workspace API key without touching the signed-in session.
  * `apiGet` would attach the JWT and sign the user out on 401, so this is a
  * raw fetch with only `X-API-Key`. A 2xx for this agent means the key is real
- * and can see this workspace; 401/403/404 mean it is not.
+ * and can see this workspace; 401 and 403 mean it is not. Anything else,
+ * including a 404 for an agent that no longer exists, is not an answer about
+ * the key, so it is thrown for the caller to report as "could not check".
  */
 export async function validateApiKeyForAgent(
   apiKey: string,
@@ -116,33 +119,8 @@ export async function validateApiKeyForAgent(
     },
   );
   if (response.ok) return true;
-  if (
-    response.status === 401 ||
-    response.status === 403 ||
-    response.status === 404
-  ) {
-    return false;
-  }
+  if (response.status === 401 || response.status === 403) return false;
   throw new Error(`Request failed: ${response.status}`);
-}
-
-export type BulkDeleteTracesResult = {
-  deleted: number;
-};
-
-/**
- * Soft-delete every trace of one agent matching the given filters via the
- * backend's `select_all` contract — the recovery path when a misbehaving client
- * floods the store and the matching set spans more pages than are loaded.
- * Explicit per-row deletion goes through `useTraceDeletion` instead.
- */
-export async function bulkDeleteMatchingTraces(
-  accessToken: string,
-  { agentId, q }: { agentId: string; q?: string },
-): Promise<BulkDeleteTracesResult> {
-  const body: Record<string, unknown> = { select_all: true, agent_id: agentId };
-  if (q && q.trim()) body.q = q.trim();
-  return apiPost<BulkDeleteTracesResult>("/traces/bulk-delete", accessToken, body);
 }
 
 export type ConvertTestType = "response" | "tool_call";

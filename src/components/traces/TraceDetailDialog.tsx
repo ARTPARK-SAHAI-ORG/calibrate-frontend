@@ -67,10 +67,8 @@ export function turnsToHistory(turns: TraceTurn[]): TestCaseHistory[] {
     const createdAt =
       typeof turn.created_at === "string" ? turn.created_at : undefined;
     const ts = createdAt ? { created_at: createdAt } : {};
-    if (turn.role === "system" && content) {
-      history.push({ role: "system", content, ...ts });
-      continue;
-    }
+    // The instructions the agent was given are stored on the trace but never
+    // drawn, so they are dropped here rather than left as an empty block.
     if (turn.role === "user" && content) {
       history.push({ role: "user", content, ...ts });
       continue;
@@ -171,9 +169,16 @@ export function TraceDetailDialog({
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
-  const [trace, setTrace] = useState<TraceDetail | null>(null);
+  // The trace is held with the id it was fetched for, so content is only ever
+  // drawn under its own trace: asking for another one shows nothing until the
+  // new one arrives, instead of the last one flashing under the new heading.
+  const [loaded, setLoaded] = useState<{
+    uuid: string;
+    trace: TraceDetail;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const trace = isOpen && loaded?.uuid === traceUuid ? loaded.trace : null;
 
   useEffect(() => {
     if (!isOpen || !traceUuid || !accessToken) return;
@@ -181,10 +186,10 @@ export function TraceDetailDialog({
     const load = async () => {
       setIsLoading(true);
       setError(null);
-      setTrace(null);
+      setLoaded(null);
       try {
         const data = await fetchTrace(accessToken, traceUuid);
-        if (!cancelled) setTrace(data);
+        if (!cancelled) setLoaded({ uuid: traceUuid, trace: data });
       } catch (err) {
         reportError("Error fetching trace:", err);
         if (!cancelled) setError("Failed to load this trace. Please try again.");

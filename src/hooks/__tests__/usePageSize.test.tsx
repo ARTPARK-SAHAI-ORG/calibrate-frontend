@@ -29,6 +29,19 @@ describe("usePageSize", () => {
     expect(second.result.current[0]).toBe(50);
   });
 
+  it("has the saved choice on the very first render, so a list asks once", () => {
+    window.localStorage.setItem(KEY, "25");
+    const sizes: number[] = [];
+    renderHook(() => {
+      const [pageSize] = usePageSize();
+      sizes.push(pageSize);
+      return pageSize;
+    });
+    // 50 then 25 would mean the list requested the default first and then
+    // requested again at the saved size.
+    expect(sizes.every((size) => size === 25)).toBe(true);
+  });
+
   it("saves a new choice so the next visit keeps it", () => {
     const { result } = renderHook(() => usePageSize());
     act(() => result.current[1](100));

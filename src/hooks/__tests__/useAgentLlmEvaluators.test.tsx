@@ -128,3 +128,25 @@ it("fetches nothing when disabled or signed out", async () => {
   expect(mockFetchEvals).not.toHaveBeenCalled();
   expect(mockFetchAgentEvals).not.toHaveBeenCalled();
 });
+
+it("reads as still loading while there is no sign-in yet, then loads when it lands", async () => {
+  const { result, rerender } = renderHook(
+    ({ accessToken }: { accessToken: string | null }) =>
+      useAgentLlmEvaluators({ agentUuid: "ag-1", accessToken }),
+    { initialProps: { accessToken: null as string | null } },
+  );
+
+  // Not "loaded, and empty": nothing has been asked for yet.
+  expect(result.current.isLoading).toBe(true);
+  expect(result.current.error).toBeNull();
+  expect(mockFetchEvals).not.toHaveBeenCalled();
+
+  rerender({ accessToken: "tok" });
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  expect(mockFetchEvals).toHaveBeenCalledTimes(1);
+  expect(result.current.evaluators.map((e) => e.uuid)).toEqual([
+    "ev-default",
+    "ev-custom",
+  ]);
+});

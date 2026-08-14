@@ -47,11 +47,17 @@ export function useAgentLlmEvaluators({
   const [preselectedUuids, setPreselectedUuids] = useState<Set<string>>(
     () => new Set(),
   );
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !accessToken) return;
+    if (!enabled || !accessToken) {
+      // Sign-in has not landed yet, so there is nothing to show and nothing
+      // has failed: that reads as still loading, not as a loaded empty list.
+      // The effect runs again once the token arrives.
+      setIsLoading(enabled && !accessToken);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
       setIsLoading(true);

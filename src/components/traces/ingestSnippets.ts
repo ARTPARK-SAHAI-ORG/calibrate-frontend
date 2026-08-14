@@ -70,8 +70,8 @@ function python({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
             ],
         },
         # Optional
-        "message_id": "msg-001",
-        "conversation_id": "conv-001",
+        "message_id": "your-message-id",
+        "conversation_id": "your-conversation-id",
         "metadata": [{"key": "env", "value": "production"}],
     },
 )`;
@@ -102,8 +102,8 @@ function javascript({ backendUrl, agentUuid, apiKey }: SnippetValues): string {
       ],
     },
     // Optional
-    message_id: "msg-001",
-    conversation_id: "conv-001",
+    message_id: "your-message-id",
+    conversation_id: "your-conversation-id",
     metadata: [{ key: "env", value: "production" }],
   }),
 });`;

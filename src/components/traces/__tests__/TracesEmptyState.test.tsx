@@ -292,6 +292,88 @@ it("says when the key could not be checked, and cancel returns to the start", as
   ).not.toBeInTheDocument();
 });
 
+it("still opens the sending code when the pasted key does not work", async () => {
+  validateApiKeyForAgent.mockResolvedValue(false);
+  const user = setupUser();
+  setup();
+
+  await user.click(screen.getByRole("button", { name: "I have a key already" }));
+  await user.type(screen.getByPlaceholderText("Paste your key"), "sk_bad");
+  await user.click(screen.getByRole("button", { name: "Check key" }));
+  await screen.findByText(
+    "This key did not work. Check it is for this workspace.",
+  );
+
+  // The key check failing must not lock away the code that sends a trace: the
+  // reader can put a key into it by hand.
+  await user.click(screen.getByText("Send your first trace"));
+  expect(screen.getByText("agent_id")).toBeInTheDocument();
+  expect(snippetText()).toContain("sk_...");
+});
+
+it("stays where you are when the new key dialog is cancelled", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+  await user.click(screen.getByRole("button", { name: "I have added this" }));
+  expect(
+    screen.getByRole("button", { name: "Check for traces" }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByText("Create an API key"));
+  await user.click(screen.getByRole("button", { name: "Create a new API key" }));
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+  // No key was made this time, so the reader is left on the step they opened
+  // the dialog from, not sent back to the code.
+  expect(screen.getByText("sk_live_secret")).toBeInTheDocument();
+  expect(screen.queryByText("agent_id")).not.toBeInTheDocument();
+});
+
+/** The text of every part the snippet greys out as an explanation. */
+function commentedText(): string {
+  return Array.from(document.querySelectorAll("pre span.italic"))
+    .map((el) => el.textContent ?? "")
+    .join("\n");
+}
+
+it("keeps the address in the request as code, not as a greyed out note", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  expect(snippetText()).toContain("https://api.example.com/traces");
+  expect(commentedText()).not.toContain("api.example.com");
+
+  for (const language of ["Python", "JavaScript"]) {
+    await user.click(screen.getByRole("button", { name: language }));
+    expect(commentedText()).not.toContain("api.example.com");
+    // The one real note is still greyed out, so the change did not turn the
+    // marking off altogether.
+    expect(commentedText()).toContain("Optional");
+  }
+});
+
+it("uses fill-in ids in the two optional ids, not ones to ship as they are", async () => {
+  const user = setupUser();
+  setup();
+  await openStepTwo(user);
+
+  for (const language of ["Python", "JavaScript"]) {
+    await user.click(screen.getByRole("button", { name: language }));
+    expect(snippetText()).toContain("your-message-id");
+    expect(snippetText()).toContain("your-conversation-id");
+    expect(snippetText()).not.toContain("msg-001");
+    expect(snippetText()).not.toContain("conv-001");
+  }
+
+  // cURL cannot carry a note, so it leaves both ids out rather than show one
+  // that looks ready to send.
+  await user.click(screen.getByRole("button", { name: "cURL" }));
+  expect(snippetText()).not.toContain("message_id");
+  expect(snippetText()).not.toContain("conversation_id");
+});
+
 it("copies the snippet that is on screen, key and agent included", async () => {
   // user-event installs its own clipboard stub on setup, so spy after it.
   const user = setupUser();

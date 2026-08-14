@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { CheckCircleIcon, ChevronDownIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
@@ -91,6 +91,9 @@ export function TracesEmptyState({
   onCheckForTraces,
 }: TracesEmptyStateProps) {
   const [isCreateKeyOpen, setIsCreateKeyOpen] = useState(false);
+  /** Set when a key is created, cleared when the dialog closes, so cancelling
+   *  a later opening does not move the reader back to step two. */
+  const madeKeyThisTime = useRef(false);
   const [isChecking, setIsChecking] = useState(false);
   const [checkedAndEmpty, setCheckedAndEmpty] = useState(false);
   // `reached` is how far they have got, `openStep` is what is expanded, which
@@ -105,8 +108,15 @@ export function TracesEmptyState({
   const toggleStep = (step: number) => {
     setOpenStep((open) => (open === step ? 0 : step));
   };
+  // Step two is always open to the reader, whether or not step one worked out:
+  // the key can be typed into the code by hand, so nothing about a failed key
+  // check should hide the code that does the sending.
   const stepState = (step: number): StepState =>
-    step < reached ? "done" : step === reached ? "current" : "upcoming";
+    step < reached
+      ? "done"
+      : step === reached || step === 2
+        ? "current"
+        : "upcoming";
 
   // The backend returns the key itself only when it is created, so this is the
   // one moment it can be filled into the request. Held in memory only, and gone
@@ -301,12 +311,18 @@ export function TracesEmptyState({
         onClose={() => {
           setIsCreateKeyOpen(false);
           // The dialog reveals the key, then the reader closes it; that is the
-          // point the key is in the request and step one is done.
-          if (createdKey) goToStep(2);
+          // point the key is in the request and step one is done. Only this
+          // opening counts: someone on step three who opens the dialog and
+          // cancels should stay where they were.
+          if (madeKeyThisTime.current) {
+            madeKeyThisTime.current = false;
+            goToStep(2);
+          }
         }}
         onCreate={async (name) => {
           const created = await createApiKey(name);
           setCreatedKey(created.key);
+          madeKeyThisTime.current = true;
           return created;
         }}
       />

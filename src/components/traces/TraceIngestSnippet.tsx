@@ -28,7 +28,9 @@ async function copyText(text: string): Promise<void> {
 // Strings and comments are the only things worth colouring in the snippet:
 // they are what tell a reader "this is a value you replace" versus "this is an
 // explanation". A full highlighter would be a dependency for three snippets.
-const TOKENS = /("(?:[^"\\]|\\.)*")|((?:#|\/\/)[^\n]*)/g;
+// A comment marker only counts at the start of a line or after a space, so the
+// "//" in an address like https://host/traces stays ordinary code.
+const TOKENS = /("(?:[^"\\]|\\.)*")|((?:^|\s)(?:#|\/\/)[^\n]*)/gm;
 
 function highlight(code: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
