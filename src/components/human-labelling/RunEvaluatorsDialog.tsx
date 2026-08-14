@@ -182,9 +182,10 @@ export function RunEvaluatorsDialog({
   const allPicked =
     evaluators.length > 0 && evaluators.every((e) => picked[e.uuid]);
   const somePicked = pickedCount > 0 && !allPicked;
+  // Anything picked (all or just some) → clearing is the useful action.
   const toggleSelectAll = () => {
     const next: Record<string, boolean> = {};
-    const target = !allPicked;
+    const target = pickedCount === 0;
     for (const e of evaluators) next[e.uuid] = target;
     setPicked(next);
   };
@@ -286,11 +287,11 @@ export function RunEvaluatorsDialog({
                       if (el) el.indeterminate = somePicked;
                     }}
                     onChange={toggleSelectAll}
-                    aria-label={allPicked ? "Unselect all evaluators" : "Select all evaluators"}
+                    aria-label={pickedCount > 0 ? "Unselect all evaluators" : "Select all evaluators"}
                     className="w-4 h-4 cursor-pointer accent-foreground"
                   />
                   <span className="text-xs font-medium text-muted-foreground">
-                    {allPicked ? "Unselect all" : "Select all"}
+                    {pickedCount > 0 ? "Unselect all" : "Select all"}
                   </span>
                 </label>
               )}

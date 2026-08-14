@@ -216,6 +216,19 @@ describe("AssignAnnotatorsDialog", () => {
     ).not.toBeChecked();
   });
 
+  it("clears a partial selection in one click", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Unselect all annotators" }),
+    );
+    expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+  });
+
   it("does not show the select-all control with a single annotator", async () => {
     mockedApiClient.mockResolvedValue([annotators[0]]);
     renderDialog();

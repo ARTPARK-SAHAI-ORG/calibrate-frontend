@@ -108,8 +108,9 @@ export function AssignAnnotatorsDialog({
 
   const allPicked = annotators.length > 0 && picked.size === annotators.length;
   const somePicked = picked.size > 0 && !allPicked;
+  // Anything picked (all or just some) → clearing is the useful action.
   const toggleSelectAll = () => {
-    if (allPicked) {
+    if (picked.size > 0) {
       setPicked(new Set());
     } else {
       setPicked(new Set(annotators.map((a) => a.uuid)));
@@ -265,14 +266,14 @@ export function AssignAnnotatorsDialog({
                           }}
                           onChange={toggleSelectAll}
                           aria-label={
-                            allPicked
+                            picked.size > 0
                               ? "Unselect all annotators"
                               : "Select all annotators"
                           }
                           className="w-4 h-4 cursor-pointer accent-foreground"
                         />
                         <span className="text-xs font-medium text-muted-foreground">
-                          {allPicked ? "Unselect all" : "Select all"}
+                          {picked.size > 0 ? "Unselect all" : "Select all"}
                         </span>
                       </label>
                     )}
