@@ -34,7 +34,7 @@ const EXAMPLES: {
     key: "build",
     title: "Create evals just by talking about your agent",
     description:
-      "Your AI tool asks what your agent does, who it serves, and where it goes wrong today, then turns your answers into evals and runs them.",
+      "Answer a few questions about what your agent does, who it serves, and where it goes wrong today. Your answers become the evals, and they run straight away.",
     prompt: "/onboard",
     steps: [
       {
@@ -52,7 +52,7 @@ const EXAMPLES: {
     key: "fix",
     title: "Analyse the mistakes and fix your agent",
     description:
-      "Your AI tool reads every test that failed, works out what they have in common, and proposes changes to your agent's instructions.",
+      "Ask what went wrong and every failed test comes back grouped by what the failures have in common, with changes to your agent's instructions to try.",
     prompt: "Which tests failed last time, and what should I change?",
     steps: [
       { text: "Read the 6 tests that failed" },
@@ -66,7 +66,7 @@ const EXAMPLES: {
     key: "judge",
     title: "Align the LLM judge with your experts",
     description:
-      "Your AI tool compares the judge's scores with the human labels, rewrites the judge instructions, and repeats until they agree often enough.",
+      "Ask for better agreement and the judge's instructions get rewritten, checked against the human labels, and rewritten again until they line up.",
     prompt: "My LLM judge does not agree with my experts often enough. Fix it.",
     steps: [
       { text: "Read the 120 samples your experts labelled" },
@@ -104,7 +104,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Catch a mistake before it reaches people",
     description:
-      "Your AI tool writes the setup into your code, so the tests are checked on their own every time the code changes.",
+      "Wire the same tests into your code, so they are checked on their own every time it changes.",
   },
   {
     title: "Collect labels from your experts",
