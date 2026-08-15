@@ -26,7 +26,7 @@ describe("CodingAgentsSection", () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText("Why did the last run fail, and what should I change?"),
+      screen.getByText("Which tests failed last time, and what should I change?"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Ran the tests again: 23 of 24 passed"),
@@ -45,7 +45,10 @@ describe("CodingAgentsSection", () => {
   it("lists what else the agent can be asked for", () => {
     render(<CodingAgentsSection />);
     expect(
-      screen.getByRole("heading", { name: "Set up labelling jobs" }),
+      screen.getByRole("heading", { name: "Set up human review" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Compare models on the same tests" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Manage the LLM judges" }),

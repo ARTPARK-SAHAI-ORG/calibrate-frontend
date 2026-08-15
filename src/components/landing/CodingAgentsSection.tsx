@@ -39,7 +39,7 @@ const EXAMPLES: {
     steps: [
       { text: "Asked what your agent does and where it fails today" },
       { text: "Connected your agent and checked that it answers" },
-      { text: "Wrote 24 test cases from the failures you described" },
+      { text: "Wrote 24 test cases from the mistakes you described" },
       { text: "Picked an LLM judge for the cases that need one" },
       { text: "Ran them: 18 passed, 6 failed", result: true },
     ],
@@ -48,10 +48,10 @@ const EXAMPLES: {
     key: "fix",
     title: "Find the mistakes and get fixes to try",
     description:
-      "Your agent reads every failure from the run, groups them by what went wrong, and proposes changes to your agent's instructions.",
-    prompt: "Why did the last run fail, and what should I change?",
+      "Your agent reads every test that failed, groups them by what went wrong, and proposes changes to your agent's instructions.",
+    prompt: "Which tests failed last time, and what should I change?",
     steps: [
-      { text: "Read the 6 failures from the last run" },
+      { text: "Read the 6 tests that failed" },
       { text: "4 of them: replied in English when the caller wrote in Hindi" },
       { text: "2 of them: did not ask for the order number before answering" },
       { text: "Proposed two changes to your agent's instructions" },
@@ -77,21 +77,34 @@ const EXAMPLES: {
   },
 ];
 
+/** Each of these maps to something the skills can really do through the public
+ * API. Do not add one without an endpoint behind it: there is no way to create
+ * labelling jobs or hand out a link per reviewer, for instance. */
 const THINGS_TO_ASK: { title: string; description: string }[] = [
-  {
-    title: "Set up labelling jobs",
-    description:
-      "Create a labelling task, add the samples to review, and produce a link for each reviewer.",
-  },
-  {
-    title: "Assign the work to reviewers",
-    description:
-      "Split the samples between reviewers, and send a few of the same ones to everyone to see whether they agree.",
-  },
   {
     title: "Connect an agent to Calibrate",
     description:
       "Register the agent, check that Calibrate can reach it, and confirm a reply comes back.",
+  },
+  {
+    title: "Turn a dataset you already have into tests",
+    description:
+      "Point it at a spreadsheet, a data file, or a public dataset, and it loads the rows as test cases.",
+  },
+  {
+    title: "Compare models on the same tests",
+    description:
+      "Try every test on several models and get a leaderboard on quality, cost and speed.",
+  },
+  {
+    title: "Check the tests every time the code changes",
+    description:
+      "Have the same tests checked automatically whenever someone changes the code, so a change that breaks the agent is caught before it goes live.",
+  },
+  {
+    title: "Set up human review",
+    description:
+      "Create a labelling task, add the samples people should review, add the reviewers, and load the labels they give back.",
   },
   {
     title: "Manage the LLM judges",
@@ -187,7 +200,7 @@ export function CodingAgentsSection() {
         <p className="text-base md:text-xl text-gray-500 max-w-3xl mx-auto">
           Calibrate works inside Claude Code, Cursor, Codex and Windsurf. Ask
           for what you want in ordinary words and your agent builds the tests,
-          runs them, reads the failures, and tells you what to change.
+          tries them, reads what went wrong, and tells you what to change.
         </p>
       </div>
 
