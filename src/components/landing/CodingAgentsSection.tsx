@@ -89,27 +89,22 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Start testing an agent you already have",
     description:
-      "Add your agent to Calibrate, send it a test message, and check the reply comes back the way Calibrate expects.",
+      "Does the groundwork needed to connect your agent to Calibrate",
   },
   {
     title: "Turn a spreadsheet you already have into tests",
     description:
-      "Point it at a spreadsheet, a data file, or a public dataset, and it loads the rows as test cases.",
+      "Converts your existing dataset, or even a public dataset, into tests inside Calibrate",
   },
   {
     title: "Find the best model for your agent",
     description:
-      "Run your evals using different models and get a leaderboard across quality, cost and speed.",
+      "Run your evals using different models and get a leaderboard across quality, cost and speed",
   },
   {
     title: "Collect labels from your experts",
     description:
-      "Create a labelling task, pick the LLM judges to align, add the samples experts will review, and update them as human labels come in.",
-  },
-  {
-    title: "Manage your LLM judges",
-    description:
-      "Create and improve the LLM judges that score your agent's answers.",
+      "Create a labelling task, pick the LLM judges to align, add the samples experts will review, and update them as human labels come in",
   },
 ];
 

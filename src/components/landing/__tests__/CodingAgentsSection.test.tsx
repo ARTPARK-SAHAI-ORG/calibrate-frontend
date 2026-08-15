@@ -53,7 +53,9 @@ describe("CodingAgentsSection", () => {
       screen.getByRole("heading", { name: "Find the best model for your agent" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Manage your LLM judges" }),
+      screen.getByRole("heading", {
+        name: "Turn a spreadsheet you already have into tests",
+      }),
     ).toBeInTheDocument();
   });
 
