@@ -1,0 +1,51 @@
+name: Changelog
+
+# Adds one line to CHANGELOG.MD for every pull request merged into main, then
+# commits it back to main. Never runs on prod: if a bot wrote the file on both
+# branches they would diverge and every main -> prod merge would conflict on it.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+# Two merges landing at once would both push to main and one would be rejected.
+# Queue them instead.
+concurrency: changelog
+
+jobs:
+  append:
+    if: github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Add the entry
+        env:
+          # Read through the environment, not ${{ }} inside the script: a pull
+          # request title is written by whoever opened it and would otherwise be
+          # pasted straight into the shell.
+          TITLE: ${{ github.event.pull_request.title }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          # Prepend, via cat rather than sed, so it also works on an empty file.
+          printf -- '- %s ([#%s](%s))\n' "$TITLE" "$NUMBER" "$URL" \
+            | cat - CHANGELOG.MD > CHANGELOG.new
+          mv CHANGELOG.new CHANGELOG.MD
+
+      - name: Commit to main
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # [skip ci] keeps this commit from re-running the whole test suite,
+          # which tests.yml would otherwise do on every push to main.
+          git commit -am "changelog: #${NUMBER} [skip ci]"
+          git push
