@@ -14,11 +14,11 @@ name: Changelog
 
 # pull_request_target, not pull_request, so a merged pull request opened from
 # someone else's fork gets its line too. On pull_request, GitHub runs the copy of
-# this file from the pull request itself, so it hands the run a read-only token
-# and no secrets, and the push at the end is rejected. pull_request_target runs
-# the copy already on main, which nobody outside can change, so the token can
-# write. That is only safe because the checkout below takes main and this job
-# never runs the pull request's code.
+# this file from the pull request itself and hands the run no secrets, so the
+# push at the end has nothing to push with. pull_request_target runs the copy
+# already on main, which nobody outside can change, so the secrets are there.
+# That is only safe because the checkout below takes main and this job never runs
+# the pull request's code.
 on:
   pull_request_target:
     types: [closed]
@@ -49,6 +49,13 @@ jobs:
           ref: main
           # The merged commit is needed by name below, so shallow will not do.
           fetch-depth: 0
+          # main is protected: every change must come through a pull request, and
+          # only a repository admin is allowed past that. The token a workflow
+          # gets by default is not, and GitHub will not let the Actions bot be
+          # added to the bypass list, so the push at the end has to be made with
+          # an admin's own token. CHANGELOG_TOKEN is a personal access token
+          # scoped to this repository with permission to write files.
+          token: ${{ secrets.CHANGELOG_TOKEN }}
 
       - name: Collect what the pull request did
         env:

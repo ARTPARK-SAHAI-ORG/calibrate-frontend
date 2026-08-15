@@ -1,5 +1,6 @@
 ## August 2026
 
+- The changelog page lists what has changed in the app, and gets a new line every time something ships ([#365](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/365))
 - See how many items an evaluator run has finished while it is still going ([#364](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/364))
 - Duplicate an agent from its own page instead of building a copy by hand ([#363](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/363))
 - Mark an evaluator as optional so annotators can finish an item without scoring it ([#361](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/361))
