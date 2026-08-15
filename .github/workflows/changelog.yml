@@ -1,8 +1,16 @@
 name: Changelog
 
-# Adds one line to CHANGELOG.MD for every pull request merged into main, then
-# commits it back to main. Never runs on prod: if a bot wrote the file on both
-# branches they would diverge and every main -> prod merge would conflict on it.
+# Adds one line to CHANGELOG.MD for every pull request merged into main, written
+# from the standpoint of someone using the app rather than as the pull request
+# title, then commits it back to main.
+#
+# Never runs on prod: if a bot wrote the file on both branches they would diverge
+# and every main -> prod merge would conflict on it. prod gets the file the
+# ordinary way, by merging main.
+#
+# CHANGELOG.MD starts straight at a month heading with no title above it. The
+# step below reads its first line to decide whether this month already has a
+# heading, so a title there would give every merge its own duplicate heading.
 
 on:
   pull_request:
@@ -19,25 +27,82 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
+          # The merged commit is needed by name below, so shallow will not do.
+          fetch-depth: 0
 
-      - name: Add the entry
+      - name: Collect what the pull request did
         env:
-          # Read through the environment, not ${{ }} inside the script: a pull
-          # request title is written by whoever opened it and would otherwise be
-          # pasted straight into the shell.
+          # Read through the environment, not ${{ }} inside the script: a title
+          # and body are written by whoever opened the pull request and would
+          # otherwise be pasted straight into the shell.
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          {
+            printf 'Title: %s\n\nDescription:\n%s\n\nFiles changed:\n' "$TITLE" "$BODY"
+            git show --stat --format= "$SHA" || true
+          } > pr.md
+
+      - name: Write the entry
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Read,Write"'
+          prompt: |
+            Read pr.md. It describes one pull request that just merged into
+            Calibrate, a web app where nonprofit teams test and evaluate voice AI
+            agents. Write ONE sentence saying what a person using the app can now
+            do, or what stopped going wrong, and put that sentence alone in
+            entry.txt.
+
+            Rules for the sentence:
+            - Say what changed for the person using the app, not what the code does.
+            - Plain everyday words. No technical vocabulary at all: no hook,
+              endpoint, component, state, cache, poll, payload, refactor, API,
+              backend, frontend, render, route, query, parameter, pagination.
+            - No machine learning or statistics words: no inference, ground truth,
+              precision, recall, aggregation, distribution, threshold.
+            - Use the app's own words: agent, test, test run, evaluator, annotator,
+              labelling task, item, score, benchmark, trace, workspace, persona,
+              scenario, simulation.
+            - One sentence, sentence case, no full stop at the end, no em-dashes,
+              expanded contractions (does not, cannot), no marketing words.
+            - Do not invent anything the pull request does not show.
+
+            Write nothing but that sentence to entry.txt. No heading, no dash, no
+            pull request number, no quotes.
+
+      - name: Add it to the changelog
+        env:
           TITLE: ${{ github.event.pull_request.title }}
           NUMBER: ${{ github.event.pull_request.number }}
           URL: ${{ github.event.pull_request.html_url }}
         run: |
-          # Prepend, via cat rather than sed, so it also works on an empty file.
-          printf -- '- %s ([#%s](%s))\n' "$TITLE" "$NUMBER" "$URL" \
-            | cat - CHANGELOG.MD > CHANGELOG.new
+          # Fall back to the pull request title if the step above could not write
+          # a sentence, so a failure there loses the wording, never the entry.
+          LINE=$(head -1 entry.txt 2>/dev/null | sed -E 's/^[-*] *//; s/ *$//')
+          [ -n "$LINE" ] || LINE=$(printf '%s' "$TITLE" | sed -E 's/ *\(#[0-9]+\) *$//')
+          ENTRY="- ${LINE} ([#${NUMBER}](${URL}))"
+          MONTH=$(date -u +'%B %Y')
+
+          # Newest first, under a heading for the month. Written with cat rather
+          # than sed so it also works on an empty file.
+          if head -1 CHANGELOG.MD | grep -qxF "## $MONTH"; then
+            { head -2 CHANGELOG.MD; printf '%s\n' "$ENTRY"; tail -n +3 CHANGELOG.MD; } > CHANGELOG.new
+          else
+            { printf '## %s\n\n%s\n\n' "$MONTH" "$ENTRY"; cat CHANGELOG.MD; } > CHANGELOG.new
+          fi
           mv CHANGELOG.new CHANGELOG.MD
+          rm -f pr.md entry.txt
 
       - name: Commit to main
         env:
@@ -47,5 +112,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # [skip ci] keeps this commit from re-running the whole test suite,
           # which tests.yml would otherwise do on every push to main.
-          git commit -am "changelog: #${NUMBER} [skip ci]"
+          git commit -m "changelog: #${NUMBER} [skip ci]" -- CHANGELOG.MD
           git push
