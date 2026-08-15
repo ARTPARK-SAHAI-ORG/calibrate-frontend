@@ -644,12 +644,24 @@ function ModelSection({
 }) {
   const isProcessing = modelResult.success === null;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
+  // Rows land one by one while the model runs, so count the ones that already
+  // have a verdict (or errored) for the live "x of y done" header.
+  const finishedCount = (modelResult.test_results ?? []).filter(
+    (t) => t && benchmarkTestStatus(t) !== "running",
+  ).length;
   const passedCount = modelResult.passed ?? 0;
   const erroredCount = (modelResult.test_results ?? []).filter((t) => t?.error).length;
   // Errored tests may be lumped into the API's `failed` count — subtract them
   // so the header buckets line up with the categorised rows below.
   const failedCount = Math.max((modelResult.failed ?? 0) - erroredCount, 0);
   const totalTests = modelResult.total_tests ?? testNames.length;
+  // How many rows this model will end up with: the same rule the test list
+  // below uses, so the header count never disagrees with the rows shown.
+  const expectedCount = Math.max(
+    totalTests,
+    testNames.length,
+    modelResult.test_results?.length ?? 0,
+  );
   const query = searchQuery.trim().toLowerCase();
   const modelLabellingKeys = collectModelLabellingKeys(
     modelResult,
@@ -685,6 +697,11 @@ function ModelSection({
               </svg>
             )}
           </div>
+          {isProcessing && expectedCount > 0 && (
+            <div className="text-xs text-muted-foreground flex-shrink-0 ml-4">
+              {finishedCount} of {expectedCount} done
+            </div>
+          )}
           {!isProcessing && modelResult.success !== null && (
             <div className="flex items-center gap-2 text-xs flex-shrink-0 ml-4">
               {(statusFilter === "all" || statusFilter === "passed") && (
@@ -720,9 +737,6 @@ function ModelSection({
       {isExpanded && (
         <div className="px-4 pt-3 pb-3">
           {(() => {
-            const resultsCount = modelResult.test_results?.length ?? 0;
-            const expectedCount = Math.max(totalTests, testNames.length, resultsCount);
-
             if (expectedCount === 0 && !hasResults) {
               return (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
