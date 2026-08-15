@@ -132,6 +132,30 @@ function QuickStartStepIndicator(props: { index: number; total: number }) {
   );
 }
 
+/** Light copy that starts a new sentence sits on its own line; lowercase continuations stay inline. */
+function QuickStartStepHeadline(props: {
+  headingBold: string;
+  headingLight: string;
+  className: string;
+}) {
+  const stacked = /^\p{Lu}/u.test(props.headingLight.trimStart());
+  return (
+    <h3 className={props.className}>
+      <span className="font-semibold text-gray-900">{props.headingBold}</span>
+      {stacked ? null : " "}
+      <span
+        className={
+          stacked
+            ? "block font-light text-gray-500"
+            : "font-light text-gray-500"
+        }
+      >
+        {props.headingLight}
+      </span>
+    </h3>
+  );
+}
+
 function LandingQuickStartDesktopStepStack(props: {
   steps: LandingQuickStartStep[];
   secIdx: number;
@@ -152,14 +176,11 @@ function LandingQuickStartDesktopStepStack(props: {
         >
           <div className="text-left">
             <QuickStartStepIndicator index={idx} total={stepTotal} />
-            <h3 className={stepHeadlineClass}>
-              <span className="font-semibold text-gray-900">
-                {step.headingBold}
-              </span>{" "}
-              <span className="font-light text-gray-500">
-                {step.headingLight}
-              </span>
-            </h3>
+            <QuickStartStepHeadline
+              headingBold={step.headingBold}
+              headingLight={step.headingLight}
+              className={stepHeadlineClass}
+            />
           </div>
           <div className="rounded-xl overflow-hidden shadow-xl">
             <img
@@ -192,14 +213,11 @@ function LandingQuickStartMobileStepStack(props: {
         <div key={step.key} className="flex flex-col gap-9">
           <div className="text-left w-full min-w-0">
             <QuickStartStepIndicator index={idx} total={stepTotal} />
-            <h3 className={stepHeadlineClass}>
-              <span className="font-semibold text-gray-900">
-                {step.headingBold}
-              </span>{" "}
-              <span className="font-light text-gray-500">
-                {step.headingLight}
-              </span>
-            </h3>
+            <QuickStartStepHeadline
+              headingBold={step.headingBold}
+              headingLight={step.headingLight}
+              className={stepHeadlineClass}
+            />
           </div>
           <div className="rounded-xl overflow-hidden shadow-xl">
             <img
@@ -227,53 +245,73 @@ const tabs: LandingTab[] = [
     id: "llm",
     label: "Text agents",
     navDescription:
-      "Create tests, define custom evaluators, and find the best LLM for your agent",
+      "Capture error cases, define the success criteria and find the best model for your agent",
     sections: [
       {
         headingBold: "Evaluate the quality",
         headingLight: "of your AI responses",
         description:
-          "Define edge cases and evaluate the agent's response against custom criteria",
+          "Create structured tests that mimic how users talk to your agent and define the success criteria",
         quickStart: {
           steps: [
             {
               key: "llm-input",
               headingBold: "Add the conversation history",
-              headingLight: "as input to the agent",
+              headingLight: "that the agent receives as input for each test",
               image: "/llm-input.png",
             },
             {
               key: "llm-evaluator",
-              headingBold:
-                "Define custom criteria to evaluate the agent's response",
-              headingLight: "given the conversation history",
+              headingBold: "Define the success criteria",
+              headingLight:
+                "to evaluate the agent's response given the conversation history",
               image: "/llm-evaluator.png",
             },
             {
               key: "llm-output",
-              headingBold: "Run the test and see whether",
-              headingLight: "the agent response passed the evaluation criteria",
+              headingBold: "Run the test",
+              headingLight:
+                "A powerful LLM evaluates whether the agent's response matches your success criteria",
               image: "/llm-output.png",
+            },
+            {
+              key: "tool-calls",
+              headingBold: "Evaluate the tools your agent called",
+              headingLight: "or any data it extracted",
+              image: "/llm-tool-call.png",
+            },
+            {
+              key: "all-tests",
+              headingBold: "Grow the tests",
+              headingLight:
+                "to keep a history of every failure mode for your agent",
+              image: "/llm-all.png",
             },
           ],
           closingHeadline: {
             headingBold: "Find the best LLM",
             headingLight: "for your agent",
             subheading:
-              "Compare different models on your tests to find the best one for your agent",
+              "Compare different models to find the best fit across quality, latency and cost",
           },
           comparisonSteps: [
             {
               key: "llm-multi-input",
-              headingBold: "Pick the models to compare",
-              headingLight: "and run benchmarking on all tests",
+              headingBold: "Select the models",
+              headingLight: "you want to compare",
               image: "/llm-multi-input.png",
             },
             {
               key: "llm-multi-output",
-              headingBold: "Get a leaderboard",
-              headingLight: "across models and evaluators to pick the best LLM",
+              headingBold: "Get the leaderboard",
+              headingLight: "across the models",
               image: "/llm-multi-output.png",
+            },
+            {
+              key: "llm-tradeoff",
+              headingBold: "Find the best tradeoff",
+              headingLight: "by balancing latency, cost and quality",
+              image: "/llm-tradeoff.gif",
             },
           ],
         },
@@ -288,108 +326,16 @@ const tabs: LandingTab[] = [
     ],
   },
   {
-    id: "voice",
-    label: "Voice agents",
-    navDescription:
-      "Benchmark speech\u2011to\u2011text and text\u2011to\u2011speech models using metrics suited for agents",
-    sections: [
-      {
-        headingBold: "Find the best speech\u2011to\u2011text model",
-        headingLight: "for your users",
-        description:
-          "Calibrate uses evaluators that compare the meaning of the predicted transcriptions with the references beyond simple rule-based metrics to rank different models",
-        images: [
-          "/stt-leaderboard.png",
-          "/stt-leaderboard.png",
-          "/stt-leaderboard.png",
-          "/stt-output.png",
-        ],
-        quickStart: {
-          steps: [
-            {
-              key: "stt-upload",
-              headingBold: "Upload your audios",
-              headingLight: "with reference texts",
-              image: "/stt-dataset.png",
-            },
-            {
-              key: "stt-config",
-              headingBold: "Select the language, models to compare",
-              headingLight:
-                "and the evaluators for measuring transcription accuracy",
-              image: "/stt-config.png",
-            },
-            {
-              key: "stt-leaderboard",
-              headingBold: "See the leaderboard",
-              headingLight: "across models for each metric",
-              image: "/stt-leaderboard.png",
-            },
-            {
-              key: "stt-rows",
-              headingBold: "For each model",
-              headingLight:
-                "view row-by-row outputs along with evaluator scores and reasoning",
-              image: "/stt-row-by-row.png",
-            },
-          ],
-        },
-      },
-      {
-        headingBold: "Select the perfect voice",
-        headingLight: "for your agent",
-        description:
-          "Calibrate uses AI models which lets you evaluate the generated audios against the reference texts on pronunciation, clarity, naturalness and more",
-        images: [
-          "/tts-dataset.png",
-          "/tts-config.png",
-          "/tts-leaderboard.png",
-          "/tts-row-by-row.png",
-        ],
-        quickStart: {
-          steps: [
-            {
-              key: "tts-texts",
-              headingBold: "Add the reference texts",
-              headingLight: "to be spoken",
-              image: "/tts-dataset.png",
-            },
-            {
-              key: "tts-config",
-              headingBold: "Select the language, models to compare",
-              headingLight:
-                "and the evaluators to measure the quality of the generated audios",
-              image: "/tts-config.png",
-            },
-            {
-              key: "tts-leaderboard",
-              headingBold: "See the leaderboard",
-              headingLight: "across models for each metric",
-              image: "/tts-leaderboard.png",
-            },
-            {
-              key: "tts-rows",
-              headingBold: "For each model",
-              headingLight:
-                "view the generated audios for each row along with evaluator scores and reasoning",
-              image: "/tts-row-by-row.png",
-            },
-          ],
-        },
-      },
-    ],
-  },
-  {
     id: "human-alignment",
     label: "Human alignment",
     navDescription:
-      "Collect human labels and iteratively align your LLM judges to automate monitoring reliably",
+      "Align your LLM judges with human experts to automate monitoring reliably",
     sections: [
       {
-        headingBold: "Align your LLM judges",
-        headingLight: "with human judgment",
+        headingBold: "Align LLM judges",
+        headingLight: "with trusted experts",
         description:
-          "LLM evaluators are prone to mistakes as well. The only way to trust them is to compare them with human judgment. Collect human labels, measure alignment with LLM judges and iteratively improve them.",
+          "Calibrate uses LLMs to judge the outputs of your agents automatically. But they can make mistakes too. To trust them, you need to ensure the LLM judges are aligned with your human experts.",
         images: [
           "/human-alignment-1.png",
           "/human-alignment-2.png",
@@ -402,45 +348,41 @@ const tabs: LandingTab[] = [
           steps: [
             {
               key: "human-task",
-              headingBold: "Create a human alignment task",
-              headingLight:
-                "and attach the evaluators you want to align. Each evaluator becomes an annotation column for every item",
+              headingBold: "Create a labelling task",
+              headingLight: "and select the LLM judges you want to align",
               image: "/human-alignment-1.png",
             },
             {
               key: "human-items",
-              headingBold: "Add the items to the task",
-              headingLight: "that humans will review and label",
+              headingBold: "Add the samples",
+              headingLight: "that humans will review",
               image: "/human-alignment-2.png",
             },
             {
               key: "human-jobs",
-              headingBold:
-                "Create labelling jobs by assigning items to annotators",
+              headingBold: "Create labelling jobs",
               headingLight:
-                "and send unique links so that labels from one annotator never influence another's",
+                "and send each reviewer the unique link assigned to them",
               image: "/human-alignment-3.png",
             },
             {
               key: "human-blind-link",
-              headingBold:
-                "Each annotator labels each item across all evaluators",
+              headingBold: "Reviewers label samples independently",
               headingLight:
-                "you want to align. Measure consistency in their labels by sending a few common items to all annotators",
+                "one at a time. Measure consistency in their labels by sending a few common samples to all reviewers.",
               image: "/human-alignment-4.png",
             },
             {
               key: "human-evaluator-runs",
-              headingBold: "Run your evaluators on the same items",
-              headingLight:
-                "and review disagreements between LLM judges and human labels",
+              headingBold: "Run LLM judges on the same samples",
+              headingLight: "and review disagreements with human labels",
               image: "/human-alignment-5.png",
             },
             {
               key: "human-unified",
-              headingBold: "Iteratively improve LLM judge alignment",
+              headingBold: "Refine the LLM judge",
               headingLight:
-                "by experimenting with different evaluator settings. Once aligned, the evaluator can be reliably used to automate monitoring.",
+                "by improving the prompt or using a better model until it agrees with your experts",
               image: "/human-alignment-6.png",
             },
           ],
@@ -449,16 +391,107 @@ const tabs: LandingTab[] = [
     ],
   },
   {
+    id: "voice",
+    label: "Voice agents",
+    navDescription:
+      "Benchmark speech\u2011to\u2011text and text\u2011to\u2011speech models using metrics suited for agents",
+    sections: [
+      {
+        headingBold: "Find the best speech\u2011to\u2011text model",
+        headingLight: "for your dataset",
+        description:
+          "Calibrate uses LLM judges to compare the meaning of the predicted transcriptions with the references, going beyond simple rule-based metrics to rank models reliably",
+        images: [
+          "/stt-leaderboard.png",
+          "/stt-leaderboard.png",
+          "/stt-leaderboard.png",
+          "/stt-output.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "stt-upload",
+              headingBold: "Upload your audios",
+              headingLight: "with reference transcripts",
+              image: "/stt-dataset.png",
+            },
+            {
+              key: "stt-config",
+              headingBold: "Select the models",
+              headingLight: "to compare for the language of your dataset",
+              image: "/stt-config.png",
+            },
+            {
+              key: "stt-leaderboard",
+              headingBold: "Get the leaderboard",
+              headingLight: "across models on cost, quality and latency",
+              image: "/stt-leaderboard.png",
+            },
+            {
+              key: "stt-rows",
+              headingBold: "Compare predicted transcripts",
+              headingLight:
+                "with the input audio or reference transcript for each model",
+              image: "/stt-row-by-row.png",
+            },
+          ],
+        },
+      },
+      {
+        headingBold: "Select the best text-to-speech model",
+        headingLight: "for your agent",
+        description:
+          "Calibrate uses AI models to automatically evaluate the generated audios on pronunciation, clarity, naturalness and more",
+        images: [
+          "/tts-dataset.png",
+          "/tts-config.png",
+          "/tts-leaderboard.png",
+          "/tts-row-by-row.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "tts-texts",
+              headingBold: "Upload the reference texts",
+              headingLight: "to be spoken by each model",
+              image: "/tts-dataset.png",
+            },
+            {
+              key: "tts-config",
+              headingBold: "Select the models",
+              headingLight:
+                "to compare for the language of your dataset and the evaluation criteria",
+              image: "/tts-config.png",
+            },
+            {
+              key: "tts-leaderboard",
+              headingBold: "Get the leaderboard",
+              headingLight: "across models for every criterion",
+              image: "/tts-leaderboard.png",
+            },
+            {
+              key: "tts-rows",
+              headingBold: "Listen to the generated audios",
+              headingLight: "for each model",
+              image: "/tts-row-by-row.png",
+            },
+          ],
+        },
+      },
+    ],
+  },
+
+  {
     id: "simulations",
     label: "Simulations",
     navDescription:
-      "Use personas and scenarios to simulate conversations before deploying to real users",
+      "Create simulated users that talk to your agent as real users would, to evaluate it end-to-end",
     sections: [
       {
         headingBold: "Simulate conversations",
         headingLight: "with your agent",
         description:
-          "Catch bugs and regressions in your agent before deploying it to real users",
+          "Evaluating individual components is important but it does not capture how your agent performs end-to-end as it talks to a real user",
         images: [
           "/sim-persona.png",
           "/sim-scenario.png",
@@ -469,30 +502,29 @@ const tabs: LandingTab[] = [
           steps: [
             {
               key: "sim-personas",
-              headingBold: "Create user personas",
-              headingLight: "to define who your users are",
+              headingBold: "Create realistic user personas",
+              headingLight: "that mimic your users",
               image: "/sim-persona.png",
             },
             {
               key: "sim-purpose",
-              headingBold: "Create scenarios",
-              headingLight:
-                "to depict the purpose of the user's interaction with the agent",
+              headingBold: "Define the purpose",
+              headingLight: "for which users talk to your agent",
               image: "/sim-scenario.png",
             },
             {
               key: "sim-run",
               headingBold: "Run a simulation",
               headingLight:
-                "with personas and scenarios using custom evaluators and get performance metrics across all runs",
-              image: "/sim-overall.png",
+                "where simulated users adopt the personas and talk to your agent for the defined purposes",
+              image: "/sim-specific.png",
             },
             {
               key: "sim-inspect",
-              headingBold: "Inspect each simulation run",
+              headingBold: "Measure agent performance",
               headingLight:
-                "with full transcript and generated audios for the agent and the simulated user",
-              image: "/sim-specific.png",
+                "using aligned LLM judges that evaluate the agent's quality in each conversation",
+              image: "/sim-overall.png",
             },
           ],
         },
@@ -854,10 +886,13 @@ export default function HomePage() {
             </h1>
 
             <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
-              Existing AI evaluation tools are too complex or overly expensive
-              for {"non\u2011profits"} to use. Calibrate is built by ML
-              engineers with decades of experience to make AI evaluation
-              accessible with best practices baked into every step
+              Adding AI to your product is easy. But answering whether it works
+              is hard. Manual verification can help you launch but it does not
+              ensure reliability at scale. Existing evaluation tools are either
+              too complex or overly expensive for {"non\u2011profits"}.
+              Calibrate is built by ML engineers with decades of experience to
+              make AI evaluation accessible with best practices baked into every
+              step.
             </p>
           </div>
 
@@ -950,8 +985,7 @@ export default function HomePage() {
                 </p>
                 <ul className="space-y-2">
                   {useCase.useCase.map((point) => {
-                    const text =
-                      typeof point === "string" ? point : point.text;
+                    const text = typeof point === "string" ? point : point.text;
                     return (
                       <li
                         key={text}
