@@ -21,6 +21,13 @@ test.describe("Landing page", () => {
     await expect(page.locator("#landing-simulations")).toBeInViewport({
       timeout: 10000,
     });
+    await page
+      .getByRole("button", { name: "Continuous monitoring" })
+      .first()
+      .click();
+    await expect(page.locator("#landing-monitoring")).toBeInViewport({
+      timeout: 10000,
+    });
   });
 
   test("the Get started CTA routes to login", async ({ page }) => {

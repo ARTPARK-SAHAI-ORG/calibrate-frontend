@@ -531,6 +531,66 @@ const tabs: LandingTab[] = [
       },
     ],
   },
+  {
+    id: "monitoring",
+    label: "Continuous monitoring",
+    navDescription:
+      "Send the conversations your agent has with real users to Calibrate and keep evaluating quality after launch",
+    sections: [
+      {
+        headingBold: "Keep evaluating quality",
+        headingLight: "after your agent goes live",
+        description:
+          "Send the conversations your agent has with real users to Calibrate, then turn them into tests and labelling tasks so evaluation continues on real usage",
+        quickStart: {
+          steps: [
+            {
+              key: "traces-setup",
+              headingBold: "Send your agent's real conversations to Calibrate",
+              headingLight:
+                "with an API key and a few lines of code in your product",
+              image: "/traces-setup.png",
+            },
+            {
+              key: "traces-list",
+              headingBold: "See every conversation your agent had with users",
+              headingLight:
+                "with what the user said, what the agent replied and when it happened",
+              image: "/traces-list.png",
+            },
+            {
+              key: "traces-detail",
+              headingBold: "Open any conversation",
+              headingLight:
+                "to read the full history, the agent's reply and the tools it called",
+              image: "/traces-detail.png",
+            },
+            {
+              key: "traces-tests",
+              headingBold: "Turn real conversations into tests",
+              headingLight:
+                "so the cases your users actually send become part of your test suite",
+              image: "/traces-tests.png",
+            },
+            {
+              key: "traces-labelling",
+              headingBold: "Send real conversations for human labelling",
+              headingLight:
+                "to keep your LLM judges aligned with your team as usage changes",
+              image: "/traces-labelling.png",
+            },
+          ],
+        },
+        images: [
+          "/traces-setup.png",
+          "/traces-list.png",
+          "/traces-detail.png",
+          "/traces-tests.png",
+          "/traces-labelling.png",
+        ],
+      },
+    ],
+  },
 ];
 
 import {
