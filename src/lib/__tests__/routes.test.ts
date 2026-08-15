@@ -57,6 +57,7 @@ describe("isPublicPath", () => {
     "/api/auth/session",
     "/terms",
     "/privacy",
+    "/changelog",
   ])("treats %s as public", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });

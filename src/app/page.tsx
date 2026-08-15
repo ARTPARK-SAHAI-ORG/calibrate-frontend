@@ -911,8 +911,105 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Use Cases Section */}
+      <div
+        id="use-cases"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10 md:mb-14">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
+              Trusted by mission-driven teams
+            </h2>
+            <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
+              How non-profits use Calibrate to build AI products responsibly
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {USE_CASES.map((useCase) => (
+              <div
+                key={useCase.name}
+                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
+              >
+                <img
+                  src={useCase.logo}
+                  alt={`${useCase.name} logo`}
+                  className="h-16 md:h-20 w-auto max-w-[200px] object-contain object-left mb-5 md:mb-6"
+                />
+                <h3 className="text-xl md:text-2xl font-semibold text-gray-900 mb-5">
+                  {useCase.name}
+                </h3>
+                <p className="text-sm font-semibold text-gray-400 mb-1.5">
+                  What they do
+                </p>
+                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5">
+                  {useCase.whatTheyDo}
+                </p>
+                <p className="text-sm font-semibold text-gray-400 mb-2">
+                  Use case
+                </p>
+                <ul className="space-y-2">
+                  {useCase.useCase.map((point) => {
+                    const text =
+                      typeof point === "string" ? point : point.text;
+                    return (
+                      <li
+                        key={text}
+                        className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
+                      >
+                        <span
+                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
+                          aria-hidden
+                        />
+                        <span>
+                          {typeof point === "string" ? (
+                            text
+                          ) : (
+                            <a
+                              href={point.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 transition-colors cursor-pointer"
+                            >
+                              {text}
+                            </a>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {useCase.quote && (
+                  <figure className="mt-6 pt-5 border-t border-gray-100">
+                    <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
+                      &ldquo;{useCase.quote}&rdquo;
+                    </blockquote>
+                    {useCase.quoteHref && (
+                      <a
+                        href={useCase.quoteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                      >
+                        Read the story
+                        <span aria-hidden>→</span>
+                      </a>
+                    )}
+                  </figure>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Feature sections — md+: sticky nav row then sections; mobile: each section’s button directly above its content */}
-      <div className="px-6 pb-20 pt-8 md:px-8 md:pb-20 md:pt-12 lg:px-12 lg:pt-14">
+      {/* The header's "How it works" link lands here: this is the walk through
+          of what Calibrate does, area by area. */}
+      <div
+        id="how-it-works"
+        className="px-6 pb-20 pt-8 md:px-8 md:pb-20 md:pt-12 lg:px-12 lg:pt-14 scroll-mt-20"
+      >
         <div className="mx-auto flex max-w-7xl flex-col">
           <nav
             aria-label="Product areas"
@@ -1140,98 +1237,6 @@ export default function HomePage() {
             Request an integration
             <span>→</span>
           </a> */}
-        </div>
-      </div>
-
-      {/* Use Cases Section */}
-      <div
-        id="use-cases"
-        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
-      >
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10 md:mb-14">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
-              Trusted by mission-driven teams
-            </h2>
-            <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-              How non-profits use Calibrate to build AI products responsibly
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            {USE_CASES.map((useCase) => (
-              <div
-                key={useCase.name}
-                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
-              >
-                <img
-                  src={useCase.logo}
-                  alt={`${useCase.name} logo`}
-                  className="h-16 md:h-20 w-auto max-w-[200px] object-contain object-left mb-5 md:mb-6"
-                />
-                <h3 className="text-xl md:text-2xl font-semibold text-gray-900 mb-5">
-                  {useCase.name}
-                </h3>
-                <p className="text-sm font-semibold text-gray-400 mb-1.5">
-                  What they do
-                </p>
-                <p className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5">
-                  {useCase.whatTheyDo}
-                </p>
-                <p className="text-sm font-semibold text-gray-400 mb-2">
-                  Use case
-                </p>
-                <ul className="space-y-2">
-                  {useCase.useCase.map((point) => {
-                    const text =
-                      typeof point === "string" ? point : point.text;
-                    return (
-                      <li
-                        key={text}
-                        className="flex gap-2.5 text-sm md:text-[15px] text-gray-600 leading-relaxed"
-                      >
-                        <span
-                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
-                          aria-hidden
-                        />
-                        <span>
-                          {typeof point === "string" ? (
-                            text
-                          ) : (
-                            <a
-                              href={point.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 transition-colors cursor-pointer"
-                            >
-                              {text}
-                            </a>
-                          )}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {useCase.quote && (
-                  <figure className="mt-6 pt-5 border-t border-gray-100">
-                    <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
-                      &ldquo;{useCase.quote}&rdquo;
-                    </blockquote>
-                    {useCase.quoteHref && (
-                      <a
-                        href={useCase.quoteHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
-                      >
-                        Read the story
-                        <span aria-hidden>→</span>
-                      </a>
-                    )}
-                  </figure>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 

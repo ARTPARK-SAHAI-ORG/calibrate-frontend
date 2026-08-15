@@ -67,12 +67,13 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
 **Next.js App Router** with all pages as client components (`"use client"`). The backend is a separate service at `NEXT_PUBLIC_BACKEND_URL` — this repo is frontend only and talks to it via REST.
 
 **Routing structure** (`src/app/`):
-- Public: `/` (landing), `/login`, `/signup`, `/public/...` (shareable result pages)
+- Public: `/` (landing), `/login`, `/signup`, `/changelog`, `/public/...` (shareable result pages)
+  - `/changelog` is the only page built from a file in the repo rather than the backend: it reads `CHANGELOG.MD` at build time (`parseChangelog` in `src/lib/changelog.ts` → `ChangelogList`), so a deploy is what publishes new entries. `.github/workflows/changelog.yml` writes that file, one line per pull request merged into main.
 - Authenticated app pages: `/agents`, `/tools`, `/evaluators`, `/stt`, `/tests`, `/tts`, `/personas`, `/scenarios`, `/simulations`, `/datasets/[id]`, `/workspace-settings`
 - API routes: `/api/auth` (NextAuth handler), `/api/debug-env`
 - The sidebar in `src/components/AppLayout.tsx` drives navigation: each `NavItem.id` maps to the route `/${id}`. Renaming a nav item's `id` changes the route.
 
-**Auth** (`src/middleware.ts`, `src/auth.ts`): NextAuth v5 with Google provider. The middleware accepts EITHER a NextAuth session OR an `access_token` cookie (backend-issued JWT from email/password login). On Google sign-in, `auth.ts` exchanges the Google id_token with the backend's `/auth/google` to get a backend JWT. Public routes (landing, login, signup, /public/*, /terms, /privacy, /debug, /docs) bypass auth. `GET /about` redirects to `/#about-calibrate` on the landing page (legacy About URL). `MAINTENANCE_MODE=true` redirects all non-API traffic to `/`.
+**Auth** (`src/middleware.ts`, `src/auth.ts`): NextAuth v5 with Google provider. The middleware accepts EITHER a NextAuth session OR an `access_token` cookie (backend-issued JWT from email/password login). On Google sign-in, `auth.ts` exchanges the Google id_token with the backend's `/auth/google` to get a backend JWT. Public routes (landing, login, signup, /changelog, /public/*, /terms, /privacy, /debug, /docs) bypass auth. `GET /about` redirects to `/#about-calibrate` on the landing page (legacy About URL). `MAINTENANCE_MODE=true` redirects all non-API traffic to `/`.
 
 **Access token hook**: Use `useAuth()` / `useAccessToken()` from `src/hooks/useAccessToken.ts` in new code — it unifies NextAuth session and localStorage JWT. Do NOT use `useSession()` directly (it only covers Google OAuth, not email/password).
 

@@ -19,6 +19,10 @@ describe("LandingFooter", () => {
     expect(
       screen.queryByRole("link", { name: "CLI" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Changelog" })).toHaveAttribute(
+      "href",
+      "/changelog",
+    );
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
       "href",
       "https://docs.google.com/document/d/e/2PACX-1vScdz5QUGyo_q4fBSAymagmoi55K8Ss77t2AcnsDYriYXp0LyM8GQ1Pnj3EDjrCUg/pub",

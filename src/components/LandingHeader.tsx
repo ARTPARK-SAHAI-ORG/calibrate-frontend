@@ -19,10 +19,14 @@ export function LandingHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navLinks: NavLink[] = [
+    { label: "Partners", href: "/#use-cases" },
+    { label: "How it works", href: "/#how-it-works" },
     { label: "Open source", href: "/#open-source" },
     { label: "Integrations", href: "/#integrations" },
-    { label: "Case studies", href: "/#use-cases" },
-    { label: "Documentation", href: process.env.NEXT_PUBLIC_DOCS_URL, external: true },
+    // Scrolls to the footer, which holds the documentation, changelog, privacy
+    // and terms links. No leading slash, so it stays on whichever page the
+    // reader is on: every page with this header has the footer too.
+    { label: "Resources", href: "#resources" },
   ];
 
   const renderNavLink = (link: NavLink, className: string, onClick?: () => void) =>
