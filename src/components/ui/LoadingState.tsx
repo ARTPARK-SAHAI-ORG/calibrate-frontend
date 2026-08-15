@@ -48,10 +48,10 @@ export function ErrorState({
 type NotFoundStateProps = {
   className?: string;
   /**
-   * `"switching"` means the page hit a 404 and we are still working out
+   * `"switching"` means the page hit a 403 or 404 and we are still working out
    * whether it belongs to another of the user's workspaces. Show the spinner,
    * not the dead-end screen, so a link that is about to switch workspaces
-   * never flashes "Not Found" first.
+   * never flashes a dead end first.
    */
   errorCode?: 401 | 403 | 404 | "switching";
   /**
