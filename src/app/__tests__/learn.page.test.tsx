@@ -133,7 +133,11 @@ describe("LearnPage", () => {
   it("links to the insights from workshop-for-leaders in that session's summary", () => {
     render(<LearnPage />);
     const { block } = sessionOnPage("workshop-for-leaders");
-    const insights = within(block).getByRole("link", { name: "Insights" });
+    // The words in the link say where it goes, so it reads correctly to
+    // anyone who hears it out of the sentence around it.
+    const insights = within(block).getByRole("link", {
+      name: "summary of the insights",
+    });
     expect(insights).toHaveAttribute(
       "href",
       "https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub",

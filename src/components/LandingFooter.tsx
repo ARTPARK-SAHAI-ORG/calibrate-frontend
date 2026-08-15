@@ -5,7 +5,14 @@ import { WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 export function LandingFooter() {
   return (
-    <footer className="bg-gray-50 text-gray-500 py-10 md:py-16 px-4 md:px-8 lg:px-12 border-t border-gray-200">
+    // The header used to have a Resources link that scrolled here, and it now
+    // goes to /learn instead. The anchor stays for links written outside this
+    // repo. scroll-mt keeps the heading clear of the header, which stays
+    // pinned to the top of the screen.
+    <footer
+      id="resources"
+      className="bg-gray-50 text-gray-500 py-10 md:py-16 px-4 md:px-8 lg:px-12 border-t border-gray-200 scroll-mt-20"
+    >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
           {/* Resources Column */}

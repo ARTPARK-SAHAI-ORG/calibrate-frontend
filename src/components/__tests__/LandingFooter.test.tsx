@@ -51,6 +51,14 @@ describe("LandingFooter", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps the resources anchor for links written before the Learn page", () => {
+    const { container } = render(<LandingFooter />);
+    expect(container.querySelector("footer")).toHaveAttribute(
+      "id",
+      "resources",
+    );
+  });
+
   it("renders the current year in the copyright line", () => {
     render(<LandingFooter />);
     const year = new Date().getFullYear().toString();

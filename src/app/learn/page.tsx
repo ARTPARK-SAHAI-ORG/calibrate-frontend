@@ -37,22 +37,20 @@ const TALKS: {
     title: "AI evals 101",
     summary: (
       <>
-        The talk covers: Why AI systems need to be evaluated, what does
-        evaluation mean, how to get started, creating a golden dataset, minimum
-        viable evaluation, and how to continuously keep improving your AI
-        system. We also answer questions throughout the session asked by the
-        community during the live version of the workshop. A summary of the
-        insights can be found{" "}
-        {/* "here" on its own says nothing to anyone using a screen reader,
-            who hears a link out of the sentence around it. */}
+        The talk covers: why AI systems need to be evaluated, what evaluation
+        means, how to get started, creating a golden dataset, minimum viable
+        evaluation, and how to keep improving your AI system. We also answer
+        questions asked by the community during the live workshop, and we have
+        written up a{" "}
+        {/* The words in the link say where it goes, so it still makes sense
+            to anyone who hears it out of the sentence around it. */}
         <a
           href="https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Insights"
           className="font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer"
         >
-          here
+          summary of the insights
         </a>
         .
       </>
@@ -68,7 +66,7 @@ const TALKS: {
     id: "getting-started",
     title: "Getting started with Calibrate",
     summary:
-      "A tutorial on how Calibrate helps evaluate AI agents using a form-filling voice agent as a case study. It explains the approach of eval-driven development of building agents, where evals are not considered an afterthought but closely inform what needs to be built and help ensure agent quality. We show how to convert each failure mode as a test case and comprehensively discuss how to evaluate open-ended responses using LLM judges along with sharing the best practices and pitfalls to avoid.",
+      "A tutorial on how Calibrate helps evaluate AI agents using a form-filling voice agent as a case study. It explains the eval-driven approach to building agents, where evals are not considered an afterthought but closely inform what needs to be built and help ensure agent quality. We show how to convert each failure mode into a test case and comprehensively discuss how to evaluate open-ended responses using LLM judges. We also share best practices and the pitfalls to avoid.",
     recordingEmbedUrl:
       "https://drive.google.com/file/d/1wIxDXWDuthB3urpUoZKB2KcdxartonMT/preview",
     recordingUrl:
@@ -159,8 +157,8 @@ export default function LearnPage() {
               Learning resources
             </h1>
             <p className="text-base md:text-xl text-gray-500 max-w-4xl mx-auto text-pretty">
-              Guidance on thinking about AI evals, best practices and tutorials
-              on Calibrate
+              Guidance and best practices for AI evals, plus tutorials on
+              Calibrate
             </p>
           </div>
 
