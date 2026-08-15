@@ -1,6 +1,11 @@
 export const WHATSAPP_INVITE_URL =
   "https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z";
 
+/** Luma calendar for the Sahai @ARTPARK webinars, where the team teaches AI
+ * evaluation. Linked from the landing footer; Luma's own Follow button is how
+ * a reader subscribes. */
+export const WEBINARS_URL = "https://luma.com/artpark-sahai";
+
 /** Official ARTPARK marketing site (used on landing eyebrow etc.). */
 export const ARTPARK_WEBSITE_URL = "https://www.artpark.in/";
 

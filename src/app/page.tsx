@@ -1086,7 +1086,6 @@ export default function HomePage() {
                         className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
                       >
                         Read the story
-                        <span aria-hidden>→</span>
                       </a>
                     )}
                   </figure>
@@ -1320,7 +1319,6 @@ export default function HomePage() {
             className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
           >
             See all integrations
-            <span>→</span>
           </a>
           {/* <a
             href="https://forms.gle/AoGE6DMs7N4DNAK2A"
@@ -1413,16 +1411,14 @@ export default function HomePage() {
               className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 bg-white hover:bg-gray-100 text-gray-800 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
             >
               Get started for free
-              <span aria-hidden>→</span>
             </Link>
+            {/* Sends the reader back up to the walk through of what Calibrate
+                does, the same section the header's "How it works" link opens. */}
             <a
-              href={process.env.NEXT_PUBLIC_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#how-it-works"
               className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 border border-white/40 text-white hover:bg-white/10 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
             >
-              Read the docs
-              <span aria-hidden>→</span>
+              See how it works
             </a>
           </div>
         </div>
