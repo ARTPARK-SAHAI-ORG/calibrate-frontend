@@ -23,7 +23,11 @@ concurrency: changelog
 
 jobs:
   append:
-    if: github.event.pull_request.merged
+    # Anyone who forks this repo gets a copy of this file. The repository check
+    # keeps it from writing to their changelog and pushing to their main. A pull
+    # request opened FROM a fork into this repo still gets its entry: that run
+    # belongs to this repo, not the fork.
+    if: github.event.pull_request.merged && github.repository == 'ARTPARK-SAHAI-ORG/calibrate-frontend'
     runs-on: ubuntu-latest
     permissions:
       contents: write
