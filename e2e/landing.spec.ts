@@ -22,7 +22,7 @@ test.describe("Landing page", () => {
       timeout: 10000,
     });
     await page
-      .getByRole("button", { name: "Continuous monitoring" })
+      .getByRole("button", { name: "Continuous improvement" })
       .first()
       .click();
     await expect(page.locator("#landing-monitoring")).toBeInViewport({

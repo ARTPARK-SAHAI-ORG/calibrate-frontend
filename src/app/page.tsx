@@ -533,59 +533,57 @@ const tabs: LandingTab[] = [
   },
   {
     id: "monitoring",
-    label: "Continuous monitoring",
-    navDescription: "Track agent quality once it is deployed",
+    label: "Continuous improvement",
+    navDescription:
+      "Track agent quality after deployment, update tests and continue gathering human feedback",
     sections: [
       {
         headingBold: "Keep evaluating quality",
         headingLight: "after your agent goes live",
         description:
-          "Send the conversations your agent has with real users to Calibrate, then turn them into tests and labelling tasks so evaluation continues on real usage",
+          "Calibrate can automatically capture your agent conversations, identify where it is failing and convert them to tests to help you continuously improve your agent",
         quickStart: {
           steps: [
             {
-              key: "traces-setup",
-              headingBold: "Send your agent's real conversations to Calibrate",
-              headingLight:
-                "with an API key and a few lines of code in your product",
-              image: "/traces-setup.png",
+              key: "monitoring-key",
+              headingBold: "Create an API key",
+              headingLight: "to verify your identity",
+              image: "/monitoring-1.png",
             },
             {
-              key: "traces-list",
-              headingBold: "See every conversation your agent had with users",
+              key: "monitoring-snippet",
+              headingBold: "Add the code snippet",
               headingLight:
-                "with what the user said, what the agent replied and when it happened",
-              image: "/traces-list.png",
+                "to your agent so agent conversations are sent to Calibrate",
+              image: "/monitoring-2.png",
             },
             {
-              key: "traces-detail",
-              headingBold: "Open any conversation",
-              headingLight:
-                "to read the full history, the agent's reply and the tools it called",
-              image: "/traces-detail.png",
+              key: "monitoring-conversations",
+              headingBold: "View all conversations",
+              headingLight: "and monitor your live agent performance",
+              image: "/monitoring-3.png",
             },
             {
-              key: "traces-tests",
-              headingBold: "Turn real conversations into tests",
-              headingLight:
-                "so the cases your users actually send become part of your test suite",
-              image: "/traces-tests.png",
+              key: "monitoring-tests",
+              headingBold: "Create tests",
+              headingLight: "for cases where the agent made a mistake",
+              image: "/monitoring-4.png",
             },
             {
-              key: "traces-labelling",
-              headingBold: "Send real conversations for human labelling",
+              key: "monitoring-labels",
+              headingBold: "Collect human labels",
               headingLight:
-                "to keep your LLM judges aligned with your team as usage changes",
-              image: "/traces-labelling.png",
+                "to ensure your automated LLM judges remain aligned",
+              image: "/monitoring-5.png",
             },
           ],
         },
         images: [
-          "/traces-setup.png",
-          "/traces-list.png",
-          "/traces-detail.png",
-          "/traces-tests.png",
-          "/traces-labelling.png",
+          "/monitoring-1.png",
+          "/monitoring-2.png",
+          "/monitoring-3.png",
+          "/monitoring-4.png",
+          "/monitoring-5.png",
         ],
       },
     ],
