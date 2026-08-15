@@ -101,6 +101,12 @@ export function TracesTabContent({
       ? "tool_call"
       : "response";
 
+  // Annotators score the agent's reply, so a trace that only made tool calls
+  // has nothing to label and is left out of what is submitted.
+  const labellableUuids = selectedTraces
+    .filter((trace) => !!trace.response_preview?.trim())
+    .map((trace) => trace.uuid);
+
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
   // rows only preview, so they are fetched before the task dialog opens.
@@ -119,11 +125,13 @@ export function TracesTabContent({
   const [submittedUuids, setSubmittedUuids] = useState<string[]>([]);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const labellableRef = useRef(labellableUuids);
+  labellableRef.current = labellableUuids;
 
   const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
-    const uuids = Array.from(selected);
+    const uuids = labellableRef.current;
     setSubmittedUuids(uuids);
     setIsPreparingLabelling(true);
     try {
@@ -132,7 +140,7 @@ export function TracesTabContent({
       );
       // The ticks changed while the traces were loading, so opening the task
       // now would work on rows the reader no longer picked.
-      const now = selectedRef.current;
+      const now = new Set(labellableRef.current);
       if (uuids.length !== now.size || uuids.some((uuid) => !now.has(uuid))) {
         toast.error(
           "The selected traces changed while they were loading, so nothing was submitted. Try again.",
@@ -308,8 +316,12 @@ export function TracesTabContent({
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={selected.size}
-                      emptyMessage="Select at least one trace to submit for labelling."
+                      count={labellableUuids.length}
+                      emptyMessage={
+                        selected.size > 0
+                          ? "Labelling traces that only made tool calls is not supported yet."
+                          : "Select at least one trace to submit for labelling."
+                      }
                       onOpen={() => setEvaluatorStepOpen(true)}
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                     />
