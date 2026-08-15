@@ -9,6 +9,7 @@ import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
+import { TraceScoreSummary } from "@/components/traces/TraceScoreSummary";
 import {
   AddRunToLabellingTaskDialog,
   type SourceEvaluatorRef,
@@ -257,6 +258,10 @@ export function TracesTabContent({
           {error}
         </div>
       )}
+
+      {/* The score is about every trace this agent has, not the page or the
+          search below it, so it sits above the toolbar. */}
+      {hasLoaded && !showEmptyState && <TraceScoreSummary />}
 
       {/* Above the list rather than inside it, so a search that matches nothing
           still leaves the box that got there. */}
