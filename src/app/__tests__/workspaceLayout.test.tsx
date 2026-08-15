@@ -82,12 +82,14 @@ it("keeps showing the page for a workspace the person belongs to", async () => {
   expect(screen.getByText("Agent list")).toBeInTheDocument();
 });
 
-it("shows Not Found for a workspace the person does not belong to", async () => {
+it("says there is no access for a workspace the person does not belong to", async () => {
   params = { org: SOMEONE_ELSES };
 
   render(<WorkspaceLayout>{page}</WorkspaceLayout>);
 
-  expect(await screen.findByText("Not Found")).toBeInTheDocument();
+  expect(
+    await screen.findByText("You do not have access to this page"),
+  ).toBeInTheDocument();
   expect(screen.queryByText("Agent list")).not.toBeInTheDocument();
   expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBeNull();
 });

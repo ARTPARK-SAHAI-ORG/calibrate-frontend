@@ -238,7 +238,7 @@ describe("usePageErrorState", () => {
       expect(replace).not.toHaveBeenCalled();
     });
 
-    it("never switches on a 403", () => {
+    it("opens the page under the workspace a 403 names", async () => {
       const { result } = renderHook(() => usePageErrorState());
 
       act(() => {
@@ -248,8 +248,40 @@ describe("usePageErrorState", () => {
         } as unknown as Response);
       });
 
-      expect(result.current.errorCode).toBe(403);
+      expect(result.current.errorCode).toBe("switching");
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith(`/${ORG_B}/agents/agent-1`),
+      );
+    });
+
+    it("says no access when a 403 names no workspace", async () => {
+      const { result } = renderHook(() => usePageErrorState());
+
+      act(() => {
+        result.current.captureResponse({
+          status: 403,
+          clone: () => ({ json: async () => ({ detail: "Forbidden" }) }),
+        } as unknown as Response);
+      });
+
+      await waitFor(() => expect(result.current.errorCode).toBe(403));
       expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("switches on an apiClient 403 that names a workspace", () => {
+      mockGetErrorStatusCode.mockReturnValue(403);
+      const { result } = renderHook(() => usePageErrorState());
+
+      act(() => {
+        result.current.captureError(
+          new Error(
+            `Request failed: 403 - {"detail":"Forbidden","organization_uuid":"${ORG_B}"}`,
+          ),
+        );
+      });
+
+      expect(replace).toHaveBeenCalledWith(`/${ORG_B}/agents/agent-1`);
+      expect(result.current.errorCode).toBe("switching");
     });
 
     it("switches on an apiClient 404 that names a workspace", () => {

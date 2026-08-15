@@ -48,10 +48,10 @@ export function ErrorState({
 type NotFoundStateProps = {
   className?: string;
   /**
-   * `"switching"` means the page hit a 404 and we are still working out
+   * `"switching"` means the page hit a 403 or 404 and we are still working out
    * whether it belongs to another of the user's workspaces. Show the spinner,
    * not the dead-end screen, so a link that is about to switch workspaces
-   * never flashes "Not Found" first.
+   * never flashes a dead end first.
    */
   errorCode?: 401 | 403 | 404 | "switching";
   /**
@@ -63,19 +63,21 @@ type NotFoundStateProps = {
   onGoHome?: () => void;
 };
 
-const errorContent: Record<number, { title: string; message: string }> = {
+/**
+ * The backend answers anything the reader is not allowed to open with a 403, so
+ * a 404 now means the page really is not there.
+ */
+const errorContent: Record<number, { title: string; message?: string }> = {
   401: {
-    title: "Access Denied",
-    message: "You don't have permission to access this page.",
+    title: "You do not have access to this page",
+    message: "Please request the admin to share access with you.",
   },
   403: {
-    title: "Access Denied",
-    message: "You don't have permission to access this page.",
+    title: "You do not have access to this page",
+    message: "Please request the admin to share access with you.",
   },
   404: {
-    title: "Not Found",
-    message:
-      "The page you are looking for does not exist or may have been moved",
+    title: "This page is not available",
   },
 };
 
@@ -96,15 +98,14 @@ export function NotFoundState({
     <div
       className={`flex flex-col items-center justify-center py-20 text-center px-4 ${className}`}
     >
-      <h1 className="text-7xl md:text-8xl font-bold text-muted-foreground">
-        {errorCode}
-      </h1>
-      <h2 className="text-xl md:text-2xl font-semibold text-foreground mt-4">
+      <h1 className="text-xl md:text-2xl font-semibold text-foreground">
         {title}
-      </h2>
-      <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
-        {message}
-      </p>
+      </h1>
+      {message && (
+        <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
+          {message}
+        </p>
+      )}
       <button
         onClick={onGoHome ?? (() => router.push(HOME_PATH))}
         className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"

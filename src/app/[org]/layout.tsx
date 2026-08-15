@@ -11,9 +11,9 @@ import { HOME_PATH } from "@/lib/routes";
 /**
  * Every page behind sign-in lives under the workspace it belongs to.
  *
- * If the address names a workspace the user is not a member of, show Not
- * Found: the same screen as a deleted item, so a link never reveals that
- * someone else's workspace exists.
+ * If the address names a workspace the user is not a member of, say so: the
+ * same "you do not have access" screen the backend's own refusal produces. The
+ * screen names nothing inside the workspace, so it reveals nothing about it.
  *
  * The pages underneath render straight away and only give way once we know the
  * workspace is not theirs, so the normal case gains no waiting. Their own
@@ -50,6 +50,7 @@ export default function WorkspaceLayout({
         {/* Home has to leave this workspace behind, so it goes to the plain
             address and lets the opening page pick one the user belongs to. */}
         <NotFoundState
+          errorCode={403}
           onGoHome={() => window.location.assign(HOME_PATH)}
         />
       </div>

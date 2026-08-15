@@ -139,11 +139,13 @@ describe("AnnotationJobView", () => {
     );
   });
 
-  it("shows a 404 state", async () => {
+  it("says the link does not work, with no code on screen", async () => {
     fetchMock.mockResolvedValue(jsonResponse({}, 404));
     render(<AnnotationJobView token="bad-tok" mode="public" />);
-    await waitFor(() => expect(screen.getByText("404")).toBeInTheDocument());
-    expect(screen.getByText("Link not found")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("This link does not work")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("404")).not.toBeInTheDocument();
   });
 
   it("shows an error state for other non-ok statuses", async () => {

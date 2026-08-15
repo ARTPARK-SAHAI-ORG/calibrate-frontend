@@ -12,10 +12,10 @@ import {
 export type PageErrorCode = 401 | 403 | 404;
 
 /**
- * `"switching"` covers the moment between a 404 arriving and us knowing
+ * `"switching"` covers the moment between the failure arriving and us knowing
  * whether it names another workspace of the user's. Pages pass it straight to
  * <NotFoundState />, which renders the normal spinner for it, so a link that
- * is about to switch workspaces never flashes "Not Found" first.
+ * is about to switch workspaces never flashes a dead end first.
  */
 export type PageErrorState = PageErrorCode | "switching";
 
@@ -25,11 +25,11 @@ export type PageErrorState = PageErrorCode | "switching";
  * surfaced as a full-page <NotFoundState errorCode={errorCode} /> instead of
  * the generic error/Retry state.
  *
- * A 404 is also where a shared link lands when the resource sits in one of the
- * user's other workspaces. The backend names that workspace in the 404 body
- * (see `src/lib/workspaceRedirect.ts`), and we make it active and reload
- * rather than showing the dead-end screen. 403 is left alone — the backend
- * only names the workspace on a 404.
+ * Either of those is also where a shared link lands when the thing sits in one
+ * of the user's other workspaces. The backend names that workspace in the body
+ * (see `src/lib/workspaceRedirect.ts`), and we make it active and reload rather
+ * than showing the dead end. The backend is moving that answer from 404 to 403,
+ * so both are read the same way and neither needs to land first.
  *
  * Two capture helpers cover the two ways pages talk to the backend:
  *   - `captureResponse(res)` for raw `fetch` calls (status off `res.status`);
@@ -56,44 +56,33 @@ export function usePageErrorState() {
       void signOut({ callbackUrl: "/login" });
       return true;
     }
-    if (response.status === 404) {
-      // The body is read off a copy so the caller's own error handling (and
-      // any later `res.json()`) still sees an unconsumed response.
-      if (typeof response.clone === "function") {
-        setErrorCode("switching");
-        void response
-          .clone()
-          .json()
-          .then((body) => {
-            if (!switchToOwningWorkspace(readOwningOrgUuid(body))) {
-              setErrorCode(404);
-            }
-          })
-          .catch(() => setErrorCode(404));
-        return true;
-      }
-      setErrorCode(404);
+    const status = response.status;
+    if (status !== 403 && status !== 404) return false;
+    // The body is read off a copy so the caller's own error handling (and
+    // any later `res.json()`) still sees an unconsumed response.
+    if (typeof response.clone === "function") {
+      setErrorCode("switching");
+      void response
+        .clone()
+        .json()
+        .then((body) => {
+          if (!switchToOwningWorkspace(readOwningOrgUuid(body))) {
+            setErrorCode(status);
+          }
+        })
+        .catch(() => setErrorCode(status));
       return true;
     }
-    if (response.status === 403) {
-      setErrorCode(403);
-      return true;
-    }
-    return false;
+    setErrorCode(status);
+    return true;
   }, []);
 
   const captureError = useCallback((err: unknown): boolean => {
     const status = getErrorStatusCode(err);
-    if (status === 404) {
-      const switching = switchToOwningWorkspace(orgUuidFromErrorMessage(err));
-      setErrorCode(switching ? "switching" : 404);
-      return true;
-    }
-    if (status === 403) {
-      setErrorCode(403);
-      return true;
-    }
-    return false;
+    if (status !== 403 && status !== 404) return false;
+    const switching = switchToOwningWorkspace(orgUuidFromErrorMessage(err));
+    setErrorCode(switching ? "switching" : status);
+    return true;
   }, []);
 
   return { errorCode, reset, captureResponse, captureError };

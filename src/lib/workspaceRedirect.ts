@@ -8,19 +8,19 @@ import { splitWorkspace, withWorkspace } from "@/lib/routes";
  * and the frontend could not tell "wrong workspace" from "deleted".
  *
  * Links now name their workspace, so this only catches links made before that
- * was true. The backend answers a 404 for something the caller can reach with
- * the workspace that owns it:
+ * was true. The backend names the owning workspace on a 403 or a 404 when the
+ * caller can reach the thing there:
  *
- *   404 { "detail": "Agent not found", "organization_uuid": "<uuid>" }
+ *   403|404 { "detail": "...", "organization_uuid": "<uuid>" }
  *
- * The field is left out when the caller is not a member, so a plain 404 stays a
- * plain 404 and we never reveal that someone else's item exists.
+ * The field is left out when the caller is not a member, so a plain 403 or 404
+ * stays a dead end and we never reveal that someone else's item exists.
  *
  * Wired into `usePageErrorState`, which every page routes its load failure
  * through.
  */
 
-/** Reads the owning workspace uuid out of a parsed 404 body. */
+/** Reads the owning workspace uuid out of a parsed 403 or 404 body. */
 export function readOwningOrgUuid(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
   const uuid = (body as { organization_uuid?: unknown }).organization_uuid;
@@ -44,10 +44,10 @@ export function orgUuidFromErrorMessage(err: unknown): string | null {
 
 /**
  * Opens the same page under the workspace that owns it. Returns false, leaving
- * the caller to show the normal "Not Found", when that would change nothing.
+ * the caller to show the normal dead-end screen, when that would change nothing.
  *
  * Going round in circles is not possible: the workspace is part of the address,
- * so a second 404 from the same page reports the workspace already in it.
+ * so a second 403 or 404 from the same page reports the workspace already in it.
  */
 export function switchToOwningWorkspace(uuid: string | null): boolean {
   if (!uuid || uuid === getActiveOrgUuid()) return false;
