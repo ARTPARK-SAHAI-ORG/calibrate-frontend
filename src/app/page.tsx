@@ -5,6 +5,7 @@ import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
 import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarquee";
 import { AboutMarketingSection } from "@/components/landing/AboutMarketingSection";
+import { CodingAgentsSection } from "@/components/landing/CodingAgentsSection";
 import Link from "next/link";
 
 type LandingQuickStartStep = {
@@ -1188,6 +1189,15 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Driving Calibrate from the coding agent the reader already uses. The
+          header's "Coding agents" link lands here. */}
+      <div
+        id="coding-agents"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
+        <CodingAgentsSection />
       </div>
 
       {/* Open source — procurement & trust */}

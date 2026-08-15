@@ -95,5 +95,9 @@ describe("LandingHeader", () => {
     expect(
       screen.getByRole("link", { name: "Open source" }),
     ).toHaveAttribute("href", "/#open-source");
+    // The link carries a "New" pill, so its name is the label plus the pill.
+    expect(
+      screen.getByRole("link", { name: "Use with AI tools New" }),
+    ).toHaveAttribute("href", "/#coding-agents");
   });
 });
