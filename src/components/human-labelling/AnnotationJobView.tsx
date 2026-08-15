@@ -437,10 +437,9 @@ export function AnnotationJobView({
     return (
       <div className={`${wrapperClass} items-center justify-center p-6`}>
         <div className="max-w-md w-full text-center space-y-3">
-          <div className="text-5xl font-bold">404</div>
-          <h1 className="text-lg font-semibold">Link not found</h1>
+          <h1 className="text-lg font-semibold">This link does not work</h1>
           <p className="text-sm text-muted-foreground">
-            This annotation link is invalid or has been removed
+            It is either wrong, or it has been removed.
           </p>
         </div>
       </div>

@@ -355,8 +355,9 @@ describe("AgentDetail", () => {
     mockFetchSequenceForAgent(buildAgent);
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
 
-    await waitFor(() => expect(screen.getByText("404")).toBeInTheDocument());
-    expect(screen.getByText("Not Found")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("This page is not available")).toBeInTheDocument(),
+    );
   });
 
   it("shows generic error state and retries via window.location.reload on fetch failure", async () => {

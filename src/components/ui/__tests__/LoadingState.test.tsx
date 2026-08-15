@@ -49,33 +49,40 @@ describe("ErrorState", () => {
 });
 
 describe("NotFoundState", () => {
-  it("renders the default 404 content", () => {
+  it("covers both a missing page and a page the reader cannot open, without showing a number", () => {
     render(<NotFoundState />);
-    expect(screen.getByText("404")).toBeInTheDocument();
-    expect(screen.getByText("Not Found")).toBeInTheDocument();
+    expect(screen.getByText("This page is not available")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "The page you are looking for does not exist or may have been moved"
+        "It either does not exist, or you do not have access to it."
       )
     ).toBeInTheDocument();
+    expect(screen.queryByText("404")).not.toBeInTheDocument();
   });
 
-  it("renders 401 content", () => {
+  it("says it is about access when the request was refused", () => {
     render(<NotFoundState errorCode={401} />);
-    expect(screen.getByText("401")).toBeInTheDocument();
-    expect(screen.getAllByText("Access Denied").length).toBeGreaterThan(0);
+    expect(screen.getByText("You do not have access")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Ask someone who manages this workspace to give you access."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText("401")).not.toBeInTheDocument();
   });
 
   it("renders 403 content", () => {
     render(<NotFoundState errorCode={403} />);
-    expect(screen.getByText("403")).toBeInTheDocument();
-    expect(screen.getAllByText("Access Denied").length).toBeGreaterThan(0);
+    expect(screen.getByText("You do not have access")).toBeInTheDocument();
+    expect(screen.queryByText("403")).not.toBeInTheDocument();
   });
 
   it("renders a spinner while the workspace is being worked out", () => {
     const { container } = render(<NotFoundState errorCode="switching" />);
     expect(container.querySelector("svg.animate-spin")).toBeInTheDocument();
-    expect(screen.queryByText("404")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("This page is not available")
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Go to home" })
     ).not.toBeInTheDocument();

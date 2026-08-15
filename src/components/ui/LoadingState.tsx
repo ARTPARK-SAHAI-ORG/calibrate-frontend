@@ -63,19 +63,24 @@ type NotFoundStateProps = {
   onGoHome?: () => void;
 };
 
+/**
+ * The backend answers a request for something in a workspace the reader is not
+ * part of the same way it answers a request for something that was deleted, so
+ * on that screen we cannot tell the two apart and the wording covers both. A
+ * 401 or 403 is the one case we do know is about access.
+ */
 const errorContent: Record<number, { title: string; message: string }> = {
   401: {
-    title: "Access Denied",
-    message: "You don't have permission to access this page.",
+    title: "You do not have access",
+    message: "Ask someone who manages this workspace to give you access.",
   },
   403: {
-    title: "Access Denied",
-    message: "You don't have permission to access this page.",
+    title: "You do not have access",
+    message: "Ask someone who manages this workspace to give you access.",
   },
   404: {
-    title: "Not Found",
-    message:
-      "The page you are looking for does not exist or may have been moved",
+    title: "This page is not available",
+    message: "It either does not exist, or you do not have access to it.",
   },
 };
 
@@ -96,12 +101,9 @@ export function NotFoundState({
     <div
       className={`flex flex-col items-center justify-center py-20 text-center px-4 ${className}`}
     >
-      <h1 className="text-7xl md:text-8xl font-bold text-muted-foreground">
-        {errorCode}
-      </h1>
-      <h2 className="text-xl md:text-2xl font-semibold text-foreground mt-4">
+      <h1 className="text-xl md:text-2xl font-semibold text-foreground">
         {title}
-      </h2>
+      </h1>
       <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
         {message}
       </p>
