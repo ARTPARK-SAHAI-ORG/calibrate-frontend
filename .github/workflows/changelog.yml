@@ -117,4 +117,8 @@ jobs:
           # [skip ci] keeps this commit from re-running the whole test suite,
           # which tests.yml would otherwise do on every push to main.
           git commit -m "changelog: #${NUMBER} [skip ci]" -- CHANGELOG.MD
+          # No rebase or retry: main only moves through merged pull requests, and
+          # the concurrency group above already keeps two of those from writing
+          # this file at once. A rejected push here means someone pushed straight
+          # to main, which should fail loudly rather than be worked around.
           git push
