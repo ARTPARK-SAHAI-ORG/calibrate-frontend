@@ -16,6 +16,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   pages: {
     signIn: "/login",
+    // Send failed sign-ins (including cancelling at Google) back to our own
+    // login page instead of NextAuth's built-in "Server error" page.
+    error: "/login",
   },
   callbacks: {
     async jwt({ token, account }) {

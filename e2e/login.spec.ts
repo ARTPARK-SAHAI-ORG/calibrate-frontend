@@ -53,4 +53,15 @@ test.describe("Login page", () => {
     // Stayed on /login — no navigation happened.
     await expect(page).toHaveURL(/\/login$/);
   });
+
+  test("shows a message when Google sign-in fails, and clears the error from the URL", async ({
+    page,
+  }) => {
+    await page.goto("/login?error=Configuration");
+
+    await expect(
+      page.getByText("Sign in with Google did not complete. Please try again."),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+  });
 });
