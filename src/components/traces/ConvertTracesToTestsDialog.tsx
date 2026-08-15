@@ -155,9 +155,9 @@ export function ConvertTracesToTestsDialog({
                 </div>
               ) : (
                 <p className="text-sm text-foreground">
-                  The tool calls recorded in{" "}
-                  {count === 1 ? "this trace" : "these traces"} are added as the
-                  expected output. You can change them later on the test.
+                  The resulting tests will consider the tool calls recorded in{" "}
+                  {count === 1 ? "this trace" : "these traces"} as the expected
+                  output. This can be changed later for each test.
                 </p>
               )}
 

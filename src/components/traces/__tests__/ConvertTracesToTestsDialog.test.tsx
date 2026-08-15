@@ -241,7 +241,7 @@ it("asks only for confirmation for tool-call traces", async () => {
   expect(screen.queryByText(/Match tool name only/)).toBeNull();
   expect(
     screen.getByText(
-      /The tool calls recorded in these traces are added as the expected output/,
+      /The resulting tests will consider the tool calls recorded in these traces as the expected output/,
     ),
   ).toBeInTheDocument();
 
