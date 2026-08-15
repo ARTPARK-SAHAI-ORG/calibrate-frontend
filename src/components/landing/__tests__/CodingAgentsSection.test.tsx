@@ -36,7 +36,7 @@ describe("CodingAgentsSection", () => {
 
   it("links to the agents documentation", () => {
     render(<CodingAgentsSection />);
-    expect(screen.getByRole("link", { name: "Set it up" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Read the docs" })).toHaveAttribute(
       "href",
       "https://docs.example.com/agents/overview",
     );
