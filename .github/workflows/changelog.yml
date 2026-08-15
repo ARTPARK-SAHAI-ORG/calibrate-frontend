@@ -12,8 +12,15 @@ name: Changelog
 # step below reads its first line to decide whether this month already has a
 # heading, so a title there would give every merge its own duplicate heading.
 
+# pull_request_target, not pull_request, so a merged pull request opened from
+# someone else's fork gets its line too. On pull_request, GitHub runs the copy of
+# this file from the pull request itself, so it hands the run a read-only token
+# and no secrets, and the push at the end is rejected. pull_request_target runs
+# the copy already on main, which nobody outside can change, so the token can
+# write. That is only safe because the checkout below takes main and this job
+# never runs the pull request's code.
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches: [main]
 
@@ -24,9 +31,11 @@ concurrency: changelog
 jobs:
   append:
     # Anyone who forks this repo gets a copy of this file. The repository check
-    # keeps it from writing to their changelog and pushing to their main. A pull
-    # request opened FROM a fork into this repo still gets its entry: that run
-    # belongs to this repo, not the fork.
+    # keeps it from writing to their changelog and pushing to their main.
+    #
+    # The merged check matters more here than it looks: closed also fires when
+    # someone closes a pull request without merging it, which anyone can do to
+    # their own at any time.
     if: github.event.pull_request.merged && github.repository == 'ARTPARK-SAHAI-ORG/calibrate-frontend'
     runs-on: ubuntu-latest
     permissions:
