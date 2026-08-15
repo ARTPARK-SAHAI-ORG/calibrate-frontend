@@ -64,23 +64,20 @@ type NotFoundStateProps = {
 };
 
 /**
- * The backend answers a request for something in a workspace the reader is not
- * part of the same way it answers a request for something that was deleted, so
- * on that screen we cannot tell the two apart and the wording covers both. A
- * 401 or 403 is the one case we do know is about access.
+ * The backend answers anything the reader is not allowed to open with a 403, so
+ * a 404 now means the page really is not there.
  */
-const errorContent: Record<number, { title: string; message: string }> = {
+const errorContent: Record<number, { title: string; message?: string }> = {
   401: {
-    title: "You do not have access",
-    message: "Ask someone who manages this workspace to give you access.",
+    title: "You do not have access to this page",
+    message: "Please request the admin to share access with you.",
   },
   403: {
-    title: "You do not have access",
-    message: "Ask someone who manages this workspace to give you access.",
+    title: "You do not have access to this page",
+    message: "Please request the admin to share access with you.",
   },
   404: {
     title: "This page is not available",
-    message: "It either does not exist, or you do not have access to it.",
   },
 };
 
@@ -104,9 +101,11 @@ export function NotFoundState({
       <h1 className="text-xl md:text-2xl font-semibold text-foreground">
         {title}
       </h1>
-      <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
-        {message}
-      </p>
+      {message && (
+        <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
+          {message}
+        </p>
+      )}
       <button
         onClick={onGoHome ?? (() => router.push(HOME_PATH))}
         className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"

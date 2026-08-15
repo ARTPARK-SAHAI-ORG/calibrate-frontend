@@ -49,31 +49,30 @@ describe("ErrorState", () => {
 });
 
 describe("NotFoundState", () => {
-  it("covers both a missing page and a page the reader cannot open, without showing a number", () => {
+  it("says a missing page is not available, without showing a number", () => {
     render(<NotFoundState />);
     expect(screen.getByText("This page is not available")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "It either does not exist, or you do not have access to it."
-      )
-    ).toBeInTheDocument();
     expect(screen.queryByText("404")).not.toBeInTheDocument();
+    // Nothing about access: a 404 no longer means the page was blocked.
+    expect(screen.queryByText(/access/i)).not.toBeInTheDocument();
   });
 
   it("says it is about access when the request was refused", () => {
     render(<NotFoundState errorCode={401} />);
-    expect(screen.getByText("You do not have access")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Ask someone who manages this workspace to give you access."
-      )
+      screen.getByText("You do not have access to this page")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Please request the admin to share access with you.")
     ).toBeInTheDocument();
     expect(screen.queryByText("401")).not.toBeInTheDocument();
   });
 
   it("renders 403 content", () => {
     render(<NotFoundState errorCode={403} />);
-    expect(screen.getByText("You do not have access")).toBeInTheDocument();
+    expect(
+      screen.getByText("You do not have access to this page")
+    ).toBeInTheDocument();
     expect(screen.queryByText("403")).not.toBeInTheDocument();
   });
 
