@@ -130,6 +130,18 @@ describe("LearnPage", () => {
     },
   );
 
+  it("links to the insights from workshop-for-leaders in that session's summary", () => {
+    render(<LearnPage />);
+    const { block } = sessionOnPage("workshop-for-leaders");
+    const insights = within(block).getByRole("link", { name: "Insights" });
+    expect(insights).toHaveAttribute(
+      "href",
+      "https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub",
+    );
+    expect(insights).toHaveAttribute("target", "_blank");
+    expect(insights).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("links to the documentation, the calendar and the changelog at the top", () => {
     render(<LearnPage />);
     // The footer carries its own documentation and changelog links, so look

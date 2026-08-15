@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
@@ -19,7 +20,7 @@ const TALKS: {
   id: string;
   title: string;
   /** One or two lines on what the session covered, shown under its title. */
-  summary: string;
+  summary: ReactNode;
   /**
    * Address the recording plays at inside the page: YouTube's `/embed/…` or
    * Google Drive's `/preview`. The plain address a reader would copy does not
@@ -34,8 +35,28 @@ const TALKS: {
   {
     id: "workshop-for-leaders",
     title: "AI evals 101",
-    summary:
-      "What it means to evaluate an AI system, why a team needs to, how to run it, and what a good result looks like.",
+    summary: (
+      <>
+        The talk covers: Why AI systems need to be evaluated, what does
+        evaluation mean, how to get started, creating a golden dataset, minimum
+        viable evaluation, and how to continuously keep improving your AI
+        system. We also answer questions throughout the session asked by the
+        community during the live version of the workshop. A summary of the
+        insights can be found{" "}
+        {/* "here" on its own says nothing to anyone using a screen reader,
+            who hears a link out of the sentence around it. */}
+        <a
+          href="https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Insights"
+          className="font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer"
+        >
+          here
+        </a>
+        .
+      </>
+    ),
     recordingEmbedUrl: "https://www.youtube.com/embed/Hsqm8lR1U8w",
     recordingUrl: "https://youtu.be/Hsqm8lR1U8w",
     slidesEmbedUrl:
@@ -47,7 +68,7 @@ const TALKS: {
     id: "getting-started",
     title: "Getting started with Calibrate",
     summary:
-      "A walk through of Calibrate, from connecting an agent to writing tests and reading the results.",
+      "A tutorial on how Calibrate helps evaluate AI agents using a form-filling voice agent as a case study. It explains the approach of eval-driven development of building agents, where evals are not considered an afterthought but closely inform what needs to be built and help ensure agent quality. We show how to convert each failure mode as a test case and comprehensively discuss how to evaluate open-ended responses using LLM judges along with sharing the best practices and pitfalls to avoid.",
     recordingEmbedUrl:
       "https://drive.google.com/file/d/1wIxDXWDuthB3urpUoZKB2KcdxartonMT/preview",
     recordingUrl:
@@ -61,7 +82,7 @@ const TALKS: {
     id: "office-hours",
     title: "AI evals office hours",
     summary:
-      "Nonprofit teams bring the problems they hit while evaluating their AI, and we answer them one by one.",
+      "Office hours is a space for nonprofits to get their questions on AI evals answered. We covered how to evaluate when a team has few engineers, how domain experts can do the work without engineering help, how to write test cases that cover many situations, and how to watch quality over time. Teams asked about models that keep changing, splitting the work between engineers and domain experts, the cost of building and testing, building a trusted set of correct answers, and setting a baseline for correctness in public health and community health worker programmes.",
     recordingEmbedUrl:
       "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/preview",
     recordingUrl:
