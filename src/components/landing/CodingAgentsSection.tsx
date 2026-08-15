@@ -203,9 +203,9 @@ export function CodingAgentsSection() {
           Use Calibrate with your favourite AI tool
         </h2>
         <p className="text-base md:text-xl text-gray-500 max-w-3xl mx-auto">
-          Our Calibrate Skill helps your AI tool create the evals for testing
-          your agent, upload it on Calibrate, run them, analyse what went wrong,
-          and suggest how to improve it.
+          Our Calibrate skill helps your AI tool create the evals for testing
+          your agent, upload and run them on Calibrate, analyse what went wrong,
+          and suggest how to improve your agent.
         </p>
       </div>
 
