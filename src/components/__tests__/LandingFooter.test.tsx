@@ -19,6 +19,10 @@ describe("LandingFooter", () => {
     expect(
       screen.queryByRole("link", { name: "CLI" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Learn" })).toHaveAttribute(
+      "href",
+      "/learn",
+    );
     expect(screen.getByRole("link", { name: "Changelog" })).toHaveAttribute(
       "href",
       "/changelog",
@@ -45,6 +49,14 @@ describe("LandingFooter", () => {
     expect(
       screen.queryByRole("link", { name: "LinkedIn" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the resources anchor for links written before the Learn page", () => {
+    const { container } = render(<LandingFooter />);
+    expect(container.querySelector("footer")).toHaveAttribute(
+      "id",
+      "resources",
+    );
   });
 
   it("renders the current year in the copyright line", () => {

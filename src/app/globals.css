@@ -77,6 +77,13 @@ body {
   display: none;
 }
 
+/* The pages that wear the landing header and footer (the landing page itself,
+   /learn and /changelog) are set in DM Sans. The rest of the app is not, so
+   without this a page reads as belonging to a different product. */
+.landing-page {
+  font-family: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+}
+
 /* Landing: infinite horizontal logo strip (Integrations) */
 @keyframes integration-marquee {
   0% {

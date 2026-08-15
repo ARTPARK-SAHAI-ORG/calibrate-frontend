@@ -42,13 +42,11 @@ describe("LandingHeader", () => {
     );
   });
 
-  it("renders resources and get started links", () => {
+  it("renders learn and get started links", () => {
     render(<LandingHeader />);
-    // Resources scrolls to the footer on the page the reader is already on,
-    // so it carries no leading slash.
-    expect(screen.getByRole("link", { name: "Resources" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Learn" })).toHaveAttribute(
       "href",
-      "#resources",
+      "/learn",
     );
     expect(
       screen.getByRole("link", { name: "Get started" }),
