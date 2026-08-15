@@ -1795,6 +1795,135 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("Correct")).toBeInTheDocument();
   });
 
+  it("hides an optional evaluator with no human label and no score", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            is_optional: true,
+          },
+        ]}
+        runs={[]}
+      />,
+    );
+    expect(screen.queryByText("Binary Evaluator")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an optional evaluator that a run scored but nobody labelled", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            is_optional: true,
+          },
+        ]}
+        runs={[makeRun()]}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.getByText("Correct")).toBeInTheDocument();
+  });
+
+  it("shows an optional evaluator that a person labelled but no run scored", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            is_optional: true,
+          },
+        ]}
+        runs={[makeRun({ value: { value: null } })]}
+        humanAgreementForItem={{
+          item_id: "item-1",
+          annotator_count: 1,
+          evaluators: [
+            {
+              evaluator_id: "ev-bin",
+              agreement: 1,
+              pair_count: 1,
+              human_annotations: [
+                {
+                  annotation_id: "ann-a1",
+                  annotator_id: "a1",
+                  annotator_name: "Alice",
+                  job_id: "job-1",
+                  value: { value: true },
+                  updated_at: "",
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+  });
+
+  it("keeps an optional evaluator whose only run score is a No", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            is_optional: true,
+          },
+        ]}
+        runs={[makeRun({ value: { value: false } })]}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.getByText("Wrong")).toBeInTheDocument();
+  });
+
+  it("says so when every evaluator on the item could be skipped and none was answered", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            is_optional: true,
+          },
+        ]}
+        runs={[]}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Every evaluator on this item could be skipped, and none was answered or scored.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps a required evaluator with nothing on it", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[]}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(
+      screen.getByText("No result recorded for this item."),
+    ).toBeInTheDocument();
+  });
+
   it("shows disagreements-only empty state", () => {
     render(
       <EvaluatorResultsPane

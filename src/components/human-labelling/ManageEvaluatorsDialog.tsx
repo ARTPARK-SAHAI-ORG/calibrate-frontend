@@ -36,6 +36,7 @@ type ManageEvaluatorsDialogProps = {
   taskUuid: string;
   taskType?: EvaluatorType;
   currentEvaluatorIds: string[];
+  currentOptionalIds: string[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -45,6 +46,7 @@ export function ManageEvaluatorsDialog({
   taskUuid,
   taskType,
   currentEvaluatorIds,
+  currentOptionalIds,
   onClose,
   onSaved,
 }: ManageEvaluatorsDialogProps) {
@@ -60,6 +62,9 @@ export function ManageEvaluatorsDialog({
   const [orderedSelected, setOrderedSelected] = useState<string[]>(() => [
     ...currentEvaluatorIds,
   ]);
+  const [optionalIds, setOptionalIds] = useState<Set<string>>(
+    new Set(currentOptionalIds),
+  );
   const [search, setSearch] = useState("");
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -118,6 +123,14 @@ export function ManageEvaluatorsDialog({
     });
   };
 
+  const toggleOptional = (uuid: string) =>
+    setOptionalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) next.delete(uuid);
+      else next.add(uuid);
+      return next;
+    });
+
   const currentSet = useMemo(
     () => new Set(currentEvaluatorIds),
     [currentEvaluatorIds],
@@ -145,9 +158,30 @@ export function ManageEvaluatorsDialog({
     return serverOrderAfterLinkOps.some((id, i) => id !== orderedSelected[i]);
   }, [currentEvaluatorIds, toAdd, toRemove, orderedSelected]);
 
-  const hasChanges = toAdd.length > 0 || toRemove.length > 0 || orderChanged;
+  // Only evaluators still in the selection can be optional, kept in the
+  // same order as the list for a stable request body.
+  const optionalSelected = useMemo(
+    () => orderedSelected.filter((id) => optionalIds.has(id)),
+    [orderedSelected, optionalIds],
+  );
+
+  const optionalChanged = useMemo(() => {
+    const before = new Set(currentOptionalIds);
+    return (
+      optionalSelected.length !== before.size ||
+      optionalSelected.some((id) => !before.has(id))
+    );
+  }, [currentOptionalIds, optionalSelected]);
+
+  const hasChanges =
+    toAdd.length > 0 || toRemove.length > 0 || orderChanged || optionalChanged;
   const wouldRemoveAll = orderedSelected.length === 0;
-  const canSave = hasChanges && !wouldRemoveAll;
+  // If every evaluator can be skipped there is nothing an annotator has to
+  // answer, so a row could never be finished. Keep at least one required.
+  const allWouldBeOptional =
+    orderedSelected.length > 0 &&
+    optionalSelected.length === orderedSelected.length;
+  const canSave = hasChanges && !wouldRemoveAll && !allWouldBeOptional;
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -165,7 +199,10 @@ export function ManageEvaluatorsDialog({
         accessToken,
         {
           method: "PUT",
-          body: { evaluator_ids: orderedSelected },
+          body: {
+            evaluator_ids: orderedSelected,
+            optional_evaluator_ids: optionalSelected,
+          },
         },
       );
       onSaved();
@@ -391,9 +428,10 @@ export function ManageEvaluatorsDialog({
             <div className="flex flex-col gap-2 min-w-0">
               {/* Match the h-9 search input height on the left so the
                   cards below line up with the catalogue list. */}
-              <p className="h-9 flex items-center text-xs text-muted-foreground">
+              <p className="min-h-9 flex items-center text-xs text-muted-foreground">
                 Drag the cards to set the order evaluators appear in across the
-                task
+                task. Mark an evaluator optional if annotators can leave it
+                blank.
               </p>
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {orderedSelected.length === 0 ? (
@@ -451,6 +489,25 @@ export function ManageEvaluatorsDialog({
                             {ev?.name ?? uuid.slice(0, 8)}
                           </div>
                         </div>
+                        <label
+                          draggable={false}
+                          onDragStart={(e) => e.preventDefault()}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`flex-shrink-0 flex items-center gap-1.5 text-xs mt-0.5 ${
+                            saving
+                              ? "text-muted-foreground cursor-not-allowed"
+                              : "text-muted-foreground hover:text-foreground cursor-pointer"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={optionalIds.has(uuid)}
+                            onChange={() => toggleOptional(uuid)}
+                            disabled={saving}
+                            className="w-3.5 h-3.5 cursor-pointer accent-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                          Optional
+                        </label>
                         <button
                           type="button"
                           onClick={() => handleRemoveSelected(uuid)}
@@ -484,6 +541,13 @@ export function ManageEvaluatorsDialog({
           {wouldRemoveAll && (
             <p className="text-xs text-red-500">
               A task must have at least one evaluator.
+            </p>
+          )}
+
+          {allWouldBeOptional && (
+            <p className="text-xs text-red-500">
+              At least one evaluator must stay required, so annotators always
+              have something to answer.
             </p>
           )}
 

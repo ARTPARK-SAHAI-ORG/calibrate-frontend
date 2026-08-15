@@ -60,6 +60,9 @@ jest.mock("../EvaluatorRunDetailView", () => {
         <span data-testid="pane-evaluators-count">
           {Array.isArray(props.evaluators) ? props.evaluators.length : 0}
         </span>
+        <span data-testid="pane-evaluators">
+          {JSON.stringify(props.evaluators)}
+        </span>
         <span data-testid="pane-runs-count">
           {Array.isArray(props.runs) ? props.runs.length : 0}
         </span>
@@ -168,6 +171,37 @@ describe("ItemDetailDialog", () => {
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
     expect(screen.getByText("My Item")).toBeInTheDocument();
+  });
+
+  it("passes the task's optional evaluator flag through to the pane", async () => {
+    apiClientMock.mockResolvedValue(baseSummary());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={{
+          ...task,
+          evaluators: [
+            { uuid: "ev-1", output_type: "binary", is_optional: true },
+          ],
+        }}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
+    );
+    expect(
+      JSON.parse(screen.getByTestId("pane-evaluators").textContent ?? "[]"),
+    ).toEqual([
+      {
+        evaluator_id: "ev-1",
+        evaluator_version_id: "v1",
+        name: "Correctness",
+        is_optional: true,
+      },
+    ]);
   });
 
   it("falls back to 'Item' when the payload has no name", async () => {

@@ -31,6 +31,7 @@ function renderDialog(
       accessToken="tok"
       taskUuid="task-1"
       currentEvaluatorIds={["ev-1", "ev-2"]}
+      currentOptionalIds={[]}
       onClose={onClose}
       onSaved={onSaved}
       {...props}
@@ -49,6 +50,17 @@ function catalogueCheckbox(name: string): HTMLInputElement {
     .find((el): el is HTMLLabelElement => el !== null);
   if (!label) throw new Error(`No catalogue label found for "${name}"`);
   return label.querySelector("input[type=checkbox]") as HTMLInputElement;
+}
+
+// The "Optional" checkbox lives inside the right-column card, which is the
+// draggable wrapper around the evaluator name.
+function optionalCheckbox(name: string): HTMLInputElement {
+  const card = screen
+    .getAllByText(name)
+    .map((el) => el.closest("div[draggable]"))
+    .find((el): el is HTMLElement => el !== null);
+  if (!card) throw new Error(`No selected card found for "${name}"`);
+  return card.querySelector("input[type=checkbox]") as HTMLInputElement;
 }
 
 async function waitForCatalogueLoaded() {
@@ -148,6 +160,7 @@ describe("ManageEvaluatorsDialog", () => {
         accessToken="tok"
         taskUuid="task-1"
         currentEvaluatorIds={[]}
+        currentOptionalIds={[]}
         onClose={jest.fn()}
         onSaved={jest.fn()}
       />,
@@ -240,7 +253,10 @@ describe("ManageEvaluatorsDialog", () => {
       expect(mockApiClient).toHaveBeenCalledWith(
         "/annotation-tasks/task-1/evaluators",
         "tok",
-        { method: "PUT", body: { evaluator_ids: ["ev-2"] } },
+        {
+          method: "PUT",
+          body: { evaluator_ids: ["ev-2"], optional_evaluator_ids: [] },
+        },
       ),
     );
     expect(mockApiClient).not.toHaveBeenCalledWith(
@@ -290,7 +306,10 @@ describe("ManageEvaluatorsDialog", () => {
       expect(mockApiClient).toHaveBeenCalledWith(
         "/annotation-tasks/task-1/evaluators",
         "tok",
-        { method: "PUT", body: { evaluator_ids: ["ev-2", "ev-1"] } },
+        {
+          method: "PUT",
+          body: { evaluator_ids: ["ev-2", "ev-1"], optional_evaluator_ids: [] },
+        },
       ),
     );
   });
@@ -404,6 +423,151 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockRejectedValue(new Error("Request failed: 500 - not json"));
     renderDialog();
     await waitFor(() => expect(screen.getByText("not json")).toBeInTheDocument());
+  });
+
+  it("marks an evaluator optional, enables Save, and sends it in optional_evaluator_ids", async () => {
+    const user = setupUser();
+    mockApiClient.mockImplementation((url: string) => {
+      if (url === "/evaluators?include_defaults=true") {
+        return Promise.resolve({ items: EVALUATORS });
+      }
+      return Promise.resolve({ message: "ok" });
+    });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
+    await waitForCatalogueLoaded();
+
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    await user.click(optionalCheckbox("Helpfulness"));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        "/annotation-tasks/task-1/evaluators",
+        "tok",
+        {
+          method: "PUT",
+          body: {
+            evaluator_ids: ["ev-1", "ev-2"],
+            optional_evaluator_ids: ["ev-2"],
+          },
+        },
+      ),
+    );
+  });
+
+  it("shows an evaluator passed in currentOptionalIds as already ticked", async () => {
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+    expect(optionalCheckbox("Correctness")).toBeChecked();
+    expect(optionalCheckbox("Helpfulness")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("refuses to save when every evaluator would be optional", async () => {
+    const user = setupUser();
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(optionalCheckbox("Helpfulness"));
+    expect(
+      screen.getByText(
+        "At least one evaluator must stay required, so annotators always have something to answer.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+
+    // Making one required again clears it.
+    await user.click(optionalCheckbox("Correctness"));
+    expect(
+      screen.queryByText(
+        "At least one evaluator must stay required, so annotators always have something to answer.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+
+  it("drops an evaluator from optional_evaluator_ids when it is removed", async () => {
+    const user = setupUser();
+    mockApiClient.mockImplementation((url: string) => {
+      if (url === "/evaluators?include_defaults=true") {
+        return Promise.resolve({ items: EVALUATORS });
+      }
+      return Promise.resolve({ message: "ok" });
+    });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        "/annotation-tasks/task-1/evaluators",
+        "tok",
+        {
+          method: "PUT",
+          body: { evaluator_ids: ["ev-2"], optional_evaluator_ids: [] },
+        },
+      ),
+    );
+  });
+
+  it("keeps the Optional mark when an evaluator is removed and added back", async () => {
+    const user = setupUser();
+    mockApiClient.mockImplementation((url: string) => {
+      if (url === "/evaluators?include_defaults=true") {
+        return Promise.resolve({ items: EVALUATORS });
+      }
+      return Promise.resolve({ message: "ok" });
+    });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+    await user.click(catalogueCheckbox("Correctness"));
+
+    expect(optionalCheckbox("Correctness")).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        "/annotation-tasks/task-1/evaluators",
+        "tok",
+        {
+          method: "PUT",
+          // Re-added, so it goes to the end of the order, still optional.
+          body: {
+            evaluator_ids: ["ev-2", "ev-1"],
+            optional_evaluator_ids: ["ev-1"],
+          },
+        },
+      ),
+    );
+  });
+
+  it("enables Save when the only change is taking Optional off", async () => {
+    const user = setupUser();
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(optionalCheckbox("Correctness"));
+    expect(optionalCheckbox("Correctness")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("cancels the in-flight evaluators fetch on unmount without state updates", async () => {

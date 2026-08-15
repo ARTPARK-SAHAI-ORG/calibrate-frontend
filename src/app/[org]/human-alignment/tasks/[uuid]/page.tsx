@@ -279,6 +279,7 @@ type LabellingTask = {
       }[];
     } | null;
     variables?: EvaluatorVariableDef[] | null;
+    is_optional?: boolean;
   }[];
   items?: LabellingItem[];
   jobs?: LabellingJob[];
@@ -4463,6 +4464,9 @@ function LabellingTaskPageInner() {
           taskUuid={task.uuid}
           taskType={task.type ?? task.evaluators?.[0]?.evaluator_type}
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
+          currentOptionalIds={(task.evaluators ?? [])
+            .filter((e) => e.is_optional)
+            .map((e) => e.uuid)}
           onClose={() => setManageOpen(false)}
           onSaved={() => {
             setManageOpen(false);

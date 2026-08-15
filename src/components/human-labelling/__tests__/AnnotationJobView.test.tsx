@@ -1076,6 +1076,166 @@ describe("AnnotationJobView", () => {
     });
   });
 
+  describe("optional evaluators", () => {
+    // ev-2 (the rating) is optional here; ev-1 stays required.
+    const withOptionalRating = (overrides: Record<string, unknown> = {}) =>
+      jobResponse({
+        evaluators: [evaluators[0], { ...evaluators[1], is_optional: true }],
+        items: [items[0]],
+        ...overrides,
+      });
+
+    it("submits with the optional evaluator left blank and omits it from the request", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(jsonResponse(withOptionalRating()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Optional")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      const submitButton = screen.getByRole("button", {
+        name: "Mark as complete",
+      });
+      expect(submitButton).toBeEnabled();
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1"], count: 1, status: "pending" }),
+      );
+      await user.click(submitButton);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.annotations).toEqual([
+        { evaluator_id: "ev-1", value: { value: true } },
+      ]);
+    });
+
+    it("still blocks submitting while a required evaluator is blank", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(jsonResponse(withOptionalRating()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      const submitButton = screen.getByRole("button", {
+        name: "Mark as complete",
+      });
+      expect(submitButton).toBeDisabled();
+      expect(submitButton).toHaveAttribute(
+        "title",
+        "Judgements should be given for all required evaluators before submitting",
+      );
+
+      // Answering only the optional one does not unblock it.
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(
+        screen.getByRole("button", { name: "Mark as complete" }),
+      ).toBeDisabled();
+    });
+
+    it("hides a skipped optional evaluator in the admin view but keeps a blank required one", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(withOptionalRating({ read_only: true })),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Quality")).not.toBeInTheDocument();
+    });
+
+    it("still shows an optional evaluator the annotator did answer", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          withOptionalRating({
+            read_only: true,
+            annotations: [
+              {
+                item_id: items[0].uuid,
+                evaluator_id: "ev-2",
+                value: { value: 3 },
+              },
+            ],
+          }),
+        ),
+      );
+      render(
+        <AnnotationJobView token="tok" mode="admin" fillViewport={false} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Quality")).toBeInTheDocument();
+    });
+
+    it("saves an optional answer added to a row that was already submitted", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          withOptionalRating({
+            items,
+            annotations: [
+              {
+                item_id: items[0].uuid,
+                evaluator_id: "ev-1",
+                value: { value: true },
+              },
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      // Item 1 is already saved with only its required evaluator answered,
+      // so the view opens on item 2. Go back to item 1, answer the optional
+      // evaluator there, and move on: that answer must be saved.
+      await user.click(screen.getAllByTitle(/^Item 1/)[0]);
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "3" }));
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
+      );
+      await user.click(screen.getAllByTitle(/^Item 2/)[0]);
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.item_id).toBe(items[0].uuid);
+      expect(body.annotations).toContainEqual({
+        evaluator_id: "ev-2",
+        value: { value: 3 },
+      });
+    });
+
+    it("does not mark rows finished before anything is saved when every evaluator is optional", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            evaluators: evaluators.map((ev) => ({
+              ...ev,
+              is_optional: true,
+            })),
+            items: [items[0]],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      // "Update" is the label for a row already saved. Nothing is saved yet.
+      expect(
+        screen.queryByRole("button", { name: "Update" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("shows the item description when the payload has one", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(

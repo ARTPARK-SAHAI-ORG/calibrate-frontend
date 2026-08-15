@@ -774,13 +774,6 @@ describe("AddRunToLabellingTaskDialog", () => {
     ]);
   });
 
-  // NOTE: the `toAttach` evaluator-attachment branch inside handleSubmit's
-  // "existing" mode (lines ~442-465 of the source) is unreachable through the
-  // UI: `supportedTasks` (the second relevance gate) already filters out any
-  // existing task that doesn't carry every evaluator in `evaluatorUuids`, so
-  // by the time a task can be selected, `toAttach` is always empty. Not
-  // covered here for that reason.
-
   it("retries after an ITEM_NAME_CONFLICT, skipping conflicting items", async () => {
     const user = setupUser();
     const tasks = [
@@ -821,6 +814,11 @@ describe("AddRunToLabellingTaskDialog", () => {
       ).toBeInTheDocument(),
     );
     expect(itemsCallCount).toBe(1);
+    expect(
+      apiClientMock.mock.calls.some((c) =>
+        String(c[0]).includes("/evaluators"),
+      ),
+    ).toBe(false);
   });
 
   it("surfaces a generic failure when adding items fails outright", async () => {
