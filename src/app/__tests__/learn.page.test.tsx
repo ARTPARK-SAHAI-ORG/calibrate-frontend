@@ -2,13 +2,17 @@
  * The Learn page. Every session must show up with its recording and its slides
  * playing on the page, pointing at the exact addresses we published, because a
  * wrong or missing address here is a dead end for the reader.
+ *
+ * Sessions are named here by their id, not their title. Titles and summaries
+ * are copy that gets reworded; the id is what a shared link carries and what
+ * the list down the left points at, so that is what this pins.
  */
 import { render, screen, within } from "@/test-utils";
 import LearnPage from "../learn/page";
 import { WEBINARS_URL } from "@/constants/links";
 
 type ExpectedTalk = {
-  title: string;
+  id: string;
   recordingEmbedUrl: string;
   recordingUrl: string;
   slidesEmbedUrl: string;
@@ -17,7 +21,7 @@ type ExpectedTalk = {
 
 const EXPECTED_TALKS: ExpectedTalk[] = [
   {
-    title: "AI evaluation workshop for leaders",
+    id: "workshop-for-leaders",
     recordingEmbedUrl: "https://www.youtube.com/embed/Hsqm8lR1U8w",
     recordingUrl: "https://youtu.be/Hsqm8lR1U8w",
     slidesEmbedUrl:
@@ -26,7 +30,7 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vTV6Fa34l5SF899zK4GUOQ2VwElkS4ShtiBz7_JkecfvY5CActCm30Dd7Gw0PuzYy368U-EHA-56uKD/pub?start=false&loop=false&delayms=3000",
   },
   {
-    title: "Getting started with Calibrate",
+    id: "getting-started",
     recordingEmbedUrl:
       "https://drive.google.com/file/d/1wIxDXWDuthB3urpUoZKB2KcdxartonMT/preview",
     recordingUrl:
@@ -37,7 +41,7 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/pub?start=false&loop=false&delayms=3000&slide=id.p",
   },
   {
-    title: "AI evaluation office hours",
+    id: "office-hours",
     recordingEmbedUrl:
       "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/preview",
     recordingUrl:
@@ -48,6 +52,13 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vTPza71y_OugQVvKUsOupP55fXiH_r8aJcNE27pKW-vHMe_lop6OrdlC6DmKdnomaBIiSSdy36suURG/pub?start=false&loop=false&delayms=3000",
   },
 ];
+
+/** The block on the page for one session, and the title it is showing. */
+function sessionOnPage(id: string) {
+  const block = document.getElementById(id);
+  if (!block) throw new Error(`No session on the page with the id "${id}"`);
+  return { block, title: block.getAttribute("aria-label") ?? "" };
+}
 
 describe("LearnPage", () => {
   const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
@@ -60,43 +71,58 @@ describe("LearnPage", () => {
     process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
   });
 
-  it("lists every session in the order we published them", () => {
+  it("shows every session, in the order we published them", () => {
     render(<LearnPage />);
-    const titles = screen
-      .getAllByRole("heading", { level: 2 })
-      .map((heading) => heading.textContent);
-    expect(titles).toEqual(EXPECTED_TALKS.map((talk) => talk.title));
+    const onPage = screen
+      .getAllByRole("region")
+      .map((section) => section.getAttribute("id"));
+    expect(onPage).toEqual(EXPECTED_TALKS.map((talk) => talk.id));
+  });
+
+  it("gives every session a title and a line on what it covered", () => {
+    render(<LearnPage />);
+    EXPECTED_TALKS.forEach((talk) => {
+      const { block, title } = sessionOnPage(talk.id);
+      expect(title).not.toBe("");
+      expect(
+        within(block).getByRole("heading", { level: 2 }),
+      ).toHaveTextContent(title);
+      expect(block.querySelector("h2 + p")?.textContent?.trim()).toBeTruthy();
+    });
   });
 
   it.each(EXPECTED_TALKS)(
-    "plays the recording and the slides for $title",
+    "plays the recording and the slides for $id",
     (talk: ExpectedTalk) => {
       render(<LearnPage />);
-      const section = screen.getByRole("region", { name: talk.title });
+      const { block, title } = sessionOnPage(talk.id);
 
-      expect(
-        within(section).getByTitle(`Recording of ${talk.title}`),
-      ).toHaveAttribute("src", talk.recordingEmbedUrl);
-
-      expect(
-        within(section).getByTitle(`Slides from ${talk.title}`),
-      ).toHaveAttribute("src", talk.slidesEmbedUrl);
+      expect(within(block).getByTitle(`Recording of ${title}`)).toHaveAttribute(
+        "src",
+        talk.recordingEmbedUrl,
+      );
+      expect(within(block).getByTitle(`Slides from ${title}`)).toHaveAttribute(
+        "src",
+        talk.slidesEmbedUrl,
+      );
     },
   );
 
   it.each(EXPECTED_TALKS)(
-    "opens the recording and the slides for $title in a new tab",
+    "opens the recording and the slides for $id in a new tab",
     (talk: ExpectedTalk) => {
       render(<LearnPage />);
-      const recording = screen.getByRole("link", {
-        name: `Open the recording of ${talk.title} in a new tab`,
+      const { block, title } = sessionOnPage(talk.id);
+
+      const recording = within(block).getByRole("link", {
+        name: `Open the recording of ${title} in a new tab`,
       });
       expect(recording).toHaveAttribute("href", talk.recordingUrl);
       expect(recording).toHaveAttribute("target", "_blank");
       expect(recording).toHaveAttribute("rel", "noopener noreferrer");
 
-      const slides = screen.getByRole("link", {
-        name: `Open the slides from ${talk.title} in a new tab`,
+      const slides = within(block).getByRole("link", {
+        name: `Open the slides from ${title} in a new tab`,
       });
       expect(slides).toHaveAttribute("href", talk.slidesUrl);
       expect(slides).toHaveAttribute("target", "_blank");
@@ -122,15 +148,34 @@ describe("LearnPage", () => {
     );
   });
 
+  it("lists every session down the left, each linking to its place on the page", () => {
+    render(<LearnPage />);
+    const onThisPage = within(
+      screen.getByRole("navigation", { name: "Sessions on this page" }),
+    );
+    EXPECTED_TALKS.forEach((talk) => {
+      const { title } = sessionOnPage(talk.id);
+      expect(onThisPage.getByRole("link", { name: title })).toHaveAttribute(
+        "href",
+        `#${talk.id}`,
+      );
+    });
+  });
+
   it("keeps the header and the footer, with the header logo linking home", () => {
     render(<LearnPage />);
-    const header = screen.getByRole("navigation");
+    // The list of sessions down the left is a second set of navigation links,
+    // so pick out the header by the one thing only it has.
+    const header = screen
+      .getAllByRole("navigation")
+      .find((nav) => !nav.getAttribute("aria-label"))!;
     expect(
       within(header).getByRole("link", { name: /Calibrate/ }),
     ).toHaveAttribute("href", "/");
     const footer = screen.getByRole("contentinfo");
-    expect(
-      within(footer).getByRole("link", { name: "Learn" }),
-    ).toHaveAttribute("href", "/learn");
+    expect(within(footer).getByRole("link", { name: "Learn" })).toHaveAttribute(
+      "href",
+      "/learn",
+    );
   });
 });

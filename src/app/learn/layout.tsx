@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Learn | Calibrate",
-  description:
-    "Recordings and slides from the sessions we run on evaluating AI.",
+  description: "Learning resources on Calibrate and AI evals",
 };
 
 export default function LearnLayout({

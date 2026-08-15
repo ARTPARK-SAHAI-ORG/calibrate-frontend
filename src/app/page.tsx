@@ -945,12 +945,7 @@ export default function HomePage() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-white"
-      style={{
-        fontFamily: "var(--font-dm-sans), system-ui, -apple-system, sans-serif",
-      }}
-    >
+    <div className="min-h-screen bg-white landing-page">
       <LandingHeader />
 
       {/* Hero — full viewport below header; mobile: main copy vertically centered, BUILT BY / FUNDED BY anchored to bottom of first screen */}
