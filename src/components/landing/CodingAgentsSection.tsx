@@ -17,61 +17,145 @@ export function installCommand(agentFlag: string): string {
   return `npx skills add dalmia/calibrate-skills --agent ${agentFlag} -g`;
 }
 
-/** The made-up request in the example window. Kept short so it reads as
- * something a person would actually type. */
-const EXAMPLE_PROMPT =
-  "My LLM judge does not agree with my reviewers often enough. Fix it.";
+type ExampleStep = { text: string; result?: boolean };
 
-/** What the agent reports back, line by line. `result` lines are the numbers
- * the reader is meant to notice. */
-const EXAMPLE_STEPS: { text: string; result?: boolean }[] = [
-  { text: "Read the 120 samples your reviewers labelled" },
-  { text: "Ran the LLM judge on the same samples" },
-  { text: "Agreement with your reviewers: 71%", result: true },
-  { text: "Rewrote the judge instructions and ran them again" },
-  { text: "Agreement with your reviewers: 88%", result: true },
-  { text: "Rewrote the judge instructions and ran them again" },
-  { text: "Agreement with your reviewers: 94%", result: true },
-  { text: "Made this the live judge and kept the earlier versions" },
+/** The three examples worth showing in full. Each is a made-up but faithful
+ * version of what the skills already do: /onboard, reading a failed run, and
+ * tuning a judge against human labels. `result` lines are the numbers the
+ * reader is meant to notice. */
+const EXAMPLES: {
+  key: string;
+  title: string;
+  description: string;
+  prompt: string;
+  steps: ExampleStep[];
+}[] = [
+  {
+    key: "build",
+    title: "Build your first set of tests by talking to it",
+    description:
+      "Your agent asks what you are building and where it goes wrong today, then turns your answers into test cases and runs them.",
+    prompt: "/onboard",
+    steps: [
+      { text: "Asked what your agent does and where it fails today" },
+      { text: "Connected your agent and checked that it answers" },
+      { text: "Wrote 24 test cases from the failures you described" },
+      { text: "Picked an LLM judge for the cases that need one" },
+      { text: "Ran them: 18 passed, 6 failed", result: true },
+    ],
+  },
+  {
+    key: "fix",
+    title: "Find the mistakes and get fixes to try",
+    description:
+      "Your agent reads every failure from the run, groups them by what went wrong, and proposes changes to your agent's instructions.",
+    prompt: "Why did the last run fail, and what should I change?",
+    steps: [
+      { text: "Read the 6 failures from the last run" },
+      { text: "4 of them: replied in English when the caller wrote in Hindi" },
+      { text: "2 of them: did not ask for the order number before answering" },
+      { text: "Proposed two changes to your agent's instructions" },
+      { text: "Ran the tests again: 23 of 24 passed", result: true },
+    ],
+  },
+  {
+    key: "judge",
+    title: "Tune the LLM judge until it agrees with your reviewers",
+    description:
+      "Your agent compares the judge's scores with the human labels, rewrites the judge instructions, and repeats until they agree often enough.",
+    prompt: "My LLM judge does not agree with my reviewers often enough. Fix it.",
+    steps: [
+      { text: "Read the 120 samples your reviewers labelled" },
+      { text: "Ran the LLM judge on the same samples" },
+      { text: "Agreement with your reviewers: 71%", result: true },
+      { text: "Rewrote the judge instructions and ran them again" },
+      { text: "Agreement with your reviewers: 88%", result: true },
+      { text: "Rewrote the judge instructions and ran them again" },
+      { text: "Agreement with your reviewers: 94%", result: true },
+      { text: "Made this the live judge and kept the earlier versions" },
+    ],
+  },
 ];
 
 const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
-    title: "Write the test cases",
+    title: "Set up labelling jobs",
     description:
-      "Turn a spreadsheet, past conversations, or a description of what your users ask into a set of tests.",
+      "Create a labelling task, add the samples to review, and produce a link for each reviewer.",
   },
   {
-    title: "Find where the agent fails",
+    title: "Assign the work to reviewers",
     description:
-      "Run the tests, read every failure, and say what went wrong in each one.",
+      "Split the samples between reviewers, and send a few of the same ones to everyone to see whether they agree.",
   },
   {
-    title: "Suggest what to change",
+    title: "Connect an agent to Calibrate",
     description:
-      "Recommend edits to your agent's instructions, based on the failures it just read.",
+      "Register the agent, check that Calibrate can reach it, and confirm a reply comes back.",
   },
   {
-    title: "Set up human review",
+    title: "Manage the LLM judges",
     description:
-      "Create a labelling task, add the samples, and produce a link for each reviewer.",
-  },
-  {
-    title: "Compare the LLM judge with people",
-    description:
-      "Show every sample where the LLM judge and your reviewers disagreed, and why.",
-  },
-  {
-    title: "Keep tuning until it is good enough",
-    description:
-      "Rewrite the judge instructions and run them again, until agreement reaches the level you asked for.",
+      "Write a new judge, add a version of its instructions, and choose which version is the live one.",
   },
 ];
 
+/** One drawn window: the request on top, what the agent reports back below.
+ * Drawn in the page rather than a screenshot, so it stays sharp at every
+ * width and the reader can select the text. */
+function ExampleWindow({
+  agentLabel,
+  prompt,
+  steps,
+}: {
+  agentLabel: string;
+  prompt: string;
+  steps: ExampleStep[];
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 shadow-xl overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+        <span className="h-3 w-3 rounded-full bg-gray-600" aria-hidden />
+        <span className="h-3 w-3 rounded-full bg-gray-700" aria-hidden />
+        <span className="h-3 w-3 rounded-full bg-gray-700" aria-hidden />
+        <span className="ml-2 font-mono text-xs text-gray-400">
+          {agentLabel}
+        </span>
+        <span className="ml-auto text-[11px] uppercase tracking-wider text-gray-500">
+          Example
+        </span>
+      </div>
+      <div className="p-5 md:p-6 font-mono text-[13px] leading-relaxed">
+        <p className="flex gap-3 text-white">
+          <span className="text-emerald-400" aria-hidden>
+            &gt;
+          </span>
+          <span>{prompt}</span>
+        </p>
+        <ul className="mt-5 space-y-2.5">
+          {/* Some lines repeat word for word, which is the point of the loop,
+              so the position is what identifies a line. */}
+          {steps.map((step, index) => (
+            <li
+              key={index}
+              className={`flex gap-3 ${
+                step.result ? "text-emerald-300" : "text-gray-400"
+              }`}
+            >
+              <span aria-hidden>{step.result ? "✓" : "·"}</span>
+              <span>{step.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Tells readers that Calibrate can be driven from the coding agent they already
- * use. The window is an illustration drawn in the page, not a screenshot, so it
- * stays sharp and readable on every screen.
+ * use: three worked examples, then the shorter list of everything else, then the
+ * one command that sets it up.
  */
 export function CodingAgentsSection() {
   const [agent, setAgent] = useState(AGENTS[0]);
@@ -91,8 +175,8 @@ export function CodingAgentsSection() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="text-center mb-10 md:mb-14">
-        <div className="mb-4 flex justify-center md:mb-6">
+      <div className="text-center mb-12 md:mb-16">
+        <div className="mb-2 flex justify-center md:mb-3">
           <span className="inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
             New
           </span>
@@ -107,48 +191,36 @@ export function CodingAgentsSection() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-gray-800 bg-gray-900 shadow-xl overflow-hidden">
-        <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-          <span className="h-3 w-3 rounded-full bg-gray-600" aria-hidden />
-          <span className="h-3 w-3 rounded-full bg-gray-700" aria-hidden />
-          <span className="h-3 w-3 rounded-full bg-gray-700" aria-hidden />
-          <span className="ml-2 font-mono text-xs text-gray-400">
-            {agent.label}
-          </span>
-          <span className="ml-auto text-[11px] uppercase tracking-wider text-gray-500">
-            Example
-          </span>
-        </div>
-        <div className="p-5 md:p-7 font-mono text-[13px] leading-relaxed md:text-sm">
-          <p className="flex gap-3 text-white">
-            <span className="text-emerald-400" aria-hidden>
-              &gt;
-            </span>
-            <span>{EXAMPLE_PROMPT}</span>
-          </p>
-          <ul className="mt-5 space-y-2.5">
-            {/* Two of the lines repeat word for word, which is the point of
-                the loop, so the position is what identifies a line. */}
-            {EXAMPLE_STEPS.map((step, index) => (
-              <li
-                key={index}
-                className={`flex gap-3 ${
-                  step.result ? "text-emerald-300" : "text-gray-400"
-                }`}
-              >
-                <span aria-hidden>{step.result ? "✓" : "·"}</span>
-                <span>{step.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex flex-col gap-14 md:gap-16 lg:gap-20">
+        {EXAMPLES.map((example) => (
+          <div
+            key={example.key}
+            className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 md:gap-8 items-center"
+          >
+            <div className="text-left">
+              <h3 className="text-xl md:text-2xl lg:text-[1.75rem] font-semibold text-gray-900 leading-[1.15] tracking-[-0.02em] mb-3">
+                {example.title}
+              </h3>
+              <p className="text-sm md:text-base text-gray-500 leading-relaxed">
+                {example.description}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <ExampleWindow
+                agentLabel={agent.label}
+                prompt={example.prompt}
+                steps={example.steps}
+              />
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-12 md:mt-16">
+      <div className="mt-14 md:mt-20">
         <h3 className="text-center text-xl md:text-2xl font-semibold text-gray-900 mb-6 md:mb-8">
-          What you can ask for
+          What else you can ask for
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {THINGS_TO_ASK.map((item) => (
             <div
               key={item.title}
@@ -165,7 +237,7 @@ export function CodingAgentsSection() {
         </div>
       </div>
 
-      <div className="mt-10 md:mt-14 flex flex-col items-center gap-4">
+      <div className="mt-12 md:mt-16 flex flex-col items-center gap-4">
         <div
           className="flex flex-wrap justify-center gap-2"
           role="group"
@@ -183,14 +255,14 @@ export function CodingAgentsSection() {
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
                 option.id === agent.id
                   ? "border-gray-900 bg-gray-900 text-white"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
               }`}
             >
               {option.label}
             </button>
           ))}
         </div>
-        <div className="flex w-full max-w-2xl items-center gap-3 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <div className="flex w-full max-w-2xl items-center gap-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-3">
           <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs md:text-sm text-gray-800">
             {command}
           </code>
@@ -200,7 +272,7 @@ export function CodingAgentsSection() {
             className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
               copied
                 ? "bg-emerald-100 text-emerald-800"
-                : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
             }`}
           >
             {copied ? "Copied" : "Copy"}

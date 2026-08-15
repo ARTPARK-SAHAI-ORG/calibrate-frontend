@@ -10,7 +10,13 @@ type LandingHeaderProps = {
   talkToUsHref?: string;
 };
 
-type NavLink = { label: string; href?: string; external?: boolean };
+type NavLink = {
+  label: string;
+  href?: string;
+  external?: boolean;
+  /** Small pill after the label, for a section worth pointing at. */
+  badge?: string;
+};
 
 export function LandingHeader({
   showLogoLink = false,
@@ -21,7 +27,7 @@ export function LandingHeader({
   const navLinks: NavLink[] = [
     { label: "Partners", href: "/#use-cases" },
     { label: "How it works", href: "/#how-it-works" },
-    { label: "Coding agents", href: "/#coding-agents" },
+    { label: "Use with agents", href: "/#coding-agents", badge: "New" },
     { label: "Open source", href: "/#open-source" },
     { label: "Integrations", href: "/#integrations" },
     // Scrolls to the footer, which holds the documentation, changelog, privacy
@@ -30,7 +36,27 @@ export function LandingHeader({
     { label: "Resources", href: "#resources" },
   ];
 
-  const renderNavLink = (link: NavLink, className: string, onClick?: () => void) =>
+  const badgeClass =
+    "rounded border border-emerald-200/90 bg-emerald-50/90 px-1 py-px text-[9px] font-semibold uppercase tracking-wider text-emerald-950";
+
+  const renderNavLabel = (link: NavLink, badgeVisibility: string) =>
+    link.badge ? (
+      <span className="inline-flex items-center gap-1.5">
+        {link.label}
+        <span className={`${badgeVisibility} ${badgeClass}`}>{link.badge}</span>
+      </span>
+    ) : (
+      link.label
+    );
+
+  const renderNavLink = (
+    link: NavLink,
+    className: string,
+    onClick?: () => void,
+    // In the row of links the pill only appears from xl: any narrower and the
+    // extra width pushes the links into the logo. The menu has room for it.
+    badgeVisibility = "hidden xl:inline-block",
+  ) =>
     link.external ? (
       <a
         key={link.label}
@@ -40,7 +66,7 @@ export function LandingHeader({
         className={className}
         onClick={onClick}
       >
-        {link.label}
+        {renderNavLabel(link, badgeVisibility)}
       </a>
     ) : (
       <Link
@@ -49,7 +75,7 @@ export function LandingHeader({
         className={className}
         onClick={onClick}
       >
-        {link.label}
+        {renderNavLabel(link, badgeVisibility)}
       </Link>
     );
 
@@ -127,7 +153,12 @@ export function LandingHeader({
       {menuOpen && (
         <div className="lg:hidden absolute top-full left-0 right-0 border-b border-gray-100 bg-white shadow-sm px-4 py-2">
           {navLinks.map((link) =>
-            renderNavLink(link, mobileLinkClass, () => setMenuOpen(false)),
+            renderNavLink(
+              link,
+              mobileLinkClass,
+              () => setMenuOpen(false),
+              "inline-block",
+            ),
           )}
           <a
             href={talkToUsHref}

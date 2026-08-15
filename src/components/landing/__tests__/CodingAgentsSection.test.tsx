@@ -12,13 +12,26 @@ describe("CodingAgentsSection", () => {
     process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
   });
 
-  it("shows the heading, the example window and what the agent can be asked for", () => {
+  it("shows the heading and all three worked examples", () => {
     render(<CodingAgentsSection />);
     expect(
       screen.getByRole("heading", {
         name: "Ask your coding agent to do the work",
       }),
     ).toBeInTheDocument();
+
+    expect(screen.getByText("/onboard")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ran them: 18 passed, 6 failed"),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Why did the last run fail, and what should I change?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ran the tests again: 23 of 24 passed"),
+    ).toBeInTheDocument();
+
     expect(
       screen.getByText(
         "My LLM judge does not agree with my reviewers often enough. Fix it.",
@@ -27,11 +40,25 @@ describe("CodingAgentsSection", () => {
     expect(
       screen.getByText("Agreement with your reviewers: 94%"),
     ).toBeInTheDocument();
+  });
+
+  it("lists what else the agent can be asked for", () => {
+    render(<CodingAgentsSection />);
     expect(
-      screen.getByRole("heading", {
-        name: "Compare the LLM judge with people",
-      }),
+      screen.getByRole("heading", { name: "Set up labelling jobs" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Manage the LLM judges" }),
+    ).toBeInTheDocument();
+  });
+
+  it("names the picked agent on every example window", async () => {
+    const user = setupUser();
+    render(<CodingAgentsSection />);
+    // One window per example, each titled with the agent the reader picked.
+    expect(screen.getAllByText("Claude Code")).toHaveLength(4); // 3 windows + the picker
+    await user.click(screen.getByRole("button", { name: "Windsurf" }));
+    expect(screen.getAllByText("Windsurf")).toHaveLength(4);
   });
 
   it("links to the agents documentation", () => {

@@ -1195,7 +1195,7 @@ export default function HomePage() {
           header's "Coding agents" link lands here. */}
       <div
         id="coding-agents"
-        className="bg-white pb-16 md:pb-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
       >
         <CodingAgentsSection />
       </div>
