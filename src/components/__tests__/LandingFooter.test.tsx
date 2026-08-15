@@ -19,6 +19,10 @@ describe("LandingFooter", () => {
     expect(
       screen.queryByRole("link", { name: "CLI" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Learn" })).toHaveAttribute(
+      "href",
+      "/learn",
+    );
     expect(screen.getByRole("link", { name: "Changelog" })).toHaveAttribute(
       "href",
       "/changelog",

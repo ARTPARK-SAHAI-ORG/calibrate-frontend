@@ -30,10 +30,7 @@ export function LandingHeader({
     { label: "Use with AI tools", href: "/#coding-agents", badge: "New" },
     { label: "Open source", href: "/#open-source" },
     { label: "Integrations", href: "/#integrations" },
-    // Scrolls to the footer, which holds the documentation, changelog, privacy
-    // and terms links. No leading slash, so it stays on whichever page the
-    // reader is on: every page with this header has the footer too.
-    { label: "Resources", href: "#resources" },
+    { label: "Learn", href: "/learn" },
   ];
 
   const badgeClass =
