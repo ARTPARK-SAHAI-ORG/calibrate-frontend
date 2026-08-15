@@ -92,19 +92,14 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
       "Add your agent to Calibrate, send it a test message, and check the reply comes back the way Calibrate expects.",
   },
   {
-    title: "Turn a dataset you already have into tests",
+    title: "Turn a spreadsheet you already have into tests",
     description:
       "Point it at a spreadsheet, a data file, or a public dataset, and it loads the rows as test cases.",
   },
   {
     title: "Find the best model for your agent",
     description:
-      "Try the same tests on several models and get a leaderboard across quality, cost and speed.",
-  },
-  {
-    title: "Catch a mistake before it reaches people",
-    description:
-      "Wire the same tests into your code, so they are checked on their own every time it changes.",
+      "Run your evals using different models and get a leaderboard across quality, cost and speed.",
   },
   {
     title: "Collect labels from your experts",
@@ -112,9 +107,9 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
       "Create a labelling task, pick the LLM judges to align, add the samples experts will review, and update them as human labels come in.",
   },
   {
-    title: "Decide what counts as a good answer",
+    title: "Manage your LLM judges",
     description:
-      "Write an LLM judge for the criteria your experts care about, add a new version of its instructions, and choose which one is live.",
+      "Create and improve the LLM judges that score your agent's answers.",
   },
 ];
 
