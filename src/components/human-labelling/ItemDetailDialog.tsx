@@ -84,6 +84,8 @@ export type ItemCommentEntry = {
 type TaskEvaluatorDef = {
   uuid: string;
   description?: string | null;
+  /** Annotators may leave this evaluator blank. */
+  is_optional?: boolean;
   output_type?: "binary" | "rating" | null;
   scale_min?: number | boolean | null;
   scale_max?: number | boolean | null;
@@ -329,6 +331,7 @@ export function ItemDetailDialog({
       evaluator_id: string;
       evaluator_version_id?: string;
       name?: string;
+      is_optional?: boolean;
     }[] = [];
     const seenEvKey = new Set<string>();
     const runs: EvaluatorRunRow[] = [];
@@ -387,6 +390,7 @@ export function ItemDetailDialog({
           evaluator_id: row.evaluator_id,
           evaluator_version_id: row.evaluator_version_id ?? undefined,
           name: evName,
+          is_optional: taskEv?.is_optional,
         });
       }
       if (

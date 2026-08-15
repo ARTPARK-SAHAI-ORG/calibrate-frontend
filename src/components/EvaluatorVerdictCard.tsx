@@ -39,6 +39,10 @@ type CommonProps = {
    * specific evaluator version so it stays visually distinct from the
    * evaluator's display name. */
   versionLabel?: string | null;
+  /** Marks the evaluator as one an annotator may leave blank. Shown as
+   * muted text beside the name, deliberately quieter than the version
+   * pill so it reads as a note and not as a label on the evaluator. */
+  isOptional?: boolean;
   /** "binary" → Correct/Wrong, "rating" → 1..scaleMax buttons. */
   outputType: EvaluatorOutputType;
   /** Evaluator uuid — used for linking the name to its detail page. */
@@ -187,6 +191,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             {props.versionLabel && (
               <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground inline-block align-middle whitespace-nowrap">
                 {props.versionLabel}
+              </span>
+            )}
+            {props.isOptional && (
+              <span className="text-xs font-normal text-muted-foreground align-middle whitespace-nowrap">
+                Optional
               </span>
             )}
           </div>

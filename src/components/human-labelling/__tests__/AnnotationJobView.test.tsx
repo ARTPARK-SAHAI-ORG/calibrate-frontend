@@ -1076,6 +1076,77 @@ describe("AnnotationJobView", () => {
     });
   });
 
+  describe("optional evaluators", () => {
+    // ev-2 (the rating) is optional here; ev-1 stays required.
+    const withOptionalRating = (overrides: Record<string, unknown> = {}) =>
+      jobResponse({
+        evaluators: [evaluators[0], { ...evaluators[1], is_optional: true }],
+        items: [items[0]],
+        ...overrides,
+      });
+
+    it("submits with the optional evaluator left blank and omits it from the request", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(jsonResponse(withOptionalRating()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Optional")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      const submitButton = screen.getByRole("button", {
+        name: "Mark as complete",
+      });
+      expect(submitButton).toBeEnabled();
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1"], count: 1, status: "pending" }),
+      );
+      await user.click(submitButton);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.annotations).toEqual([
+        { evaluator_id: "ev-1", value: { value: true } },
+      ]);
+    });
+
+    it("still blocks submitting while a required evaluator is blank", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(jsonResponse(withOptionalRating()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      const submitButton = screen.getByRole("button", {
+        name: "Mark as complete",
+      });
+      expect(submitButton).toBeDisabled();
+      expect(submitButton).toHaveAttribute(
+        "title",
+        "Judgements should be given for all required evaluators before submitting",
+      );
+
+      // Answering only the optional one does not unblock it.
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(
+        screen.getByRole("button", { name: "Mark as complete" }),
+      ).toBeDisabled();
+    });
+
+    it("hides a skipped optional evaluator in the admin view but keeps a blank required one", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(withOptionalRating({ read_only: true })),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Quality")).not.toBeInTheDocument();
+    });
+  });
+
   it("shows the item description when the payload has one", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(

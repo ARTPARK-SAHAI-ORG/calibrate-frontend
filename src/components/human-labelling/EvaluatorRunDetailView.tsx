@@ -708,6 +708,9 @@ export function EvaluatorResultsPane({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
+    /** Annotators may leave this evaluator blank, so it is hidden on an
+     * item where nobody labelled it and no run scored it. */
+    is_optional?: boolean;
   }[];
   evaluatorNamesById: Record<string, string>;
   /** Lookup helper: given a run row or evaluator descriptor, return the
@@ -786,19 +789,34 @@ export function EvaluatorResultsPane({
     );
   }
 
-  const visibleEvaluators = filterDisagreements
-    ? evaluators.filter((ev) => {
-        const humansForEv = humanAgreementForItem?.evaluators.find(
-          (e) => e.evaluator_id === ev.evaluator_id,
-        );
-        return (
-          !!humansForEv &&
-          humansForEv.human_annotations.length > 0 &&
-          humansForEv.agreement !== null &&
-          humansForEv.agreement !== 1
-        );
-      })
-    : evaluators;
+  const visibleEvaluators = evaluators.filter((ev) => {
+    const humansForEv = humanAgreementForItem?.evaluators.find(
+      (e) => e.evaluator_id === ev.evaluator_id,
+    );
+    const humanCount = humansForEv?.human_annotations.length ?? 0;
+    if (filterDisagreements) {
+      return (
+        !!humansForEv &&
+        humanCount > 0 &&
+        humansForEv.agreement !== null &&
+        humansForEv.agreement !== 1
+      );
+    }
+    // An optional evaluator can be left blank, so drop it from an item
+    // where nobody labelled it and no evaluator run scored it.
+    if (!ev.is_optional) return true;
+    return (
+      humanCount > 0 ||
+      runs.some(
+        (x) =>
+          x.evaluator_id === ev.evaluator_id &&
+          (!ev.evaluator_version_id ||
+            x.evaluator_version_id === ev.evaluator_version_id) &&
+          x.value?.value !== null &&
+          x.value?.value !== undefined,
+      )
+    );
+  });
 
   if (filterDisagreements && visibleEvaluators.length === 0) {
     return (

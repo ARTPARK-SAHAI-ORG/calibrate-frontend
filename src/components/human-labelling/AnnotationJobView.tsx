@@ -67,6 +67,9 @@ type Evaluator = {
   description: string | null;
   evaluator_type: string;
   output_type: "binary" | "rating" | string;
+  /** When true the annotator may leave this one blank and still submit.
+   * Frozen on the job at creation time; absent means required. */
+  is_optional?: boolean;
   // Rating bounds returned by the backend (null/absent for binary
   // evaluators). Threaded into EvaluatorVerdictCard so the rating
   // buttons render `scale_min..scale_max` instead of the default 1..5.
@@ -128,6 +131,12 @@ type FieldValue = { value: unknown; comment: string };
 
 function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
+}
+
+/** The evaluators an annotator must answer before an item counts as done.
+ * Everything that asks "is this item finished?" goes through here. */
+function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
+  return evaluators.filter((ev) => ev.is_optional !== true);
 }
 
 function readSavedValue(v: unknown): unknown {
@@ -298,8 +307,9 @@ export function AnnotationJobView({
         setCurrentIndex(0);
         return;
       }
+      const required = requiredOnly(data.evaluators);
       const firstIncomplete = data.items.findIndex((it) =>
-        data.evaluators.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+        required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
@@ -582,10 +592,17 @@ function AnnotateView({
     prevStatus.current = data.job.status;
   }, [data.job.status, isAdmin]);
 
+  // Optional evaluators may be left blank, so every "is this item finished?"
+  // question is asked of the required ones only.
+  const requiredEvaluators = useMemo(
+    () => requiredOnly(evaluators),
+    [evaluators],
+  );
+
   const itemCompleted = useCallback(
     (itemId: string) =>
-      evaluators.every((ev) => savedKeys.has(fieldKey(itemId, ev.uuid))),
-    [evaluators, savedKeys],
+      requiredEvaluators.every((ev) => savedKeys.has(fieldKey(itemId, ev.uuid))),
+    [requiredEvaluators, savedKeys],
   );
 
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
@@ -628,6 +645,9 @@ function AnnotateView({
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
       if (!hasFieldValue(f)) {
+        // A blank optional evaluator is simply not sent; a blank required
+        // one means there is nothing valid to save yet.
+        if (ev.is_optional === true) continue;
         return false;
       }
       annotationsBody.push({
@@ -676,8 +696,9 @@ function AnnotateView({
       }
 
       const justSaved = new Set<FieldKey>();
-      for (const ev of evaluators) {
-        justSaved.add(fieldKey(currentItem.uuid, ev.uuid));
+      for (const a of annotationsBody) {
+        if (a.evaluator_id)
+          justSaved.add(fieldKey(currentItem.uuid, a.evaluator_id));
       }
       setSavedKeys((prev) => {
         const next = new Set(prev);
@@ -702,7 +723,7 @@ function AnnotateView({
 
       if (advance) {
         const isItemDone = (itemId: string) =>
-          evaluators.every((ev) => {
+          requiredEvaluators.every((ev) => {
             const k = fieldKey(itemId, ev.uuid);
             return justSaved.has(k) || savedKeys.has(k);
           });
@@ -741,7 +762,7 @@ function AnnotateView({
       if (!itemCompleted(uuid)) {
         if (
           evaluators.length > 0 &&
-          evaluators.every((ev) => evaluatorAnswered(uuid, ev))
+          requiredEvaluators.every((ev) => evaluatorAnswered(uuid, ev))
         ) {
           const ok = await handleSubmitItem({ advance: false });
           if (!ok) return;
@@ -843,17 +864,10 @@ function AnnotateView({
             {!isAdmin &&
               (() => {
                 const currentItemSaved = currentItem
-                  ? evaluators.every((ev) =>
-                      savedKeys.has(fieldKey(currentItem.uuid, ev.uuid)),
-                    )
+                  ? itemCompleted(currentItem.uuid)
                   : false;
                 const unsavedCount = items.reduce(
-                  (n, it) =>
-                    evaluators.every((ev) =>
-                      savedKeys.has(fieldKey(it.uuid, ev.uuid)),
-                    )
-                      ? n
-                      : n + 1,
+                  (n, it) => (itemCompleted(it.uuid) ? n : n + 1),
                   0,
                 );
                 const isLastUnsaved =
@@ -861,7 +875,7 @@ function AnnotateView({
                 const allEvaluatorsAnswered =
                   !!currentItem &&
                   evaluators.length > 0 &&
-                  evaluators.every((ev) =>
+                  requiredEvaluators.every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
                 const disabled =
@@ -874,7 +888,7 @@ function AnnotateView({
                       ? "Mark as complete"
                       : "Submit & Next";
                 const tooltip = !allEvaluatorsAnswered
-                  ? "Judgements should be given for all evaluators before submitting"
+                  ? "Judgements should be given for all required evaluators before submitting"
                   : undefined;
                 return (
                   <button
@@ -1192,6 +1206,11 @@ function EvaluatorsPane({
       {evaluators.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
+        // Reviewing what came back: an optional evaluator the annotator
+        // skipped has nothing to show, so drop the card entirely.
+        const blank =
+          !f || f.value === undefined || f.value === null || f.value === "";
+        if (readOnly && ev.is_optional === true && blank) return null;
         const variableValues = itemEvaluatorVariables[ev.uuid];
         const outputType =
           ev.output_type === "binary" || ev.output_type === "rating"
@@ -1235,6 +1254,7 @@ function EvaluatorsPane({
               key={ev.uuid}
               mode="read"
               name={ev.name}
+              isOptional={ev.is_optional === true}
               description={ev.description}
               outputType={outputType}
               evaluatorUuid={ev.uuid}
@@ -1265,6 +1285,9 @@ function EvaluatorsPane({
             key={ev.uuid}
             mode="write"
             name={ev.name}
+            // Muted note beside the name so the annotator knows this one
+            // can be left blank.
+            isOptional={ev.is_optional === true}
             description={ev.description}
             outputType={outputType}
             evaluatorUuid={ev.uuid}
