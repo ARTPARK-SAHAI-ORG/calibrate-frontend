@@ -42,9 +42,14 @@ describe("LandingHeader", () => {
     );
   });
 
-  it("renders documentation and get started links", () => {
+  it("renders resources and get started links", () => {
     render(<LandingHeader />);
-    expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument();
+    // Resources scrolls to the footer on the page the reader is already on,
+    // so it carries no leading slash.
+    expect(screen.getByRole("link", { name: "Resources" })).toHaveAttribute(
+      "href",
+      "#resources",
+    );
     expect(
       screen.getByRole("link", { name: "Get started" }),
     ).toHaveAttribute("href", "/login");
@@ -75,11 +80,15 @@ describe("LandingHeader", () => {
     expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
   });
 
-  it("links case studies, integrations, and open source to their landing sections", () => {
+  it("links how it works, partners, integrations, and open source to their landing sections", () => {
     render(<LandingHeader />);
     expect(
-      screen.getByRole("link", { name: "Case studies" }),
-    ).toHaveAttribute("href", "/#use-cases");
+      screen.getByRole("link", { name: "How it works" }),
+    ).toHaveAttribute("href", "/#how-it-works");
+    expect(screen.getByRole("link", { name: "Partners" })).toHaveAttribute(
+      "href",
+      "/#use-cases",
+    );
     expect(
       screen.getByRole("link", { name: "Integrations" }),
     ).toHaveAttribute("href", "/#integrations");
