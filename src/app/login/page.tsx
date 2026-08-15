@@ -17,6 +17,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     document.title = "Login | Calibrate";
+
+    // A failed Google sign-in lands back here with ?error=. Show a message and
+    // drop the param so a reload does not keep it on screen.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("error")) {
+      setError("Sign in with Google did not complete. Please try again.");
+      params.delete("error");
+      const query = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}`,
+      );
+    }
+
     setAuthSearch(window.location.search);
   }, []);
 
