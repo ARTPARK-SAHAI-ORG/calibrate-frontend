@@ -32,13 +32,13 @@ const EXAMPLES: {
 }[] = [
   {
     key: "build",
-    title: "Get your first set of tests written for you",
+    title: "Get your evals created just by talking about your agent",
     description:
-      "Your agent asks what you are building and where it goes wrong today, then turns your answers into test cases and runs them.",
+      "Your AI tool asks what your agent does, who it serves, and where it goes wrong today, then turns your answers into evals and runs them.",
     prompt: "/onboard",
     steps: [
       {
-        text: "Asked who your agent talks to and what a good answer looks like",
+        text: "Asked what your agent does, who it talks to, and what a good answer looks like",
       },
       {
         text: "Connected your agent and checked its reply comes back the way Calibrate expects",
@@ -50,9 +50,9 @@ const EXAMPLES: {
   },
   {
     key: "fix",
-    title: "Find the mistakes and get fixes to try",
+    title: "Analyse the mistakes and get fixes to try",
     description:
-      "Your agent reads every test that failed, groups them by what went wrong, and proposes changes to your agent's instructions.",
+      "Your AI tool reads every test that failed, works out what they have in common, and proposes changes to your agent's instructions.",
     prompt: "Which tests failed last time, and what should I change?",
     steps: [
       { text: "Read the 6 tests that failed" },
@@ -64,9 +64,9 @@ const EXAMPLES: {
   },
   {
     key: "judge",
-    title: "Make the LLM judge agree with your experts",
+    title: "Align the LLM judge with your experts",
     description:
-      "Your agent compares the judge's scores with the human labels, rewrites the judge instructions, and repeats until they agree often enough.",
+      "Your AI tool compares the judge's scores with the human labels, rewrites the judge instructions, and repeats until they agree often enough.",
     prompt: "My LLM judge does not agree with my experts often enough. Fix it.",
     steps: [
       { text: "Read the 120 samples your experts labelled" },
@@ -104,7 +104,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Catch a mistake before it reaches people",
     description:
-      "Your agent writes the setup into your code, so the tests are checked on their own every time the code changes.",
+      "Your AI tool writes the setup into your code, so the tests are checked on their own every time the code changes.",
   },
   {
     title: "Get the answers reviewed by your experts",
@@ -200,10 +200,10 @@ export function CodingAgentsSection() {
           </span>
         </div>
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
-          Use Calibrate with your favourite AI tool
+          Use Calibrate inside your favourite AI tool
         </h2>
         <p className="text-base md:text-xl text-gray-500 max-w-3xl mx-auto">
-          Our Calibrate skill helps your AI tool create the evals for testing
+          Install our Calibrate skill and it will create the evals for testing
           your agent, upload and run them on Calibrate, analyse what went wrong,
           and suggest how to improve your agent.
         </p>

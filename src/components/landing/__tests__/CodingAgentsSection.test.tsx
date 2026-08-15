@@ -16,7 +16,7 @@ describe("CodingAgentsSection", () => {
     render(<CodingAgentsSection />);
     expect(
       screen.getByRole("heading", {
-        name: "Use Calibrate with your favourite AI tool",
+        name: "Use Calibrate inside your favourite AI tool",
       }),
     ).toBeInTheDocument();
 
