@@ -249,7 +249,7 @@ export function CodingAgentsSection() {
         <div
           className="flex flex-wrap justify-center gap-2"
           role="group"
-          aria-label="Choose your coding agent"
+          aria-label="Choose your AI tool"
         >
           {AGENTS.map((option) => (
             <button
