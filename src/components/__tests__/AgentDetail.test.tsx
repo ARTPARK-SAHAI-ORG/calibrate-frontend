@@ -98,6 +98,11 @@ jest.mock("../VerifyRequestPreviewDialog", () => ({
 
 const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
+// The global next/navigation mock in jest.setup.ts hands every component the
+// same router object, so this is the push AgentDetail calls.
+const pushMock = (jest.requireMock("next/navigation") as any).useRouter()
+  .push as jest.Mock;
+
 function jsonResponse(body: any, overrides: Partial<Response> = {}) {
   return {
     ok: true,
@@ -956,5 +961,62 @@ describe("AgentDetail", () => {
     expect(lastCall.activeTab).toBe("agent");
     // No inline back-link header rendered when the parent supplies one.
     expect(screen.queryByTitle("Back to agents")).not.toBeInTheDocument();
+  });
+
+  it("duplicates the agent from its own page and opens the copy", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Duplicate agent" }));
+    expect(screen.getByDisplayValue("Copy of Build Agent")).toBeInTheDocument();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ uuid: "dup-uuid" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/agents/dup-uuid"),
+    );
+    const duplicateCall = (global.fetch as jest.Mock).mock.calls.find(
+      (c: any[]) => String(c[0]).endsWith("/duplicate"),
+    );
+    expect(JSON.parse(duplicateCall[1].body)).toEqual({
+      name: "Copy of Build Agent",
+    });
+  });
+
+  it("keeps the duplicate dialog open when the name is already taken", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Duplicate agent" }));
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ detail: "Agent name already exists" }, {
+        ok: false,
+        status: 409,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Agent name already exists")).toBeInTheDocument(),
+    );
+    expect(pushMock).not.toHaveBeenCalledWith("/agents/dup-uuid");
+
+    // Editing the name clears the conflict message.
+    await user.type(screen.getByDisplayValue("Copy of Build Agent"), "2");
+    expect(
+      screen.queryByText("Agent name already exists"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Copy of Build Agent2")).toBeInTheDocument();
   });
 });

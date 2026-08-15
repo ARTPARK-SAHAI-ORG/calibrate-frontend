@@ -7,6 +7,7 @@ import { AgentDetail, AgentDetailHeaderState } from "@/components/AgentDetail";
 import { useSidebarState } from "@/lib/sidebar";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
+import { DuplicateIconButton } from "@/components/ui";
 
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
@@ -84,6 +85,10 @@ export default function AgentDetailPage() {
   const headerActions =
     headerState && !headerState.isLoading && !headerState.hasError ? (
       <div className="flex items-center gap-2 mr-1 md:mr-2">
+        <DuplicateIconButton
+          onClick={() => headerState.onDuplicate()}
+          tooltip="Duplicate agent"
+        />
         {headerState.isConnectionUnverified && headerState.activeTab !== "connection" && (
           <div className="relative">
             <button

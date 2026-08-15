@@ -27,7 +27,8 @@ import {
   usePageErrorState,
 } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
-import { NotFoundState } from "@/components/ui";
+import { NotFoundState, DuplicateIconButton } from "@/components/ui";
+import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
   VerifyRequestPreviewDialog,
@@ -44,6 +45,7 @@ export type AgentDetailHeaderState = {
   isSaving: boolean;
   onSave: () => void;
   onEditName: () => void;
+  onDuplicate: () => void;
   isConnectionUnverified: boolean;
   isVerifying: boolean;
   onVerify: () => void;
@@ -181,8 +183,11 @@ export function AgentDetail({
     useState(false);
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
 
-  // Hide the floating "Talk to Us" button when the edit name dialog is open
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+
+  // Hide the floating "Talk to Us" button while a dialog is open
   useHideFloatingButton(isEditNameDialogOpen);
+  useHideFloatingButton(isDuplicateDialogOpen);
 
   // Helper to perform the actual tab switch + URL update. Read from the live
   // address, not the router snapshot, so params the Tests tab just wrote are
@@ -979,6 +984,7 @@ export function AgentDetail({
         isSaving,
         onSave: () => saveRef.current(),
         onEditName: handleOpenEditNameDialog,
+        onDuplicate: () => setIsDuplicateDialogOpen(true),
         isConnectionUnverified,
         isVerifying: verify.isVerifying,
         onVerify: handleVerifyClick,
@@ -1086,6 +1092,10 @@ export function AgentDetail({
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <DuplicateIconButton
+              onClick={() => setIsDuplicateDialogOpen(true)}
+              tooltip="Duplicate agent"
+            />
             {isConnectionUnverified && (
               <div className="relative">
                 <button
@@ -1300,6 +1310,16 @@ export function AgentDetail({
           </div>
         )}
       </div>
+
+      {/* Duplicate Agent Dialog */}
+      {isDuplicateDialogOpen && (
+        <DuplicateAgentDialog
+          agentUuid={agentUuid}
+          agentName={agent.name}
+          onClose={() => setIsDuplicateDialogOpen(false)}
+          onDuplicated={(newAgentUuid) => router.push(`/agents/${newAgentUuid}`)}
+        />
+      )}
 
       {/* Edit Name Dialog */}
       {isEditNameDialogOpen && (
