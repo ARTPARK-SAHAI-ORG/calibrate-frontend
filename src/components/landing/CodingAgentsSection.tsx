@@ -32,7 +32,7 @@ const EXAMPLES: {
 }[] = [
   {
     key: "build",
-    title: "Get your evals created just by talking about your agent",
+    title: "Create evals just by talking about your agent",
     description:
       "Your AI tool asks what your agent does, who it serves, and where it goes wrong today, then turns your answers into evals and runs them.",
     prompt: "/onboard",
@@ -50,7 +50,7 @@ const EXAMPLES: {
   },
   {
     key: "fix",
-    title: "Analyse the mistakes and get fixes to try",
+    title: "Analyse the mistakes and fix your agent",
     description:
       "Your AI tool reads every test that failed, works out what they have in common, and proposes changes to your agent's instructions.",
     prompt: "Which tests failed last time, and what should I change?",
@@ -107,7 +107,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
       "Your AI tool writes the setup into your code, so the tests are checked on their own every time the code changes.",
   },
   {
-    title: "Get the answers reviewed by your experts",
+    title: "Collect labels from your experts",
     description:
       "Create a labelling task, pick the LLM judges to align, add the samples experts will review, and update them as human labels come in.",
   },
@@ -205,7 +205,7 @@ export function CodingAgentsSection() {
         <p className="text-base md:text-xl text-gray-500 max-w-3xl mx-auto">
           Install our Calibrate skill and your tool will create the evals for
           testing your agent, upload and run them on Calibrate, analyse what
-          went wrong, and suggest how to improve your agent.
+          went wrong, and suggest fixes
         </p>
       </div>
 

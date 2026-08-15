@@ -46,7 +46,7 @@ describe("CodingAgentsSection", () => {
     render(<CodingAgentsSection />);
     expect(
       screen.getByRole("heading", {
-        name: "Get the answers reviewed by your experts",
+        name: "Collect labels from your experts",
       }),
     ).toBeInTheDocument();
     expect(
