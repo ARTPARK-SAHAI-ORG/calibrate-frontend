@@ -1,5 +1,6 @@
 ## August 2026
 
+- Add a Learn page with our AI evaluation sessions ([#370](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/370))
 - Add a coding agents section to the landing page ([#368](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/368))
 - Remember the landing how-to card in the URL ([#369](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/369))
 - Add a continuous improvement section to the landing page ([#367](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/367))
