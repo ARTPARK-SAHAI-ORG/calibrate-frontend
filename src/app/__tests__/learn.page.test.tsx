@@ -9,8 +9,7 @@ import { WEBINARS_URL } from "@/constants/links";
 
 type ExpectedTalk = {
   title: string;
-  /** Null for the session whose recording cannot play on the page. */
-  recordingEmbedUrl: string | null;
+  recordingEmbedUrl: string;
   recordingUrl: string;
   slidesEmbedUrl: string;
   slidesUrl: string;
@@ -39,9 +38,10 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
   },
   {
     title: "AI evaluation office hours",
-    recordingEmbedUrl: null,
+    recordingEmbedUrl:
+      "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/preview",
     recordingUrl:
-      "https://zoom.us/rec/play/sb_TY_2uklbqi0KBF1fP9EkWEEgKeHf_MtLT660DhClDKYh2AyVlJBe4y7wgtm581ND9xUPT9R4va3y7.oEGyESXnqtJ_GARB?accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&oldStyle=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fzoom.us%2Frec%2Fshare%2FqTA5OSrq3piKwVTciTjqOtFi4Yhuqvonw138Upn8FVIr8hUAF8H1gUie3aSWU8qD.Bt6CxDadfgufWwo9",
+      "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/view?usp=sharing",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vTPza71y_OugQVvKUsOupP55fXiH_r8aJcNE27pKW-vHMe_lop6OrdlC6DmKdnomaBIiSSdy36suURG/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
@@ -74,19 +74,9 @@ describe("LearnPage", () => {
       render(<LearnPage />);
       const section = screen.getByRole("region", { name: talk.title });
 
-      const recording = within(section).queryByTitle(
-        `Recording of ${talk.title}`,
-      );
-      if (talk.recordingEmbedUrl) {
-        expect(recording).toHaveAttribute("src", talk.recordingEmbedUrl);
-      } else {
-        // Zoom refuses to play inside another page, so this one only links out
-        // and says why.
-        expect(recording).not.toBeInTheDocument();
-        expect(
-          within(section).getByText(/Zoom does not let its recordings play/),
-        ).toBeInTheDocument();
-      }
+      expect(
+        within(section).getByTitle(`Recording of ${talk.title}`),
+      ).toHaveAttribute("src", talk.recordingEmbedUrl);
 
       expect(
         within(section).getByTitle(`Slides from ${talk.title}`),

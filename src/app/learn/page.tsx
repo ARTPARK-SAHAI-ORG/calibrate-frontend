@@ -15,11 +15,11 @@ import { WEBINARS_URL } from "@/constants/links";
 const TALKS: {
   title: string;
   /**
-   * Address the recording plays at inside the page. Null when the site
-   * holding the recording refuses to play inside another page, as Zoom does,
-   * in which case only `recordingUrl` is shown.
+   * Address the recording plays at inside the page: YouTube's `/embed/…` or
+   * Google Drive's `/preview`. The plain address a reader would copy does not
+   * play inside another page, which is why both are listed.
    */
-  recordingEmbedUrl: string | null;
+  recordingEmbedUrl: string;
   recordingUrl: string;
   /** Published Google Slides address, `/embed` rather than `/pub`. */
   slidesEmbedUrl: string;
@@ -47,10 +47,10 @@ const TALKS: {
   },
   {
     title: "AI evaluation office hours",
-    // Zoom does not let its recordings play inside another page.
-    recordingEmbedUrl: null,
+    recordingEmbedUrl:
+      "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/preview",
     recordingUrl:
-      "https://zoom.us/rec/play/sb_TY_2uklbqi0KBF1fP9EkWEEgKeHf_MtLT660DhClDKYh2AyVlJBe4y7wgtm581ND9xUPT9R4va3y7.oEGyESXnqtJ_GARB?accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&oldStyle=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fzoom.us%2Frec%2Fshare%2FqTA5OSrq3piKwVTciTjqOtFi4Yhuqvonw138Upn8FVIr8hUAF8H1gUie3aSWU8qD.Bt6CxDadfgufWwo9",
+      "https://drive.google.com/file/d/1H3gEug-l3AbDICblZ3y-OGjZMU3edufZ/view?usp=sharing",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vTPza71y_OugQVvKUsOupP55fXiH_r8aJcNE27pKW-vHMe_lop6OrdlC6DmKdnomaBIiSSdy36suURG/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
@@ -132,20 +132,13 @@ export default function LearnPage() {
 
                 <div className="mb-10 md:mb-12">
                   <p className={partLabelClass}>Recording</p>
-                  {talk.recordingEmbedUrl ? (
-                    <iframe
-                      src={talk.recordingEmbedUrl}
-                      title={`Recording of ${talk.title}`}
-                      className={frameClass}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
-                      Zoom does not let its recordings play inside another
-                      page, so this one opens in a new tab.
-                    </p>
-                  )}
+                  <iframe
+                    src={talk.recordingEmbedUrl}
+                    title={`Recording of ${talk.title}`}
+                    className={frameClass}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                   <a
                     href={talk.recordingUrl}
                     target="_blank"
