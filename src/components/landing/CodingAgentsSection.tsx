@@ -37,7 +37,7 @@ const EXAMPLES: {
       "Your agent asks what you are building and where it goes wrong today, then turns your answers into test cases and runs them.",
     prompt: "/onboard",
     steps: [
-      { text: "Asked what your agent does and where it fails today" },
+      { text: "Asked who your agent talks to and what a good answer looks like" },
       { text: "Connected your agent and checked that it answers" },
       { text: "Wrote 24 test cases from the mistakes you described" },
       { text: "Picked an LLM judge for the cases that need one" },
@@ -53,7 +53,7 @@ const EXAMPLES: {
     steps: [
       { text: "Read the 6 tests that failed" },
       { text: "4 of them: replied in English when the caller wrote in Hindi" },
-      { text: "2 of them: did not ask for the order number before answering" },
+      { text: "2 of them: gave advice that should have come from a nurse" },
       { text: "Proposed two changes to your agent's instructions" },
       { text: "Ran the tests again: 23 of 24 passed", result: true },
     ],
@@ -84,7 +84,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Connect an agent to Calibrate",
     description:
-      "Register the agent, check that Calibrate can reach it, and confirm a reply comes back.",
+      "Add your agent to Calibrate, then send it a test message and check that it replies.",
   },
   {
     title: "Turn a dataset you already have into tests",
@@ -94,22 +94,22 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Compare models on the same tests",
     description:
-      "Try every test on several models and get a leaderboard on quality, cost and speed.",
+      "Try every test on several models, and see which one is good enough at a price you can afford.",
   },
   {
     title: "Check the tests every time the code changes",
     description:
-      "Have the same tests checked automatically whenever someone changes the code, so a change that breaks the agent is caught before it goes live.",
+      "Your agent writes the setup into your code, so every change is tested on its own and a mistake is caught before it reaches the people you serve.",
   },
   {
-    title: "Set up human review",
+    title: "Run the human review side",
     description:
-      "Create a labelling task, add the samples people should review, add the reviewers, and load the labels they give back.",
+      "Create a labelling task, choose which judges it uses, add the samples people review, and update them as the labels come back.",
   },
   {
     title: "Manage the LLM judges",
     description:
-      "Write a new judge, add a version of its instructions, and choose which version is the live one.",
+      "Write a judge that captures what your experts count as a good answer, add a new version of its instructions, and choose which one is live.",
   },
 ];
 

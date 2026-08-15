@@ -45,7 +45,7 @@ describe("CodingAgentsSection", () => {
   it("lists what else the agent can be asked for", () => {
     render(<CodingAgentsSection />);
     expect(
-      screen.getByRole("heading", { name: "Set up human review" }),
+      screen.getByRole("heading", { name: "Run the human review side" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Compare models on the same tests" }),
