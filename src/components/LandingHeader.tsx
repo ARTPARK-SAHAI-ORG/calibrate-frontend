@@ -21,6 +21,7 @@ export function LandingHeader({
   const navLinks: NavLink[] = [
     { label: "Partners", href: "/#use-cases" },
     { label: "How it works", href: "/#how-it-works" },
+    { label: "Coding agents", href: "/#coding-agents" },
     { label: "Open source", href: "/#open-source" },
     { label: "Integrations", href: "/#integrations" },
     // Scrolls to the footer, which holds the documentation, changelog, privacy
@@ -65,8 +66,11 @@ export function LandingHeader({
     </>
   );
 
+  // Six links plus two buttons do not fit beside the logo until 1024px, and
+  // below that they wrap and run into it. So the row appears at lg and the
+  // hamburger menu covers every width under that.
   const desktopLinkClass =
-    "text-gray-600 text-sm md:text-base font-medium hover:text-gray-900 transition-colors cursor-pointer";
+    "whitespace-nowrap text-gray-600 text-sm xl:text-base font-medium hover:text-gray-900 transition-colors cursor-pointer";
   const mobileLinkClass =
     "block py-2 text-gray-700 text-base font-medium hover:text-gray-900 transition-colors cursor-pointer";
 
@@ -81,18 +85,18 @@ export function LandingHeader({
       )}
 
       <div className="flex items-center gap-3 md:gap-4">
-        <div className="hidden md:flex items-center gap-6 lg:gap-8 md:mr-2">
+        <div className="hidden lg:flex items-center gap-4 xl:gap-8 xl:mr-2">
           {navLinks.map((link) => renderNavLink(link, desktopLinkClass))}
         </div>
         <a
           href={talkToUsHref}
-          className="hidden sm:inline-block px-4 md:px-5 py-2 border border-gray-300 text-gray-900 text-sm md:text-base font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          className="hidden sm:inline-block whitespace-nowrap px-4 md:px-5 py-2 border border-gray-300 text-gray-900 text-sm md:text-base font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
         >
           Talk to us
         </a>
         <Link
           href="/login"
-          className="px-4 md:px-5 py-2 bg-black text-white text-sm md:text-base font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+          className="whitespace-nowrap px-4 md:px-5 py-2 bg-black text-white text-sm md:text-base font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
           Get started
         </Link>
@@ -101,7 +105,7 @@ export function LandingHeader({
           onClick={() => setMenuOpen((open) => !open)}
           aria-label="Menu"
           aria-expanded={menuOpen}
-          className="md:hidden p-2 -mr-2 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+          className="lg:hidden p-2 -mr-2 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
         >
           <svg
             className="w-6 h-6"
@@ -121,7 +125,7 @@ export function LandingHeader({
       </div>
 
       {menuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 border-b border-gray-100 bg-white shadow-sm px-4 py-2">
+        <div className="lg:hidden absolute top-full left-0 right-0 border-b border-gray-100 bg-white shadow-sm px-4 py-2">
           {navLinks.map((link) =>
             renderNavLink(link, mobileLinkClass, () => setMenuOpen(false)),
           )}

@@ -95,5 +95,9 @@ describe("LandingHeader", () => {
     expect(
       screen.getByRole("link", { name: "Open source" }),
     ).toHaveAttribute("href", "/#open-source");
+    expect(screen.getByRole("link", { name: "Coding agents" })).toHaveAttribute(
+      "href",
+      "/#coding-agents",
+    );
   });
 });
