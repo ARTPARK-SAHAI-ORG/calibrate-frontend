@@ -111,7 +111,7 @@ it("renders nothing when closed and never fetches", () => {
 it("uses Add to tests copy and pluralizes the trace count", async () => {
   setup({ traceUuids: ["tr-1"] });
   expect(
-    screen.getByRole("heading", { name: "Add 1 trace to tests" }),
+    screen.getByRole("heading", { name: "Add 1 trace to your tests" }),
   ).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled(),
@@ -126,7 +126,7 @@ it("lists only llm evaluators without variables, and preselects the default LLM-
     expect(screen.getByText("Correctness")).toBeInTheDocument(),
   );
   expect(
-    screen.getByRole("heading", { name: "Add 2 traces to tests" }),
+    screen.getByRole("heading", { name: "Add 2 traces to your tests" }),
   ).toBeInTheDocument();
   expect(screen.getByText("My Judge")).toBeInTheDocument();
   // Conversation evaluator filtered out.
@@ -223,7 +223,7 @@ it("requires an evaluator for a response test", async () => {
   expect(screen.getByRole("button", { name: "Add to tests" })).toBeDisabled();
 });
 
-it("shows only tool-call options and submits the given tool_call type", async () => {
+it("asks only for confirmation for tool-call traces", async () => {
   mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
   const user = setupUser();
   setup({ testType: "tool_call" });
@@ -231,19 +231,21 @@ it("shows only tool-call options and submits the given tool_call type", async ()
   expect(mockFetchEvals).not.toHaveBeenCalled();
   expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   expect(screen.queryByText(/Pick at least one evaluator/)).toBeNull();
-  expect(
-    screen.getByText(/same tool calls happen again/),
-  ).toBeInTheDocument();
   expect(screen.queryAllByRole("radio")).toHaveLength(0);
   expect(screen.queryByText("Test type")).not.toBeInTheDocument();
   expect(
     screen.queryByText(/only when every selected trace has tool calls/i),
   ).not.toBeInTheDocument();
+  // Nothing to choose: no options at all, just what will happen.
+  expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  expect(screen.queryByText(/Match tool name only/)).toBeNull();
   expect(
-    screen.getByText("Match tool name only (ignore arguments)"),
+    screen.getByText(
+      /The tool calls recorded in these traces are added as the expected output/,
+    ),
   ).toBeInTheDocument();
+
   expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled();
-  await user.click(screen.getByLabelText("Match tool name only"));
   await user.click(screen.getByRole("button", { name: "Add to tests" }));
 
   await waitFor(() => expect(mockConvert).toHaveBeenCalled());
@@ -251,7 +253,7 @@ it("shows only tool-call options and submits the given tool_call type", async ()
     traceIds: ["tr-1", "tr-2"],
     type: "tool_call",
     evaluatorUuids: undefined,
-    acceptAnyArguments: true,
+    acceptAnyArguments: false,
   });
 });
 

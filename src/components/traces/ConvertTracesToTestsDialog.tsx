@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { LoadingState } from "@/components/ui";
-import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
 import {
@@ -69,14 +68,12 @@ export function ConvertTracesToTestsDialog({
     null,
   );
   const selectedEvaluators = pickedEvaluators ?? preselectedUuids;
-  const [acceptAnyArgs, setAcceptAnyArgs] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setPickedEvaluators(null);
-    setAcceptAnyArgs(false);
     setError(null);
   }, [isOpen]);
 
@@ -99,7 +96,9 @@ export function ConvertTracesToTestsDialog({
         type: testType,
         evaluatorUuids:
           testType === "response" ? Array.from(selectedEvaluators) : undefined,
-        acceptAnyArguments: acceptAnyArgs,
+        // The recorded calls become the expected output, arguments and all,
+        // and the test can be edited afterwards.
+        acceptAnyArguments: false,
       });
       onConverted(result);
     } catch (err) {
@@ -122,13 +121,16 @@ export function ConvertTracesToTestsDialog({
       <div className="bg-background rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Add {count} trace{count === 1 ? "" : "s"} to tests
+            Add {count} trace{count === 1 ? "" : "s"} to your tests
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {testType === "response"
-              ? "Pick at least one evaluator. Each created test judges the reply with these."
-              : "Each created test checks that the same tool calls happen again."}
-          </p>
+          {/* Tool-call traces have nothing to choose, so the whole dialog is
+              the one sentence below and a confirmation. */}
+          {testType === "response" && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Pick at least one evaluator for evaluating the agent&apos;s
+              performance
+            </p>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
@@ -152,16 +154,11 @@ export function ConvertTracesToTestsDialog({
                   />
                 </div>
               ) : (
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <SelectCheckbox
-                    checked={acceptAnyArgs}
-                    onToggle={() => setAcceptAnyArgs((v) => !v)}
-                    label="Match tool name only"
-                  />
-                  <span className="text-sm text-foreground">
-                    Match tool name only (ignore arguments)
-                  </span>
-                </label>
+                <p className="text-sm text-foreground">
+                  The tool calls recorded in{" "}
+                  {count === 1 ? "this trace" : "these traces"} are added as the
+                  expected output. You can change them later on the test.
+                </p>
               )}
 
               {(error ?? loadError) && (
