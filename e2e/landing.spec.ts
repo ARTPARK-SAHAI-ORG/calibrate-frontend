@@ -16,8 +16,15 @@ test.describe("Landing page", () => {
 
   test("product-area nav scrolls to its section", async ({ page }) => {
     await page.goto("/");
-    // Each product-area button smooth-scrolls to a landing section.
+    // Each product-area button smooth-scrolls to a landing section and
+    // writes `#<id>` so a reload (or shared link) opens that area.
     await page.getByRole("button", { name: "Simulations" }).first().click();
+    await expect(page).toHaveURL(/#simulations$/);
+    await expect(page.locator("#landing-simulations")).toBeInViewport({
+      timeout: 10000,
+    });
+    await page.reload();
+    await expect(page).toHaveURL(/#simulations$/);
     await expect(page.locator("#landing-simulations")).toBeInViewport({
       timeout: 10000,
     });
@@ -25,7 +32,15 @@ test.describe("Landing page", () => {
       .getByRole("button", { name: "Continuous improvement" })
       .first()
       .click();
+    await expect(page).toHaveURL(/#monitoring$/);
     await expect(page.locator("#landing-monitoring")).toBeInViewport({
+      timeout: 10000,
+    });
+  });
+
+  test("a product-area hash opens that section", async ({ page }) => {
+    await page.goto("/#voice");
+    await expect(page.locator("#landing-voice")).toBeInViewport({
       timeout: 10000,
     });
   });

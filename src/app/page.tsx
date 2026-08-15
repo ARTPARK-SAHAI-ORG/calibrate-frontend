@@ -596,6 +596,16 @@ import {
   WHATSAPP_INVITE_URL,
 } from "@/constants/links";
 
+function tabIdFromHash(hash: string): string | null {
+  let id: string;
+  try {
+    id = decodeURIComponent(hash.slice(1));
+  } catch {
+    return null;
+  }
+  return tabs.some((tab) => tab.id === id) ? id : null;
+}
+
 export default function HomePage() {
   const [activeFeatureSectionId, setActiveFeatureSectionId] =
     useState<string>("llm");
@@ -611,6 +621,45 @@ export default function HomePage() {
   // Set page title
   useEffect(() => {
     document.title = "Calibrate | AI evaluation platform for NGOs";
+  }, []);
+
+  const scrollLandingTabIntoView = (
+    tabId: string,
+    behavior: ScrollBehavior,
+  ) => {
+    if (pendingScrollTimeoutRef.current) {
+      clearTimeout(pendingScrollTimeoutRef.current);
+    }
+    pendingScrollTargetRef.current = tabId;
+    pendingScrollTimeoutRef.current = setTimeout(() => {
+      pendingScrollTargetRef.current = null;
+    }, 1000);
+    setActiveFeatureSectionId(tabId);
+    document
+      .getElementById(`landing-${tabId}`)
+      ?.scrollIntoView({ behavior, block: "start" });
+  };
+
+  // Reload and shared links (`/#voice`) land on that product area.
+  useEffect(() => {
+    const applyHash = (behavior: ScrollBehavior) => {
+      const tabId = tabIdFromHash(window.location.hash);
+      if (!tabId) return;
+      scrollLandingTabIntoView(tabId, behavior);
+    };
+    applyHash("auto");
+    const onLoad = () => applyHash("auto");
+    if (document.readyState !== "complete") {
+      window.addEventListener("load", onLoad);
+    }
+    const onPop = () => applyHash("smooth");
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("load", onLoad);
+      window.removeEventListener("popstate", onPop);
+    };
+    // Mount-only: the hash is read from the address bar, not from React state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -664,17 +713,15 @@ export default function HomePage() {
   }, []);
 
   const scrollToLandingSection = (tabId: string) => {
-    if (pendingScrollTimeoutRef.current) {
-      clearTimeout(pendingScrollTimeoutRef.current);
+    const next = `#${tabId}`;
+    if (window.location.hash !== next) {
+      history.pushState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}${next}`,
+      );
     }
-    pendingScrollTargetRef.current = tabId;
-    pendingScrollTimeoutRef.current = setTimeout(() => {
-      pendingScrollTargetRef.current = null;
-    }, 1000);
-    setActiveFeatureSectionId(tabId);
-    document
-      .getElementById(`landing-${tabId}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollLandingTabIntoView(tabId, "smooth");
   };
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
