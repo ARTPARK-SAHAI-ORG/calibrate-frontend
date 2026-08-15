@@ -818,13 +818,15 @@ export function EvaluatorResultsPane({
     );
   });
 
-  if (filterDisagreements && visibleEvaluators.length === 0) {
+  if (visibleEvaluators.length === 0) {
     return (
       <div className="space-y-3">
         {descriptionBlock}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          All evaluators agree with human annotations on this item.
+          {filterDisagreements
+            ? "All evaluators agree with human annotations on this item."
+            : "Every evaluator on this item could be skipped, and none was answered or scored."}
         </div>
       </div>
     );
@@ -1421,6 +1423,9 @@ export function ItemDetailPane({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
+    /** Named here so anyone rebuilding this list can see the flag exists.
+     * Rebuilding it without this drops the hiding rule silently. */
+    is_optional?: boolean;
   }[];
   evaluatorNamesById: Record<string, string>;
   getJobEvaluator: (key: {
@@ -1528,6 +1533,9 @@ function EvaluatorSummary({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
+    /** Named here so anyone rebuilding this list can see the flag exists.
+     * Rebuilding it without this drops the hiding rule silently. */
+    is_optional?: boolean;
   }[];
   evaluatorNamesById: Record<string, string>;
   versionLabels: Record<string, string>;

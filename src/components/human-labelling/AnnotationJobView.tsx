@@ -599,18 +599,33 @@ function AnnotateView({
     [evaluators],
   );
 
-  const itemCompleted = useCallback(
-    (itemId: string) =>
-      requiredEvaluators.every((ev) => savedKeys.has(fieldKey(itemId, ev.uuid))),
-    [requiredEvaluators, savedKeys],
-  );
-
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
   // and the button label all agree on what counts as answered or edited.
   const hasFieldValue = (f?: FieldValue) =>
     !!f && f.value !== undefined && f.value !== null && f.value !== "";
   const evaluatorAnswered = (itemId: string, ev: Evaluator) =>
     hasFieldValue(fields[fieldKey(itemId, ev.uuid)]);
+
+  // A row counts as finished only when every required evaluator is saved,
+  // something was actually saved for it (a task whose evaluators are all
+  // optional would otherwise read as finished before anyone touched it),
+  // and no answer is sitting on screen unsaved. That last part matters for
+  // optional evaluators: answering one on a row that is already saved has
+  // to leave the row unfinished, or the new answer is silently dropped
+  // when the annotator moves on.
+  const itemCompleted = useCallback(
+    (itemId: string) => {
+      const savedFor = (ev: Evaluator) =>
+        savedKeys.has(fieldKey(itemId, ev.uuid));
+      if (!requiredEvaluators.every(savedFor)) return false;
+      if (!evaluators.some(savedFor)) return false;
+      return !evaluators.some(
+        (ev) => evaluatorAnswered(itemId, ev) && !savedFor(ev),
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [requiredEvaluators, evaluators, savedKeys, fields],
+  );
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !== (savedComments[itemId] ?? "").trim();
 

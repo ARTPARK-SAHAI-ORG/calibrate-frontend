@@ -121,17 +121,7 @@ export function ManageEvaluatorsDialog({
       if (prev.includes(uuid)) return prev.filter((id) => id !== uuid);
       return [...prev, uuid];
     });
-    dropOptional(uuid);
   };
-
-  // An evaluator that is no longer selected cannot stay marked optional.
-  const dropOptional = (uuid: string) =>
-    setOptionalIds((prev) => {
-      if (!prev.has(uuid)) return prev;
-      const next = new Set(prev);
-      next.delete(uuid);
-      return next;
-    });
 
   const toggleOptional = (uuid: string) =>
     setOptionalIds((prev) => {
@@ -186,7 +176,12 @@ export function ManageEvaluatorsDialog({
   const hasChanges =
     toAdd.length > 0 || toRemove.length > 0 || orderChanged || optionalChanged;
   const wouldRemoveAll = orderedSelected.length === 0;
-  const canSave = hasChanges && !wouldRemoveAll;
+  // If every evaluator can be skipped there is nothing an annotator has to
+  // answer, so a row could never be finished. Keep at least one required.
+  const allWouldBeOptional =
+    orderedSelected.length > 0 &&
+    optionalSelected.length === orderedSelected.length;
+  const canSave = hasChanges && !wouldRemoveAll && !allWouldBeOptional;
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -265,7 +260,6 @@ export function ManageEvaluatorsDialog({
       return next;
     });
     setOrderedSelected((prev) => prev.filter((id) => id !== uuid));
-    dropOptional(uuid);
   };
 
   return (
@@ -547,6 +541,13 @@ export function ManageEvaluatorsDialog({
           {wouldRemoveAll && (
             <p className="text-xs text-red-500">
               A task must have at least one evaluator.
+            </p>
+          )}
+
+          {allWouldBeOptional && (
+            <p className="text-xs text-red-500">
+              At least one evaluator must stay required, so annotators always
+              have something to answer.
             </p>
           )}
 

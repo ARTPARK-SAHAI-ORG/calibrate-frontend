@@ -467,6 +467,32 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
+  it("refuses to save when every evaluator would be optional", async () => {
+    const user = setupUser();
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(optionalCheckbox("Helpfulness"));
+    expect(
+      screen.getByText(
+        "At least one evaluator must stay required, so annotators always have something to answer.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+
+    // Making one required again clears it.
+    await user.click(optionalCheckbox("Correctness"));
+    expect(
+      screen.queryByText(
+        "At least one evaluator must stay required, so annotators always have something to answer.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+
   it("drops an evaluator from optional_evaluator_ids when it is removed", async () => {
     const user = setupUser();
     mockApiClient.mockImplementation((url: string) => {
@@ -494,6 +520,54 @@ describe("ManageEvaluatorsDialog", () => {
         },
       ),
     );
+  });
+
+  it("keeps the Optional mark when an evaluator is removed and added back", async () => {
+    const user = setupUser();
+    mockApiClient.mockImplementation((url: string) => {
+      if (url === "/evaluators?include_defaults=true") {
+        return Promise.resolve({ items: EVALUATORS });
+      }
+      return Promise.resolve({ message: "ok" });
+    });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+    await user.click(catalogueCheckbox("Correctness"));
+
+    expect(optionalCheckbox("Correctness")).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        "/annotation-tasks/task-1/evaluators",
+        "tok",
+        {
+          method: "PUT",
+          // Re-added, so it goes to the end of the order, still optional.
+          body: {
+            evaluator_ids: ["ev-2", "ev-1"],
+            optional_evaluator_ids: ["ev-1"],
+          },
+        },
+      ),
+    );
+  });
+
+  it("enables Save when the only change is taking Optional off", async () => {
+    const user = setupUser();
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-2"],
+      currentOptionalIds: ["ev-1"],
+    });
+    await waitForCatalogueLoaded();
+
+    await user.click(optionalCheckbox("Correctness"));
+    expect(optionalCheckbox("Correctness")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("cancels the in-flight evaluators fetch on unmount without state updates", async () => {
