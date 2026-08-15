@@ -329,7 +329,7 @@ const tabs: LandingTab[] = [
     id: "human-alignment",
     label: "Human alignment",
     navDescription:
-      "Align your LLM judges with human experts to automate monitoring reliably",
+      "Align LLM judges with your human experts to ensure automated evaluations are reliable",
     sections: [
       {
         headingBold: "Align LLM judges",
@@ -534,8 +534,7 @@ const tabs: LandingTab[] = [
   {
     id: "monitoring",
     label: "Continuous monitoring",
-    navDescription:
-      "Send the conversations your agent has with real users to Calibrate and keep evaluating quality after launch",
+    navDescription: "Track agent quality once it is deployed",
     sections: [
       {
         headingBold: "Keep evaluating quality",
@@ -702,7 +701,7 @@ export default function HomePage() {
       <button
         type="button"
         onClick={() => scrollToLandingSection(tab.id)}
-        className={`group w-full min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 md:max-w-[20rem] md:min-w-[260px] md:w-auto md:shrink-0 lg:min-w-[280px] ${
+        className={`group h-full w-full min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 ${
           active
             ? "border-emerald-200/90 bg-gradient-to-br from-white via-emerald-50 to-white shadow-[0_8px_30px_-12px_rgba(16,185,129,0.35)] ring-1 ring-emerald-900/[0.06]"
             : "border-gray-100/90 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
@@ -726,8 +725,11 @@ export default function HomePage() {
         >
           {tab.label}
         </span>
+        {/* Between the sticky row appearing and the screen being wide enough
+            for five cards, the line under the name is dropped so every
+            product area still fits without scrolling sideways. */}
         <span
-          className={`mt-2 block text-[12px] leading-relaxed ${
+          className={`mt-2 block text-[12px] leading-relaxed md:hidden lg:block ${
             active ? "text-gray-600" : "text-gray-500"
           }`}
         >
@@ -1109,9 +1111,11 @@ export default function HomePage() {
             className="sticky top-[4.5rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
+            {/* The cards share the row evenly, so every product area is on
+                screen without scrolling sideways. */}
+            <div className="flex w-full flex-row flex-nowrap gap-3">
               {tabs.map((tab, index) => (
-                <div key={tab.id}>
+                <div key={tab.id} className="min-w-0 flex-1 lg:min-w-[170px]">
                   {renderLandingProductNavButton(tab, index)}
                 </div>
               ))}
