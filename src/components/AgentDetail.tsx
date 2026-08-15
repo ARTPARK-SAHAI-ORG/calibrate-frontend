@@ -26,8 +26,14 @@ import {
   useVerifyConnection,
   usePageErrorState,
 } from "@/hooks";
-import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
+import {
+  SpinnerIcon,
+  CheckCircleIcon,
+  CopyIcon,
+  SaveIcon,
+} from "@/components/icons";
 import { NotFoundState } from "@/components/ui";
+import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
   VerifyRequestPreviewDialog,
@@ -44,6 +50,7 @@ export type AgentDetailHeaderState = {
   isSaving: boolean;
   onSave: () => void;
   onEditName: () => void;
+  onDuplicate: () => void;
   isConnectionUnverified: boolean;
   isVerifying: boolean;
   onVerify: () => void;
@@ -181,8 +188,11 @@ export function AgentDetail({
     useState(false);
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
 
-  // Hide the floating "Talk to Us" button when the edit name dialog is open
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+
+  // Hide the floating "Talk to Us" button while a dialog is open
   useHideFloatingButton(isEditNameDialogOpen);
+  useHideFloatingButton(isDuplicateDialogOpen);
 
   // Helper to perform the actual tab switch + URL update. Read from the live
   // address, not the router snapshot, so params the Tests tab just wrote are
@@ -232,9 +242,11 @@ export function AgentDetail({
   // Save state
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
+  // Resolves to true when the save landed. Duplicating waits on this so the
+  // copy carries what is on screen, not the older version on the server.
   const saveRef = useRef<
-    (options?: { silent?: boolean }) => void | Promise<void>
-  >(() => {});
+    (options?: { silent?: boolean }) => Promise<boolean>
+  >(async () => true);
   const isSavingRef = useRef(false);
 
   // Tracks the verified state of the connection agent at the moment data was
@@ -615,7 +627,7 @@ export function AgentDetail({
   // Update save function ref when relevant state changes
   useEffect(() => {
     saveRef.current = async (options?: { silent?: boolean }) => {
-      if (!agent) return;
+      if (!agent) return false;
       const silent = options?.silent === true;
 
       try {
@@ -679,7 +691,7 @@ export function AgentDetail({
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
-          return;
+          return false;
         }
 
         if (!response.ok) {
@@ -719,11 +731,13 @@ export function AgentDetail({
         if (!silent) {
           setShowSaveToast(true);
         }
+        return true;
       } catch (err) {
         reportError("Error saving agent:", err);
         if (!silent) {
           alert(err instanceof Error ? err.message : "Failed to save agent");
         }
+        return false;
       } finally {
         setIsSaving(false);
         isSavingRef.current = false;
@@ -979,6 +993,7 @@ export function AgentDetail({
         isSaving,
         onSave: () => saveRef.current(),
         onEditName: handleOpenEditNameDialog,
+        onDuplicate: () => setIsDuplicateDialogOpen(true),
         isConnectionUnverified,
         isVerifying: verify.isVerifying,
         onVerify: handleVerifyClick,
@@ -1086,6 +1101,13 @@ export function AgentDetail({
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setIsDuplicateDialogOpen(true)}
+              className="h-8 md:h-9 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <CopyIcon className="w-4 h-4" />
+              Duplicate
+            </button>
             {isConnectionUnverified && (
               <div className="relative">
                 <button
@@ -1117,8 +1139,14 @@ export function AgentDetail({
               disabled={isSaving}
               className="h-8 md:h-9 px-4 md:px-6 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-              {isSaving ? "" : "Save"}
+              {isSaving ? (
+                <SpinnerIcon className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <SaveIcon className="w-4 h-4" />
+                  Save
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1163,7 +1191,9 @@ export function AgentDetail({
               onAgentHeadersChange={setConnectionHeaders}
               connectionConfig={connectionConfig}
               onConnectionConfigChange={setConnectionConfig}
-              onSave={() => saveRef.current()}
+              onSave={async () => {
+                await saveRef.current();
+              }}
               isSaving={isSaving}
               onVerificationSuccess={handleConnectionVerifySuccess}
             />
@@ -1300,6 +1330,19 @@ export function AgentDetail({
           </div>
         )}
       </div>
+
+      {/* Duplicate Agent Dialog */}
+      {isDuplicateDialogOpen && (
+        <DuplicateAgentDialog
+          agentUuid={agentUuid}
+          agentName={agent.name}
+          onClose={() => setIsDuplicateDialogOpen(false)}
+          onDuplicated={(newAgentUuid) => router.push(`/agents/${newAgentUuid}`)}
+          // The copy is made from the agent stored on the server, so save what
+          // is on screen first.
+          onBeforeDuplicate={() => saveRef.current({ silent: true })}
+        />
+      )}
 
       {/* Edit Name Dialog */}
       {isEditNameDialogOpen && (
