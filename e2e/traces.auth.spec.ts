@@ -251,7 +251,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await page.getByRole("button", { name: /^Add to tests \(/ }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: /Add 1 trace to tests/ }),
+      dialog.getByRole("heading", { name: /Add 1 trace to your tests/ }),
     ).toBeVisible();
     const submit = dialog.getByRole("button", {
       name: "Add to tests",

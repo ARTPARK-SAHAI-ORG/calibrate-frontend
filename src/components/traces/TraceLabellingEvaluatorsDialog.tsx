@@ -56,7 +56,8 @@ export function TraceLabellingEvaluatorsDialog({
             Submit traces for labelling
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Choose what annotators score each trace against.
+            Pick at least one evaluator. Annotators score the reply against
+            these.
           </p>
         </div>
 
@@ -69,9 +70,6 @@ export function TraceLabellingEvaluatorsDialog({
                 <div className="text-sm font-semibold text-foreground">
                   Evaluators
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Pick at least one. Annotators score the reply against these.
-                </p>
                 <EvaluatorPicker
                   evaluators={evaluators}
                   selectedIds={selected}

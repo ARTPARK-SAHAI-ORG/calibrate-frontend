@@ -744,6 +744,11 @@ describe("AddRunToLabellingTaskDialog", () => {
     await waitFor(() =>
       expect(screen.getByText(/Added 1 trace/)).toBeInTheDocument(),
     );
+    // The heading switches to the finished wording, and the body no longer
+    // repeats the "View task" button in a sentence.
+    expect(screen.getByText("Submitted for labelling")).toBeInTheDocument();
+    expect(screen.queryByText(/Submit 1 trace for labelling/)).toBeNull();
+    expect(screen.queryByText(/start labelling/)).toBeNull();
 
     const postCall = apiClientMock.mock.calls.find(
       (c) => c[0] === "/annotation-tasks" && c[2]?.method === "POST",

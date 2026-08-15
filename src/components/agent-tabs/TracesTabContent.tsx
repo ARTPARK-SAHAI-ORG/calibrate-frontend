@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
@@ -38,8 +37,17 @@ import { reportError } from "@/lib/reportError";
  * The Traces tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
-export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
-  const router = useRouter();
+export function TracesTabContent({
+  agentUuid,
+  onTestsCreated,
+  onViewTests,
+}: {
+  agentUuid: string;
+  /** Called after traces are turned into tests, so the Tests tab reloads. */
+  onTestsCreated: () => void;
+  /** Opens the Tests tab, where the created tests are listed. */
+  onViewTests: () => void;
+}) {
   const accessToken = useAccessToken();
 
   const [pageSize, setPageSize] = usePageSize();
@@ -93,6 +101,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       ? "tool_call"
       : "response";
 
+  // Annotators score the agent's reply, so a trace that only made tool calls
+  // has nothing to label and is left out of what is submitted.
+  const labellableUuids = selectedTraces
+    .filter((trace) => !!trace.response_preview?.trim())
+    .map((trace) => trace.uuid);
+
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
   // rows only preview, so they are fetched before the task dialog opens.
@@ -111,11 +125,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
   const [submittedUuids, setSubmittedUuids] = useState<string[]>([]);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const labellableRef = useRef(labellableUuids);
+  labellableRef.current = labellableUuids;
 
   const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
-    const uuids = Array.from(selected);
+    const uuids = labellableRef.current;
     setSubmittedUuids(uuids);
     setIsPreparingLabelling(true);
     try {
@@ -124,7 +140,7 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
       );
       // The ticks changed while the traces were loading, so opening the task
       // now would work on rows the reader no longer picked.
-      const now = selectedRef.current;
+      const now = new Set(labellableRef.current);
       if (uuids.length !== now.size || uuids.some((uuid) => !now.has(uuid))) {
         toast.error(
           "The selected traces changed while they were loading, so nothing was submitted. Try again.",
@@ -300,8 +316,12 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={selected.size}
-                      emptyMessage="Select at least one trace to submit for labelling."
+                      count={labellableUuids.length}
+                      emptyMessage={
+                        selected.size > 0
+                          ? "Labelling traces that only made tool calls is not supported yet."
+                          : "Select at least one trace to submit for labelling."
+                      }
                       onOpen={() => setEvaluatorStepOpen(true)}
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                     />
@@ -386,10 +406,13 @@ export function TracesTabContent({ agentUuid }: { agentUuid: string }) {
           setConvertOpen(false);
           deletion.clearSelection();
           const created = result.created;
+          // The created tests belong to this agent, so reload the Tests tab
+          // and send the reader there rather than to the whole test library.
+          onTestsCreated();
           toast.success(`Created ${created} test${created === 1 ? "" : "s"}`, {
             action: {
               label: "View tests",
-              onClick: () => router.push("/tests"),
+              onClick: onViewTests,
             },
           });
         }}
