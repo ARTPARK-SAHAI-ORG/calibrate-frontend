@@ -728,7 +728,7 @@ describe("EvaluatorRunDetailView", () => {
       />,
     );
     expect(screen.getByText("In progress")).toBeInTheDocument();
-    expect(screen.getByText("1 of 2 items scored")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument();
     // The finished item is marked done in the item strip; the other is not.
     expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
     expect(screen.getAllByTitle("Item 2").length).toBeGreaterThan(0);
@@ -742,7 +742,7 @@ describe("EvaluatorRunDetailView", () => {
         versionLabels={{}}
       />,
     );
-    expect(screen.queryByText(/items scored/)).not.toBeInTheDocument();
+    expect(screen.queryByText("1/2")).not.toBeInTheDocument();
   });
 
   it("renders topError banner", () => {

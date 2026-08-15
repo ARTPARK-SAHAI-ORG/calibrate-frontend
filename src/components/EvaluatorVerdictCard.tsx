@@ -175,25 +175,25 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
-          {/* One line that scrolls sideways: the name and its version pill
-              stay together on the chips' row however long the name is,
-              instead of wrapping and pushing the pill below the name. The
-              scrollbar itself is hidden — it sat under every card title,
-              including the short ones that never scroll. Dragging still
-              works. */}
-          <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <NameLabel
-              name={props.name}
-              uuid={props.evaluatorUuid}
-              enableLink={props.enableLink}
-            />{" "}
+          {/* Name and version pill on one line. A long name is shortened
+              with an ellipsis so the version pill always stays whole: it
+              used to be clipped mid-character by a sideways scroll box
+              whose scrollbar was hidden, which just looked broken. */}
+          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+            <span className="min-w-0 truncate" title={props.name}>
+              <NameLabel
+                name={props.name}
+                uuid={props.evaluatorUuid}
+                enableLink={props.enableLink}
+              />
+            </span>
             {props.versionLabel && (
-              <span className="ml-1.5 font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground inline-block align-middle whitespace-nowrap">
+              <span className="flex-shrink-0 font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground whitespace-nowrap">
                 {props.versionLabel}
               </span>
             )}
             {props.isOptional && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground inline-block align-middle whitespace-nowrap font-medium">
+              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground whitespace-nowrap font-medium">
                 Optional
               </span>
             )}
@@ -293,8 +293,8 @@ function NameLabel({
   enableLink?: boolean;
 }) {
   const cls =
-    // `inline`, not `inline-block`, so the version pill sits right after the
-    // name. The header keeps both on one scrolling line, so no wrapping here.
+    // Stays inline so the wrapper around it can shorten a long name with an
+    // ellipsis and keep the version pill beside it whole.
     "text-sm font-medium text-foreground align-middle";
   if (enableLink && uuid) {
     return (
@@ -372,21 +372,15 @@ function ReadVerdictPill({
     ratingLabel?.trim() ||
     ratingScale?.find((e) => e.value === score)?.name?.trim() ||
     null;
+  // One pill, not two: the label already says what the score means, so the
+  // number only shows when the scale has no name for it.
   return (
-    <>
-      <span
-        className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
-      >
-        {scaleMax !== undefined ? `${score} / ${scaleMax}` : `Score: ${score}`}
-      </span>
-      {resolvedRatingLabel && (
-        <span
-          className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
-        >
-          {resolvedRatingLabel}
-        </span>
-      )}
-    </>
+    <span
+      className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
+    >
+      {resolvedRatingLabel ??
+        (scaleMax !== undefined ? `${score} / ${scaleMax}` : `Score: ${score}`)}
+    </span>
   );
 }
 

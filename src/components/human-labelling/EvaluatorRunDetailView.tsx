@@ -1931,8 +1931,8 @@ export function EvaluatorRunDetailView({
         {statusLabel(job.status)}
       </span>
       {showDoneCount && (
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {doneCount} of {itemsForRun.length} items scored
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border tabular-nums border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
+          {doneCount}/{itemsForRun.length}
         </span>
       )}
     </>

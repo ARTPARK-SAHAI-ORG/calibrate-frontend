@@ -196,6 +196,22 @@ describe("EvaluatorVerdictCard - read mode rating", () => {
     expect(screen.getByText("1 / 5")).toHaveClass("text-red-600");
   });
 
+  it("shows only the label when the score has one, not the number too", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Rating Eval"
+        outputType="rating"
+        score={3}
+        scaleMin={1}
+        scaleMax={5}
+        ratingLabel="Acceptable"
+      />,
+    );
+    expect(screen.getByText("Acceptable")).toBeInTheDocument();
+    expect(screen.queryByText("3 / 5")).not.toBeInTheDocument();
+  });
+
   it("falls back to ratingScale lookup when ratingLabel is absent", () => {
     render(
       <EvaluatorVerdictCard
@@ -284,18 +300,16 @@ describe("EvaluatorVerdictCard - header extras", () => {
         reasoning="Because"
       />,
     );
-    // Same parent, and that parent is not a flex row — otherwise the pill
-    // becomes its own flex item and drops to a line of its own when the
-    // toggle button next to it grows.
+    // Name and pill share one row. A long name is shortened with an
+    // ellipsis; the pill never shrinks, so its text is never half-cut.
     const pill = screen.getByText("v3");
-    const name = screen.getByText("Eval");
-    expect(pill.parentElement).toBe(name.parentElement);
-    expect(pill.parentElement?.className).not.toContain("flex ");
-    expect(name.className).not.toContain("inline-block");
-    // A long name scrolls sideways instead of wrapping and pushing the
-    // pill onto a line of its own.
-    expect(pill.parentElement?.className).toContain("overflow-x-auto");
-    expect(pill.parentElement?.className).toContain("whitespace-nowrap");
+    const nameWrapper = screen.getByText("Eval").parentElement!;
+    const row = pill.parentElement!;
+    expect(nameWrapper.parentElement).toBe(row);
+    expect(row.className).toContain("flex");
+    expect(nameWrapper.className).toContain("truncate");
+    expect(nameWrapper.className).toContain("min-w-0");
+    expect(pill.className).toContain("flex-shrink-0");
   });
 
   it("renders name as a link when enableLink and evaluatorUuid are set", () => {
