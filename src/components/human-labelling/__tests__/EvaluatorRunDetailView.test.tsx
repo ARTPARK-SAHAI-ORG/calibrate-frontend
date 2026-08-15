@@ -715,6 +715,36 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   });
 
+  it("counts the items already scored while the run is still going", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({
+          status: "in_progress",
+          completed_at: null,
+          runs: [makeRun({ item_id: "item-1" })],
+        })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    // The finished item is marked done in the item strip; the other is not.
+    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Item 2").length).toBeGreaterThan(0);
+  });
+
+  it("hides the scored count once the run is completed", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({ runs: [makeRun({ item_id: "item-1" })] })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.queryByText("1/2")).not.toBeInTheDocument();
+  });
+
   it("renders topError banner", () => {
     render(
       <EvaluatorRunDetailView
