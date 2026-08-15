@@ -239,6 +239,40 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(screen.getByText("v3")).toBeInTheDocument();
   });
 
+  it("renders Optional as a muted pill beside the name", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Script Fidelity"
+        outputType="binary"
+        isOptional
+        value={undefined}
+        comment=""
+        onValueChange={() => {}}
+        onCommentChange={() => {}}
+      />,
+    );
+    const mark = screen.getByText("Optional");
+    expect(mark.className).toContain("rounded-md");
+    expect(mark.className).toContain("border");
+    expect(screen.queryByText("Optional")?.tagName).toBe("SPAN");
+  });
+
+  it("hides the Optional pill when the evaluator is required", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Script Fidelity"
+        outputType="binary"
+        value={undefined}
+        comment=""
+        onValueChange={() => {}}
+        onCommentChange={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Optional")).toBeNull();
+  });
+
   it("keeps the version pill in the same text flow as the name", () => {
     render(
       <EvaluatorVerdictCard

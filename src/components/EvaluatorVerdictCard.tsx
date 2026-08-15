@@ -40,8 +40,7 @@ type CommonProps = {
    * evaluator's display name. */
   versionLabel?: string | null;
   /** Marks the evaluator as one an annotator may leave blank. Shown as
-   * muted text beside the name, deliberately quieter than the version
-   * pill so it reads as a note and not as a label on the evaluator. */
+   * a muted pill beside the name, same shape as the version chip. */
   isOptional?: boolean;
   /** "binary" → Correct/Wrong, "rating" → 1..scaleMax buttons. */
   outputType: EvaluatorOutputType;
@@ -189,12 +188,12 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               enableLink={props.enableLink}
             />{" "}
             {props.versionLabel && (
-              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground inline-block align-middle whitespace-nowrap">
+              <span className="ml-1.5 font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground inline-block align-middle whitespace-nowrap">
                 {props.versionLabel}
               </span>
             )}
             {props.isOptional && (
-              <span className="text-xs font-normal text-muted-foreground align-middle whitespace-nowrap">
+              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground inline-block align-middle whitespace-nowrap font-medium">
                 Optional
               </span>
             )}

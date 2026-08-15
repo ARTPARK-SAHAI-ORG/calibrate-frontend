@@ -1300,8 +1300,6 @@ function EvaluatorsPane({
             key={ev.uuid}
             mode="write"
             name={ev.name}
-            // Muted note beside the name so the annotator knows this one
-            // can be left blank.
             isOptional={ev.is_optional === true}
             description={ev.description}
             outputType={outputType}

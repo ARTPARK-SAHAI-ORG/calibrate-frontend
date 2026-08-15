@@ -2570,11 +2570,6 @@ function LabellingTaskPageInner() {
                       }
                     >
                       {ev.name}
-                      {ev.is_optional && (
-                        <span className="ml-1.5 text-muted-foreground font-normal">
-                          Optional
-                        </span>
-                      )}
                     </Link>
                   );
                 })}
