@@ -1,7 +1,7 @@
 "use client";
 
 import { Link } from "@/lib/nav";
-import { WHATSAPP_INVITE_URL } from "@/constants/links";
+import { WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 export function LandingFooter() {
   return (
@@ -72,12 +72,12 @@ export function LandingFooter() {
               </li>
               <li>
                 <a
-                  href="https://linkedin.com/company/artpark"
+                  href={WEBINARS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-gray-900 transition-colors"
                 >
-                  LinkedIn
+                  Webinars on AI evaluation
                 </a>
               </li>
             </ul>

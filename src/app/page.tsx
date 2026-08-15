@@ -329,7 +329,7 @@ const tabs: LandingTab[] = [
     id: "human-alignment",
     label: "Human alignment",
     navDescription:
-      "Align your LLM judges with human experts to automate monitoring reliably",
+      "Align LLM judges with your human experts to ensure automated evaluations are reliable",
     sections: [
       {
         headingBold: "Align LLM judges",
@@ -531,6 +531,63 @@ const tabs: LandingTab[] = [
       },
     ],
   },
+  {
+    id: "monitoring",
+    label: "Continuous improvement",
+    navDescription:
+      "Track agent quality after deployment, update tests and continue gathering human feedback",
+    sections: [
+      {
+        headingBold: "Keep evaluating quality",
+        headingLight: "after your agent goes live",
+        description:
+          "Calibrate can automatically capture your agent conversations, identify where it is failing and convert them to tests to help you continuously improve your agent",
+        quickStart: {
+          steps: [
+            {
+              key: "monitoring-key",
+              headingBold: "Create an API key",
+              headingLight: "to verify your identity",
+              image: "/monitoring-1.png",
+            },
+            {
+              key: "monitoring-snippet",
+              headingBold: "Add the code snippet",
+              headingLight:
+                "to your agent so agent conversations are sent to Calibrate",
+              image: "/monitoring-2.png",
+            },
+            {
+              key: "monitoring-conversations",
+              headingBold: "View all conversations",
+              headingLight: "and monitor your live agent performance",
+              image: "/monitoring-3.png",
+            },
+            {
+              key: "monitoring-tests",
+              headingBold: "Create tests",
+              headingLight: "for cases where the agent made a mistake",
+              image: "/monitoring-4.png",
+            },
+            {
+              key: "monitoring-labels",
+              headingBold: "Collect human labels",
+              headingLight:
+                "to ensure your automated LLM judges remain aligned",
+              image: "/monitoring-5.png",
+            },
+          ],
+        },
+        images: [
+          "/monitoring-1.png",
+          "/monitoring-2.png",
+          "/monitoring-3.png",
+          "/monitoring-4.png",
+          "/monitoring-5.png",
+        ],
+      },
+    ],
+  },
 ];
 
 import {
@@ -642,7 +699,7 @@ export default function HomePage() {
       <button
         type="button"
         onClick={() => scrollToLandingSection(tab.id)}
-        className={`group w-full min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 md:max-w-[20rem] md:min-w-[260px] md:w-auto md:shrink-0 lg:min-w-[280px] ${
+        className={`group h-full w-full min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 ${
           active
             ? "border-emerald-200/90 bg-gradient-to-br from-white via-emerald-50 to-white shadow-[0_8px_30px_-12px_rgba(16,185,129,0.35)] ring-1 ring-emerald-900/[0.06]"
             : "border-gray-100/90 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
@@ -666,8 +723,11 @@ export default function HomePage() {
         >
           {tab.label}
         </span>
+        {/* Between the sticky row appearing and the screen being wide enough
+            for five cards, the line under the name is dropped so every
+            product area still fits without scrolling sideways. */}
         <span
-          className={`mt-2 block text-[12px] leading-relaxed ${
+          className={`mt-2 block text-[12px] leading-relaxed md:hidden lg:block ${
             active ? "text-gray-600" : "text-gray-500"
           }`}
         >
@@ -1026,7 +1086,6 @@ export default function HomePage() {
                         className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
                       >
                         Read the story
-                        <span aria-hidden>→</span>
                       </a>
                     )}
                   </figure>
@@ -1050,9 +1109,11 @@ export default function HomePage() {
             className="sticky top-[4.5rem] z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
+            {/* The cards share the row evenly, so every product area is on
+                screen without scrolling sideways. */}
+            <div className="flex w-full flex-row flex-nowrap gap-3">
               {tabs.map((tab, index) => (
-                <div key={tab.id}>
+                <div key={tab.id} className="min-w-0 flex-1 lg:min-w-[170px]">
                   {renderLandingProductNavButton(tab, index)}
                 </div>
               ))}
@@ -1260,7 +1321,6 @@ export default function HomePage() {
             className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
           >
             See all integrations
-            <span>→</span>
           </a>
           {/* <a
             href="https://forms.gle/AoGE6DMs7N4DNAK2A"
@@ -1353,16 +1413,14 @@ export default function HomePage() {
               className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 bg-white hover:bg-gray-100 text-gray-800 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
             >
               Get started for free
-              <span aria-hidden>→</span>
             </Link>
+            {/* Sends the reader back up to the walk through of what Calibrate
+                does, the same section the header's "How it works" link opens. */}
             <a
-              href={process.env.NEXT_PUBLIC_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#how-it-works"
               className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 border border-white/40 text-white hover:bg-white/10 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
             >
-              Read the docs
-              <span aria-hidden>→</span>
+              See how it works
             </a>
           </div>
         </div>

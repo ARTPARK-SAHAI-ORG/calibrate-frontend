@@ -1,6 +1,6 @@
 import { render, screen } from "@/test-utils";
 import { LandingFooter } from "../LandingFooter";
-import { WHATSAPP_INVITE_URL } from "@/constants/links";
+import { WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 describe("LandingFooter", () => {
   const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
@@ -39,10 +39,12 @@ describe("LandingFooter", () => {
       "href",
       WHATSAPP_INVITE_URL,
     );
-    expect(screen.getByRole("link", { name: "LinkedIn" })).toHaveAttribute(
-      "href",
-      "https://linkedin.com/company/artpark",
-    );
+    expect(
+      screen.getByRole("link", { name: "Webinars on AI evaluation" }),
+    ).toHaveAttribute("href", WEBINARS_URL);
+    expect(
+      screen.queryByRole("link", { name: "LinkedIn" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the current year in the copyright line", () => {

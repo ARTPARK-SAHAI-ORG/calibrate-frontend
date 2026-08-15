@@ -34,7 +34,6 @@ export function AboutMarketingSection() {
               aria-hidden
             >
               LinkedIn
-              <span aria-hidden>→</span>
             </p>
           </div>
         </a>
@@ -64,7 +63,6 @@ export function AboutMarketingSection() {
               aria-hidden
             >
               LinkedIn
-              <span aria-hidden>→</span>
             </p>
           </div>
         </a>
