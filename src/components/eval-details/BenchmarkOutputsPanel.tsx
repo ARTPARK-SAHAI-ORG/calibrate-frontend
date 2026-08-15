@@ -655,6 +655,13 @@ function ModelSection({
   // so the header buckets line up with the categorised rows below.
   const failedCount = Math.max((modelResult.failed ?? 0) - erroredCount, 0);
   const totalTests = modelResult.total_tests ?? testNames.length;
+  // How many rows this model will end up with: the same rule the test list
+  // below uses, so the header count never disagrees with the rows shown.
+  const expectedCount = Math.max(
+    totalTests,
+    testNames.length,
+    modelResult.test_results?.length ?? 0,
+  );
   const query = searchQuery.trim().toLowerCase();
   const modelLabellingKeys = collectModelLabellingKeys(
     modelResult,
@@ -690,9 +697,9 @@ function ModelSection({
               </svg>
             )}
           </div>
-          {isProcessing && totalTests > 0 && (
+          {isProcessing && expectedCount > 0 && (
             <div className="text-xs text-muted-foreground flex-shrink-0 ml-4">
-              {finishedCount} of {totalTests} done
+              {finishedCount} of {expectedCount} done
             </div>
           )}
           {!isProcessing && modelResult.success !== null && (
@@ -730,9 +737,6 @@ function ModelSection({
       {isExpanded && (
         <div className="px-4 pt-3 pb-3">
           {(() => {
-            const resultsCount = modelResult.test_results?.length ?? 0;
-            const expectedCount = Math.max(totalTests, testNames.length, resultsCount);
-
             if (expectedCount === 0 && !hasResults) {
               return (
                 <div className="px-3 py-2 text-sm text-muted-foreground">

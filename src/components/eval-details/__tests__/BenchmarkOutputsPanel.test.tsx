@@ -234,6 +234,30 @@ describe("BenchmarkOutputsPanel", () => {
     expect(screen.getByText("0 of 3 done")).toBeInTheDocument();
   });
 
+  it("counts against the number of rows shown when more results arrive than the reported total", () => {
+    render(
+      <BenchmarkOutputsPanel
+        modelResults={[
+          makeModel({
+            model: "model-e",
+            success: null,
+            total_tests: 2,
+            test_results: [
+              { name: "One", passed: true },
+              { name: "Two", passed: false },
+              { name: "Three", passed: null },
+            ],
+          }),
+        ]}
+        expandedModels={new Set()}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("2 of 3 done")).toBeInTheDocument();
+  });
+
   describe("benchmarkTestStatus / StatusIcon mapping via rendering", () => {
     it("maps error > running(passed null) > passed/failed correctly", () => {
       render(
