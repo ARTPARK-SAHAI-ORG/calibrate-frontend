@@ -644,6 +644,11 @@ function ModelSection({
 }) {
   const isProcessing = modelResult.success === null;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
+  // Rows land one by one while the model runs, so count the ones that already
+  // have a verdict (or errored) for the live "x of y done" header.
+  const finishedCount = (modelResult.test_results ?? []).filter(
+    (t) => t && benchmarkTestStatus(t) !== "running",
+  ).length;
   const passedCount = modelResult.passed ?? 0;
   const erroredCount = (modelResult.test_results ?? []).filter((t) => t?.error).length;
   // Errored tests may be lumped into the API's `failed` count — subtract them
@@ -685,6 +690,11 @@ function ModelSection({
               </svg>
             )}
           </div>
+          {isProcessing && totalTests > 0 && (
+            <div className="text-xs text-muted-foreground flex-shrink-0 ml-4">
+              {finishedCount} of {totalTests} done
+            </div>
+          )}
           {!isProcessing && modelResult.success !== null && (
             <div className="flex items-center gap-2 text-xs flex-shrink-0 ml-4">
               {(statusFilter === "all" || statusFilter === "passed") && (

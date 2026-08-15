@@ -177,6 +177,63 @@ describe("BenchmarkOutputsPanel", () => {
     expect(statuses).toContain("error");
   });
 
+  it("counts finished tests per running model in the header and drops the count once the model is done", () => {
+    const { rerender } = render(
+      <BenchmarkOutputsPanel
+        modelResults={twoModels}
+        expandedModels={new Set()}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    // model-b: 1 of its 2 rows has a verdict, the other is still running.
+    expect(screen.getByText("1 of 2 done")).toBeInTheDocument();
+
+    // A model that has not returned any row yet still shows its total.
+    rerender(
+      <BenchmarkOutputsPanel
+        modelResults={[
+          makeModel({ model: "model-c", success: null, total_tests: 4, test_results: null }),
+        ]}
+        expandedModels={new Set()}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("0 of 4 done")).toBeInTheDocument();
+
+    // Finished model: counts replace the progress line.
+    rerender(
+      <BenchmarkOutputsPanel
+        modelResults={[modelA]}
+        expandedModels={new Set()}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText(/of 3 done/)).not.toBeInTheDocument();
+    expect(screen.getByText("1 passed")).toBeInTheDocument();
+  });
+
+  it("falls back to the placeholder test names for the total while a model is running", () => {
+    render(
+      <BenchmarkOutputsPanel
+        modelResults={[
+          makeModel({ model: "model-d", success: null, total_tests: null, test_results: null }),
+        ]}
+        expandedModels={new Set()}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+        testNames={["One", "Two", "Three"]}
+      />,
+    );
+    expect(screen.getByText("0 of 3 done")).toBeInTheDocument();
+  });
+
   describe("benchmarkTestStatus / StatusIcon mapping via rendering", () => {
     it("maps error > running(passed null) > passed/failed correctly", () => {
       render(
