@@ -27,7 +27,7 @@ export function LandingHeader({
   const navLinks: NavLink[] = [
     { label: "Partners", href: "/#use-cases" },
     { label: "How it works", href: "/#how-it-works" },
-    { label: "Use with agents", href: "/#coding-agents", badge: "New" },
+    { label: "Use with AI tools", href: "/#coding-agents", badge: "New" },
     { label: "Open source", href: "/#open-source" },
     { label: "Integrations", href: "/#integrations" },
     // Scrolls to the footer, which holds the documentation, changelog, privacy
@@ -101,7 +101,7 @@ export function LandingHeader({
     "block py-2 text-gray-700 text-base font-medium hover:text-gray-900 transition-colors cursor-pointer";
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between gap-3 px-4 md:px-8 py-4 border-b border-gray-100 bg-white">
+    <nav className="sticky top-0 z-50 flex items-center justify-between gap-3 px-4 md:px-8 lg:px-5 xl:px-8 py-4 border-b border-gray-100 bg-white">
       {showLogoLink ? (
         <Link href="/" className="flex items-center gap-2">
           {LogoContent}
@@ -111,7 +111,7 @@ export function LandingHeader({
       )}
 
       <div className="flex items-center gap-3 md:gap-4">
-        <div className="hidden lg:flex items-center gap-4 xl:gap-8 xl:mr-2">
+        <div className="hidden lg:flex items-center gap-3 xl:gap-8 xl:mr-2">
           {navLinks.map((link) => renderNavLink(link, desktopLinkClass))}
         </div>
         <a

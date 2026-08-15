@@ -32,13 +32,17 @@ const EXAMPLES: {
 }[] = [
   {
     key: "build",
-    title: "Build your first set of tests by talking to it",
+    title: "Get your first set of tests written for you",
     description:
       "Your agent asks what you are building and where it goes wrong today, then turns your answers into test cases and runs them.",
     prompt: "/onboard",
     steps: [
-      { text: "Asked who your agent talks to and what a good answer looks like" },
-      { text: "Connected your agent and checked that it answers" },
+      {
+        text: "Asked who your agent talks to and what a good answer looks like",
+      },
+      {
+        text: "Connected your agent and checked its reply comes back the way Calibrate expects",
+      },
       { text: "Wrote 24 test cases from the mistakes you described" },
       { text: "Picked an LLM judge for the cases that need one" },
       { text: "Ran them: 18 passed, 6 failed", result: true },
@@ -60,18 +64,18 @@ const EXAMPLES: {
   },
   {
     key: "judge",
-    title: "Tune the LLM judge until it agrees with your reviewers",
+    title: "Make the LLM judge agree with your experts",
     description:
       "Your agent compares the judge's scores with the human labels, rewrites the judge instructions, and repeats until they agree often enough.",
-    prompt: "My LLM judge does not agree with my reviewers often enough. Fix it.",
+    prompt: "My LLM judge does not agree with my experts often enough. Fix it.",
     steps: [
-      { text: "Read the 120 samples your reviewers labelled" },
+      { text: "Read the 120 samples your experts labelled" },
       { text: "Ran the LLM judge on the same samples" },
-      { text: "Agreement with your reviewers: 71%", result: true },
+      { text: "Agreement with your experts: 71%", result: true },
       { text: "Rewrote the judge instructions and ran them again" },
-      { text: "Agreement with your reviewers: 88%", result: true },
+      { text: "Agreement with your experts: 88%", result: true },
       { text: "Rewrote the judge instructions and ran them again" },
-      { text: "Agreement with your reviewers: 94%", result: true },
+      { text: "Agreement with your experts: 94%", result: true },
       { text: "Made this the live judge and kept the earlier versions" },
     ],
   },
@@ -85,7 +89,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Start testing an agent you already have",
     description:
-      "Add your agent to Calibrate, then send it a test message and check that it replies.",
+      "Add your agent to Calibrate, send it a test message, and check the reply comes back the way Calibrate expects.",
   },
   {
     title: "Turn a dataset you already have into tests",
@@ -95,7 +99,7 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Find the best model for your agent",
     description:
-      "Try every test on several models, and see which one is good enough at a price you can afford.",
+      "Try the same tests on several models and get a leaderboard across quality, cost and speed.",
   },
   {
     title: "Catch a mistake before it reaches people",
@@ -105,12 +109,12 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
     title: "Get the answers reviewed by your experts",
     description:
-      "Create a labelling task, choose which judges it uses, add the samples people review, and update them as the labels come back.",
+      "Create a labelling task, pick the LLM judges to align, add the samples experts will review, and update them as human labels come in.",
   },
   {
     title: "Decide what counts as a good answer",
     description:
-      "Write a judge that captures what your experts expect, add a new version of its instructions, and choose which one is live.",
+      "Write an LLM judge for the criteria your experts care about, add a new version of its instructions, and choose which one is live.",
   },
 ];
 
@@ -196,12 +200,12 @@ export function CodingAgentsSection() {
           </span>
         </div>
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
-          Ask your coding agent to do the work
+          Use Calibrate with your favourite AI tool
         </h2>
         <p className="text-base md:text-xl text-gray-500 max-w-3xl mx-auto">
-          Calibrate works inside Claude Code, Cursor, Codex and Windsurf. Ask
-          for what you want in ordinary words and your agent builds the tests,
-          tries them, reads what went wrong, and tells you what to change.
+          Our Calibrate Skill helps your AI tool create the evals for testing
+          your agent, upload it on Calibrate, run them, analyse what went wrong,
+          and suggest how to improve it.
         </p>
       </div>
 

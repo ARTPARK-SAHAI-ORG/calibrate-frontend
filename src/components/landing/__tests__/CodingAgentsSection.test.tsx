@@ -16,7 +16,7 @@ describe("CodingAgentsSection", () => {
     render(<CodingAgentsSection />);
     expect(
       screen.getByRole("heading", {
-        name: "Ask your coding agent to do the work",
+        name: "Use Calibrate with your favourite AI tool",
       }),
     ).toBeInTheDocument();
 
@@ -34,11 +34,11 @@ describe("CodingAgentsSection", () => {
 
     expect(
       screen.getByText(
-        "My LLM judge does not agree with my reviewers often enough. Fix it.",
+        "My LLM judge does not agree with my experts often enough. Fix it.",
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Agreement with your reviewers: 94%"),
+      screen.getByText("Agreement with your experts: 94%"),
     ).toBeInTheDocument();
   });
 
