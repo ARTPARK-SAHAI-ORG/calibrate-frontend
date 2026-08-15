@@ -11,17 +11,23 @@ import { useAccessToken } from "@/hooks";
  * detail page so both offer the same dialog. `onDuplicated` receives the new
  * agent's id and name; the caller decides whether to add a row, navigate, or
  * both.
+ *
+ * The backend copies the agent it has stored, so a caller that holds edits the
+ * person has not saved yet passes `onBeforeDuplicate` to save them first. It
+ * returns false when that save fails, and nothing is copied.
  */
 export function DuplicateAgentDialog({
   agentUuid,
   agentName: originalName,
   onClose,
   onDuplicated,
+  onBeforeDuplicate,
 }: {
   agentUuid: string;
   agentName: string;
   onClose: () => void;
   onDuplicated: (newAgentUuid: string, name: string) => void;
+  onBeforeDuplicate?: () => Promise<boolean>;
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
@@ -42,6 +48,14 @@ export function DuplicateAgentDialog({
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      if (onBeforeDuplicate && !(await onBeforeDuplicate())) {
+        setError(
+          "Your latest changes could not be saved, so the copy was not created. Try again.",
+        );
+        setIsDuplicating(false);
+        return;
       }
 
       const response = await fetch(

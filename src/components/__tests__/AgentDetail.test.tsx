@@ -963,7 +963,30 @@ describe("AgentDetail", () => {
     expect(screen.queryByTitle("Back to agents")).not.toBeInTheDocument();
   });
 
-  it("duplicates the agent from its own page and opens the copy", async () => {
+  // The header and the dialog both have a button reading "Duplicate"; the
+  // dialog's is the last one added to the page.
+  function clickHeaderDuplicate(user: ReturnType<typeof setupUser>) {
+    return user.click(screen.getAllByRole("button", { name: "Duplicate" })[0]);
+  }
+  function clickConfirmDuplicate(user: ReturnType<typeof setupUser>) {
+    const buttons = screen.getAllByRole("button", { name: "Duplicate" });
+    return user.click(buttons[buttons.length - 1]);
+  }
+
+  // Duplicating saves what is on screen first, so both calls need answering.
+  function mockSaveThenDuplicate(duplicateResponse: Response) {
+    (global.fetch as jest.Mock).mockImplementation((url: string, init: any) => {
+      if (String(url).endsWith("/duplicate")) {
+        return Promise.resolve(duplicateResponse);
+      }
+      if (init?.method === "PUT") {
+        return Promise.resolve(jsonResponse(buildAgent));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+  }
+
+  it("saves the on-screen changes, duplicates the agent, and opens the copy", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
@@ -971,23 +994,58 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByRole("button", { name: "Duplicate agent" }));
+    await clickHeaderDuplicate(user);
     expect(screen.getByDisplayValue("Copy of Build Agent")).toBeInTheDocument();
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      jsonResponse({ uuid: "dup-uuid" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+    mockSaveThenDuplicate(jsonResponse({ uuid: "dup-uuid" }));
+    await clickConfirmDuplicate(user);
 
     await waitFor(() =>
       expect(pushMock).toHaveBeenCalledWith("/agents/dup-uuid"),
     );
-    const duplicateCall = (global.fetch as jest.Mock).mock.calls.find(
-      (c: any[]) => String(c[0]).endsWith("/duplicate"),
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    // The save goes out before the copy is asked for.
+    const saveIndex = calls.findIndex((c: any[]) => c[1]?.method === "PUT");
+    const duplicateIndex = calls.findIndex((c: any[]) =>
+      String(c[0]).endsWith("/duplicate"),
     );
-    expect(JSON.parse(duplicateCall[1].body)).toEqual({
+    expect(saveIndex).toBeGreaterThanOrEqual(0);
+    expect(saveIndex).toBeLessThan(duplicateIndex);
+    expect(JSON.parse(calls[duplicateIndex][1].body)).toEqual({
       name: "Copy of Build Agent",
     });
+  });
+
+  it("does not duplicate when saving the on-screen changes fails", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await clickHeaderDuplicate(user);
+    (global.fetch as jest.Mock).mockImplementation((url: string, init: any) => {
+      if (init?.method === "PUT") {
+        return Promise.resolve(jsonResponse(null, { ok: false, status: 500 }));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+    await clickConfirmDuplicate(user);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Your latest changes could not be saved, so the copy was not created. Try again.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some((c: any[]) =>
+        String(c[0]).endsWith("/duplicate"),
+      ),
+    ).toBe(false);
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it("keeps the duplicate dialog open when the name is already taken", async () => {
@@ -998,19 +1056,19 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByRole("button", { name: "Duplicate agent" }));
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
+    await clickHeaderDuplicate(user);
+    mockSaveThenDuplicate(
       jsonResponse({ detail: "Agent name already exists" }, {
         ok: false,
         status: 409,
       }),
     );
-    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+    await clickConfirmDuplicate(user);
 
     await waitFor(() =>
       expect(screen.getByText("Agent name already exists")).toBeInTheDocument(),
     );
-    expect(pushMock).not.toHaveBeenCalledWith("/agents/dup-uuid");
+    expect(pushMock).not.toHaveBeenCalled();
 
     // Editing the name clears the conflict message.
     await user.type(screen.getByDisplayValue("Copy of Build Agent"), "2");
