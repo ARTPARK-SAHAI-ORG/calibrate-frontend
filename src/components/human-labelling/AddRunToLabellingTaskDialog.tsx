@@ -646,30 +646,6 @@ export function AddRunToLabellingTaskDialog({
         }
         taskUuid = selectedTask.uuid;
         taskName = selectedTask.name;
-        const existing = new Set(
-          (selectedTask.evaluators ?? []).map((e) => e.uuid),
-        );
-        const toAttach = Array.from(evaluatorUuids).filter(
-          (uuid) => !existing.has(uuid),
-        );
-        for (const evaluator_id of toAttach) {
-          try {
-            await apiClient(
-              `/annotation-tasks/${taskUuid}/evaluators`,
-              accessToken,
-              { method: "POST", body: { evaluator_id } },
-            );
-          } catch (err) {
-            reportError(
-              "AddRunToLabellingTaskDialog: failed to attach evaluator to task",
-              err,
-            );
-            if (!mountedRef.current) return;
-            setSubmitError(parseApiError(err, "Failed to attach evaluator"));
-            setSubmitting(false);
-            return;
-          }
-        }
       }
 
       // `payload.name` is unique within a task, so re-adding the same run's
