@@ -91,7 +91,7 @@ export default function AgentDetailPage() {
       <div className="flex items-center gap-2 mr-1 md:mr-2">
         <button
           onClick={() => headerState.onDuplicate()}
-          className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer flex items-center gap-2"
+          className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2"
         >
           <CopyIcon className="w-4 h-4" />
           Duplicate
