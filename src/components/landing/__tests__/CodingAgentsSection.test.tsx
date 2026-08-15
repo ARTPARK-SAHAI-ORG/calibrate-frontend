@@ -45,13 +45,15 @@ describe("CodingAgentsSection", () => {
   it("lists what else the agent can be asked for", () => {
     render(<CodingAgentsSection />);
     expect(
-      screen.getByRole("heading", { name: "Run the human review side" }),
+      screen.getByRole("heading", {
+        name: "Get the answers reviewed by your experts",
+      }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Compare models on the same tests" }),
+      screen.getByRole("heading", { name: "Find the best model for your agent" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Manage the LLM judges" }),
+      screen.getByRole("heading", { name: "Decide what counts as a good answer" }),
     ).toBeInTheDocument();
   });
 

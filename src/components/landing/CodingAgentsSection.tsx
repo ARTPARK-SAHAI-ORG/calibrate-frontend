@@ -77,12 +77,13 @@ const EXAMPLES: {
   },
 ];
 
-/** Each of these maps to something the skills can really do through the public
- * API. Do not add one without an endpoint behind it: there is no way to create
+/** The title says what the reader gets, the description says how it happens.
+ * Each one maps to something the skills can really do through the public API,
+ * so do not add one without an endpoint behind it: there is no way to create
  * labelling jobs or hand out a link per reviewer, for instance. */
 const THINGS_TO_ASK: { title: string; description: string }[] = [
   {
-    title: "Connect an agent to Calibrate",
+    title: "Start testing an agent you already have",
     description:
       "Add your agent to Calibrate, then send it a test message and check that it replies.",
   },
@@ -92,24 +93,24 @@ const THINGS_TO_ASK: { title: string; description: string }[] = [
       "Point it at a spreadsheet, a data file, or a public dataset, and it loads the rows as test cases.",
   },
   {
-    title: "Compare models on the same tests",
+    title: "Find the best model for your agent",
     description:
       "Try every test on several models, and see which one is good enough at a price you can afford.",
   },
   {
-    title: "Check the tests every time the code changes",
+    title: "Catch a mistake before it reaches people",
     description:
-      "Your agent writes the setup into your code, so every change is tested on its own and a mistake is caught before it reaches the people you serve.",
+      "Your agent writes the setup into your code, so the tests are checked on their own every time the code changes.",
   },
   {
-    title: "Run the human review side",
+    title: "Get the answers reviewed by your experts",
     description:
       "Create a labelling task, choose which judges it uses, add the samples people review, and update them as the labels come back.",
   },
   {
-    title: "Manage the LLM judges",
+    title: "Decide what counts as a good answer",
     description:
-      "Write a judge that captures what your experts count as a good answer, add a new version of its instructions, and choose which one is live.",
+      "Write a judge that captures what your experts expect, add a new version of its instructions, and choose which one is live.",
   },
 ];
 
