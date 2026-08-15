@@ -1,5 +1,6 @@
 ## August 2026
 
+- Remember the landing how-to card in the URL ([#369](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/369))
 - Add a continuous improvement section to the landing page ([#367](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/367))
 - Make the changelog workflow able to push to main ([#366](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/366))
 - The changelog page lists what has changed in the app, and gets a new line every time something ships ([#365](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/365))
