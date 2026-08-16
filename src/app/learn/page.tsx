@@ -5,6 +5,13 @@ import { LandingFooter } from "@/components/LandingFooter";
 import { LearnTableOfContents } from "@/components/learn/LearnTableOfContents";
 import { WEBINARS_URL } from "@/constants/links";
 
+/** A link inside a summary. Declared above the lists because they use it as
+ * soon as this file loads. */
+const summaryLinkClass =
+  "font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer";
+/** Bullets inside a summary. */
+const summaryListClass = "mt-3 list-disc space-y-1.5 pl-5";
+
 /**
  * One thing a reader can watch or read: either a session we ran, or a deck we
  * put together on its own. Both are written out in this file rather than
@@ -55,7 +62,7 @@ const TALKS: LearnItem[] = [
           href="https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer"
+          className={summaryLinkClass}
         >
           summary of the insights
         </a>
@@ -104,9 +111,33 @@ const TALKS: LearnItem[] = [
 const DECKS: LearnItem[] = [
   {
     id: "evaluating-gen-ai-social-sector",
-    title: "Evaluating AI products for the social sector",
-    summary:
-      "A detailed walkthrough of the 4-level framework for evaluating AI products in the social sector: does the AI system perform as intended (level 1), does the overall product engage and retain users? (level 2), and do outcomes improve. The first half goes deep on the first level: deciding what a good answer looks like before you build, writing a rubric, creating a set of correct answers, the smallest amount of evaluation worth doing before you launch, and stress testing an agent that works in a high risk setting. The second half covers where users drop off, picking one number per stage, and running experiments.",
+    title: "Evaluating AI products in the social sector",
+    summary: (
+      <>
+        A detailed walkthrough of the{" "}
+        <a
+          href="https://eval.playbook.org.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={summaryLinkClass}
+        >
+          4-level framework
+        </a>{" "}
+        for evaluating AI products in the social sector:
+        <ul className={summaryListClass}>
+          <li>Does the AI system perform as intended? (level 1)</li>
+          <li>Does the overall product engage and retain users? (level 2)</li>
+          <li>
+            Does the product change users&apos; thoughts, feelings, knowledge
+            and behaviour towards the development outcome? (level 3)
+          </li>
+          <li>
+            Do users with access to the product improve development outcomes?
+            (level 4)
+          </li>
+        </ul>
+      </>
+    ),
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
@@ -114,9 +145,9 @@ const DECKS: LearnItem[] = [
   },
   {
     id: "ai-evaluation-guide",
-    title: "AI evaluation guide and Calibrate features",
+    title: "How to evaluate AI products in non-profits using Calibrate",
     summary:
-      "Why AI fails users in low resource languages and local contexts, what counts as an agent, and how to judge an AI answer the way you would judge a person doing the same job. Then every part of Calibrate, walked through on a form filling voice agent for public health: checking replies and tool calls, comparing models on cost, speed and quality, building LLM judges that agree with your own experts, watching live traffic, speech to text, text to speech, and full conversation simulations. It closes with what Noora Health, ARMMAN and Kabakoo found.",
+      "The slides cover: How LLMs work, why AI fails in social-sector contexts, how evaluation helps deploy AI responsibly and how Calibrate helps teams build a robust pipeline for AI evaluation.",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
@@ -261,9 +292,11 @@ export default function LearnPage() {
                         <h2 className="mb-3 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
                           {talk.title}
                         </h2>
-                        <p className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
+                        {/* A div rather than a p: a summary can hold bullets,
+                            which are not allowed inside a paragraph. */}
+                        <div className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
                           {talk.summary}
-                        </p>
+                        </div>
 
                         <div
                           className={`grid grid-cols-1 gap-10 lg:gap-6 ${
