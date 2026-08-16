@@ -407,7 +407,7 @@ const FAILS_UNSEEN: Point[] = [
   {
     key: "not-your-context",
     art: problemArt.notYourContext,
-    title: "Lack of your specific context",
+    title: "The AI does not know your context",
     description:
       "AI follows the patterns in its training data, which may not hold for your use case. It also does not have access to your guidelines and may contradict them, producing unsafe responses.",
   },
@@ -431,9 +431,9 @@ const NOTHING_CATCHES_IT: Point[] = [
   {
     key: "by-hand",
     art: problemArt.byHand,
-    title: "Changes introduce unexpected errors",
+    title: "Manual verification does not scale",
     description:
-      "Someone verifies a few responses before deploying changes. That barely works for a pilot, but does not create a reliable product for real users.",
+      "Someone verifies a few responses before deploying changes. That barely works for a pilot, but does not create a reliable product for real users as new changes cause unexpected errors.",
   },
   {
     key: "lands-on-engineers",
@@ -493,7 +493,7 @@ const GOALS: Point[] = [
   {
     key: "time-on-the-ai",
     art: goalArt.timeOnTheAi,
-    title: "Focus on improvement, not infra",
+    title: "Focus on improvement",
     description:
       "Your team inspects the errors, talks to users and improves the AI quality instead of building the evaluation setup around it.",
   },
@@ -566,7 +566,7 @@ export function WhyCalibrateSection() {
       <PointGrid points={FAILS_UNSEEN} />
 
       <h3 className={`${groupHeadingClass} mt-14 md:mt-20`}>
-        Manual verification does not scale
+        Why teams fail to catch it
       </h3>
       <PointGrid points={NOTHING_CATCHES_IT} />
 
