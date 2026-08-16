@@ -11,6 +11,10 @@ const AGENTS: { id: string; label: string; flag: string }[] = [
   { id: "windsurf", label: "Windsurf", flag: "windsurf" },
 ];
 
+/** The recording of the same walkthrough that /learn shows under
+ * "Connecting your AI tool with Calibrate". */
+const WALKTHROUGH_EMBED_URL = "https://www.youtube.com/embed/Vx3oxYKbLVw";
+
 /** Teaches the coding agent how to use Calibrate. Documented at
  * {docs}/agents/overview. */
 export function installCommand(agentFlag: string): string {
@@ -197,6 +201,20 @@ export function CodingAgentsSection() {
           testing your agent, upload and run them on Calibrate, analyse what
           went wrong, and suggest fixes
         </p>
+      </div>
+
+      {/* The same walkthrough that sits on /learn under "Connecting your AI
+          tool with Calibrate". */}
+      <div className="mb-14 md:mb-20 w-full max-w-3xl mx-auto">
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          <iframe
+            className="absolute top-0 left-0 h-full w-full rounded-xl shadow-lg"
+            src={WALKTHROUGH_EMBED_URL}
+            title="Connecting your AI tool with Calibrate"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-14 md:gap-16 lg:gap-20">

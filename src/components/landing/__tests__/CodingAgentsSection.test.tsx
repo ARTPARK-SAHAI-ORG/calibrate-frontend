@@ -42,6 +42,19 @@ describe("CodingAgentsSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("plays the walkthrough recording", () => {
+    const { container } = render(<CodingAgentsSection />);
+    const frame = container.querySelector("iframe");
+    expect(frame).toHaveAttribute(
+      "src",
+      "https://www.youtube.com/embed/Vx3oxYKbLVw",
+    );
+    expect(frame).toHaveAttribute(
+      "title",
+      "Connecting your AI tool with Calibrate",
+    );
+  });
+
   it("lists what else the agent can be asked for", () => {
     render(<CodingAgentsSection />);
     expect(
