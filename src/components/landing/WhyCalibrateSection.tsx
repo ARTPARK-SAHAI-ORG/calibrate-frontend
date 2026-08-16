@@ -473,9 +473,9 @@ export function WhyCalibrateSection() {
           Why AI evaluation is broken today
         </h2>
         <p className="text-base md:text-xl text-gray-500 text-pretty max-w-2xl mx-auto">
-          AI lets you reach more people than your team ever could. A bad answer
-          reaches them just as fast, and today almost nobody can tell when that
-          happens.
+          As AI becomes more capable, the risks of misuse and harm increase too.
+          More teams are using AI, but often without the checks needed to deploy
+          it responsibly.
         </p>
       </div>
 

@@ -17,13 +17,12 @@ describe("WhyCalibrateSection", () => {
     }
   });
 
-  it("opens on the reach that makes a bad answer costly", () => {
+  it("opens on capability rising faster than the checks on it", () => {
     render(<WhyCalibrateSection />);
 
+    expect(screen.getByText(/As AI becomes more capable/)).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /AI lets you reach more people than your team ever could/,
-      ),
+      screen.getByText(/without the checks needed to deploy it responsibly/),
     ).toBeInTheDocument();
   });
 
