@@ -50,7 +50,7 @@ export function LearnTableOfContents({
         <p className="mb-4 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
           On this page
         </p>
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-3">
           {sections.map((section) => {
             const isActive = section.id === activeId;
             return (

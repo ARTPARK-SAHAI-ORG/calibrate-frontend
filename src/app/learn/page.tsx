@@ -104,9 +104,9 @@ const TALKS: LearnItem[] = [
 const DECKS: LearnItem[] = [
   {
     id: "evaluating-gen-ai-social-sector",
-    title: "Evaluating Gen AI products for the social sector",
+    title: "Evaluating AI products for the social sector",
     summary:
-      "Four levels to judge an AI product on: does the system give the right answer, does the product keep people coming back, do people act on what it says, and do outcomes improve. The first half goes deep on the first level: deciding what a good answer looks like before you build, writing a rubric, creating a set of correct answers, the smallest amount of evaluation worth doing before you launch, and stress testing an agent that works in a high risk setting. The second half covers where users drop off, picking one number per stage, and running experiments.",
+      "A detailed walkthrough of the 4-level framework for evaluating AI products in the social sector: does the AI system perform as intended (level 1), does the overall product engage and retain users? (level 2), and do outcomes improve. The first half goes deep on the first level: deciding what a good answer looks like before you build, writing a rubric, creating a set of correct answers, the smallest amount of evaluation worth doing before you launch, and stress testing an agent that works in a high risk setting. The second half covers where users drop off, picking one number per stage, and running experiments.",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
