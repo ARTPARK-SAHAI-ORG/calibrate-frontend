@@ -15,6 +15,22 @@ import { Link } from "@/lib/nav";
 const ART_BOX = "0 0 120 58";
 const ART_CLASS = "h-[4.5rem] w-auto";
 
+/** The frame every picture shares. `alt` is what a screen reader hears in
+ * place of the drawing, so it has to carry the words drawn inside it: those
+ * labels are the only place some of them appear. */
+function ArtFrame(props: { alt: string; children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox={ART_BOX}
+      className={ART_CLASS}
+      role="img"
+      aria-label={props.alt}
+    >
+      {props.children}
+    </svg>
+  );
+}
+
 /** A word or two on the baseline, naming what the drawing above it shows. */
 function ArtLabel(props: { x: number; children: string }) {
   return (
@@ -70,9 +86,9 @@ function ArtBar(props: {
 
 /** Everything one release produces, as a block of squares. `checked` is how
  * many of them anyone actually looks at. */
-function ArtCheckGrid(props: { checked: number; label: string }) {
+function ArtCheckGrid(props: { checked: number; label: string; alt: string }) {
   return (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt={props.alt}>
       {Array.from({ length: 36 }, (_, i) => (
         <rect
           key={i}
@@ -85,7 +101,7 @@ function ArtCheckGrid(props: { checked: number; label: string }) {
         />
       ))}
       <ArtLabel x={60}>{props.label}</ArtLabel>
-    </svg>
+    </ArtFrame>
   );
 }
 
@@ -151,7 +167,7 @@ function ArtGrowingBars(props: { redLast?: boolean }) {
 
 const problemArt = {
   differentResults: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="The same input, answered well the first time and badly the second.">
       <ArtResultPill
         y={2}
         className="fill-emerald-500"
@@ -165,16 +181,16 @@ const problemArt = {
         label="second time"
       />
       <ArtLabel x={60}>the same input</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   weakestLanguage: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="A tall bar for English beside a much shorter one for Kannada.">
       <ArtBar x={16} height={34} className="fill-gray-300" label="English" />
       <ArtBar x={72} height={11} className="fill-red-400" label="Kannada" />
-    </svg>
+    </ArtFrame>
   ),
   notYourContext: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="The internet on one side, your work on the other, and nothing carrying across.">
       <rect
         x="6"
         y="6"
@@ -202,10 +218,10 @@ const problemArt = {
       />
       <ArtLabel x={26}>internet</ArtLabel>
       <ArtLabel x={94}>your work</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   instructionsIgnored: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="Three instructions, the first two followed and the last one ignored.">
       {[2, 14, 26].map((y, i) => (
         <g key={y}>
           <rect
@@ -237,10 +253,10 @@ const problemArt = {
         </g>
       ))}
       <ArtLabel x={60}>one instruction ignored</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   harmfulMistake: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="A warning sign, for harm you cannot undo.">
       <path d="M60 3 L90 35 L30 35 Z" className="fill-red-400" />
       <path
         d="M60 15 V25"
@@ -251,11 +267,17 @@ const problemArt = {
       />
       <circle cx="60" cy="30" r="2" fill="white" />
       <ArtLabel x={60}>harm you cannot undo</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
-  byHand: <ArtCheckGrid checked={3} label="a few checked, the rest not" />,
+  byHand: (
+    <ArtCheckGrid
+      checked={3}
+      label="a few checked, the rest not"
+      alt="A block of outputs with only a few of them checked."
+    />
+  ),
   landsOnEngineers: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="An expert and an engineer with a wall between them.">
       <ArtPerson x={24} className="fill-emerald-500" />
       <rect
         x="56"
@@ -268,13 +290,13 @@ const problemArt = {
       <ArtPerson x={96} className="fill-gray-300" />
       <ArtLabel x={24}>expert</ArtLabel>
       <ArtLabel x={96}>engineer</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   perSeat: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="Bars rising higher with every person added, because the cost rises with them.">
       <ArtGrowingBars redLast />
       <ArtLabel x={60}>cost per person added</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
 };
 
@@ -285,7 +307,7 @@ const goalArt = {
   /** One list of failures with a newly added row at the bottom, so the picture
    * says "kept in one place and still growing" rather than "a process". */
   oneRecord: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="A list of failures with a new row just added at the bottom.">
       {[2, 9, 16, 23, 30].map((y, i) => (
         <rect
           key={y}
@@ -298,11 +320,17 @@ const goalArt = {
         />
       ))}
       <ArtLabel x={60}>one list, always growing</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
-  nothingBreaks: <ArtCheckGrid checked={36} label="all of them checked" />,
+  nothingBreaks: (
+    <ArtCheckGrid
+      checked={36}
+      label="all of them checked"
+      alt="A block of outputs with every one of them checked."
+    />
+  ),
   expertsLead: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="An expert and an engineer side by side, with no wall between them.">
       <rect
         x="38"
         y="24"
@@ -315,10 +343,10 @@ const goalArt = {
       <ArtPerson x={96} className="fill-gray-300" />
       <ArtLabel x={24}>expert</ArtLabel>
       <ArtLabel x={96}>engineer</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   holdsAsYouGrow: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="Bars rising as the work grows, under a flat line, because your effort does not.">
       <ArtGrowingBars />
       <line
         x1="8"
@@ -330,10 +358,10 @@ const goalArt = {
         strokeLinecap="round"
       />
       <ArtLabel x={60}>your effort stays flat</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   caughtEarly: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="A row of outputs with the failing one ringed and found.">
       {[12, 36, 60, 84, 108].map((cx, i) => (
         <circle
           key={cx}
@@ -352,10 +380,10 @@ const goalArt = {
         strokeWidth="3.5"
       />
       <ArtLabel x={60}>found before users do</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
   timeOnTheAi: (
-    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+    <ArtFrame alt="A large block for improving your AI beside a small one for the setup.">
       <rect
         x="2"
         y="6"
@@ -374,7 +402,7 @@ const goalArt = {
       />
       <ArtLabel x={44}>improving your AI</ArtLabel>
       <ArtLabel x={105}>setup</ArtLabel>
-    </svg>
+    </ArtFrame>
   ),
 };
 

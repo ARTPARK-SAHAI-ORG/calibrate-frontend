@@ -52,6 +52,20 @@ describe("WhyCalibrateSection", () => {
     }
   });
 
+  // Some of those drawn words are the only place they appear: no card names a
+  // language outside the English against Kannada picture. Hiding the pictures
+  // from a screen reader therefore drops content, so each one carries its own
+  // description instead of aria-hidden.
+  it("reads every picture out rather than hiding it", () => {
+    const { container } = render(<WhyCalibrateSection />);
+
+    for (const svg of container.querySelectorAll("svg")) {
+      expect(svg).not.toHaveAttribute("aria-hidden");
+      expect(svg).toHaveAttribute("role", "img");
+      expect(svg.getAttribute("aria-label")?.length).toBeGreaterThan(20);
+    }
+  });
+
   it("leaves self-hosting and pricing to the open source section", () => {
     render(<WhyCalibrateSection />);
 
