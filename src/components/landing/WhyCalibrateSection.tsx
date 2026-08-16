@@ -173,16 +173,49 @@ const problemArt = {
       <ArtBar x={72} height={11} className="fill-red-400" label="Kannada" />
     </svg>
   ),
-  reachesAPerson: (
+  notYourContext: (
     <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
-      {[18, 46, 74, 102].map((x, i) => (
-        <ArtPerson
-          key={x}
-          x={x}
-          className={i === 1 ? "fill-red-400" : "fill-gray-200"}
-        />
-      ))}
-      <ArtLabel x={60}>it reaches a real person</ArtLabel>
+      <rect
+        x="6"
+        y="6"
+        width="40"
+        height="28"
+        rx="6"
+        className="fill-gray-300"
+      />
+      <path
+        d="M53 13 L67 27 M67 13 L53 27"
+        className="stroke-red-400"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <rect
+        x="74"
+        y="6"
+        width="40"
+        height="28"
+        rx="6"
+        fill="none"
+        className="stroke-emerald-500"
+        strokeWidth="3.5"
+      />
+      <ArtLabel x={26}>internet</ArtLabel>
+      <ArtLabel x={94}>your work</ArtLabel>
+    </svg>
+  ),
+  harmfulMistake: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <path d="M60 3 L90 35 L30 35 Z" className="fill-red-400" />
+      <path
+        d="M60 15 V25"
+        className="stroke-white"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="60" cy="30" r="2" fill="white" />
+      <ArtLabel x={60}>harm you cannot undo</ArtLabel>
     </svg>
   ),
   byHand: <ArtCheckGrid checked={3} label="a few checked, the rest not" />,
@@ -343,14 +376,21 @@ const FAILS_UNSEEN: Point[] = [
     art: problemArt.weakestLanguage,
     title: "Weakest in the language your users speak",
     description:
-      "These models are trained on data from the internet which is dominated by a few languages, and they know nothing about your programme or your guidelines.",
+      "These models are trained on data from the internet, dominated by a few languages. Quality degrades in languages less represented online, which is often where the social sector operates.",
   },
   {
-    key: "reaches-a-person",
-    art: problemArt.reachesAPerson,
-    title: "A mistake reaches a person, not an order",
+    key: "not-your-context",
+    art: problemArt.notYourContext,
+    title: "The AI answers from the internet, not from your work",
     description:
-      "A shopping assistant that gets it wrong loses a sale. A health line that gets it wrong reaches someone with nobody else to ask.",
+      "It has never seen your guidelines or the conditions your team works in, so what it picked up elsewhere may not hold for your users.",
+  },
+  {
+    key: "harmful-mistake",
+    art: problemArt.harmfulMistake,
+    title: "Mistakes impact real lives",
+    description:
+      "In health, child protection and maternal care, a confident wrong answer can do lasting damage, and the person acting on it has no way to tell.",
   },
 ];
 
@@ -365,7 +405,7 @@ const NOTHING_CATCHES_IT: Point[] = [
   {
     key: "lands-on-engineers",
     art: problemArt.landsOnEngineers,
-    title: "It lands on engineers who do not know your domain",
+    title: "Evaluation lands on engineers who do not know your domain",
     description:
       "Engineers cannot say whether an answer is right for your programme, and the people who can are left out of the work.",
   },
@@ -400,7 +440,7 @@ const GOALS: Point[] = [
     art: goalArt.expertsLead,
     title: "Your domain experts lead",
     description:
-      "The people who know the work decide what good looks like, and check it themselves.",
+      "The people who know the work decide what good looks like, and do the checking themselves.",
   },
   {
     key: "holds",
@@ -430,7 +470,7 @@ function PointCard(props: {
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 text-left shadow-sm">
+    <div className="h-full rounded-2xl border border-gray-200 bg-white p-5 md:p-6 text-left shadow-sm">
       <div className="mb-4 flex h-[4.5rem] items-center">{props.art}</div>
       <h4 className="text-lg font-semibold text-gray-900 mb-2 text-balance">
         {props.title}
@@ -442,16 +482,24 @@ function PointCard(props: {
   );
 }
 
+/** Three across on a wide screen, two at md, one on a phone. Flex rather than
+ * a grid so a group with a count that does not divide by three (four points,
+ * say) centres its last row instead of leaving a card stranded on the left. The
+ * widths subtract the gap so the rows line up with the other groups. */
 function PointGrid(props: { points: Point[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+    <div className="flex flex-wrap justify-center gap-4 md:gap-6">
       {props.points.map((point) => (
-        <PointCard
+        <div
           key={point.key}
-          art={point.art}
-          title={point.title}
-          description={point.description}
-        />
+          className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]"
+        >
+          <PointCard
+            art={point.art}
+            title={point.title}
+            description={point.description}
+          />
+        </div>
       ))}
     </div>
   );
@@ -479,7 +527,7 @@ export function WhyCalibrateSection() {
         </p>
       </div>
 
-      <h3 className={groupHeadingClass}>Why this matters</h3>
+      <h3 className={groupHeadingClass}>Why AI fails and why it matters</h3>
       <PointGrid points={FAILS_UNSEEN} />
 
       <h3 className={`${groupHeadingClass} mt-14 md:mt-20`}>
