@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 
 /**
- * The list of sessions down the left of the Learn page. The session being read
- * is marked as the reader scrolls.
+ * The list down the left of the Learn page, covering every session and every
+ * deck on it. The one being read is marked as the reader scrolls.
  *
- * Hidden below the large breakpoint: the sessions stack full width there and
- * there is no room beside them.
+ * Hidden below the large breakpoint: the sessions and decks stack full width
+ * there and there is no room beside them.
  */
 
-/** How far below the top of the screen a session counts as the one being read. */
+/** How far below the top of the screen an entry counts as the one being read. */
 const READING_LINE_PX = 160;
 
 export function LearnTableOfContents({
@@ -45,7 +45,7 @@ export function LearnTableOfContents({
   if (sections.length === 0) return null;
 
   return (
-    <nav aria-label="Sessions on this page" className="hidden lg:block">
+    <nav aria-label="On this page" className="hidden lg:block">
       <div className="sticky top-24">
         <p className="mb-4 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
           On this page

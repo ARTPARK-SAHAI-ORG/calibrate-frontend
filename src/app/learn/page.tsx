@@ -6,32 +6,39 @@ import { LearnTableOfContents } from "@/components/learn/LearnTableOfContents";
 import { WEBINARS_URL } from "@/constants/links";
 
 /**
- * Every session we have run on evaluating AI, with its recording and its
- * slides playing on the page. The list is written out here rather than
- * fetched: it changes when we run a new session, which is also when someone
- * edits this file.
- *
- * Oldest first, so a reader who watches straight down gets the general talk
- * before the tool walk through and the questions session.
+ * One thing a reader can watch or read: either a session we ran, or a deck we
+ * put together on its own. Both are written out in this file rather than
+ * fetched, because the list changes when we run a session or finish a deck,
+ * which is also when someone edits this file.
  */
-const TALKS: {
+type LearnItem = {
   /** Name in the address bar and in the list down the left. Set once and left
    * alone, so a shared link survives a change of title. */
   id: string;
   title: string;
-  /** One or two lines on what the session covered, shown under its title. */
+  /** One or two lines on what it covered, shown under its title. */
   summary: ReactNode;
   /**
    * Address the recording plays at inside the page: YouTube's `/embed/…` or
    * Google Drive's `/preview`. The plain address a reader would copy does not
-   * play inside another page, which is why both are listed.
+   * play inside another page, which is why both are listed. Left out for a
+   * deck with no recording, and then the slides run the full width.
    */
-  recordingEmbedUrl: string;
-  recordingUrl: string;
+  recordingEmbedUrl?: string;
+  recordingUrl?: string;
   /** Published Google Slides address, `/embed` rather than `/pub`. */
   slidesEmbedUrl: string;
   slidesUrl: string;
-}[] = [
+};
+
+/**
+ * Every session we have run on evaluating AI, with its recording and its
+ * slides playing on the page.
+ *
+ * Oldest first, so a reader who watches straight down gets the general talk
+ * before the tool walk through and the questions session.
+ */
+const TALKS: LearnItem[] = [
   {
     id: "workshop-for-leaders",
     title: "AI evals 101",
@@ -92,11 +99,55 @@ const TALKS: {
   },
 ];
 
+/** Decks we have written that do not come from a session, so there is no
+ * recording to play beside them. */
+const DECKS: LearnItem[] = [
+  {
+    id: "evaluating-gen-ai-social-sector",
+    title: "Evaluating Gen AI products for the social sector",
+    summary:
+      "Four levels to judge an AI product on: does the system give the right answer, does the product keep people coming back, do people act on what it says, and do outcomes improve. The first half goes deep on the first level: deciding what a good answer looks like before you build, writing a rubric, creating a set of correct answers, the smallest amount of evaluation worth doing before you launch, and stress testing an agent that works in a high risk setting. The second half covers where users drop off, picking one number per stage, and running experiments.",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "ai-evaluation-guide",
+    title: "AI evaluation guide and Calibrate features",
+    summary:
+      "Why AI fails users in low resource languages and local contexts, what counts as an agent, and how to judge an AI answer the way you would judge a person doing the same job. Then every part of Calibrate, walked through on a form filling voice agent for public health: checking replies and tool calls, comparing models on cost, speed and quality, building LLM judges that agree with your own experts, watching live traffic, speech to text, text to speech, and full conversation simulations. It closes with what Noora Health, ARMMAN and Kabakoo found.",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "intro-to-calibrate",
+    title: "Introduction to Calibrate",
+    summary:
+      "The short version of the guide above. Why checking answers by hand works on day one and stops working the moment you have real users, what a team wants in its place, and a walk through of Calibrate using a form filling voice agent for public health as the example.",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
+  },
+];
+
+/** The two blocks the page is split into, each under its own label. */
+const GROUPS = [
+  { label: "Sessions", items: TALKS },
+  { label: "Slide decks", items: DECKS },
+];
+
 const topLinkClass =
   "inline-flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 text-sm md:text-base font-medium border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer";
 /** The emerald eyebrow pill the landing page uses above a block of content. */
 const partLabelClass =
   "mb-3 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]";
+/** The label above each block of the page, in the same emerald pill. */
+const groupLabelClass =
+  "mb-8 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-2 py-1 text-xs md:text-sm font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]";
 /** Same treatment the landing page gives its screenshots. */
 const frameClass = "w-full aspect-video rounded-xl overflow-hidden shadow-xl";
 const openLinkClass =
@@ -189,67 +240,85 @@ export default function LearnPage() {
 
           <div className="mt-14 md:mt-20 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-12">
             <LearnTableOfContents
-              sections={TALKS.map(({ id, title }) => ({ id, title }))}
+              sections={GROUPS.flatMap(({ items }) =>
+                items.map(({ id, title }) => ({ id, title })),
+              )}
             />
 
             <div className="flex min-w-0 flex-col gap-16 md:gap-24">
-              {TALKS.map((talk) => (
-                <section
-                  key={talk.id}
-                  id={talk.id}
-                  aria-label={talk.title}
-                  className="scroll-mt-24"
-                >
-                  <h2 className="mb-3 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
-                    {talk.title}
-                  </h2>
-                  <p className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
-                    {talk.summary}
-                  </p>
+              {GROUPS.map((group) => (
+                <div key={group.label} className="min-w-0">
+                  <p className={groupLabelClass}>{group.label}</p>
 
-                  <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-6">
-                    <div className="min-w-0">
-                      <p className={partLabelClass}>Recording</p>
-                      <iframe
-                        src={talk.recordingEmbedUrl}
-                        title={`Recording of ${talk.title}`}
-                        className={frameClass}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                      <a
-                        href={talk.recordingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open the recording of ${talk.title} in a new tab`}
-                        className={openLinkClass}
+                  <div className="flex flex-col gap-16 md:gap-24">
+                    {group.items.map((talk) => (
+                      <section
+                        key={talk.id}
+                        id={talk.id}
+                        aria-label={talk.title}
+                        className="scroll-mt-24"
                       >
-                        Open the recording in a new tab
-                        <OpensInNewTabIcon />
-                      </a>
-                    </div>
+                        <h2 className="mb-3 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
+                          {talk.title}
+                        </h2>
+                        <p className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
+                          {talk.summary}
+                        </p>
 
-                    <div className="min-w-0">
-                      <p className={partLabelClass}>Slides</p>
-                      <iframe
-                        src={talk.slidesEmbedUrl}
-                        title={`Slides from ${talk.title}`}
-                        className={frameClass}
-                        allowFullScreen
-                      />
-                      <a
-                        href={talk.slidesUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open the slides from ${talk.title} in a new tab`}
-                        className={openLinkClass}
-                      >
-                        Open the slides in a new tab
-                        <OpensInNewTabIcon />
-                      </a>
-                    </div>
+                        <div
+                          className={`grid grid-cols-1 gap-10 lg:gap-6 ${
+                            talk.recordingEmbedUrl
+                              ? "lg:grid-cols-2"
+                              : "lg:max-w-3xl"
+                          }`}
+                        >
+                          {talk.recordingEmbedUrl && talk.recordingUrl && (
+                            <div className="min-w-0">
+                              <p className={partLabelClass}>Recording</p>
+                              <iframe
+                                src={talk.recordingEmbedUrl}
+                                title={`Recording of ${talk.title}`}
+                                className={frameClass}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                              <a
+                                href={talk.recordingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open the recording of ${talk.title} in a new tab`}
+                                className={openLinkClass}
+                              >
+                                Open the recording in a new tab
+                                <OpensInNewTabIcon />
+                              </a>
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <p className={partLabelClass}>Slides</p>
+                            <iframe
+                              src={talk.slidesEmbedUrl}
+                              title={`Slides from ${talk.title}`}
+                              className={frameClass}
+                              allowFullScreen
+                            />
+                            <a
+                              href={talk.slidesUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Open the slides from ${talk.title} in a new tab`}
+                              className={openLinkClass}
+                            >
+                              Open the slides in a new tab
+                              <OpensInNewTabIcon />
+                            </a>
+                          </div>
+                        </div>
+                      </section>
+                    ))}
                   </div>
-                </section>
+                </div>
               ))}
             </div>
           </div>
