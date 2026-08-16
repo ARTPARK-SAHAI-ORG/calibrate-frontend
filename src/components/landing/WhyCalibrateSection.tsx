@@ -612,13 +612,13 @@ export function WhyCalibrateSection() {
           href="/learn#workshop-for-leaders"
           className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
-          Watch AI Evals 101
+          New to AI evals? Start here
         </Link>
         <Link
           href="/learn#getting-started"
           className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
         >
-          Watch Calibrate 101
+          See how Calibrate works
         </Link>
       </div>
     </div>
