@@ -12,17 +12,21 @@ describe("LandingHeader", () => {
     process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
   });
 
+  // The logo's name comes from its image alt plus the wordmark, so anchoring on
+  // "Calibrate Logo" keeps these from also matching the "Why Calibrate?" link.
+  const logoName = /^Calibrate Logo/;
+
   it("renders the logo without a link by default", () => {
     render(<LandingHeader />);
     expect(screen.getByText("Calibrate")).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /Calibrate/ }),
+      screen.queryByRole("link", { name: logoName }),
     ).not.toBeInTheDocument();
   });
 
   it("renders the logo as a link to / when showLogoLink is true", () => {
     render(<LandingHeader showLogoLink />);
-    const link = screen.getByRole("link", { name: /Calibrate/ });
+    const link = screen.getByRole("link", { name: logoName });
     expect(link).toHaveAttribute("href", "/");
   });
 
@@ -48,9 +52,10 @@ describe("LandingHeader", () => {
       "href",
       "/learn",
     );
-    expect(
-      screen.getByRole("link", { name: "Get started" }),
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Get started" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 
   it("does not render a GitHub link", () => {
@@ -66,33 +71,44 @@ describe("LandingHeader", () => {
     const button = screen.getByRole("button", { name: "Menu" });
     expect(button).toHaveAttribute("aria-expanded", "false");
     // Desktop copy of the nav links is always in the DOM.
-    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(
+      1,
+    );
 
     await user.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     // Mobile menu adds a second copy of each link.
-    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(
+      2,
+    );
 
     await user.click(button);
     expect(button).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Open source" })).toHaveLength(
+      1,
+    );
   });
 
-  it("links how it works, partners, integrations, and open source to their landing sections", () => {
+  it("links why calibrate, how it works, partners, and open source to their landing sections", () => {
     render(<LandingHeader />);
     expect(
-      screen.getByRole("link", { name: "How it works" }),
-    ).toHaveAttribute("href", "/#how-it-works");
+      screen.getByRole("link", { name: "Why Calibrate?" }),
+    ).toHaveAttribute("href", "/#why-calibrate");
+    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute(
+      "href",
+      "/#how-it-works",
+    );
     expect(screen.getByRole("link", { name: "Partners" })).toHaveAttribute(
       "href",
       "/#use-cases",
     );
     expect(
-      screen.getByRole("link", { name: "Integrations" }),
-    ).toHaveAttribute("href", "/#integrations");
-    expect(
-      screen.getByRole("link", { name: "Open source" }),
-    ).toHaveAttribute("href", "/#open-source");
+      screen.queryByRole("link", { name: "Integrations" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open source" })).toHaveAttribute(
+      "href",
+      "/#open-source",
+    );
     // The link carries a "New" pill, so its name is the label plus the pill.
     expect(
       screen.getByRole("link", { name: "Use with AI tools New" }),
