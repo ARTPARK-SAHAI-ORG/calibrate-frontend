@@ -7,7 +7,7 @@ describe("WhyCalibrateSection", () => {
 
     for (const heading of [
       "Why AI evaluation is broken today",
-      "AI will fail your users, and you will not see it",
+      "Why this matters",
       "And nothing you have today catches it",
       "What good AI evaluation looks like",
     ]) {
@@ -30,7 +30,7 @@ describe("WhyCalibrateSection", () => {
     render(<WhyCalibrateSection />);
 
     for (const title of [
-      "The same input, a different result",
+      "Unpredictable responses for the same input",
       "Weakest in the language your users speak",
       "A mistake reaches a person, not an order",
     ]) {

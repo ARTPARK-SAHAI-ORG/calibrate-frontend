@@ -334,16 +334,16 @@ const FAILS_UNSEEN: Point[] = [
   {
     key: "different-results",
     art: problemArt.differentResults,
-    title: "The same input, a different result",
+    title: "Unpredictable responses for the same input",
     description:
-      "AI predicts what comes next instead of looking anything up, so one good result proves nothing about the next.",
+      "AI systems make educated guesses. For the same input, the guess can change every time, leaving room for errors.",
   },
   {
     key: "weakest-language",
     art: problemArt.weakestLanguage,
     title: "Weakest in the language your users speak",
     description:
-      "These models learned mostly from English on the internet, and they know nothing about your programme or your guidelines.",
+      "These models are trained on data from the internet which is dominated by a few languages, and they know nothing about your programme or your guidelines.",
   },
   {
     key: "reaches-a-person",
@@ -479,9 +479,7 @@ export function WhyCalibrateSection() {
         </p>
       </div>
 
-      <h3 className={groupHeadingClass}>
-        AI will fail your users, and you will not see it
-      </h3>
+      <h3 className={groupHeadingClass}>Why this matters</h3>
       <PointGrid points={FAILS_UNSEEN} />
 
       <h3 className={`${groupHeadingClass} mt-14 md:mt-20`}>
