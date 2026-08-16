@@ -5,50 +5,62 @@ import { LandingFooter } from "@/components/LandingFooter";
 import { LearnTableOfContents } from "@/components/learn/LearnTableOfContents";
 import { WEBINARS_URL } from "@/constants/links";
 
+/** A link inside a summary. Declared above the lists because they use it as
+ * soon as this file loads. */
+const summaryLinkClass =
+  "font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer";
+/** Bullets inside a summary. */
+const summaryListClass = "mt-3 list-disc space-y-2.5 pl-5";
+/** The name a bullet leads with, above the line explaining it. */
+const summaryTermClass = "block font-medium text-gray-900";
+
 /**
- * Every session we have run on evaluating AI, with its recording and its
- * slides playing on the page. The list is written out here rather than
- * fetched: it changes when we run a new session, which is also when someone
- * edits this file.
- *
- * Oldest first, so a reader who watches straight down gets the general talk
- * before the tool walk through and the questions session.
+ * One thing a reader can watch or read: either a session we ran, or a deck we
+ * put together on its own. Both are written out in this file rather than
+ * fetched, because the list changes when we run a session or finish a deck,
+ * which is also when someone edits this file.
  */
-const TALKS: {
+type LearnItem = {
   /** Name in the address bar and in the list down the left. Set once and left
    * alone, so a shared link survives a change of title. */
   id: string;
   title: string;
-  /** One or two lines on what the session covered, shown under its title. */
+  /** One or two lines on what it covered, shown under its title. */
   summary: ReactNode;
   /**
    * Address the recording plays at inside the page: YouTube's `/embed/…` or
    * Google Drive's `/preview`. The plain address a reader would copy does not
-   * play inside another page, which is why both are listed.
+   * play inside another page, which is why both are listed. Left out for a
+   * deck with no recording, and then the slides run the full width.
    */
-  recordingEmbedUrl: string;
-  recordingUrl: string;
+  recordingEmbedUrl?: string;
+  recordingUrl?: string;
   /** Published Google Slides address, `/embed` rather than `/pub`. */
   slidesEmbedUrl: string;
   slidesUrl: string;
-}[] = [
+};
+
+/**
+ * Everything on the page, in the order a reader meets it. Move an entry here
+ * to move it on the page, and add a new one wherever it should be read.
+ */
+const ENTRIES: LearnItem[] = [
   {
     id: "workshop-for-leaders",
-    title: "AI evals 101",
+    title: "Getting started with AI evals",
     summary: (
       <>
-        The talk covers: why AI systems need to be evaluated, what evaluation
-        means, how to get started, creating a golden dataset, minimum viable
-        evaluation, and how to keep improving your AI system. We also answer
-        questions asked by the community during the live workshop, and we have
-        written up a{" "}
+        Why AI systems need to be evaluated, what evaluation means, how to get
+        started, creating a golden dataset, minimum viable evaluation, and how
+        to keep improving your AI system. We also answer questions asked by the
+        community during the live workshop, and we have written up a{" "}
         {/* The words in the link say where it goes, so it still makes sense
             to anyone who hears it out of the sentence around it. */}
         <a
           href="https://docs.google.com/document/d/e/2PACX-1vR9nJWvGTk0oisXlxAdjUZEANkLrnUjmmqxlE07BUxX3HVVkD5kcY_w65RJPJlONG9FEEQc5eL0A3Xv/pub"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-bold text-inherit underline-offset-2 decoration-gray-400 hover:text-gray-900 hover:decoration-gray-700 cursor-pointer"
+          className={summaryLinkClass}
         >
           summary of the insights
         </a>
@@ -77,6 +89,16 @@ const TALKS: {
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/pub?start=false&loop=false&delayms=3000&slide=id.p",
   },
   {
+    id: "intro-to-calibrate",
+    title: "Calibrate feature walkthrough",
+    summary:
+      "For those already familiar with the basics of AI evaluation, this guide gives a walkthrough of all the core features on Calibrate using a form filling voice agent as a case study: evaluating LLMs using structured tests, finding the best model across latency, cost and quality, aligning LLM judges with human experts, continuously monitoring agent performance, evaluating speech-to-text and text-to-speech models, and running simulated conversations with agents to evaluate them end-to-end.",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
+  },
+  {
     id: "office-hours",
     title: "AI evals office hours",
     summary:
@@ -89,6 +111,60 @@ const TALKS: {
       "https://docs.google.com/presentation/d/e/2PACX-1vTPza71y_OugQVvKUsOupP55fXiH_r8aJcNE27pKW-vHMe_lop6OrdlC6DmKdnomaBIiSSdy36suURG/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vTPza71y_OugQVvKUsOupP55fXiH_r8aJcNE27pKW-vHMe_lop6OrdlC6DmKdnomaBIiSSdy36suURG/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "evaluating-gen-ai-social-sector",
+    title: "Evaluating AI products in the social sector",
+    summary: (
+      <>
+        A detailed walkthrough of the{" "}
+        <a
+          href="https://eval.playbook.org.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={summaryLinkClass}
+        >
+          4-level framework
+        </a>{" "}
+        for evaluating AI products in the social sector:
+        <ul className={summaryListClass}>
+          <li>
+            <span className={summaryTermClass}>Level 1, model evaluation</span>
+            Does the AI system perform as intended?
+          </li>
+          <li>
+            <span className={summaryTermClass}>
+              Level 2, product evaluation
+            </span>
+            Does the overall product engage and retain users?
+          </li>
+          <li>
+            <span className={summaryTermClass}>Level 3, user evaluation</span>
+            Does the product change users&apos; thoughts, feelings, knowledge
+            and behaviour towards the development outcome?
+          </li>
+          <li>
+            <span className={summaryTermClass}>Level 4, impact evaluation</span>
+            Do users with access to the product improve development outcomes?
+          </li>
+        </ul>
+      </>
+    ),
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vRWltXva8xMcfBDZ5TPrQH2hATDDaKdA-c0ZItHMRT_O1wWECKVdsvGbv7EIFf0qg/pub?start=false&loop=false&delayms=3000",
+  },
+
+  {
+    id: "ai-evaluation-guide",
+    title: "Evaluating AI systems in non-profits using Calibrate",
+    summary:
+      "A longer version of the Calibrate feature walkthrough above, additionally covering: How LLMs work, why AI fails in social-sector contexts, how evaluation helps deploy AI responsibly.",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/pub?start=false&loop=false&delayms=3000",
   },
 ];
 
@@ -189,11 +265,11 @@ export default function LearnPage() {
 
           <div className="mt-14 md:mt-20 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-12">
             <LearnTableOfContents
-              sections={TALKS.map(({ id, title }) => ({ id, title }))}
+              sections={ENTRIES.map(({ id, title }) => ({ id, title }))}
             />
 
             <div className="flex min-w-0 flex-col gap-16 md:gap-24">
-              {TALKS.map((talk) => (
+              {ENTRIES.map((talk) => (
                 <section
                   key={talk.id}
                   id={talk.id}
@@ -203,31 +279,39 @@ export default function LearnPage() {
                   <h2 className="mb-3 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
                     {talk.title}
                   </h2>
-                  <p className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
+                  {/* A div rather than a p: a summary can hold bullets,
+                            which are not allowed inside a paragraph. */}
+                  <div className="mb-8 md:mb-10 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
                     {talk.summary}
-                  </p>
+                  </div>
 
-                  <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-6">
-                    <div className="min-w-0">
-                      <p className={partLabelClass}>Recording</p>
-                      <iframe
-                        src={talk.recordingEmbedUrl}
-                        title={`Recording of ${talk.title}`}
-                        className={frameClass}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                      <a
-                        href={talk.recordingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open the recording of ${talk.title} in a new tab`}
-                        className={openLinkClass}
-                      >
-                        Open the recording in a new tab
-                        <OpensInNewTabIcon />
-                      </a>
-                    </div>
+                  <div
+                    className={`grid grid-cols-1 gap-10 lg:gap-6 ${
+                      talk.recordingEmbedUrl ? "lg:grid-cols-2" : "lg:max-w-3xl"
+                    }`}
+                  >
+                    {talk.recordingEmbedUrl && talk.recordingUrl && (
+                      <div className="min-w-0">
+                        <p className={partLabelClass}>Recording</p>
+                        <iframe
+                          src={talk.recordingEmbedUrl}
+                          title={`Recording of ${talk.title}`}
+                          className={frameClass}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                        <a
+                          href={talk.recordingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open the recording of ${talk.title} in a new tab`}
+                          className={openLinkClass}
+                        >
+                          Open the recording in a new tab
+                          <OpensInNewTabIcon />
+                        </a>
+                      </div>
+                    )}
 
                     <div className="min-w-0">
                       <p className={partLabelClass}>Slides</p>
