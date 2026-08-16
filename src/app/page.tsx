@@ -6,6 +6,7 @@ import { LandingFooter } from "@/components/LandingFooter";
 import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarquee";
 import { AboutMarketingSection } from "@/components/landing/AboutMarketingSection";
 import { CodingAgentsSection } from "@/components/landing/CodingAgentsSection";
+import { WhyCalibrateSection } from "@/components/landing/WhyCalibrateSection";
 import Link from "next/link";
 
 type LandingQuickStartStep = {
@@ -1047,6 +1048,15 @@ export default function HomePage() {
             </div>
           </div> */}
         </div>
+      </div>
+
+      {/* The case for evaluating at all, made before the reader meets any
+          feature. Sits between the hero and the partner logos on purpose. */}
+      <div
+        id="why-calibrate"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100 scroll-mt-20"
+      >
+        <WhyCalibrateSection />
       </div>
 
       {/* Use Cases Section */}
