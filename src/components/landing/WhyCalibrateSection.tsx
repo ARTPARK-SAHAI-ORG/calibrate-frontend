@@ -282,31 +282,22 @@ const problemArt = {
  * problem's: the block that was mostly unchecked is now all emerald, and the
  * wall between the expert and the engineer is gone. */
 const goalArt = {
-  repeatable: (
+  /** One list of failures with a newly added row at the bottom, so the picture
+   * says "kept in one place and still growing" rather than "a process". */
+  oneRecord: (
     <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <g key={i}>
-          <rect
-            x={6 + i * 42}
-            y="8"
-            width="26"
-            height="24"
-            rx="5"
-            className="fill-emerald-500"
-          />
-          {i < 2 ? (
-            <path
-              d={`M${35 + i * 42} 20 H${43 + i * 42} M${39 + i * 42} 16 L${44 + i * 42} 20 L${39 + i * 42} 24`}
-              className="stroke-gray-300"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          ) : null}
-        </g>
+      {[2, 9, 16, 23, 30].map((y, i) => (
+        <rect
+          key={y}
+          x="16"
+          y={y}
+          width="88"
+          height="5"
+          rx="2.5"
+          className={i === 4 ? "fill-emerald-500" : "fill-gray-200"}
+        />
       ))}
-      <ArtLabel x={60}>the same steps, every time</ArtLabel>
+      <ArtLabel x={60}>one list, always growing</ArtLabel>
     </svg>
   ),
   nothingBreaks: <ArtCheckGrid checked={36} label="all of them checked" />,
@@ -425,7 +416,7 @@ const FAILS_UNSEEN: Point[] = [
     art: problemArt.instructionsIgnored,
     title: "Instructions ignored, or wrong to start with",
     description:
-      "The instructions you write can be vague or contradict each other, and even clear ones get skipped when the request is complicated.",
+      "Your instructions might be incomplete or incorrect, or the model may not be powerful enough to follow them correctly",
   },
   {
     key: "harmful-mistake",
@@ -449,14 +440,14 @@ const NOTHING_CATCHES_IT: Point[] = [
     art: problemArt.landsOnEngineers,
     title: "Evaluation falls on engineers who do not know your domain",
     description:
-      "Engineers cannot say whether an answer is right for your end users. The domain experts who can are either left out of the work or find it hard to engage with it due to friction in collaboration.",
+      "Engineers cannot evaluate response quality whereas the domain experts are either left out of the work or experience friction in collaboration.",
   },
   {
     key: "per-seat",
     art: problemArt.perSeat,
     title: "The tools that exist are not made for non-profits",
     description:
-      "Existing AI evaluation tools are either too hard to use for non-technical stakeholders or too costly.",
+      "Existing AI evaluation tools are either too hard to use for non-technical stakeholders or too costly or simply don't address the real evaluation gaps.",
   },
 ];
 
@@ -465,44 +456,45 @@ const NOTHING_CATCHES_IT: Point[] = [
  * they belong to the open source section further down the page. */
 const GOALS: Point[] = [
   {
-    key: "repeatable",
-    art: goalArt.repeatable,
-    title: "One repeatable way to find mistakes",
-    description: "The same steps every time, whoever is looking.",
+    key: "one-record",
+    art: goalArt.oneRecord,
+    title: "Every failure in one place",
+    description:
+      "Not in someone's head or spread across spreadsheets. One list that grows each time you find something new.",
   },
   {
     key: "nothing-breaks",
     art: goalArt.nothingBreaks,
     title: "Release changes without breaking what worked",
     description:
-      "Every change is checked against everything the AI already got right.",
+      "Every failure mode is checked against what already worked before to ensure new changes don't break existing functionality",
   },
   {
     key: "experts-lead",
     art: goalArt.expertsLead,
-    title: "Your domain experts lead",
+    title: "Domain experts take the lead",
     description:
-      "The people who know the work decide what good looks like, and do the checking themselves.",
+      "Calibrate is built for non-technical domain experts to own AI evals without taking up engineering bandwidth .",
   },
   {
     key: "holds",
     art: goalArt.holdsAsYouGrow,
-    title: "More to check does not mean more work",
-    description:
-      "The effort on your side stays the same as the amount to check grows.",
+    title: "The evaluation effort does not scale with usage",
+    description: "Calibrate plugs into your AI tools to ensure evaluation .",
   },
   {
     key: "caught-early",
     art: goalArt.caughtEarly,
     title: "Catch failures before users do",
-    description: "What your AI does once it is live is checked as it happens.",
+    description:
+      "Calibrate helps you monitor your AI quality live, proactively catching errors before waiting for users to report them.",
   },
   {
     key: "time-on-the-ai",
     art: goalArt.timeOnTheAi,
-    title: "Spend your time on the AI",
+    title: "Focus on improvement, not infra",
     description:
-      "Your team improves the AI instead of building the evaluation setup around it.",
+      "Your team inspects the errors, talks to users and improves the AI quality instead of building the evaluation setup around it",
   },
 ];
 
