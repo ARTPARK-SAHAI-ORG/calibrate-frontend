@@ -1,5 +1,6 @@
 ## August 2026
 
+- Add the Claude and Calibrate tutorial to the Learn page ([#373](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/373))
 - Add three slide decks to the Learn page ([#372](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/372))
 - Add a why Calibrate section to the landing page ([#371](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/371))
 - Add a Learn page with our AI evaluation sessions ([#370](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/370))
