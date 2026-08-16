@@ -35,9 +35,12 @@ type LearnItem = {
    */
   recordingEmbedUrl?: string;
   recordingUrl?: string;
-  /** Published Google Slides address, `/embed` rather than `/pub`. */
-  slidesEmbedUrl: string;
-  slidesUrl: string;
+  /**
+   * Published Google Slides address, `/embed` rather than `/pub`. Left out for
+   * a recording with no slides, and then the recording runs the full width.
+   */
+  slidesEmbedUrl?: string;
+  slidesUrl?: string;
 };
 
 /**
@@ -97,6 +100,14 @@ const ENTRIES: LearnItem[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "connect-ai-tool-with-calibrate",
+    title: "Connecting your AI tool with Calibrate",
+    summary:
+      "Using the Calibrate command line tool and skills, you can connect your preferred AI tool with Calibrate so that it can create the evals automatically for your use case, upload and run them on Calibrate, analyse what went wrong, and suggest fixes. It can also analyse where your LLM judges disagree with humans and iterate on the judge on its own until it is aligned, without requiring you to intervene at each step.",
+    recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
+    recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
   },
   {
     id: "office-hours",
@@ -287,7 +298,9 @@ export default function LearnPage() {
 
                   <div
                     className={`grid grid-cols-1 gap-10 lg:gap-6 ${
-                      talk.recordingEmbedUrl ? "lg:grid-cols-2" : "lg:max-w-3xl"
+                      talk.recordingEmbedUrl && talk.slidesEmbedUrl
+                        ? "lg:grid-cols-2"
+                        : "lg:max-w-3xl"
                     }`}
                   >
                     {talk.recordingEmbedUrl && talk.recordingUrl && (
@@ -313,25 +326,27 @@ export default function LearnPage() {
                       </div>
                     )}
 
-                    <div className="min-w-0">
-                      <p className={partLabelClass}>Slides</p>
-                      <iframe
-                        src={talk.slidesEmbedUrl}
-                        title={`Slides from ${talk.title}`}
-                        className={frameClass}
-                        allowFullScreen
-                      />
-                      <a
-                        href={talk.slidesUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open the slides from ${talk.title} in a new tab`}
-                        className={openLinkClass}
-                      >
-                        Open the slides in a new tab
-                        <OpensInNewTabIcon />
-                      </a>
-                    </div>
+                    {talk.slidesEmbedUrl && talk.slidesUrl && (
+                      <div className="min-w-0">
+                        <p className={partLabelClass}>Slides</p>
+                        <iframe
+                          src={talk.slidesEmbedUrl}
+                          title={`Slides from ${talk.title}`}
+                          className={frameClass}
+                          allowFullScreen
+                        />
+                        <a
+                          href={talk.slidesUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open the slides from ${talk.title} in a new tab`}
+                          className={openLinkClass}
+                        >
+                          Open the slides in a new tab
+                          <OpensInNewTabIcon />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </section>
               ))}
