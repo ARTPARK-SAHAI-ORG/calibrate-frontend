@@ -416,14 +416,14 @@ const FAILS_UNSEEN: Point[] = [
     art: problemArt.instructionsIgnored,
     title: "Instructions ignored, or wrong to start with",
     description:
-      "Your instructions might be incomplete or incorrect, or the model may not be powerful enough to follow them correctly",
+      "Your instructions might be incomplete or incorrect, or the model may not be powerful enough to follow them correctly.",
   },
   {
     key: "harmful-mistake",
     art: problemArt.harmfulMistake,
     title: "Mistakes impact real lives",
     description:
-      "Non-profits operate in sensitive domains, like health, education and agriculture, where a wrong answer can leave lasting damage",
+      "Non-profits operate in sensitive domains, like health, education and agriculture, where a wrong answer can leave lasting damage.",
   },
 ];
 
@@ -447,7 +447,7 @@ const NOTHING_CATCHES_IT: Point[] = [
     art: problemArt.perSeat,
     title: "The tools that exist are not made for non-profits",
     description:
-      "Existing AI evaluation tools are either too hard to use for non-technical stakeholders or too costly or simply don't address the real evaluation gaps.",
+      "Existing AI evaluation tools are too hard to use for non-technical stakeholders, too costly, or simply do not address the real evaluation gaps.",
   },
 ];
 
@@ -460,27 +460,28 @@ const GOALS: Point[] = [
     art: goalArt.oneRecord,
     title: "Every failure in one place",
     description:
-      "Not in someone's head or spread across spreadsheets. One list that grows each time you find something new.",
+      "Not in someone's head or spread across spreadsheets. One list of all failure modes that grows each time you find something new.",
   },
   {
     key: "nothing-breaks",
     art: goalArt.nothingBreaks,
     title: "Release changes without breaking what worked",
     description:
-      "Every failure mode is checked against what already worked before to ensure new changes don't break existing functionality",
+      "Every failure mode is checked against what already worked before to ensure new changes do not break existing functionality.",
   },
   {
     key: "experts-lead",
     art: goalArt.expertsLead,
     title: "Domain experts take the lead",
     description:
-      "Calibrate is built for non-technical domain experts to own AI evals without taking up engineering bandwidth .",
+      "Calibrate is built for non-technical domain experts to own AI evals without taking up engineering bandwidth.",
   },
   {
     key: "holds",
     art: goalArt.holdsAsYouGrow,
     title: "The evaluation effort does not scale with usage",
-    description: "Calibrate plugs into your AI tools to ensure evaluation .",
+    description:
+      "Calibrate plugs into your AI tools to continuously analyse errors, identify patterns and suggest improvements, so your workload does not grow with scale.",
   },
   {
     key: "caught-early",
@@ -494,7 +495,7 @@ const GOALS: Point[] = [
     art: goalArt.timeOnTheAi,
     title: "Focus on improvement, not infra",
     description:
-      "Your team inspects the errors, talks to users and improves the AI quality instead of building the evaluation setup around it",
+      "Your team inspects the errors, talks to users and improves the AI quality instead of building the evaluation setup around it.",
   },
 ];
 
