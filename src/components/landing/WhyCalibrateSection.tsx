@@ -204,6 +204,41 @@ const problemArt = {
       <ArtLabel x={94}>your work</ArtLabel>
     </svg>
   ),
+  instructionsIgnored: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      {[2, 14, 26].map((y, i) => (
+        <g key={y}>
+          <rect
+            x="6"
+            y={y}
+            width="76"
+            height="8"
+            rx="3"
+            className="fill-gray-200"
+          />
+          {i < 2 ? (
+            <path
+              d={`M92 ${y + 4} l4 4 l7 -7`}
+              className="stroke-emerald-500"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          ) : (
+            <path
+              d={`M93 ${y + 1} l9 9 M102 ${y + 1} l-9 9`}
+              className="stroke-red-400"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+            />
+          )}
+        </g>
+      ))}
+      <ArtLabel x={60}>one instruction ignored</ArtLabel>
+    </svg>
+  ),
   harmfulMistake: (
     <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
       <path d="M60 3 L90 35 L30 35 Z" className="fill-red-400" />
@@ -376,21 +411,28 @@ const FAILS_UNSEEN: Point[] = [
     art: problemArt.weakestLanguage,
     title: "Weakest in the language your users speak",
     description:
-      "These models are trained on data from the internet, dominated by a few languages. Quality degrades in languages less represented online, which is often where the social sector operates.",
+      "These models are trained on data from the internet, dominated by a few languages. Quality degrades in languages with lesser online presence.",
   },
   {
     key: "not-your-context",
     art: problemArt.notYourContext,
-    title: "The AI answers from the internet, not from your work",
+    title: "Lack of your specific context",
     description:
-      "It has never seen your guidelines or the conditions your team works in, so what it picked up elsewhere may not hold for your users.",
+      "AI follows the patterns in its training data, which may not hold for your use case. It also does not have access to your guidelines and may contradict them, producing unsafe responses.",
+  },
+  {
+    key: "instructions-ignored",
+    art: problemArt.instructionsIgnored,
+    title: "Instructions ignored, or wrong to start with",
+    description:
+      "The instructions you write can be vague or contradict each other, and even clear ones get skipped when the request is complicated.",
   },
   {
     key: "harmful-mistake",
     art: problemArt.harmfulMistake,
     title: "Mistakes impact real lives",
     description:
-      "In health, child protection and maternal care, a confident wrong answer can do lasting damage, and the person acting on it has no way to tell.",
+      "Non-profits operate in sensitive domains, like health, education and agriculture, where a wrong answer can leave lasting damage",
   },
 ];
 
@@ -398,23 +440,23 @@ const NOTHING_CATCHES_IT: Point[] = [
   {
     key: "by-hand",
     art: problemArt.byHand,
-    title: "Checking a few by hand is all anyone does",
+    title: "Changes introduce unexpected errors",
     description:
-      "Someone looks over a few answers before a release and goes ahead if they look fine. That works on day one, not once real users arrive.",
+      "Someone verifies a few responses before deploying changes. That barely works for a pilot, but does not create a reliable product for real users.",
   },
   {
     key: "lands-on-engineers",
     art: problemArt.landsOnEngineers,
-    title: "Evaluation lands on engineers who do not know your domain",
+    title: "Evaluation falls on engineers who do not know your domain",
     description:
-      "Engineers cannot say whether an answer is right for your programme, and the people who can are left out of the work.",
+      "Engineers cannot say whether an answer is right for your end users. The domain experts who can are either left out of the work or find it hard to engage with it due to friction in collaboration.",
   },
   {
     key: "per-seat",
     art: problemArt.perSeat,
-    title: "The tools that exist charge for every person you add",
+    title: "The tools that exist are not made for non-profits",
     description:
-      "AI evaluation tools are priced per person, so inviting the experts who most need to take part is what makes them unaffordable.",
+      "Existing AI evaluation tools are either too hard to use for non-technical stakeholders or too costly.",
   },
 ];
 
@@ -531,7 +573,7 @@ export function WhyCalibrateSection() {
       <PointGrid points={FAILS_UNSEEN} />
 
       <h3 className={`${groupHeadingClass} mt-14 md:mt-20`}>
-        And nothing you have today catches it
+        Manual verification does not scale
       </h3>
       <PointGrid points={NOTHING_CATCHES_IT} />
 

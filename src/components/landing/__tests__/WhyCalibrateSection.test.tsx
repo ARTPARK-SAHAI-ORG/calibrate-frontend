@@ -1,66 +1,54 @@
 import { render, screen } from "@/test-utils";
 import { WhyCalibrateSection } from "../WhyCalibrateSection";
 
+/**
+ * The wording in this section changes constantly, so these tests deliberately
+ * do NOT assert on copy. They hold the shape of the argument and the rules the
+ * copy has to obey. If you are here because a test broke after an edit, the
+ * question to ask is whether the shape changed, not whether a sentence did.
+ */
 describe("WhyCalibrateSection", () => {
-  // The headings themselves get reworded often, so this checks the shape of the
-  // argument rather than the words: a section title, two named groups of
-  // problems, and the closing title over the goals.
+  const groups = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll<HTMLElement>(".flex-wrap"));
+
   it("runs the argument in three beats", () => {
     const { container } = render(<WhyCalibrateSection />);
 
+    // A section title, two named groups of problems, then the closing title
+    // over the goals.
     expect(container.querySelectorAll("h2")).toHaveLength(2);
     expect(container.querySelectorAll("h3")).toHaveLength(2);
+    expect(groups(container)).toHaveLength(3);
     for (const heading of container.querySelectorAll("h2, h3")) {
-      expect(heading.textContent?.trim()).not.toBe("");
+      expect(heading.textContent?.trim()).toBeTruthy();
     }
   });
 
-  it("opens on capability rising faster than the checks on it", () => {
-    render(<WhyCalibrateSection />);
+  it("opens with a lead-in under the section title", () => {
+    const { container } = render(<WhyCalibrateSection />);
 
-    expect(screen.getByText(/As AI becomes more capable/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/without the checks needed to deploy it responsibly/),
-    ).toBeInTheDocument();
+    const intro = container.querySelector("h2 + p");
+    expect(intro?.textContent?.length).toBeGreaterThan(40);
   });
 
-  it("names the three ways the AI fails unseen", () => {
-    render(<WhyCalibrateSection />);
+  it("gives every point a picture, a title and a line of its own", () => {
+    const { container } = render(<WhyCalibrateSection />);
 
-    for (const title of [
-      "Unpredictable responses for the same input",
-      "Weakest in the language your users speak",
-      "The AI answers from the internet, not from your work",
-      "Mistakes impact real lives",
-    ]) {
-      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    for (const group of groups(container)) {
+      expect(group.children.length).toBeGreaterThan(0);
+      for (const card of group.children) {
+        expect(card.querySelector("svg")).toBeInTheDocument();
+        expect(card.querySelector("h4")?.textContent?.trim()).toBeTruthy();
+        expect(card.querySelector("p")?.textContent?.trim()).toBeTruthy();
+      }
     }
   });
 
-  it("names the three reasons nothing catches it", () => {
-    render(<WhyCalibrateSection />);
+  it("labels every picture, because a shape alone says nothing", () => {
+    const { container } = render(<WhyCalibrateSection />);
 
-    for (const title of [
-      "Checking a few by hand is all anyone does",
-      "Evaluation lands on engineers who do not know your domain",
-      "The tools that exist charge for every person you add",
-    ]) {
-      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
-    }
-  });
-
-  it("lists the six goals", () => {
-    render(<WhyCalibrateSection />);
-
-    for (const title of [
-      "One repeatable way to find mistakes",
-      "Release changes without breaking what worked",
-      "Your domain experts lead",
-      "More to check does not mean more work",
-      "Catch failures before users do",
-      "Spend your time on the AI",
-    ]) {
-      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    for (const svg of container.querySelectorAll("svg")) {
+      expect(svg.querySelectorAll("text").length).toBeGreaterThan(0);
     }
   });
 
@@ -72,13 +60,14 @@ describe("WhyCalibrateSection", () => {
   });
 
   it("offers both sessions, why it matters before how Calibrate does it", () => {
-    render(<WhyCalibrateSection />);
+    const { container } = render(<WhyCalibrateSection />);
 
-    expect(
-      screen.getByRole("link", { name: "Watch AI Evals 101" }),
-    ).toHaveAttribute("href", "/learn#workshop-for-leaders");
-    expect(
-      screen.getByRole("link", { name: "Watch Calibrate 101" }),
-    ).toHaveAttribute("href", "/learn#getting-started");
+    const hrefs = Array.from(container.querySelectorAll("a")).map((a) =>
+      a.getAttribute("href"),
+    );
+    expect(hrefs).toEqual([
+      "/learn#workshop-for-leaders",
+      "/learn#getting-started",
+    ]);
   });
 });
