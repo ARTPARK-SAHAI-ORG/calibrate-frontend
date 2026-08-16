@@ -2,157 +2,514 @@
 
 import { Link } from "@/lib/nav";
 
-/** The six reasons a social sector team has no dependable way to know whether
- * its AI works. Ordered as a narrative: what teams do today, why the AI itself
- * defeats it, why the stakes are higher here, and why neither more people nor
- * the existing tools fix it. Every point comes from the evaluation sessions we
- * run with partner teams, so do not add one we have not actually heard. */
-const PROBLEMS: { title: string; description: string }[] = [
+/* Every picture below shares one 120x58 box: the drawing sits in the top 38
+ * units and its words on the baseline at 54. The words are the point. A shape
+ * on its own does not tell anyone what a mistake costs or who is blocked, so no
+ * picture here ships without them. Grey is the ordinary state, emerald is what
+ * works, red is what goes wrong.
+ *
+ * No invented numbers in the labels. A chat agent is also only one of the
+ * things Calibrate evaluates, alongside tool calls, extracted data, speech to
+ * text and text to speech, so the words never assume a conversation. */
+
+const ART_BOX = "0 0 120 58";
+const ART_CLASS = "h-[4.5rem] w-auto";
+
+/** A word or two on the baseline, naming what the drawing above it shows. */
+function ArtLabel(props: { x: number; children: string }) {
+  return (
+    <text
+      x={props.x}
+      y="54"
+      textAnchor="middle"
+      fontSize="9.5"
+      fontWeight="600"
+      className="fill-gray-400"
+    >
+      {props.children}
+    </text>
+  );
+}
+
+/** A person: head above shoulders, drawn once and reused. The shoulders are a
+ * dome with a flat bottom rather than a rounded rectangle, which at this size
+ * would just read as a second circle. */
+function ArtPerson(props: { x: number; className: string }) {
+  const { x } = props;
+  return (
+    <g className={props.className}>
+      <circle cx={x} cy="10" r="7.5" />
+      <path
+        d={`M${x - 11} 36 L${x - 11} 29 a11 10 0 0 1 22 0 L${x + 11} 36 Z`}
+      />
+    </g>
+  );
+}
+
+/** A bar with its name under it, for the "this against that" pictures. */
+function ArtBar(props: {
+  x: number;
+  height: number;
+  className: string;
+  label: string;
+}) {
+  return (
+    <>
+      <rect
+        x={props.x}
+        y={38 - props.height}
+        width="32"
+        height={props.height}
+        rx="4"
+        className={props.className}
+      />
+      <ArtLabel x={props.x + 16}>{props.label}</ArtLabel>
+    </>
+  );
+}
+
+/** Everything one release produces, as a block of squares. `checked` is how
+ * many of them anyone actually looks at. */
+function ArtCheckGrid(props: { checked: number; label: string }) {
+  return (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      {Array.from({ length: 36 }, (_, i) => (
+        <rect
+          key={i}
+          x={2 + (i % 12) * 10}
+          y={4 + Math.floor(i / 12) * 11}
+          width="7"
+          height="7"
+          rx="1.5"
+          className={i < props.checked ? "fill-emerald-500" : "fill-gray-200"}
+        />
+      ))}
+      <ArtLabel x={60}>{props.label}</ArtLabel>
+    </svg>
+  );
+}
+
+/** One of the two results the same input produced. */
+function ArtResultPill(props: {
+  y: number;
+  className: string;
+  mark: string;
+  label: string;
+}) {
+  return (
+    <>
+      <rect
+        x="6"
+        y={props.y}
+        width="108"
+        height="16"
+        rx="5"
+        className={props.className}
+      />
+      <path
+        d={props.mark}
+        className="stroke-white"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <text
+        x="72"
+        y={props.y + 11.5}
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight="600"
+        fill="white"
+      >
+        {props.label}
+      </text>
+    </>
+  );
+}
+
+/** Four bars that keep growing, for the two pictures about scale and cost. */
+function ArtGrowingBars(props: { redLast?: boolean }) {
+  return (
+    <>
+      {[10, 17, 25, 34].map((height, i) => (
+        <rect
+          key={height}
+          x={14 + i * 24}
+          y={38 - height}
+          width="16"
+          height={height}
+          rx="3"
+          className={
+            props.redLast && i === 3 ? "fill-red-400" : "fill-gray-200"
+          }
+        />
+      ))}
+    </>
+  );
+}
+
+const problemArt = {
+  differentResults: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <ArtResultPill
+        y={2}
+        className="fill-emerald-500"
+        mark="M16 9 l4 4 l7 -8"
+        label="first time"
+      />
+      <ArtResultPill
+        y={21}
+        className="fill-red-400"
+        mark="M16 25 l9 8 M25 25 l-9 8"
+        label="second time"
+      />
+      <ArtLabel x={60}>the same input</ArtLabel>
+    </svg>
+  ),
+  weakestLanguage: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <ArtBar x={16} height={34} className="fill-gray-300" label="English" />
+      <ArtBar x={72} height={11} className="fill-red-400" label="Kannada" />
+    </svg>
+  ),
+  reachesAPerson: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      {[18, 46, 74, 102].map((x, i) => (
+        <ArtPerson
+          key={x}
+          x={x}
+          className={i === 1 ? "fill-red-400" : "fill-gray-200"}
+        />
+      ))}
+      <ArtLabel x={60}>it reaches a real person</ArtLabel>
+    </svg>
+  ),
+  byHand: <ArtCheckGrid checked={3} label="a few checked, the rest not" />,
+  landsOnEngineers: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <ArtPerson x={24} className="fill-emerald-500" />
+      <rect
+        x="56"
+        y="0"
+        width="8"
+        height="38"
+        rx="3"
+        className="fill-red-400"
+      />
+      <ArtPerson x={96} className="fill-gray-300" />
+      <ArtLabel x={24}>expert</ArtLabel>
+      <ArtLabel x={96}>engineer</ArtLabel>
+    </svg>
+  ),
+  perSeat: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <ArtGrowingBars redLast />
+      <ArtLabel x={60}>cost per person added</ArtLabel>
+    </svg>
+  ),
+};
+
+/** The answers. Where a goal undoes a problem its picture mirrors that
+ * problem's: the block that was mostly unchecked is now all emerald, and the
+ * wall between the expert and the engineer is gone. */
+const goalArt = {
+  repeatable: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <g key={i}>
+          <rect
+            x={6 + i * 42}
+            y="8"
+            width="26"
+            height="24"
+            rx="5"
+            className="fill-emerald-500"
+          />
+          {i < 2 ? (
+            <path
+              d={`M${35 + i * 42} 20 H${43 + i * 42} M${39 + i * 42} 16 L${44 + i * 42} 20 L${39 + i * 42} 24`}
+              className="stroke-gray-300"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          ) : null}
+        </g>
+      ))}
+      <ArtLabel x={60}>the same steps, every time</ArtLabel>
+    </svg>
+  ),
+  nothingBreaks: <ArtCheckGrid checked={36} label="all of them checked" />,
+  expertsLead: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <rect
+        x="38"
+        y="24"
+        width="44"
+        height="6"
+        rx="3"
+        className="fill-gray-200"
+      />
+      <ArtPerson x={24} className="fill-emerald-500" />
+      <ArtPerson x={96} className="fill-gray-300" />
+      <ArtLabel x={24}>expert</ArtLabel>
+      <ArtLabel x={96}>engineer</ArtLabel>
+    </svg>
+  ),
+  holdsAsYouGrow: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <ArtGrowingBars />
+      <line
+        x1="8"
+        y1="4"
+        x2="112"
+        y2="4"
+        className="stroke-emerald-500"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      <ArtLabel x={60}>your effort stays flat</ArtLabel>
+    </svg>
+  ),
+  caughtEarly: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      {[12, 36, 60, 84, 108].map((cx, i) => (
+        <circle
+          key={cx}
+          cx={cx}
+          cy="20"
+          r="7"
+          className={i === 2 ? "fill-red-400" : "fill-gray-200"}
+        />
+      ))}
+      <circle
+        cx="60"
+        cy="20"
+        r="14"
+        fill="none"
+        className="stroke-emerald-500"
+        strokeWidth="3.5"
+      />
+      <ArtLabel x={60}>found before users do</ArtLabel>
+    </svg>
+  ),
+  timeOnTheAi: (
+    <svg viewBox={ART_BOX} className={ART_CLASS} aria-hidden>
+      <rect
+        x="2"
+        y="6"
+        width="84"
+        height="28"
+        rx="6"
+        className="fill-emerald-500"
+      />
+      <rect
+        x="92"
+        y="6"
+        width="26"
+        height="28"
+        rx="6"
+        className="fill-gray-200"
+      />
+      <ArtLabel x={44}>improving your AI</ArtLabel>
+      <ArtLabel x={105}>setup</ArtLabel>
+    </svg>
+  ),
+};
+
+type Point = {
+  key: string;
+  art: React.ReactNode;
+  title: string;
+  description: string;
+};
+
+/** The argument runs in two halves and the headings carry it: the AI fails
+ * where you cannot see it, and then nothing a team has today catches that.
+ * Every point comes from the evaluation sessions we run with partner teams, so
+ * do not add one we have not actually heard. */
+const FAILS_UNSEEN: Point[] = [
   {
-    title:
-      "Checking a few answers by hand is the standard, and it works on day one",
+    key: "different-results",
+    art: problemArt.differentResults,
+    title: "The same input, a different result",
     description:
-      "Most teams read a handful of replies before a release and ship if they look fine. Then fixing one complaint quietly breaks an answer that was already right, the list of cases to try by hand only grows, and the same mistake returns because the last fix was never written down.",
+      "AI predicts what comes next instead of looking anything up, so one good result proves nothing about the next.",
   },
   {
-    title: "Ask the same question twice and you can get two different answers",
+    key: "weakest-language",
+    art: problemArt.weakestLanguage,
+    title: "Weakest in the language your users speak",
     description:
-      "AI does not work like the rest of your software. It predicts the words most likely to come next rather than looking anything up, so the same question can be answered well one time and badly the next. One good answer tells you nothing about the next thousand.",
+      "These models learned mostly from English on the internet, and they know nothing about your programme or your guidelines.",
   },
   {
-    title: "The models are weakest where your users are",
+    key: "reaches-a-person",
+    art: problemArt.reachesAPerson,
+    title: "A mistake reaches a person, not an order",
     description:
-      "Most of what these models learned from is English text from the internet. Hindi is the fourth most spoken language in the world and barely appears. Answers get worse in the languages your users actually speak, and the model knows nothing about your programme, your guidelines, or what is true on the ground this month.",
-  },
-  {
-    title: "A wrong answer costs more in your work than in most",
-    description:
-      "A shopping assistant that gets it wrong loses an order. A maternal health line that gets it wrong reaches a mother who has nobody else to ask. The people your AI serves are usually the least able to absorb a mistake and the least likely to report one.",
-  },
-  {
-    title:
-      "The people who know what a good answer looks like cannot check it themselves",
-    description:
-      "Your nurses, teachers and counsellors are the only ones who can say whether a reply is right. Today that means writing cases into a spreadsheet, waiting for an engineer to run them, and reading results that were not written for them. Most engineers have not done this kind of evaluation either, so it lands on one person and stalls.",
-  },
-  {
-    title: "The tools that exist are not built for you",
-    description:
-      "They charge for every person you add, so bringing in the domain experts who most need to be there is what makes them expensive. They assume an engineering team to set them up. And they assume your data can sit on someone else's servers, which for health and child protection records it often cannot.",
+      "A shopping assistant that gets it wrong loses a sale. A health line that gets it wrong reaches someone with nobody else to ask.",
   },
 ];
 
-/** What teams should be able to expect instead. This is the vision Calibrate is
- * built towards, so every point maps to something the product does today or is
- * being built to do. */
-const GOALS: { title: string; description: string }[] = [
+const NOTHING_CATCHES_IT: Point[] = [
   {
-    title: "A repeatable way to find mistakes",
+    key: "by-hand",
+    art: problemArt.byHand,
+    title: "Checking a few by hand is all anyone does",
     description:
-      "The same steps every time, so what gets caught does not depend on who is looking that day.",
+      "Someone looks over a few answers before a release and goes ahead if they look fine. That works on day one, not once real users arrive.",
   },
   {
-    title: "Deploy without breaking what worked",
+    key: "lands-on-engineers",
+    art: problemArt.landsOnEngineers,
+    title: "It lands on engineers who do not know your domain",
     description:
-      "Every change is checked against everything your agent already got right.",
+      "Engineers cannot say whether an answer is right for your programme, and the people who can are left out of the work.",
   },
   {
+    key: "per-seat",
+    art: problemArt.perSeat,
+    title: "The tools that exist charge for every person you add",
+    description:
+      "AI evaluation tools are priced per person, so inviting the experts who most need to take part is what makes them unaffordable.",
+  },
+];
+
+/** What teams should be able to expect instead, one for one with the goals we
+ * set out in the sessions. Self-hosting and pricing are deliberately NOT here:
+ * they belong to the open source section further down the page. */
+const GOALS: Point[] = [
+  {
+    key: "repeatable",
+    art: goalArt.repeatable,
+    title: "One repeatable way to find mistakes",
+    description: "The same steps every time, whoever is looking.",
+  },
+  {
+    key: "nothing-breaks",
+    art: goalArt.nothingBreaks,
+    title: "Release changes without breaking what worked",
+    description:
+      "Every change is checked against everything the AI already got right.",
+  },
+  {
+    key: "experts-lead",
+    art: goalArt.expertsLead,
     title: "Your domain experts lead",
     description:
-      "The people who know the programme write the cases, set what a good answer is, and read the results without waiting on an engineer.",
+      "The people who know the work decide what good looks like, and check it themselves.",
   },
   {
-    title: "It holds as you grow",
-    description: "The same process works whether you have 20 cases or 2,000.",
-  },
-  {
-    title: "See failures before a user complains",
+    key: "holds",
+    art: goalArt.holdsAsYouGrow,
+    title: "More to check does not mean more work",
     description:
-      "Live conversations are checked as they happen, so you hear about a problem from Calibrate and not from the people you serve.",
+      "The effort on your side stays the same as the amount to check grows.",
   },
   {
-    title: "Your data stays where you need it",
+    key: "caught-early",
+    art: goalArt.caughtEarly,
+    title: "Catch failures before users do",
+    description: "What your AI does once it is live is checked as it happens.",
+  },
+  {
+    key: "time-on-the-ai",
+    art: goalArt.timeOnTheAi,
+    title: "Spend your time on the AI",
     description:
-      "Calibrate is open source and can run on your own infrastructure, with no charge per person you add.",
+      "Your team improves the AI instead of building the evaluation setup around it.",
   },
 ];
 
+function PointCard(props: {
+  art: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 text-left shadow-sm">
+      <div className="mb-4 flex h-[4.5rem] items-center">{props.art}</div>
+      <h4 className="text-lg font-semibold text-gray-900 mb-2 text-balance">
+        {props.title}
+      </h4>
+      <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
+        {props.description}
+      </p>
+    </div>
+  );
+}
+
+function PointGrid(props: { points: Point[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      {props.points.map((point) => (
+        <PointCard
+          key={point.key}
+          art={point.art}
+          title={point.title}
+          description={point.description}
+        />
+      ))}
+    </div>
+  );
+}
+
+const groupHeadingClass =
+  "text-center text-2xl md:text-3xl font-medium text-gray-900 leading-[1.15] tracking-[-0.02em] text-balance mb-6 md:mb-8";
+
 /**
- * The case for Calibrate, made before the reader meets any feature: the six
- * reasons knowing whether your AI works is hard today, then what it should look
- * like instead.
+ * The case for Calibrate, made before the reader meets any feature. It runs as
+ * an argument in three beats: the AI fails where nobody can see it, nothing a
+ * team has today catches that, and here is what should exist instead.
  */
 export function WhyCalibrateSection() {
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="text-center mb-12 md:mb-16">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em] text-balance">
+    <div className="max-w-6xl mx-auto">
+      <div className="text-center mb-10 md:mb-14">
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-5 leading-[1.1] tracking-[-0.02em] text-balance">
           Why AI evaluation is broken today
         </h2>
-        <p className="text-base md:text-xl text-gray-500 text-pretty leading-relaxed max-w-3xl mx-auto">
-          Almost no team building AI for a social programme has a dependable way
-          to know whether it works. MIT studied 300 AI deployments in companies
-          and found that 95 percent produced no measurable result, and the
-          models themselves were rarely the reason. These are the reasons.
+        <p className="text-base md:text-xl text-gray-500 text-pretty max-w-2xl mx-auto">
+          AI lets you reach more people than your team ever could. A bad answer
+          reaches them just as fast, and today almost nobody can tell when that
+          happens.
         </p>
       </div>
 
-      <ol className="space-y-8 md:space-y-10">
-        {PROBLEMS.map((problem, index) => (
-          <li
-            key={problem.title}
-            className="grid grid-cols-1 md:grid-cols-[3.5rem_1fr] gap-2 md:gap-6 border-t border-gray-200 pt-6 md:pt-8"
-          >
-            {/* Tailwind's reset drops the marker an <ol> would normally give
-                each row, so this number is the only one a reader gets. It is
-                content, not decoration, and stays out of aria-hidden. */}
-            <span className="font-mono text-sm font-semibold tabular-nums tracking-wider text-emerald-700">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <div>
-              <h3 className="text-xl md:text-2xl font-semibold text-gray-900 leading-[1.2] tracking-[-0.02em] text-balance">
-                {problem.title}
-              </h3>
-              <p className="mt-3 text-base md:text-lg text-gray-500 leading-relaxed text-pretty">
-                {problem.description}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <h3 className={groupHeadingClass}>
+        AI will fail your users, and you will not see it
+      </h3>
+      <PointGrid points={FAILS_UNSEEN} />
 
-      <div className="text-center mt-16 md:mt-24 mb-10 md:mb-14">
+      <h3 className={`${groupHeadingClass} mt-14 md:mt-20`}>
+        And nothing you have today catches it
+      </h3>
+      <PointGrid points={NOTHING_CATCHES_IT} />
+
+      <div className="text-center mt-16 md:mt-24 mb-8 md:mb-12">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em] text-balance">
           What good AI evaluation looks like
         </h2>
       </div>
+      <PointGrid points={GOALS} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {GOALS.map((goal) => (
-          <div
-            key={goal.title}
-            className="rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm"
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {goal.title}
-            </h3>
-            <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
-              {goal.description}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-12 md:mt-16 flex flex-col items-center gap-4 text-center">
-        <p className="text-base md:text-lg text-gray-500 text-pretty max-w-2xl">
-          New to this? We run a session for leaders on why AI evaluation matters
-          and where to start.
-        </p>
+      {/* Two sessions on /learn, in the order a newcomer needs them: why
+          evaluation matters at all, then how Calibrate does it. */}
+      <div className="mt-10 md:mt-14 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 md:gap-4">
         <Link
           href="/learn#workshop-for-leaders"
-          className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
-          See the session for leaders
+          Watch AI Evals 101
+        </Link>
+        <Link
+          href="/learn#getting-started"
+          className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          Watch Calibrate 101
         </Link>
       </div>
     </div>

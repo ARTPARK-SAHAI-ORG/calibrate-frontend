@@ -25,11 +25,11 @@ export function LandingHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navLinks: NavLink[] = [
+    { label: "Why Calibrate?", href: "/#why-calibrate" },
     { label: "Partners", href: "/#use-cases" },
     { label: "How it works", href: "/#how-it-works" },
     { label: "Use with AI tools", href: "/#coding-agents", badge: "New" },
     { label: "Open source", href: "/#open-source" },
-    { label: "Integrations", href: "/#integrations" },
     { label: "Learn", href: "/learn" },
   ];
 

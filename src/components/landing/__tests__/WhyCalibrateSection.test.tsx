@@ -2,93 +2,85 @@ import { render, screen } from "@/test-utils";
 import { WhyCalibrateSection } from "../WhyCalibrateSection";
 
 describe("WhyCalibrateSection", () => {
-  it("lists every reason evaluation is hard today, numbered in order", () => {
+  it("runs the argument in three beats", () => {
     render(<WhyCalibrateSection />);
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Why AI evaluation is broken today",
-      }),
-    ).toBeInTheDocument();
-
-    const problems = screen.getAllByRole("listitem");
-    expect(problems).toHaveLength(6);
-    expect(problems[0]).toHaveTextContent("01");
-    expect(problems[0]).toHaveTextContent(
-      "Checking a few answers by hand is the standard",
-    );
-    expect(problems[5]).toHaveTextContent("06");
-    expect(problems[5]).toHaveTextContent(
-      "The tools that exist are not built for you",
-    );
+    for (const heading of [
+      "Why AI evaluation is broken today",
+      "AI will fail your users, and you will not see it",
+      "And nothing you have today catches it",
+      "What good AI evaluation looks like",
+    ]) {
+      expect(
+        screen.getByRole("heading", { name: heading }),
+      ).toBeInTheDocument();
+    }
   });
 
-  it("names the AI's own failures, the stakes, and who is shut out", () => {
+  it("opens on the reach that makes a bad answer costly", () => {
     render(<WhyCalibrateSection />);
 
     expect(
-      screen.getByRole("heading", {
-        name: "Ask the same question twice and you can get two different answers",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "The models are weakest where your users are",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "A wrong answer costs more in your work than in most",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "The people who know what a good answer looks like cannot check it themselves",
-      }),
+      screen.getByText(
+        /AI lets you reach more people than your team ever could/,
+      ),
     ).toBeInTheDocument();
   });
 
-  it("turns to what good evaluation looks like instead", () => {
+  it("names the three ways the AI fails unseen", () => {
     render(<WhyCalibrateSection />);
 
-    expect(
-      screen.getByRole("heading", {
-        name: "What good AI evaluation looks like",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "A repeatable way to find mistakes",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "Deploy without breaking what worked",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Your domain experts lead" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "It holds as you grow" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "See failures before a user complains",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "Your data stays where you need it",
-      }),
-    ).toBeInTheDocument();
+    for (const title of [
+      "The same input, a different result",
+      "Weakest in the language your users speak",
+      "A mistake reaches a person, not an order",
+    ]) {
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    }
   });
 
-  it("sends readers to the session for leaders", () => {
+  it("names the three reasons nothing catches it", () => {
+    render(<WhyCalibrateSection />);
+
+    for (const title of [
+      "Checking a few by hand is all anyone does",
+      "It lands on engineers who do not know your domain",
+      "The tools that exist charge for every person you add",
+    ]) {
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    }
+  });
+
+  it("lists the six goals", () => {
+    render(<WhyCalibrateSection />);
+
+    for (const title of [
+      "One repeatable way to find mistakes",
+      "Release changes without breaking what worked",
+      "Your domain experts lead",
+      "More to check does not mean more work",
+      "Catch failures before users do",
+      "Spend your time on the AI",
+    ]) {
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    }
+  });
+
+  it("leaves self-hosting and pricing to the open source section", () => {
+    render(<WhyCalibrateSection />);
+
+    expect(screen.queryByText(/self-host/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/open source/i)).not.toBeInTheDocument();
+  });
+
+  it("offers both sessions, why it matters before how Calibrate does it", () => {
     render(<WhyCalibrateSection />);
 
     expect(
-      screen.getByRole("link", { name: "See the session for leaders" }),
+      screen.getByRole("link", { name: "Watch AI Evals 101" }),
     ).toHaveAttribute("href", "/learn#workshop-for-leaders");
+    expect(
+      screen.getByRole("link", { name: "Watch Calibrate 101" }),
+    ).toHaveAttribute("href", "/learn#getting-started");
   });
 });

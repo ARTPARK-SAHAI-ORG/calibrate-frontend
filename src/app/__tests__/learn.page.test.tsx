@@ -185,8 +185,10 @@ describe("LearnPage", () => {
     const header = screen
       .getAllByRole("navigation")
       .find((nav) => !nav.getAttribute("aria-label"))!;
+    // Anchor on the logo image's alt text: the header also carries a
+    // "Why Calibrate?" link, which a bare /Calibrate/ would match too.
     expect(
-      within(header).getByRole("link", { name: /Calibrate/ }),
+      within(header).getByRole("link", { name: /^Calibrate Logo/ }),
     ).toHaveAttribute("href", "/");
     const footer = screen.getByRole("contentinfo");
     expect(within(footer).getByRole("link", { name: "Learn" })).toHaveAttribute(
