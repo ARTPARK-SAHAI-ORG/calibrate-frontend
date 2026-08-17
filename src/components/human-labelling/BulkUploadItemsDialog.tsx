@@ -383,12 +383,9 @@ export function BulkUploadItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (row[valueHeader] ?? "").trim();
               const rawReasoning = (row[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // A blank value means the annotator chose not to label this
+              // evaluator for this row — skip it rather than erroring.
+              if (!rawValue) continue;
               const parsed = parseAnnotationCell(rawValue, meta);
               if ("error" in parsed) {
                 setParseError(`Row ${i + 1}: ${parsed.error}.`);
@@ -541,7 +538,7 @@ export function BulkUploadItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank to skip annotating this evaluator for the row.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),
