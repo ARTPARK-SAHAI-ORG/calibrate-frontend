@@ -55,6 +55,10 @@ const ENTRIES: LearnItem[] = [
       "The main demo of Calibrate, showing how to evaluate an AI agent and improve it, from start to finish. Start here if you want to see the whole product in one go.",
     recordingEmbedUrl: "https://www.youtube.com/embed/F1oR8QlCnmI",
     recordingUrl: "https://youtu.be/F1oR8QlCnmI",
+    slidesEmbedUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
+    slidesUrl:
+      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
   },
   {
     id: "workshop-for-leaders",
@@ -98,16 +102,6 @@ const ENTRIES: LearnItem[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/embed?start=false&loop=false&delayms=3000&slide=id.p",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/pub?start=false&loop=false&delayms=3000&slide=id.p",
-  },
-  {
-    id: "intro-to-calibrate",
-    title: "Calibrate feature walkthrough",
-    summary:
-      "For those already familiar with the basics of AI evaluation, this guide gives a walkthrough of all the core features on Calibrate using a form filling voice agent as a case study: evaluating LLMs using structured tests, finding the best model across latency, cost and quality, aligning LLM judges with human experts, continuously monitoring agent performance, evaluating speech-to-text and text-to-speech models, and running simulated conversations with agents to evaluate them end-to-end.",
-    slidesEmbedUrl:
-      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
-    slidesUrl:
-      "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
   },
   {
     id: "connect-ai-tool-with-calibrate",
@@ -179,7 +173,7 @@ const ENTRIES: LearnItem[] = [
     id: "ai-evaluation-guide",
     title: "Evaluating AI systems in non-profits using Calibrate",
     summary:
-      "A longer version of the Calibrate feature walkthrough above, additionally covering: How LLMs work, why AI fails in social-sector contexts, how evaluation helps deploy AI responsibly.",
+      "A longer version of the slides that come with the Calibrate demo at the top of this page, additionally covering: How LLMs work, why AI fails in social-sector contexts, how evaluation helps deploy AI responsibly.",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vSaOgSBTLQurLiDp9jSfJtfMyJQYxwPhS5t6drMeZr6mcGSN8y53XNSk9CIPjzpOAoQdV6T-Yv8T-5W/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
