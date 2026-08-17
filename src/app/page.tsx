@@ -1034,9 +1034,9 @@ export default function HomePage() {
 
             <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
               Adding AI to your product is easy. Answering whether it works is
-              hard. Calibrate is built by ML engineers to make AI evaluation
-              accessible for non-profits with best practices baked into every
-              step.
+              hard. Calibrate gives you a simple and repeatable way to find
+              errors, so you can deploy changes confidently without breaking
+              what already works.
             </p>
           </div>
 
