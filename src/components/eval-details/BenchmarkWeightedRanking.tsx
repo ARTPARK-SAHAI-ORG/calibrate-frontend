@@ -16,9 +16,11 @@ import {
   defaultWeights,
   rankModelsByWeights,
   rebalanceWeights,
+  toFinite,
   weightsFromTemplate,
   type RankingDimension,
   type RankingWeights,
+  type WeightedRankingRow,
 } from "@/lib/benchmarkWeightedRanking";
 
 type BenchmarkWeightedRankingProps = {
@@ -40,7 +42,10 @@ const PRESETS: {
   label: string;
   template: Record<RankingDimension, number>;
 }[] = [
-  { label: "Quality first", template: { quality: 0.7, cost: 0.2, latency: 0.1 } },
+  {
+    label: "Quality first",
+    template: { quality: 0.7, cost: 0.2, latency: 0.1 },
+  },
   { label: "Cheapest", template: { quality: 0.2, cost: 0.65, latency: 0.15 } },
   { label: "Fastest", template: { quality: 0.2, cost: 0.15, latency: 0.65 } },
   { label: "Balanced", template: { quality: 1, cost: 1, latency: 1 } },
@@ -56,35 +61,63 @@ export function scoreBandClass(score: number): string {
 }
 
 /**
- * Weight sliders (quality / cost / latency, always summing to 100%) over a
- * benchmark's models, with a leaderboard that re-orders live as the weights
- * move. Shown above the tradeoff scatter in the Model selection tab. Renders
- * nothing unless at least two of the three metrics are present across the run.
+ * LLM benchmark adapter: turns the combined-leaderboard payload into the
+ * ranking widget's rows (quality shown as "N% pass") and feeds
+ * `WeightedRankingView`. Kept as its own export so `BenchmarkResultsDialog`
+ * and its tests are unchanged.
  */
 export function BenchmarkWeightedRanking({
   leaderboardSummary,
   modelResults,
   benchmarkScoreLabel = "Test pass rate (%)",
 }: BenchmarkWeightedRankingProps) {
-  const payload = useMemo(
-    () =>
-      buildBenchmarkCombinedLeaderboardPayload(
-        leaderboardSummary,
-        modelResults,
-        benchmarkScoreLabel,
-      ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel],
-  );
-
-  const dims = useMemo<RankingDimension[]>(() => {
-    if (!payload) return [];
+  const { rows, dims } = useMemo(() => {
+    const payload = buildBenchmarkCombinedLeaderboardPayload(
+      leaderboardSummary,
+      modelResults,
+      benchmarkScoreLabel,
+    );
+    if (!payload)
+      return {
+        rows: [] as WeightedRankingRow[],
+        dims: [] as RankingDimension[],
+      };
     const active: RankingDimension[] = [];
     if (payload.plan.showOverallPassRate) active.push("quality");
     if (payload.plan.showCost) active.push("cost");
     if (payload.plan.showLatency) active.push("latency");
-    return active;
-  }, [payload]);
+    const rows: WeightedRankingRow[] = payload.rows.map((r) => {
+      const passRate = toFinite(r.pass_rate);
+      return {
+        model: String(r.model),
+        name: formatModelName(String(r.model)),
+        qualityText: `${formatPercent(passRate)} pass`,
+        pass_rate: passRate,
+        avg_cost: toFinite(r.avg_cost),
+        avg_latency_ms: toFinite(r.avg_latency_ms),
+      };
+    });
+    return { rows, dims: active };
+  }, [leaderboardSummary, modelResults, benchmarkScoreLabel]);
 
+  return <WeightedRankingView rows={rows} dims={dims} />;
+}
+
+/**
+ * Weight sliders (quality / cost / latency, always summing to 100%) over a set
+ * of models/providers, with a leaderboard that re-orders live as the weights
+ * move. Shown above the tradeoff scatter in the Model selection tab of the LLM,
+ * STT, and TTS results. Quality shows the way each surface's chart does, via the
+ * row's `qualityText`. Renders nothing unless at least two dimensions and two
+ * rows are present.
+ */
+export function WeightedRankingView({
+  rows,
+  dims,
+}: {
+  rows: WeightedRankingRow[];
+  dims: RankingDimension[];
+}) {
   const dimKey = dims.join(",");
   const [weights, setWeights] = useState<RankingWeights>(() =>
     defaultWeights(dims),
@@ -99,9 +132,17 @@ export function BenchmarkWeightedRanking({
   }
 
   const ranked = useMemo(
-    () => rankModelsByWeights(payload?.rows ?? [], weights, dims),
-    [payload, weights, dims],
+    () =>
+      rankModelsByWeights(
+        rows as unknown as Record<string, unknown>[],
+        weights,
+        dims,
+      ),
+    [rows, weights, dims],
   );
+
+  // Display name + quality chunk per row, looked up when rendering the list.
+  const meta = useMemo(() => new Map(rows.map((r) => [r.model, r])), [rows]);
 
   const colorMap = useMemo(
     () => getColorMap(ranked.map((m) => m.model)),
@@ -209,42 +250,48 @@ export function BenchmarkWeightedRanking({
         ref={listRef}
         className="rounded-xl border border-border overflow-hidden"
       >
-        {ranked.map((m) => (
-          <li
-            key={m.model}
-            data-model={m.model}
-            className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 bg-background"
-          >
-            <span className="w-6 text-center tabular-nums text-sm font-medium text-muted-foreground">
-              {m.rank}
-            </span>
-            <span
-              className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: colorMap.get(m.model) }}
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-foreground truncate">
-                {formatModelName(m.model)}
+        {ranked.map((m) => {
+          // Every ranked model came from a `rows` entry, so this always resolves.
+          const row = meta.get(m.model)!;
+          return (
+            <li
+              key={m.model}
+              data-model={m.model}
+              className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 bg-background"
+            >
+              <span className="w-6 text-center tabular-nums text-sm font-medium text-muted-foreground">
+                {m.rank}
+              </span>
+              <span
+                className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: colorMap.get(m.model) }}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-foreground truncate">
+                  {row.name}
+                </div>
+                <div className="text-xs text-muted-foreground tabular-nums">
+                  {row.qualityText} · {formatCostUsd(m.cost)} ·{" "}
+                  {formatLatencyMs(m.latency)}
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground tabular-nums">
-                {formatPercent(m.quality)} pass · {formatCostUsd(m.cost)} ·{" "}
-                {formatLatencyMs(m.latency)}
+              <div className="hidden sm:block w-28">
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${scoreBandClass(Math.round(m.score))}`}
+                    style={{
+                      width: `${Math.round((m.score / topScore) * 100)}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="hidden sm:block w-28">
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${scoreBandClass(Math.round(m.score))}`}
-                  style={{ width: `${Math.round((m.score / topScore) * 100)}%` }}
-                />
-              </div>
-            </div>
-            <span className="w-10 text-right text-base font-medium tabular-nums text-foreground">
-              {Math.round(m.score)}
-            </span>
-          </li>
-        ))}
+              <span className="w-10 text-right text-base font-medium tabular-nums text-foreground">
+                {Math.round(m.score)}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

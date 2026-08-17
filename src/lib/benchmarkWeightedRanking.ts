@@ -43,7 +43,38 @@ export type RankedModel = {
   rank: number;
 };
 
-function toFinite(value: unknown): number | undefined {
+/**
+ * A display-ready input row for the ranking widget. The scorer reads
+ * `pass_rate` / `avg_cost` / `avg_latency_ms` (same field names for LLM and
+ * audio); `name` is the label shown in the list and `qualityText` is the
+ * already-formatted quality chunk of the subtitle (e.g. "72% pass" for LLM,
+ * "WER 0.05" for STT) so each surface shows quality the way its chart does.
+ */
+export type WeightedRankingRow = {
+  model: string;
+  name: string;
+  qualityText: string;
+  pass_rate?: number;
+  avg_cost?: number;
+  avg_latency_ms?: number;
+};
+
+/**
+ * Active dimensions for a set of rows: a dimension is offered only when at
+ * least one row reports its metric. Mirrors the LLM payload's `show*` flags so
+ * a metric absent across the whole run never shows a dead slider.
+ */
+export function dimsFromRows(rows: WeightedRankingRow[]): RankingDimension[] {
+  const dims: RankingDimension[] = [];
+  if (rows.some((r) => toFinite(r.pass_rate) !== undefined)) dims.push("quality");
+  if (rows.some((r) => toFinite(r.avg_cost) !== undefined)) dims.push("cost");
+  if (rows.some((r) => toFinite(r.avg_latency_ms) !== undefined))
+    dims.push("latency");
+  return dims;
+}
+
+/** Coerce to a finite number, or undefined when the value isn't one. */
+export function toFinite(value: unknown): number | undefined {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 }

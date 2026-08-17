@@ -39,9 +39,12 @@ import {
   sttQualityMetrics,
   ttsQualityMetrics,
   buildAudioParetoPoints,
+  buildAudioWeightedRows,
   formatErrorRate,
   type AudioQualityMetric,
 } from "@/lib/audioPareto";
+import { dimsFromRows } from "@/lib/benchmarkWeightedRanking";
+import { WeightedRankingView } from "./BenchmarkWeightedRanking";
 import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
@@ -229,9 +232,7 @@ export const SEMANTIC_WER_ABOUT_METRIC: MetricDescription = {
  * STT About-tab row and the CSV column on both the detail and public pages. */
 export function hasSemanticWerMetric(
   providerResults:
-    | Array<{ metrics?: Record<string, unknown> | null }>
-    | null
-    | undefined,
+    Array<{ metrics?: Record<string, unknown> | null }> | null | undefined,
 ): boolean {
   return (providerResults ?? []).some((pr) => pr.metrics?.semantic_wer != null);
 }
@@ -240,9 +241,7 @@ export function hasSemanticWerMetric(
  * About-tab rows and CSV columns on both the detail and public pages. */
 export function hasSarvamMetrics(
   providerResults:
-    | Array<{ metrics?: Record<string, unknown> | null }>
-    | null
-    | undefined,
+    Array<{ metrics?: Record<string, unknown> | null }> | null | undefined,
 ): boolean {
   return (providerResults ?? []).some(
     (pr) =>
@@ -352,9 +351,7 @@ function readLatencySeconds(value: unknown): number | null {
 /** Whether any provider measured TTFS. Drives the STT About-tab row. */
 export function hasTtfsMetric(
   providerResults:
-    | Array<{ metrics?: Record<string, unknown> | null }>
-    | null
-    | undefined,
+    Array<{ metrics?: Record<string, unknown> | null }> | null | undefined,
 ): boolean {
   return (providerResults ?? []).some(
     (pr) => readLatencySeconds(pr.metrics?.ttfs) != null,
@@ -1000,61 +997,66 @@ function TopPicksChart({
   if (metrics.length === 0) return null;
   const selected = metrics.find((m) => m.id === metricId) ?? metrics[0];
   const points = buildAudioParetoPoints(rows, getProviderLabel, selected, kind);
+  const rankingRows = buildAudioWeightedRows(points, selected);
+  const rankingDims = dimsFromRows(rankingRows);
   return (
     <div className={className}>
-      <ParetoFrontierChart
-        points={points}
-        colorMap={getColorMap(points.map((p) => p.model))}
-        title="Quality vs cost vs latency tradeoff"
-        passRateLabel={selected.label}
-        qualityNoun={selected.qualityNoun}
-        qualityComparative={selected.qualityComparative}
-        entityNoun="provider"
-        costAxisLabel={PARETO_COST_AXIS_LABEL}
-        formatQuality={
-          selected.display === "raw" ? formatErrorRate : undefined
-        }
-        filename={filename}
-        toolbar={
-          metrics.length > 1 ? (
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor={`${filename}-metric`}
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Plot quality by
-              </label>
-              <div className="relative inline-block">
-                <select
-                  id={`${filename}-metric`}
-                  value={selected.id}
-                  onChange={(e) => setMetricId(e.target.value)}
-                  className="appearance-none rounded-md border border-border bg-background py-1 pl-2 pr-8 text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+      <div className="space-y-6">
+        <WeightedRankingView rows={rankingRows} dims={rankingDims} />
+        <ParetoFrontierChart
+          points={points}
+          colorMap={getColorMap(points.map((p) => p.model))}
+          title="Quality vs cost vs latency tradeoff"
+          passRateLabel={selected.label}
+          qualityNoun={selected.qualityNoun}
+          qualityComparative={selected.qualityComparative}
+          entityNoun="provider"
+          costAxisLabel={PARETO_COST_AXIS_LABEL}
+          formatQuality={
+            selected.display === "raw" ? formatErrorRate : undefined
+          }
+          filename={filename}
+          toolbar={
+            metrics.length > 1 ? (
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor={`${filename}-metric`}
+                  className="text-xs font-medium text-muted-foreground"
                 >
-                  {metrics.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
+                  Plot quality by
+                </label>
+                <div className="relative inline-block">
+                  <select
+                    id={`${filename}-metric`}
+                    value={selected.id}
+                    onChange={(e) => setMetricId(e.target.value)}
+                    className="appearance-none rounded-md border border-border bg-background py-1 pl-2 pr-8 text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    {metrics.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </div>
               </div>
-            </div>
-          ) : undefined
-        }
-      />
+            ) : undefined
+          }
+        />
+      </div>
     </div>
   );
 }
