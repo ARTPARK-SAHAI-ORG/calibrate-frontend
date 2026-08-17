@@ -114,4 +114,13 @@ describe("LandingHeader", () => {
       screen.getByRole("link", { name: "Use with AI tools New" }),
     ).toHaveAttribute("href", "/#coding-agents");
   });
+
+  it("shows open source as a green pill", () => {
+    render(<LandingHeader />);
+    const label = screen
+      .getByRole("link", { name: "Open source" })
+      .querySelector("span");
+    expect(label).toHaveTextContent("Open source");
+    expect(label?.className).toContain("bg-emerald-50/90");
+  });
 });

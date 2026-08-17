@@ -16,6 +16,9 @@ type NavLink = {
   external?: boolean;
   /** Small pill after the label, for a section worth pointing at. */
   badge?: string;
+  /** Draw the label itself as a pill, the way the hero used to say
+   * "Open source". */
+  pill?: boolean;
 };
 
 export function LandingHeader({
@@ -29,15 +32,20 @@ export function LandingHeader({
     { label: "Partners", href: "/#use-cases" },
     { label: "How it works", href: "/#how-it-works" },
     { label: "Use with AI tools", href: "/#coding-agents", badge: "New" },
-    { label: "Open source", href: "/#open-source" },
+    { label: "Open source", href: "/#open-source", pill: true },
     { label: "Learn", href: "/learn" },
   ];
 
   const badgeClass =
     "rounded border border-emerald-200/90 bg-emerald-50/90 px-1 py-px text-[9px] font-semibold uppercase tracking-wider text-emerald-950";
 
+  const pillClass =
+    "inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-2 py-0.5 font-semibold text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]";
+
   const renderNavLabel = (link: NavLink, badgeVisibility: string) =>
-    link.badge ? (
+    link.pill ? (
+      <span className={pillClass}>{link.label}</span>
+    ) : link.badge ? (
       <span className="inline-flex items-center gap-1.5">
         {link.label}
         <span className={`${badgeVisibility} ${badgeClass}`}>{link.badge}</span>
