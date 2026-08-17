@@ -1025,6 +1025,9 @@ export default function HomePage() {
                 <span className="font-semibold tracking-wide text-gray-800">
                   GOVERNMENT OF KARNATAKA
                 </span>
+              </span>{" "}
+              <span className="mt-1 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)] md:mt-0 md:ml-1.5 md:text-[11px]">
+                Open source
               </span>
             </p>
             <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">

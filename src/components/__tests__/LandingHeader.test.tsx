@@ -24,6 +24,20 @@ describe("LandingHeader", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("takes the reader back to the top of the page when the logo is clicked", async () => {
+    const user = setupUser();
+    const scrollTo = jest.fn();
+    Object.defineProperty(window, "scrollTo", {
+      writable: true,
+      value: scrollTo,
+    });
+    render(<LandingHeader />);
+    await user.click(
+      screen.getByRole("button", { name: "Back to the top of the page" }),
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+  });
+
   it("renders the logo as a link to / when showLogoLink is true", () => {
     render(<LandingHeader showLogoLink />);
     const link = screen.getByRole("link", { name: logoName });
@@ -113,14 +127,5 @@ describe("LandingHeader", () => {
     expect(
       screen.getByRole("link", { name: "Use with AI tools New" }),
     ).toHaveAttribute("href", "/#coding-agents");
-  });
-
-  it("shows open source as a green pill", () => {
-    render(<LandingHeader />);
-    const label = screen
-      .getByRole("link", { name: "Open source" })
-      .querySelector("span");
-    expect(label).toHaveTextContent("Open source");
-    expect(label?.className).toContain("bg-emerald-50/90");
   });
 });

@@ -261,8 +261,8 @@ const navSections: NavSection[] = [
         icon: <TourIcon className="w-4 h-4" />,
       },
       {
-        id: "docs",
-        label: "Documentation",
+        id: "tutorials",
+        label: "Tutorials",
         icon: (
           <svg
             className="w-4 h-4"
@@ -573,9 +573,9 @@ export function AppLayout({
                             {item.icon}
                             {item.label}
                           </button>
-                        ) : item.id === "docs" ? (
+                        ) : item.id === "tutorials" ? (
                           <a
-                            href={process.env.NEXT_PUBLIC_DOCS_URL}
+                            href="/learn"
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => {
@@ -657,9 +657,9 @@ export function AppLayout({
                         >
                           {item.icon}
                         </button>
-                      ) : item.id === "docs" ? (
+                      ) : item.id === "tutorials" ? (
                         <a
-                          href={process.env.NEXT_PUBLIC_DOCS_URL}
+                          href="/learn"
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={item.label}

@@ -125,6 +125,13 @@ describe("AppLayout", () => {
     expect(toolsLink).toHaveAttribute("href", "/tools");
   });
 
+  it("opens the learning resources page from Tutorials", () => {
+    renderLayout();
+    const tutorials = screen.getByText("Tutorials").closest("a");
+    expect(tutorials).toHaveAttribute("href", "/learn");
+    expect(tutorials).toHaveAttribute("target", "_blank");
+  });
+
   it("toggles the sidebar", async () => {
     const user = setupUser();
     const { onSidebarToggle } = renderLayout();
