@@ -993,75 +993,64 @@ export default function HomePage() {
         <div className="pointer-events-none absolute top-20 left-1/4 h-64 w-64 rounded-full bg-emerald-100 opacity-40 blur-3xl"></div>
         <div className="pointer-events-none absolute top-40 right-1/4 h-48 w-48 rounded-full bg-blue-100 opacity-40 blur-3xl"></div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-8 text-center md:flex-none md:px-8 md:py-20 lg:py-24">
-          <div className="flex min-h-0 flex-1 flex-col justify-center md:flex-none">
-            <div className="mb-4 flex justify-center md:mb-6">
-              <span className="inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-                Open source
+        <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-8 text-center md:flex-none md:px-8 md:py-10 lg:py-12">
+          <div className="flex min-h-0 flex-col">
+            {/* Who built and funded Calibrate, read before the heading. */}
+            <p className="mx-auto mb-4 flex max-w-2xl shrink-0 flex-col items-center gap-1 text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mb-6 md:block md:text-[13px] md:text-balance">
+              <span className="block md:contents">
+                <span className="font-normal text-gray-400">BUILT BY</span>{" "}
+                <a
+                  href={ARTPARK_WEBSITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mx-0.5 inline cursor-pointer text-inherit underline-offset-[3px] decoration-gray-400/80 transition-colors hover:text-gray-700 hover:decoration-gray-600"
+                >
+                  <span className="whitespace-nowrap">ARTPARK</span>
+                  <img
+                    src="/artpark-mark.webp"
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="ml-1 inline-block h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] object-contain align-[-0.2em] md:max-h-4 md:max-w-4"
+                  />
+                </a>{" "}
+                @ IISc
               </span>
-            </div>
+              <span className="hidden md:inline" aria-hidden>
+                {" "}
+                ·{" "}
+              </span>
+              <span className="block md:contents">
+                <span className="font-normal text-gray-400">FUNDED BY</span>{" "}
+                <span className="font-semibold tracking-wide text-gray-800">
+                  GOVERNMENT OF KARNATAKA
+                </span>
+              </span>
+            </p>
             <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">
               AI agent evaluation for {"non\u2011profits"}
               <br />
             </h1>
 
             <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
-              Adding AI to your product is easy. But answering whether it works
-              is hard. Manual verification can help you launch but it does not
-              ensure reliability at scale. Existing evaluation tools are either
-              too complex or overly expensive for {"non\u2011profits"}.
-              Calibrate is built by ML engineers with decades of experience to
-              make AI evaluation accessible with best practices baked into every
+              Adding AI to your product is easy. Answering whether it works is
+              hard. Calibrate is built by ML engineers to make AI evaluation
+              accessible for non-profits with best practices baked into every
               step.
             </p>
           </div>
 
-          <p className="mx-auto mt-10 flex max-w-2xl shrink-0 flex-col items-center gap-1 text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:block md:text-[13px] md:text-balance">
-            <span className="block md:contents">
-              <span className="font-normal text-gray-400">BUILT BY</span>{" "}
-              <a
-                href={ARTPARK_WEBSITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mx-0.5 inline cursor-pointer text-inherit underline-offset-[3px] decoration-gray-400/80 transition-colors hover:text-gray-700 hover:decoration-gray-600"
-              >
-                <span className="whitespace-nowrap">ARTPARK</span>
-                <img
-                  src="/artpark-mark.webp"
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="ml-1 inline-block h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] object-contain align-[-0.2em] md:max-h-4 md:max-w-4"
-                />
-              </a>{" "}
-              @ IISc
-            </span>
-            <span className="hidden md:inline" aria-hidden>
-              {" "}
-              ·{" "}
-            </span>
-            <span className="block md:contents">
-              <span className="font-normal text-gray-400">FUNDED BY</span>{" "}
-              <span className="font-semibold tracking-wide text-gray-800">
-                GOVERNMENT OF KARNATAKA
-              </span>
-            </span>
-          </p>
-
-          {/* The demo, the same one /learn opens with. */}
-          <div className="mt-10 md:mt-14 w-full max-w-3xl mx-auto">
-            <div
-              className="relative w-full"
-              style={{ paddingBottom: "56.25%" }}
-            >
-              <iframe
-                className="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
-                src={DEMO_VIDEO_EMBED_URL}
-                title={DEMO_VIDEO_TITLE}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
+          {/* The demo, the same one /learn opens with. On a computer its
+              height comes from the height of the screen, so it always sits on
+              the first screen with the heading, without scrolling. */}
+          <div className="mx-auto mt-6 aspect-video w-full max-w-3xl md:mt-8 md:h-[min(28rem,calc(100dvh-32rem))] md:w-auto md:max-w-none">
+            <iframe
+              className="h-full w-full rounded-xl shadow-lg"
+              src={DEMO_VIDEO_EMBED_URL}
+              title={DEMO_VIDEO_TITLE}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           </div>
         </div>
       </div>
@@ -1528,7 +1517,10 @@ export default function HomePage() {
                 Close
               </button>
             </div>
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+            <div
+              className="relative w-full"
+              style={{ paddingBottom: "56.25%" }}
+            >
               <iframe
                 className="absolute top-0 left-0 h-full w-full rounded-xl shadow-lg"
                 src={`${DEMO_VIDEO_EMBED_URL}?autoplay=1`}
