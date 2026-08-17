@@ -60,4 +60,14 @@ test.describe("Signed out", () => {
 
     await expect(page).toHaveURL("/");
   });
+
+  test("a blog post opens without signing in", async ({ page }) => {
+    const post = "/blog/the-model-is-no-longer-the-problem";
+    await page.goto(post);
+
+    await expect(page).toHaveURL(post);
+    await expect(
+      page.getByRole("heading", { name: "The model is no longer the problem" }),
+    ).toBeVisible();
+  });
 });

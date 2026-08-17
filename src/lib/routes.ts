@@ -31,6 +31,7 @@ const PUBLIC_PREFIXES = [
   "/terms",
   "/privacy",
   "/changelog",
+  "/blog",
   "/docs",
   "/debug",
   "/about",

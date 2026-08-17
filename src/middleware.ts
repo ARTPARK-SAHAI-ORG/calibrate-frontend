@@ -33,11 +33,12 @@ export default auth((req) => {
   const isPrivacyPage = req.nextUrl.pathname === "/privacy";
   const isChangelogPage = req.nextUrl.pathname === "/changelog";
   const isLearnPage = req.nextUrl.pathname === "/learn";
+  const isBlogRoute = req.nextUrl.pathname.startsWith("/blog");
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, public share links, annotate-job links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isPublicShareRoute || isAnnotateJobRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, public share links, annotate-job links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isPublicShareRoute || isAnnotateJobRoute) {
     return NextResponse.next();
   }
 

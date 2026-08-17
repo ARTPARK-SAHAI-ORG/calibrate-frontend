@@ -35,6 +35,11 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/blog" className="hover:text-gray-900 transition-colors">
+                  Blog
+                </Link>
+              </li>
+              <li>
                 <Link href="/changelog" className="hover:text-gray-900 transition-colors">
                   Changelog
                 </Link>

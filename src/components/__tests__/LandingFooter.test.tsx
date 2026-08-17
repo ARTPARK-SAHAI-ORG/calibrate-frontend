@@ -23,6 +23,10 @@ describe("LandingFooter", () => {
       "href",
       "/learn",
     );
+    expect(screen.getByRole("link", { name: "Blog" })).toHaveAttribute(
+      "href",
+      "/blog",
+    );
     expect(screen.getByRole("link", { name: "Changelog" })).toHaveAttribute(
       "href",
       "/changelog",
