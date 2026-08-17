@@ -32,6 +32,11 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
   },
   {
+    id: "connect-ai-tool-with-calibrate",
+    recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
+    recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
+  },
+  {
     id: "workshop-for-leaders",
     recordingEmbedUrl: "https://www.youtube.com/embed/Hsqm8lR1U8w",
     recordingUrl: "https://youtu.be/Hsqm8lR1U8w",
@@ -50,11 +55,6 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/embed?start=false&loop=false&delayms=3000&slide=id.p",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/pub?start=false&loop=false&delayms=3000&slide=id.p",
-  },
-  {
-    id: "connect-ai-tool-with-calibrate",
-    recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
-    recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
   },
   {
     id: "office-hours",

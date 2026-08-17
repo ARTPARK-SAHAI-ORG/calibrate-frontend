@@ -50,15 +50,23 @@ type LearnItem = {
 const ENTRIES: LearnItem[] = [
   {
     id: "calibrate-demo",
-    title: "Evaluating and improving AI agents with Calibrate",
+    title: "Calibrate tutorial",
     summary:
-      "The main demo of Calibrate, showing how to evaluate an AI agent and improve it, from start to finish. Start here if you want to see the whole product in one go.",
+      "A step-by-step walkthrough of all the core features on Calibrate using a form filling voice agent as a case study: evaluating LLMs using structured tests, finding the best model across latency, cost and quality, aligning LLM judges with human experts, continuously monitoring agent performance, evaluating speech-to-text and text-to-speech models, and running simulated conversations with agents to evaluate them end-to-end.",
     recordingEmbedUrl: "https://www.youtube.com/embed/F1oR8QlCnmI",
     recordingUrl: "https://youtu.be/F1oR8QlCnmI",
     slidesEmbedUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "connect-ai-tool-with-calibrate",
+    title: "Convert your AI tool into an AI eval agent",
+    summary:
+      "Using the Calibrate command line tool and skills, you can connect your preferred AI tool with Calibrate so that it can create the evals automatically for your use case, upload and run them on Calibrate, analyse what went wrong, and suggest fixes. It can also analyse where your LLM judges disagree with humans and iterate on the judge on its own until it is aligned, without requiring you to intervene at each step.",
+    recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
+    recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
   },
   {
     id: "workshop-for-leaders",
@@ -91,7 +99,7 @@ const ENTRIES: LearnItem[] = [
   },
   {
     id: "getting-started",
-    title: "Getting started with Calibrate",
+    title: "Empowering domain experts with AI evals",
     summary:
       "A tutorial on how Calibrate helps evaluate AI agents using a form-filling voice agent as a case study. It explains the eval-driven approach to building agents, where evals are not considered an afterthought but closely inform what needs to be built and help ensure agent quality. We show how to convert each failure mode into a test case and comprehensively discuss how to evaluate open-ended responses using LLM judges. We also share best practices and the pitfalls to avoid.",
     recordingEmbedUrl:
@@ -103,14 +111,7 @@ const ENTRIES: LearnItem[] = [
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQYRP-s0ouc0fvSIZurEoZH7ie56OGGlxjW0bBju8J0_vCRqT5pqreIcSBHDlKPLJnjWa4OFceW3EtZ/pub?start=false&loop=false&delayms=3000&slide=id.p",
   },
-  {
-    id: "connect-ai-tool-with-calibrate",
-    title: "Connecting your AI tool with Calibrate",
-    summary:
-      "Using the Calibrate command line tool and skills, you can connect your preferred AI tool with Calibrate so that it can create the evals automatically for your use case, upload and run them on Calibrate, analyse what went wrong, and suggest fixes. It can also analyse where your LLM judges disagree with humans and iterate on the judge on its own until it is aligned, without requiring you to intervene at each step.",
-    recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
-    recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
-  },
+
   {
     id: "office-hours",
     title: "AI evals office hours",
@@ -171,7 +172,7 @@ const ENTRIES: LearnItem[] = [
 
   {
     id: "ai-evaluation-guide",
-    title: "Evaluating AI systems in non-profits using Calibrate",
+    title: "Evaluating and improving AI agents",
     summary:
       "A longer version of the slides that come with the Calibrate demo at the top of this page, additionally covering: How LLMs work, why AI fails in social-sector contexts, how evaluation helps deploy AI responsibly.",
     slidesEmbedUrl:
