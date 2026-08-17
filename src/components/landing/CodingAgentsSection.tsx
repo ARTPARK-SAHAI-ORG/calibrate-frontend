@@ -12,7 +12,7 @@ const AGENTS: { id: string; label: string; flag: string }[] = [
 ];
 
 /** The recording of the same walkthrough that /learn shows under
- * "Connecting your AI tool with Calibrate". */
+ * "Convert your AI tool into an AI eval agent". */
 const WALKTHROUGH_EMBED_URL = "https://www.youtube.com/embed/Vx3oxYKbLVw";
 
 /** Teaches the coding agent how to use Calibrate. Documented at
@@ -210,7 +210,7 @@ export function CodingAgentsSection() {
           <iframe
             className="absolute top-0 left-0 h-full w-full rounded-xl shadow-lg"
             src={WALKTHROUGH_EMBED_URL}
-            title="Connecting your AI tool with Calibrate"
+            title="Convert your AI tool into an AI eval agent"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />

@@ -51,7 +51,7 @@ describe("CodingAgentsSection", () => {
     );
     expect(frame).toHaveAttribute(
       "title",
-      "Connecting your AI tool with Calibrate",
+      "Convert your AI tool into an AI eval agent",
     );
   });
 
