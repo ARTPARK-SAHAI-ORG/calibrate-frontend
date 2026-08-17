@@ -598,6 +598,11 @@ import {
   WHATSAPP_INVITE_URL,
 } from "@/constants/links";
 
+/** The demo, shown in the hero and in the dialog the last button opens. The
+ * same recording opens the /learn page. */
+const DEMO_VIDEO_TITLE = "Calibrate demo";
+const DEMO_VIDEO_EMBED_URL = "https://www.youtube.com/embed/F1oR8QlCnmI";
+
 function tabIdFromHash(hash: string): string | null {
   let id: string;
   try {
@@ -611,6 +616,7 @@ function tabIdFromHash(hash: string): string | null {
 export default function HomePage() {
   const [activeFeatureSectionId, setActiveFeatureSectionId] =
     useState<string>("llm");
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
   // While a click-driven smooth scroll is in flight, holds the clicked tab id so
   // the scroll listener keeps it active instead of flipping to sections it passes.
   const pendingScrollTargetRef = useRef<string | null>(null);
@@ -624,6 +630,16 @@ export default function HomePage() {
   useEffect(() => {
     document.title = "Calibrate | AI evaluation platform for NGOs";
   }, []);
+
+  // Escape closes the demo, as it does in every other dialog in the app.
+  useEffect(() => {
+    if (!isDemoOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsDemoOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDemoOpen]);
 
   const scrollLandingTabIntoView = (
     tabId: string,
@@ -1032,21 +1048,21 @@ export default function HomePage() {
             </span>
           </p>
 
-          {/* Launch Video */}
-          {/* <div className="mt-8 md:mt-12 w-full max-w-3xl mx-auto">
+          {/* The demo, the same one /learn opens with. */}
+          <div className="mt-10 md:mt-14 w-full max-w-3xl mx-auto">
             <div
               className="relative w-full"
               style={{ paddingBottom: "56.25%" }}
             >
               <iframe
                 className="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
-                src="https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1"
-                title="Calibrate Launch Video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                src={DEMO_VIDEO_EMBED_URL}
+                title={DEMO_VIDEO_TITLE}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
             </div>
-          </div> */}
+          </div>
         </div>
       </div>
 
@@ -1476,17 +1492,54 @@ export default function HomePage() {
             >
               Get started for free
             </Link>
-            {/* Sends the reader back up to the walk through of what Calibrate
-                does, the same section the header's "How it works" link opens. */}
-            <a
-              href="#how-it-works"
+            {/* Plays the demo in front of the page, so the reader does not
+                lose their place. */}
+            <button
+              type="button"
+              onClick={() => setIsDemoOpen(true)}
               className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 border border-white/40 text-white hover:bg-white/10 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
             >
-              See how it works
-            </a>
+              See the demo
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Only on screen while it is open, so closing it stops the video. */}
+      {isDemoOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={DEMO_VIDEO_TITLE}
+          onClick={() => setIsDemoOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+        >
+          <div
+            className="w-full max-w-4xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDemoOpen(false)}
+                aria-label="Close the demo"
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+              <iframe
+                className="absolute top-0 left-0 h-full w-full rounded-xl shadow-lg"
+                src={`${DEMO_VIDEO_EMBED_URL}?autoplay=1`}
+                title={DEMO_VIDEO_TITLE}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <LandingFooter />
     </div>

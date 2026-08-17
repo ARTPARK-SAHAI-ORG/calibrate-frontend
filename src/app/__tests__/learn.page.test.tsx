@@ -23,6 +23,11 @@ type ExpectedTalk = {
 
 const EXPECTED_TALKS: ExpectedTalk[] = [
   {
+    id: "calibrate-demo",
+    recordingEmbedUrl: "https://www.youtube.com/embed/F1oR8QlCnmI",
+    recordingUrl: "https://youtu.be/F1oR8QlCnmI",
+  },
+  {
     id: "workshop-for-leaders",
     recordingEmbedUrl: "https://www.youtube.com/embed/Hsqm8lR1U8w",
     recordingUrl: "https://youtu.be/Hsqm8lR1U8w",

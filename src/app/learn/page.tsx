@@ -49,6 +49,14 @@ type LearnItem = {
  */
 const ENTRIES: LearnItem[] = [
   {
+    id: "calibrate-demo",
+    title: "Evaluating and improving AI agents with Calibrate",
+    summary:
+      "The main demo of Calibrate, showing how to evaluate an AI agent and improve it, from start to finish. Start here if you want to see the whole product in one go.",
+    recordingEmbedUrl: "https://www.youtube.com/embed/F1oR8QlCnmI",
+    recordingUrl: "https://youtu.be/F1oR8QlCnmI",
+  },
+  {
     id: "workshop-for-leaders",
     title: "Getting started with AI evals",
     summary: (
