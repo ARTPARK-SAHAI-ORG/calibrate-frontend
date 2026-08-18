@@ -1,6 +1,15 @@
 import "@testing-library/jest-dom";
 
 /**
+ * A build that does not say which address it answers on is treated as a copy
+ * of the hosted site, and asks search engines to skip it (IS_CANONICAL_SITE in
+ * src/lib/site.ts). Tests run as the hosted site, so that guard does not turn
+ * itself on everywhere. The tests in src/app/__tests__/seo.test.ts set their
+ * own value where they need a different one.
+ */
+process.env.NEXT_PUBLIC_APP_URL ||= "https://calibrate.artpark.ai";
+
+/**
  * Global mocks for component/interaction tests.
  *
  * These modules ship untranspiled ESM (next-auth) or require the Next.js

@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Hit a block, say so immediately.** Anything outside the work that stops you — a git lock file, a port already in use, a missing `node_modules` in a fresh worktree, a dev server that will not start, a crashed background process — gets reported the moment you hit it, in one line, with what you need. One obvious retry is allowed. After that, stop and ask: do not try workarounds, and never delete, kill, or reset something to get past it without permission.
 
+> **Check it before you call it a risk.** Never end a report with a setting, a
+> server value, or a deploy detail for the user to go and confirm. Check it
+> yourself first: the site is public, so `curl https://calibrate.artpark.ai/...`
+> reads the live canonical link, the live `robots.txt`, or whatever else you
+> were about to ask about. If your change did not touch it and it was already
+> working in production, it is not a risk and does not belong in the report, the
+> commit message, or the pull request at all. No hypothetical failure sources.
+
 > **Abstract every fix; never patch just the one instance.** When the user points at a problem, don't fix only the exact line they quoted. Work out the underlying rule and apply it consistently to _every_ place it's relevant across your changes and the surrounding code. Then verify the whole set (grep/audit), don't eyeball one case. A fix that isn't generalized is incomplete and will read as sloppy, naive logic.
 
 ## Project

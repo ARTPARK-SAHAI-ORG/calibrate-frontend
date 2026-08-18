@@ -575,6 +575,16 @@ describe("a copy of this site running on another domain", () => {
     expect(copyRootMetadata.robots).toEqual({ index: false, follow: false });
   });
 
+  it("counts a build that names no address at all as a copy", async () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const site = await reload(() => import("@/lib/site"));
+
+    expect(site.IS_CANONICAL_SITE).toBe(false);
+    // The address is still needed for absolute links, so it falls back to the
+    // real site. Only the search guard treats the missing value as a copy.
+    expect(site.SITE_URL).toBe(CANONICAL_SITE_URL);
+  });
+
   it.each([
     ["with a slash on the end", "https://calibrate.artpark.ai/"],
     ["without the s in https", "http://calibrate.artpark.ai"],

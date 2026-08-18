@@ -20,9 +20,12 @@ export const CANONICAL_SITE_URL = "https://calibrate.artpark.ai";
  * fallback is production, so a preview build with no value set points readers
  * at the real site rather than at a dead address.
  */
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL || CANONICAL_SITE_URL
-).replace(/\/$/, "");
+const CONFIGURED_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(
+  /\/$/,
+  "",
+);
+
+export const SITE_URL = CONFIGURED_URL || CANONICAL_SITE_URL;
 
 /**
  * Just the domain, so http against https, a capital letter, or a www in front
@@ -43,9 +46,13 @@ function bareHost(url: string): string {
  * Naming the real address in a canonical link is a request a search engine may
  * ignore. This is what actually keeps a copy out of search: robots.ts blocks
  * every crawler and the root layout adds noindex when this is false.
+ *
+ * Read from NEXT_PUBLIC_APP_URL itself rather than from SITE_URL, so a build
+ * that never set it counts as a copy rather than inheriting the real site
+ * through the fallback below.
  */
 export const IS_CANONICAL_SITE =
-  bareHost(SITE_URL) === bareHost(CANONICAL_SITE_URL);
+  bareHost(CONFIGURED_URL) === bareHost(CANONICAL_SITE_URL);
 
 /**
  * A page's one true address: always on the real site, never on the server that
