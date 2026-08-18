@@ -41,7 +41,7 @@ export const POSTS: BlogPost[] = [
     date: "2026-08-17",
     author: "Aman Dalmia",
     summary:
-      "Teams are shipping AI faster than ever and hardly asking whether it works. What is missing is not a better model. It is evaluation.",
+      "Evaluation is the missing piece that translates model capability to real impact.",
     body: (
       <>
         <p>
