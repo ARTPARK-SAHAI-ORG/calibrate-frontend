@@ -10,7 +10,7 @@ import {
   findPost,
   tabTitle,
 } from "@/lib/blogPosts";
-import { shareImage } from "@/lib/site";
+import { canonicalUrl, shareImage } from "@/lib/site";
 
 type PostPageProps = { params: Promise<{ slug: string }> };
 
@@ -26,13 +26,13 @@ export async function generateMetadata({
   return {
     title: tabTitle(post),
     description: post.summary,
-    alternates: { canonical: `/blog/${post.slug}` },
+    alternates: { canonical: canonicalUrl(`/blog/${post.slug}`) },
     openGraph: {
       type: "article",
       siteName: "Calibrate",
       title: post.title,
       description: post.summary,
-      url: `/blog/${post.slug}`,
+      url: canonicalUrl(`/blog/${post.slug}`),
       publishedTime: post.date,
       authors: [post.author],
       // A post with its own picture describes it with its own headline,

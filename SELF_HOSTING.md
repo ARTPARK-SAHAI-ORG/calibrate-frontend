@@ -52,12 +52,25 @@ cp env.example .env.local
 
 | Variable                         | Description                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_APP_URL`            | Same as `AUTH_URL`. Used by client code for absolute links.                       |
+| `NEXT_PUBLIC_APP_URL`            | Same as `AUTH_URL`. Used by client code for absolute links. See the note below.   |
 | `NEXT_PUBLIC_DOCS_URL`           | Best to point it to the actual docs site: https://calibrate.artpark.ai/docs       |
 | `NEXT_PUBLIC_SENTRY_DSN`         | Sentry project DSN for error monitoring. Leave empty to disable.                  |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production`, `preview`, or `development`. Not needed if Sentry is not enabled.   |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID`  | Google Analytics 4 ID (`G-...`). Leave empty to disable analytics.                |
 | `MAINTENANCE_MODE`               | Set to `true` to redirect all non-API traffic to `/`. Useful for cutover windows. |
+
+#### Your copy is kept out of search results
+
+Setting `NEXT_PUBLIC_APP_URL` to your own address tells the app it is not the
+hosted site at calibrate.artpark.ai. When that is the case, it asks search
+engines to skip it: its `robots.txt` blocks every crawler and its pages carry a
+`noindex` line. The blog and the other public pages also keep naming
+calibrate.artpark.ai as their real address.
+
+This is on purpose. The blog posts ship with the code, so without it your copy
+and ours would be the same words on two domains, and a search engine would show
+one and hide the other. Your own installation works exactly the same either way:
+nothing about the app is hidden from the people using it, only from crawlers.
 
 ### 4. Run locally
 

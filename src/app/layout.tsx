@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
-import { pageMetadata, SITE_URL } from "@/lib/site";
+import { IS_CANONICAL_SITE, pageMetadata, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FloatingButtonProvider } from "@/components/providers/FloatingButtonProvider";
 import { OrganizationBootstrapper } from "@/components/OrganizationBootstrapper";
@@ -55,6 +55,11 @@ export const metadata: Metadata = {
     template: "%s",
   },
   twitter: { card: "summary_large_image" },
+  // A copy of this app on someone else's domain, and our own preview builds,
+  // ask to be left out of search entirely. robots.txt blocks crawlers there
+  // too, but that is a request a crawler may ignore; this is the line that
+  // takes a page back out once it has been read.
+  ...(IS_CANONICAL_SITE ? {} : { robots: { index: false, follow: false } }),
 };
 
 export default function RootLayout({

@@ -191,6 +191,25 @@ The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) holds
 the list of pages against `PAGES` in the sitemap and fails when a page's preview
 address is not its own, or when two pages hand out the same words.
 
+### Only the hosted site is offered to search
+
+The code is open, so anyone can serve every blog post from their own domain,
+and our preview builds do the same on throwaway addresses. A search engine
+treats two identical pages as rivals and shows one, so a copy left open can
+take the credit for our writing.
+
+`CANONICAL_SITE_URL` in [src/lib/site.ts](src/lib/site.ts) is the real site,
+written out rather than read from the environment. Canonical links, `og:url`,
+the sitemap and the article facts a post hands Google are all built from it, so
+every copy points the credit back here. `IS_CANONICAL_SITE` is false whenever
+`NEXT_PUBLIC_APP_URL` names anything else: [robots.ts](src/app/robots.ts) then
+blocks every crawler and [layout.tsx](src/app/layout.tsx) adds `noindex`, which
+is the half that actually keeps a copy out.
+
+`SITE_URL` is still this build's own address and stays that way: it is what
+`metadataBase` and the robots.txt sitemap line need. Never write a public
+page's address from it.
+
 ### The picture a shared link shows
 
 The box WhatsApp, LinkedIn and X draw around a pasted link uses one picture,
