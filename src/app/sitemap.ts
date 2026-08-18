@@ -3,7 +3,18 @@ import { POSTS } from "@/lib/blogPosts";
 import { SITE_URL } from "@/lib/site";
 
 /** The pages worth finding that are not blog posts. */
-const PAGES = ["/", "/learn", "/changelog", "/blog"];
+export const PAGES = ["/", "/learn", "/changelog", "/blog"];
+
+/**
+ * Pages left out of the sitemap because they need signing in, so a search
+ * engine can never see them anyway.
+ *
+ * Written as the folder name under src/app. A new page has to appear here, in
+ * PAGES, or in the robots block list, or the test in
+ * src/app/__tests__/seo.test.ts fails and names it. That is the only thing
+ * stopping a page from being quietly invisible to search.
+ */
+export const BEHIND_SIGN_IN = ["[org]"];
 
 /**
  * Every page we want in search results.

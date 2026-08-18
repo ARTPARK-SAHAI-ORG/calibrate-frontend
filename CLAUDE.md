@@ -146,6 +146,27 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
 
+### A new page must be filed for search, in the same change
+
+Adding a folder under `src/app` that answers an address means putting it in one
+of three lists, or the "Sitemap and robots" check fails and names it:
+
+- `PAGES` in [src/app/sitemap.ts](src/app/sitemap.ts) — anyone can read it and we want it found.
+- The `disallow` list in [src/app/robots.ts](src/app/robots.ts) — anyone can open it but it must stay out of search. Anything reached by a token in the address, plus API and internal pages.
+- `BEHIND_SIGN_IN` in [src/app/sitemap.ts](src/app/sitemap.ts) — it needs signing in, so a search engine cannot reach it anyway.
+
+**File it yourself when the answer is obvious, and say which list you chose and
+why in one line when you report the change.** Obvious means: a marketing or
+writing page open to everyone goes in `PAGES`; anything under the workspace or
+otherwise behind sign-in goes in `BEHIND_SIGN_IN`; a token link, an API route,
+or a debug page goes in the `disallow` list.
+
+**Ask when it is not obvious, and do not guess.** A page open to everyone that
+we may not want advertised is the usual case: a campaign landing page, a page
+that repeats another one, something meant only for people given the link. The
+cost of guessing is silent, since a wrongly filed page either never appears in
+search or appears when it should not, and nothing breaks either way.
+
 ### Server-paginated list bar
 
 Use this whenever a list is backed by server-side `limit`/`offset` paging (today: **Traces tab** and **human-alignment task items tab**). Copy the markup from `TracesTabContent` or `src/app/[org]/human-alignment/tasks/[uuid]/page.tsx` — do not invent a new layout.

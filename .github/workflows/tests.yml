@@ -10,6 +10,21 @@ on:
 # backend-free public specs; `e2e-integration` boots the real backend and runs
 # authenticated specs. Both e2e jobs upload the `e2e` flag (Codecov merges them).
 jobs:
+  # Its own check so a red cross on the pull request reads "Sitemap and
+  # robots" and names what broke. The component job skips this file
+  # (SKIP_SEO_TESTS below) so one unfiled page fails one check, not two.
+  seo:
+    name: Sitemap and robots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- src/app/__tests__/seo.test.ts
+
   component:
     name: Component tests (Jest)
     runs-on: ubuntu-latest
@@ -21,6 +36,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:coverage
+        env:
+          SKIP_SEO_TESTS: "1"
       - name: Upload component coverage
         uses: codecov/codecov-action@v5
         with:
