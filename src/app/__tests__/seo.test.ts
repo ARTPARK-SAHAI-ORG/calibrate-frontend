@@ -10,6 +10,8 @@
 // jest cannot read. Only the layout's metadata is read here, never rendered.
 jest.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 
+// First, before anything below reads the address this build answers on.
+import "@/test-utils/hostedSiteEnv";
 import type { Metadata } from "next";
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
