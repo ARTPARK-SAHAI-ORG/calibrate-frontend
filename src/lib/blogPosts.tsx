@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
+import { WHATSAPP_INVITE_URL } from "@/constants/links";
 
 /**
  * Everything the blog holds, newest first. Posts are written here rather than
@@ -110,6 +111,59 @@ export function findPost(slug: string): BlogPost | undefined {
 }
 
 export const POSTS: BlogPost[] = [
+  {
+    slug: "calibrate-at-indiafoss",
+    title: "Calibrate will be at IndiaFOSS",
+    seoTitle: "Calibrate at IndiaFOSS",
+    date: "2026-08-18",
+    author: "Aman Dalmia",
+    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    summary:
+      "Our proposal to present Calibrate at IndiaFOSS, the biggest gathering of the open-source community in India, has been accepted.",
+    body: (
+      <>
+        <p>
+          Our proposal to present{" "}
+          <Link
+            href="/"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            Calibrate
+          </Link>{" "}
+          at IndiaFOSS, the biggest gathering of the open-source community in
+          India, has been accepted.
+        </p>
+        <p>
+          If you want to learn about the challenges of evaluating agents, or you
+          are struggling to make your own AI systems reliable, I would love to
+          catch up with you there. I will share what we have been building and
+          testing in partnership with several non-profits, to address the major
+          gaps in all existing AI evaluation tools and to help domain experts
+          take the lead in highly sensitive fields like health, education and
+          agriculture.
+        </p>
+        <p>
+          I am especially looking forward to meeting all the students who are
+          eager to learn about and start their open-source journey. We have
+          ample learning opportunities for those who want to know how AI is
+          being used to solve genuinely useful problems, beyond the ones that
+          get all the hype, and to build their skills by contributing.
+        </p>
+        <p>
+          Come and say hello at the conference. If you cannot make it, our{" "}
+          <a
+            href={WHATSAPP_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            community
+          </a>{" "}
+          is open to everyone.
+        </p>
+      </>
+    ),
+  },
   {
     slug: "evaluation-is-all-you-need",
     title: "Evaluation is all you need",
