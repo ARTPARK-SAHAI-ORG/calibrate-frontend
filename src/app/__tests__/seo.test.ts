@@ -10,7 +10,7 @@
 // jest cannot read. Only the layout's metadata is read here, never rendered.
 jest.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { metadata as rootMetadata } from "../layout";
 import { metadata as blogMetadata } from "../blog/layout";
@@ -18,7 +18,7 @@ import { metadata as changelogMetadata } from "../changelog/layout";
 import { metadata as learnMetadata } from "../learn/layout";
 import { generateMetadata as postMetadata } from "../blog/[slug]/page";
 import robots from "../robots";
-import sitemap from "../sitemap";
+import sitemap, { PAGES, BEHIND_SIGN_IN } from "../sitemap";
 import { POSTS, articleJsonLd, tabTitle } from "@/lib/blogPosts";
 import type { BlogPost } from "@/lib/blogPosts";
 import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
@@ -233,5 +233,57 @@ describe("the browser tab", () => {
     });
     expect(meta.title).toBe(tabTitle(POSTS[0]));
     expect(meta.openGraph?.title).toBe(POSTS[0].title);
+  });
+});
+
+/**
+ * The one check that survives someone adding a page months from now.
+ *
+ * A page nobody lists is invisible to search and nobody notices, because
+ * nothing breaks: the page loads, the build passes, and it simply never
+ * appears in Google. So every page with an address of its own has to be
+ * declared somewhere, and this fails by name when one is not.
+ */
+describe("every page is accounted for", () => {
+  const APP_DIR = join(__dirname, "..");
+
+  /** True when this folder, or anything under it, answers an address. */
+  function hasRoute(dir: string): boolean {
+    return readdirSync(dir, { withFileTypes: true }).some((entry) =>
+      entry.isDirectory()
+        ? hasRoute(join(dir, entry.name))
+        : entry.name === "page.tsx" || entry.name === "route.ts",
+    );
+  }
+
+  /** Folder name of every page with an address, "" for the landing page. */
+  function routeFolders(): string[] {
+    const folders = readdirSync(APP_DIR, { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name !== "__tests__" &&
+          hasRoute(join(APP_DIR, entry.name)),
+      )
+      .map((entry) => entry.name);
+    return existsSync(join(APP_DIR, "page.tsx")) ? ["", ...folders] : folders;
+  }
+
+  /** "/blog", "/api/" and "blog" all name the same folder. */
+  const folderOf = (path: string) => path.replace(/^\/|\/$/g, "");
+
+  it("lists every page in the sitemap, in the robots block list, or behind sign-in", () => {
+    const declared = new Set([
+      ...PAGES.map(folderOf),
+      ...(robots().rules as { disallow: string[] }).disallow.map(folderOf),
+      ...BEHIND_SIGN_IN.map(folderOf),
+    ]);
+
+    expect(routeFolders().filter((folder) => !declared.has(folder))).toEqual([]);
+  });
+
+  it("knows what it is looking at", () => {
+    expect(routeFolders()).toContain("blog");
+    expect(routeFolders()).toContain("");
   });
 });
