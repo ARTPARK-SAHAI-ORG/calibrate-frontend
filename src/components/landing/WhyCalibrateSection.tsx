@@ -598,7 +598,10 @@ export function WhyCalibrateSection() {
       </h3>
       <PointGrid points={NOTHING_CATCHES_IT} />
 
-      <div className="text-center mt-16 md:mt-24 mb-8 md:mb-12">
+      <div
+        id="good-evaluation"
+        className="scroll-mt-20 text-center mt-16 md:mt-24 mb-8 md:mb-12"
+      >
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em] text-balance">
           What good AI evaluation looks like
         </h2>

@@ -58,6 +58,13 @@ test.describe("Public routes", () => {
     await expect(page).toHaveURL(/\/#about-calibrate$/);
   });
 
+  test("a good-evaluation hash opens that section", async ({ page }) => {
+    await page.goto("/#good-evaluation");
+    await expect(page.locator("#good-evaluation")).toBeInViewport({
+      timeout: 10000,
+    });
+  });
+
   test("a protected route bounces a logged-out user to /login", async ({
     page,
   }) => {

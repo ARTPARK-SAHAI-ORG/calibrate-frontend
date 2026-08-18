@@ -84,4 +84,10 @@ describe("WhyCalibrateSection", () => {
       "/learn#getting-started",
     ]);
   });
+
+  it("gives the goals block an address a link can open", () => {
+    const { container } = render(<WhyCalibrateSection />);
+
+    expect(container.querySelector("#good-evaluation")).toBeTruthy();
+  });
 });
