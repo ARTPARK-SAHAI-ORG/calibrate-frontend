@@ -205,7 +205,8 @@ of the wide banner. The words are what a screen reader says in place of it.
 
 - Site-wide picture: `images: [shareImage()]`.
 - A page or post with its own: `images: [shareImage(post.image, post.title)]`, where the second argument describes that picture.
-- Every picture is 1200 by 630 and lives under `public/`. The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) reads the file's own header and fails if a declared size stops matching, so a picture of another size cannot ship quietly.
+- A page in `PAGES`: pass `image` to `pageMetadata()` and put the file under `public/share/`. A blog post: set `image` on the post and put the file under `public/blog/`.
+- Every picture is 1200 by 630 and under 300 KB. The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) reads the file's own header and its weight, so a picture of another size cannot ship quietly, and neither can one exported at full quality by mistake. WhatsApp stops showing a heavy picture with no warning: the link simply appears as bare text.
 
 ### Server-paginated list bar
 

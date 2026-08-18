@@ -282,6 +282,22 @@ describe("what the preview box is told about the picture", () => {
     ]);
   }
 
+  /**
+   * WhatsApp stops showing a preview picture reliably somewhere above a few
+   * hundred kilobytes, and there is no warning when it gives up: the link just
+   * appears as bare text. Everything we ship is well under this, so the cap is
+   * a tripwire for a picture exported at full quality by mistake, not a budget
+   * to spend up to.
+   */
+  const HEAVIEST_PICTURE_BYTES = 300 * 1024;
+
+  it("keeps every picture light enough for WhatsApp to show", async () => {
+    for (const [name, picture] of await declaredPictures()) {
+      const bytes = readFileSync(join(PUBLIC_DIR, picture.url)).length;
+      expect([name, bytes < HEAVIEST_PICTURE_BYTES]).toEqual([name, true]);
+    }
+  });
+
   it("gives every page a picture, its real size, and words for it", async () => {
     const pages = await declaredPictures();
     expect(pages.length).toBe(PAGES.length + POSTS.length);
