@@ -40,15 +40,25 @@ describe("Blog", () => {
       "href",
       "/blog",
     );
-
-    const picture = document.querySelector(`img[src="${post.image}"]`);
-    expect(picture).toBeInTheDocument();
-    // Empty alt text: the picture repeats the headline right above it, so a
-    // screen reader should skip it rather than read the title twice.
-    expect(picture).toHaveAttribute("alt", "");
   });
 
-  it("shows the first post in full", async () => {
+  it("plays the walkthrough video on the IndiaFOSS post", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+      }),
+    );
+
+    expect(
+      screen.getByTitle("Recording of the Calibrate walkthrough"),
+    ).toHaveAttribute("src", "https://www.youtube.com/embed/F1oR8QlCnmI");
+    expect(screen.getByRole("link", { name: "learn page" })).toHaveAttribute(
+      "href",
+      "/learn",
+    );
+  });
+
+  it("shows a post in full, picture and all", async () => {
     render(
       await BlogPostPage({
         params: Promise.resolve({
@@ -58,6 +68,13 @@ describe("Blog", () => {
     );
 
     expect(screen.getByText("17 August 2026")).toBeInTheDocument();
+    const picture = document.querySelector(
+      'img[src="/blog/evaluation-is-all-you-need.png"]',
+    );
+    expect(picture).toBeInTheDocument();
+    // Empty alt text: the picture repeats the headline right above it, so a
+    // screen reader should skip it rather than read the title twice.
+    expect(picture).toHaveAttribute("alt", "");
     expect(screen.getByText("So, where are we lacking?")).toBeInTheDocument();
     expect(
       screen.getByText("Open-source. Free. Self-hostable."),

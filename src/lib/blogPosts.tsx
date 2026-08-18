@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
+import { WHATSAPP_INVITE_URL } from "@/constants/links";
 
 /**
  * Everything the blog holds, newest first. Posts are written here rather than
@@ -111,6 +112,71 @@ export function findPost(slug: string): BlogPost | undefined {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "calibrate-at-indiafoss",
+    title: "Calibrate will be at IndiaFOSS",
+    seoTitle: "Calibrate at IndiaFOSS",
+    date: "2026-08-18",
+    author: "Aman Dalmia",
+    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    summary:
+      "Our proposal to present Calibrate at IndiaFOSS, the biggest gathering of the open-source community in India, has been accepted.",
+    body: (
+      <>
+        <p>
+          Our proposal to present{" "}
+          <Link
+            href="/"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            Calibrate
+          </Link>{" "}
+          at IndiaFOSS, the biggest gathering of the open-source community in
+          India, has been accepted.
+        </p>
+        <p>
+          If you want to learn about the challenges of evaluating agents, or you
+          are struggling to make your own AI systems reliable, I would love to
+          catch up with you there. I will share what we have been building and
+          testing in partnership with several non-profits, to address the major
+          gaps in all existing AI evaluation tools and to help domain experts
+          take the lead in highly sensitive fields like health, education and
+          agriculture.
+        </p>
+        <p>
+          I am especially looking forward to meeting all the students who are
+          eager to learn about and start their open-source journey. We have
+          ample learning opportunities for those who want to know how AI is
+          being used to solve genuinely useful problems, beyond the ones that
+          get all the hype, and to build their skills by contributing.
+        </p>
+        <p>
+          If you are attending too,{" "}
+          <a
+            href="https://www.linkedin.com/in/aman-dalmia/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            let's connect
+          </a>{" "}
+          .
+        </p>
+
+        <p>
+          To learn more about Calibrate, you can see our past talks and
+          tutorials{" "}
+          <Link
+            href="/learn"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            here
+          </Link>
+          .
+        </p>
+      </>
+    ),
+  },
+  {
     slug: "evaluation-is-all-you-need",
     title: "Evaluation is all you need",
     seoTitle: "How to evaluate your AI agents",
@@ -156,11 +222,11 @@ export const POSTS: BlogPost[] = [
           The social sector operates in high-stakes domains: agriculture,
           health, education, livelihoods, poverty, to name a few. A mistake can
           genuinely impact someone&apos;s life as they are often not well
-          equipped to distinguish an AI-generated response from an
-          expert&apos;s advice. I am often asked questions like &ldquo;whether
-          the team should move to the latest model released last week&rdquo;,
-          but hardly &ldquo;are we sure the AI is responding accurately for the
-          most critical inputs we receive&rdquo;. My response is always the same
+          equipped to distinguish an AI-generated response from an expert&apos;s
+          advice. I am often asked questions like &ldquo;whether the team should
+          move to the latest model released last week&rdquo;, but hardly
+          &ldquo;are we sure the AI is responding accurately for the most
+          critical inputs we receive&rdquo;. My response is always the same
           boring one: &ldquo;only the evals can answer that&rdquo;. I don&apos;t
           hear back from them after that, until the next model release.
         </p>
