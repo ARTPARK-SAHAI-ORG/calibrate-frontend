@@ -43,7 +43,7 @@ describe("Blog", () => {
     render(
       await BlogPostPage({
         params: Promise.resolve({
-          slug: "the-model-is-no-longer-the-problem",
+          slug: "evaluation-is-all-you-need",
         }),
       }),
     );

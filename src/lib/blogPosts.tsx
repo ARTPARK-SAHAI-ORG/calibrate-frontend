@@ -36,8 +36,8 @@ export function findPost(slug: string): BlogPost | undefined {
 
 export const POSTS: BlogPost[] = [
   {
-    slug: "the-model-is-no-longer-the-problem",
-    title: "The model is no longer the problem",
+    slug: "evaluation-is-all-you-need",
+    title: "Evaluation is all you need",
     date: "2026-08-17",
     author: "Aman Dalmia",
     summary:
