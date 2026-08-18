@@ -189,7 +189,7 @@ describe("LearnPage", () => {
     expect(insights).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("links to the documentation, the calendar and the changelog at the top", () => {
+  it("links to the documentation, the calendar, the blog and the changelog at the top", () => {
     render(<LearnPage />);
     // The footer carries its own documentation and changelog links, so look
     // in the page body only.
@@ -201,6 +201,10 @@ describe("LearnPage", () => {
     expect(
       main.getByRole("link", { name: "Upcoming sessions" }),
     ).toHaveAttribute("href", WEBINARS_URL);
+    expect(main.getByRole("link", { name: "Blog" })).toHaveAttribute(
+      "href",
+      "/blog",
+    );
     expect(main.getByRole("link", { name: "Changelog" })).toHaveAttribute(
       "href",
       "/changelog",

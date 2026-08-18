@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Changelog | Calibrate",
   description: "Everything we have changed in Calibrate, newest first.",
+  alternates: { canonical: "/changelog" },
 };
 
 export default function ChangelogLayout({
