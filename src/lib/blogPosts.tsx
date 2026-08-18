@@ -150,34 +150,26 @@ export const POSTS: BlogPost[] = [
           get all the hype, and to build their skills by contributing.
         </p>
         <p>
-          Come and say hello at the conference. If you cannot make it, our{" "}
+          If you are attending too,{" "}
           <a
-            href={WHATSAPP_INVITE_URL}
+            href="https://www.linkedin.com/in/aman-dalmia/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
           >
-            community
+            let's connect
           </a>{" "}
-          is open to everyone.
+          .
         </p>
-        <p>A longer version of roughly what we will present is here:</p>
-        {/* Same treatment the recordings get on the learn page, so a video
-            reads the same wherever it appears. */}
-        <iframe
-          src="https://www.youtube.com/embed/F1oR8QlCnmI"
-          title="Recording of the Calibrate walkthrough"
-          className="w-full aspect-video rounded-xl overflow-hidden shadow-xl"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+
         <p>
-          Every recording and set of slides we have published sits on the{" "}
+          To learn more about Calibrate, you can see our past talks and
+          tutorials{" "}
           <Link
             href="/learn"
             className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
           >
-            learn page
+            here
           </Link>
           .
         </p>
@@ -230,11 +222,11 @@ export const POSTS: BlogPost[] = [
           The social sector operates in high-stakes domains: agriculture,
           health, education, livelihoods, poverty, to name a few. A mistake can
           genuinely impact someone&apos;s life as they are often not well
-          equipped to distinguish an AI-generated response from an
-          expert&apos;s advice. I am often asked questions like &ldquo;whether
-          the team should move to the latest model released last week&rdquo;,
-          but hardly &ldquo;are we sure the AI is responding accurately for the
-          most critical inputs we receive&rdquo;. My response is always the same
+          equipped to distinguish an AI-generated response from an expert&apos;s
+          advice. I am often asked questions like &ldquo;whether the team should
+          move to the latest model released last week&rdquo;, but hardly
+          &ldquo;are we sure the AI is responding accurately for the most
+          critical inputs we receive&rdquo;. My response is always the same
           boring one: &ldquo;only the evals can answer that&rdquo;. I don&apos;t
           hear back from them after that, until the next model release.
         </p>
