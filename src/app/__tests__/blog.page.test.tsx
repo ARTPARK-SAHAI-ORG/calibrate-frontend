@@ -42,6 +42,22 @@ describe("Blog", () => {
     );
   });
 
+  it("plays the walkthrough video on the IndiaFOSS post", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+      }),
+    );
+
+    expect(
+      screen.getByTitle("Recording of the Calibrate walkthrough"),
+    ).toHaveAttribute("src", "https://www.youtube.com/embed/F1oR8QlCnmI");
+    expect(screen.getByRole("link", { name: "learn page" })).toHaveAttribute(
+      "href",
+      "/learn",
+    );
+  });
+
   it("shows a post in full, picture and all", async () => {
     render(
       await BlogPostPage({

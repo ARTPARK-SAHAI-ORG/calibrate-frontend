@@ -161,6 +161,26 @@ export const POSTS: BlogPost[] = [
           </a>{" "}
           is open to everyone.
         </p>
+        <p>A longer version of roughly what we will present is here:</p>
+        {/* Same treatment the recordings get on the learn page, so a video
+            reads the same wherever it appears. */}
+        <iframe
+          src="https://www.youtube.com/embed/F1oR8QlCnmI"
+          title="Recording of the Calibrate walkthrough"
+          className="w-full aspect-video rounded-xl overflow-hidden shadow-xl"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+        <p>
+          Every recording and set of slides we have published sits on the{" "}
+          <Link
+            href="/learn"
+            className="font-medium text-gray-900 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+          >
+            learn page
+          </Link>
+          .
+        </p>
       </>
     ),
   },
