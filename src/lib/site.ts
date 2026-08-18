@@ -67,10 +67,17 @@ export function pageMetadata({
   path,
   title,
   description,
+  image,
 }: {
   path: string;
   title: string;
   description: string;
+  /**
+   * The page's own picture, as a path from the site root, for a page that has
+   * one drawn for it. Leave it out to use the site-wide picture. Must be 1200
+   * by 630, which the test in src/app/__tests__/seo.test.ts holds it to.
+   */
+  image?: string;
 }): Metadata {
   return {
     title,
@@ -82,7 +89,10 @@ export function pageMetadata({
       title,
       description,
       url: path,
-      images: [shareImage()],
+      // A page with its own picture is described by its own title, since that
+      // is what the picture says. The rest fall back to the site-wide picture
+      // and the words that go with it.
+      images: [image ? shareImage(image, title) : shareImage()],
     },
   };
 }

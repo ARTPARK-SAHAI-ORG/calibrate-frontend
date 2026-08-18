@@ -22,7 +22,13 @@ import robots from "../robots";
 import sitemap, { PAGES, BEHIND_SIGN_IN } from "../sitemap";
 import { POSTS, articleJsonLd, tabTitle } from "@/lib/blogPosts";
 import type { BlogPost } from "@/lib/blogPosts";
-import { SHARE_IMAGE, SHARE_IMAGE_ALT, SITE_URL, shareImage } from "@/lib/site";
+import {
+  SHARE_IMAGE,
+  SHARE_IMAGE_ALT,
+  SITE_URL,
+  pageMetadata,
+  shareImage,
+} from "@/lib/site";
 
 /** A picture in the preview box: where it is, how big, and what it says. */
 type OgImage = { url: string; width: number; height: number; alt: string };
@@ -301,6 +307,19 @@ describe("what the preview box is told about the picture", () => {
 
     expect(picture.url).toBe(post.image);
     expect(picture.alt).toBe(post.title);
+  });
+
+  it("lets a page use its own picture, described by its own title", () => {
+    const meta = pageMetadata({
+      path: "/learn",
+      title: "Learn | Calibrate",
+      description: "Learning resources on Calibrate and AI evals",
+      image: "/share/learn.png",
+    });
+
+    expect((meta.openGraph as { images: OgImage[] }).images).toEqual([
+      shareImage("/share/learn.png", "Learn | Calibrate"),
+    ]);
   });
 
   it("falls back to the site-wide picture and its words", () => {
