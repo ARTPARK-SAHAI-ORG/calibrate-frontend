@@ -174,6 +174,23 @@ that repeats another one, something meant only for people given the link. The
 cost of guessing is silent, since a wrongly filed page either never appears in
 search or appears when it should not, and nothing breaks either way.
 
+### A page open to everyone writes its own link preview
+
+Build the metadata for any page in `PAGES` with `pageMetadata()` from
+[src/lib/site.ts](src/lib/site.ts). Never hand-write the title, description,
+canonical link and `openGraph` block on such a page.
+
+Next does not mix a page's own title into a preview box it inherited. A page
+that sets a title but no `openGraph` block of its own hands out the home page's
+title, description and address to anyone who pastes its link. Nothing breaks:
+the page loads, the tab is right, the build passes. The only symptom is the
+wrong words in a chat window, which is invisible from inside the code. Learn and
+the changelog did this for months.
+
+The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) holds
+the list of pages against `PAGES` in the sitemap and fails when a page's preview
+address is not its own, or when two pages hand out the same words.
+
 ### The picture a shared link shows
 
 The box WhatsApp, LinkedIn and X draw around a pasted link uses one picture,

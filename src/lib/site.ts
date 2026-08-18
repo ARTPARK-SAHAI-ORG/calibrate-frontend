@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /**
  * Where the site lives, as an absolute address.
  *
@@ -45,5 +47,42 @@ export function shareImage(path: string = SHARE_IMAGE, alt = SHARE_IMAGE_ALT) {
     width: SHARE_IMAGE_WIDTH,
     height: SHARE_IMAGE_HEIGHT,
     alt,
+  };
+}
+
+/**
+ * Everything a page open to everyone needs: what it is called, what it says,
+ * its one true address, and the box a pasted link gets.
+ *
+ * Written once because Next does not mix a page's title into a preview box it
+ * inherited. A page that sets a title but no preview box of its own quietly
+ * shows the home page's title, description and address instead. Learn and the
+ * changelog did exactly that for months and nothing broke, which is why it went
+ * unnoticed.
+ *
+ * Every page listed in PAGES in src/app/sitemap.ts is built from this, and the
+ * test in src/app/__tests__/seo.test.ts fails if one of them is not.
+ */
+export function pageMetadata({
+  path,
+  title,
+  description,
+}: {
+  path: string;
+  title: string;
+  description: string;
+}): Metadata {
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "website",
+      siteName: "Calibrate",
+      title,
+      description,
+      url: path,
+      images: [shareImage()],
+    },
   };
 }

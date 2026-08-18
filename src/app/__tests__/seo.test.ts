@@ -10,6 +10,7 @@
 // jest cannot read. Only the layout's metadata is read here, never rendered.
 jest.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 
+import type { Metadata } from "next";
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { metadata as rootMetadata } from "../layout";
@@ -108,6 +109,61 @@ describe("canonical addresses", () => {
       expect(meta.alternates?.canonical).toBe(`/blog/${post.slug}`);
     }
   });
+});
+
+/**
+ * Every page open to everyone, and the preview box it hands out.
+ *
+ * Kept as a map rather than a list so the first test below can hold it against
+ * the sitemap: a page added to one and not the other fails here by name.
+ */
+const PUBLIC_PAGES: Record<string, Metadata> = {
+  "/": rootMetadata,
+  "/learn": learnMetadata,
+  "/changelog": changelogMetadata,
+  "/blog": blogMetadata,
+};
+
+/**
+ * The trap that caught learn and the changelog.
+ *
+ * Next does not mix a page's own title into a preview box it inherited. A page
+ * that sets a title but no preview box of its own shows the home page's title,
+ * description and address to anyone who pastes its link, and nothing breaks:
+ * the page loads, the build passes, the tab is right. The only symptom is the
+ * wrong words in a chat window, which nobody sees from inside the code.
+ */
+describe("every page open to everyone speaks for itself", () => {
+  it("covers exactly the pages in the sitemap", () => {
+    expect(Object.keys(PUBLIC_PAGES).sort()).toEqual([...PAGES].sort());
+  });
+
+  it.each(PAGES)("gives %s its own address in the preview box", (path) => {
+    expect(PUBLIC_PAGES[path].openGraph?.url).toBe(path);
+  });
+
+  it("never lets a page hand out another page's words", () => {
+    const said = PAGES.map((path) => {
+      const openGraph = PUBLIC_PAGES[path].openGraph;
+      return `${openGraph?.title} | ${openGraph?.description}`;
+    });
+
+    expect(new Set(said).size).toBe(PAGES.length);
+  });
+
+  it.each(PAGES)(
+    "says the same thing in the tab and the preview for %s",
+    (path) => {
+      const meta = PUBLIC_PAGES[path];
+      const title =
+        typeof meta.title === "string"
+          ? meta.title
+          : (meta.title as { default: string }).default;
+
+      expect(meta.openGraph?.title).toBe(title);
+      expect(meta.openGraph?.description).toBe(meta.description);
+    },
+  );
 });
 
 /**
@@ -212,8 +268,7 @@ describe("what the preview box is told about the picture", () => {
       }),
     );
     return [
-      ["the landing page", rootMetadata] as const,
-      ["the blog", blogMetadata] as const,
+      ...PAGES.map((path) => [path, PUBLIC_PAGES[path]] as const),
       ...posts,
     ].map(([name, meta]) => [
       name,
@@ -223,7 +278,7 @@ describe("what the preview box is told about the picture", () => {
 
   it("gives every page a picture, its real size, and words for it", async () => {
     const pages = await declaredPictures();
-    expect(pages.length).toBe(2 + POSTS.length);
+    expect(pages.length).toBe(PAGES.length + POSTS.length);
 
     for (const [name, picture] of pages) {
       expect([name, picture.width]).toEqual([name, 1200]);

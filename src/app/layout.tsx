@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
-import { shareImage, SITE_URL } from "@/lib/site";
+import { pageMetadata, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FloatingButtonProvider } from "@/components/providers/FloatingButtonProvider";
 import { OrganizationBootstrapper } from "@/components/OrganizationBootstrapper";
@@ -32,30 +32,27 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
+  // The landing page cannot set any of this itself: it is a client component,
+  // and those cannot export metadata. The canonical link and the preview box
+  // come from here for that reason.
+  //
+  // Pages behind sign-in inherit the lot and so claim to be the home page,
+  // which never reaches a crawler because it is sent to the login page first.
+  // Every page open to everyone writes its own through the same helper.
+  ...pageMetadata({
+    path: "/",
+    title: "Calibrate",
+    description: "Open-source AI agent evaluation for non-profits",
+  }),
   // Names the site once, so every page below can write a canonical link or a
   // preview image as a short path and still emit a full address. Without it
   // Next guesses, and on Vercel it guesses the throwaway deployment address.
   metadataBase: new URL(SITE_URL),
+  // Only the root carries this. A page passes the whole tab title it wants, so
+  // the template leaves it alone.
   title: {
     default: "Calibrate",
     template: "%s",
-  },
-  description: "Open-source AI agent evaluation for non-profits",
-  // The landing page cannot set this itself: it is a client component, and
-  // those cannot export metadata. Pages behind sign-in inherit it and so claim
-  // to be the home page, which never reaches a crawler because it is sent to
-  // the login page first.
-  alternates: { canonical: "/" },
-  // The box WhatsApp, LinkedIn and X draw around a pasted link. Every page
-  // inherits this one unless it sets its own, so a link to any page shows a
-  // picture and a headline rather than bare text.
-  openGraph: {
-    type: "website",
-    siteName: "Calibrate",
-    title: "Calibrate",
-    description: "Open-source AI agent evaluation for non-profits",
-    url: "/",
-    images: [shareImage()],
   },
   twitter: { card: "summary_large_image" },
 };
