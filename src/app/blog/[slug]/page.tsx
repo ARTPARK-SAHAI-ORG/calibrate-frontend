@@ -70,6 +70,17 @@ export default async function BlogPostPage({ params }: PostPageProps) {
             {post.title}
           </h1>
           <PostByline post={post} className="mt-4" />
+          {post.image && (
+            // Width and height are the real ones, so the page does not jump
+            // when the picture finishes loading.
+            <img
+              src={post.image}
+              alt=""
+              width={1200}
+              height={630}
+              className="mt-8 md:mt-10 w-full rounded-xl"
+            />
+          )}
           {/* The post is written as paragraphs, so they are spaced here rather
               than one class at a time inside every post. */}
           <div className="mt-10 md:mt-12 space-y-6 text-base md:text-lg text-gray-700 leading-relaxed text-pretty">

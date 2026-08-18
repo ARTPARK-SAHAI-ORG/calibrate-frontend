@@ -40,6 +40,12 @@ describe("Blog", () => {
       "href",
       "/blog",
     );
+
+    const picture = document.querySelector(`img[src="${post.image}"]`);
+    expect(picture).toBeInTheDocument();
+    // Empty alt text: the picture repeats the headline right above it, so a
+    // screen reader should skip it rather than read the title twice.
+    expect(picture).toHaveAttribute("alt", "");
   });
 
   it("shows the first post in full", async () => {
