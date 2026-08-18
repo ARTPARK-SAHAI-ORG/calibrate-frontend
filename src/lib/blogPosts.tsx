@@ -12,6 +12,11 @@ export type BlogPost = {
    * survives a change of title. */
   slug: string;
   title: string;
+  /** What the browser tab and the search result say, when that should differ
+   * from the headline on the page. A headline can be short and sharp; this can
+   * carry the words someone would actually type into a search. Falls back to
+   * the headline. */
+  seoTitle?: string;
   /** The day it went up, as year-month-day. */
   date: string;
   author: string;
@@ -65,6 +70,11 @@ export function formatPostDate(date: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** What the browser tab and the search result say. */
+export function tabTitle(post: BlogPost): string {
+  return `${post.seoTitle ?? post.title} | Calibrate`;
 }
 
 /** The date and who wrote it, shown the same way wherever a post appears. */

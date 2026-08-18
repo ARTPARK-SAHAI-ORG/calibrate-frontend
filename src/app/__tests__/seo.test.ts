@@ -10,6 +10,8 @@
 // jest cannot read. Only the layout's metadata is read here, never rendered.
 jest.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 import { metadata as rootMetadata } from "../layout";
 import { metadata as blogMetadata } from "../blog/layout";
 import { metadata as changelogMetadata } from "../changelog/layout";
@@ -17,7 +19,8 @@ import { metadata as learnMetadata } from "../learn/layout";
 import { generateMetadata as postMetadata } from "../blog/[slug]/page";
 import robots from "../robots";
 import sitemap from "../sitemap";
-import { POSTS, articleJsonLd } from "@/lib/blogPosts";
+import { POSTS, articleJsonLd, tabTitle } from "@/lib/blogPosts";
+import type { BlogPost } from "@/lib/blogPosts";
 import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
 
 describe("sitemap", () => {
@@ -139,6 +142,41 @@ describe("link previews", () => {
 });
 
 /**
+ * The picture itself, not just the line of metadata pointing at it. Naming a
+ * file that was never added is silent: the build passes, the page loads, and
+ * the only symptom is a bare link with no picture wherever it is shared. The
+ * size matters as much as the file, since WhatsApp and LinkedIn crop anything
+ * that is not 1200 by 630.
+ */
+describe("share pictures", () => {
+  const PUBLIC_DIR = join(__dirname, "..", "..", "..", "public");
+
+  /** Width and height straight out of the PNG header. */
+  function pngSize(path: string): { width: number; height: number } {
+    const header = readFileSync(path).subarray(16, 24);
+    return { width: header.readUInt32BE(0), height: header.readUInt32BE(4) };
+  }
+
+  const pictures = [
+    ["the site-wide fallback", SHARE_IMAGE],
+    ...POSTS.filter((post) => post.image).map(
+      (post) => [`the ${post.slug} post`, post.image as string] as const,
+    ),
+  ] as const;
+
+  it.each(pictures)("ships a file for %s", (_name, path) => {
+    expect(existsSync(join(PUBLIC_DIR, path))).toBe(true);
+  });
+
+  it.each(pictures)("sizes %s at 1200 by 630", (_name, path) => {
+    expect(pngSize(join(PUBLIC_DIR, path))).toEqual({
+      width: 1200,
+      height: 630,
+    });
+  });
+});
+
+/**
  * What Google reads to show a result as a dated article by a person rather
  * than a bare link. Every address in it has to be a full one, since the block
  * is read away from the page it sits in.
@@ -168,5 +206,32 @@ describe("article facts", () => {
     ]) {
       expect(url.startsWith(`${SITE_URL}/`)).toBe(true);
     }
+  });
+});
+
+/**
+ * A headline that reads well on the page is often not what someone types into
+ * a search. The tab and the search result can carry those words instead, while
+ * the page keeps its headline.
+ */
+describe("the browser tab", () => {
+  const post = { title: "Evaluation is all you need" } as BlogPost;
+
+  it("uses the headline when a post asks for nothing else", () => {
+    expect(tabTitle(post)).toBe("Evaluation is all you need | Calibrate");
+  });
+
+  it("uses the searchable words when a post has them", () => {
+    expect(tabTitle({ ...post, seoTitle: "Why AI evals matter" })).toBe(
+      "Why AI evals matter | Calibrate",
+    );
+  });
+
+  it("leaves the preview box showing the headline", async () => {
+    const meta = await postMetadata({
+      params: Promise.resolve({ slug: POSTS[0].slug }),
+    });
+    expect(meta.title).toBe(tabTitle(POSTS[0]));
+    expect(meta.openGraph?.title).toBe(POSTS[0].title);
   });
 });

@@ -3,7 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
-import { POSTS, PostByline, articleJsonLd, findPost } from "@/lib/blogPosts";
+import {
+  POSTS,
+  PostByline,
+  articleJsonLd,
+  findPost,
+  tabTitle,
+} from "@/lib/blogPosts";
 import { SHARE_IMAGE } from "@/lib/site";
 
 type PostPageProps = { params: Promise<{ slug: string }> };
@@ -18,7 +24,7 @@ export async function generateMetadata({
   const post = findPost((await params).slug);
   if (!post) return { title: "Blog | Calibrate" };
   return {
-    title: `${post.title} | Calibrate`,
+    title: tabTitle(post),
     description: post.summary,
     alternates: { canonical: `/blog/${post.slug}` },
     openGraph: {
