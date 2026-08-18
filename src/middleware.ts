@@ -34,11 +34,15 @@ export default auth((req) => {
   const isChangelogPage = req.nextUrl.pathname === "/changelog";
   const isLearnPage = req.nextUrl.pathname === "/learn";
   const isBlogRoute = req.nextUrl.pathname.startsWith("/blog");
+  // Without this the crawler asks for the sitemap and is handed the login page.
+  const isCrawlerFile =
+    req.nextUrl.pathname === "/robots.txt" ||
+    req.nextUrl.pathname === "/sitemap.xml";
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, public share links, annotate-job links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isPublicShareRoute || isAnnotateJobRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute) {
     return NextResponse.next();
   }
 

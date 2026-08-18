@@ -61,6 +61,17 @@ test.describe("Signed out", () => {
     await expect(page).toHaveURL("/");
   });
 
+  // The middleware answers these two before any page renders, so a missing
+  // entry in its public list hands a crawler the login page instead.
+  for (const file of ["/robots.txt", "/sitemap.xml"]) {
+    test(`${file} is readable without signing in`, async ({ page }) => {
+      const response = await page.goto(file);
+
+      expect(response?.status()).toBe(200);
+      expect(page.url()).toContain(file);
+    });
+  }
+
   test("a blog post opens without signing in", async ({ page }) => {
     const post = "/blog/evaluation-is-all-you-need";
     await page.goto(post);
