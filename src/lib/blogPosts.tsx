@@ -118,6 +118,7 @@ export const POSTS: BlogPost[] = [
     authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
     summary:
       "Evaluation is the missing piece that translates model capability to real impact.",
+    image: "/blog/evaluation-is-all-you-need.png",
     body: (
       <>
         <p>
