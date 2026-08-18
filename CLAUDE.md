@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Hit a block, say so immediately.** Anything outside the work that stops you — a git lock file, a port already in use, a missing `node_modules` in a fresh worktree, a dev server that will not start, a crashed background process — gets reported the moment you hit it, in one line, with what you need. One obvious retry is allowed. After that, stop and ask: do not try workarounds, and never delete, kill, or reset something to get past it without permission.
 
-> **Abstract every fix; never patch just the one instance.** When the user points at a problem, don't fix only the exact line they quoted. Work out the underlying rule and apply it consistently to *every* place it's relevant across your changes and the surrounding code. Then verify the whole set (grep/audit), don't eyeball one case. A fix that isn't generalized is incomplete and will read as sloppy, naive logic.
+> **Abstract every fix; never patch just the one instance.** When the user points at a problem, don't fix only the exact line they quoted. Work out the underlying rule and apply it consistently to _every_ place it's relevant across your changes and the surrounding code. Then verify the whole set (grep/audit), don't eyeball one case. A fix that isn't generalized is incomplete and will read as sloppy, naive logic.
 
 ## Project
 
@@ -51,9 +51,10 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
 
 **CI** (`.github/workflows/tests.yml`): three jobs — `component` (Jest), `e2e` (public, backend-free), and `e2e-integration` (checks out + boots `calibrate-backend` via `uv` on `:8000`, runs the authenticated specs). Each uploads coverage to Codecov under a flag (`component` / `e2e`; both e2e jobs use `e2e`, which Codecov merges). Needs a `CODECOV_TOKEN` repo secret. `codecov.yml` declares the flags and per-flag status checks.
 
-**`codecov/patch` is a required, blocking check.** It measures coverage of *only the lines this PR changed* against a high target (~92%). New/changed source therefore MUST ship with tests that exercise it — a PR that adds untested code fails CI even though `npm test` passes locally. Practically: every new hook, component, or util needs its own `__tests__` file, and changed page wiring needs to be reached by an existing or new render test. Extract logic into a hook/component (as with `useJobDeletion` + `src/components/eval-jobs/`) so it can be unit-tested directly rather than only through a page. Run `npm run test:coverage` and read the per-file table before pushing; if a changed file shows uncovered lines in the diff, add tests until the patch is covered.
+**`codecov/patch` is a required, blocking check.** It measures coverage of _only the lines this PR changed_ against a high target (~92%). New/changed source therefore MUST ship with tests that exercise it — a PR that adds untested code fails CI even though `npm test` passes locally. Practically: every new hook, component, or util needs its own `__tests__` file, and changed page wiring needs to be reached by an existing or new render test. Extract logic into a hook/component (as with `useJobDeletion` + `src/components/eval-jobs/`) so it can be unit-tested directly rather than only through a page. Run `npm run test:coverage` and read the per-file table before pushing; if a changed file shows uncovered lines in the diff, add tests until the patch is covered.
 
 **Coverage is measured separately per layer** — component coverage never mixes with E2E coverage:
+
 - **Component** (`npm run test:coverage`) — Jest v8 provider → `coverage/component/` (lcov + HTML + json-summary), `collectCoverageFrom` = `src/**` minus `src/app`, `.d.ts`, instrumentation, middleware.
 - **E2E** (`npm run test:e2e:coverage` for public, `test:e2e:integration:coverage` for authenticated) — sets `E2E_COVERAGE=1`, enabling `monocart-reporter` + the coverage hook in `e2e/fixtures.ts` (import `test`/`expect` from `./fixtures`, not `@playwright/test`). Collects Chromium V8 coverage, source-maps it to `src/*`, writes `coverage/e2e/` (lcov + HTML). `scripts/clean-e2e-lcov.mjs` post-strips the generated bundle chunks monocart also emits so the lcov is `src/`-only. Chromium-only; a no-op on plain `npm run test:e2e`. (Authenticated coverage is far higher — it exercises `AppLayout`, `Agents`, etc.)
 - `npm run coverage` runs both into their separate dirs. Both live under `/coverage` (gitignored).
@@ -69,6 +70,7 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
 **Next.js App Router** with all pages as client components (`"use client"`). The backend is a separate service at `NEXT_PUBLIC_BACKEND_URL` — this repo is frontend only and talks to it via REST.
 
 **Routing structure** (`src/app/`):
+
 - Public: `/` (landing), `/login`, `/signup`, `/changelog`, `/learn`, `/public/...` (shareable result pages)
   - `/learn` is the page holding every session we have run on evaluating AI and every standalone deck we have written. All of it comes from one `ENTRIES` array of `LearnItem` in `src/app/learn/page.tsx`, in the order it is read on the page; adding or reordering means editing that array, and the list down the left follows it. Each entry shows its title, a summary, its recording if it has one, then its slides if it has them, all playing on the page in `<iframe>`s, with an open-in-a-new-tab link under each. Both pairs are optional: `recordingEmbedUrl`/`recordingUrl` left out makes the entry a deck, `slidesEmbedUrl`/`slidesUrl` left out makes it a recording on its own, and whichever one is left runs the full width instead of sharing the row. A `summary` is a `ReactNode`, so it can carry links and bullets, which is why the page wraps it in a `div` rather than a `p`. Recordings need an embeddable address (YouTube `/embed/…`, Google Drive `/preview`), and a Drive file must be shared with anyone who has the link or the frame shows a sign-in screen. Slides use the published Google Slides address with `/embed` in place of `/pub`. Three links sit above the sessions: documentation, the Luma calendar of upcoming sessions, and the changelog. The landing header's **Learn** link points here (it used to be **Resources**, scrolling to the footer, which is why `LandingFooter` no longer carries an `id="resources"` anchor).
   - `/changelog` is the only page built from a file in the repo rather than the backend: it reads `CHANGELOG.MD` at build time (`parseChangelog` in `src/lib/changelog.ts` → `ChangelogList`), so a deploy is what publishes new entries. `.github/workflows/changelog.yml` writes that file, one line per pull request merged into main.
@@ -89,6 +91,7 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
 **Paginated list endpoints**: the backend list endpoints — `GET /agents`, `/tests`, `/evaluators`, `/annotation-tasks`, `/agent-tests/agent/{uuid}/tests`, `/agent-tests/agent/{uuid}/runs`, `/agent-tests/runs`, `/jobs` (STT/TTS list), and `/traces` — return a `{ items, total, limit, offset }` envelope (`Paginated<T>` in `api.ts`), not a bare array. Read the array through `unwrapList<T>(data)` from `src/lib/api.ts`; it tolerates the envelope, a legacy `{ runs: [...] }` payload, a legacy `{ jobs: [...] }` payload (pre-migration `/jobs`), and a bare array (so it's safe for the still-unchanged list endpoints like `/tools`, `/personas`, `/scenarios`). The `/jobs` list item is a slim, flat `JobListItem` — `uuid`, `type`, `status`, `dataset_id`/`dataset_name`, top-level `providers`/`language`/`sample_count`, dates — with the heavy `results`/`provider_results`/`details.evaluators`/`audio_paths`/`texts` blobs dropped (they live only on the `[uuid]` detail pages). For every list endpoint EXCEPT `/traces`, the `q`/`limit`/`offset`/`type`/`status`/`has_failures` params are unused — filtering/search/sort is client-side over the fully-fetched `items`. **`/traces` is the one exception and the intended pattern for machine-written data**: `useTraces` (`src/hooks/useTraces.ts`) drives `limit`/`offset` server-side and holds only one page, because a production trace stream can far exceed what the client should download. Do not "harmonize" it back to the fetch-everything pattern. `GET /traces` also takes `q`, a plain case-insensitive "contains this text" match over the message id, conversation id, conversation history, reply, and metadata (blank is ignored, `%`/`_` are literal), so search is server-side too; it refuses a page above `MAX_TRACES_PAGE_SIZE` (200), which `fetchTraces` clamps to. Traces are also **scoped to one agent**: every list read sends `agent_id` (`GET /traces?agent_id=…`), so `useTraces` takes an `agentId` and refetches when it changes.
 
 **Workspaces / orgs**: The backend is multi-tenant — every request resolves an active workspace from the `X-Org-UUID` header (falling back to the user's personal workspace if absent). Frontend plumbing:
+
 - `src/lib/orgs.ts` — types (`Organization`, `OrganizationMember`), localStorage helpers (`getActiveOrgUuid`, `setActiveOrgUuid`), and the `calibrate:active-org-changed` event.
 - `src/lib/api.ts` — `getDefaultHeaders()` reads the active uuid and attaches `X-Org-UUID`.
 - `src/lib/fetchInterceptor.ts` — monkey-patches `window.fetch` so legacy raw-fetch call sites also get the header.
@@ -100,6 +103,7 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
   - **API keys tab**: workspace-scoped API keys for CI / GitHub Actions. Created via `CreateApiKeyDialog` (two-phase: name form → one-time secret reveal with copy; the backend returns the plaintext `key` only in the POST response, the list returns a masked `masked_key` / `last_four`), revoked via `DeleteConfirmationDialog`.
 
 **Page skeleton**: every authenticated page is:
+
 ```tsx
 <AppLayout
   activeItem="<nav-id>"
@@ -110,14 +114,17 @@ Rule of thumb: component behavior (dialog opens, form validates, filter updates 
   {/* content */}
 </AppLayout>
 ```
+
 Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — it handles SSR hydration and sets open-by-default on desktop.
 
 **Component organization**:
+
 - `src/components/agent-tabs/` — the tabbed UI on `/agents/[uuid]` (Agent / Tools / Data Extraction / Tests / Traces / Evaluators / Settings for build agents; Connection / Tests / Traces / Evaluators / Settings for connection agents). Which tabs appear is data-driven via `calibrateTabs` / `connectionTabs` arrays and a `tabLabels` map.
   - The **Evaluators tab** (`EvaluatorsTabContent`) lets users curate which evaluators matter for an agent: attach existing library evaluators (`AddEvaluatorsDialog`, a searchable checkbox picker), create new ones inline (`CreateEvaluatorFlow`, which auto-attaches on create), duplicate, detach (kept in library), or permanently delete (owned only). Persistence is a real agent↔evaluator association — see the endpoints note below.
   - The **Tests tab** is wired to that same agent evaluator list: a NEW test seeds its evaluators from the agent's connected evaluators filtered to the tab's type (`llm` for next-reply, `conversation` for conversation), falling back to the `default-llm-next-reply` correctness evaluator. After a create/update that references evaluators not yet on the agent, `TestsTabContent` prompts to add them to the agent's defaults (attach only — removing an evaluator from a test never detaches it from the agent). `AddTestDialog` takes an `agentEvaluatorUuids` prop for the seeding.
 
 **Test runs are created by the parent, never by the dialog.** `src/lib/testRunApi.ts` owns the two calls (`startTestRun` to create, `fetchTestRun` to read). Every "run" action on `/tests` and the agent Tests tab calls `startTestRun` FIRST, prepends an optimistic row to the runs list, and only then opens `TestRunnerDialog` with the returned `taskId`. The dialog takes `{ isOpen, onClose, agentUuid, agentName, taskId, onNewRun }` and is fetch/poll/render only: it holds one `run` response as its sole source of run content and derives every row, count, and aggregate from it, so there is no local copy to reconcile or reset. Rerun works the same way — the dialog calls `startTestRun` and reports the new id through `onNewRun`, which is what puts rerun-created runs in the list and (on `/tests`) swaps `?runId=`. Pass `null` for `testUuids` to run every test linked to the agent. Because the dialog needs a real run id, both pages render it ONCE, driven by a run id, rather than keeping separate "new run" and "view past run" instances.
+
 - `src/components/traces/` — the Traces tab on the agent detail page (`/agents/[uuid]?tab=traces`, the tab after Tests). There is no `/traces` route and no sidebar entry: **traces belong to one agent**. The customer's app ingests them with `POST /traces` (API key) carrying the agent's uuid as a top-level `agent_id`; `message_id` and `conversation_id` are optional and nullable, and the ingest response has no `created` field. This UI is read + curate only (no ingest form). `TracesTable` is a desktop table / mobile card list with **Input**, **Output** (reply, else the tool calls as chips), and **Created**, plus selection and delete controls. Pagination uses the shared **server-paginated list bar** via `ServerPaginatedListBar` (see Conventions) directly above the table. `TraceDetailDialog` fetches its own detail via `fetchTrace` and reuses `TestDetailView` so a trace reads like a test run. `TracesEmptyState` is the three-step setup guide (create OR paste-and-check a key via `validateApiKeyForAgent`, send a trace, check it arrived); the request itself lives in `TraceIngestSnippet` so `TraceIngestCodeDialog` can show the same thing from the toolbar's **View code** after the first trace lands, when the setup steps are gone (with `YOUR_API_KEY`, since a key's text exists only at creation). Bulk actions on a selection: **Add to tests** (`ConvertTracesToTestsDialog`) and **Submit for labelling** (`TraceLabellingEvaluatorsDialog` to pick evaluators, then the shared `AddRunToLabellingTaskDialog` with its `traces` source; the tab fetches each selected trace in full first, because the list holds only previews and that dialog wants a ready source). Both dialogs pick evaluators through `useAgentLlmEvaluators` + the shared `EvaluatorPicker`: llm evaluators minus any that declare `live_version.variables` (there is nowhere to ask for their values, and neither request carries them), preselected to this agent's own, else the `default-llm-next-reply` fork. Backed by `src/lib/tracesApi.ts` + the `useTraces`/`useTraceDeletion` hooks. Every list read is agent-scoped, server-paginated (page size from `usePageSize`, shared with the labelling items tab under one saved setting; the backend caps a page at `MAX_TRACES_PAGE_SIZE`). It is the ONE server-paginated list in the app; do not "harmonize" it to the fetch-everything pattern. **Search is server-side too**: the toolbar's search box is debounced (300ms) into `useTraces`'s `q`, which resets to the first page; while anything is typed an empty result shows "No traces match your search." rather than the setup steps. Deep-links are `?tab=traces` and `?traceId=`. Deletes go through `POST /traces/bulk-delete`, which takes `{ trace_ids }` ONLY — no `select_all`, no filters, unknown fields rejected — so there is no "delete everything matching" path and no per-trace DELETE.
   - **Add to tests** (internally `ConvertTracesToTestsDialog` + `convertTracesToTests` in `tracesApi.ts` → backend `POST /traces/convert-to-tests`): a bulk action on the selected traces with no type picker. The parent derives `tool_call` only when every selected trace has no `response_preview` and has `tool_call_count > 0`; otherwise it derives `response`, so any selected response forces response mode. Response mode shows the LLM evaluator selection, requires at least one, and preselects the `default-llm-next-reply` fork via `defaultOriginSlug`. Tool-call mode shows the ignore-arguments option, which maps to `accept_any_arguments`. The dialog does NOT ask which agents to link: the backend links each created test to the agent that produced its trace, so `agentUuid` is used only to pick which evaluators are offered. Evaluators are sent as a plain list of ids under `evaluators`. When a conversion fails the backend names the evaluators or traces at fault; `convertTracesErrorMessage` reads that out of the failure and the dialog shows it instead of a general line, and nothing is created, so the reader can fix it and submit again. The backend owns generated test names and their fallback; the frontend sends no name. The dialog is pure (fetches evaluators, calls `convertTracesToTests`, reports via `onConverted`); the tab clears the selection (`useBulkDeletion.clearSelection`) and fires a sonner `toast.success` linking to the created tests. This is the loop close: added tests then run/benchmark and their run results feed the existing `AddRunToLabellingTaskDialog` labelling flow unchanged.
 - `src/components/simulation-tabs/` — simulation configuration and runs UI.
@@ -127,7 +134,7 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
   - **`stt_run` → `stt`** (from `/stt/[uuid]`): each provider row → `payload.{reference_transcript ← gt, predicted_transcript ← pred}` (audio/WER dropped — the STT item pane shows transcripts only).
   - **`tts_run` → `tts`** (from `/tts/[uuid]`): each provider row → `payload.{text, audio_path}` (the inverse of STT — source text + synthesized clip; the row is eligible only if it has a non-empty `audio_path`).
   - **`simulation_run` → `conversation`** (from `/simulations/[uuid]/runs/[runId]`): each non-aborted run's transcript (minus the `end_reason` sentinel) → `payload.transcript`.
-  The stt/tts/simulation pages pre-normalise their rows into the source's `rows` / `results` and pass run evaluators as `SourceEvaluatorRef[]`. In all cases: pick or inline-create a task of the target type. The existing-task picker only lists tasks that already have every evaluator from the run. New tasks pass those evaluators via `evaluator_ids[]` on `POST /annotation-tasks`. Items go to `POST /annotation-tasks/{uuid}/items` with `ITEM_NAME_CONFLICT` retry. Widening further is additive — extend the source union, add a `buildItemsFromSource` branch, and map it in `targetTaskTypeForSource` / `itemNounForSource`.
+    The stt/tts/simulation pages pre-normalise their rows into the source's `rows` / `results` and pass run evaluators as `SourceEvaluatorRef[]`. In all cases: pick or inline-create a task of the target type. The existing-task picker only lists tasks that already have every evaluator from the run. New tasks pass those evaluators via `evaluator_ids[]` on `POST /annotation-tasks`. Items go to `POST /annotation-tasks/{uuid}/items` with `ITEM_NAME_CONFLICT` retry. Widening further is additive — extend the source union, add a `buildItemsFromSource` branch, and map it in `targetTaskTypeForSource` / `itemNounForSource`.
 - `src/components/ui/` — primitive UI components.
 - `src/components/providers/` — React context providers (e.g. `FloatingButtonProvider`).
 - `src/hooks/` — shared hooks, re-exported from `index.ts`. `useCrudResource` is the generic CRUD hook used across resource list pages. `useDialogUrlParam` deep-links an open dialog/item to a URL query param (write on open, clear on close, re-open on load) so a reload keeps it open and the URL is shareable — used for the open test case (`?testId=<uuid>`) on both `/tests` and the agent Tests tab (`TestsTabContent`); the `/tests` Runs tab has its own `?runId=` deep-link inline. The item filters on the evaluation run page and the labelling job page do the same through `src/components/human-labelling/valueFilterUrl.ts` (`?scores=<evaluatorId>:<value>.<value>,…` and `?disagreements=1`, written with `replaceState`), so a reload or a shared link keeps the same filters on.
@@ -167,6 +174,40 @@ that repeats another one, something meant only for people given the link. The
 cost of guessing is silent, since a wrongly filed page either never appears in
 search or appears when it should not, and nothing breaks either way.
 
+### A page open to everyone writes its own link preview
+
+Build the metadata for any page in `PAGES` with `pageMetadata()` from
+[src/lib/site.ts](src/lib/site.ts). Never hand-write the title, description,
+canonical link and `openGraph` block on such a page.
+
+Next does not mix a page's own title into a preview box it inherited. A page
+that sets a title but no `openGraph` block of its own hands out the home page's
+title, description and address to anyone who pastes its link. Nothing breaks:
+the page loads, the tab is right, the build passes. The only symptom is the
+wrong words in a chat window, which is invisible from inside the code. Learn and
+the changelog did this for months.
+
+The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) holds
+the list of pages against `PAGES` in the sitemap and fails when a page's preview
+address is not its own, or when two pages hand out the same words.
+
+### The picture a shared link shows
+
+The box WhatsApp, LinkedIn and X draw around a pasted link uses one picture,
+and every page names it through `shareImage()` in
+[src/lib/site.ts](src/lib/site.ts) rather than writing a path. The helper
+returns the address, the size and a line of words describing the picture.
+
+Never write a bare path into an `openGraph.images` list. The size has to be
+declared: WhatsApp and LinkedIn lay the box out before the picture has
+downloaded, and with no size they fall back to a small square thumbnail instead
+of the wide banner. The words are what a screen reader says in place of it.
+
+- Site-wide picture: `images: [shareImage()]`.
+- A page or post with its own: `images: [shareImage(post.image, post.title)]`, where the second argument describes that picture.
+- A page in `PAGES`: pass `image` to `pageMetadata()` and put the file under `public/share/`. A blog post: set `image` on the post and put the file under `public/blog/`.
+- Every picture is 1200 by 630 and under 300 KB. The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) reads the file's own header and its weight, so a picture of another size cannot ship quietly, and neither can one exported at full quality by mistake. WhatsApp stops showing a heavy picture with no warning: the link simply appears as bare text.
+
 ### Server-paginated list bar
 
 Use this whenever a list is backed by server-side `limit`/`offset` paging (today: **Traces tab** and **human-alignment task items tab**). Copy the markup from `TracesTabContent` or `src/app/[org]/human-alignment/tasks/[uuid]/page.tsx` — do not invent a new layout.
@@ -178,11 +219,13 @@ Use this whenever a list is backed by server-side `limit`/`offset` paging (today
 **Row layout:** `flex flex-wrap items-center justify-between gap-3 pb-1 text-sm text-muted-foreground`
 
 **Left (count):**
+
 - `0` → `0 {nouns}` (e.g. `0 traces`, `0 items`)
 - `total ≤ 10` → **`{total}`** `{noun}` — number in `text-foreground font-medium`
 - `total > 10` → **Showing `{start}`–`{end}` of `{total}` `{nouns}`** — the three numbers in `text-foreground font-medium`. `start = offset + 1`, `end = min(offset + items.length, total)`.
 
 **Right** (only when `total > 10`): handled inside `ServerPaginatedListBar` — `PageSizeSelect` plus icon prev/next and `Page X of Y` when `pageCount > 1`. Reset `offset` to `0` when page size changes. Disable nav while a fetch is in flight.
+
 - Do **not** use text labels like "Previous" / "Next", do not put pagination below the table, and do not inline a second copy of this markup.
 
 **Component:** `ServerPaginatedListBar` from `@/components/ui`. The parent list section uses `space-y-3` between toolbar, optional bulk strip, and a `space-y-1` group holding the bar + table.
@@ -220,9 +263,10 @@ Whenever making a change, adding a new feature, or modifying anything, always do
 3. **Identify reuse** — call out which parts of the existing code can be reused directly or repackaged/extracted into reusable functions or components to support what needs to be built, rather than duplicating logic.
 4. **Prefer reliable libraries** — if the needed functionality is well-covered by a well-known, reliable library, bias toward using it instead of re-implementing it here, unless the requirements genuinely demand a custom solution.
 5. **Share the plan and surface choices** — present the plan and explicitly raise any decisions to be made, along with their tradeoffs, and ask the user instead of making assumptions.
-6. **Abstract the fix, apply it everywhere** — when fixing or changing something (especially from user feedback), derive the general rule and apply it to *every* place it's relevant, not only the instance the user quoted. Then audit the whole set (grep, a small script, a checklist) to confirm consistency — don't eyeball a single case. Naive, one-spot patches are treated as incomplete work.
+6. **Abstract the fix, apply it everywhere** — when fixing or changing something (especially from user feedback), derive the general rule and apply it to _every_ place it's relevant, not only the instance the user quoted. Then audit the whole set (grep, a small script, a checklist) to confirm consistency — don't eyeball a single case. Naive, one-spot patches are treated as incomplete work.
 
 ## Parallel execution (default)
+
 **Always invoke the `parallelize` skill before you start implementing.** The moment the
 plan is agreed and it is time to write code, run the skill and let it drive the work.
 This is not optional and does not need the user to ask for it.
@@ -237,7 +281,7 @@ Only skip it for a change so small it is a single edit to a single file.
 ## Workflow
 
 - **Write tests before you call it done — non-negotiable.** Any change that adds or modifies runtime code MUST come with tests that cover the changed lines, and you MUST run them (`npm test`, plus `npm run test:coverage` to confirm the changed files aren't leaving diff lines uncovered) and see them pass BEFORE you say the work is complete or commit. "It builds and typechecks" is NOT done — CI's `codecov/patch` gate will fail a PR whose new code is untested even when the build is green. Do not report a task as finished, and do not commit, until the new behavior is exercised by passing tests. If a change seems untestable, that's a signal to extract the logic into a hook/component/util that can be unit-tested (see `useJobDeletion` and `src/components/eval-jobs/JobDeleteControls.tsx`).
-- **Abstract the fix; apply it to every relevant place**: when the user reports a problem or asks for a change, treat the quoted instance as an *example*, not the whole job. Extract the underlying rule and apply it across all the code and copy it touches, then audit the full set (grep / a quick script) to prove consistency instead of checking one case. Shipping a naive one-spot patch and leaving siblings inconsistent is a recurring failure — do not repeat it.
+- **Abstract the fix; apply it to every relevant place**: when the user reports a problem or asks for a change, treat the quoted instance as an _example_, not the whole job. Extract the underlying rule and apply it across all the code and copy it touches, then audit the full set (grep / a quick script) to prove consistency instead of checking one case. Shipping a naive one-spot patch and leaving siblings inconsistent is a recurring failure — do not repeat it.
 - **Auto-commit when done**: once all changes for the user's request are complete and verified (including tests written and passing), create a git commit without waiting for the user to ask. Use a clear, scoped commit message that explains the why.
 - **Auto-push on feature branches**: after committing, push without waiting for approval, as long as the branch is NOT the default branch (`main`). This is standing permission — do not ask, do not offer, just push and say which branch you pushed. On `main` itself, never commit or push directly: create a worktree and a branch instead.
 - **Keep CLAUDE.md in sync with reality**: after making changes, check whether any high-level understanding of the app has shifted — new routes, new top-level concepts, renamed nav items, changed auth flow, new architectural patterns, new conventions, retired features, etc. If yes, update CLAUDE.md in the same commit so this file stays an accurate map of the codebase. Skip updates for low-level details (individual component tweaks, copy changes, bug fixes that don't change architecture).
