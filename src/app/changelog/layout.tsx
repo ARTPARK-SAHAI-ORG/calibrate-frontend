@@ -3,7 +3,7 @@ import { pageMetadata } from "@/lib/site";
 export const metadata = pageMetadata({
   path: "/changelog",
   title: "Changelog | Calibrate",
-  description: "Everything we have changed in Calibrate, newest first.",
+  description: "New releases and bug fixes",
   image: "/share/changelog.png",
 });
 
