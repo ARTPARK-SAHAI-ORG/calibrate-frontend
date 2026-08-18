@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
-import { POSTS, formatPostDate } from "@/lib/blogPosts";
+import { POSTS, PostByline } from "@/lib/blogPosts";
 
 export default function BlogPage() {
   return (
@@ -16,11 +16,7 @@ export default function BlogPage() {
           <ul className="space-y-10 md:space-y-14">
             {POSTS.map((post) => (
               <li key={post.slug}>
-                <p className="text-sm text-gray-400">
-                  <time dateTime={post.date}>{formatPostDate(post.date)}</time>
-                  <span className="mx-2">·</span>
-                  {post.author}
-                </p>
+                <PostByline post={post} />
                 <h2 className="mt-2 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
                   <Link
                     href={`/blog/${post.slug}`}

@@ -14,6 +14,9 @@ export type BlogPost = {
   /** The day it went up, as year-month-day. */
   date: string;
   author: string;
+  /** Where the author's name goes when clicked. Left out for an author with
+   * nowhere to point at. */
+  authorUrl?: string;
   /** One or two lines shown under the title on the list page, and given to
    * anyone who shares the link. */
   summary: string;
@@ -30,6 +33,34 @@ export function formatPostDate(date: string): string {
   });
 }
 
+/** The date and who wrote it, shown the same way wherever a post appears. */
+export function PostByline({
+  post,
+  className = "",
+}: {
+  post: BlogPost;
+  className?: string;
+}) {
+  return (
+    <p className={`text-sm text-gray-600 ${className}`}>
+      <time dateTime={post.date}>{formatPostDate(post.date)}</time>
+      <span className="mx-2">·</span>
+      {post.authorUrl ? (
+        <a
+          href={post.authorUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors"
+        >
+          {post.author}
+        </a>
+      ) : (
+        post.author
+      )}
+    </p>
+  );
+}
+
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
 }
@@ -40,6 +71,7 @@ export const POSTS: BlogPost[] = [
     title: "Evaluation is all you need",
     date: "2026-08-17",
     author: "Aman Dalmia",
+    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
     summary:
       "Evaluation is the missing piece that translates model capability to real impact.",
     body: (

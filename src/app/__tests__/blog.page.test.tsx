@@ -32,7 +32,10 @@ describe("Blog", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: post.title }),
     ).toBeInTheDocument();
-    expect(screen.getByText(post.author)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: post.author })).toHaveAttribute(
+      "href",
+      post.authorUrl,
+    );
     expect(screen.getByRole("link", { name: "← All posts" })).toHaveAttribute(
       "href",
       "/blog",
