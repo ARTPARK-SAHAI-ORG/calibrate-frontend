@@ -17,8 +17,8 @@ import { metadata as learnMetadata } from "../learn/layout";
 import { generateMetadata as postMetadata } from "../blog/[slug]/page";
 import robots from "../robots";
 import sitemap from "../sitemap";
-import { POSTS } from "@/lib/blogPosts";
-import { SITE_URL } from "@/lib/site";
+import { POSTS, articleJsonLd } from "@/lib/blogPosts";
+import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
 
 describe("sitemap", () => {
   it("lists the marketing pages and every post, with the post's own date", () => {
@@ -100,6 +100,73 @@ describe("canonical addresses", () => {
         params: Promise.resolve({ slug: post.slug }),
       });
       expect(meta.alternates?.canonical).toBe(`/blog/${post.slug}`);
+    }
+  });
+});
+
+/**
+ * The preview box a link gets when it is pasted into WhatsApp, LinkedIn or X.
+ * Most readers meet a post through one of those, not through a search, so a
+ * page that loses its picture or its headline here costs real clicks.
+ */
+describe("link previews", () => {
+  it.each([
+    ["the landing page", rootMetadata, "website"],
+    ["the blog", blogMetadata, "website"],
+  ])("gives %s a picture and a headline", (_name, meta, type) => {
+    expect(meta.openGraph?.type).toBe(type);
+    expect(meta.openGraph?.title).toBeTruthy();
+    expect(meta.openGraph?.images).toEqual([SHARE_IMAGE]);
+  });
+
+  it("describes a post as an article, with its own date and picture", async () => {
+    const post = POSTS[0];
+    const meta = await postMetadata({
+      params: Promise.resolve({ slug: post.slug }),
+    });
+    const openGraph = meta.openGraph as {
+      type: string;
+      title: string;
+      publishedTime: string;
+      images: string[];
+    };
+
+    expect(openGraph.type).toBe("article");
+    expect(openGraph.title).toBe(post.title);
+    expect(openGraph.publishedTime).toBe(post.date);
+    expect(openGraph.images).toEqual([post.image ?? SHARE_IMAGE]);
+  });
+});
+
+/**
+ * What Google reads to show a result as a dated article by a person rather
+ * than a bare link. Every address in it has to be a full one, since the block
+ * is read away from the page it sits in.
+ */
+describe("article facts", () => {
+  const article = articleJsonLd(POSTS[0]) as Record<string, never> & {
+    headline: string;
+    datePublished: string;
+    image: string;
+    mainEntityOfPage: string;
+    author: { name: string; url?: string };
+    publisher: { logo: { url: string } };
+  };
+
+  it("carries the headline, the date and the author", () => {
+    expect(article.headline).toBe(POSTS[0].title);
+    expect(article.datePublished).toBe(POSTS[0].date);
+    expect(article.author.name).toBe(POSTS[0].author);
+    expect(article.author.url).toBe(POSTS[0].authorUrl);
+  });
+
+  it("writes every address out in full", () => {
+    for (const url of [
+      article.image,
+      article.mainEntityOfPage,
+      article.publisher.logo.url,
+    ]) {
+      expect(url.startsWith(`${SITE_URL}/`)).toBe(true);
     }
   });
 });

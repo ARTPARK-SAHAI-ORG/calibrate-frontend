@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
 
 /**
  * Everything the blog holds, newest first. Posts are written here rather than
@@ -20,8 +21,41 @@ export type BlogPost = {
   /** One or two lines shown under the title on the list page, and given to
    * anyone who shares the link. */
   summary: string;
+  /** Its own share picture, as a path from the site root. Falls back to
+   * SHARE_IMAGE when a post has none. */
+  image?: string;
   body: ReactNode;
 };
+
+/**
+ * The facts about a post, in the shape Google reads: what it is, who wrote it,
+ * when it went up. Without this a search result is a bare link; with it, it can
+ * carry the date and the author's name.
+ *
+ * Addresses here are written out in full because this block is read on its own,
+ * away from the page it sits in, so a path from the site root means nothing.
+ */
+export function articleJsonLd(post: BlogPost) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.summary,
+    datePublished: post.date,
+    image: `${SITE_URL}${post.image ?? SHARE_IMAGE}`,
+    mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
+    author: {
+      "@type": "Person",
+      name: post.author,
+      ...(post.authorUrl ? { url: post.authorUrl } : {}),
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Calibrate",
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+    },
+  };
+}
 
 /** How a date reads on the page. UTC, so the day never shifts by timezone. */
 export function formatPostDate(date: string): string {

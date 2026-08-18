@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
-import { SITE_URL } from "@/lib/site";
+import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FloatingButtonProvider } from "@/components/providers/FloatingButtonProvider";
 import { OrganizationBootstrapper } from "@/components/OrganizationBootstrapper";
@@ -46,6 +46,18 @@ export const metadata: Metadata = {
   // to be the home page, which never reaches a crawler because it is sent to
   // the login page first.
   alternates: { canonical: "/" },
+  // The box WhatsApp, LinkedIn and X draw around a pasted link. Every page
+  // inherits this one unless it sets its own, so a link to any page shows a
+  // picture and a headline rather than bare text.
+  openGraph: {
+    type: "website",
+    siteName: "Calibrate",
+    title: "Calibrate",
+    description: "Open-source AI agent evaluation for non-profits",
+    url: "/",
+    images: [SHARE_IMAGE],
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({

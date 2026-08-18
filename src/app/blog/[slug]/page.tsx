@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
-import { POSTS, PostByline, findPost } from "@/lib/blogPosts";
+import { POSTS, PostByline, articleJsonLd, findPost } from "@/lib/blogPosts";
+import { SHARE_IMAGE } from "@/lib/site";
 
 type PostPageProps = { params: Promise<{ slug: string }> };
 
@@ -20,6 +21,16 @@ export async function generateMetadata({
     title: `${post.title} | Calibrate`,
     description: post.summary,
     alternates: { canonical: `/blog/${post.slug}` },
+    openGraph: {
+      type: "article",
+      siteName: "Calibrate",
+      title: post.title,
+      description: post.summary,
+      url: `/blog/${post.slug}`,
+      publishedTime: post.date,
+      authors: [post.author],
+      images: [post.image ?? SHARE_IMAGE],
+    },
   };
 }
 
@@ -32,6 +43,17 @@ export default async function BlogPostPage({ params }: PostPageProps) {
       <LandingHeader showLogoLink talkToUsHref="/#join-community" />
       <main className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
         <article className="max-w-3xl mx-auto">
+          {/* Escaping "<" keeps a stray angle bracket in a post from closing
+              this tag early and spilling the rest onto the page. */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(articleJsonLd(post)).replace(
+                /</g,
+                "\\u003c",
+              ),
+            }}
+          />
           <Link
             href="/blog"
             className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
