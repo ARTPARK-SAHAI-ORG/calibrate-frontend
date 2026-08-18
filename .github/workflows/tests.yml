@@ -10,6 +10,21 @@ on:
 # backend-free public specs; `e2e-integration` boots the real backend and runs
 # authenticated specs. Both e2e jobs upload the `e2e` flag (Codecov merges them).
 jobs:
+  # Its own check so a red cross on the pull request reads "Sitemap and
+  # robots" and names what broke. These tests also run inside the component
+  # job; the point of repeating them here is the label, not the coverage.
+  seo:
+    name: Sitemap and robots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- src/app/__tests__/seo.test.ts
+
   component:
     name: Component tests (Jest)
     runs-on: ubuntu-latest
