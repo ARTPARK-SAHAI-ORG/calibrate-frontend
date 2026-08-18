@@ -51,6 +51,12 @@ const config = {
     "<rootDir>/node_modules/",
     "<rootDir>/e2e/",
     "<rootDir>/.claude/",
+    // The sitemap and robots checks have their own CI job, so one unfiled page
+    // shows as a single red cross that names the cause rather than two. Set
+    // only there; running the tests any other way still includes them.
+    ...(process.env.SKIP_SEO_TESTS
+      ? ["<rootDir>/src/app/__tests__/seo.test.ts"]
+      : []),
   ],
 };
 
