@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
-import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
+import { shareImage, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FloatingButtonProvider } from "@/components/providers/FloatingButtonProvider";
 import { OrganizationBootstrapper } from "@/components/OrganizationBootstrapper";
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     title: "Calibrate",
     description: "Open-source AI agent evaluation for non-profits",
     url: "/",
-    images: [SHARE_IMAGE],
+    images: [shareImage()],
   },
   twitter: { card: "summary_large_image" },
 };

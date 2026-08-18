@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SHARE_IMAGE } from "@/lib/site";
+import { shareImage } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Blog | Calibrate",
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Blog | Calibrate",
     description: "What we are learning about evaluating AI, newest first.",
     url: "/blog",
-    images: [SHARE_IMAGE],
+    images: [shareImage()],
   },
 };
 

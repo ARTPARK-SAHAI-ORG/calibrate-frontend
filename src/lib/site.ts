@@ -18,3 +18,32 @@ export const SITE_URL = (
  * A post can name its own with `image`; this is the fallback for the rest.
  */
 export const SHARE_IMAGE = "/share-card.png";
+
+/** Every picture we ship for the preview box is this size. */
+export const SHARE_IMAGE_WIDTH = 1200;
+export const SHARE_IMAGE_HEIGHT = 630;
+
+/** What the fallback picture says, for a reader who cannot see it. */
+export const SHARE_IMAGE_ALT =
+  "Calibrate. AI agent evaluation for non-profits.";
+
+/**
+ * One picture for the preview box, with its size written out.
+ *
+ * The size is here because WhatsApp and LinkedIn draw the box before the
+ * picture has finished downloading. Without the numbers they guess, and the
+ * guess is a small square thumbnail rather than the wide banner. The words are
+ * for a reader using a screen reader, who otherwise gets a bare file name.
+ *
+ * Pass a path to use a page's own picture, and words that describe it. Leave
+ * both out for the site-wide one. The test in src/app/__tests__/seo.test.ts
+ * reads the file itself and fails if the real size stops matching.
+ */
+export function shareImage(path: string = SHARE_IMAGE, alt = SHARE_IMAGE_ALT) {
+  return {
+    url: path,
+    width: SHARE_IMAGE_WIDTH,
+    height: SHARE_IMAGE_HEIGHT,
+    alt,
+  };
+}

@@ -10,7 +10,7 @@ import {
   findPost,
   tabTitle,
 } from "@/lib/blogPosts";
-import { SHARE_IMAGE } from "@/lib/site";
+import { shareImage } from "@/lib/site";
 
 type PostPageProps = { params: Promise<{ slug: string }> };
 
@@ -35,7 +35,10 @@ export async function generateMetadata({
       url: `/blog/${post.slug}`,
       publishedTime: post.date,
       authors: [post.author],
-      images: [post.image ?? SHARE_IMAGE],
+      // A post with its own picture describes it with its own headline,
+      // since that is what the picture says. The rest fall back to the
+      // site-wide picture and the words that go with it.
+      images: [post.image ? shareImage(post.image, post.title) : shareImage()],
     },
   };
 }

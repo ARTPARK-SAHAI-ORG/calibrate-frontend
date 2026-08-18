@@ -21,7 +21,10 @@ import robots from "../robots";
 import sitemap, { PAGES, BEHIND_SIGN_IN } from "../sitemap";
 import { POSTS, articleJsonLd, tabTitle } from "@/lib/blogPosts";
 import type { BlogPost } from "@/lib/blogPosts";
-import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
+import { SHARE_IMAGE, SHARE_IMAGE_ALT, SITE_URL, shareImage } from "@/lib/site";
+
+/** A picture in the preview box: where it is, how big, and what it says. */
+type OgImage = { url: string; width: number; height: number; alt: string };
 
 describe("sitemap", () => {
   it("lists the marketing pages and every post, with the post's own date", () => {
@@ -119,7 +122,7 @@ describe("link previews", () => {
   ])("gives %s a picture and a headline", (_name, meta, type) => {
     expect(meta.openGraph?.type).toBe(type);
     expect(meta.openGraph?.title).toBeTruthy();
-    expect(meta.openGraph?.images).toEqual([SHARE_IMAGE]);
+    expect(meta.openGraph?.images).toEqual([shareImage()]);
   });
 
   it("describes a post as an article, with its own date and picture", async () => {
@@ -131,13 +134,15 @@ describe("link previews", () => {
       type: string;
       title: string;
       publishedTime: string;
-      images: string[];
+      images: OgImage[];
     };
 
     expect(openGraph.type).toBe("article");
     expect(openGraph.title).toBe(post.title);
     expect(openGraph.publishedTime).toBe(post.date);
-    expect(openGraph.images).toEqual([post.image ?? SHARE_IMAGE]);
+    expect(openGraph.images).toEqual([
+      post.image ? shareImage(post.image, post.title) : shareImage(),
+    ]);
   });
 });
 
@@ -172,6 +177,83 @@ describe("share pictures", () => {
     expect(pngSize(join(PUBLIC_DIR, path))).toEqual({
       width: 1200,
       height: 630,
+    });
+  });
+});
+
+/**
+ * The size and the words that go beside the picture.
+ *
+ * WhatsApp and LinkedIn lay the preview box out before the picture has
+ * finished downloading, so a page that does not say how big its picture is
+ * gets a small square thumbnail instead of the wide banner. The words are what
+ * a screen reader says in place of the picture.
+ *
+ * The numbers are read back out of the file itself, so swapping in a picture
+ * of another size fails here rather than quietly telling every reader a size
+ * that is not true.
+ */
+describe("what the preview box is told about the picture", () => {
+  const PUBLIC_DIR = join(__dirname, "..", "..", "..", "public");
+
+  function pngSize(path: string): { width: number; height: number } {
+    const header = readFileSync(path).subarray(16, 24);
+    return { width: header.readUInt32BE(0), height: header.readUInt32BE(4) };
+  }
+
+  /** Every public page, and the one picture each of them names. */
+  async function declaredPictures(): Promise<[string, OgImage][]> {
+    const posts = await Promise.all(
+      POSTS.map(async (post) => {
+        const meta = await postMetadata({
+          params: Promise.resolve({ slug: post.slug }),
+        });
+        return [`the ${post.slug} post`, meta] as const;
+      }),
+    );
+    return [
+      ["the landing page", rootMetadata] as const,
+      ["the blog", blogMetadata] as const,
+      ...posts,
+    ].map(([name, meta]) => [
+      name,
+      (meta.openGraph as { images: OgImage[] }).images[0],
+    ]);
+  }
+
+  it("gives every page a picture, its real size, and words for it", async () => {
+    const pages = await declaredPictures();
+    expect(pages.length).toBe(2 + POSTS.length);
+
+    for (const [name, picture] of pages) {
+      expect([name, picture.width]).toEqual([name, 1200]);
+      expect([name, picture.height]).toEqual([name, 630]);
+      expect([name, picture.alt.length > 0]).toEqual([name, true]);
+      expect([name, pngSize(join(PUBLIC_DIR, picture.url))]).toEqual([
+        name,
+        { width: picture.width, height: picture.height },
+      ]);
+    }
+  });
+
+  it("describes a post's own picture with the post's headline", async () => {
+    const post = POSTS.find((entry) => entry.image);
+    if (!post) return;
+    const meta = await postMetadata({
+      params: Promise.resolve({ slug: post.slug }),
+    });
+    const [picture] = (meta.openGraph as { images: OgImage[] }).images;
+
+    expect(picture.url).toBe(post.image);
+    expect(picture.alt).toBe(post.title);
+  });
+
+  it("falls back to the site-wide picture and its words", () => {
+    expect(shareImage()).toEqual({
+      url: SHARE_IMAGE,
+      width: 1200,
+      height: 630,
+      alt: SHARE_IMAGE_ALT,
     });
   });
 });
@@ -279,7 +361,9 @@ describe("every page is accounted for", () => {
       ...BEHIND_SIGN_IN.map(folderOf),
     ]);
 
-    expect(routeFolders().filter((folder) => !declared.has(folder))).toEqual([]);
+    expect(routeFolders().filter((folder) => !declared.has(folder))).toEqual(
+      [],
+    );
   });
 
   it("knows what it is looking at", () => {
