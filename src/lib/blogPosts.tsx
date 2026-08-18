@@ -113,6 +113,7 @@ export const POSTS: BlogPost[] = [
   {
     slug: "evaluation-is-all-you-need",
     title: "Evaluation is all you need",
+    seoTitle: "Why AI evaluation matters more than the model you pick",
     date: "2026-08-17",
     author: "Aman Dalmia",
     authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
