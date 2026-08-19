@@ -92,8 +92,7 @@ const SAMPLE_ROWS: BulkSampleRow[] = [
       conversation_history: JSON.stringify([
         { role: "user", content: "What is your return policy?" },
       ]),
-      agent_response:
-        "You can return any item within 30 days for a full refund.",
+      agent_response: "You can return any item within 30 days for a full refund.",
     },
     variableValue:
       "The agent should clearly explain the return policy in a helpful and friendly tone.",
