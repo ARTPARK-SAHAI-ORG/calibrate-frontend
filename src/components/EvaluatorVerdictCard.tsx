@@ -98,6 +98,8 @@ type WriteProps = CommonProps & {
   onCommentChange?: (s: string) => void;
   /** Renders the controls but disables interaction (e.g. saving in flight). */
   disabled?: boolean;
+  /** How the reasoning box behaves on this job. Absent means optional, which is how every job created before this behaves. */
+  reasoningMode?: "optional" | "required" | "hidden";
 };
 
 export type EvaluatorVerdictCardProps = ReadProps | WriteProps;
@@ -254,11 +256,14 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           {hasVariables && (
             <VariableValuesBlock values={props.variableValues!} />
           )}
-          <WriteReasoning
-            value={props.comment ?? ""}
-            onChange={(s) => props.onCommentChange?.(s)}
-            disabled={props.disabled}
-          />
+          {props.reasoningMode !== "hidden" && (
+            <WriteReasoning
+              value={props.comment ?? ""}
+              onChange={(s) => props.onCommentChange?.(s)}
+              disabled={props.disabled}
+              required={props.reasoningMode === "required"}
+            />
+          )}
         </>
       )}
 
@@ -622,15 +627,17 @@ function WriteReasoning({
   value,
   onChange,
   disabled,
+  required,
 }: {
   value: string;
   onChange: (s: string) => void;
   disabled?: boolean;
+  required?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
-        Reasoning {disabled ? "" : "(optional)"}
+        Reasoning {disabled ? "" : required ? "(required)" : "(optional)"}
       </div>
       <textarea
         value={value}

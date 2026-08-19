@@ -807,6 +807,86 @@ describe("EvaluatorVerdictCard - write mode variables + reasoning", () => {
   });
 });
 
+describe("EvaluatorVerdictCard - reasoningMode", () => {
+  it("shows 'Reasoning (optional)' when reasoningMode is absent", () => {
+    render(
+      <EvaluatorVerdictCard mode="write" name="Eval" outputType="binary" />,
+    );
+    expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("shows 'Reasoning (optional)' when reasoningMode is optional", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="optional"
+      />,
+    );
+    expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
+  });
+
+  it("shows 'Reasoning (required)' when reasoningMode is required", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="required"
+      />,
+    );
+    expect(screen.getByText("Reasoning (required)")).toBeInTheDocument();
+    expect(screen.queryByText("Reasoning (optional)")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("drops the '(required)' suffix while disabled, same as optional does", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="required"
+        disabled
+      />,
+    );
+    expect(screen.getByText("Reasoning")).toBeInTheDocument();
+    expect(screen.queryByText("Reasoning (required)")).not.toBeInTheDocument();
+  });
+
+  it("renders no reasoning box when reasoningMode is hidden", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="hidden"
+      />,
+    );
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Reasoning/)).not.toBeInTheDocument();
+    // The verdict buttons are untouched.
+    expect(screen.getByRole("button", { name: "Correct" })).toBeInTheDocument();
+  });
+
+  it("still shows written reasoning in read mode", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Eval"
+        outputType="binary"
+        match={true}
+        reasoning="Because it matched."
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /See reasoning/i }));
+    expect(screen.getByText("Because it matched.")).toBeInTheDocument();
+  });
+});
+
 describe("ReasoningToggleButton", () => {
   it("renders closed reasoning label by default and calls onToggle", async () => {
     const user = setupUser();

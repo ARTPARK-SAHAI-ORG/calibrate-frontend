@@ -42,7 +42,10 @@ import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploa
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { BulkUploadLlmGeneralItemsDialog } from "@/components/human-labelling/BulkUploadLlmGeneralItemsDialog";
-import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
+import {
+  AssignAnnotatorsDialog,
+  type LabellingJobSettings,
+} from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
 import { ItemDetailDialog } from "@/components/human-labelling/ItemDetailDialog";
 import {
@@ -2324,6 +2327,7 @@ function LabellingTaskPageInner() {
   const handleAssignAnnotators = async (
     annotatorIds: string[],
     evaluatorIds: string[],
+    settings: LabellingJobSettings,
   ) => {
     if (
       (selectedItemIds.size === 0 && !selectAllTotal) ||
@@ -2340,6 +2344,7 @@ function LabellingTaskPageInner() {
             ...(itemsSearch ? { q: itemsSearch } : {}),
           }
         : { item_ids: Array.from(selectedItemIds) }),
+      ...settings,
     };
     const result = await apiClient<{ count: number; jobs: CreatedJob[] }>(
       `/annotation-tasks/${uuid}/jobs`,

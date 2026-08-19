@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import { SendForReviewFlow } from "../SendForReviewFlow";
 import { apiClient } from "../../../lib/api";
 
@@ -148,6 +148,8 @@ describe("SendForReviewFlow", () => {
       annotator_ids: ["a-1"],
       evaluator_ids: ["ev-1"],
       item_ids: ["item-1", "item-3"],
+      comments_enabled: true,
+      reasoning_mode: "optional",
     });
 
     expect(await screen.findByText("1 new job created")).toBeInTheDocument();
@@ -174,6 +176,35 @@ describe("SendForReviewFlow", () => {
       annotator_ids: ["a-1"],
       evaluator_ids: ["ev-1"],
       item_ids: ["item-1", "item-2", "item-3"],
+      comments_enabled: true,
+      reasoning_mode: "optional",
+    });
+  });
+
+  it("sends the comment and reasoning settings chosen in the dialog", async () => {
+    const user = setupUser();
+    mockApi();
+    renderFlow();
+
+    await user.click(sendButton());
+    await user.click(await screen.findByRole("checkbox", { name: "Alice" }));
+
+    const comments = screen.getByRole("group", {
+      name: /Comments on each item/,
+    });
+    await user.click(within(comments).getByRole("radio", { name: "Do not show" }));
+
+    const reasoning = screen.getByRole("group", {
+      name: /Reasoning on each label/,
+    });
+    await user.click(within(reasoning).getByRole("radio", { name: "Required" }));
+
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitForCreateCall();
+    expect(createCall()![2].body).toMatchObject({
+      comments_enabled: false,
+      reasoning_mode: "required",
     });
   });
 

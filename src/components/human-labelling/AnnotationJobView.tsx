@@ -50,6 +50,13 @@ type Job = {
   /** Backend marks the read-only viewer link state on completed jobs. */
   is_public?: boolean;
   view_token?: string | null;
+  /** Whether the per-item comments box is offered to the annotator.
+   * Absent means true, which is how every job created before this behaves. */
+  comments_enabled?: boolean;
+  /** How the per-evaluator reasoning box behaves for the annotator.
+   * Absent means "optional", which is how every job created before this
+   * behaves. */
+  reasoning_mode?: "optional" | "required" | "hidden";
 };
 
 type Annotator = { uuid: string; name: string };
@@ -568,6 +575,10 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // Both settings are frozen on the job. Absent keeps today's behaviour:
+  // the comments box is offered and reasoning is optional.
+  const commentsEnabled = data.job.comments_enabled !== false;
+  const reasoningMode = data.job.reasoning_mode ?? "optional";
   const filterActive =
     canFilterByValue &&
     usableValueFilters(valueFilters, data.evaluators).length > 0;
@@ -663,6 +674,15 @@ function AnnotateView({
         // A blank optional evaluator is simply not sent; a blank required
         // one means there is nothing valid to save yet.
         if (ev.is_optional === true) continue;
+        return false;
+      }
+      // When the job asks for reasoning, an answered evaluator with an
+      // empty reasoning box cannot be saved. Every save path (the submit
+      // button and the silent save on leaving an item) runs through here.
+      if (reasoningMode === "required" && !(f?.comment ?? "").trim()) {
+        setTopError(
+          "Add reasoning for every label you answered before submitting.",
+        );
         return false;
       }
       annotationsBody.push({
@@ -1010,6 +1030,8 @@ function AnnotateView({
                   fields={fields}
                   setField={setField}
                   readOnly={isAdmin}
+                  commentsEnabled={commentsEnabled}
+                  reasoningMode={reasoningMode}
                   itemComment={itemComments[currentItem.uuid] ?? ""}
                   onItemCommentChange={(s) =>
                     setItemComments((prev) => ({
@@ -1043,6 +1065,8 @@ function AnnotateView({
                     fields={fields}
                     setField={setField}
                     readOnly={isAdmin}
+                    commentsEnabled={commentsEnabled}
+                    reasoningMode={reasoningMode}
                     itemComment={itemComments[currentItem.uuid] ?? ""}
                     onItemCommentChange={(s) =>
                       setItemComments((prev) => ({
@@ -1131,6 +1155,8 @@ function EvaluatorsPane({
   fields,
   setField,
   readOnly,
+  commentsEnabled,
+  reasoningMode,
   itemComment,
   onItemCommentChange,
 }: {
@@ -1139,6 +1165,10 @@ function EvaluatorsPane({
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
+  /** Job setting: false hides the comments box from the annotator. */
+  commentsEnabled: boolean;
+  /** Job setting: how the per-evaluator reasoning box behaves in write mode. */
+  reasoningMode: "optional" | "required" | "hidden";
   /** Current free-text comment for this item — backed by the
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
@@ -1163,7 +1193,11 @@ function EvaluatorsPane({
   ) : null;
 
   const trimmedComment = itemComment.trim();
-  const showCommentBlock = readOnly ? trimmedComment.length > 0 : true;
+  // Read-only views show a comment only when one was written, so a job with
+  // comments switched off has nothing to show there either way.
+  const showCommentBlock = readOnly
+    ? trimmedComment.length > 0
+    : commentsEnabled;
   const commentBlock = showCommentBlock ? (
     <div className="space-y-1.5">
       <h3 className="text-sm font-semibold">
@@ -1309,6 +1343,7 @@ function EvaluatorsPane({
             variableValues={variableValues}
             value={f?.value as boolean | number | undefined}
             comment={typeof f?.comment === "string" ? f.comment : ""}
+            reasoningMode={reasoningMode}
             onValueChange={(v) => setField(k, { value: v })}
             onCommentChange={(s) => setField(k, { comment: s })}
             trueLabel={trueLabel}

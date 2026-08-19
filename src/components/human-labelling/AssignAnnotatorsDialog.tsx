@@ -39,6 +39,61 @@ function parseApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
+export type ReasoningMode = "optional" | "required" | "hidden";
+
+export type LabellingJobSettings = {
+  comments_enabled: boolean;
+  reasoning_mode: ReasoningMode;
+};
+
+/**
+ * One choice out of a short list, laid out like the checkbox rows above it.
+ * The fieldset names the group for screen readers and disables every option
+ * in it at once.
+ */
+function SettingChoice<T extends string>({
+  label,
+  help,
+  name,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  help: string;
+  name: string;
+  value: T;
+  options: { value: T; label: string }[];
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset className="space-y-2" disabled={disabled}>
+      <legend className="text-sm font-medium">{label}</legend>
+      <p className="text-xs text-muted-foreground">{help}</p>
+      <div className="space-y-2 pt-1">
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+              className="w-4 h-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span className="text-sm">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 type AssignAnnotatorsDialogProps = {
   isOpen: boolean;
   accessToken: string;
@@ -49,6 +104,7 @@ type AssignAnnotatorsDialogProps = {
   onConfirm: (
     annotatorIds: string[],
     evaluatorIds: string[],
+    settings: LabellingJobSettings,
   ) => Promise<void> | void;
 };
 
@@ -72,10 +128,14 @@ export function AssignAnnotatorsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>("optional");
 
   useEffect(() => {
     if (!isOpen) return;
     setPicked(new Set());
+    setCommentsEnabled(true);
+    setReasoningMode("optional");
     setSubmitError(null);
     let cancelled = false;
     const run = async () => {
@@ -154,7 +214,10 @@ export function AssignAnnotatorsDialog({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await onConfirm(Array.from(picked), Array.from(pickedEvaluators));
+      await onConfirm(Array.from(picked), Array.from(pickedEvaluators), {
+        comments_enabled: commentsEnabled,
+        reasoning_mode: reasoningMode,
+      });
     } catch (err) {
       setSubmitError(parseApiError(err, "Failed to create jobs"));
     } finally {
@@ -373,6 +436,40 @@ export function AssignAnnotatorsDialog({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Outside the grid, so it runs the full width in the wide layout. */}
+          <div className="mt-6 pt-6 border-t border-border space-y-4">
+            <p className="text-xs font-medium text-muted-foreground">
+              Settings
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+              <SettingChoice
+                label="Comments on each item"
+                help="The box where annotators write notes about an item."
+                name="comments-on-each-item"
+                value={commentsEnabled ? "show" : "hide"}
+                options={[
+                  { value: "show", label: "Show" },
+                  { value: "hide", label: "Do not show" },
+                ]}
+                disabled={submitting}
+                onChange={(v) => setCommentsEnabled(v === "show")}
+              />
+              <SettingChoice<ReasoningMode>
+                label="Reasoning on each label"
+                help="The box where annotators explain the score they gave."
+                name="reasoning-on-each-label"
+                value={reasoningMode}
+                options={[
+                  { value: "optional", label: "Optional" },
+                  { value: "required", label: "Required" },
+                  { value: "hidden", label: "Do not show" },
+                ]}
+                disabled={submitting}
+                onChange={setReasoningMode}
+              />
+            </div>
           </div>
 
           {submitError && (

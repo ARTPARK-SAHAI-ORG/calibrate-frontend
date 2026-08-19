@@ -1236,6 +1236,232 @@ describe("AnnotationJobView", () => {
     });
   });
 
+  describe("comments and reasoning job settings", () => {
+    const singleItemJob = (job: Record<string, unknown> = {}) =>
+      jobResponse({
+        items: [items[0]],
+        job: { ...jobResponse().job, ...job },
+      });
+
+    it("keeps the comments box and the reasoning box when both settings are absent", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(singleItemJob()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByPlaceholderText("Add any notes about this item"),
+      ).toBeInTheDocument();
+      expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
+        2,
+      );
+      expect(screen.getAllByText("Reasoning (optional)")).toHaveLength(2);
+    });
+
+    it("hides the comments box when the job has comments switched off", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(singleItemJob({ comments_enabled: false })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByPlaceholderText("Add any notes about this item"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Comments (optional)")).not.toBeInTheDocument();
+      // The reasoning boxes are untouched by this setting.
+      expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
+        2,
+      );
+    });
+
+    it("keeps the comments box when the job explicitly switches comments on", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(singleItemJob({ comments_enabled: true })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByPlaceholderText("Add any notes about this item"),
+      ).toBeInTheDocument();
+    });
+
+    it("hides the reasoning box when the job hides reasoning", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(singleItemJob({ reasoning_mode: "hidden" })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByPlaceholderText("Add your reasoning"),
+      ).not.toBeInTheDocument();
+      // The comments box is untouched by this setting.
+      expect(
+        screen.getByPlaceholderText("Add any notes about this item"),
+      ).toBeInTheDocument();
+    });
+
+    it("labels the reasoning box as required when the job requires it", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(singleItemJob({ reasoning_mode: "required" })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+      expect(screen.getAllByText("Reasoning (required)")).toHaveLength(2);
+      expect(screen.queryByText("Reasoning (optional)")).not.toBeInTheDocument();
+    });
+
+    it("blocks the save until reasoning is typed for every answered label", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(singleItemJob({ reasoning_mode: "required" })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      await user.click(screen.getByRole("button", { name: "3" }));
+
+      await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+      expect(
+        screen.getByText(
+          "Add reasoning for every label you answered before submitting.",
+        ),
+      ).toBeInTheDocument();
+      // Nothing was sent — only the initial GET happened.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Reasoning on only the first evaluator still blocks the save.
+      const boxes = screen.getAllByPlaceholderText("Add your reasoning");
+      await user.type(boxes[0], "It is right");
+      await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+      expect(
+        screen.getByText(
+          "Add reasoning for every label you answered before submitting.",
+        ),
+      ).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await user.type(
+        screen.getAllByPlaceholderText("Add your reasoning")[1],
+        "Reads well",
+      );
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(
+        screen.queryByText(
+          "Add reasoning for every label you answered before submitting.",
+        ),
+      ).not.toBeInTheDocument();
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.annotations).toEqual([
+        { evaluator_id: "ev-1", value: { value: true, reasoning: "It is right" } },
+        { evaluator_id: "ev-2", value: { value: 3, reasoning: "Reads well" } },
+      ]);
+    });
+
+    it("keeps the annotator on the item when they navigate away with reasoning missing", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          jobResponse({ job: { ...jobResponse().job, reasoning_mode: "required" } }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      await user.click(screen.getByRole("button", { name: "3" }));
+      await user.click(screen.getByRole("button", { name: "Next" }));
+
+      expect(
+        screen.getByText(
+          "Add reasoning for every label you answered before submitting.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips a blank optional evaluator instead of demanding reasoning for it", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          jobResponse({
+            evaluators: [evaluators[0], { ...evaluators[1], is_optional: true }],
+            items: [items[0]],
+            job: { ...jobResponse().job, reasoning_mode: "required" },
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("My Task")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      await user.type(
+        screen.getAllByPlaceholderText("Add your reasoning")[0],
+        "Because",
+      );
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1"], count: 1, status: "pending" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(body.annotations).toEqual([
+        { evaluator_id: "ev-1", value: { value: true, reasoning: "Because" } },
+      ]);
+    });
+
+    it("still shows saved reasoning in the read-only view when reasoning is hidden", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            read_only: true,
+            items: [items[0]],
+            job: { ...jobResponse().job, reasoning_mode: "hidden" },
+            annotations: [
+              {
+                uuid: "a1",
+                job_id: "job-1",
+                item_id: "item-1",
+                evaluator_id: "ev-1",
+                value: { value: true, reasoning: "written earlier" },
+                created_at: "",
+                updated_at: "",
+              },
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByRole("button", { name: "See reasoning" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows the item description when the payload has one", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
