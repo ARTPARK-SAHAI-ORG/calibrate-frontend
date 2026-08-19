@@ -115,12 +115,14 @@ const calibrateTabs: TabType[] = [
   "traces",
   "settings",
 ];
+// Connection sits next to Settings: it is set up once, while evaluators and
+// tests are what the reader comes back to.
 const connectionTabs: TabType[] = [
-  "connection",
   "evaluators",
   "tests",
   "runs",
   "traces",
+  "connection",
   "settings",
 ];
 
@@ -425,11 +427,13 @@ export function AgentDetail({
         const data: AgentData = await response.json();
         setAgent(data);
 
-        // Set initial tab based on agent type
+        // Set initial tab based on agent type. A Connect agent opens on
+        // Evaluators: its connection is set up once, while its evaluators and
+        // tests are what the reader comes back for.
         const currentTab = searchParams.get("tab") as TabType | null;
         if (data.type === "connection") {
           if (!currentTab || !connectionTabs.includes(currentTab)) {
-            setActiveTab("connection");
+            setActiveTab("evaluators");
           }
         } else {
           if (!currentTab || !calibrateTabs.includes(currentTab)) {
