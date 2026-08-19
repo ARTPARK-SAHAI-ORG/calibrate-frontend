@@ -1,5 +1,6 @@
 ## August 2026
 
+- Show human scores alongside evaluator scores ([#386](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/386))
 - Always give the assign annotators dialog a settings column ([#385](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/385))
 - Choose comment and reasoning settings when creating labelling jobs ([#384](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/384))
 - Make uploading existing human labels easier in bulk upload ([#382](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/382))
