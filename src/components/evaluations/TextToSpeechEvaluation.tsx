@@ -18,7 +18,7 @@ import {
   TTSProvider,
   getTtsApiType,
 } from "../agent-tabs/constants/providers";
-import { LIMITS, showLimitToast } from "@/constants/limits";
+import { LIMITS, showLimitToast, exceedsEvalLimit } from "@/constants/limits";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
@@ -351,6 +351,18 @@ export function TextToSpeechEvaluation({
           evaluator_uuids: evaluatorUuids,
           ...(datasetName.trim() ? { dataset_name: datasetName.trim() } : {}),
         };
+      }
+
+      // Rows typed or uploaded here already passed the editor's limit, but a
+      // saved dataset never did, so the row count is checked again here.
+      const rowCount =
+        inputMode === "dataset"
+          ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
+              ?.item_count ?? 0)
+          : (requestBody.texts as string[]).length;
+      if (exceedsEvalLimit(rowCount, maxRowsPerEval, "rows")) {
+        setIsEvaluating(false);
+        return;
       }
 
       const response = await fetch(`${backendUrl}/tts/evaluate`, {

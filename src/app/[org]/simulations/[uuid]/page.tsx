@@ -204,6 +204,20 @@ export default function SimulationDetailPage() {
 
   const handleLaunch = async (type: "text" | "voice") => {
     setLaunchDropdownOpen(false);
+    // The pickers hold the same limits, but a configuration saved before a
+    // limit changed would otherwise launch unchecked.
+    if (selectedPersonas.length > LIMITS.SIMULATION_MAX_PERSONAS) {
+      showLimitToast(
+        `You can only run up to ${LIMITS.SIMULATION_MAX_PERSONAS} personas at a time.`,
+      );
+      return;
+    }
+    if (selectedScenarios.length > LIMITS.SIMULATION_MAX_SCENARIOS) {
+      showLimitToast(
+        `You can only run up to ${LIMITS.SIMULATION_MAX_SCENARIOS} scenarios at a time.`,
+      );
+      return;
+    }
     setIsLaunching(true);
 
     try {

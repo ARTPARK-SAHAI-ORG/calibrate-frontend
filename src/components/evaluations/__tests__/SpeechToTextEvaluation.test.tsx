@@ -364,6 +364,72 @@ describe("SpeechToTextEvaluation", () => {
     expect(mockToastError).toHaveBeenCalledWith("Please select a dataset.");
   });
 
+  it("blocks a saved dataset that is bigger than the row limit", async () => {
+    const user = setupUser();
+    // 25 rows, over the limit of 20.
+    mockListDatasets.mockResolvedValue([
+      { uuid: "ds-1", name: "Big Dataset", item_count: 25 },
+    ]);
+    const evaluateRef = { current: null as (() => void) | null };
+    render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
+
+    await user.click(screen.getByText("Evaluators"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    await selectProvider(user, "Deepgram");
+
+    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Use existing dataset"));
+    await waitFor(() => screen.getByTestId("dataset-picker"));
+    await user.click(screen.getByTestId("pick-ds-1"));
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    expect(mockToastError).toHaveBeenCalled();
+    const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
+      false,
+    );
+  });
+
+  it("runs a saved dataset that fits inside the row limit", async () => {
+    const user = setupUser();
+    mockListDatasets.mockResolvedValue([
+      { uuid: "ds-1", name: "Small Dataset", item_count: 5 },
+    ]);
+    const evaluateRef = { current: null as (() => void) | null };
+    render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
+
+    await user.click(screen.getByText("Evaluators"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    await selectProvider(user, "Deepgram");
+
+    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Use existing dataset"));
+    await waitFor(() => screen.getByTestId("dataset-picker"));
+    await user.click(screen.getByTestId("pick-ds-1"));
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ task_id: "task-ok", status: "queued" }),
+    });
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    await waitFor(() => {
+      const calledUrls = (global.fetch as jest.Mock).mock.calls.map(
+        (c) => c[0],
+      );
+      expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
+        true,
+      );
+    });
+  });
+
   it("shows the empty-datasets state and can switch back to manual upload", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);

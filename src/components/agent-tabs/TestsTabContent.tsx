@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   useAccessToken,
   useAgentTests,
-  useMaxRowsPerEval,
   useDialogUrlParam,
   usePageSize,
 } from "@/hooks";
@@ -47,7 +46,6 @@ import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
-import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel } from "@/lib/testTypes";
 import {
   TestTypeFilter,
@@ -203,7 +201,6 @@ export function TestsTabContent({
   agentNature,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
-  const maxRowsPerEval = useMaxRowsPerEval();
   // Evaluators currently attached to this agent — used to seed a new test's
   // evaluators and to detect which of a saved test's evaluators are "new" to
   // the agent (so we can offer to add them to the agent's defaults).
@@ -981,6 +978,10 @@ export function TestsTabContent({
         backendAccessToken,
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
+        // `tests` is only a page (or empty, for "every matching test with no
+        // filter applied") whenever allLinked is true — the real count is the
+        // server-reported total, not this page's length.
+        allLinked ? linkedTestsTotal : tests.length,
       );
       if (!taskId) return null;
       onRunStarted?.();
@@ -1614,12 +1615,6 @@ export function TestsTabContent({
               <button
                 data-tour="tests-run-all"
                 onClick={() => {
-                  if (linkedTestsTotal > maxRowsPerEval) {
-                    showLimitToast(
-                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                    );
-                    return;
-                  }
                   setRunAllConfirmOpen(true);
                 }}
                 disabled={startingRun !== null}
@@ -1891,12 +1886,6 @@ export function TestsTabContent({
                   <div>
                     <button
                       onClick={async () => {
-                        if (selectedTestCount > maxRowsPerEval) {
-                          showLimitToast(
-                            `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                          );
-                          return;
-                        }
                         const { tests, allLinked } =
                           await selectedTestsForAction();
                         if (!allLinked && tests.length === 0) return;

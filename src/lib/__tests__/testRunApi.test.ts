@@ -22,6 +22,13 @@ jest.mock("../reportError", () => ({
   reportError: jest.fn(),
 }));
 
+// The workspace limit on how many tests one run may cover. Relative specifier:
+// jest.mock() does not resolve the "@/" alias.
+const getMaxRowsPerEval = jest.fn(async () => 20);
+jest.mock("../../hooks/useMaxRowsPerEval", () => ({
+  getMaxRowsPerEval: (...args: unknown[]) => getMaxRowsPerEval(...args),
+}));
+
 const BACKEND_URL = "http://backend.test";
 const TOKEN = "test-token";
 
@@ -36,6 +43,7 @@ describe("testRunApi", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    getMaxRowsPerEval.mockResolvedValue(20);
     localStorage.clear();
   });
 
@@ -114,6 +122,47 @@ describe("testRunApi", () => {
         startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
       ).resolves.toBeNull();
       expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("blocks a run of more tests than the workspace allows", async () => {
+      getMaxRowsPerEval.mockResolvedValue(2);
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", [
+          "t-1",
+          "t-2",
+          "t-3",
+        ]),
+      ).resolves.toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+      // The limit toast carries the contact link, so it is not the plain one.
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).not.toHaveBeenCalledWith(
+        "Could not start the test run. Please try again.",
+      );
+    });
+
+    it("counts the tests the caller names when the run covers every linked test", async () => {
+      getMaxRowsPerEval.mockResolvedValue(2);
+
+      // testUuids is null (run everything linked), so the size comes from the
+      // count the caller passes.
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null, 5),
+      ).resolves.toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("starts a run that is exactly on the limit", async () => {
+      getMaxRowsPerEval.mockResolvedValue(2);
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-10" }),
+      );
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null, 2),
+      ).resolves.toBe("task-10");
       expect(toast.error).not.toHaveBeenCalled();
     });
 

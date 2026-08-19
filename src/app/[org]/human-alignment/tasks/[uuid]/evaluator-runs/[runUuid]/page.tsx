@@ -8,6 +8,7 @@ import { Breadcrumbs, RetryIcon, type Crumb } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
+import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
@@ -257,6 +258,21 @@ export default function EvaluatorRunDetailPage() {
   const submitRerun = useCallback(
     async (selections: RunEvaluatorsSelection[]) => {
       if (!accessToken || !taskUuid || rerunSubmitting) return;
+      // With no resolved items the rerun covers the whole task.
+      const itemCount =
+        rerunItemIds.length ||
+        job?.details?.item_count ||
+        task?.items?.length ||
+        0;
+      const overLimit = await evaluatorRunLimitMessage(
+        accessToken,
+        itemCount,
+        selections.length,
+      );
+      if (overLimit) {
+        setRerunError(overLimit);
+        return;
+      }
       setRerunSubmitting(true);
       setRerunError(null);
       try {
@@ -289,7 +305,15 @@ export default function EvaluatorRunDetailPage() {
         setRerunSubmitting(false);
       }
     },
-    [accessToken, taskUuid, rerunItemIds, rerunSubmitting, router],
+    [
+      accessToken,
+      taskUuid,
+      rerunItemIds,
+      job,
+      task,
+      rerunSubmitting,
+      router,
+    ],
   );
 
   const handleExport = useCallback(async () => {

@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { signOut } from "next-auth/react";
 import { TestsTabContent } from "../TestsTabContent";
-import { showLimitToast } from "@/constants/limits";
 import { toast } from "sonner";
 import {
   readBulkNameConflictMessage,
@@ -14,7 +13,7 @@ import {
 // ---------------------------------------------------------------------------
 
 const useAccessTokenMock = jest.fn();
-const useMaxRowsPerEvalMock = jest.fn();
+const getMaxRowsPerEvalMock = jest.fn(async () => 100);
 
 // Capture the deep-link hook's args (esp. onOpen) and expose a spy setParam so
 // we can assert URL writes/clears and drive the "open from URL" path directly.
@@ -34,7 +33,6 @@ jest.mock("../../../hooks", () => ({
     .PAGE_SIZE_OPTIONS,
   useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
     .useAgentTests,
-  useMaxRowsPerEval: () => useMaxRowsPerEvalMock(),
   useDialogUrlParam: (args: any) => {
     if (args.param === "runId") {
       runIdParamArgs = args;
@@ -45,14 +43,16 @@ jest.mock("../../../hooks", () => ({
   },
 }));
 
+// The run size limit lives in startTestRunOrNotify, which reads it from here.
+jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+  __esModule: true,
+  useMaxRowsPerEval: () => 100,
+  getMaxRowsPerEval: (...args: unknown[]) => getMaxRowsPerEvalMock(...args),
+}));
+
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
   reportError: jest.fn(),
-}));
-
-jest.mock("../../../constants/limits", () => ({
-  __esModule: true,
-  showLimitToast: jest.fn(),
 }));
 
 jest.mock("sonner", () => ({
@@ -449,7 +449,7 @@ function renderComponent(
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "https://api.example.com";
   useAccessTokenMock.mockReturnValue("token-123");
-  useMaxRowsPerEvalMock.mockReturnValue(100);
+  getMaxRowsPerEvalMock.mockResolvedValue(100);
   deleteDialogProps = null;
   addTestDialogProps = null;
   dialogUrlParamArgs = null;
@@ -459,7 +459,6 @@ beforeEach(() => {
   benchmarkProps = null;
   benchmarkResultsProps = null;
   (signOut as jest.Mock).mockClear();
-  (showLimitToast as jest.Mock).mockClear();
   (readBulkNameConflictMessage as jest.Mock).mockResolvedValue(null);
   (readNameConflictMessage as jest.Mock).mockResolvedValue(null);
   state = {
@@ -706,7 +705,7 @@ describe("TestsTabContent — paging", () => {
   });
 
   it("counts every linked test against the run limit, not the filtered ones", async () => {
-    useMaxRowsPerEvalMock.mockReturnValue(5);
+    getMaxRowsPerEvalMock.mockResolvedValue(5);
     const user = setupUser();
     state.agentTests = [...manyTests, toolCallTest];
     renderComponent();
@@ -717,7 +716,8 @@ describe("TestsTabContent — paging", () => {
 
     // One test matches the filter, but Run all runs all 13.
     await user.click(screen.getByText("Run all tests"));
-    expect(showLimitToast).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(runPostCall()).toBeFalsy();
   });
 
@@ -1057,15 +1057,21 @@ describe("TestsTabContent — populated table", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("shows a limit toast when running more tests than allowed", async () => {
-    useMaxRowsPerEvalMock.mockReturnValue(1);
+  it("shows a limit toast and starts nothing when running more tests than allowed", async () => {
+    getMaxRowsPerEvalMock.mockResolvedValue(1);
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
-    expect(showLimitToast).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/run"),
+      ),
+    ).toHaveLength(0);
   });
 });
 
