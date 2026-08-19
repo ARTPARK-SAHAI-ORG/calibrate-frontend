@@ -47,6 +47,13 @@
   box-sizing: border-box;
 }
 
+/* Textareas are inline by default, which leaves a few pixels of blank line
+   under the box. That shows up as an odd gap above the red error text under
+   an input. */
+textarea {
+  display: block;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
