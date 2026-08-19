@@ -22,7 +22,7 @@ import {
   agreementColor,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
-import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
+import { summariseValues } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemValueFilter,
@@ -365,26 +365,7 @@ export function summariseEvaluatorRuns(
     )
     .map((r) => r.value?.value);
 
-  if (jobEvaluator?.output_type === "rating") {
-    const nums = values.filter(
-      (v): v is number => typeof v === "number" && Number.isFinite(v),
-    );
-    return formatEvaluatorResultStat(
-      {
-        count: nums.length,
-        mean: nums.length
-          ? nums.reduce((a, b) => a + b, 0) / nums.length
-          : null,
-      },
-      jobEvaluator,
-    );
-  }
-
-  const bools = values.filter((v): v is boolean => typeof v === "boolean");
-  return formatEvaluatorResultStat(
-    { count: bools.length, trueCount: bools.filter(Boolean).length },
-    jobEvaluator,
-  );
+  return summariseValues(values, jobEvaluator);
 }
 
 export function isBelowFullEvaluatorAgreement(

@@ -25,6 +25,8 @@ import {
 import { useUrlValueFilters } from "./valueFilterUrl";
 import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
 import type { ReviewItem } from "./SendForReviewFlow";
+import { buildJobHumanScoreCards, readSavedValue } from "./jobHumanScores";
+import type { EvaluatorScoreCard } from "./EvaluatorScoreCards";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -147,13 +149,6 @@ function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
   return evaluators.filter((ev) => ev.is_optional !== true);
 }
 
-function readSavedValue(v: unknown): unknown {
-  if (v && typeof v === "object" && "value" in (v as Record<string, unknown>)) {
-    return (v as Record<string, unknown>).value;
-  }
-  return v;
-}
-
 function readSavedComment(v: unknown): string {
   if (v && typeof v === "object") {
     const obj = v as Record<string, unknown>;
@@ -201,6 +196,8 @@ export type AnnotationJobMeta = {
   annotator: { uuid: string; name: string };
   jobStatus: "pending" | "in_progress" | "completed";
   evaluators: { uuid: string; name: string }[];
+  /** One card per evaluator the annotator scored, for the read-only pages. */
+  humanScores: EvaluatorScoreCard[];
   /** Job UUID + share state, threaded through so the admin wrapper can render
    * the visibility toggle for the read-only viewer link. */
   job: {
@@ -362,6 +359,10 @@ export function AnnotationJobView({
           uuid: e.uuid,
           name: e.name,
         })),
+        humanScores: buildJobHumanScoreCards(
+          result.data.evaluators,
+          result.data.annotations,
+        ),
         job: {
           uuid: result.data.job.uuid,
           is_public: result.data.job.is_public ?? false,
