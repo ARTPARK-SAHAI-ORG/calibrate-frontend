@@ -10,9 +10,13 @@ import {
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   annotationColumnsError,
@@ -23,6 +27,7 @@ import {
   sampleEvaluatorValue,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 export type EvaluatorVariableDef = {
@@ -94,10 +99,6 @@ type ParsedItem = {
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
-
 // Column header for an evaluator variable, e.g. "Correctness/criteria". One
 // column per variable per evaluator — keeps the CSV flat instead of asking
 // users to hand-author JSON in a single cell.
@@ -154,6 +155,15 @@ export function BulkUploadItemsDialog({
     annotatorId: selectedAnnotatorId,
     namedItems: parsedItems,
   });
+  // When the user is uploading existing labels and the task already has items,
+  // the download hands back those items so only the label columns are left to
+  // fill in. With no items yet, the made-up sample CSV is used instead.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -569,6 +579,28 @@ export function BulkUploadItemsDialog({
       header: variableColumnName(e.name, v.name),
     })),
   );
+  // Same column order as the sample CSV, with each item's stored content
+  // filled in and the value and reasoning columns left blank to label.
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    { header: "description", cell: (p) => csvCellFromPayload(p.description) },
+    ...contentColumns.map((c) => ({
+      header: c.csvColumn,
+      cell: (p: Record<string, unknown>) => csvCellFromPayload(p[c.payloadKey]),
+    })),
+    ...variableColumns.map((c) => ({
+      header: c.header,
+      cell: (p: Record<string, unknown>) => {
+        const byEvaluator = p.evaluator_variables as
+          Record<string, Record<string, unknown>> | undefined;
+        return csvCellFromPayload(byEvaluator?.[c.evaluatorUuid]?.[c.varName]);
+      },
+    })),
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
   const annotationColumns =
     uploadAnnotations && annotationEvaluatorsMeta.length > 0
       ? annotationEvaluatorsMeta.flatMap((e) => [
@@ -770,11 +802,25 @@ export function BulkUploadItemsDialog({
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
-      buildSampleCsv={buildSampleCsv}
+      buildSampleCsv={() =>
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleCsv()
+      }
       sampleFilename={() =>
-        uploadAnnotations
-          ? `sample_${sampleFilenameBase}_with_annotations.csv`
-          : `sample_${sampleFilenameBase}.csv`
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? `sample_${sampleFilenameBase}_with_annotations.csv`
+            : `sample_${sampleFilenameBase}.csv`
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download this task's items as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", fill in the label columns, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>

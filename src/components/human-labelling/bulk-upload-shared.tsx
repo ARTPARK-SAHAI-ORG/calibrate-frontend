@@ -1044,6 +1044,83 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+// ─── Existing task items → CSV ────────────────────────────────────────────
+
+/** One item already in the labelling task, as `GET /annotation-tasks/{uuid}/items` returns it. */
+export type TaskItem = { uuid: string; payload: Record<string, unknown> };
+
+/** Wraps a cell in quotes when it carries a comma, quote or newline. */
+export function csvEscape(s: string): string {
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// A CSV cell for one item payload field. Text goes in as-is; anything
+// structured (a chat history, a transcript) goes in as JSON, which is the
+// same form the upload parser reads back.
+export function csvCellFromPayload(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+export type ItemCsvColumn = {
+  header: string;
+  cell: (payload: Record<string, unknown>) => string;
+};
+
+/** Builds a CSV holding one row per existing item, ready to be labelled. */
+export function buildItemsCsv(
+  items: TaskItem[],
+  columns: ItemCsvColumn[],
+): string {
+  const lines = [columns.map((c) => csvEscape(c.header)).join(",")];
+  for (const item of items) {
+    const payload = (item.payload ?? {}) as Record<string, unknown>;
+    lines.push(columns.map((c) => csvEscape(c.cell(payload))).join(","));
+  }
+  return lines.join("\n");
+}
+
+// Loads every item already in the task so the download can hand back the
+// real rows to label rather than made-up ones. Runs only while `enabled`
+// (i.e. the user opted into uploading existing labels). A failure is
+// silent: the caller falls back to the sample CSV.
+export function useTaskItems(
+  enabled: boolean,
+  taskUuid: string,
+  accessToken: string,
+): { items: TaskItem[]; loading: boolean } {
+  const [items, setItems] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !taskUuid || !accessToken) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await apiClient<TaskItem[]>(
+          `/annotation-tasks/${taskUuid}/items`,
+          accessToken,
+        );
+        if (!cancelled) setItems(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, taskUuid, accessToken]);
+
+  return { items, loading };
+}
+
 // Shared shell for the three bulk-upload dialogs (LLM / STT / Conversation).
 // Owns the modal chrome, header, footer, dropzone, format-help toggle, tip
 // callout, and sample-CSV download wiring. Each dialog supplies its own
@@ -1053,6 +1130,12 @@ type BulkUploadDialogShellProps = {
   title: string;
   buildSampleCsv: () => string;
   sampleFilename: string | (() => string);
+  // Wording of the tip under the dropzone. Defaults describe the made-up
+  // sample; dialogs override them when the download holds the task's own
+  // items instead. The suffix follows the link with no space added, so it
+  // carries its own leading space or punctuation.
+  sampleLinkLabel?: string;
+  sampleTipSuffix?: string;
   // Structured CSV format guidelines, rendered to a styled PDF for the
   // "Download CSV format guidelines" button.
   buildGuidelines: () => GuidelineDoc;
@@ -1087,6 +1170,8 @@ export function BulkUploadDialogShell({
   title,
   buildSampleCsv,
   sampleFilename,
+  sampleLinkLabel = "download the sample CSV",
+  sampleTipSuffix = " and edit it as a starting point",
   buildGuidelines,
   guidelinesFilename = "csv_format_guidelines.pdf",
   csvFile,
@@ -1217,9 +1302,9 @@ export function BulkUploadDialogShell({
                       onClick={downloadSample}
                       className="underline underline-offset-2 font-semibold text-emerald-700 dark:text-emerald-300 hover:opacity-80 transition-opacity cursor-pointer"
                     >
-                      download the sample CSV
-                    </button>{" "}
-                    and edit it as a starting point
+                      {sampleLinkLabel}
+                    </button>
+                    {sampleTipSuffix}
                   </span>
                 </div>
               )}

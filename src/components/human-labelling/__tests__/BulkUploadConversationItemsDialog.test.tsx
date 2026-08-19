@@ -462,9 +462,98 @@ describe("BulkUploadConversationItemsDialog", () => {
       await user.click(screen.getByRole("option", { name: "Alice" }));
     }
 
+    // Reads back the CSV handed to the browser by the last download.
+    async function lastDownloadedCsv(): Promise<string> {
+      const calls = (
+        global as unknown as { URL: { createObjectURL: jest.Mock } }
+      ).URL.createObjectURL.mock.calls;
+      const blob = calls[calls.length - 1][0] as Blob;
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+      });
+    }
+
+    const ITEM_CSV_HEADER =
+      "name,description,transcript,Correctness/value,Correctness/reasoning";
+
+    it("downloads the task's own items when it already has some", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([
+          {
+            uuid: "i1",
+            payload: {
+              name: "Card lost",
+              description: "Lost card flow",
+              transcript: [{ role: "user", content: "I lost my card" }],
+            },
+          },
+          {
+            uuid: "i2",
+            payload: {
+              name: "Refund",
+              transcript: [{ role: "user", content: "charged twice" }],
+            },
+          },
+        ]); // task items
+      const user = setupUser();
+      render(
+        <BulkUploadConversationItemsDialog
+          {...defaultProps({ linkedEvaluators })}
+        />,
+      );
+      await selectAnnotator(user);
+      await waitFor(() =>
+        expect(apiClient).toHaveBeenCalledWith(
+          "/annotation-tasks/task-1/items",
+          "tok",
+        ),
+      );
+      const link = await screen.findByRole("button", {
+        name: "download this task's items as a CSV",
+      });
+      await user.click(link);
+
+      const lines = (await lastDownloadedCsv()).split("\n");
+      expect(lines[0]).toBe(ITEM_CSV_HEADER);
+      expect(lines[1]).toBe(
+        'Card lost,Lost card flow,"[{""role"":""user"",""content"":""I lost my card""}]",,',
+      );
+      expect(lines[2]).toBe(
+        'Refund,,"[{""role"":""user"",""content"":""charged twice""}]",,',
+      );
+      expect(lines).toHaveLength(3);
+    });
+
+    it("still downloads the sample CSV when the task has no items yet", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]); // task items
+      const user = setupUser();
+      render(
+        <BulkUploadConversationItemsDialog
+          {...defaultProps({ linkedEvaluators })}
+        />,
+      );
+      await selectAnnotator(user);
+      const link = await screen.findByRole("button", {
+        name: "download the sample CSV",
+      });
+      await user.click(link);
+
+      const csv = await lastDownloadedCsv();
+      // Same columns in the same order as the task's own items CSV.
+      expect(csv.split("\n")[0]).toBe(ITEM_CSV_HEADER);
+      expect(csv).toContain("Card lost - happy path");
+    });
+
     it("parses annotation columns and shows values in the preview", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (for the download link)
         .mockResolvedValueOnce({
           all_new: true,
           existing_with_annotations: [],
@@ -519,6 +608,7 @@ describe("BulkUploadConversationItemsDialog", () => {
     it("uploads a row whose annotation value cell is blank, with no annotations", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (for the download link)
         .mockResolvedValueOnce({
           all_new: true,
           existing_with_annotations: [],
@@ -547,7 +637,8 @@ describe("BulkUploadConversationItemsDialog", () => {
       await user.click(screen.getByRole("button", { name: "Upload item" }));
       await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
       const uploadCall = apiClient.mock.calls.find(
-        (c) => c[0] === "/annotation-tasks/task-1/items",
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
       );
       expect(uploadCall![2].body).toEqual({
         items: [
@@ -588,6 +679,7 @@ describe("BulkUploadConversationItemsDialog", () => {
     it("uploads with annotations and sends annotator_id + annotations payload", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (for the download link)
         .mockResolvedValueOnce({
           all_new: true,
           existing_with_annotations: [],
@@ -617,7 +709,8 @@ describe("BulkUploadConversationItemsDialog", () => {
       await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
 
       const uploadCall = apiClient.mock.calls.find(
-        (c) => c[0] === "/annotation-tasks/task-1/items",
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
       );
       expect(uploadCall).toBeTruthy();
       expect(uploadCall![2].body).toEqual({
@@ -683,6 +776,7 @@ describe("BulkUploadConversationItemsDialog", () => {
     it("adds an annotator without leaving the dialog when none exist", async () => {
       apiClient
         .mockResolvedValueOnce([]) // annotators
+        .mockResolvedValueOnce([]) // task items (for the download link)
         .mockResolvedValueOnce({ uuid: "new-1", message: "ok" }); // create
       const user = setupUser();
       render(

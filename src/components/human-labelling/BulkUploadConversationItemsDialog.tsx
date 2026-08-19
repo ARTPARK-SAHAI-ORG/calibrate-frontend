@@ -11,10 +11,14 @@ import {
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   type TurnObject,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   annotationColumnsError,
@@ -28,6 +32,7 @@ import {
   turnContentString,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 const TRANSCRIPT_HEADERS = [
@@ -38,10 +43,6 @@ const TRANSCRIPT_HEADERS = [
 ];
 const NAME_HEADERS = ["name", "title", "conversation_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
-
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 const SAMPLE_CONVERSATION_BASE_ROWS: Array<{
   name: string;
@@ -179,6 +180,14 @@ export function BulkUploadConversationItemsDialog({
     null,
   );
   const annotatorsState = useAnnotators(isOpen, accessToken);
+  // When the user is uploading existing labels for items the task already
+  // holds, the download hands back those items so only the label columns
+  // are left to fill in.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
       uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
@@ -618,17 +627,47 @@ export function BulkUploadConversationItemsDialog({
       duplicateNames.length > 0 ||
       evaluatorsMissingOutputType.length > 0);
 
+  // Hand back the task's own items only when there are some to hand back.
+  // With none, the made-up sample is still the useful starting point.
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
+  // Same column order as the sample CSV, with every label cell left blank
+  // for the annotator to fill in.
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    { header: "description", cell: (p) => csvCellFromPayload(p.description) },
+    { header: "transcript", cell: (p) => csvCellFromPayload(p.transcript) },
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
+
   return (
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
       buildSampleCsv={() =>
-        buildSampleConversationCsv(annotationEvaluatorsMeta, uploadAnnotations)
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleConversationCsv(
+              annotationEvaluatorsMeta,
+              uploadAnnotations,
+            )
       }
       sampleFilename={() =>
-        uploadAnnotations
-          ? "sample_conversation_items_with_annotations.csv"
-          : "sample_conversation_items.csv"
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? "sample_conversation_items_with_annotations.csv"
+            : "sample_conversation_items.csv"
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download this task's items as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", fill in the label columns, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>

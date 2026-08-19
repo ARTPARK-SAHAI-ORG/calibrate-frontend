@@ -10,9 +10,13 @@ import {
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   annotationColumnsError,
@@ -23,6 +27,7 @@ import {
   sampleEvaluatorValue,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
@@ -40,10 +45,6 @@ const PREDICTED_HEADERS = [
   "prediction",
   "hypothesis",
 ];
-
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 const SAMPLE_STT_BASE_ROWS: Array<{
   name: string;
@@ -169,6 +170,31 @@ export function BulkUploadSttItemsDialog({
   const evaluatorsMissingOutputType = annotationEvaluatorsMeta.filter(
     (e) => e.output_type !== "binary" && e.output_type !== "rating",
   );
+
+  // When the user is uploading existing labels and the task already has
+  // items, the download hands back those items so only the label columns
+  // are left to fill in. With no items yet it stays the made-up sample.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    {
+      header: "reference_transcript",
+      cell: (p) => csvCellFromPayload(p.reference_transcript),
+    },
+    {
+      header: "predicted_transcript",
+      cell: (p) => csvCellFromPayload(p.predicted_transcript),
+    },
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
 
   // Two linked evaluators sharing a name produce duplicate CSV headers
   // that PapaParse silently overwrites. Block the annotation flow until
@@ -538,12 +564,24 @@ export function BulkUploadSttItemsDialog({
       isOpen={isOpen}
       title="Bulk upload items"
       buildSampleCsv={() =>
-        buildSampleSttCsv(annotationEvaluatorsMeta, uploadAnnotations)
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleSttCsv(annotationEvaluatorsMeta, uploadAnnotations)
       }
       sampleFilename={() =>
-        uploadAnnotations
-          ? "sample_stt_items_with_annotations.csv"
-          : "sample_stt_items.csv"
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? "sample_stt_items_with_annotations.csv"
+            : "sample_stt_items.csv"
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download this task's items as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", fill in the label columns, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>
