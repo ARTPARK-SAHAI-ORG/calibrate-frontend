@@ -4018,11 +4018,15 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadSttOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadSttOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+            toast.success(
+              withAnnotations
+                ? `Added labels for ${count} ${count === 1 ? "item" : "items"}`
+                : `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
           }}
         />
       )}
@@ -4055,11 +4059,15 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadConversationOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadConversationOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+            toast.success(
+              withAnnotations
+                ? `Added labels for ${count} ${count === 1 ? "item" : "items"}`
+                : `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
           }}
         />
       )}
@@ -4079,11 +4087,15 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadLlmOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadLlmOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+            toast.success(
+              withAnnotations
+                ? `Added labels for ${count} ${count === 1 ? "item" : "items"}`
+                : `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
           }}
         />
       )}
@@ -4361,11 +4373,15 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadLlmGeneralOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadLlmGeneralOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+            toast.success(
+              withAnnotations
+                ? `Added labels for ${count} ${count === 1 ? "item" : "items"}`
+                : `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
           }}
         />
       )}

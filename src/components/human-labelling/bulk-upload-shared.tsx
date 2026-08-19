@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "@/lib/nav";
 import { jsPDF } from "jspdf";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
+import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
@@ -153,6 +154,40 @@ export function parseAnnotationCell(
   return { error: `unsupported evaluator type for "${e.name}"` };
 }
 
+// Annotation value columns are optional per row and per evaluator: a blank
+// cell means that evaluator was not labelled for that row, so nothing is sent
+// for it. The CSV still has to carry at least one evaluator value column,
+// otherwise the user opted into uploading annotations but supplied none.
+export function annotationColumnsError(
+  headers: string[],
+  evaluators: EvaluatorMeta[],
+): string | null {
+  if (evaluators.length === 0) return null;
+  // A value or reasoning column whose name matches no evaluator would be read
+  // by nobody, so every value typed into it would be dropped without a word.
+  // Catches a renamed evaluator and a mistyped header alike.
+  const known = new Set(
+    evaluators.flatMap((e) => [
+      evaluatorValueColumn(e.name),
+      evaluatorReasoningColumn(e.name),
+    ]),
+  );
+  const unknown = headers.filter(
+    (h) => /\/(value|reasoning)$/.test(h) && !known.has(h),
+  );
+  if (unknown.length > 0) {
+    return `${unknown.map((h) => `"${h}"`).join(", ")} ${
+      unknown.length === 1 ? "does" : "do"
+    } not match any evaluator on this task. Check the spelling against the evaluator's name, or remove the column.`;
+  }
+  if (evaluators.some((e) => headers.includes(evaluatorValueColumn(e.name)))) {
+    return null;
+  }
+  return `CSV has no annotation column. Add at least one of: ${evaluators
+    .map((e) => `"${evaluatorValueColumn(e.name)}"`)
+    .join(", ")}.`;
+}
+
 // ─── Parsed-items preview + annotated-check (LLM / STT / Conversation) ─────
 
 /** POST `annotated-check` when bulk-uploading with pre-filled annotations. */
@@ -209,6 +244,68 @@ export function useAnnotatedItemsCheck(args: {
   return { annotatedCheck, annotatedCheckLoading };
 }
 
+// Names in the CSV that no item in the task carries. Uploading annotations
+// only labels items that are already there, so a name the task does not have
+// would quietly create an empty item instead. Returns [] while the check has
+// not come back yet, so nothing is claimed before the answer is known.
+export function unknownItemNames(
+  parsedNames: readonly string[],
+  check: AnnotatedCheckResult | null,
+): string[] {
+  if (!check) return [];
+  const matched = new Set([
+    ...check.existing_with_annotations.map((e) => e.index),
+    ...check.existing_without_annotations.map((e) => e.index),
+  ]);
+  return parsedNames.filter((_, index) => !matched.has(index));
+}
+
+/** Message for the names in the CSV that no item in the task carries. */
+export function unknownItemNamesMessage(names: readonly string[]): string {
+  const shown = names.slice(0, 5).map((n) => `"${n}"`);
+  const rest = names.length - shown.length;
+  const list =
+    rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
+  return `This task has no item named ${list}. Every row has to match an item that is already in the task, so add the items first, then upload the annotations.`;
+}
+
+/** Red banner naming the rows whose item is not in the task. */
+export function UnknownItemNamesWarning({
+  names,
+}: {
+  names: readonly string[];
+}) {
+  if (names.length === 0) return null;
+  return (
+    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+      {unknownItemNamesMessage(names)}
+    </div>
+  );
+}
+
+// Column titles in the CSV that the upload reads nothing from. A title the
+// upload does not recognise is skipped in silence, so a mistyped score column
+// like "Tone/valu" would throw away everything typed into it. Listing them
+// makes the slip visible without refusing the file.
+export function unusedCsvColumns(
+  headers: readonly string[],
+  usedHeaders: readonly (string | null | undefined)[],
+): string[] {
+  const used = new Set(usedHeaders.filter((h): h is string => !!h));
+  return headers.filter((h) => h.trim() !== "" && !used.has(h));
+}
+
+/** Note listing the column titles the upload reads nothing from. */
+export function UnusedColumnsNote({ columns }: { columns: readonly string[] }) {
+  if (columns.length === 0) return null;
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
+      Nothing is read from {columns.map((c) => `"${c}"`).join(", ")}. Check the
+      spelling if one of them was meant to hold scores.
+    </div>
+  );
+}
+
 export function bulkUploadAnnotatedRowBgClass(
   index: number,
   check: AnnotatedCheckResult | null,
@@ -260,11 +357,6 @@ export function BulkUploadItemsPreviewShell({
           </span>
         )}
       </div>
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[20rem]">
-          <div className="min-w-max">{children}</div>
-        </div>
-      </div>
       {annotatedCheck &&
         annotatedCheck.existing_without_annotations.length > 0 && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-foreground">
@@ -274,8 +366,8 @@ export function BulkUploadItemsPreviewShell({
               <span className="font-semibold text-amber-700 dark:text-amber-400">
                 amber
               </span>{" "}
-              match names of existing items — annotations will be attached to
-              those existing items. The original item remains unchanged.
+              match names of existing items. The annotations will be attached to
+              those items, and the items themselves stay unchanged.
             </span>
           </div>
         )}
@@ -289,11 +381,16 @@ export function BulkUploadItemsPreviewShell({
                 red
               </span>{" "}
               match names of existing items that already have annotations from
-              this annotator — those annotations will be replaced with the new
-              ones. The original item remains unchanged.
+              this annotator. Those annotations will be replaced with the new
+              ones, and the items themselves stay unchanged.
             </span>
           </div>
         )}
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -309,6 +406,7 @@ export function useAnnotators(
   annotators: Annotator[];
   loading: boolean;
   error: string | null;
+  addAnnotator: (annotator: Annotator) => void;
 } {
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
   const [loading, setLoading] = useState(false);
@@ -335,27 +433,41 @@ export function useAnnotators(
     };
   }, [isOpen, accessToken]);
 
-  return { annotators, loading, error };
+  // Appends an annotator created from inside the dialog so the picker can
+  // select it without refetching the list.
+  const addAnnotator = useCallback((annotator: Annotator) => {
+    setAnnotators((prev) =>
+      prev.some((a) => a.uuid === annotator.uuid) ? prev : [...prev, annotator],
+    );
+  }, []);
+
+  return { annotators, loading, error, addAnnotator };
 }
 
 type AnnotationOptInProps = {
   annotators: Annotator[];
   loading: boolean;
   error: string | null;
+  accessToken: string;
+  /** Adds an annotator created inside the dialog to the picker's list. */
+  onAnnotatorAdded: (annotator: Annotator) => void;
   uploadAnnotations: boolean;
   onToggle: (next: boolean) => void;
   selectedAnnotatorId: string | null;
   onSelectAnnotator: (uuid: string | null) => void;
 };
 
-// Renders the "Upload annotations too?" yes/no choice and, when yes,
-// either a single-select annotator picker, an empty state with a link to
-// add annotators, or load/error feedback. Used at the top of every bulk
-// upload items dialog when the parent task has linked evaluators.
+// Renders the "Upload annotations too?" yes/no choice and, when yes, the
+// annotator picker or load/error feedback. With no annotators yet the name
+// form is shown on its own; once there is a list, the same form sits at the
+// top of the picker's open panel. Used at the top of every bulk upload items
+// dialog when the parent task has linked evaluators.
 export function AnnotationOptIn({
   annotators,
   loading,
   error,
+  accessToken,
+  onAnnotatorAdded,
   uploadAnnotations,
   onToggle,
   selectedAnnotatorId,
@@ -403,39 +515,50 @@ export function AnnotationOptIn({
             <p className="text-xs text-muted-foreground">Loading annotators…</p>
           ) : error ? (
             <p className="text-xs text-red-500">{error}</p>
-          ) : annotators.length === 0 ? (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
-              No annotators exist yet.{" "}
-              <Link
-                href="/human-alignment?tab=annotators"
-                className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-              >
-                Add an annotator
-              </Link>{" "}
-              to your account first.
-            </div>
           ) : (
-            <SingleSelectPicker<Annotator>
-              items={annotators}
-              selectedId={selectedAnnotatorId}
-              onSelect={(a) => onSelectAnnotator(a.uuid)}
-              getId={(a) => a.uuid}
-              ariaLabel="Select annotator"
-              placeholder="Select an annotator"
-              className="w-full"
-              matchesSearch={(a, q) =>
-                a.name.toLowerCase().includes(q.toLowerCase())
-              }
-              searchPlaceholder="Search annotators"
-              renderTrigger={(a) => (
-                <span className="text-sm text-foreground">
-                  {a ? a.name : "Select an annotator"}
-                </span>
+            <div className="space-y-2">
+              {annotators.length === 0 ? (
+                <AddAnnotatorInline
+                  accessToken={accessToken}
+                  onAdded={(a) => {
+                    onAnnotatorAdded(a);
+                    onSelectAnnotator(a.uuid);
+                  }}
+                />
+              ) : (
+                <SingleSelectPicker<Annotator>
+                  items={annotators}
+                  selectedId={selectedAnnotatorId}
+                  onSelect={(a) => onSelectAnnotator(a.uuid)}
+                  getId={(a) => a.uuid}
+                  ariaLabel="Select annotator"
+                  placeholder="Select an annotator"
+                  className="w-full"
+                  matchesSearch={(a, q) =>
+                    a.name.toLowerCase().includes(q.toLowerCase())
+                  }
+                  searchPlaceholder="Search annotators"
+                  renderHeader={(close) => (
+                    <AddAnnotatorInline
+                      accessToken={accessToken}
+                      onAdded={(a) => {
+                        onAnnotatorAdded(a);
+                        onSelectAnnotator(a.uuid);
+                        close();
+                      }}
+                    />
+                  )}
+                  renderTrigger={(a) => (
+                    <span className="text-sm text-foreground">
+                      {a ? a.name : "Select an annotator"}
+                    </span>
+                  )}
+                  renderOption={(a) => (
+                    <span className="text-sm text-foreground">{a.name}</span>
+                  )}
+                />
               )}
-              renderOption={(a) => (
-                <span className="text-sm text-foreground">{a.name}</span>
-              )}
-            />
+            </div>
           )}
         </div>
       )}
@@ -477,13 +600,13 @@ export function EvaluatorAnnotationColumnsHelp({
               <code className="font-mono text-foreground">
                 {evaluatorValueColumn(e.name)}
               </code>{" "}
-              — value for {pill} evaluator ({range})
+              : value for {pill} evaluator ({range})
             </li>
             <li>
               <code className="font-mono text-foreground">
                 {evaluatorReasoningColumn(e.name)}
               </code>{" "}
-              — (optional) reasoning for the value assigned to the {pill}{" "}
+              : (optional) reasoning for the value assigned to the {pill}{" "}
               evaluator
             </li>
           </React.Fragment>
@@ -750,7 +873,7 @@ export function ConversationFormatDetails({ example }: { example: string }) {
           <div className="mt-1.5">Each turn must have:</div>
           <ul className="list-disc pl-5 mt-1 space-y-0.5">
             <li>
-              <code className="font-mono text-foreground">role</code> — either{" "}
+              <code className="font-mono text-foreground">role</code>, either{" "}
               <code className="font-mono text-foreground">
                 &quot;user&quot;
               </code>{" "}
@@ -760,7 +883,7 @@ export function ConversationFormatDetails({ example }: { example: string }) {
               </code>
             </li>
             <li>
-              <code className="font-mono text-foreground">content</code> — the
+              <code className="font-mono text-foreground">content</code>, the
               actual message said by that role
             </li>
           </ul>
@@ -1000,6 +1123,83 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+// ─── Existing task items → CSV ────────────────────────────────────────────
+
+/** One item already in the labelling task, as `GET /annotation-tasks/{uuid}/items` returns it. */
+export type TaskItem = { uuid: string; payload: Record<string, unknown> };
+
+/** Wraps a cell in quotes when it carries a comma, quote or newline. */
+export function csvEscape(s: string): string {
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// A CSV cell for one item payload field. Text goes in as-is; anything
+// structured (a chat history, a transcript) goes in as JSON, which is the
+// same form the upload parser reads back.
+export function csvCellFromPayload(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+export type ItemCsvColumn = {
+  header: string;
+  cell: (payload: Record<string, unknown>) => string;
+};
+
+/** Builds a CSV holding one row per existing item, ready to be labelled. */
+export function buildItemsCsv(
+  items: TaskItem[],
+  columns: ItemCsvColumn[],
+): string {
+  const lines = [columns.map((c) => csvEscape(c.header)).join(",")];
+  for (const item of items) {
+    const payload = (item.payload ?? {}) as Record<string, unknown>;
+    lines.push(columns.map((c) => csvEscape(c.cell(payload))).join(","));
+  }
+  return lines.join("\n");
+}
+
+// Loads every item already in the task so the download can hand back the
+// real rows to label rather than made-up ones. Runs only while `enabled`
+// (i.e. the user opted into uploading existing labels). A failure is
+// silent: the caller falls back to the sample CSV.
+export function useTaskItems(
+  enabled: boolean,
+  taskUuid: string,
+  accessToken: string,
+): { items: TaskItem[]; loading: boolean } {
+  const [items, setItems] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !taskUuid || !accessToken) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await apiClient<TaskItem[]>(
+          `/annotation-tasks/${taskUuid}/items`,
+          accessToken,
+        );
+        if (!cancelled) setItems(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, taskUuid, accessToken]);
+
+  return { items, loading };
+}
+
 // Shared shell for the three bulk-upload dialogs (LLM / STT / Conversation).
 // Owns the modal chrome, header, footer, dropzone, format-help toggle, tip
 // callout, and sample-CSV download wiring. Each dialog supplies its own
@@ -1009,6 +1209,12 @@ type BulkUploadDialogShellProps = {
   title: string;
   buildSampleCsv: () => string;
   sampleFilename: string | (() => string);
+  // Wording of the tip under the dropzone. Defaults describe the made-up
+  // sample; dialogs override them when the download holds the task's own
+  // items instead. The suffix follows the link with no space added, so it
+  // carries its own leading space or punctuation.
+  sampleLinkLabel?: string;
+  sampleTipSuffix?: string;
   // Structured CSV format guidelines, rendered to a styled PDF for the
   // "Download CSV format guidelines" button.
   buildGuidelines: () => GuidelineDoc;
@@ -1043,6 +1249,8 @@ export function BulkUploadDialogShell({
   title,
   buildSampleCsv,
   sampleFilename,
+  sampleLinkLabel = "download the sample CSV",
+  sampleTipSuffix = " and edit it as a starting point",
   buildGuidelines,
   guidelinesFilename = "csv_format_guidelines.pdf",
   csvFile,
@@ -1173,9 +1381,9 @@ export function BulkUploadDialogShell({
                       onClick={downloadSample}
                       className="underline underline-offset-2 font-semibold text-emerald-700 dark:text-emerald-300 hover:opacity-80 transition-opacity cursor-pointer"
                     >
-                      download the sample CSV
-                    </button>{" "}
-                    and edit it as a starting point
+                      {sampleLinkLabel}
+                    </button>
+                    {sampleTipSuffix}
                   </span>
                 </div>
               )}

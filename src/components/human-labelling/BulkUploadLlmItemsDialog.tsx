@@ -26,7 +26,7 @@ const CONTENT_COLUMNS: BulkContentColumn[] = [
     previewLabel: "Chat history",
     previewWidth: "minmax(120px, 200px)",
     guidelineDescription:
-      'A JSON array of chat messages that represents the conversation that has happened so far, before the agent response being judged. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role\ncreated_at — (optional) ISO-8601 timestamp for when this turn happened',
+      'A JSON array of chat messages that represents the conversation that has happened so far, before the agent response being judged. Each message is an object with a "role" and "content" field.\n\nrole: either "user" or "assistant"\ncontent: the message said by that role\ncreated_at: (optional) ISO-8601 timestamp for when this turn happened',
     guidelineExample: `[
   {"role": "user", "content": "What is your return policy?", "created_at": "2026-05-18T09:14:02Z"},
   {"role": "assistant", "content": "You can return any item within 30 days."}
@@ -154,7 +154,7 @@ export function BulkUploadLlmItemsDialog({
       contentColumns={CONTENT_COLUMNS}
       sampleRows={SAMPLE_ROWS}
       sampleFallbackEvaluators={SAMPLE_FALLBACK_EVALUATORS}
-      guidelinesTitle="Bulk upload — LLM labelling items"
+      guidelinesTitle="Bulk upload: LLM labelling items"
       guidelinesIntro="Upload a CSV with the following columns. Each row creates one LLM annotation item."
       sampleFilenameBase="llm_items"
       onClose={onClose}

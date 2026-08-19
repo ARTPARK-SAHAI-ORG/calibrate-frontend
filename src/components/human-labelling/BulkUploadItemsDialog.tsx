@@ -10,18 +10,28 @@ import {
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
+  annotationColumnsError,
   evaluatorValueColumn,
   findHeaderKey,
   parseAnnotationCell,
   parseApiError,
   sampleEvaluatorValue,
+  UnknownItemNamesWarning,
+  unknownItemNames,
+  UnusedColumnsNote,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 export type EvaluatorVariableDef = {
@@ -60,7 +70,10 @@ export type BulkContentColumn = {
   guidelineDescription: string;
   guidelineExample?: string;
   // Parse a non-empty trimmed cell into the payload value (or an error).
-  parse: (raw: string, rowIndex: number) => { value: unknown } | { error: string };
+  parse: (
+    raw: string,
+    rowIndex: number,
+  ) => { value: unknown } | { error: string };
   // Render the parsed value in the preview grid.
   renderPreview: (value: unknown) => React.ReactNode;
 };
@@ -90,9 +103,8 @@ type ParsedItem = {
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
+const NO_SCORES_MESSAGE =
+  "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
 
 // Column header for an evaluator variable, e.g. "Correctness/criteria". One
 // column per variable per evaluator — keeps the CSV flat instead of asking
@@ -134,6 +146,13 @@ export function BulkUploadItemsDialog({
 }: BulkUploadItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that the upload reads nothing from. Noted next
+  // to the preview so a mistyped score column is visible; it never blocks.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
+  // Rows left out because they carry no score in any evaluator column while
+  // existing labels are being uploaded. Counted so they do not disappear
+  // without a word.
+  const [rowsWithoutScores, setRowsWithoutScores] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -150,6 +169,24 @@ export function BulkUploadItemsDialog({
     annotatorId: selectedAnnotatorId,
     namedItems: parsedItems,
   });
+  // When the user is uploading existing labels and the task already has items,
+  // the download hands back those items so only the label columns are left to
+  // fill in. With no items yet, the made-up sample CSV is used instead.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
+  // Uploading existing labels only labels items the task already holds. A row
+  // whose name matches nothing would otherwise create an empty item, which
+  // then stops "Run evaluators" for the whole task.
+  const unknownNames = uploadAnnotations
+    ? unknownItemNames(
+        parsedItems.map((p) => p.name),
+        annotatedCheck,
+      )
+    : [];
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -180,6 +217,8 @@ export function BulkUploadItemsDialog({
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -193,7 +232,10 @@ export function BulkUploadItemsDialog({
   // Re-parse when the annotation toggle changes (column requirements differ).
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
+    setUploadError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
 
@@ -201,6 +243,8 @@ export function BulkUploadItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setCsvFile(file);
     if (!file) return;
     if (duplicateNames.length > 0) {
@@ -265,7 +309,9 @@ export function BulkUploadItemsDialog({
           setParseError(
             `CSV is missing column(s) for evaluator variables: ${missingColumns
               .map((c) => `"${c}"`)
-              .join(", ")}. Download the sample CSV above for the exact format.`,
+              .join(
+                ", ",
+              )}. Download the sample CSV above for the exact format.`,
           );
           return;
         }
@@ -279,24 +325,18 @@ export function BulkUploadItemsDialog({
             );
             return;
           }
-          const missingAnnotationCols: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) {
-              missingAnnotationCols.push(valueHeader);
-            }
-          }
-          if (missingAnnotationCols.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missingAnnotationCols
-                .map((c) => `"${c}"`)
-                .join(", ")}. Download the sample CSV above for the exact format.`,
-            );
+          const columnsError = annotationColumnsError(
+            headers,
+            annotationEvaluatorsMeta,
+          );
+          if (columnsError) {
+            setParseError(columnsError);
             return;
           }
         }
 
         const items: ParsedItem[] = [];
+        let skippedWithoutScores = 0;
 
         for (let i = 0; i < results.data.length; i++) {
           const row = results.data[i];
@@ -313,11 +353,7 @@ export function BulkUploadItemsDialog({
               (slot) => (row[slot.columnKey] ?? "").trim() !== "",
             ),
           );
-          if (
-            !name &&
-            contentRaws.every((c) => !c) &&
-            !anyVariableValue
-          )
+          if (!name && contentRaws.every((c) => !c) && !anyVariableValue)
             continue;
 
           if (!name) {
@@ -325,13 +361,17 @@ export function BulkUploadItemsDialog({
             return;
           }
 
-          // Content columns (all required).
+          // Content columns (required, except when the user is uploading
+          // labels for items the task already holds: the download writes a
+          // blank cell for anything the stored item does not carry, and the
+          // item is matched by name rather than rewritten).
           const content: Record<string, unknown> = {};
           let contentError: string | null = null;
           for (let c = 0; c < contentColumns.length; c++) {
             const col = contentColumns[c];
             const raw = contentRaws[c];
             if (!raw) {
+              if (uploadAnnotations) continue;
               contentError = `Row ${i + 1}: "${col.csvColumn}" is required.`;
               break;
             }
@@ -355,6 +395,10 @@ export function BulkUploadItemsDialog({
             for (const slot of slots) {
               const raw = (row[slot.columnKey] ?? "").trim();
               if (!raw) {
+                // Same reason as the content columns above: a blank cell in
+                // the downloaded file means the item never carried a value
+                // for this variable, so it is left out instead of failing.
+                if (uploadAnnotations) continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(
                   e.name,
                   slot.varName,
@@ -364,7 +408,12 @@ export function BulkUploadItemsDialog({
               variableValues[slot.varName] = raw;
             }
             if (rowError) break;
-            refs.push({ evaluator_uuid: e.uuid, variable_values: variableValues });
+            if (Object.keys(variableValues).length > 0) {
+              refs.push({
+                evaluator_uuid: e.uuid,
+                variable_values: variableValues,
+              });
+            }
           }
           if (rowError) {
             setParseError(rowError);
@@ -383,12 +432,9 @@ export function BulkUploadItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (row[valueHeader] ?? "").trim();
               const rawReasoning = (row[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // Blank cell (or no column at all) = this evaluator was not
+              // labelled for this row; nothing is sent for it.
+              if (!rawValue) continue;
               const parsed = parseAnnotationCell(rawValue, meta);
               if ("error" in parsed) {
                 setParseError(`Row ${i + 1}: ${parsed.error}.`);
@@ -403,13 +449,50 @@ export function BulkUploadItemsDialog({
             }
           }
 
-          items.push({ name, description, content, evaluators: refs, annotations });
+          // A row with no score in any evaluator column changes nothing when
+          // existing labels are being uploaded, so it is left out of the
+          // preview, the count, and the upload.
+          if (uploadAnnotations && annotations.length === 0) {
+            skippedWithoutScores++;
+            continue;
+          }
+
+          items.push({
+            name,
+            description,
+            content,
+            evaluators: refs,
+            annotations,
+          });
         }
 
         if (items.length === 0) {
-          setParseError("No rows with content were found in the CSV.");
+          setParseError(
+            skippedWithoutScores > 0
+              ? NO_SCORES_MESSAGE
+              : "No rows with content were found in the CSV.",
+          );
           return;
         }
+        // Every title the rows above were read through, as it is spelled in
+        // the file (a name column titled "title" counts as read). Anything
+        // left over is noted for the reader; it changes nothing that is sent.
+        const usedHeaders = [
+          nameKey,
+          descriptionKey,
+          ...contentKeys.map((ck) => ck.key),
+          ...Array.from(variableHeaderMap.values()).flatMap((slots) =>
+            slots.map((slot) => slot.columnKey),
+          ),
+          ...(uploadAnnotations
+            ? annotationEvaluatorsMeta.flatMap((e) => [
+                evaluatorValueColumn(e.name),
+                evaluatorReasoningColumn(e.name),
+              ])
+            : []),
+        ];
+        setUnusedColumns(unusedCsvColumns(headers, usedHeaders));
+        setRowsWithoutScores(skippedWithoutScores);
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -435,7 +518,9 @@ export function BulkUploadItemsDialog({
         const evaluator_variables: Record<string, Record<string, string>> = {};
         for (const ref of p.evaluators) {
           if (ref.variable_values) {
-            evaluator_variables[ref.evaluator_uuid] = { ...ref.variable_values };
+            evaluator_variables[ref.evaluator_uuid] = {
+              ...ref.variable_values,
+            };
           }
         }
         const annotationsObj = uploadAnnotations
@@ -521,7 +606,7 @@ export function BulkUploadItemsDialog({
 
     for (const e of evaluatorsWithVariables) {
       for (const v of e.variables) {
-        const desc = v.description ? ` — ${v.description}` : "";
+        const desc = v.description ? `: ${v.description}` : "";
         columns.push({
           name: variableColumnName(e.name, v.name),
           description: `Used for the "${e.name}" evaluator${desc}`,
@@ -541,7 +626,7 @@ export function BulkUploadItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank on rows this evaluator was not labelled for.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),
@@ -566,6 +651,28 @@ export function BulkUploadItemsDialog({
       header: variableColumnName(e.name, v.name),
     })),
   );
+  // Same column order as the sample CSV, with each item's stored content
+  // filled in and the value and reasoning columns left blank to label.
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    { header: "description", cell: (p) => csvCellFromPayload(p.description) },
+    ...contentColumns.map((c) => ({
+      header: c.csvColumn,
+      cell: (p: Record<string, unknown>) => csvCellFromPayload(p[c.payloadKey]),
+    })),
+    ...variableColumns.map((c) => ({
+      header: c.header,
+      cell: (p: Record<string, unknown>) => {
+        const byEvaluator = p.evaluator_variables as
+          Record<string, Record<string, unknown>> | undefined;
+        return csvCellFromPayload(byEvaluator?.[c.evaluatorUuid]?.[c.varName]);
+      },
+    })),
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
   const annotationColumns =
     uploadAnnotations && annotationEvaluatorsMeta.length > 0
       ? annotationEvaluatorsMeta.flatMap((e) => [
@@ -600,126 +707,137 @@ export function BulkUploadItemsDialog({
   };
 
   const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
-      <div
-        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-        style={gridStyle}
+    <div className="space-y-2">
+      <BulkUploadItemsPreviewShell
+        itemCount={parsedItems.length}
+        annotatedCheckLoading={annotatedCheckLoading}
+        annotatedCheck={annotatedCheck}
       >
-        <div className="text-xs font-medium text-muted-foreground">Name</div>
-        {showDescriptionColumn && (
-          <div className="text-xs font-medium text-muted-foreground">
-            Description
-          </div>
-        )}
-        {contentColumns.map((c) => (
-          <div
-            key={`h-${c.payloadKey}`}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            {c.previewLabel}
-          </div>
-        ))}
-        {variableColumns.map((c) => (
-          <div
-            key={`h-${c.evaluatorUuid}-${c.varName}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
-          </div>
-        ))}
-        {annotationColumns.map((c) => (
-          <div
-            key={`ah-${c.evaluatorUuid}-${c.kind}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
-          </div>
-        ))}
-      </div>
-      <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => {
-          const valuesByKey = new Map<string, string>();
-          for (const ref of p.evaluators) {
-            if (!ref.variable_values) continue;
-            for (const [varName, value] of Object.entries(
-              ref.variable_values,
-            )) {
-              valuesByKey.set(`${ref.evaluator_uuid}/${varName}`, value);
-            }
-          }
-          return (
-            <div
-              key={idx}
-              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-              style={gridStyle}
-            >
-              <div className="truncate text-foreground" title={p.name}>
-                {p.name || <span className="text-muted-foreground">—</span>}
-              </div>
-              {showDescriptionColumn && (
-                <div
-                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                  title={p.description || undefined}
-                >
-                  {p.description}
-                </div>
-              )}
-              {contentColumns.map((c) => (
-                <div key={`c-${idx}-${c.payloadKey}`} className="min-w-0">
-                  {c.renderPreview(p.content[c.payloadKey])}
-                </div>
-              ))}
-              {variableColumns.map((c) => {
-                const value =
-                  valuesByKey.get(`${c.evaluatorUuid}/${c.varName}`) ?? "";
-                return (
-                  <div
-                    key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
-                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                  >
-                    {value}
-                  </div>
-                );
-              })}
-              {annotationColumns.map((c) => {
-                const ann = p.annotations.find(
-                  (a) => a.evaluator_uuid === c.evaluatorUuid,
-                );
-                const display =
-                  c.kind === "value"
-                    ? ann
-                      ? typeof ann.value === "boolean"
-                        ? ann.value
-                          ? "true"
-                          : "false"
-                        : String(ann.value)
-                      : ""
-                    : (ann?.reasoning ?? "");
-                return (
-                  <div
-                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                  >
-                    {display}
-                  </div>
-                );
-              })}
+        <div
+          className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+          style={gridStyle}
+        >
+          <div className="text-xs font-medium text-muted-foreground">Name</div>
+          {showDescriptionColumn && (
+            <div className="text-xs font-medium text-muted-foreground">
+              Description
             </div>
-          );
-        })}
-        {parsedItems.length > 50 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            + {parsedItems.length - 50} more rows
-          </div>
-        )}
-      </div>
-    </BulkUploadItemsPreviewShell>
+          )}
+          {contentColumns.map((c) => (
+            <div
+              key={`h-${c.payloadKey}`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              {c.previewLabel}
+            </div>
+          ))}
+          {variableColumns.map((c) => (
+            <div
+              key={`h-${c.evaluatorUuid}-${c.varName}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
+            >
+              {c.header}
+            </div>
+          ))}
+          {annotationColumns.map((c) => (
+            <div
+              key={`ah-${c.evaluatorUuid}-${c.kind}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
+            >
+              {c.header}
+            </div>
+          ))}
+        </div>
+        <div className="divide-y divide-border">
+          {parsedItems.slice(0, 50).map((p, idx) => {
+            const valuesByKey = new Map<string, string>();
+            for (const ref of p.evaluators) {
+              if (!ref.variable_values) continue;
+              for (const [varName, value] of Object.entries(
+                ref.variable_values,
+              )) {
+                valuesByKey.set(`${ref.evaluator_uuid}/${varName}`, value);
+              }
+            }
+            return (
+              <div
+                key={idx}
+                className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+                style={gridStyle}
+              >
+                <div className="truncate text-foreground" title={p.name}>
+                  {p.name || <span className="text-muted-foreground">—</span>}
+                </div>
+                {showDescriptionColumn && (
+                  <div
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                    title={p.description || undefined}
+                  >
+                    {p.description}
+                  </div>
+                )}
+                {contentColumns.map((c) => (
+                  <div key={`c-${idx}-${c.payloadKey}`} className="min-w-0">
+                    {c.renderPreview(p.content[c.payloadKey])}
+                  </div>
+                ))}
+                {variableColumns.map((c) => {
+                  const value =
+                    valuesByKey.get(`${c.evaluatorUuid}/${c.varName}`) ?? "";
+                  return (
+                    <div
+                      key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
+                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                    >
+                      {value}
+                    </div>
+                  );
+                })}
+                {annotationColumns.map((c) => {
+                  const ann = p.annotations.find(
+                    (a) => a.evaluator_uuid === c.evaluatorUuid,
+                  );
+                  const display =
+                    c.kind === "value"
+                      ? ann
+                        ? typeof ann.value === "boolean"
+                          ? ann.value
+                            ? "true"
+                            : "false"
+                          : String(ann.value)
+                        : ""
+                      : (ann?.reasoning ?? "");
+                  return (
+                    <div
+                      key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                    >
+                      {display}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {parsedItems.length > 50 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              + {parsedItems.length - 50} more rows
+            </div>
+          )}
+        </div>
+      </BulkUploadItemsPreviewShell>
+      <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
+      {rowsWithoutScores > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {rowsWithoutScores === 1
+            ? "1 row has no scores and is not included."
+            : `${rowsWithoutScores} rows have no scores and are not included.`}
+        </div>
+      )}
+    </div>
   );
 
   const annotationOptIn =
@@ -730,6 +848,8 @@ export function BulkUploadItemsDialog({
             annotators={annotatorsState.annotators}
             loading={annotatorsState.loading}
             error={annotatorsState.error}
+            accessToken={accessToken}
+            onAnnotatorAdded={annotatorsState.addAnnotator}
             uploadAnnotations={uploadAnnotations}
             onToggle={setUploadAnnotations}
             selectedAnnotatorId={selectedAnnotatorId}
@@ -740,13 +860,13 @@ export function BulkUploadItemsDialog({
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
             {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their variable
-            and annotation columns would collide in the CSV — rename one on the
+            and annotation columns would collide in the CSV. Rename one on the
             evaluators page before uploading.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
+            Annotation upload isn&apos;t available. Evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
@@ -756,6 +876,11 @@ export function BulkUploadItemsDialog({
 
   const uploadBlocked =
     duplicateNames.length > 0 ||
+    unknownNames.length > 0 ||
+    // Until the check comes back there is no way to know whether every row
+    // names an item the task has, and uploading a row it does not would
+    // create an empty item.
+    (uploadAnnotations && annotatedCheckLoading) ||
     (uploadAnnotations &&
       (annotatorsState.annotators.length === 0 ||
         !selectedAnnotatorId ||
@@ -765,11 +890,25 @@ export function BulkUploadItemsDialog({
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
-      buildSampleCsv={buildSampleCsv}
+      buildSampleCsv={() =>
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleCsv()
+      }
       sampleFilename={() =>
-        uploadAnnotations
-          ? `sample_${sampleFilenameBase}_with_annotations.csv`
-          : `sample_${sampleFilenameBase}.csv`
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? `sample_${sampleFilenameBase}_with_annotations.csv`
+            : `sample_${sampleFilenameBase}.csv`
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download your dataset as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", add the annotations, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>

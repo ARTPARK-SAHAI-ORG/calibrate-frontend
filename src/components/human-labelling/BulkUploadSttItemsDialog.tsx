@@ -7,21 +7,31 @@ import {
   AnnotationOptIn,
   BulkUploadDialogShell,
   BulkUploadItemsPreviewShell,
+  UnknownItemNamesWarning,
+  UnusedColumnsNote,
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
+  annotationColumnsError,
   evaluatorValueColumn,
   findHeaderKey,
   parseAnnotationCell,
   parseApiError,
   sampleEvaluatorValue,
+  unknownItemNames,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
@@ -40,9 +50,8 @@ const PREDICTED_HEADERS = [
   "hypothesis",
 ];
 
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
+const NO_SCORES_MESSAGE =
+  "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
 
 const SAMPLE_STT_BASE_ROWS: Array<{
   name: string;
@@ -135,6 +144,13 @@ export function BulkUploadSttItemsDialog({
 }: BulkUploadSttItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that this upload reads nothing from, so a
+  // mistyped one is visible instead of quietly dropping what was typed in it.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
+  // Rows left out because they carry no score in any evaluator column while
+  // existing labels are being uploaded. Counted so they do not disappear
+  // without a word.
+  const [rowsWithoutScores, setRowsWithoutScores] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -145,9 +161,7 @@ export function BulkUploadSttItemsDialog({
   const annotatorsState = useAnnotators(isOpen, accessToken);
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
-      uploadAnnotations &&
-      !!selectedAnnotatorId &&
-      parsedItems.length > 0,
+      uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
     taskUuid,
     accessToken,
     annotatorId: selectedAnnotatorId,
@@ -171,14 +185,52 @@ export function BulkUploadSttItemsDialog({
     (e) => e.output_type !== "binary" && e.output_type !== "rating",
   );
 
+  // When the user is uploading existing labels and the task already has
+  // items, the download hands back those items so only the label columns
+  // are left to fill in. With no items yet it stays the made-up sample.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    {
+      header: "reference_transcript",
+      cell: (p) => csvCellFromPayload(p.reference_transcript),
+    },
+    {
+      header: "predicted_transcript",
+      cell: (p) => csvCellFromPayload(p.predicted_transcript),
+    },
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
+
   // Two linked evaluators sharing a name produce duplicate CSV headers
   // that PapaParse silently overwrites. Block the annotation flow until
   // one is renamed.
   const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
 
+  // Uploading existing labels only attaches them to items the task already
+  // has. A row naming an item the task does not have would create a brand new
+  // item with empty transcripts, which the next evaluator run would then score.
+  // Name those rows and refuse the upload until they are sorted out.
+  const unknownNames = uploadAnnotations
+    ? unknownItemNames(
+        parsedItems.map((p) => p.name),
+        annotatedCheck,
+      )
+    : [];
+
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -191,7 +243,10 @@ export function BulkUploadSttItemsDialog({
 
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
+    setUploadError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
 
@@ -199,6 +254,8 @@ export function BulkUploadSttItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setCsvFile(file);
     if (!file) return;
     Papa.parse<Record<string, string>>(file, {
@@ -225,21 +282,17 @@ export function BulkUploadSttItemsDialog({
             );
             return;
           }
-          const missing: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) missing.push(valueHeader);
-          }
-          if (missing.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missing
-                .map((c) => `"${c}"`)
-                .join(", ")}.`,
-            );
+          const columnsError = annotationColumnsError(
+            headers,
+            annotationEvaluatorsMeta,
+          );
+          if (columnsError) {
+            setParseError(columnsError);
             return;
           }
         }
         const items: ParsedItem[] = [];
+        let skippedWithoutScores = 0;
         for (let i = 0; i < results.data.length; i++) {
           const r = results.data[i];
           const name = (r[nameKey] ?? "").trim();
@@ -250,7 +303,14 @@ export function BulkUploadSttItemsDialog({
             setParseError(`Row ${i + 1}: "name" is required.`);
             return;
           }
-          if (!reference_transcript || !predicted_transcript) {
+          // When labels are being uploaded for items the task already has,
+          // the downloaded CSV can carry a blank transcript (a provider that
+          // transcribed nothing). The item is matched by name and is not
+          // rewritten, so send what is there instead of refusing the row.
+          if (
+            !uploadAnnotations &&
+            (!reference_transcript || !predicted_transcript)
+          ) {
             setParseError(
               `Row ${i + 1}: both "reference_transcript" and "predicted_transcript" are required.`,
             );
@@ -268,12 +328,9 @@ export function BulkUploadSttItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (r[valueHeader] ?? "").trim();
               const rawReasoning = (r[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // Blank cell (or no column at all) = this evaluator was not
+              // labelled for this row; nothing is sent for it.
+              if (!rawValue) continue;
               const parsed = parseAnnotationCell(rawValue, meta);
               if ("error" in parsed) {
                 setParseError(`Row ${i + 1}: ${parsed.error}.`);
@@ -287,6 +344,13 @@ export function BulkUploadSttItemsDialog({
               });
             }
           }
+          // A row with no score in any evaluator column changes nothing when
+          // existing labels are being uploaded, so it is left out of the
+          // preview, the count, and the upload.
+          if (uploadAnnotations && annotations.length === 0) {
+            skippedWithoutScores++;
+            continue;
+          }
           items.push({
             name,
             reference_transcript,
@@ -295,9 +359,29 @@ export function BulkUploadSttItemsDialog({
           });
         }
         if (items.length === 0) {
-          setParseError("No rows with content were found in the CSV.");
+          setParseError(
+            skippedWithoutScores > 0
+              ? NO_SCORES_MESSAGE
+              : "No rows with content were found in the CSV.",
+          );
           return;
         }
+        // The resolved keys, not the canonical names, so a file using an
+        // alias for a column is not reported as unused.
+        setUnusedColumns(
+          unusedCsvColumns(headers, [
+            nameKey,
+            refKey,
+            predKey,
+            ...(uploadAnnotations
+              ? annotationEvaluatorsMeta.flatMap((e) => [
+                  evaluatorValueColumn(e.name),
+                  evaluatorReasoningColumn(e.name),
+                ])
+              : []),
+          ]),
+        );
+        setRowsWithoutScores(skippedWithoutScores);
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -378,7 +462,7 @@ export function BulkUploadSttItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank on rows this evaluator was not labelled for.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),
@@ -388,7 +472,7 @@ export function BulkUploadSttItemsDialog({
     }
 
     return {
-      title: "Bulk upload — STT labelling items",
+      title: "Bulk upload: STT labelling items",
       intro:
         "Upload a CSV with the following columns. Each row creates one STT annotation item.",
       columns,
@@ -422,90 +506,97 @@ export function BulkUploadSttItemsDialog({
   };
 
   const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
+    <div className="space-y-2">
+      <BulkUploadItemsPreviewShell
+        itemCount={parsedItems.length}
+        annotatedCheckLoading={annotatedCheckLoading}
+        annotatedCheck={annotatedCheck}
+      >
+        <div
+          className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+          style={sttGridStyle}
+        >
+          <div className="text-xs font-medium text-muted-foreground">Name</div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Reference transcript
+          </div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Predicted transcript
+          </div>
+          {annotationColumns.map((c) => (
             <div
-              className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+              key={`ah-${c.evaluatorUuid}-${c.kind}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
+            >
+              {c.header}
+            </div>
+          ))}
+        </div>
+        <div className="divide-y divide-border">
+          {parsedItems.slice(0, 50).map((p, idx) => (
+            <div
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
               style={sttGridStyle}
             >
-              <div className="text-xs font-medium text-muted-foreground">
-                Name
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name || <span className="text-muted-foreground">—</span>}
               </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                Reference transcript
+              <div
+                className="truncate text-foreground"
+                title={p.reference_transcript}
+              >
+                {p.reference_transcript}
               </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                Predicted transcript
+              <div
+                className="truncate text-foreground"
+                title={p.predicted_transcript}
+              >
+                {p.predicted_transcript}
               </div>
-              {annotationColumns.map((c) => (
-                <div
-                  key={`ah-${c.evaluatorUuid}-${c.kind}`}
-                  className="text-xs font-medium text-muted-foreground font-mono truncate"
-                  title={c.header}
-                >
-                  {c.header}
-                </div>
-              ))}
-            </div>
-            <div className="divide-y divide-border">
-              {parsedItems.slice(0, 50).map((p, idx) => (
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
                   <div
-                    key={idx}
-                    className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-                    style={sttGridStyle}
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
                   >
-                    <div className="truncate text-foreground" title={p.name}>
-                      {p.name || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                    <div
-                      className="truncate text-foreground"
-                      title={p.reference_transcript}
-                    >
-                      {p.reference_transcript}
-                    </div>
-                    <div
-                      className="truncate text-foreground"
-                      title={p.predicted_transcript}
-                    >
-                      {p.predicted_transcript}
-                    </div>
-                    {annotationColumns.map((c) => {
-                      const ann = p.annotations.find(
-                        (a) => a.evaluator_uuid === c.evaluatorUuid,
-                      );
-                      const display =
-                        c.kind === "value"
-                          ? ann
-                            ? typeof ann.value === "boolean"
-                              ? ann.value
-                                ? "true"
-                                : "false"
-                              : String(ann.value)
-                            : ""
-                          : (ann?.reasoning ?? "");
-                      return (
-                        <div
-                          key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                          className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                        >
-                          {display}
-                        </div>
-                      );
-                    })}
+                    {display}
                   </div>
-              ))}
-              {parsedItems.length > 50 && (
-                <div className="px-4 py-2 text-xs text-muted-foreground">
-                  + {parsedItems.length - 50} more rows
-                </div>
-              )}
+                );
+              })}
             </div>
-    </BulkUploadItemsPreviewShell>
+          ))}
+          {parsedItems.length > 50 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              + {parsedItems.length - 50} more rows
+            </div>
+          )}
+        </div>
+      </BulkUploadItemsPreviewShell>
+      <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
+      {rowsWithoutScores > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {rowsWithoutScores === 1
+            ? "1 row has no scores and is not included."
+            : `${rowsWithoutScores} rows have no scores and are not included.`}
+        </div>
+      )}
+    </div>
   );
 
   const annotationOptIn =
@@ -515,6 +606,8 @@ export function BulkUploadSttItemsDialog({
           annotators={annotatorsState.annotators}
           loading={annotatorsState.loading}
           error={annotatorsState.error}
+          accessToken={accessToken}
+          onAnnotatorAdded={annotatorsState.addAnnotator}
           uploadAnnotations={uploadAnnotations}
           onToggle={setUploadAnnotations}
           selectedAnnotatorId={selectedAnnotatorId}
@@ -529,7 +622,7 @@ export function BulkUploadSttItemsDialog({
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
+            Annotation upload isn&apos;t available: evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
@@ -539,22 +632,39 @@ export function BulkUploadSttItemsDialog({
 
   const uploadBlocked =
     uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
+    // Until the check comes back there is no way to know whether every row
+    // names an item the task has, and uploading a row it does not would
+    // create an empty item.
+    (annotatedCheckLoading ||
+      annotatorsState.annotators.length === 0 ||
       !selectedAnnotatorId ||
       duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+      evaluatorsMissingOutputType.length > 0 ||
+      unknownNames.length > 0);
 
   return (
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
       buildSampleCsv={() =>
-        buildSampleSttCsv(annotationEvaluatorsMeta, uploadAnnotations)
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleSttCsv(annotationEvaluatorsMeta, uploadAnnotations)
       }
       sampleFilename={() =>
-        uploadAnnotations
-          ? "sample_stt_items_with_annotations.csv"
-          : "sample_stt_items.csv"
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? "sample_stt_items_with_annotations.csv"
+            : "sample_stt_items.csv"
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download your dataset as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", add the annotations, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>

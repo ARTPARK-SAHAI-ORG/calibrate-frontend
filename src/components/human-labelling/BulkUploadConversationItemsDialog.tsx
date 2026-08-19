@@ -11,12 +11,17 @@ import {
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
+  type ItemCsvColumn,
   type ParsedAnnotation,
   type TurnObject,
   buildItemAnnotationsPayload,
+  buildItemsCsv,
   bulkUploadAnnotatedRowBgClass,
+  csvCellFromPayload,
+  csvEscape,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
+  annotationColumnsError,
   evaluatorValueColumn,
   findHeaderKey,
   parseAnnotationCell,
@@ -25,8 +30,13 @@ import {
   rolePillClass,
   sampleEvaluatorValue,
   turnContentString,
+  UnknownItemNamesWarning,
+  unknownItemNames,
+  UnusedColumnsNote,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
+  useTaskItems,
 } from "./bulk-upload-shared";
 
 const TRANSCRIPT_HEADERS = [
@@ -38,9 +48,8 @@ const TRANSCRIPT_HEADERS = [
 const NAME_HEADERS = ["name", "title", "conversation_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
+const NO_SCORES_MESSAGE =
+  "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
 
 const SAMPLE_CONVERSATION_BASE_ROWS: Array<{
   name: string;
@@ -51,7 +60,7 @@ const SAMPLE_CONVERSATION_BASE_ROWS: Array<{
   {
     name: "Card lost - happy path",
     description:
-      "Lost card flow — agent should verify identity before blocking.",
+      "Lost card flow, agent should verify identity before blocking.",
     transcript: JSON.stringify([
       { role: "assistant", content: "Hi, how can I help?" },
       { role: "user", content: "I lost my card" },
@@ -112,7 +121,9 @@ function buildSampleConversationCsv(
 type ParsedItem = {
   name: string;
   description: string;
-  transcript: TurnObject[];
+  // Null when the transcript cell was left blank while uploading existing
+  // labels: the item is matched by name and its transcript is not rewritten.
+  transcript: TurnObject[] | null;
   annotations: ParsedAnnotation[];
 };
 
@@ -170,6 +181,12 @@ export function BulkUploadConversationItemsDialog({
 }: BulkUploadConversationItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that this upload reads nothing from, so a
+  // mistyped one is visible instead of quietly dropping what was typed in it.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
+  // Rows left out because they carry no score at all while existing labels
+  // are being uploaded. Counted so they do not vanish without explanation.
+  const [rowsWithoutScores, setRowsWithoutScores] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -178,6 +195,14 @@ export function BulkUploadConversationItemsDialog({
     null,
   );
   const annotatorsState = useAnnotators(isOpen, accessToken);
+  // When the user is uploading existing labels for items the task already
+  // holds, the download hands back those items so only the label columns
+  // are left to fill in.
+  const { items: taskItems } = useTaskItems(
+    isOpen && uploadAnnotations,
+    taskUuid,
+    accessToken,
+  );
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
       uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
@@ -186,6 +211,15 @@ export function BulkUploadConversationItemsDialog({
     annotatorId: selectedAnnotatorId,
     namedItems: parsedItems,
   });
+  // Uploading existing labels only labels items the task already holds. A row
+  // whose name matches nothing would otherwise create an empty item, which
+  // then stops "Run evaluators" for the whole task.
+  const unknownNames = uploadAnnotations
+    ? unknownItemNames(
+        parsedItems.map((p) => p.name),
+        annotatedCheck,
+      )
+    : [];
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -212,6 +246,8 @@ export function BulkUploadConversationItemsDialog({
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -224,7 +260,10 @@ export function BulkUploadConversationItemsDialog({
 
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
+    setUploadError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
 
@@ -232,6 +271,8 @@ export function BulkUploadConversationItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setCsvFile(file);
     if (!file) return;
     Papa.parse<Record<string, string>>(file, {
@@ -258,21 +299,17 @@ export function BulkUploadConversationItemsDialog({
             );
             return;
           }
-          const missing: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) missing.push(valueHeader);
-          }
-          if (missing.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missing
-                .map((c) => `"${c}"`)
-                .join(", ")}.`,
-            );
+          const columnsError = annotationColumnsError(
+            headers,
+            annotationEvaluatorsMeta,
+          );
+          if (columnsError) {
+            setParseError(columnsError);
             return;
           }
         }
         const items: ParsedItem[] = [];
+        let skippedWithoutScores = 0;
         for (let i = 0; i < results.data.length; i++) {
           const row = results.data[i];
           const raw = (row[transcriptKey] ?? "").trim();
@@ -285,38 +322,42 @@ export function BulkUploadConversationItemsDialog({
             setParseError(`Row ${i + 1}: "name" is required.`);
             return;
           }
-          if (!raw) {
+          // A blank transcript is fine when uploading existing labels: the
+          // row is matched to an item by name and only its labels are read.
+          if (!raw && !uploadAnnotations) {
             setParseError(`Row ${i + 1}: "transcript" is required.`);
             return;
           }
-          let parsed: unknown;
-          try {
-            parsed = parseJsonLenient(raw);
-          } catch {
-            setParseError(
-              `Row ${i + 1}: "transcript" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
-            );
-            return;
-          }
-          if (!Array.isArray(parsed) || parsed.length === 0) {
-            setParseError(
-              `Row ${i + 1}: "transcript" must be a non-empty array of turn objects.`,
-            );
-            return;
-          }
-          for (let j = 0; j < parsed.length; j++) {
-            const t = parsed[j];
-            if (!t || typeof t !== "object") {
+          let parsed: unknown = null;
+          if (raw) {
+            try {
+              parsed = parseJsonLenient(raw);
+            } catch {
               setParseError(
-                `Row ${i + 1}, turn ${j + 1}: each turn must be an object with a "role".`,
+                `Row ${i + 1}: "transcript" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
               );
               return;
             }
-            if (typeof (t as TurnObject).role !== "string") {
+            if (!Array.isArray(parsed) || parsed.length === 0) {
               setParseError(
-                `Row ${i + 1}, turn ${j + 1}: each turn must have a string "role".`,
+                `Row ${i + 1}: "transcript" must be a non-empty array of turn objects.`,
               );
               return;
+            }
+            for (let j = 0; j < parsed.length; j++) {
+              const t = parsed[j];
+              if (!t || typeof t !== "object") {
+                setParseError(
+                  `Row ${i + 1}, turn ${j + 1}: each turn must be an object with a "role".`,
+                );
+                return;
+              }
+              if (typeof (t as TurnObject).role !== "string") {
+                setParseError(
+                  `Row ${i + 1}, turn ${j + 1}: each turn must have a string "role".`,
+                );
+                return;
+              }
             }
           }
           const annotations: ParsedAnnotation[] = [];
@@ -331,12 +372,9 @@ export function BulkUploadConversationItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (row[valueHeader] ?? "").trim();
               const rawReasoning = (row[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // Blank cell (or no column at all) = this evaluator was not
+              // labelled for this row; nothing is sent for it.
+              if (!rawValue) continue;
               const parsedAnn = parseAnnotationCell(rawValue, meta);
               if ("error" in parsedAnn) {
                 setParseError(`Row ${i + 1}: ${parsedAnn.error}.`);
@@ -350,17 +388,43 @@ export function BulkUploadConversationItemsDialog({
               });
             }
           }
+          // A row with no score in any evaluator column changes nothing when
+          // existing labels are being uploaded, so it is left out of the
+          // preview, the count, and the upload.
+          if (uploadAnnotations && annotations.length === 0) {
+            skippedWithoutScores++;
+            continue;
+          }
           items.push({
             name,
             description,
-            transcript: parsed as TurnObject[],
+            transcript: parsed as TurnObject[] | null,
             annotations,
           });
         }
         if (items.length === 0) {
-          setParseError("No rows with a transcript were found in the CSV.");
+          setParseError(
+            skippedWithoutScores > 0
+              ? NO_SCORES_MESSAGE
+              : uploadAnnotations
+                ? "No rows were found in the CSV."
+                : "No rows with a transcript were found in the CSV.",
+          );
           return;
         }
+        // The resolved keys, not the canonical names: a file using an alias
+        // (say "title" for the name) is read from that column, so it is used.
+        const usedHeaders = [nameKey, descriptionKey, transcriptKey];
+        if (uploadAnnotations) {
+          for (const meta of annotationEvaluatorsMeta) {
+            usedHeaders.push(
+              evaluatorValueColumn(meta.name),
+              evaluatorReasoningColumn(meta.name),
+            );
+          }
+        }
+        setUnusedColumns(unusedCsvColumns(headers, usedHeaders));
+        setRowsWithoutScores(skippedWithoutScores);
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -390,7 +454,7 @@ export function BulkUploadConversationItemsDialog({
           payload: {
             name: p.name,
             ...(p.description ? { description: p.description } : {}),
-            transcript: p.transcript,
+            ...(p.transcript ? { transcript: p.transcript } : {}),
           },
           ...(annotationsObj ? { annotations: annotationsObj } : {}),
         };
@@ -422,7 +486,7 @@ export function BulkUploadConversationItemsDialog({
       {
         name: "transcript",
         description:
-          'A JSON array of chat messages representing the full conversation. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role\ncreated_at — (optional) ISO-8601 timestamp for when this turn happened',
+          'A JSON array of chat messages representing the full conversation. Each message is an object with a "role" and "content" field.\n\nrole: either "user" or "assistant"\ncontent: the message said by that role\ncreated_at: (optional) ISO-8601 timestamp for when this turn happened',
         example: `[
   {"role": "assistant", "content": "Hi, how can I help?", "created_at": "2026-05-18T09:14:02Z"},
   {"role": "user", "content": "I lost my card"}
@@ -442,7 +506,7 @@ export function BulkUploadConversationItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank on rows this evaluator was not labelled for.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),
@@ -458,7 +522,7 @@ export function BulkUploadConversationItemsDialog({
     });
 
     return {
-      title: "Bulk upload — Conversation labelling items",
+      title: "Bulk upload: Conversation labelling items",
       intro:
         "Upload a CSV with the following columns. Each row creates one conversation annotation item.",
       columns,
@@ -498,93 +562,104 @@ export function BulkUploadConversationItemsDialog({
   };
 
   const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
-      <div
-        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-        style={simGridStyle}
+    <div className="space-y-2">
+      <BulkUploadItemsPreviewShell
+        itemCount={parsedItems.length}
+        annotatedCheckLoading={annotatedCheckLoading}
+        annotatedCheck={annotatedCheck}
       >
-        <div className="text-xs font-medium text-muted-foreground">Name</div>
-        {showDescriptionColumn && (
+        <div
+          className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+          style={simGridStyle}
+        >
+          <div className="text-xs font-medium text-muted-foreground">Name</div>
+          {showDescriptionColumn && (
+            <div className="text-xs font-medium text-muted-foreground">
+              Description
+            </div>
+          )}
           <div className="text-xs font-medium text-muted-foreground">
-            Description
+            Transcript
           </div>
-        )}
-        <div className="text-xs font-medium text-muted-foreground">
-          Transcript
-        </div>
-        <div className="text-xs font-medium text-muted-foreground text-right">
-          Turns
-        </div>
-        {annotationColumns.map((c) => (
-          <div
-            key={`ah-${c.evaluatorUuid}-${c.kind}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
+          <div className="text-xs font-medium text-muted-foreground text-right">
+            Turns
           </div>
-        ))}
-      </div>
-      <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => (
-          <div
-            key={idx}
-            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-            style={simGridStyle}
-          >
-            <div className="truncate text-foreground" title={p.name}>
-              {p.name}
+          {annotationColumns.map((c) => (
+            <div
+              key={`ah-${c.evaluatorUuid}-${c.kind}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
+            >
+              {c.header}
             </div>
-            {showDescriptionColumn && (
-              <div
-                className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                title={p.description || undefined}
-              >
-                {p.description}
+          ))}
+        </div>
+        <div className="divide-y divide-border">
+          {parsedItems.slice(0, 50).map((p, idx) => (
+            <div
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+              style={simGridStyle}
+            >
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name}
               </div>
-            )}
-            <div className="min-w-0">
-              <TranscriptPreview turns={p.transcript} />
-            </div>
-            <div className="text-right tabular-nums text-muted-foreground">
-              {p.transcript.length}
-            </div>
-            {annotationColumns.map((c) => {
-              const ann = p.annotations.find(
-                (a) => a.evaluator_uuid === c.evaluatorUuid,
-              );
-              const display =
-                c.kind === "value"
-                  ? ann
-                    ? typeof ann.value === "boolean"
-                      ? ann.value
-                        ? "true"
-                        : "false"
-                      : String(ann.value)
-                    : ""
-                  : (ann?.reasoning ?? "");
-              return (
+              {showDescriptionColumn && (
                 <div
-                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
                   className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  title={p.description || undefined}
                 >
-                  {display}
+                  {p.description}
                 </div>
-              );
-            })}
-          </div>
-        ))}
-        {parsedItems.length > 50 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            + {parsedItems.length - 50} more rows
-          </div>
-        )}
-      </div>
-    </BulkUploadItemsPreviewShell>
+              )}
+              <div className="min-w-0">
+                <TranscriptPreview turns={p.transcript ?? []} />
+              </div>
+              <div className="text-right tabular-nums text-muted-foreground">
+                {p.transcript?.length ?? 0}
+              </div>
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
+                  <div
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {display}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          {parsedItems.length > 50 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              + {parsedItems.length - 50} more rows
+            </div>
+          )}
+        </div>
+      </BulkUploadItemsPreviewShell>
+      <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
+      {rowsWithoutScores > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {rowsWithoutScores === 1
+            ? "1 row has no scores and is not included."
+            : `${rowsWithoutScores} rows have no scores and are not included.`}
+        </p>
+      )}
+    </div>
   );
 
   const annotationOptIn =
@@ -594,6 +669,8 @@ export function BulkUploadConversationItemsDialog({
           annotators={annotatorsState.annotators}
           loading={annotatorsState.loading}
           error={annotatorsState.error}
+          accessToken={accessToken}
+          onAnnotatorAdded={annotatorsState.addAnnotator}
           uploadAnnotations={uploadAnnotations}
           onToggle={setUploadAnnotations}
           selectedAnnotatorId={selectedAnnotatorId}
@@ -608,7 +685,7 @@ export function BulkUploadConversationItemsDialog({
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
+            Annotation upload isn&apos;t available. Evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
@@ -617,23 +694,58 @@ export function BulkUploadConversationItemsDialog({
     ) : null;
 
   const uploadBlocked =
-    uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
-      !selectedAnnotatorId ||
-      duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+    unknownNames.length > 0 ||
+    // Until the check comes back there is no way to know whether every row
+    // names an item the task has, and uploading a row it does not would
+    // create an empty item.
+    (uploadAnnotations &&
+      (annotatedCheckLoading ||
+        annotatorsState.annotators.length === 0 ||
+        !selectedAnnotatorId ||
+        duplicateNames.length > 0 ||
+        evaluatorsMissingOutputType.length > 0));
+
+  // Hand back the task's own items only when there are some to hand back.
+  // With none, the made-up sample is still the useful starting point.
+  const useTaskItemsCsv = uploadAnnotations && taskItems.length > 0;
+  // Same column order as the sample CSV, with every label cell left blank
+  // for the annotator to fill in.
+  const itemCsvColumns: ItemCsvColumn[] = [
+    { header: "name", cell: (p) => csvCellFromPayload(p.name) },
+    { header: "description", cell: (p) => csvCellFromPayload(p.description) },
+    { header: "transcript", cell: (p) => csvCellFromPayload(p.transcript) },
+    ...annotationEvaluatorsMeta.flatMap((e) => [
+      { header: evaluatorValueColumn(e.name), cell: () => "" },
+      { header: evaluatorReasoningColumn(e.name), cell: () => "" },
+    ]),
+  ];
 
   return (
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
       buildSampleCsv={() =>
-        buildSampleConversationCsv(annotationEvaluatorsMeta, uploadAnnotations)
+        useTaskItemsCsv
+          ? buildItemsCsv(taskItems, itemCsvColumns)
+          : buildSampleConversationCsv(
+              annotationEvaluatorsMeta,
+              uploadAnnotations,
+            )
       }
       sampleFilename={() =>
-        uploadAnnotations
-          ? "sample_conversation_items_with_annotations.csv"
-          : "sample_conversation_items.csv"
+        useTaskItemsCsv
+          ? "items_to_label.csv"
+          : uploadAnnotations
+            ? "sample_conversation_items_with_annotations.csv"
+            : "sample_conversation_items.csv"
+      }
+      sampleLinkLabel={
+        useTaskItemsCsv ? "download your dataset as a CSV" : undefined
+      }
+      sampleTipSuffix={
+        useTaskItemsCsv
+          ? ", add the annotations, and upload it back"
+          : undefined
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>

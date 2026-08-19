@@ -71,7 +71,7 @@ describe("BulkUploadLlmItemsDialog", () => {
     expect(capturedProps.onClose).toBe(onClose);
     expect(capturedProps.onSuccess).toBe(onSuccess);
     expect(capturedProps.guidelinesTitle).toBe(
-      "Bulk upload — LLM labelling items",
+      "Bulk upload: LLM labelling items",
     );
     expect(capturedProps.sampleFilenameBase).toBe("llm_items");
     expect(capturedProps.sampleRows).toHaveLength(2);

@@ -30,6 +30,9 @@ type SingleSelectPickerProps<T> = {
   // Returns a reason string when an item cannot be selected (rendered as a
   // muted line under the option and made non-interactive), or null when it can.
   isItemDisabled?: (item: T) => string | null;
+  // Content pinned above the options inside the open panel, e.g. a form that
+  // creates a new item. `close` shuts the panel once that action is done.
+  renderHeader?: (close: () => void) => React.ReactNode;
 };
 
 type Rect = { left: number; top: number; width: number; bottom: number };
@@ -53,6 +56,7 @@ export function SingleSelectPicker<T>({
   ariaLabel,
   compact = false,
   isItemDisabled,
+  renderHeader,
 }: SingleSelectPickerProps<T>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -196,6 +200,11 @@ export function SingleSelectPicker<T>({
                     className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                     onClick={(e) => e.stopPropagation()}
                   />
+                </div>
+              )}
+              {renderHeader && (
+                <div className="p-3 border-b border-border">
+                  {renderHeader(() => setOpen(false))}
                 </div>
               )}
               <div className="max-h-60 overflow-y-auto">
