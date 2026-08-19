@@ -23,6 +23,7 @@ import {
   type ValueFilter,
 } from "./ItemValueFilter";
 import { useUrlValueFilters } from "./valueFilterUrl";
+import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
 import type { ReviewItem } from "./SendForReviewFlow";
 
 function fireConfetti() {
@@ -50,6 +51,13 @@ type Job = {
   /** Backend marks the read-only viewer link state on completed jobs. */
   is_public?: boolean;
   view_token?: string | null;
+  /** Whether the per-item comments box is offered to the annotator.
+   * Absent means true, which is how every job created before this behaves. */
+  comments_enabled?: boolean;
+  /** How the per-evaluator reasoning box behaves for the annotator.
+   * Absent means "optional", which is how every job created before this
+   * behaves. */
+  reasoning_mode?: "optional" | "required" | "hidden";
 };
 
 type Annotator = { uuid: string; name: string };
@@ -568,6 +576,10 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // Both settings are frozen on the job. Absent keeps today's behaviour:
+  // the comments box is offered and reasoning is optional.
+  const commentsEnabled = data.job.comments_enabled !== false;
+  const reasoningMode = data.job.reasoning_mode ?? "optional";
   const filterActive =
     canFilterByValue &&
     usableValueFilters(valueFilters, data.evaluators).length > 0;
@@ -627,9 +639,32 @@ function AnnotateView({
     [requiredEvaluators, evaluators, savedKeys, fields],
   );
   const commentChangedFor = (itemId: string) =>
-    (itemComments[itemId] ?? "").trim() !== (savedComments[itemId] ?? "").trim();
+    (itemComments[itemId] ?? "").trim() !==
+    (savedComments[itemId] ?? "").trim();
+
+  // Labels the annotator touched in this sitting. A job that asks for
+  // reasoning asks for it on these only: a label that arrived already
+  // answered (a bulk upload of existing labels can carry a score with no
+  // reasoning) is not the annotator's to explain, and asking would leave
+  // them unable to save the item at all.
+  const [touchedKeys, setTouchedKeys] = useState<Set<FieldKey>>(new Set());
+  // Labels whose reasoning box is empty, marked red after a save was
+  // refused. Emptied as soon as the annotator starts typing in one.
+  const [missingReasoningKeys, setMissingReasoningKeys] = useState<
+    Set<FieldKey>
+  >(new Set());
+  const evaluatorsPaneRef = useRef<HTMLDivElement | null>(null);
 
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
+    setTouchedKeys((prev) => new Set(prev).add(key));
+    if (typeof partial.comment === "string" && partial.comment.trim()) {
+      setMissingReasoningKeys((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
     setFields((prev) => ({
       ...prev,
       [key]: {
@@ -639,6 +674,27 @@ function AnnotateView({
       },
     }));
   };
+
+  /** Labels on this item the annotator answered in this sitting and left
+   * without reasoning, on a job that requires it. */
+  const reasoningMissingFor = (itemId: string): FieldKey[] => {
+    if (reasoningMode !== "required") return [];
+    return evaluators
+      .map((ev) => fieldKey(itemId, ev.uuid))
+      .filter(
+        (k) =>
+          touchedKeys.has(k) &&
+          hasFieldValue(fields[k]) &&
+          !(fields[k]?.comment ?? "").trim(),
+      );
+  };
+
+  // Red borders are painted first, then the first one is scrolled into view,
+  // the same as the item dialogs do with their invalid fields.
+  useEffect(() => {
+    if (missingReasoningKeys.size === 0) return;
+    return scheduleScrollToFirstFieldError(evaluatorsPaneRef.current);
+  }, [missingReasoningKeys]);
 
   // `advance` controls the auto-jump to the next item. It's true for the
   // explicit "Submit & Next" button, and false when we save silently because
@@ -651,6 +707,17 @@ function AnnotateView({
     if (isAdmin) return false;
     if (!currentItem || submitting) return false;
     setTopError(null);
+
+    // Nothing is sent until every label answered in this sitting has its
+    // reasoning. The boxes go red and the first one is scrolled to, so the
+    // annotator is told where to write rather than only that something is
+    // wrong.
+    const missing = reasoningMissingFor(currentItem.uuid);
+    if (missing.length > 0) {
+      setMissingReasoningKeys(new Set(missing));
+      return false;
+    }
+    setMissingReasoningKeys(new Set());
 
     const annotationsBody: {
       evaluator_id: string | null;
@@ -757,6 +824,10 @@ function AnnotateView({
   // Target index the annotator is trying to reach while the current item has
   // partial, un-saveable progress. Non-null shows the confirmation overlay.
   const [pendingNav, setPendingNav] = useState<number | null>(null);
+  // Why the item cannot be saved, so the warning says the right thing.
+  const [pendingNavReason, setPendingNavReason] = useState<
+    "unanswered" | "reasoning"
+  >("unanswered");
 
   // Every way of leaving the current item (Previous, Next, the index list)
   // routes through here.
@@ -775,6 +846,15 @@ function AnnotateView({
     if (!isAdmin && currentItem) {
       const uuid = currentItem.uuid;
       if (!itemCompleted(uuid)) {
+        // Reasoning is missing, so this item cannot be saved. Offer the
+        // leave-without-saving choice rather than refusing to move, which
+        // would strand the annotator on an item they cannot finish and
+        // cannot leave.
+        if (reasoningMissingFor(uuid).length > 0) {
+          setPendingNavReason("reasoning");
+          setPendingNav(target);
+          return;
+        }
         if (
           evaluators.length > 0 &&
           requiredEvaluators.every((ev) => evaluatorAnswered(uuid, ev))
@@ -788,6 +868,7 @@ function AnnotateView({
           evaluators.some((ev) => evaluatorAnswered(uuid, ev)) ||
           commentChangedFor(uuid)
         ) {
+          setPendingNavReason("unanswered");
           setPendingNav(target);
           return;
         }
@@ -1002,7 +1083,10 @@ function AnnotateView({
               // STT/TTS show compact inputs (short transcripts, or text +
               // an audio clip) side-by-side with the evaluators; keep a
               // single outer scroll container so they stay aligned.
-              <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto">
+              <div
+                ref={evaluatorsPaneRef}
+                className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto"
+              >
                 <ItemPane item={currentItem} taskType={data.task.type} />
                 <EvaluatorsPane
                   evaluators={evaluators}
@@ -1010,6 +1094,9 @@ function AnnotateView({
                   fields={fields}
                   setField={setField}
                   readOnly={isAdmin}
+                  commentsEnabled={commentsEnabled}
+                  reasoningMode={reasoningMode}
+                  missingReasoningKeys={missingReasoningKeys}
                   itemComment={itemComments[currentItem.uuid] ?? ""}
                   onItemCommentChange={(s) =>
                     setItemComments((prev) => ({
@@ -1033,6 +1120,7 @@ function AnnotateView({
                   <ItemPane item={currentItem} taskType={data.task.type} />
                 </div>
                 <div
+                  ref={evaluatorsPaneRef}
                   className={`${
                     isAdmin ? "md:flex-[4]" : "md:flex-[3]"
                   } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
@@ -1043,6 +1131,9 @@ function AnnotateView({
                     fields={fields}
                     setField={setField}
                     readOnly={isAdmin}
+                    commentsEnabled={commentsEnabled}
+                    reasoningMode={reasoningMode}
+                    missingReasoningKeys={missingReasoningKeys}
                     itemComment={itemComments[currentItem.uuid] ?? ""}
                     onItemCommentChange={(s) =>
                       setItemComments((prev) => ({
@@ -1070,8 +1161,9 @@ function AnnotateView({
               Review incomplete
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              This sample is not completely reviewed yet and a few questions are
-              still unanswered. If you leave, your answers will not be saved.
+              {pendingNavReason === "reasoning"
+                ? "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
+                : "This sample is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}
             </p>
             <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
               <button
@@ -1131,6 +1223,9 @@ function EvaluatorsPane({
   fields,
   setField,
   readOnly,
+  commentsEnabled,
+  reasoningMode,
+  missingReasoningKeys,
   itemComment,
   onItemCommentChange,
 }: {
@@ -1139,6 +1234,12 @@ function EvaluatorsPane({
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
+  /** Job setting: false hides the comments box from the annotator. */
+  commentsEnabled: boolean;
+  /** Job setting: how the per-evaluator reasoning box behaves in write mode. */
+  reasoningMode: "optional" | "required" | "hidden";
+  /** Labels whose empty reasoning box refused the last save, marked red. */
+  missingReasoningKeys: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
@@ -1163,7 +1264,11 @@ function EvaluatorsPane({
   ) : null;
 
   const trimmedComment = itemComment.trim();
-  const showCommentBlock = readOnly ? trimmedComment.length > 0 : true;
+  // Read-only views show a comment only when one was written, so a job with
+  // comments switched off has nothing to show there either way.
+  const showCommentBlock = readOnly
+    ? trimmedComment.length > 0
+    : commentsEnabled;
   const commentBlock = showCommentBlock ? (
     <div className="space-y-1.5">
       <h3 className="text-sm font-semibold">
@@ -1309,6 +1414,8 @@ function EvaluatorsPane({
             variableValues={variableValues}
             value={f?.value as boolean | number | undefined}
             comment={typeof f?.comment === "string" ? f.comment : ""}
+            reasoningMissing={missingReasoningKeys.has(k)}
+            reasoningMode={reasoningMode}
             onValueChange={(v) => setField(k, { value: v })}
             onCommentChange={(s) => setField(k, { comment: s })}
             trueLabel={trueLabel}

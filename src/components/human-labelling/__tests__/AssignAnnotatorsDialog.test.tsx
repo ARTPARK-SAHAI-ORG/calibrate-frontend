@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import { AssignAnnotatorsDialog } from "../AssignAnnotatorsDialog";
 import { apiClient } from "../../../lib/api";
 
@@ -132,7 +132,10 @@ describe("AssignAnnotatorsDialog", () => {
     const assign = screen.getByRole("button", { name: "Assign" });
     expect(assign).not.toBeDisabled();
     await user.click(assign);
-    expect(onConfirm).toHaveBeenCalledWith(["a-9"], ["ev-1", "ev-2"]);
+    expect(onConfirm).toHaveBeenCalledWith(["a-9"], ["ev-1", "ev-2"], {
+      comments_enabled: true,
+      reasoning_mode: "optional",
+    });
     // Input is cleared for the next one.
     expect(screen.getByLabelText("New annotator name")).toHaveValue("");
   });
@@ -271,7 +274,12 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByText("Alice"));
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
-    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(["a-1"], []));
+    await waitFor(() =>
+      expect(onConfirm).toHaveBeenCalledWith(["a-1"], [], {
+        comments_enabled: true,
+        reasoning_mode: "optional",
+      }),
+    );
   });
 
   it("clears and restores the label picks in one click", async () => {
@@ -329,7 +337,10 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
-    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"]);
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"], {
+      comments_enabled: true,
+      reasoning_mode: "optional",
+    });
   });
 
   it("confirms with only the labels left picked", async () => {
@@ -348,7 +359,10 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
-    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1"]);
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1"], {
+      comments_enabled: true,
+      reasoning_mode: "optional",
+    });
   });
 
   it("shows a submit error when confirm rejects, parsed from a structured detail", async () => {
@@ -505,5 +519,115 @@ describe("AssignAnnotatorsDialog", () => {
     // No assertion beyond "doesn't throw" — the cancelled flag suppresses
     // the state update after unmount/close.
     await waitFor(() => expect(mockedApiClient).toHaveBeenCalledTimes(1));
+  });
+  it("shows the settings section in the wide layout, defaulting to Show and Optional", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+    const comments = screen.getByRole("group", {
+      name: "Comments on each item",
+    });
+    expect(
+      within(comments).getByText(
+        "The box where annotators write notes about an item.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(comments).getByLabelText("Show")).toBeChecked();
+    expect(within(comments).getByLabelText("Do not show")).not.toBeChecked();
+
+    const reasoning = screen.getByRole("group", {
+      name: "Reasoning on each label",
+    });
+    expect(
+      within(reasoning).getByText(
+        "The box where annotators explain the score they gave.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(reasoning).getByLabelText("Optional")).toBeChecked();
+    expect(within(reasoning).getByLabelText("Required")).not.toBeChecked();
+    expect(within(reasoning).getByLabelText("Do not show")).not.toBeChecked();
+  });
+
+  it("shows the settings section in the narrow single-column layout too", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({ evaluators: [] });
+    await screen.findByText("Alice");
+
+    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Comments on each item" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Reasoning on each label" }),
+    ).toBeInTheDocument();
+  });
+
+  it("confirms with the chosen settings", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const onConfirm = jest.fn().mockResolvedValue(undefined);
+    renderDialog({ onConfirm });
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Comments on each item" }),
+      ).getByLabelText("Do not show"),
+    );
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Reasoning on each label" }),
+      ).getByLabelText("Required"),
+    );
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"], {
+      comments_enabled: false,
+      reasoning_mode: "required",
+    });
+  });
+
+  it("resets the settings back to the defaults when reopened", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const props = {
+      accessToken: "tok",
+      evaluators,
+      onClose: jest.fn(),
+      onConfirm: jest.fn(),
+    };
+    const { rerender } = render(<AssignAnnotatorsDialog isOpen {...props} />);
+    await screen.findByText("Alice");
+
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Comments on each item" }),
+      ).getByLabelText("Do not show"),
+    );
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Reasoning on each label" }),
+      ).getByLabelText("Required"),
+    );
+
+    rerender(<AssignAnnotatorsDialog isOpen={false} {...props} />);
+    rerender(<AssignAnnotatorsDialog isOpen {...props} />);
+    await screen.findByText("Alice");
+
+    expect(
+      within(
+        screen.getByRole("group", { name: "Comments on each item" }),
+      ).getByLabelText("Show"),
+    ).toBeChecked();
+    expect(
+      within(
+        screen.getByRole("group", { name: "Reasoning on each label" }),
+      ).getByLabelText("Optional"),
+    ).toBeChecked();
   });
 });

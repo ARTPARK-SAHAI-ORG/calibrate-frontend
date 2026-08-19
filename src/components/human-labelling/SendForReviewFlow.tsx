@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { apiClient } from "@/lib/api";
-import { AssignAnnotatorsDialog } from "./AssignAnnotatorsDialog";
+import {
+  AssignAnnotatorsDialog,
+  type LabellingJobSettings,
+} from "./AssignAnnotatorsDialog";
 import { JobsCreatedDialog, type CreatedJob } from "./JobsCreatedDialog";
 
 /**
@@ -60,6 +63,7 @@ export function SendForReviewFlow({
   const handleConfirm = async (
     annotatorIds: string[],
     evaluatorIds: string[],
+    settings: LabellingJobSettings,
   ) => {
     if (!accessToken) return;
     // Errors thrown here are caught and shown by AssignAnnotatorsDialog.
@@ -72,6 +76,7 @@ export function SendForReviewFlow({
           annotator_ids: annotatorIds,
           ...(evaluatorIds.length > 0 ? { evaluator_ids: evaluatorIds } : {}),
           item_ids: sendable.map((it) => it.uuid),
+          ...settings,
         },
       },
     );
