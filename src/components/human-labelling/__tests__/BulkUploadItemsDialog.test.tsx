@@ -157,7 +157,7 @@ function defaultProps(
     contentColumns: CONTENT_COLUMNS,
     sampleRows: SAMPLE_ROWS,
     sampleFallbackEvaluators: SAMPLE_FALLBACK_EVALUATORS,
-    guidelinesTitle: "Bulk upload — test items",
+    guidelinesTitle: "Bulk upload: test items",
     guidelinesIntro: "Upload a CSV with the following columns.",
     sampleFilenameBase: "test_items",
     onClose: jest.fn(),
@@ -615,15 +615,10 @@ describe("BulkUploadItemsDialog", () => {
       );
     });
 
-    it("blocks the upload when no value cell was filled in", async () => {
+    it("fails the parse when no row has a score", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
-        .mockResolvedValueOnce([]) // task items (none yet)
-        .mockResolvedValueOnce({
-          all_new: false,
-          existing_with_annotations: [],
-          existing_without_annotations: [{ index: 0, name: "A" }],
-        }); // annotated-check
+        .mockResolvedValueOnce([]); // task items (none yet)
       const user = setupUser();
       const onSuccess = jest.fn();
       render(
@@ -637,17 +632,14 @@ describe("BulkUploadItemsDialog", () => {
           screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
-      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","",""`;
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","",""\n"B","y","{}","crit","",""`;
       await uploadFile(csv);
-      await waitFor(() =>
-        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
-      );
-      await user.click(screen.getByRole("button", { name: "Upload item" }));
       await waitFor(() =>
         expect(
           screen.getByText(/No scores were filled in/),
         ).toBeInTheDocument(),
       );
+      expect(screen.queryByText(/ready to upload/)).not.toBeInTheDocument();
       expect(onSuccess).not.toHaveBeenCalled();
       expect(
         apiClient.mock.calls.filter(
@@ -656,6 +648,104 @@ describe("BulkUploadItemsDialog", () => {
             c[2]?.method === "POST",
         ),
       ).toHaveLength(0);
+    });
+
+    it("leaves out a row with no scores and says how many were left out", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (none yet)
+        .mockResolvedValueOnce({
+          all_new: false,
+          existing_with_annotations: [],
+          existing_without_annotations: [{ index: 0, name: "A" }],
+        }) // annotated-check: only the one row that is kept
+        .mockResolvedValueOnce({}); // upload
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
+      );
+      await selectAnnotator(user);
+      await waitFor(() =>
+        expect(
+          screen.getByText("Drop a CSV here or click to browse"),
+        ).toBeInTheDocument(),
+      );
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","true","ok"\n"B","y","{}","crit","",""`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("A")).toBeInTheDocument();
+      expect(screen.queryByText("B")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("1 row has no scores and is not included."),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
+      // The same path also serves the GET that loads the task's existing
+      // items, so pick the POST that carries the upload body.
+      const uploadCall = apiClient.mock.calls.find(
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
+      )!;
+      expect(uploadCall[2].body).toEqual({
+        annotator_id: "a1",
+        items: [
+          {
+            payload: {
+              name: "A",
+              body: "x",
+              data: {},
+              evaluator_variables: { "ev-1": { criteria: "crit" } },
+            },
+            annotations: { "ev-1": { value: true, reasoning: "ok" } },
+          },
+        ],
+      });
+    });
+
+    it("keeps a row with no score columns when labels are not being uploaded", async () => {
+      apiClient
+        .mockResolvedValueOnce([]) // annotators
+        .mockResolvedValueOnce({}); // upload
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
+      );
+      const csv = `name,body,data,Correctness/criteria\n"A","x","{}","crit"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(/no scores and is not included/),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, false));
+      // The same path also serves the GET that loads the task's existing
+      // items, so pick the POST that carries the upload body.
+      const uploadCall = apiClient.mock.calls.find(
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
+      )!;
+      expect(uploadCall[2].body).toEqual({
+        items: [
+          {
+            payload: {
+              name: "A",
+              body: "x",
+              data: {},
+              evaluator_variables: { "ev-1": { criteria: "crit" } },
+            },
+          },
+        ],
+      });
     });
 
     it("uploads a row whose content and variable cells are blank, leaving those keys out", async () => {

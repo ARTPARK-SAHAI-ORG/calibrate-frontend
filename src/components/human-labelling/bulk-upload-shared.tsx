@@ -366,8 +366,8 @@ export function BulkUploadItemsPreviewShell({
               <span className="font-semibold text-amber-700 dark:text-amber-400">
                 amber
               </span>{" "}
-              match names of existing items — annotations will be attached to
-              those existing items. The original item remains unchanged.
+              match names of existing items. The annotations will be attached to
+              those items, and the items themselves stay unchanged.
             </span>
           </div>
         )}
@@ -381,8 +381,8 @@ export function BulkUploadItemsPreviewShell({
                 red
               </span>{" "}
               match names of existing items that already have annotations from
-              this annotator — those annotations will be replaced with the new
-              ones. The original item remains unchanged.
+              this annotator. Those annotations will be replaced with the new
+              ones, and the items themselves stay unchanged.
             </span>
           </div>
         )}
@@ -600,13 +600,13 @@ export function EvaluatorAnnotationColumnsHelp({
               <code className="font-mono text-foreground">
                 {evaluatorValueColumn(e.name)}
               </code>{" "}
-              — value for {pill} evaluator ({range})
+              : value for {pill} evaluator ({range})
             </li>
             <li>
               <code className="font-mono text-foreground">
                 {evaluatorReasoningColumn(e.name)}
               </code>{" "}
-              — (optional) reasoning for the value assigned to the {pill}{" "}
+              : (optional) reasoning for the value assigned to the {pill}{" "}
               evaluator
             </li>
           </React.Fragment>
@@ -873,7 +873,7 @@ export function ConversationFormatDetails({ example }: { example: string }) {
           <div className="mt-1.5">Each turn must have:</div>
           <ul className="list-disc pl-5 mt-1 space-y-0.5">
             <li>
-              <code className="font-mono text-foreground">role</code> — either{" "}
+              <code className="font-mono text-foreground">role</code>, either{" "}
               <code className="font-mono text-foreground">
                 &quot;user&quot;
               </code>{" "}
@@ -883,7 +883,7 @@ export function ConversationFormatDetails({ example }: { example: string }) {
               </code>
             </li>
             <li>
-              <code className="font-mono text-foreground">content</code> — the
+              <code className="font-mono text-foreground">content</code>, the
               actual message said by that role
             </li>
           </ul>

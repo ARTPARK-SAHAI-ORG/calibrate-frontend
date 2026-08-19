@@ -504,18 +504,15 @@ describe("BulkUploadSttItemsDialog", () => {
       );
     });
 
-    it("sends no annotations for a row whose value cell is blank when another row has one", async () => {
+    it("leaves out a row with no scores, counts it, and uploads only the scored row", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
         .mockResolvedValueOnce([]) // the task's existing items
         .mockResolvedValueOnce({
           all_new: false,
           existing_with_annotations: [],
-          existing_without_annotations: [
-            { index: 0, name: "A" },
-            { index: 1, name: "B" },
-          ],
-        }) // annotated-check
+          existing_without_annotations: [{ index: 0, name: "B" }],
+        }) // annotated-check: only the scored row is parsed
         .mockResolvedValueOnce({}); // upload
       const user = setupUser();
       const onSuccess = jest.fn();
@@ -535,21 +532,30 @@ describe("BulkUploadSttItemsDialog", () => {
 "B","ref b","pred b","true","Fine"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText("2 items ready to upload")).toBeInTheDocument(),
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
       );
-      await user.click(screen.getByRole("button", { name: "Upload 2 items" }));
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(2, true));
+      // The unscored row is not in the preview and is accounted for in a note.
+      expect(screen.queryByText("A")).not.toBeInTheDocument();
+      expect(screen.queryByText("ref")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("1 row has no scores and is not included."),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
       const uploadCall = apiClient.mock.calls.find(
         (c) =>
           c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
       );
-      expect(uploadCall![2].body.items[0]).toEqual({
-        payload: {
-          name: "A",
-          reference_transcript: "ref",
-          predicted_transcript: "pred",
+      expect(uploadCall![2].body.items).toEqual([
+        {
+          payload: {
+            name: "B",
+            reference_transcript: "ref b",
+            predicted_transcript: "pred b",
+          },
+          annotations: { "ev-1": { value: true, reasoning: "Fine" } },
         },
-      });
+      ]);
     });
 
     it("uploads a row whose predicted transcript is blank when labels are being uploaded", async () => {
@@ -618,18 +624,10 @@ describe("BulkUploadSttItemsDialog", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("refuses to upload when no value cell was filled in", async () => {
+    it("fails the parse when no row has a score at all", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
-        .mockResolvedValueOnce([]) // the task's existing items
-        .mockResolvedValueOnce({
-          all_new: false,
-          existing_with_annotations: [],
-          existing_without_annotations: [
-            { index: 0, name: "A" },
-            { index: 1, name: "B" },
-          ],
-        }); // annotated-check
+        .mockResolvedValueOnce([]); // the task's existing items
       const user = setupUser();
       const onSuccess = jest.fn();
       render(
@@ -648,16 +646,17 @@ describe("BulkUploadSttItemsDialog", () => {
 "B","ref b","pred b","",""`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText("2 items ready to upload")).toBeInTheDocument(),
-      );
-      await user.click(screen.getByRole("button", { name: "Upload 2 items" }));
-      await waitFor(() =>
         expect(
           screen.getByText(
             "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
           ),
         ).toBeInTheDocument(),
       );
+      // Nothing is parsed, so there is no preview and nothing to upload.
+      expect(screen.queryByText(/ready to upload/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/No rows with content were found/),
+      ).not.toBeInTheDocument();
       expect(onSuccess).not.toHaveBeenCalled();
       expect(
         apiClient.mock.calls.find(
@@ -666,6 +665,43 @@ describe("BulkUploadSttItemsDialog", () => {
             c[2]?.method === "POST",
         ),
       ).toBeUndefined();
+    });
+
+    it("keeps a row with no score columns when labels are not being uploaded", async () => {
+      apiClient.mockResolvedValueOnce({}); // upload
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadSttItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "No" }));
+      const csv = `name,reference_transcript,predicted_transcript\n"A","ref","pred"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(/has no scores and is not included/),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, false));
+      const uploadCall = apiClient.mock.calls.find(
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
+      );
+      expect(uploadCall![2].body).toEqual({
+        items: [
+          {
+            payload: {
+              name: "A",
+              reference_transcript: "ref",
+              predicted_transcript: "pred",
+            },
+          },
+        ],
+      });
     });
 
     it("errors when an annotation value cell is invalid", async () => {

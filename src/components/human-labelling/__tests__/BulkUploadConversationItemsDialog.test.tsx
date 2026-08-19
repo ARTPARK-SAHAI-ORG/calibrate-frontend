@@ -692,17 +692,14 @@ describe("BulkUploadConversationItemsDialog", () => {
       });
     });
 
-    it("sends no annotations for a row whose value cell is blank when another row has one", async () => {
+    it("leaves out a row with no scores and says how many were left out", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
         .mockResolvedValueOnce([]) // task items (for the download link)
         .mockResolvedValueOnce({
           all_new: false,
           existing_with_annotations: [],
-          existing_without_annotations: [
-            { index: 0, name: "A" },
-            { index: 1, name: "B" },
-          ],
+          existing_without_annotations: [{ index: 0, name: "A" }],
         }) // annotated-check
         .mockResolvedValueOnce({}); // upload
       const user = setupUser();
@@ -723,20 +720,24 @@ describe("BulkUploadConversationItemsDialog", () => {
 "B","[{""role"":""user"",""content"":""bye""}]","",""`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText("2 items ready to upload")).toBeInTheDocument(),
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
       );
-      await user.click(screen.getByRole("button", { name: "Upload 2 items" }));
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(2, true));
+      expect(
+        screen.getByText("1 row has no scores and is not included."),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
 
       const uploadCall = apiClient.mock.calls.find(
         (c) =>
           c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
       );
       const items = uploadCall![2].body.items;
+      expect(items).toHaveLength(1);
+      expect(items[0].payload.name).toBe("A");
       expect(items[0].annotations).toEqual({
         "ev-1": { value: true, reasoning: "Looks right" },
       });
-      expect(items[1]).not.toHaveProperty("annotations");
     });
 
     it("still requires a transcript when not uploading existing labels", async () => {
@@ -756,15 +757,10 @@ describe("BulkUploadConversationItemsDialog", () => {
       );
     });
 
-    it("blocks the upload when no evaluator value was filled in", async () => {
+    it("fails the parse when no row has a score", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
-        .mockResolvedValueOnce([]) // task items (for the download link)
-        .mockResolvedValueOnce({
-          all_new: false,
-          existing_with_annotations: [],
-          existing_without_annotations: [{ index: 0, name: "A" }],
-        }); // annotated-check
+        .mockResolvedValueOnce([]); // task items (for the download link)
       const user = setupUser();
       const onSuccess = jest.fn();
       render(
@@ -782,16 +778,15 @@ describe("BulkUploadConversationItemsDialog", () => {
 "A","[{""role"":""user"",""content"":""hi""}]","",""`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
-      );
-      await user.click(screen.getByRole("button", { name: "Upload item" }));
-      await waitFor(() =>
         expect(
           screen.getByText(
             "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
           ),
         ).toBeInTheDocument(),
       );
+      expect(
+        screen.queryByText("1 item ready to upload"),
+      ).not.toBeInTheDocument();
       expect(
         apiClient.mock.calls.find(
           (c) =>
@@ -934,7 +929,8 @@ describe("BulkUploadConversationItemsDialog", () => {
           all_new: false,
           existing_with_annotations: [],
           existing_without_annotations: [{ index: 0, name: "A" }],
-        }); // annotated-check
+        }) // annotated-check
+        .mockRejectedValueOnce(new Error("Request failed: 500 - boom")); // upload
       const user = setupUser();
       render(
         <BulkUploadConversationItemsDialog
@@ -948,23 +944,17 @@ describe("BulkUploadConversationItemsDialog", () => {
         ).toBeInTheDocument(),
       );
       const csv = `name,transcript,Correctness/value,Correctness/reasoning
-"A","[{""role"":""user"",""content"":""hi""}]","",""`;
+"A","[{""role"":""user"",""content"":""hi""}]","true","Looks right"`;
       await uploadFile(csv);
       await waitFor(() =>
         expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
       );
       await user.click(screen.getByRole("button", { name: "Upload item" }));
-      await waitFor(() =>
-        expect(
-          screen.getByText(/No scores were filled in/),
-        ).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("boom")).toBeInTheDocument());
 
       await user.click(screen.getByRole("button", { name: "No" }));
       await waitFor(() =>
-        expect(
-          screen.queryByText(/No scores were filled in/),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByText("boom")).not.toBeInTheDocument(),
       );
     });
 

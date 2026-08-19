@@ -50,6 +50,9 @@ const PREDICTED_HEADERS = [
   "hypothesis",
 ];
 
+const NO_SCORES_MESSAGE =
+  "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
+
 const SAMPLE_STT_BASE_ROWS: Array<{
   name: string;
   ref: string;
@@ -144,6 +147,10 @@ export function BulkUploadSttItemsDialog({
   // Column titles in the file that this upload reads nothing from, so a
   // mistyped one is visible instead of quietly dropping what was typed in it.
   const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
+  // Rows left out because they carry no score in any evaluator column while
+  // existing labels are being uploaded. Counted so they do not disappear
+  // without a word.
+  const [rowsWithoutScores, setRowsWithoutScores] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -223,6 +230,7 @@ export function BulkUploadSttItemsDialog({
     setCsvFile(null);
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -236,6 +244,7 @@ export function BulkUploadSttItemsDialog({
   useEffect(() => {
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setCsvFile(null);
@@ -246,6 +255,7 @@ export function BulkUploadSttItemsDialog({
     setParseError(null);
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setCsvFile(file);
     if (!file) return;
     Papa.parse<Record<string, string>>(file, {
@@ -282,6 +292,7 @@ export function BulkUploadSttItemsDialog({
           }
         }
         const items: ParsedItem[] = [];
+        let skippedWithoutScores = 0;
         for (let i = 0; i < results.data.length; i++) {
           const r = results.data[i];
           const name = (r[nameKey] ?? "").trim();
@@ -333,6 +344,13 @@ export function BulkUploadSttItemsDialog({
               });
             }
           }
+          // A row with no score in any evaluator column changes nothing when
+          // existing labels are being uploaded, so it is left out of the
+          // preview, the count, and the upload.
+          if (uploadAnnotations && annotations.length === 0) {
+            skippedWithoutScores++;
+            continue;
+          }
           items.push({
             name,
             reference_transcript,
@@ -341,7 +359,11 @@ export function BulkUploadSttItemsDialog({
           });
         }
         if (items.length === 0) {
-          setParseError("No rows with content were found in the CSV.");
+          setParseError(
+            skippedWithoutScores > 0
+              ? NO_SCORES_MESSAGE
+              : "No rows with content were found in the CSV.",
+          );
           return;
         }
         // The resolved keys, not the canonical names, so a file using an
@@ -359,6 +381,7 @@ export function BulkUploadSttItemsDialog({
               : []),
           ]),
         );
+        setRowsWithoutScores(skippedWithoutScores);
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -374,18 +397,6 @@ export function BulkUploadSttItemsDialog({
     if (uploadAnnotations && evaluatorsMissingOutputType.length > 0) {
       setUploadError(
         "One or more evaluators have no binary/rating output configured.",
-      );
-      return;
-    }
-    // With no value cell filled in there is nothing to record. Sending it
-    // would take the create-items path and fail on the names already in the
-    // task, which reads as a broken upload rather than an empty one.
-    if (
-      uploadAnnotations &&
-      !parsedItems.some((p) => p.annotations.length > 0)
-    ) {
-      setUploadError(
-        "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
       );
       return;
     }
@@ -461,7 +472,7 @@ export function BulkUploadSttItemsDialog({
     }
 
     return {
-      title: "Bulk upload — STT labelling items",
+      title: "Bulk upload: STT labelling items",
       intro:
         "Upload a CSV with the following columns. Each row creates one STT annotation item.",
       columns,
@@ -578,6 +589,13 @@ export function BulkUploadSttItemsDialog({
       </BulkUploadItemsPreviewShell>
       <UnknownItemNamesWarning names={unknownNames} />
       <UnusedColumnsNote columns={unusedColumns} />
+      {rowsWithoutScores > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {rowsWithoutScores === 1
+            ? "1 row has no scores and is not included."
+            : `${rowsWithoutScores} rows have no scores and are not included.`}
+        </div>
+      )}
     </div>
   );
 
@@ -604,7 +622,7 @@ export function BulkUploadSttItemsDialog({
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
+            Annotation upload isn&apos;t available: evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>

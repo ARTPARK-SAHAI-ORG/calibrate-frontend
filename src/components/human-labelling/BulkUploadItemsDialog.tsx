@@ -103,6 +103,9 @@ type ParsedItem = {
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
+const NO_SCORES_MESSAGE =
+  "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
+
 // Column header for an evaluator variable, e.g. "Correctness/criteria". One
 // column per variable per evaluator — keeps the CSV flat instead of asking
 // users to hand-author JSON in a single cell.
@@ -146,6 +149,10 @@ export function BulkUploadItemsDialog({
   // Column titles in the file that the upload reads nothing from. Noted next
   // to the preview so a mistyped score column is visible; it never blocks.
   const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
+  // Rows left out because they carry no score in any evaluator column while
+  // existing labels are being uploaded. Counted so they do not disappear
+  // without a word.
+  const [rowsWithoutScores, setRowsWithoutScores] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -211,6 +218,7 @@ export function BulkUploadItemsDialog({
     setCsvFile(null);
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -225,6 +233,7 @@ export function BulkUploadItemsDialog({
   useEffect(() => {
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setParseError(null);
     setUploadError(null);
     setCsvFile(null);
@@ -235,6 +244,7 @@ export function BulkUploadItemsDialog({
     setParseError(null);
     setParsedItems([]);
     setUnusedColumns([]);
+    setRowsWithoutScores(0);
     setCsvFile(file);
     if (!file) return;
     if (duplicateNames.length > 0) {
@@ -326,6 +336,7 @@ export function BulkUploadItemsDialog({
         }
 
         const items: ParsedItem[] = [];
+        let skippedWithoutScores = 0;
 
         for (let i = 0; i < results.data.length; i++) {
           const row = results.data[i];
@@ -438,6 +449,14 @@ export function BulkUploadItemsDialog({
             }
           }
 
+          // A row with no score in any evaluator column changes nothing when
+          // existing labels are being uploaded, so it is left out of the
+          // preview, the count, and the upload.
+          if (uploadAnnotations && annotations.length === 0) {
+            skippedWithoutScores++;
+            continue;
+          }
+
           items.push({
             name,
             description,
@@ -448,7 +467,11 @@ export function BulkUploadItemsDialog({
         }
 
         if (items.length === 0) {
-          setParseError("No rows with content were found in the CSV.");
+          setParseError(
+            skippedWithoutScores > 0
+              ? NO_SCORES_MESSAGE
+              : "No rows with content were found in the CSV.",
+          );
           return;
         }
         // Every title the rows above were read through, as it is spelled in
@@ -469,6 +492,7 @@ export function BulkUploadItemsDialog({
             : []),
         ];
         setUnusedColumns(unusedCsvColumns(headers, usedHeaders));
+        setRowsWithoutScores(skippedWithoutScores);
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -513,15 +537,6 @@ export function BulkUploadItemsDialog({
         };
       });
       const anyAnnotated = itemsBody.some((it) => "annotations" in it);
-      // Without a single score the request would be read as a plain
-      // create-items call, and every name in the file would come back as a
-      // conflict. Say what is missing instead of sending it.
-      if (uploadAnnotations && !anyAnnotated) {
-        setUploadError(
-          "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
-        );
-        return;
-      }
       await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
         method: "POST",
         body: {
@@ -591,7 +606,7 @@ export function BulkUploadItemsDialog({
 
     for (const e of evaluatorsWithVariables) {
       for (const v of e.variables) {
-        const desc = v.description ? ` — ${v.description}` : "";
+        const desc = v.description ? `: ${v.description}` : "";
         columns.push({
           name: variableColumnName(e.name, v.name),
           description: `Used for the "${e.name}" evaluator${desc}`,
@@ -815,6 +830,13 @@ export function BulkUploadItemsDialog({
       </BulkUploadItemsPreviewShell>
       <UnknownItemNamesWarning names={unknownNames} />
       <UnusedColumnsNote columns={unusedColumns} />
+      {rowsWithoutScores > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {rowsWithoutScores === 1
+            ? "1 row has no scores and is not included."
+            : `${rowsWithoutScores} rows have no scores and are not included.`}
+        </div>
+      )}
     </div>
   );
 
@@ -838,13 +860,13 @@ export function BulkUploadItemsDialog({
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
             {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their variable
-            and annotation columns would collide in the CSV — rename one on the
+            and annotation columns would collide in the CSV. Rename one on the
             evaluators page before uploading.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
+            Annotation upload isn&apos;t available. Evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
