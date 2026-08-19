@@ -29,12 +29,17 @@ export function EvaluatorScoreCards({
   heading,
   description,
   cards,
+  headingAside,
   linkEvaluators = true,
   singleRow = false,
 }: {
   heading: string;
   description: string;
   cards: EvaluatorScoreCard[];
+  /** Sits on the heading row, to the right of the heading. Used for the
+   * labelling job's status, which belongs beside the words rather than on a
+   * line of its own. */
+  headingAside?: React.ReactNode;
   /** Link each evaluator name to its own page. Off on pages anyone can open
    * with a link, where there is nothing to send the reader to. */
   linkEvaluators?: boolean;
@@ -46,7 +51,10 @@ export function EvaluatorScoreCards({
   if (cards.length === 0) return null;
   return (
     <section>
-      <h2 className="text-sm font-semibold">{heading}</h2>
+      <div className="flex items-center gap-2 flex-wrap">
+        <h2 className="text-sm font-semibold">{heading}</h2>
+        {headingAside}
+      </div>
       <p className="text-xs text-muted-foreground mt-1">{description}</p>
       <div
         className={`flex items-stretch gap-3 mt-3 ${

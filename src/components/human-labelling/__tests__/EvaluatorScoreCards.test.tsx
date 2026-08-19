@@ -87,7 +87,7 @@ describe("EvaluatorScoreCards", () => {
         cards={cards}
       />,
     );
-    const row = container.querySelector("section > div");
+    const row = container.querySelector("section > div:last-of-type");
     expect(row).toHaveClass("flex-wrap");
     expect(row).not.toHaveClass("overflow-x-auto");
   });
@@ -101,8 +101,22 @@ describe("EvaluatorScoreCards", () => {
         singleRow
       />,
     );
-    const row = container.querySelector("section > div");
+    const row = container.querySelector("section > div:last-of-type");
     expect(row).toHaveClass("overflow-x-auto");
     expect(row).not.toHaveClass("flex-wrap");
+  });
+
+  it("shows the status beside the heading when one is given", () => {
+    render(
+      <EvaluatorScoreCards
+        heading="Human scores"
+        description="What annotators gave"
+        cards={cards}
+        headingAside={<span>In progress</span>}
+      />,
+    );
+    const heading = screen.getByRole("heading", { name: "Human scores" });
+    // Beside the words, not on a line of its own.
+    expect(heading.parentElement).toHaveTextContent("In progress");
   });
 });

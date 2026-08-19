@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams, useRouter } from "@/lib/nav";
+import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import {
   AnnotationJobView,
@@ -109,6 +109,16 @@ export default function AdminAnnotateJobPage() {
     }
   };
 
+  const statusPill = meta ? (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
+        meta.jobStatus,
+      )}`}
+    >
+      {jobStatusLabel(meta.jobStatus)}
+    </span>
+  ) : null;
+
   const customHeader = (
     <button
       onClick={() => router.back()}
@@ -167,32 +177,23 @@ export default function AdminAnnotateJobPage() {
         {meta && (
           <>
             <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="flex flex-wrap gap-3 min-w-0">
-                <FieldRow label="Status">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
-                      meta.jobStatus,
-                    )}`}
-                  >
-                    {jobStatusLabel(meta.jobStatus)}
-                  </span>
-                </FieldRow>
-                <FieldRow label="Labelling task">
-                  <Link
-                    href={`/human-alignment/tasks/${meta.task.uuid}`}
-                    className="text-sm font-medium text-foreground hover:underline underline-offset-2"
-                  >
-                    {meta.task.name}
-                  </Link>
-                </FieldRow>
-                <FieldRow label="Annotator">
-                  <Link
-                    href={`/human-alignment/annotators/${meta.annotator.uuid}`}
-                    className="text-sm font-medium text-foreground hover:underline underline-offset-2"
-                  >
-                    {meta.annotator.name}
-                  </Link>
-                </FieldRow>
+              {/* The scores are the only thing worth a card here, and the
+                  status rides on their heading rather than taking a row of
+                  its own: this page fills the window height, so anything
+                  taller is taken from the item being read. With nothing
+                  scored yet the status still has to show on its own. */}
+              <div className="min-w-0">
+                {meta.humanScores.length > 0 ? (
+                  <EvaluatorScoreCards
+                    heading={HUMAN_SCORES_HEADING}
+                    description={HUMAN_SCORES_DESCRIPTION}
+                    cards={meta.humanScores}
+                    headingAside={statusPill}
+                    singleRow
+                  />
+                ) : (
+                  statusPill
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <SendForReviewFlow
@@ -259,12 +260,6 @@ export default function AdminAnnotateJobPage() {
                 )}
               </div>
             </div>
-            <EvaluatorScoreCards
-              heading={HUMAN_SCORES_HEADING}
-              description={HUMAN_SCORES_DESCRIPTION}
-              cards={meta.humanScores}
-              singleRow
-            />
           </>
         )}
 
@@ -282,19 +277,3 @@ export default function AdminAnnotateJobPage() {
   );
 }
 
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-        {label}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}

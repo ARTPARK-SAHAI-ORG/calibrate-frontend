@@ -76,6 +76,52 @@ describe("formatEvaluatorResultStat", () => {
     ).toBeNull();
   });
 
+  it("counts labels instead of items when asked for labels", () => {
+    const binary = formatEvaluatorResultStat(
+      { count: 57, trueCount: 44 },
+      { output_type: "binary" },
+      "label",
+    );
+    expect(binary?.title).toBe("Correct on 44 of 57 labels");
+
+    const rating = formatEvaluatorResultStat(
+      { count: 57, mean: 3.5 },
+      { output_type: "rating", scale_min: 1, scale_max: 5 },
+      "label",
+    );
+    expect(rating?.title).toBe("Average across 57 labels");
+  });
+
+  it("says one label rather than one labels", () => {
+    expect(
+      formatEvaluatorResultStat(
+        { count: 1, trueCount: 1 },
+        { output_type: "binary" },
+        "label",
+      )?.title,
+    ).toBe("Correct on 1 of 1 label");
+    expect(
+      formatEvaluatorResultStat(
+        { count: 1, mean: 4 },
+        { output_type: "rating", scale_min: 1, scale_max: 5 },
+        "label",
+      )?.title,
+    ).toBe("Average across 1 label");
+  });
+
+  it("counts items when no word is asked for", () => {
+    expect(
+      formatEvaluatorResultStat({ count: 2, trueCount: 1 }, {
+        output_type: "binary",
+      })?.title,
+    ).toBe("Correct on 1 of 2 items");
+    expect(
+      formatEvaluatorResultStat({ count: 1, trueCount: 1 }, {
+        output_type: "binary",
+      })?.title,
+    ).toBe("Correct on 1 of 1 item");
+  });
+
   it("treats an unknown output type as binary", () => {
     const stat = formatEvaluatorResultStat({ count: 4, trueCount: 1 }, null);
     expect(stat?.value).toBe("25%");
@@ -116,6 +162,32 @@ describe("summariseValues", () => {
     });
     expect(rating?.value).toBe("3 / 5");
     expect(rating?.title).toBe("Average across 2 items");
+  });
+
+  it("counts labels instead of items when asked for labels", () => {
+    expect(
+      summariseValues([true, false, true], { output_type: "binary" }, "label")
+        ?.title,
+    ).toBe("Correct on 2 of 3 labels");
+    expect(
+      summariseValues(
+        [2, 4],
+        { output_type: "rating", scale_min: 1, scale_max: 5 },
+        "label",
+      )?.title,
+    ).toBe("Average across 2 labels");
+  });
+
+  it("says one label rather than one labels", () => {
+    expect(
+      summariseValues([true], { output_type: "binary" }, "label")?.title,
+    ).toBe("Correct on 1 of 1 label");
+  });
+
+  it("counts items when no word is asked for", () => {
+    expect(summariseValues([true, false], { output_type: "binary" })?.title).toBe(
+      "Correct on 1 of 2 items",
+    );
   });
 
   it("returns nothing for an empty list or a list with nothing usable", () => {

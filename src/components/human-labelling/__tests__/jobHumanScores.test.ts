@@ -61,7 +61,7 @@ describe("buildJobHumanScoreCards", () => {
       ],
     );
     expect(cards[0].stat.value).toBe("100%");
-    expect(cards[0].stat.title).toContain("1 item");
+    expect(cards[0].stat.title).toBe("Correct on 1 of 1 label");
   });
 
   it("counts only the answers given for that evaluator", () => {
@@ -77,6 +77,21 @@ describe("buildJobHumanScoreCards", () => {
     );
     expect(cards[0].stat.value).toBe("100%");
     expect(cards[1].stat.value).toBe("0%");
+  });
+
+  it("counts labels, not items, because several people can label one item", () => {
+    const cards = buildJobHumanScoreCards(
+      [binary, rating],
+      [
+        ann("i1", "ev-yes", { value: true }),
+        ann("i2", "ev-yes", { value: true }),
+        ann("i3", "ev-yes", { value: false }),
+        ann("i1", "ev-rate", { value: 4 }),
+        ann("i2", "ev-rate", { value: 2 }),
+      ],
+    );
+    expect(cards[0].stat.title).toBe("Correct on 2 of 3 labels");
+    expect(cards[1].stat.title).toBe("Average across 2 labels");
   });
 
   it("leaves out an evaluator nobody labelled", () => {

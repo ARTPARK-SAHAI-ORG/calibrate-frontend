@@ -33,11 +33,21 @@ export type EvaluatorResultScale = {
   output_config?: { scale?: readonly BinaryScaleEntryLike[] | null } | null;
 };
 
-const itemWord = (n: number) => `${n} item${n === 1 ? "" : "s"}`;
+/** What one score in the count is.
+ *
+ * An evaluator scores each item once, so its count is a number of items. A
+ * person labels an item once each, so an item three people labelled puts
+ * three scores into the count. Saying "57 items" for that would be wrong,
+ * hence the two words. */
+export type EvaluatorResultUnit = "item" | "label";
+
+const countWord = (n: number, unit: EvaluatorResultUnit) =>
+  `${n} ${unit}${n === 1 ? "" : "s"}`;
 
 export function formatEvaluatorResultStat(
   counts: EvaluatorResultCounts | null | undefined,
   ev: EvaluatorResultScale | null,
+  unit: EvaluatorResultUnit = "item",
 ): EvaluatorResultStat | null {
   if (!counts || counts.count <= 0) return null;
 
@@ -50,7 +60,7 @@ export function formatEvaluatorResultStat(
     return {
       label: "Score",
       value: max != null ? `${rounded} / ${max}` : rounded,
-      title: `Average across ${itemWord(counts.count)}`,
+      title: `Average across ${countWord(counts.count, unit)}`,
       ratio: max != null && max > min ? (avg - min) / (max - min) : null,
     };
   }
@@ -66,7 +76,7 @@ export function formatEvaluatorResultStat(
   return {
     label: "Score",
     value: formatPercent((trueCount / counts.count) * 100, 0),
-    title: `${trueLabel} on ${trueCount} of ${itemWord(counts.count)}`,
+    title: `${trueLabel} on ${trueCount} of ${countWord(counts.count, unit)}`,
     ratio: trueCount / counts.count,
   };
 }
@@ -81,6 +91,7 @@ export function formatEvaluatorResultStat(
 export function summariseValues(
   values: readonly unknown[],
   ev: EvaluatorResultScale | null,
+  unit: EvaluatorResultUnit = "item",
 ): EvaluatorResultStat | null {
   if (ev?.output_type === "rating") {
     const numbers = values.filter(
@@ -94,11 +105,13 @@ export function summariseValues(
           : null,
       },
       ev,
+      unit,
     );
   }
   const bools = values.filter((v): v is boolean => typeof v === "boolean");
   return formatEvaluatorResultStat(
     { count: bools.length, trueCount: bools.filter(Boolean).length },
     ev,
+    unit,
   );
 }

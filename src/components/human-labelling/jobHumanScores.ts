@@ -35,7 +35,7 @@ export function buildJobHumanScoreCards(
     const values = annotations
       .filter((a) => a.evaluator_id === ev.uuid)
       .map((a) => readSavedValue(a.value));
-    const stat = summariseValues(values, ev);
+    const stat = summariseValues(values, ev, "label");
     if (stat) cards.push({ evaluatorId: ev.uuid, name: ev.name, stat });
   }
   return cards;

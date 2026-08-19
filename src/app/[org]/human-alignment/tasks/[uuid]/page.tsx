@@ -1515,9 +1515,12 @@ function LabellingTaskPageInner() {
         counts(ev.result),
         formatScale,
       );
+      // Counted one per label, not one per item: an item three people
+      // labelled puts three scores in, so the hover text has to say labels.
       const humanStat = formatEvaluatorResultStat(
         counts(ev.human_result),
         formatScale,
+        "label",
       );
       if (humanStat)
         humanCards.push({
@@ -2859,7 +2862,7 @@ function LabellingTaskPageInner() {
                 {/* Only evaluators that produced a score. One that never ran
                     has nothing to put in this section. */}
                 <EvaluatorScoreCards
-                  heading="Performance summary"
+                  heading="Evaluator scores"
                   description="What each evaluator scored across the items in this task"
                   cards={evaluatorsThatRan.map((ev) => ({
                     evaluatorId: ev.evaluator_id,
