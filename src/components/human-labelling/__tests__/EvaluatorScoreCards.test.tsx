@@ -48,6 +48,32 @@ describe("EvaluatorScoreCards", () => {
     expect(screen.queryByText("Human scores")).not.toBeInTheDocument();
   });
 
+  it("keeps the heading and the status on screen with no cards when asked", () => {
+    render(
+      <EvaluatorScoreCards
+        heading="Priya Sharma"
+        description=""
+        cards={[]}
+        headingAside={<span>Pending</span>}
+        showWhenEmpty
+      />,
+    );
+    const heading = screen.getByRole("heading", { name: "Priya Sharma" });
+    expect(heading.parentElement).toHaveTextContent("Pending");
+  });
+
+  it("leaves out the description line when there is nothing to explain", () => {
+    const { container } = render(
+      <EvaluatorScoreCards
+        heading="Priya Sharma"
+        description=""
+        cards={[]}
+        showWhenEmpty
+      />,
+    );
+    expect(container.querySelector("p")).toBeNull();
+  });
+
   it("links each evaluator name to its own page by default", () => {
     render(
       <EvaluatorScoreCards

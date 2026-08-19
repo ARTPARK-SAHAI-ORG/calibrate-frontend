@@ -35,6 +35,10 @@ type TaskForReview = {
   evaluators?: { uuid: string; name: string; description?: string | null }[];
 };
 
+/** Nothing scored yet. A constant so the row is not handed a new array on
+ * every render. */
+const NO_SCORES: never[] = [];
+
 export default function AdminAnnotateJobPage() {
   const router = useRouter();
   const params = useParams();
@@ -177,23 +181,26 @@ export default function AdminAnnotateJobPage() {
         {meta && (
           <>
             <div className="flex items-start justify-between gap-3 flex-wrap">
-              {/* The scores are the only thing worth a card here, and the
-                  status rides on their heading rather than taking a row of
-                  its own: this page fills the window height, so anything
-                  taller is taken from the item being read. With nothing
-                  scored yet the status still has to show on its own. */}
+              {/* The person who labelled this job, with how far they have
+                  got beside their name. Both show from the moment the job
+                  exists. The scores and the line explaining them wait until
+                  labelling has started, since there is nothing to count
+                  before that. The status rides on the heading rather than
+                  taking a row of its own: this page fills the window height,
+                  so anything taller is taken from the item being read. */}
               <div className="min-w-0">
-                {meta.humanScores.length > 0 ? (
-                  <EvaluatorScoreCards
-                    heading={HUMAN_SCORES_HEADING}
-                    description={HUMAN_SCORES_DESCRIPTION}
-                    cards={meta.humanScores}
-                    headingAside={statusPill}
-                    singleRow
-                  />
-                ) : (
-                  statusPill
-                )}
+                <EvaluatorScoreCards
+                  heading={meta.annotator.name || HUMAN_SCORES_HEADING}
+                  description={
+                    meta.jobStatus === "pending" ? "" : HUMAN_SCORES_DESCRIPTION
+                  }
+                  cards={
+                    meta.jobStatus === "pending" ? NO_SCORES : meta.humanScores
+                  }
+                  headingAside={statusPill}
+                  showWhenEmpty
+                  singleRow
+                />
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <SendForReviewFlow

@@ -11,8 +11,9 @@ export type EvaluatorScoreCard = {
   stat: EvaluatorResultStat;
 };
 
-/** The words above the cards on a labelling job. Written once so the two job
- * pages cannot drift apart. */
+/** The words above the cards on a labelling job. The heading is the name of
+ * the person who labelled the job, and this stands in when the job has no
+ * name for them. Written once so the two job pages cannot drift apart. */
 export const HUMAN_SCORES_HEADING = "Human scores";
 export const HUMAN_SCORES_DESCRIPTION =
   "The scores the annotator gave across the items they have labelled in this job";
@@ -32,6 +33,7 @@ export function EvaluatorScoreCards({
   headingAside,
   linkEvaluators = true,
   singleRow = false,
+  showWhenEmpty = false,
 }: {
   heading: string;
   description: string;
@@ -47,15 +49,21 @@ export function EvaluatorScoreCards({
    * On for pages that fill the window height, where every extra row of cards
    * is taken straight out of the item the person is reading. */
   singleRow?: boolean;
+  /** Keep the heading on screen even with no cards to show. On for a
+   * labelling job, where the name of the person labelling it and the state
+   * of their work are worth showing before any answer has been saved. */
+  showWhenEmpty?: boolean;
 }) {
-  if (cards.length === 0) return null;
+  if (cards.length === 0 && !showWhenEmpty) return null;
   return (
     <section>
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-sm font-semibold">{heading}</h2>
         {headingAside}
       </div>
-      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      {description && (
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      )}
       <div
         className={`flex items-stretch gap-3 mt-3 ${
           singleRow ? "overflow-x-auto pb-1" : "flex-wrap"
