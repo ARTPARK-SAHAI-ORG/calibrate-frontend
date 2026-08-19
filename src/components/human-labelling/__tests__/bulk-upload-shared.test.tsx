@@ -26,6 +26,7 @@ import {
   findHeaderKey,
   generateGuidelinesPdf,
   humaniseDetailObject,
+  annotationColumnsError,
   parseAnnotationCell,
   parseApiError,
   roleLabel,
@@ -213,6 +214,58 @@ describe("sampleEvaluatorValue", () => {
         scale_max: null,
       }),
     ).toBe("");
+  });
+});
+
+describe("annotationColumnsError", () => {
+  const evaluators: EvaluatorMeta[] = [
+    {
+      uuid: "ev-1",
+      name: "Correctness",
+      output_type: "binary",
+      scale_min: null,
+      scale_max: null,
+    },
+    {
+      uuid: "ev-2",
+      name: "Tone",
+      output_type: "binary",
+      scale_min: null,
+      scale_max: null,
+    },
+  ];
+
+  it("accepts a CSV carrying only one of the two evaluators' value columns", () => {
+    expect(
+      annotationColumnsError(["name", "Correctness/value"], evaluators),
+    ).toBeNull();
+  });
+
+  it("names the columns that match no evaluator", () => {
+    const message = annotationColumnsError(
+      ["name", "Correctness/value", "tone/value"],
+      evaluators,
+    );
+    expect(message).toContain('"tone/value"');
+    expect(message).toContain("does not match any evaluator");
+  });
+
+  it("catches a reasoning column that matches no evaluator", () => {
+    const message = annotationColumnsError(
+      ["name", "Correctness/value", "Empathy/reasoning"],
+      evaluators,
+    );
+    expect(message).toContain('"Empathy/reasoning"');
+  });
+
+  it("asks for a value column when the CSV has none", () => {
+    expect(annotationColumnsError(["name", "body"], evaluators)).toBe(
+      'CSV has no annotation column. Add at least one of: "Correctness/value", "Tone/value".',
+    );
+  });
+
+  it("passes when the task has no evaluators", () => {
+    expect(annotationColumnsError(["name"], [])).toBeNull();
   });
 });
 

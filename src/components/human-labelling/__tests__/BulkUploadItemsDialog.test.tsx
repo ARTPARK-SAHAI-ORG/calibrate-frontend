@@ -577,7 +577,50 @@ describe("BulkUploadItemsDialog", () => {
       );
     });
 
-    it("uploads a row whose annotation value cell is blank, with no annotations", async () => {
+    it("blocks the upload when no value cell was filled in", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (none yet)
+        .mockResolvedValueOnce({
+          all_new: true,
+          existing_with_annotations: [],
+          existing_without_annotations: [],
+        }); // annotated-check
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
+      );
+      await selectAnnotator(user);
+      await waitFor(() =>
+        expect(
+          screen.getByText("Drop a CSV here or click to browse"),
+        ).toBeInTheDocument(),
+      );
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","",""`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() =>
+        expect(
+          screen.getByText(/No scores were filled in/),
+        ).toBeInTheDocument(),
+      );
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(
+        apiClient.mock.calls.filter(
+          (c) =>
+            c[0] === "/annotation-tasks/task-1/items" &&
+            c[2]?.method === "POST",
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("uploads a row whose content and variable cells are blank, leaving those keys out", async () => {
       apiClient
         .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
         .mockResolvedValueOnce([]) // task items (none yet)
@@ -600,7 +643,7 @@ describe("BulkUploadItemsDialog", () => {
           screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
-      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","",""`;
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","","{}","","true","ok"`;
       await uploadFile(csv);
       await waitFor(() =>
         expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
@@ -614,6 +657,95 @@ describe("BulkUploadItemsDialog", () => {
           c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
       )!;
       expect(uploadCall[2].body).toEqual({
+        annotator_id: "a1",
+        items: [
+          {
+            payload: {
+              name: "A",
+              data: {},
+              evaluator_variables: {},
+            },
+            annotations: { "ev-1": { value: true, reasoning: "ok" } },
+          },
+        ],
+      });
+    });
+
+    it("still requires a content cell when labels are not being uploaded", async () => {
+      apiClient.mockResolvedValueOnce([]);
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
+      const csv = `name,body,data,Correctness/criteria\n"A","","{}","crit"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Row 1: "body" is required/),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("still requires a variable cell when labels are not being uploaded", async () => {
+      apiClient.mockResolvedValueOnce([]);
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
+      const csv = `name,body,data,Correctness/criteria\n"A","x","{}",""`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Row 1: missing value for "Correctness\/criteria"/),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("uploads one evaluator's scores when the CSV holds only that evaluator's columns", async () => {
+      const twoEvaluators: BulkLinkedEvaluator[] = [
+        ...linkedEvaluators,
+        {
+          uuid: "ev-2",
+          name: "Tone",
+          slug: null,
+          variables: [],
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
+      ];
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce([]) // task items (none yet)
+        .mockResolvedValueOnce({
+          all_new: true,
+          existing_with_annotations: [],
+          existing_without_annotations: [],
+        }) // annotated-check
+        .mockResolvedValueOnce({}); // upload
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators: twoEvaluators, onSuccess })}
+        />,
+      );
+      await selectAnnotator(user);
+      await waitFor(() =>
+        expect(
+          screen.getByText("Drop a CSV here or click to browse"),
+        ).toBeInTheDocument(),
+      );
+      // No "Tone/value" or "Tone/reasoning" column at all.
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","true","ok"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
+      // The same path also serves the GET that loads the task's existing
+      // items, so pick the POST that carries the upload body.
+      const uploadCall = apiClient.mock.calls.find(
+        (c) =>
+          c[0] === "/annotation-tasks/task-1/items" && c[2]?.method === "POST",
+      )!;
+      expect(uploadCall[2].body).toEqual({
+        annotator_id: "a1",
         items: [
           {
             payload: {
@@ -622,6 +754,7 @@ describe("BulkUploadItemsDialog", () => {
               data: {},
               evaluator_variables: { "ev-1": { criteria: "crit" } },
             },
+            annotations: { "ev-1": { value: true, reasoning: "ok" } },
           },
         ],
       });

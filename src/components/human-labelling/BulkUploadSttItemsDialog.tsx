@@ -270,7 +270,14 @@ export function BulkUploadSttItemsDialog({
             setParseError(`Row ${i + 1}: "name" is required.`);
             return;
           }
-          if (!reference_transcript || !predicted_transcript) {
+          // When labels are being uploaded for items the task already has,
+          // the downloaded CSV can carry a blank transcript (a provider that
+          // transcribed nothing). The item is matched by name and is not
+          // rewritten, so send what is there instead of refusing the row.
+          if (
+            !uploadAnnotations &&
+            (!reference_transcript || !predicted_transcript)
+          ) {
             setParseError(
               `Row ${i + 1}: both "reference_transcript" and "predicted_transcript" are required.`,
             );
@@ -330,6 +337,18 @@ export function BulkUploadSttItemsDialog({
     if (uploadAnnotations && evaluatorsMissingOutputType.length > 0) {
       setUploadError(
         "One or more evaluators have no binary/rating output configured.",
+      );
+      return;
+    }
+    // With no value cell filled in there is nothing to record. Sending it
+    // would take the create-items path and fail on the names already in the
+    // task, which reads as a broken upload rather than an empty one.
+    if (
+      uploadAnnotations &&
+      !parsedItems.some((p) => p.annotations.length > 0)
+    ) {
+      setUploadError(
+        "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
       );
       return;
     }

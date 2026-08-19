@@ -330,13 +330,17 @@ export function BulkUploadItemsDialog({
             return;
           }
 
-          // Content columns (all required).
+          // Content columns (required, except when the user is uploading
+          // labels for items the task already holds: the download writes a
+          // blank cell for anything the stored item does not carry, and the
+          // item is matched by name rather than rewritten).
           const content: Record<string, unknown> = {};
           let contentError: string | null = null;
           for (let c = 0; c < contentColumns.length; c++) {
             const col = contentColumns[c];
             const raw = contentRaws[c];
             if (!raw) {
+              if (uploadAnnotations) continue;
               contentError = `Row ${i + 1}: "${col.csvColumn}" is required.`;
               break;
             }
@@ -360,6 +364,10 @@ export function BulkUploadItemsDialog({
             for (const slot of slots) {
               const raw = (row[slot.columnKey] ?? "").trim();
               if (!raw) {
+                // Same reason as the content columns above: a blank cell in
+                // the downloaded file means the item never carried a value
+                // for this variable, so it is left out instead of failing.
+                if (uploadAnnotations) continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(
                   e.name,
                   slot.varName,
@@ -369,10 +377,12 @@ export function BulkUploadItemsDialog({
               variableValues[slot.varName] = raw;
             }
             if (rowError) break;
-            refs.push({
-              evaluator_uuid: e.uuid,
-              variable_values: variableValues,
-            });
+            if (Object.keys(variableValues).length > 0) {
+              refs.push({
+                evaluator_uuid: e.uuid,
+                variable_values: variableValues,
+              });
+            }
           }
           if (rowError) {
             setParseError(rowError);
@@ -465,6 +475,15 @@ export function BulkUploadItemsDialog({
         };
       });
       const anyAnnotated = itemsBody.some((it) => "annotations" in it);
+      // Without a single score the request would be read as a plain
+      // create-items call, and every name in the file would come back as a
+      // conflict. Say what is missing instead of sending it.
+      if (uploadAnnotations && !anyAnnotated) {
+        setUploadError(
+          "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
+        );
+        return;
+      }
       await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
         method: "POST",
         body: {

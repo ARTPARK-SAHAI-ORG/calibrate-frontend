@@ -114,7 +114,9 @@ function buildSampleConversationCsv(
 type ParsedItem = {
   name: string;
   description: string;
-  transcript: TurnObject[];
+  // Null when the transcript cell was left blank while uploading existing
+  // labels: the item is matched by name and its transcript is not rewritten.
+  transcript: TurnObject[] | null;
   annotations: ParsedAnnotation[];
 };
 
@@ -290,38 +292,42 @@ export function BulkUploadConversationItemsDialog({
             setParseError(`Row ${i + 1}: "name" is required.`);
             return;
           }
-          if (!raw) {
+          // A blank transcript is fine when uploading existing labels: the
+          // row is matched to an item by name and only its labels are read.
+          if (!raw && !uploadAnnotations) {
             setParseError(`Row ${i + 1}: "transcript" is required.`);
             return;
           }
-          let parsed: unknown;
-          try {
-            parsed = parseJsonLenient(raw);
-          } catch {
-            setParseError(
-              `Row ${i + 1}: "transcript" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
-            );
-            return;
-          }
-          if (!Array.isArray(parsed) || parsed.length === 0) {
-            setParseError(
-              `Row ${i + 1}: "transcript" must be a non-empty array of turn objects.`,
-            );
-            return;
-          }
-          for (let j = 0; j < parsed.length; j++) {
-            const t = parsed[j];
-            if (!t || typeof t !== "object") {
+          let parsed: unknown = null;
+          if (raw) {
+            try {
+              parsed = parseJsonLenient(raw);
+            } catch {
               setParseError(
-                `Row ${i + 1}, turn ${j + 1}: each turn must be an object with a "role".`,
+                `Row ${i + 1}: "transcript" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
               );
               return;
             }
-            if (typeof (t as TurnObject).role !== "string") {
+            if (!Array.isArray(parsed) || parsed.length === 0) {
               setParseError(
-                `Row ${i + 1}, turn ${j + 1}: each turn must have a string "role".`,
+                `Row ${i + 1}: "transcript" must be a non-empty array of turn objects.`,
               );
               return;
+            }
+            for (let j = 0; j < parsed.length; j++) {
+              const t = parsed[j];
+              if (!t || typeof t !== "object") {
+                setParseError(
+                  `Row ${i + 1}, turn ${j + 1}: each turn must be an object with a "role".`,
+                );
+                return;
+              }
+              if (typeof (t as TurnObject).role !== "string") {
+                setParseError(
+                  `Row ${i + 1}, turn ${j + 1}: each turn must have a string "role".`,
+                );
+                return;
+              }
             }
           }
           const annotations: ParsedAnnotation[] = [];
@@ -355,7 +361,7 @@ export function BulkUploadConversationItemsDialog({
           items.push({
             name,
             description,
-            transcript: parsed as TurnObject[],
+            transcript: parsed as TurnObject[] | null,
             annotations,
           });
         }
@@ -381,6 +387,17 @@ export function BulkUploadConversationItemsDialog({
       );
       return;
     }
+    // With no labels at all the request would be read as a request to create
+    // items, and every row would come back as a name already in the task.
+    if (
+      uploadAnnotations &&
+      !parsedItems.some((p) => p.annotations.length > 0)
+    ) {
+      setUploadError(
+        "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.",
+      );
+      return;
+    }
     setIsUploading(true);
     setUploadError(null);
     try {
@@ -392,7 +409,7 @@ export function BulkUploadConversationItemsDialog({
           payload: {
             name: p.name,
             ...(p.description ? { description: p.description } : {}),
-            transcript: p.transcript,
+            ...(p.transcript ? { transcript: p.transcript } : {}),
           },
           ...(annotationsObj ? { annotations: annotationsObj } : {}),
         };
@@ -550,10 +567,10 @@ export function BulkUploadConversationItemsDialog({
               </div>
             )}
             <div className="min-w-0">
-              <TranscriptPreview turns={p.transcript} />
+              <TranscriptPreview turns={p.transcript ?? []} />
             </div>
             <div className="text-right tabular-nums text-muted-foreground">
-              {p.transcript.length}
+              {p.transcript?.length ?? 0}
             </div>
             {annotationColumns.map((c) => {
               const ann = p.annotations.find(

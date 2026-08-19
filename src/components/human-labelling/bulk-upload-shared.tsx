@@ -163,6 +163,23 @@ export function annotationColumnsError(
   evaluators: EvaluatorMeta[],
 ): string | null {
   if (evaluators.length === 0) return null;
+  // A value or reasoning column whose name matches no evaluator would be read
+  // by nobody, so every value typed into it would be dropped without a word.
+  // Catches a renamed evaluator and a mistyped header alike.
+  const known = new Set(
+    evaluators.flatMap((e) => [
+      evaluatorValueColumn(e.name),
+      evaluatorReasoningColumn(e.name),
+    ]),
+  );
+  const unknown = headers.filter(
+    (h) => /\/(value|reasoning)$/.test(h) && !known.has(h),
+  );
+  if (unknown.length > 0) {
+    return `${unknown.map((h) => `"${h}"`).join(", ")} ${
+      unknown.length === 1 ? "does" : "do"
+    } not match any evaluator on this task. Check the spelling against the evaluator's name, or remove the column.`;
+  }
   if (evaluators.some((e) => headers.includes(evaluatorValueColumn(e.name)))) {
     return null;
   }
