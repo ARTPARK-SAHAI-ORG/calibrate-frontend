@@ -80,7 +80,7 @@ describe("AppLayout", () => {
     renderLayout();
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
-    expect(screen.getByText("Tools")).toBeInTheDocument();
+    expect(screen.getByText("Human alignment")).toBeInTheDocument();
     expect(
       screen.getByTestId("workspace-switcher-expanded"),
     ).toBeInTheDocument();
@@ -127,8 +127,8 @@ describe("AppLayout", () => {
 
   it("renders nav items as links to their routes", () => {
     renderLayout();
-    const toolsLink = screen.getByText("Tools").closest("a");
-    expect(toolsLink).toHaveAttribute("href", "/tools");
+    const personasLink = screen.getByText("Personas").closest("a");
+    expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
   it("opens the learning resources page from Tutorials", () => {
@@ -193,10 +193,13 @@ describe("AppLayout", () => {
     );
   });
 
-  it("does not offer LLM Tests in the sidebar", () => {
-    renderLayout();
-    expect(screen.queryByText("LLM Tests")).not.toBeInTheDocument();
-  });
+  it.each(["LLM Tests", "Tools", "Evaluators"])(
+    "does not offer %s in the sidebar",
+    (label) => {
+      renderLayout();
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    },
+  );
 
   it("folds the Voice Evaluation section away and remembers the choice", async () => {
     const user = setupUser();
