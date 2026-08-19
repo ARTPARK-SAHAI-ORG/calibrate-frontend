@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { SHARE_IMAGE, SITE_URL } from "@/lib/site";
+import { CANONICAL_SITE_URL, SHARE_IMAGE } from "@/lib/site";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 
 /**
@@ -48,8 +48,8 @@ export function articleJsonLd(post: BlogPost) {
     headline: post.title,
     description: post.summary,
     datePublished: post.date,
-    image: `${SITE_URL}${post.image ?? SHARE_IMAGE}`,
-    mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
+    image: `${CANONICAL_SITE_URL}${post.image ?? SHARE_IMAGE}`,
+    mainEntityOfPage: `${CANONICAL_SITE_URL}/blog/${post.slug}`,
     author: {
       "@type": "Person",
       name: post.author,
@@ -58,7 +58,7 @@ export function articleJsonLd(post: BlogPost) {
     publisher: {
       "@type": "Organization",
       name: "Calibrate",
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+      logo: { "@type": "ImageObject", url: `${CANONICAL_SITE_URL}/logo.png` },
     },
   };
 }

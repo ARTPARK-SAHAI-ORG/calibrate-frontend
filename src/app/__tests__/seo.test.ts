@@ -10,6 +10,8 @@
 // jest cannot read. Only the layout's metadata is read here, never rendered.
 jest.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 
+// First, before anything below reads the address this build answers on.
+import "@/test-utils/hostedSiteEnv";
 import type { Metadata } from "next";
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
@@ -23,9 +25,11 @@ import sitemap, { PAGES, BEHIND_SIGN_IN } from "../sitemap";
 import { POSTS, articleJsonLd, tabTitle } from "@/lib/blogPosts";
 import type { BlogPost } from "@/lib/blogPosts";
 import {
+  CANONICAL_SITE_URL,
   SHARE_IMAGE,
   SHARE_IMAGE_ALT,
   SITE_URL,
+  canonicalUrl,
   pageMetadata,
   shareImage,
 } from "@/lib/site";
@@ -39,11 +43,11 @@ describe("sitemap", () => {
     const urls = entries.map((entry) => entry.url);
 
     expect(urls).toEqual([
-      `${SITE_URL}/`,
-      `${SITE_URL}/learn`,
-      `${SITE_URL}/changelog`,
-      `${SITE_URL}/blog`,
-      ...POSTS.map((post) => `${SITE_URL}/blog/${post.slug}`),
+      `${CANONICAL_SITE_URL}/`,
+      `${CANONICAL_SITE_URL}/learn`,
+      `${CANONICAL_SITE_URL}/changelog`,
+      `${CANONICAL_SITE_URL}/blog`,
+      ...POSTS.map((post) => `${CANONICAL_SITE_URL}/blog/${post.slug}`),
     ]);
 
     for (const post of POSTS) {
@@ -104,7 +108,7 @@ describe("canonical addresses", () => {
     ["learn", learnMetadata, "/learn"],
     ["the changelog", changelogMetadata, "/changelog"],
   ])("gives %s its own address", (_name, meta, expected) => {
-    expect(meta.alternates?.canonical).toBe(expected);
+    expect(meta.alternates?.canonical).toBe(canonicalUrl(expected));
   });
 
   it("gives every post its own address", async () => {
@@ -112,7 +116,9 @@ describe("canonical addresses", () => {
       const meta = await postMetadata({
         params: Promise.resolve({ slug: post.slug }),
       });
-      expect(meta.alternates?.canonical).toBe(`/blog/${post.slug}`);
+      expect(meta.alternates?.canonical).toBe(
+        canonicalUrl(`/blog/${post.slug}`),
+      );
     }
   });
 });
@@ -145,7 +151,7 @@ describe("every page open to everyone speaks for itself", () => {
   });
 
   it.each(PAGES)("gives %s its own address in the preview box", (path) => {
-    expect(PUBLIC_PAGES[path].openGraph?.url).toBe(path);
+    expect(PUBLIC_PAGES[path].openGraph?.url).toBe(canonicalUrl(path));
   });
 
   it("never lets a page hand out another page's words", () => {
@@ -376,7 +382,7 @@ describe("article facts", () => {
       article.mainEntityOfPage,
       article.publisher.logo.url,
     ]) {
-      expect(url.startsWith(`${SITE_URL}/`)).toBe(true);
+      expect(url.startsWith(`${CANONICAL_SITE_URL}/`)).toBe(true);
     }
   });
 });
@@ -459,5 +465,145 @@ describe("every page is accounted for", () => {
   it("knows what it is looking at", () => {
     expect(routeFolders()).toContain("blog");
     expect(routeFolders()).toContain("");
+  });
+});
+
+/**
+ * A copy of this site running somewhere else.
+ *
+ * The code is open, so anyone can serve every blog post from their own domain,
+ * and our own preview builds do the same on throwaway addresses. A search
+ * engine treats two identical pages as rivals and shows one of them, so a copy
+ * left open can take the credit for writing we did. Two lines stop it: every
+ * page still names the real site as its own address, and the copy asks to be
+ * left out of search altogether.
+ *
+ * Both are read from the environment when the file is first loaded, so each
+ * test here loads a fresh copy of the app with a different address set.
+ */
+describe("a copy of this site running on another domain", () => {
+  const REAL_VALUE = process.env.NEXT_PUBLIC_APP_URL;
+  const SOMEONE_ELSE = "https://evals.example.org";
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_APP_URL = SOMEONE_ELSE;
+  });
+
+  afterEach(() => {
+    if (REAL_VALUE === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+    else process.env.NEXT_PUBLIC_APP_URL = REAL_VALUE;
+  });
+
+  /** Load one file again, with the copy's address in the environment. */
+  async function reload<T>(load: () => Promise<T>): Promise<T> {
+    let loaded: T | undefined;
+    await jest.isolateModulesAsync(async () => {
+      loaded = await load();
+    });
+    return loaded as T;
+  }
+
+  it("knows it is not the real site", async () => {
+    const site = await reload(() => import("@/lib/site"));
+
+    expect(site.SITE_URL).toBe(SOMEONE_ELSE);
+    expect(site.IS_CANONICAL_SITE).toBe(false);
+    expect(site.CANONICAL_SITE_URL).toBe("https://calibrate.artpark.ai");
+  });
+
+  it("still points every page at the real site", async () => {
+    const site = await reload(() => import("@/lib/site"));
+    const meta = site.pageMetadata({
+      path: "/blog",
+      title: "Blog | Calibrate",
+      description: "Learnings from real-world AI deployments",
+    });
+
+    expect(meta.alternates?.canonical).toBe(
+      "https://calibrate.artpark.ai/blog",
+    );
+    expect(meta.openGraph?.url).toBe("https://calibrate.artpark.ai/blog");
+  });
+
+  it("still points every post at the real site", async () => {
+    const page = await reload(() => import("../blog/[slug]/page"));
+    const meta = await page.generateMetadata({
+      params: Promise.resolve({ slug: POSTS[0].slug }),
+    });
+
+    expect(meta.alternates?.canonical).toBe(
+      `https://calibrate.artpark.ai/blog/${POSTS[0].slug}`,
+    );
+  });
+
+  it("lists the real site's addresses in its sitemap, not its own", async () => {
+    const { default: copySitemap } = await reload(() => import("../sitemap"));
+
+    for (const entry of copySitemap()) {
+      expect(entry.url.startsWith("https://calibrate.artpark.ai")).toBe(true);
+    }
+  });
+
+  it("names the real site in the facts Google reads about a post", async () => {
+    const { articleJsonLd: copyArticleJsonLd } = await reload(
+      () => import("@/lib/blogPosts"),
+    );
+    const copyArticle = copyArticleJsonLd(POSTS[0]);
+
+    for (const url of [
+      copyArticle.image,
+      copyArticle.mainEntityOfPage,
+      copyArticle.publisher.logo.url,
+    ]) {
+      expect(url.startsWith("https://calibrate.artpark.ai/")).toBe(true);
+    }
+  });
+
+  it("offers nothing to a crawler and names no sitemap", async () => {
+    const { default: copyRobots } = await reload(() => import("../robots"));
+    const result = copyRobots();
+    const rules = result.rules as { userAgent: string; disallow: string };
+
+    expect(rules.userAgent).toBe("*");
+    expect(rules.disallow).toBe("/");
+    expect(result.sitemap).toBeUndefined();
+  });
+
+  it("asks search engines to leave it out altogether", async () => {
+    const { metadata: copyRootMetadata } = await reload(
+      () => import("../layout"),
+    );
+
+    expect(copyRootMetadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("counts a build that names no address at all as a copy", async () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const site = await reload(() => import("@/lib/site"));
+
+    expect(site.IS_CANONICAL_SITE).toBe(false);
+    // The address is still needed for absolute links, so it falls back to the
+    // real site. Only the search guard treats the missing value as a copy.
+    expect(site.SITE_URL).toBe(CANONICAL_SITE_URL);
+  });
+
+  it.each([
+    ["with a slash on the end", "https://calibrate.artpark.ai/"],
+    ["without the s in https", "http://calibrate.artpark.ai"],
+    ["with a www in front", "https://www.calibrate.artpark.ai"],
+    ["shouted in capitals", "https://Calibrate.ArtPark.ai"],
+  ])(
+    "still counts the real site as itself when written %s",
+    async (_name, written) => {
+      process.env.NEXT_PUBLIC_APP_URL = written;
+      const site = await reload(() => import("@/lib/site"));
+
+      expect(site.IS_CANONICAL_SITE).toBe(true);
+    },
+  );
+
+  it("leaves the real site indexed and crawlable", () => {
+    expect(rootMetadata.robots).toBeUndefined();
+    expect((robots().rules as { disallow: string[] }).disallow).not.toBe("/");
   });
 });
