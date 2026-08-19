@@ -75,6 +75,13 @@ function TourIcon({ className }: { className?: string }) {
   );
 }
 
+// Section headings label the nav items below them and are not places to go,
+// so they are smaller, lighter and wider-spaced than the items and carry no
+// icon on the left. A folding section puts its arrow on the right, where no
+// nav item has one.
+const SECTION_HEADING_CLASS =
+  "px-2 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70";
+
 const navSections: NavSection[] = [
   {
     items: [
@@ -553,10 +560,11 @@ export function AppLayout({
                         <button
                           onClick={() => toggleSection(section.title!)}
                           aria-expanded={!collapsed}
-                          className="w-full flex items-center gap-1 px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          className={`${SECTION_HEADING_CLASS} w-full flex items-center gap-2 rounded-md hover:text-muted-foreground transition-colors cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border`}
                         >
+                          {section.title}
                           <svg
-                            className={`w-3 h-3 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                            className={`ml-auto w-3 h-3 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -568,10 +576,9 @@ export function AppLayout({
                               d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                             />
                           </svg>
-                          {section.title}
                         </button>
                       ) : (
-                        <h3 className="px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        <h3 className={SECTION_HEADING_CLASS}>
                           {section.title}
                         </h3>
                       ))}
