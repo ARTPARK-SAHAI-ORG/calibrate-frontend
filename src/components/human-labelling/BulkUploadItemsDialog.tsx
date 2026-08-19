@@ -815,11 +815,11 @@ export function BulkUploadItemsDialog({
             : `sample_${sampleFilenameBase}.csv`
       }
       sampleLinkLabel={
-        useTaskItemsCsv ? "download this task's items as a CSV" : undefined
+        useTaskItemsCsv ? "download your dataset as a CSV" : undefined
       }
       sampleTipSuffix={
         useTaskItemsCsv
-          ? ", fill in the label columns, and upload it back"
+          ? ", add the annotations, and upload it back"
           : undefined
       }
       buildGuidelines={buildGuidelines}

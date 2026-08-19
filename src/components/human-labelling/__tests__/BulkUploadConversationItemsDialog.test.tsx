@@ -513,7 +513,7 @@ describe("BulkUploadConversationItemsDialog", () => {
         ),
       );
       const link = await screen.findByRole("button", {
-        name: "download this task's items as a CSV",
+        name: "download your dataset as a CSV",
       });
       await user.click(link);
 

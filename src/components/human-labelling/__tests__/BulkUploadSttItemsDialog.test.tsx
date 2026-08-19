@@ -698,7 +698,7 @@ describe("BulkUploadSttItemsDialog", () => {
       );
       await user.click(
         screen.getByRole("button", {
-          name: "download this task's items as a CSV",
+          name: "download your dataset as a CSV",
         }),
       );
 

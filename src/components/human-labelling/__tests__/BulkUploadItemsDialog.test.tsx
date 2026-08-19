@@ -897,13 +897,13 @@ describe("BulkUploadItemsDialog", () => {
       await waitFor(() =>
         expect(
           screen.getByRole("button", {
-            name: "download this task's items as a CSV",
+            name: "download your dataset as a CSV",
           }),
         ).toBeInTheDocument(),
       );
       await user.click(
         screen.getByRole("button", {
-          name: "download this task's items as a CSV",
+          name: "download your dataset as a CSV",
         }),
       );
       const lines = (await lastDownloadedCsv()).split("\n");
@@ -932,7 +932,7 @@ describe("BulkUploadItemsDialog", () => {
       );
       expect(
         screen.queryByRole("button", {
-          name: "download this task's items as a CSV",
+          name: "download your dataset as a CSV",
         }),
       ).not.toBeInTheDocument();
       await user.click(
