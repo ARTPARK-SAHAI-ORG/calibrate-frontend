@@ -537,28 +537,28 @@ export function BulkUploadTtsItemsDialog({
                       key={r.id}
                       className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(220px,2fr)] gap-4 px-4 py-2.5 items-center"
                     >
-                    <div
-                      className="text-xs text-foreground truncate"
-                      title={r.name}
-                    >
-                      {r.name}
+                      <div
+                        className="text-xs text-foreground truncate"
+                        title={r.name}
+                      >
+                        {r.name}
+                      </div>
+                      <div
+                        className="text-xs text-foreground truncate"
+                        title={r.text}
+                      >
+                        {r.text}
+                      </div>
+                      <div className="min-w-0">
+                        <LazyAudioPlayer src={r.audioUrl} className="w-full" />
+                      </div>
                     </div>
-                    <div
-                      className="text-xs text-foreground truncate"
-                      title={r.text}
-                    >
-                      {r.text}
+                  ))}
+                  {rows.length > 50 && (
+                    <div className="px-4 py-2.5 text-xs text-muted-foreground">
+                      + {rows.length - 50} more items
                     </div>
-                    <div className="min-w-0">
-                      <LazyAudioPlayer src={r.audioUrl} className="w-full" />
-                    </div>
-                  </div>
-                ))}
-                {rows.length > 50 && (
-                  <div className="px-4 py-2.5 text-xs text-muted-foreground">
-                    + {rows.length - 50} more items
-                  </div>
-                )}
+                  )}
                 </div>
               </div>
             </div>

@@ -30,6 +30,8 @@ import {
   rolePillClass,
   sampleEvaluatorValue,
   turnContentString,
+  UnknownItemNamesWarning,
+  unknownItemNames,
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
@@ -198,6 +200,15 @@ export function BulkUploadConversationItemsDialog({
     annotatorId: selectedAnnotatorId,
     namedItems: parsedItems,
   });
+  // Uploading existing labels only labels items the task already holds. A row
+  // whose name matches nothing would otherwise create an empty item, which
+  // then stops "Run evaluators" for the whole task.
+  const unknownNames = uploadAnnotations
+    ? unknownItemNames(
+        parsedItems.map((p) => p.name),
+        annotatedCheck,
+      )
+    : [];
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -237,6 +248,7 @@ export function BulkUploadConversationItemsDialog({
   useEffect(() => {
     setParsedItems([]);
     setParseError(null);
+    setUploadError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
 
@@ -517,93 +529,96 @@ export function BulkUploadConversationItemsDialog({
   };
 
   const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
-      <div
-        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-        style={simGridStyle}
+    <div className="space-y-2">
+      <BulkUploadItemsPreviewShell
+        itemCount={parsedItems.length}
+        annotatedCheckLoading={annotatedCheckLoading}
+        annotatedCheck={annotatedCheck}
       >
-        <div className="text-xs font-medium text-muted-foreground">Name</div>
-        {showDescriptionColumn && (
+        <div
+          className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+          style={simGridStyle}
+        >
+          <div className="text-xs font-medium text-muted-foreground">Name</div>
+          {showDescriptionColumn && (
+            <div className="text-xs font-medium text-muted-foreground">
+              Description
+            </div>
+          )}
           <div className="text-xs font-medium text-muted-foreground">
-            Description
+            Transcript
           </div>
-        )}
-        <div className="text-xs font-medium text-muted-foreground">
-          Transcript
-        </div>
-        <div className="text-xs font-medium text-muted-foreground text-right">
-          Turns
-        </div>
-        {annotationColumns.map((c) => (
-          <div
-            key={`ah-${c.evaluatorUuid}-${c.kind}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
+          <div className="text-xs font-medium text-muted-foreground text-right">
+            Turns
           </div>
-        ))}
-      </div>
-      <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => (
-          <div
-            key={idx}
-            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-            style={simGridStyle}
-          >
-            <div className="truncate text-foreground" title={p.name}>
-              {p.name}
+          {annotationColumns.map((c) => (
+            <div
+              key={`ah-${c.evaluatorUuid}-${c.kind}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
+            >
+              {c.header}
             </div>
-            {showDescriptionColumn && (
-              <div
-                className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                title={p.description || undefined}
-              >
-                {p.description}
+          ))}
+        </div>
+        <div className="divide-y divide-border">
+          {parsedItems.slice(0, 50).map((p, idx) => (
+            <div
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+              style={simGridStyle}
+            >
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name}
               </div>
-            )}
-            <div className="min-w-0">
-              <TranscriptPreview turns={p.transcript ?? []} />
-            </div>
-            <div className="text-right tabular-nums text-muted-foreground">
-              {p.transcript?.length ?? 0}
-            </div>
-            {annotationColumns.map((c) => {
-              const ann = p.annotations.find(
-                (a) => a.evaluator_uuid === c.evaluatorUuid,
-              );
-              const display =
-                c.kind === "value"
-                  ? ann
-                    ? typeof ann.value === "boolean"
-                      ? ann.value
-                        ? "true"
-                        : "false"
-                      : String(ann.value)
-                    : ""
-                  : (ann?.reasoning ?? "");
-              return (
+              {showDescriptionColumn && (
                 <div
-                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
                   className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  title={p.description || undefined}
                 >
-                  {display}
+                  {p.description}
                 </div>
-              );
-            })}
-          </div>
-        ))}
-        {parsedItems.length > 50 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            + {parsedItems.length - 50} more rows
-          </div>
-        )}
-      </div>
-    </BulkUploadItemsPreviewShell>
+              )}
+              <div className="min-w-0">
+                <TranscriptPreview turns={p.transcript ?? []} />
+              </div>
+              <div className="text-right tabular-nums text-muted-foreground">
+                {p.transcript?.length ?? 0}
+              </div>
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
+                  <div
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {display}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          {parsedItems.length > 50 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              + {parsedItems.length - 50} more rows
+            </div>
+          )}
+        </div>
+      </BulkUploadItemsPreviewShell>
+      <UnknownItemNamesWarning names={unknownNames} />
+    </div>
   );
 
   const annotationOptIn =
@@ -638,11 +653,16 @@ export function BulkUploadConversationItemsDialog({
     ) : null;
 
   const uploadBlocked =
-    uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
-      !selectedAnnotatorId ||
-      duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+    unknownNames.length > 0 ||
+    // Until the check comes back there is no way to know whether every row
+    // names an item the task has, and uploading a row it does not would
+    // create an empty item.
+    (uploadAnnotations &&
+      (annotatedCheckLoading ||
+        annotatorsState.annotators.length === 0 ||
+        !selectedAnnotatorId ||
+        duplicateNames.length > 0 ||
+        evaluatorsMissingOutputType.length > 0));
 
   // Hand back the task's own items only when there are some to hand back.
   // With none, the made-up sample is still the useful starting point.

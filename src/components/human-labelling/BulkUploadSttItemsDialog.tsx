@@ -7,6 +7,7 @@ import {
   AnnotationOptIn,
   BulkUploadDialogShell,
   BulkUploadItemsPreviewShell,
+  UnknownItemNamesWarning,
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
@@ -25,6 +26,7 @@ import {
   parseAnnotationCell,
   parseApiError,
   sampleEvaluatorValue,
+  unknownItemNames,
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
@@ -201,6 +203,17 @@ export function BulkUploadSttItemsDialog({
   // one is renamed.
   const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
 
+  // Uploading existing labels only attaches them to items the task already
+  // has. A row naming an item the task does not have would create a brand new
+  // item with empty transcripts, which the next evaluator run would then score.
+  // Name those rows and refuse the upload until they are sorted out.
+  const unknownNames = uploadAnnotations
+    ? unknownItemNames(
+        parsedItems.map((p) => p.name),
+        annotatedCheck,
+      )
+    : [];
+
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
@@ -217,6 +230,7 @@ export function BulkUploadSttItemsDialog({
   useEffect(() => {
     setParsedItems([]);
     setParseError(null);
+    setUploadError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
 
@@ -458,86 +472,89 @@ export function BulkUploadSttItemsDialog({
   };
 
   const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
-      <div
-        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-        style={sttGridStyle}
+    <div className="space-y-2">
+      <BulkUploadItemsPreviewShell
+        itemCount={parsedItems.length}
+        annotatedCheckLoading={annotatedCheckLoading}
+        annotatedCheck={annotatedCheck}
       >
-        <div className="text-xs font-medium text-muted-foreground">Name</div>
-        <div className="text-xs font-medium text-muted-foreground">
-          Reference transcript
-        </div>
-        <div className="text-xs font-medium text-muted-foreground">
-          Predicted transcript
-        </div>
-        {annotationColumns.map((c) => (
-          <div
-            key={`ah-${c.evaluatorUuid}-${c.kind}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
+        <div
+          className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+          style={sttGridStyle}
+        >
+          <div className="text-xs font-medium text-muted-foreground">Name</div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Reference transcript
           </div>
-        ))}
-      </div>
-      <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => (
-          <div
-            key={idx}
-            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-            style={sttGridStyle}
-          >
-            <div className="truncate text-foreground" title={p.name}>
-              {p.name || <span className="text-muted-foreground">—</span>}
-            </div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Predicted transcript
+          </div>
+          {annotationColumns.map((c) => (
             <div
-              className="truncate text-foreground"
-              title={p.reference_transcript}
+              key={`ah-${c.evaluatorUuid}-${c.kind}`}
+              className="text-xs font-medium text-muted-foreground font-mono truncate"
+              title={c.header}
             >
-              {p.reference_transcript}
+              {c.header}
             </div>
+          ))}
+        </div>
+        <div className="divide-y divide-border">
+          {parsedItems.slice(0, 50).map((p, idx) => (
             <div
-              className="truncate text-foreground"
-              title={p.predicted_transcript}
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+              style={sttGridStyle}
             >
-              {p.predicted_transcript}
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name || <span className="text-muted-foreground">—</span>}
+              </div>
+              <div
+                className="truncate text-foreground"
+                title={p.reference_transcript}
+              >
+                {p.reference_transcript}
+              </div>
+              <div
+                className="truncate text-foreground"
+                title={p.predicted_transcript}
+              >
+                {p.predicted_transcript}
+              </div>
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
+                  <div
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {display}
+                  </div>
+                );
+              })}
             </div>
-            {annotationColumns.map((c) => {
-              const ann = p.annotations.find(
-                (a) => a.evaluator_uuid === c.evaluatorUuid,
-              );
-              const display =
-                c.kind === "value"
-                  ? ann
-                    ? typeof ann.value === "boolean"
-                      ? ann.value
-                        ? "true"
-                        : "false"
-                      : String(ann.value)
-                    : ""
-                  : (ann?.reasoning ?? "");
-              return (
-                <div
-                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                >
-                  {display}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-        {parsedItems.length > 50 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            + {parsedItems.length - 50} more rows
-          </div>
-        )}
-      </div>
-    </BulkUploadItemsPreviewShell>
+          ))}
+          {parsedItems.length > 50 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              + {parsedItems.length - 50} more rows
+            </div>
+          )}
+        </div>
+      </BulkUploadItemsPreviewShell>
+      <UnknownItemNamesWarning names={unknownNames} />
+    </div>
   );
 
   const annotationOptIn =
@@ -573,10 +590,15 @@ export function BulkUploadSttItemsDialog({
 
   const uploadBlocked =
     uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
+    // Until the check comes back there is no way to know whether every row
+    // names an item the task has, and uploading a row it does not would
+    // create an empty item.
+    (annotatedCheckLoading ||
+      annotatorsState.annotators.length === 0 ||
       !selectedAnnotatorId ||
       duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+      evaluatorsMissingOutputType.length > 0 ||
+      unknownNames.length > 0);
 
   return (
     <BulkUploadDialogShell

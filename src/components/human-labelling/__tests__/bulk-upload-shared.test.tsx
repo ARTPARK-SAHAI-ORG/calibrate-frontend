@@ -27,6 +27,8 @@ import {
   generateGuidelinesPdf,
   humaniseDetailObject,
   annotationColumnsError,
+  unknownItemNames,
+  unknownItemNamesMessage,
   parseAnnotationCell,
   parseApiError,
   roleLabel,
@@ -266,6 +268,52 @@ describe("annotationColumnsError", () => {
 
   it("passes when the task has no evaluators", () => {
     expect(annotationColumnsError(["name"], [])).toBeNull();
+  });
+});
+
+describe("unknownItemNames", () => {
+  const check = {
+    all_new: false,
+    existing_with_annotations: [{ index: 0, name: "A" }],
+    existing_without_annotations: [{ index: 2, name: "C" }],
+  };
+
+  it("returns the names whose row matched no item in the task", () => {
+    expect(unknownItemNames(["A", "B", "C", "D"], check)).toEqual(["B", "D"]);
+  });
+
+  it("returns nothing while the check has not come back", () => {
+    expect(unknownItemNames(["A", "B"], null)).toEqual([]);
+  });
+
+  it("returns nothing when every row matched", () => {
+    expect(
+      unknownItemNames(["A", "C"], {
+        all_new: false,
+        existing_with_annotations: [{ index: 0, name: "A" }],
+        existing_without_annotations: [{ index: 1, name: "C" }],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("unknownItemNamesMessage", () => {
+  it("names a single item", () => {
+    expect(unknownItemNamesMessage(["B"])).toContain('no item named "B"');
+  });
+
+  it("lists five names and counts the rest", () => {
+    const message = unknownItemNamesMessage([
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+    ]);
+    expect(message).toContain('"e" and 2 more');
+    expect(message).not.toContain('"f"');
   });
 });
 

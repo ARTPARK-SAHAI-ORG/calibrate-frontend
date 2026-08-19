@@ -244,6 +244,45 @@ export function useAnnotatedItemsCheck(args: {
   return { annotatedCheck, annotatedCheckLoading };
 }
 
+// Names in the CSV that no item in the task carries. Uploading annotations
+// only labels items that are already there, so a name the task does not have
+// would quietly create an empty item instead. Returns [] while the check has
+// not come back yet, so nothing is claimed before the answer is known.
+export function unknownItemNames(
+  parsedNames: readonly string[],
+  check: AnnotatedCheckResult | null,
+): string[] {
+  if (!check) return [];
+  const matched = new Set([
+    ...check.existing_with_annotations.map((e) => e.index),
+    ...check.existing_without_annotations.map((e) => e.index),
+  ]);
+  return parsedNames.filter((_, index) => !matched.has(index));
+}
+
+/** Message for the names in the CSV that no item in the task carries. */
+export function unknownItemNamesMessage(names: readonly string[]): string {
+  const shown = names.slice(0, 5).map((n) => `"${n}"`);
+  const rest = names.length - shown.length;
+  const list =
+    rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
+  return `This task has no item named ${list}. Every row has to match an item that is already in the task, so add the items first, then upload the annotations.`;
+}
+
+/** Red banner naming the rows whose item is not in the task. */
+export function UnknownItemNamesWarning({
+  names,
+}: {
+  names: readonly string[];
+}) {
+  if (names.length === 0) return null;
+  return (
+    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+      {unknownItemNamesMessage(names)}
+    </div>
+  );
+}
+
 export function bulkUploadAnnotatedRowBgClass(
   index: number,
   check: AnnotatedCheckResult | null,
