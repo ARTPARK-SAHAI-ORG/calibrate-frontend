@@ -10,9 +10,39 @@ describe("hasTaskOverviewData", () => {
       hasTaskOverviewData(
         {
           human_human: { pair_count: 0 },
-          evaluators: [{ pair_count: 0, result: { count: 0 } }],
+          evaluators: [
+            { pair_count: 0, result: { count: 0 }, human_result: { count: 0 } },
+          ],
         },
         [{ status: "queued" }, { status: "failed" }],
+      ),
+    ).toBe(false);
+  });
+
+  it("is true when annotators labelled but no evaluator has run", () => {
+    expect(
+      hasTaskOverviewData(
+        {
+          human_human: { pair_count: 0 },
+          evaluators: [
+            { pair_count: 0, result: null, human_result: { count: 7 } },
+          ],
+        },
+        [],
+      ),
+    ).toBe(true);
+  });
+
+  it("is false when the human score covers no items", () => {
+    expect(
+      hasTaskOverviewData(
+        {
+          human_human: { pair_count: 0 },
+          evaluators: [
+            { pair_count: 0, result: null, human_result: { count: 0 } },
+          ],
+        },
+        [],
       ),
     ).toBe(false);
   });

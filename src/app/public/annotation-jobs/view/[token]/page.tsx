@@ -9,6 +9,11 @@ import {
   jobStatusPillClass,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
+import {
+  EvaluatorScoreCards,
+  HUMAN_SCORES_DESCRIPTION,
+  HUMAN_SCORES_HEADING,
+} from "@/components/human-labelling/EvaluatorScoreCards";
 
 export default function PublicAnnotationJobViewerPage() {
   const params = useParams();
@@ -16,10 +21,7 @@ export default function PublicAnnotationJobViewerPage() {
   // Stable callback — `AnnotationJobView` lists onLoaded in its fetch
   // effect deps, so an inline arrow would trip a refetch on every state
   // update and loop forever.
-  const handleLoaded = useCallback(
-    (m: AnnotationJobMeta) => setMeta(m),
-    [],
-  );
+  const handleLoaded = useCallback((m: AnnotationJobMeta) => setMeta(m), []);
 
   const token =
     typeof params?.token === "string"
@@ -56,7 +58,10 @@ export default function PublicAnnotationJobViewerPage() {
       }
       contentClassName="max-w-7xl"
     >
-      <div className="flex flex-col gap-4" style={{ height: "calc(100dvh - 140px)" }}>
+      <div
+        className="flex flex-col gap-4"
+        style={{ height: "calc(100dvh - 140px)" }}
+      >
         {meta && meta.evaluators.length > 0 && (
           // Same uncarded evaluator pills as the admin annotation-job page.
           <div className="space-y-2">
@@ -76,6 +81,16 @@ export default function PublicAnnotationJobViewerPage() {
           </div>
         )}
 
+        {meta && (
+          <EvaluatorScoreCards
+            heading={HUMAN_SCORES_HEADING}
+            description={HUMAN_SCORES_DESCRIPTION}
+            cards={meta.humanScores}
+            linkEvaluators={false}
+            singleRow
+          />
+        )}
+
         <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
           <AnnotationJobView
             token={token}
@@ -88,4 +103,3 @@ export default function PublicAnnotationJobViewerPage() {
     </PublicPageLayout>
   );
 }
-

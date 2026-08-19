@@ -70,3 +70,35 @@ export function formatEvaluatorResultStat(
     ratio: trueCount / counts.count,
   };
 }
+
+/** Count a list of raw judgement values into the one number a card shows.
+ *
+ * The values can come from an evaluator's own runs or from the labels people
+ * gave, so both read the same way on screen. Values of the wrong shape for
+ * the evaluator (a number where a yes/no is expected, or a blank) are left
+ * out of the count rather than guessed at.
+ */
+export function summariseValues(
+  values: readonly unknown[],
+  ev: EvaluatorResultScale | null,
+): EvaluatorResultStat | null {
+  if (ev?.output_type === "rating") {
+    const numbers = values.filter(
+      (v): v is number => typeof v === "number" && Number.isFinite(v),
+    );
+    return formatEvaluatorResultStat(
+      {
+        count: numbers.length,
+        mean: numbers.length
+          ? numbers.reduce((a, b) => a + b, 0) / numbers.length
+          : null,
+      },
+      ev,
+    );
+  }
+  const bools = values.filter((v): v is boolean => typeof v === "boolean");
+  return formatEvaluatorResultStat(
+    { count: bools.length, trueCount: bools.filter(Boolean).length },
+    ev,
+  );
+}

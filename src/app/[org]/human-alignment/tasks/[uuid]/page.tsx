@@ -59,6 +59,7 @@ import {
   agreementColor,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
+import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { hasTaskOverviewData } from "@/lib/taskOverviewData";
 import { EmptyState } from "@/components/ui/LoadingState";
@@ -92,6 +93,14 @@ type TaskAgreementResponse = {
      * produced a value for; a binary evaluator fills `true_count`, a rating
      * evaluator fills `mean`. Absent when it has not run on anything. */
     result?: {
+      count: number;
+      true_count?: number | null;
+      mean?: number | null;
+    } | null;
+    /** The same rolled-up numbers, taken from the labels annotators gave on
+     * this evaluator instead of from the evaluator's own output. Absent when
+     * nobody has labelled for it yet. */
+    human_result?: {
       count: number;
       true_count?: number | null;
       mean?: number | null;
@@ -1474,37 +1483,50 @@ function LabellingTaskPageInner() {
     fetchAgreement();
   }, [fetchAgreement]);
 
-  // The agreement response carries each evaluator's rolled-up counts; the
-  // scale that turns them into "82%" or "3.9 / 5" comes from the task's own
+  // The agreement response carries each evaluator's rolled-up counts, both
+  // from the evaluator itself and from the labels annotators gave; the scale
+  // that turns them into "82%" or "3.9 / 5" comes from the task's own
   // evaluator list, so the two are joined here by evaluator uuid.
-  const evaluatorResultStats = useMemo(() => {
+  const { evaluatorResultStats, humanScoreCards } = useMemo(() => {
     const scaleById = new Map(
       (task?.evaluators ?? []).map((e) => [e.uuid, e]),
     );
-    const out: Record<string, EvaluatorResultStat | null> = {};
+    const byEvaluator: Record<string, EvaluatorResultStat | null> = {};
+    const humanCards: {
+      evaluatorId: string;
+      name: string;
+      stat: EvaluatorResultStat;
+    }[] = [];
     for (const ev of agreement?.evaluators ?? []) {
       const scale = scaleById.get(ev.evaluator_id);
-      out[ev.evaluator_id] = formatEvaluatorResultStat(
-        ev.result
-          ? {
-              count: ev.result.count,
-              trueCount: ev.result.true_count,
-              mean: ev.result.mean,
-            }
-          : null,
-        scale
-          ? {
-              output_type: scale.output_type,
-              scale_min:
-                typeof scale.scale_min === "number" ? scale.scale_min : null,
-              scale_max:
-                typeof scale.scale_max === "number" ? scale.scale_max : null,
-              output_config: scale.output_config,
-            }
-          : null,
+      const formatScale = scale
+        ? {
+            output_type: scale.output_type,
+            scale_min:
+              typeof scale.scale_min === "number" ? scale.scale_min : null,
+            scale_max:
+              typeof scale.scale_max === "number" ? scale.scale_max : null,
+            output_config: scale.output_config,
+          }
+        : null;
+      const counts = (r: (typeof ev)["result"]) =>
+        r ? { count: r.count, trueCount: r.true_count, mean: r.mean } : null;
+      byEvaluator[ev.evaluator_id] = formatEvaluatorResultStat(
+        counts(ev.result),
+        formatScale,
       );
+      const humanStat = formatEvaluatorResultStat(
+        counts(ev.human_result),
+        formatScale,
+      );
+      if (humanStat)
+        humanCards.push({
+          evaluatorId: ev.evaluator_id,
+          name: ev.name,
+          stat: humanStat,
+        });
     }
-    return out;
+    return { evaluatorResultStats: byEvaluator, humanScoreCards: humanCards };
   }, [agreement, task]);
 
   // Evaluators with a score to show. Keyed off the formatted number, not the
@@ -1523,6 +1545,22 @@ function LabellingTaskPageInner() {
   const evaluatorsWithoutHumanLabels = evaluatorsThatRan.filter(
     (ev) => ev.current == null,
   );
+  // The note must not contradict the human score cards above it. When nobody
+  // has labelled anything, "no human labels yet" is the truth. When labels do
+  // exist, the missing alignment number means the evaluator did not run on the
+  // items that were labelled, so say that instead.
+  const anyHumanLabels = (agreement?.evaluators ?? []).some(
+    (ev) => (ev.human_result?.count ?? 0) > 0,
+  );
+  const allEvaluatorsMissing =
+    evaluatorsWithoutHumanLabels.length === evaluatorsThatRan.length;
+  const humanLabelNote = !anyHumanLabels
+    ? allEvaluatorsMissing
+      ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
+      : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."
+    : allEvaluatorsMissing
+      ? "None of these evaluators have run on the items that annotators labelled, so their scores cannot be compared with the human labels yet."
+      : "Some of these evaluators have not run on the items that annotators labelled, so their scores cannot be compared with the human labels yet.";
 
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
@@ -1594,9 +1632,9 @@ function LabellingTaskPageInner() {
       return;
     }
     // Items exist — if the overview has nothing to show (no annotator
-    // agreement, no evaluator score, no finished evaluation run) it is just
-    // an empty state, so skip straight to the items tab. Wait for every
-    // overview-tab fetch to complete first so the user doesn't see a
+    // agreement, no evaluator score, no human labels, no finished evaluation
+    // run) it is just an empty state, so skip straight to the items tab. Wait
+    // for every overview-tab fetch to complete first so the user doesn't see a
     // spinner→bounce flicker on slow connections. If the agreement
     // fetch errored, stay on overview so the user sees the error rather
     // than getting silently bounced off the tab.
@@ -2820,30 +2858,24 @@ function LabellingTaskPageInner() {
               <div className="space-y-6">
                 {/* Only evaluators that produced a score. One that never ran
                     has nothing to put in this section. */}
-                {evaluatorsThatRan.length > 0 && (
-                  <section>
-                    <h2 className="text-sm font-semibold">
-                      Performance summary
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      What each evaluator scored across the items in this task
-                    </p>
-                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      {evaluatorsThatRan.map((ev) => (
-                        <AgreementStatCard
-                          key={ev.evaluator_id}
-                          evaluatorPill={{
-                            href: `/evaluators/${ev.evaluator_id}`,
-                            name: ev.name,
-                          }}
-                          value={null}
-                          result={evaluatorResultStats[ev.evaluator_id] ?? null}
-                          showResultLabel={false}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )}
+                <EvaluatorScoreCards
+                  heading="Performance summary"
+                  description="What each evaluator scored across the items in this task"
+                  cards={evaluatorsThatRan.map((ev) => ({
+                    evaluatorId: ev.evaluator_id,
+                    name: ev.name,
+                    stat: evaluatorResultStats[ev.evaluator_id]!,
+                  }))}
+                />
+                {/* The same numbers taken from the labels annotators gave.
+                    An evaluator nobody has labelled for has no card, so the
+                    whole section is absent until labelling starts. */}
+                <EvaluatorScoreCards
+                  heading="Human scores"
+                  description="The scores annotators gave across the items in this task"
+                  cards={humanScoreCards}
+                />
+
                 <section>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold">Score reliability</h2>
@@ -2871,12 +2903,7 @@ function LabellingTaskPageInner() {
                           d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
                         />
                       </svg>
-                      <span>
-                        {evaluatorsWithoutHumanLabels.length ===
-                        evaluatorsThatRan.length
-                          ? "No human labels found on the items in this task yet. Once labelled, each evaluator's alignment with humans will be shown."
-                          : "No human labels yet for some of the evaluators. Once labelled, their alignment with humans will be shown too."}
-                      </span>
+                      <span>{humanLabelNote}</span>
                     </div>
                   )}
                   <div className="flex flex-wrap items-stretch gap-3 mt-3">

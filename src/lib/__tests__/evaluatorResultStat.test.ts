@@ -1,4 +1,7 @@
-import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
+import {
+  formatEvaluatorResultStat,
+  summariseValues,
+} from "@/lib/evaluatorResultStat";
 
 describe("formatEvaluatorResultStat", () => {
   it("shows the share of items a binary evaluator marked true", () => {
@@ -76,5 +79,53 @@ describe("formatEvaluatorResultStat", () => {
   it("treats an unknown output type as binary", () => {
     const stat = formatEvaluatorResultStat({ count: 4, trueCount: 1 }, null);
     expect(stat?.value).toBe("25%");
+  });
+});
+
+describe("summariseValues", () => {
+  it("shows the share of true values for a yes/no evaluator", () => {
+    const stat = summariseValues([true, true, false, true], {
+      output_type: "binary",
+    });
+    expect(stat?.value).toBe("75%");
+    expect(stat?.title).toBe("Correct on 3 of 4 items");
+    expect(stat?.ratio).toBeCloseTo(0.75);
+  });
+
+  it("averages the numbers for a rating evaluator", () => {
+    const stat = summariseValues([2, 4, 3], {
+      output_type: "rating",
+      scale_min: 1,
+      scale_max: 5,
+    });
+    expect(stat?.value).toBe("3 / 5");
+    expect(stat?.title).toBe("Average across 3 items");
+    expect(stat?.ratio).toBeCloseTo(0.5);
+  });
+
+  it("leaves out values of the wrong shape", () => {
+    const binary = summariseValues([true, 4, null, undefined, false], {
+      output_type: "binary",
+    });
+    expect(binary?.title).toBe("Correct on 1 of 2 items");
+
+    const rating = summariseValues([true, 4, null, undefined, 2], {
+      output_type: "rating",
+      scale_min: 1,
+      scale_max: 5,
+    });
+    expect(rating?.value).toBe("3 / 5");
+    expect(rating?.title).toBe("Average across 2 items");
+  });
+
+  it("returns nothing for an empty list or a list with nothing usable", () => {
+    expect(summariseValues([], { output_type: "binary" })).toBeNull();
+    expect(summariseValues([], { output_type: "rating" })).toBeNull();
+    expect(
+      summariseValues([null, undefined, 3], { output_type: "binary" }),
+    ).toBeNull();
+    expect(
+      summariseValues([null, undefined, true], { output_type: "rating" }),
+    ).toBeNull();
   });
 });

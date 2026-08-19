@@ -10,6 +10,11 @@ import {
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
 import {
+  EvaluatorScoreCards,
+  HUMAN_SCORES_DESCRIPTION,
+  HUMAN_SCORES_HEADING,
+} from "@/components/human-labelling/EvaluatorScoreCards";
+import {
   SendForReviewFlow,
   type ReviewItem,
 } from "@/components/human-labelling/SendForReviewFlow";
@@ -254,6 +259,12 @@ export default function AdminAnnotateJobPage() {
                 )}
               </div>
             </div>
+            <EvaluatorScoreCards
+              heading={HUMAN_SCORES_HEADING}
+              description={HUMAN_SCORES_DESCRIPTION}
+              cards={meta.humanScores}
+              singleRow
+            />
           </>
         )}
 
