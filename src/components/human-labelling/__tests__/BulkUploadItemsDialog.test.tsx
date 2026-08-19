@@ -537,7 +537,7 @@ describe("BulkUploadItemsDialog", () => {
       expect(screen.getByText("looks right")).toBeInTheDocument();
     });
 
-    it("errors when an annotation column is missing", async () => {
+    it("errors when the CSV has no annotation column at all", async () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
       render(
@@ -553,16 +553,26 @@ describe("BulkUploadItemsDialog", () => {
       await uploadFile(csv);
       await waitFor(() =>
         expect(
-          screen.getByText(/CSV is missing annotation column\(s\)/),
+          screen.getByText(/CSV has no annotation column/),
         ).toBeInTheDocument(),
       );
     });
 
-    it("errors when an annotation value cell is empty", async () => {
-      apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
+    it("uploads a row whose annotation value cell is blank, with no annotations", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce({
+          all_new: true,
+          existing_with_annotations: [],
+          existing_without_annotations: [],
+        }) // annotated-check
+        .mockResolvedValueOnce({}); // upload
       const user = setupUser();
+      const onSuccess = jest.fn();
       render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
       );
       await selectAnnotator(user);
       await waitFor(() =>
@@ -573,10 +583,85 @@ describe("BulkUploadItemsDialog", () => {
       const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning\n"A","x","{}","crit","",""`;
       await uploadFile(csv);
       await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
+      const uploadCall = apiClient.mock.calls.find(
+        (c) => c[0] === "/annotation-tasks/task-1/items",
+      )!;
+      expect(uploadCall[2].body).toEqual({
+        items: [
+          {
+            payload: {
+              name: "A",
+              body: "x",
+              data: {},
+              evaluator_variables: { "ev-1": { criteria: "crit" } },
+            },
+          },
+        ],
+      });
+    });
+
+    it("sends only the evaluator whose value cell is filled", async () => {
+      const twoEvaluators: BulkLinkedEvaluator[] = [
+        ...linkedEvaluators,
+        {
+          uuid: "ev-2",
+          name: "Tone",
+          slug: null,
+          variables: [],
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
+      ];
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce({
+          all_new: true,
+          existing_with_annotations: [],
+          existing_without_annotations: [],
+        }) // annotated-check
+        .mockResolvedValueOnce({}); // upload
+      const user = setupUser();
+      const onSuccess = jest.fn();
+      render(
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators: twoEvaluators, onSuccess })}
+        />,
+      );
+      await selectAnnotator(user);
+      await waitFor(() =>
         expect(
-          screen.getByText(/missing value for "Correctness\/value"/),
+          screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
+      const csv = `name,body,data,Correctness/criteria,Correctness/value,Correctness/reasoning,Tone/value,Tone/reasoning\n"A","x","{}","crit","true","ok","",""`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
+      const uploadCall = apiClient.mock.calls.find(
+        (c) => c[0] === "/annotation-tasks/task-1/items",
+      )!;
+      expect(uploadCall[2].body).toEqual({
+        annotator_id: "a1",
+        items: [
+          {
+            payload: {
+              name: "A",
+              body: "x",
+              data: {},
+              evaluator_variables: { "ev-1": { criteria: "crit" } },
+            },
+            annotations: { "ev-1": { value: true, reasoning: "ok" } },
+          },
+        ],
+      });
     });
 
     it("errors when an annotation value cell is invalid", async () => {

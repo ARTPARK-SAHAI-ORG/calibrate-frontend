@@ -15,6 +15,7 @@ import {
   bulkUploadAnnotatedRowBgClass,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
+  annotationColumnsError,
   evaluatorValueColumn,
   findHeaderKey,
   parseAnnotationCell,
@@ -279,19 +280,12 @@ export function BulkUploadItemsDialog({
             );
             return;
           }
-          const missingAnnotationCols: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) {
-              missingAnnotationCols.push(valueHeader);
-            }
-          }
-          if (missingAnnotationCols.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missingAnnotationCols
-                .map((c) => `"${c}"`)
-                .join(", ")}. Download the sample CSV above for the exact format.`,
-            );
+          const columnsError = annotationColumnsError(
+            headers,
+            annotationEvaluatorsMeta,
+          );
+          if (columnsError) {
+            setParseError(columnsError);
             return;
           }
         }
@@ -383,12 +377,9 @@ export function BulkUploadItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (row[valueHeader] ?? "").trim();
               const rawReasoning = (row[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // Blank cell (or no column at all) = this evaluator was not
+              // labelled for this row; nothing is sent for it.
+              if (!rawValue) continue;
               const parsed = parseAnnotationCell(rawValue, meta);
               if ("error" in parsed) {
                 setParseError(`Row ${i + 1}: ${parsed.error}.`);
@@ -541,7 +532,7 @@ export function BulkUploadItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank on rows this evaluator was not labelled for.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),

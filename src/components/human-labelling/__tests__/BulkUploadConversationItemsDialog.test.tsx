@@ -466,7 +466,7 @@ describe("BulkUploadConversationItemsDialog", () => {
       expect(screen.getByText("Looks right")).toBeInTheDocument();
     });
 
-    it("errors when an annotation column is missing", async () => {
+    it("errors when the CSV has no annotation column at all", async () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
       render(
@@ -484,17 +484,25 @@ describe("BulkUploadConversationItemsDialog", () => {
       await uploadFile(csv);
       await waitFor(() =>
         expect(
-          screen.getByText(/CSV is missing annotation column\(s\)/),
+          screen.getByText(/CSV has no annotation column/),
         ).toBeInTheDocument(),
       );
     });
 
-    it("errors when an annotation value cell is empty", async () => {
-      apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
+    it("uploads a row whose annotation value cell is blank, with no annotations", async () => {
+      apiClient
+        .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+        .mockResolvedValueOnce({
+          all_new: true,
+          existing_with_annotations: [],
+          existing_without_annotations: [],
+        }) // annotated-check
+        .mockResolvedValueOnce({}); // upload
       const user = setupUser();
+      const onSuccess = jest.fn();
       render(
         <BulkUploadConversationItemsDialog
-          {...defaultProps({ linkedEvaluators })}
+          {...defaultProps({ linkedEvaluators, onSuccess })}
         />,
       );
       await selectAnnotator(user);
@@ -507,10 +515,23 @@ describe("BulkUploadConversationItemsDialog", () => {
 "A","[{""role"":""user"",""content"":""hi""}]","",""`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(
-          screen.getByText(/missing value for "Correctness\/value"/),
-        ).toBeInTheDocument(),
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
       );
+      await user.click(screen.getByRole("button", { name: "Upload item" }));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, true));
+      const uploadCall = apiClient.mock.calls.find(
+        (c) => c[0] === "/annotation-tasks/task-1/items",
+      );
+      expect(uploadCall![2].body).toEqual({
+        items: [
+          {
+            payload: {
+              name: "A",
+              transcript: [{ role: "user", content: "hi" }],
+            },
+          },
+        ],
+      });
     });
 
     it("errors when an annotation value cell is invalid", async () => {

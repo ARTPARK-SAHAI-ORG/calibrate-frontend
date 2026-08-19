@@ -153,6 +153,23 @@ export function parseAnnotationCell(
   return { error: `unsupported evaluator type for "${e.name}"` };
 }
 
+// Annotation value columns are optional per row and per evaluator: a blank
+// cell means that evaluator was not labelled for that row, so nothing is sent
+// for it. The CSV still has to carry at least one evaluator value column,
+// otherwise the user opted into uploading annotations but supplied none.
+export function annotationColumnsError(
+  headers: string[],
+  evaluators: EvaluatorMeta[],
+): string | null {
+  if (evaluators.length === 0) return null;
+  if (evaluators.some((e) => headers.includes(evaluatorValueColumn(e.name)))) {
+    return null;
+  }
+  return `CSV has no annotation column. Add at least one of: ${evaluators
+    .map((e) => `"${evaluatorValueColumn(e.name)}"`)
+    .join(", ")}.`;
+}
+
 // ─── Parsed-items preview + annotated-check (LLM / STT / Conversation) ─────
 
 /** POST `annotated-check` when bulk-uploading with pre-filled annotations. */

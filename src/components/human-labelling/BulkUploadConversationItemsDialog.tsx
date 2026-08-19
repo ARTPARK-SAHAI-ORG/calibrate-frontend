@@ -17,6 +17,7 @@ import {
   bulkUploadAnnotatedRowBgClass,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
+  annotationColumnsError,
   evaluatorValueColumn,
   findHeaderKey,
   parseAnnotationCell,
@@ -258,17 +259,12 @@ export function BulkUploadConversationItemsDialog({
             );
             return;
           }
-          const missing: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) missing.push(valueHeader);
-          }
-          if (missing.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missing
-                .map((c) => `"${c}"`)
-                .join(", ")}.`,
-            );
+          const columnsError = annotationColumnsError(
+            headers,
+            annotationEvaluatorsMeta,
+          );
+          if (columnsError) {
+            setParseError(columnsError);
             return;
           }
         }
@@ -331,12 +327,9 @@ export function BulkUploadConversationItemsDialog({
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
               const rawValue = (row[valueHeader] ?? "").trim();
               const rawReasoning = (row[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
+              // Blank cell (or no column at all) = this evaluator was not
+              // labelled for this row; nothing is sent for it.
+              if (!rawValue) continue;
               const parsedAnn = parseAnnotationCell(rawValue, meta);
               if ("error" in parsedAnn) {
                 setParseError(`Row ${i + 1}: ${parsedAnn.error}.`);
@@ -442,7 +435,7 @@ export function BulkUploadConversationItemsDialog({
               : "value";
         columns.push({
           name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+          description: `(optional) Value for the "${e.name}" evaluator (${range}). Leave blank on rows this evaluator was not labelled for.`,
         });
         columns.push({
           name: evaluatorReasoningColumn(e.name),
