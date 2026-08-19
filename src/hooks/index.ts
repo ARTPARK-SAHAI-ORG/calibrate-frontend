@@ -8,7 +8,7 @@ export { useJobDeletion } from "./useJobDeletion";
 export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
-export { useMaxRowsPerEval } from "./useMaxRowsPerEval";
+export { useMaxRowsPerEval, getMaxRowsPerEval } from "./useMaxRowsPerEval";
 export { useTraces } from "./useTraces";
 export { usePageSize, PAGE_SIZE_OPTIONS } from "./usePageSize";
 export { useTraceDeletion } from "./useTraceDeletion";

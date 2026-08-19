@@ -14,6 +14,19 @@ type MaxRowsResponse = {
 let cachedPromise: Promise<number> | null = null;
 let cachedToken: string | null = null;
 
+/**
+ * The workspace's max rows per eval, outside React. Every bulk run reads the
+ * limit through this (the hook below is the same call, for rendering). Falls
+ * back to LIMITS.DEFAULT_MAX_ROWS_PER_EVAL when there is no token or the
+ * request fails, so a run is never blocked by an unreachable limit.
+ */
+export function getMaxRowsPerEval(
+  accessToken: string | null | undefined,
+): Promise<number> {
+  if (!accessToken) return Promise.resolve(LIMITS.DEFAULT_MAX_ROWS_PER_EVAL);
+  return fetchMaxRows(accessToken);
+}
+
 function fetchMaxRows(accessToken: string): Promise<number> {
   if (cachedToken !== accessToken) {
     cachedPromise = null;

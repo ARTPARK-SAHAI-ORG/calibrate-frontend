@@ -3,7 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
+import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
 import { startTestRunOrNotify } from "@/lib/testRunApi";
@@ -34,7 +34,6 @@ import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
-import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
 import {
   TestTypeFilter,
@@ -247,7 +246,6 @@ export function TestsTabContent({
   onGoToConnectionSettings,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
-  const maxRowsPerEval = useMaxRowsPerEval();
   // Evaluators currently attached to this agent — used to seed a new test's
   // evaluators and to detect which of a saved test's evaluators are "new" to
   // the agent (so we can offer to add them to the agent's defaults).
@@ -1136,6 +1134,7 @@ export function TestsTabContent({
         backendAccessToken,
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
+        tests.length,
       );
       if (!taskId) return null;
       addOptimisticTestRun(taskId, tests);
@@ -1997,12 +1996,6 @@ export function TestsTabContent({
               <button
                 data-tour="tests-run-all"
                 onClick={() => {
-                  if (agentTests.length > maxRowsPerEval) {
-                    showLimitToast(
-                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                    );
-                    return;
-                  }
                   void launchTestRun(agentTests, true, "all");
                 }}
                 disabled={startingRun !== null}
@@ -2292,12 +2285,6 @@ export function TestsTabContent({
                   <div>
                     <button
                       onClick={() => {
-                        if (selectedTestUuids.size > maxRowsPerEval) {
-                          showLimitToast(
-                            `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                          );
-                          return;
-                        }
                         const selected = agentTests.filter((t) =>
                           selectedTestUuids.has(t.uuid),
                         );

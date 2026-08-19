@@ -42,3 +42,23 @@ export function showLimitToast(message: string) {
     </span>,
   );
 }
+
+/**
+ * The one check every bulk run funnels through.
+ *
+ * `count` is the amount of work the run creates. Where one row is repeated,
+ * the caller multiplies it out first: tests times models in a model
+ * comparison, items times evaluators in a labelling run. Shows the limit toast
+ * and returns true when the run is too big to start.
+ */
+export function exceedsEvalLimit(
+  count: number,
+  max: number,
+  noun: string,
+): boolean {
+  if (count <= max) return false;
+  showLimitToast(
+    `You can only run up to ${max} ${noun} at a time. This run needs ${count}.`,
+  );
+  return true;
+}

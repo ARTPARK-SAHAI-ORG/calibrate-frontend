@@ -62,6 +62,7 @@ import {
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import { hasTaskOverviewData } from "@/lib/taskOverviewData";
+import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -2025,6 +2026,17 @@ function LabellingTaskPageInner() {
     if (!accessToken || !uuid || startingRun) return;
     const ids = runDialogItemUuids;
     const selectAll = runDialogSelectAll;
+    // "Select all" covers every item the current search matches.
+    const itemCount = selectAll ? itemsTotal : (ids?.length ?? itemsTotal);
+    const overLimit = await evaluatorRunLimitMessage(
+      accessToken,
+      itemCount,
+      selections.length,
+    );
+    if (overLimit) {
+      setRunDialogSubmitError(overLimit);
+      return;
+    }
     setStartingRun(true);
     setRunDialogSubmitError(null);
     try {
