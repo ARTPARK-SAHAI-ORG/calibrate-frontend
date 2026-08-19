@@ -846,6 +846,49 @@ describe("AnnotationOptIn", () => {
     expect(onSelectAnnotator).toHaveBeenCalledWith("a2");
   });
 
+  it("adds an annotator from inside the open picker and closes it", async () => {
+    apiClient.mockResolvedValueOnce({ uuid: "a2", message: "ok" });
+    const user = setupUser();
+    const onAnnotatorAdded = jest.fn();
+    const onSelectAnnotator = jest.fn();
+    render(
+      <AnnotationOptIn
+        annotators={[{ uuid: "a1", name: "Alice" }]}
+        loading={false}
+        error={null}
+        uploadAnnotations={true}
+        onToggle={jest.fn()}
+        selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={onAnnotatorAdded}
+        onSelectAnnotator={onSelectAnnotator}
+      />,
+    );
+    // The name form lives in the picker's panel, not next to it.
+    expect(
+      screen.queryByLabelText("New annotator name"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText("Select annotator"));
+    await user.type(screen.getByLabelText("New annotator name"), "Bob");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(onAnnotatorAdded).toHaveBeenCalledWith({
+        uuid: "a2",
+        name: "Bob",
+      }),
+    );
+    expect(onSelectAnnotator).toHaveBeenCalledWith("a2");
+    // Panel closed, so its form and options are gone again.
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("New annotator name"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("option", { name: "Alice" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("filters the picker options via the search box (matchesSearch)", async () => {
     const user = setupUser();
     render(

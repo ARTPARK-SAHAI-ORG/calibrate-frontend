@@ -378,18 +378,11 @@ type AnnotationOptInProps = {
   onSelectAnnotator: (uuid: string | null) => void;
 };
 
-// Stands in for the "Add annotator" row at the top of the annotator list.
-// Picking it opens the name form instead of selecting an annotator.
-const ADD_ANNOTATOR_OPTION: Annotator = {
-  uuid: "__add_annotator__",
-  name: "Add annotator",
-};
-
 // Renders the "Upload annotations too?" yes/no choice and, when yes, the
 // annotator picker or load/error feedback. With no annotators yet the name
-// form is shown on its own; once there is a list, adding one moves into the
-// picker as the first row. Used at the top of every bulk upload items dialog
-// when the parent task has linked evaluators.
+// form is shown on its own; once there is a list, the same form sits at the
+// top of the picker's open panel. Used at the top of every bulk upload items
+// dialog when the parent task has linked evaluators.
 export function AnnotationOptIn({
   annotators,
   loading,
@@ -401,11 +394,6 @@ export function AnnotationOptIn({
   selectedAnnotatorId,
   onSelectAnnotator,
 }: AnnotationOptInProps) {
-  // Only true after picking "Add annotator" in the list. With no annotators
-  // at all the form shows on its own and this stays false.
-  const [addingAnnotator, setAddingAnnotator] = useState(false);
-  const showAddForm = annotators.length === 0 || addingAnnotator;
-
   return (
     <div className="space-y-3">
       <div>
@@ -450,51 +438,45 @@ export function AnnotationOptIn({
             <p className="text-xs text-red-500">{error}</p>
           ) : (
             <div className="space-y-2">
-              {showAddForm && (
+              {annotators.length === 0 ? (
                 <AddAnnotatorInline
                   accessToken={accessToken}
                   onAdded={(a) => {
                     onAnnotatorAdded(a);
                     onSelectAnnotator(a.uuid);
-                    setAddingAnnotator(false);
                   }}
                 />
-              )}
-              {annotators.length > 0 && (
+              ) : (
                 <SingleSelectPicker<Annotator>
-                  items={[ADD_ANNOTATOR_OPTION, ...annotators]}
+                  items={annotators}
                   selectedId={selectedAnnotatorId}
-                  onSelect={(a) => {
-                    if (a.uuid === ADD_ANNOTATOR_OPTION.uuid) {
-                      setAddingAnnotator(true);
-                      return;
-                    }
-                    setAddingAnnotator(false);
-                    onSelectAnnotator(a.uuid);
-                  }}
+                  onSelect={(a) => onSelectAnnotator(a.uuid)}
                   getId={(a) => a.uuid}
                   ariaLabel="Select annotator"
                   placeholder="Select an annotator"
                   className="w-full"
                   matchesSearch={(a, q) =>
-                    a.uuid === ADD_ANNOTATOR_OPTION.uuid ||
                     a.name.toLowerCase().includes(q.toLowerCase())
                   }
                   searchPlaceholder="Search annotators"
+                  renderHeader={(close) => (
+                    <AddAnnotatorInline
+                      accessToken={accessToken}
+                      onAdded={(a) => {
+                        onAnnotatorAdded(a);
+                        onSelectAnnotator(a.uuid);
+                        close();
+                      }}
+                    />
+                  )}
                   renderTrigger={(a) => (
                     <span className="text-sm text-foreground">
                       {a ? a.name : "Select an annotator"}
                     </span>
                   )}
-                  renderOption={(a) =>
-                    a.uuid === ADD_ANNOTATOR_OPTION.uuid ? (
-                      <span className="text-sm font-medium text-foreground">
-                        + {a.name}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-foreground">{a.name}</span>
-                    )
-                  }
+                  renderOption={(a) => (
+                    <span className="text-sm text-foreground">{a.name}</span>
+                  )}
                 />
               )}
             </div>
