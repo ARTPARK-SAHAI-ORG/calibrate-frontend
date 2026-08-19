@@ -1,5 +1,6 @@
 ## August 2026
 
+- Always give the assign annotators dialog a settings column ([#385](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/385))
 - Choose comment and reasoning settings when creating labelling jobs ([#384](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/384))
 - Make uploading existing human labels easier in bulk upload ([#382](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/382))
 - Drop the test for a video the IndiaFOSS post does not have ([#383](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/383))
