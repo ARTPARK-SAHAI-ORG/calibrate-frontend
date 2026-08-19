@@ -587,6 +587,8 @@ export function BulkUploadConversationItemsDialog({
           annotators={annotatorsState.annotators}
           loading={annotatorsState.loading}
           error={annotatorsState.error}
+          accessToken={accessToken}
+          onAnnotatorAdded={annotatorsState.addAnnotator}
           uploadAnnotations={uploadAnnotations}
           onToggle={setUploadAnnotations}
           selectedAnnotatorId={selectedAnnotatorId}

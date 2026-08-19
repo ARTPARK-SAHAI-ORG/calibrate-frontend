@@ -46,7 +46,10 @@ async function uploadFile(content: string, name = "items.csv") {
   ) as HTMLInputElement;
   const file = makeFile(content, name);
   await act(async () => {
-    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    Object.defineProperty(input, "files", {
+      value: [file],
+      configurable: true,
+    });
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
@@ -75,7 +78,9 @@ const linkedEvaluators: ConversationLinkedEvaluator[] = [
 ];
 
 function defaultProps(
-  overrides: Partial<React.ComponentProps<typeof BulkUploadConversationItemsDialog>> = {},
+  overrides: Partial<
+    React.ComponentProps<typeof BulkUploadConversationItemsDialog>
+  > = {},
 ) {
   return {
     isOpen: true,
@@ -90,7 +95,9 @@ function defaultProps(
 describe("BulkUploadConversationItemsDialog", () => {
   it("renders nothing when closed", () => {
     const { container } = render(
-      <BulkUploadConversationItemsDialog {...defaultProps({ isOpen: false })} />,
+      <BulkUploadConversationItemsDialog
+        {...defaultProps({ isOpen: false })}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -244,9 +251,7 @@ describe("BulkUploadConversationItemsDialog", () => {
     const user = setupUser();
     const onSuccess = jest.fn();
     render(
-      <BulkUploadConversationItemsDialog
-        {...defaultProps({ onSuccess })}
-      />,
+      <BulkUploadConversationItemsDialog {...defaultProps({ onSuccess })} />,
     );
     const csv = `name,description,transcript
 "Card lost","","[{""role"":""user"",""content"":""hi""}]"`;
@@ -316,7 +321,9 @@ describe("BulkUploadConversationItemsDialog", () => {
       expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
     );
     await user.click(screen.getByRole("button", { name: "Upload item" }));
-    await waitFor(() => expect(screen.getByText("Bad name")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Bad name")).toBeInTheDocument(),
+    );
   });
 
   it("downloads the sample CSV and guidelines PDF", async () => {
@@ -341,7 +348,9 @@ describe("BulkUploadConversationItemsDialog", () => {
   it("closes via Cancel", async () => {
     const user = setupUser();
     const onClose = jest.fn();
-    render(<BulkUploadConversationItemsDialog {...defaultProps({ onClose })} />);
+    render(
+      <BulkUploadConversationItemsDialog {...defaultProps({ onClose })} />,
+    );
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalled();
   });
@@ -386,8 +395,20 @@ describe("BulkUploadConversationItemsDialog", () => {
 
     it("shows a duplicate-evaluator-name warning and blocks annotation", async () => {
       const dup: ConversationLinkedEvaluator[] = [
-        { uuid: "1", name: "Same", output_type: "binary", scale_min: null, scale_max: null },
-        { uuid: "2", name: "Same", output_type: "binary", scale_min: null, scale_max: null },
+        {
+          uuid: "1",
+          name: "Same",
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
+        {
+          uuid: "2",
+          name: "Same",
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
       ];
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
@@ -409,7 +430,13 @@ describe("BulkUploadConversationItemsDialog", () => {
 
     it("shows a missing-output-type warning", async () => {
       const noOutputType: ConversationLinkedEvaluator[] = [
-        { uuid: "1", name: "NoType", output_type: null, scale_min: null, scale_max: null },
+        {
+          uuid: "1",
+          name: "NoType",
+          output_type: null,
+          scale_min: null,
+          scale_max: null,
+        },
       ];
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
@@ -623,9 +650,7 @@ describe("BulkUploadConversationItemsDialog", () => {
         />,
       );
       await user.click(screen.getByRole("button", { name: "Yes" }));
-      await waitFor(() =>
-        expect(screen.getByText("boom")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("boom")).toBeInTheDocument());
       expect(
         screen.queryByText("Drop a CSV here or click to browse"),
       ).not.toBeInTheDocument();
@@ -655,8 +680,10 @@ describe("BulkUploadConversationItemsDialog", () => {
       );
     });
 
-    it("shows an empty annotators state and a link to add one", async () => {
-      apiClient.mockResolvedValueOnce([]);
+    it("adds an annotator without leaving the dialog when none exist", async () => {
+      apiClient
+        .mockResolvedValueOnce([]) // annotators
+        .mockResolvedValueOnce({ uuid: "new-1", message: "ok" }); // create
       const user = setupUser();
       render(
         <BulkUploadConversationItemsDialog
@@ -665,13 +692,22 @@ describe("BulkUploadConversationItemsDialog", () => {
       );
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
+        expect(screen.getByLabelText("New annotator name")).toBeInTheDocument(),
+      );
+      await user.type(screen.getByLabelText("New annotator name"), "Alice");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      // The new annotator lands in the picker already selected, so the CSV
+      // dropzone opens without a trip to the annotators page.
+      await waitFor(() =>
         expect(
-          screen.getByText((_, el) =>
-            el?.tagName.toLowerCase() === "div" &&
-            (el?.textContent ?? "").startsWith("No annotators exist yet."),
-          ),
+          screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(apiClient).toHaveBeenCalledWith("/annotators", expect.anything(), {
+        method: "POST",
+        body: { name: "Alice" },
+      });
     });
   });
 });

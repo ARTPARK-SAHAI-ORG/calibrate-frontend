@@ -148,9 +148,7 @@ const ratingEvaluator: BulkLinkedEvaluator[] = [
 ];
 
 function defaultProps(
-  overrides: Partial<
-    React.ComponentProps<typeof BulkUploadItemsDialog>
-  > = {},
+  overrides: Partial<React.ComponentProps<typeof BulkUploadItemsDialog>> = {},
 ) {
   return {
     isOpen: true,
@@ -376,9 +374,7 @@ describe("BulkUploadItemsDialog", () => {
         .mockResolvedValueOnce([]) // annotators
         .mockResolvedValueOnce({}); // upload
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       const csv = `name,body,data,Correctness/criteria\n"A","x","{}","be helpful"`;
       await uploadFile(csv);
       await waitFor(() =>
@@ -403,9 +399,7 @@ describe("BulkUploadItemsDialog", () => {
 
     it("errors when an evaluator variable column is missing", async () => {
       apiClient.mockResolvedValueOnce([]);
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       const csv = `name,body,data\n"A","x","{}"`;
       await uploadFile(csv);
       await waitFor(() =>
@@ -419,29 +413,25 @@ describe("BulkUploadItemsDialog", () => {
 
     it("errors when a variable value cell is empty", async () => {
       apiClient.mockResolvedValueOnce([]);
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       const csv = `name,body,data,Correctness/criteria\n"A","x","{}",""`;
       await uploadFile(csv);
       await waitFor(() =>
         expect(
-          screen.getByText(
-            /Row 1: missing value for "Correctness\/criteria"/,
-          ),
+          screen.getByText(/Row 1: missing value for "Correctness\/criteria"/),
         ).toBeInTheDocument(),
       );
     });
 
     it("errors when a row has only a variable value but no name", async () => {
       apiClient.mockResolvedValueOnce([]);
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       const csv = `name,body,data,Correctness/criteria\n"","","","some criteria"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/Row 1: "name" is required/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/Row 1: "name" is required/),
+        ).toBeInTheDocument(),
       );
     });
   });
@@ -459,9 +449,7 @@ describe("BulkUploadItemsDialog", () => {
     it("shows the annotation opt-in and loads annotators on toggling Yes", async () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       expect(
         screen.getByText("Do you want to upload existing human labels?"),
       ).toBeInTheDocument();
@@ -476,12 +464,30 @@ describe("BulkUploadItemsDialog", () => {
 
     it("shows a duplicate-evaluator-name warning and blocks the flow", async () => {
       const dup: BulkLinkedEvaluator[] = [
-        { uuid: "1", name: "Same", slug: null, variables: [], output_type: "binary", scale_min: null, scale_max: null },
-        { uuid: "2", name: "Same", slug: null, variables: [], output_type: "binary", scale_min: null, scale_max: null },
+        {
+          uuid: "1",
+          name: "Same",
+          slug: null,
+          variables: [],
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
+        {
+          uuid: "2",
+          name: "Same",
+          slug: null,
+          variables: [],
+          output_type: "binary",
+          scale_min: null,
+          scale_max: null,
+        },
       ];
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
-      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators: dup })} />);
+      render(
+        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators: dup })} />,
+      );
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
         expect(
@@ -495,12 +501,22 @@ describe("BulkUploadItemsDialog", () => {
 
     it("shows a missing-output-type warning", async () => {
       const noOutputType: BulkLinkedEvaluator[] = [
-        { uuid: "1", name: "NoType", slug: null, variables: [], output_type: null, scale_min: null, scale_max: null },
+        {
+          uuid: "1",
+          name: "NoType",
+          slug: null,
+          variables: [],
+          output_type: null,
+          scale_min: null,
+          scale_max: null,
+        },
       ];
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
       render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators: noOutputType })} />,
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators: noOutputType })}
+        />,
       );
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
@@ -519,9 +535,7 @@ describe("BulkUploadItemsDialog", () => {
           existing_without_annotations: [],
         }); // annotated-check
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       await selectAnnotator(user);
       await waitFor(() =>
         expect(
@@ -540,9 +554,7 @@ describe("BulkUploadItemsDialog", () => {
     it("errors when the CSV has no annotation column at all", async () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       await selectAnnotator(user);
       await waitFor(() =>
         expect(
@@ -667,9 +679,7 @@ describe("BulkUploadItemsDialog", () => {
     it("errors when an annotation value cell is invalid", async () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       await selectAnnotator(user);
       await waitFor(() =>
         expect(
@@ -697,7 +707,9 @@ describe("BulkUploadItemsDialog", () => {
       const user = setupUser();
       const onSuccess = jest.fn();
       render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators, onSuccess })} />,
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators, onSuccess })}
+        />,
       );
       await selectAnnotator(user);
       await waitFor(() =>
@@ -742,9 +754,7 @@ describe("BulkUploadItemsDialog", () => {
           existing_without_annotations: [],
         }); // annotated-check
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       await selectAnnotator(user);
       await waitFor(() =>
         expect(
@@ -764,9 +774,7 @@ describe("BulkUploadItemsDialog", () => {
     it("resets parsed items when toggling annotations on", async () => {
       apiClient.mockResolvedValue([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       const csv = `name,body,data,Correctness/criteria\n"A","x","{}","crit"`;
       await uploadFile(csv);
       await waitFor(() =>
@@ -780,21 +788,30 @@ describe("BulkUploadItemsDialog", () => {
       );
     });
 
-    it("shows an empty annotators state", async () => {
-      apiClient.mockResolvedValueOnce([]);
+    it("adds an annotator without leaving the dialog when none exist", async () => {
+      apiClient
+        .mockResolvedValueOnce([]) // annotators
+        .mockResolvedValueOnce({ uuid: "new-1", message: "ok" }); // create
       const user = setupUser();
-      render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
-      );
+      render(<BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />);
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
+        expect(screen.getByLabelText("New annotator name")).toBeInTheDocument(),
+      );
+      await user.type(screen.getByLabelText("New annotator name"), "Alice");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      // The new annotator lands in the picker already selected, so the CSV
+      // dropzone opens without a trip to the annotators page.
+      await waitFor(() =>
         expect(
-          screen.getByText((_, el) =>
-            el?.tagName.toLowerCase() === "div" &&
-            (el?.textContent ?? "").startsWith("No annotators exist yet."),
-          ),
+          screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(apiClient).toHaveBeenCalledWith("/annotators", expect.anything(), {
+        method: "POST",
+        body: { name: "Alice" },
+      });
     });
   });
 
@@ -803,7 +820,9 @@ describe("BulkUploadItemsDialog", () => {
       apiClient.mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]);
       const user = setupUser();
       render(
-        <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators: ratingEvaluator })} />,
+        <BulkUploadItemsDialog
+          {...defaultProps({ linkedEvaluators: ratingEvaluator })}
+        />,
       );
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>

@@ -165,9 +165,7 @@ describe("BulkUploadSttItemsDialog", () => {
     const csv = `name,reference_transcript,predicted_transcript\n"","ref","pred"`;
     await uploadFile(csv);
     await waitFor(() =>
-      expect(
-        screen.getByText(/Row 1: "name" is required/),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Row 1: "name" is required/)).toBeInTheDocument(),
     );
   });
 
@@ -186,7 +184,9 @@ describe("BulkUploadSttItemsDialog", () => {
 
   it("skips fully-empty rows and errors when no rows have content", async () => {
     render(<BulkUploadSttItemsDialog {...defaultProps()} />);
-    await uploadFile(`name,reference_transcript,predicted_transcript\n"","",""`);
+    await uploadFile(
+      `name,reference_transcript,predicted_transcript\n"","",""`,
+    );
     await waitFor(() =>
       expect(
         screen.getByText(/No rows with content were found in the CSV/),
@@ -351,9 +351,7 @@ describe("BulkUploadSttItemsDialog", () => {
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
         expect(
-          screen.getByText(
-            /Two or more linked evaluators share the same name/,
-          ),
+          screen.getByText(/Two or more linked evaluators share the same name/),
         ).toBeInTheDocument(),
       );
       expect(
@@ -638,22 +636,32 @@ describe("BulkUploadSttItemsDialog", () => {
       ).toHaveBeenCalledTimes(2);
     });
 
-    it("shows an empty annotators state and a link to add one", async () => {
-      apiClient.mockResolvedValueOnce([]);
+    it("adds an annotator without leaving the dialog when none exist", async () => {
+      apiClient
+        .mockResolvedValueOnce([]) // annotators
+        .mockResolvedValueOnce({ uuid: "new-1", message: "ok" }); // create
       const user = setupUser();
       render(
         <BulkUploadSttItemsDialog {...defaultProps({ linkedEvaluators })} />,
       );
       await user.click(screen.getByRole("button", { name: "Yes" }));
       await waitFor(() =>
+        expect(screen.getByLabelText("New annotator name")).toBeInTheDocument(),
+      );
+      await user.type(screen.getByLabelText("New annotator name"), "Alice");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      // The new annotator lands in the picker already selected, so the CSV
+      // dropzone opens without a trip to the annotators page.
+      await waitFor(() =>
         expect(
-          screen.getByText(
-            (_, el) =>
-              el?.tagName.toLowerCase() === "div" &&
-              (el?.textContent ?? "").startsWith("No annotators exist yet."),
-          ),
+          screen.getByText("Drop a CSV here or click to browse"),
         ).toBeInTheDocument(),
       );
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(apiClient).toHaveBeenCalledWith("/annotators", expect.anything(), {
+        method: "POST",
+        body: { name: "Alice" },
+      });
     });
 
     it("resets parsed items when toggling annotations off/on", async () => {

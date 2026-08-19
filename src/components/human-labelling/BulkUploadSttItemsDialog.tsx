@@ -146,9 +146,7 @@ export function BulkUploadSttItemsDialog({
   const annotatorsState = useAnnotators(isOpen, accessToken);
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
-      uploadAnnotations &&
-      !!selectedAnnotatorId &&
-      parsedItems.length > 0,
+      uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
     taskUuid,
     accessToken,
     annotatorId: selectedAnnotatorId,
@@ -420,84 +418,80 @@ export function BulkUploadSttItemsDialog({
       annotatedCheckLoading={annotatedCheckLoading}
       annotatedCheck={annotatedCheck}
     >
+      <div
+        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+        style={sttGridStyle}
+      >
+        <div className="text-xs font-medium text-muted-foreground">Name</div>
+        <div className="text-xs font-medium text-muted-foreground">
+          Reference transcript
+        </div>
+        <div className="text-xs font-medium text-muted-foreground">
+          Predicted transcript
+        </div>
+        {annotationColumns.map((c) => (
+          <div
+            key={`ah-${c.evaluatorUuid}-${c.kind}`}
+            className="text-xs font-medium text-muted-foreground font-mono truncate"
+            title={c.header}
+          >
+            {c.header}
+          </div>
+        ))}
+      </div>
+      <div className="divide-y divide-border">
+        {parsedItems.slice(0, 50).map((p, idx) => (
+          <div
+            key={idx}
+            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+            style={sttGridStyle}
+          >
+            <div className="truncate text-foreground" title={p.name}>
+              {p.name || <span className="text-muted-foreground">—</span>}
+            </div>
             <div
-              className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-              style={sttGridStyle}
+              className="truncate text-foreground"
+              title={p.reference_transcript}
             >
-              <div className="text-xs font-medium text-muted-foreground">
-                Name
-              </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                Reference transcript
-              </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                Predicted transcript
-              </div>
-              {annotationColumns.map((c) => (
+              {p.reference_transcript}
+            </div>
+            <div
+              className="truncate text-foreground"
+              title={p.predicted_transcript}
+            >
+              {p.predicted_transcript}
+            </div>
+            {annotationColumns.map((c) => {
+              const ann = p.annotations.find(
+                (a) => a.evaluator_uuid === c.evaluatorUuid,
+              );
+              const display =
+                c.kind === "value"
+                  ? ann
+                    ? typeof ann.value === "boolean"
+                      ? ann.value
+                        ? "true"
+                        : "false"
+                      : String(ann.value)
+                    : ""
+                  : (ann?.reasoning ?? "");
+              return (
                 <div
-                  key={`ah-${c.evaluatorUuid}-${c.kind}`}
-                  className="text-xs font-medium text-muted-foreground font-mono truncate"
-                  title={c.header}
+                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
                 >
-                  {c.header}
+                  {display}
                 </div>
-              ))}
-            </div>
-            <div className="divide-y divide-border">
-              {parsedItems.slice(0, 50).map((p, idx) => (
-                  <div
-                    key={idx}
-                    className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-                    style={sttGridStyle}
-                  >
-                    <div className="truncate text-foreground" title={p.name}>
-                      {p.name || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                    <div
-                      className="truncate text-foreground"
-                      title={p.reference_transcript}
-                    >
-                      {p.reference_transcript}
-                    </div>
-                    <div
-                      className="truncate text-foreground"
-                      title={p.predicted_transcript}
-                    >
-                      {p.predicted_transcript}
-                    </div>
-                    {annotationColumns.map((c) => {
-                      const ann = p.annotations.find(
-                        (a) => a.evaluator_uuid === c.evaluatorUuid,
-                      );
-                      const display =
-                        c.kind === "value"
-                          ? ann
-                            ? typeof ann.value === "boolean"
-                              ? ann.value
-                                ? "true"
-                                : "false"
-                              : String(ann.value)
-                            : ""
-                          : (ann?.reasoning ?? "");
-                      return (
-                        <div
-                          key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                          className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                        >
-                          {display}
-                        </div>
-                      );
-                    })}
-                  </div>
-              ))}
-              {parsedItems.length > 50 && (
-                <div className="px-4 py-2 text-xs text-muted-foreground">
-                  + {parsedItems.length - 50} more rows
-                </div>
-              )}
-            </div>
+              );
+            })}
+          </div>
+        ))}
+        {parsedItems.length > 50 && (
+          <div className="px-4 py-2 text-xs text-muted-foreground">
+            + {parsedItems.length - 50} more rows
+          </div>
+        )}
+      </div>
     </BulkUploadItemsPreviewShell>
   );
 
@@ -508,6 +502,8 @@ export function BulkUploadSttItemsDialog({
           annotators={annotatorsState.annotators}
           loading={annotatorsState.loading}
           error={annotatorsState.error}
+          accessToken={accessToken}
+          onAnnotatorAdded={annotatorsState.addAnnotator}
           uploadAnnotations={uploadAnnotations}
           onToggle={setUploadAnnotations}
           selectedAnnotatorId={selectedAnnotatorId}

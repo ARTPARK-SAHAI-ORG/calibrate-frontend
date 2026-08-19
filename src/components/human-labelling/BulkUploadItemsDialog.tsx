@@ -61,7 +61,10 @@ export type BulkContentColumn = {
   guidelineDescription: string;
   guidelineExample?: string;
   // Parse a non-empty trimmed cell into the payload value (or an error).
-  parse: (raw: string, rowIndex: number) => { value: unknown } | { error: string };
+  parse: (
+    raw: string,
+    rowIndex: number,
+  ) => { value: unknown } | { error: string };
   // Render the parsed value in the preview grid.
   renderPreview: (value: unknown) => React.ReactNode;
 };
@@ -266,7 +269,9 @@ export function BulkUploadItemsDialog({
           setParseError(
             `CSV is missing column(s) for evaluator variables: ${missingColumns
               .map((c) => `"${c}"`)
-              .join(", ")}. Download the sample CSV above for the exact format.`,
+              .join(
+                ", ",
+              )}. Download the sample CSV above for the exact format.`,
           );
           return;
         }
@@ -307,11 +312,7 @@ export function BulkUploadItemsDialog({
               (slot) => (row[slot.columnKey] ?? "").trim() !== "",
             ),
           );
-          if (
-            !name &&
-            contentRaws.every((c) => !c) &&
-            !anyVariableValue
-          )
+          if (!name && contentRaws.every((c) => !c) && !anyVariableValue)
             continue;
 
           if (!name) {
@@ -358,7 +359,10 @@ export function BulkUploadItemsDialog({
               variableValues[slot.varName] = raw;
             }
             if (rowError) break;
-            refs.push({ evaluator_uuid: e.uuid, variable_values: variableValues });
+            refs.push({
+              evaluator_uuid: e.uuid,
+              variable_values: variableValues,
+            });
           }
           if (rowError) {
             setParseError(rowError);
@@ -394,7 +398,13 @@ export function BulkUploadItemsDialog({
             }
           }
 
-          items.push({ name, description, content, evaluators: refs, annotations });
+          items.push({
+            name,
+            description,
+            content,
+            evaluators: refs,
+            annotations,
+          });
         }
 
         if (items.length === 0) {
@@ -426,7 +436,9 @@ export function BulkUploadItemsDialog({
         const evaluator_variables: Record<string, Record<string, string>> = {};
         for (const ref of p.evaluators) {
           if (ref.variable_values) {
-            evaluator_variables[ref.evaluator_uuid] = { ...ref.variable_values };
+            evaluator_variables[ref.evaluator_uuid] = {
+              ...ref.variable_values,
+            };
           }
         }
         const annotationsObj = uploadAnnotations
@@ -721,6 +733,8 @@ export function BulkUploadItemsDialog({
             annotators={annotatorsState.annotators}
             loading={annotatorsState.loading}
             error={annotatorsState.error}
+            accessToken={accessToken}
+            onAnnotatorAdded={annotatorsState.addAnnotator}
             uploadAnnotations={uploadAnnotations}
             onToggle={setUploadAnnotations}
             selectedAnnotatorId={selectedAnnotatorId}

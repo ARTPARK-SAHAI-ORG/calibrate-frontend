@@ -85,7 +85,11 @@ jest.mock("jspdf", () => {
       return { __fakePdfOutput: type };
     }
   }
-  return { jsPDF: FakeJsPDF, __addPageCalls: addPageCalls, __textCalls: textCalls };
+  return {
+    jsPDF: FakeJsPDF,
+    __addPageCalls: addPageCalls,
+    __textCalls: textCalls,
+  };
 });
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -146,9 +150,7 @@ describe("buildItemAnnotationsPayload", () => {
 
 describe("duplicateEvaluatorNames", () => {
   it("returns an empty list when all names are unique", () => {
-    expect(duplicateEvaluatorNames([{ name: "A" }, { name: "B" }])).toEqual(
-      [],
-    );
+    expect(duplicateEvaluatorNames([{ name: "A" }, { name: "B" }])).toEqual([]);
   });
 
   it("returns names that appear more than once", () => {
@@ -276,9 +278,7 @@ describe("parseAnnotationCell", () => {
 
   it("errors when the rating value is outside the scale", () => {
     const result = parseAnnotationCell("10", ratingEval);
-    expect("error" in result && result.error).toMatch(
-      /outside the 1–5 range/,
-    );
+    expect("error" in result && result.error).toMatch(/outside the 1–5 range/);
   });
 
   it("accepts any finite number when no scale is configured", () => {
@@ -341,9 +341,7 @@ describe("humaniseDetailObject", () => {
         code: "ITEM_NAME_CONFLICT",
         conflicting_names: ["Foo", "Bar"],
       }),
-    ).toBe(
-      'Items with these names already exist in this task: "Foo", "Bar"',
-    );
+    ).toBe('Items with these names already exist in this task: "Foo", "Bar"');
   });
 
   it("returns a generic ITEM_NAME_DUPLICATE_IN_REQUEST message with no names", () => {
@@ -428,9 +426,7 @@ describe("parseApiError", () => {
 describe("findHeaderKey", () => {
   it("matches case-insensitively and ignoring whitespace", () => {
     expect(
-      findHeaderKey(["Conversation History", "Name"], [
-        "conversation_history",
-      ]),
+      findHeaderKey(["Conversation History", "Name"], ["conversation_history"]),
     ).toBe("Conversation History");
   });
 
@@ -457,9 +453,9 @@ describe("turnContentString", () => {
   });
 
   it("JSON.stringifies object content", () => {
-    expect(
-      turnContentString({ role: "tool", content: { a: 1 } }),
-    ).toBe('{"a":1}');
+    expect(turnContentString({ role: "tool", content: { a: 1 } })).toBe(
+      '{"a":1}',
+    );
   });
 
   it("falls back to String() when JSON.stringify throws", () => {
@@ -727,6 +723,8 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={false}
         onToggle={onToggle}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={jest.fn()}
       />,
     );
@@ -745,6 +743,8 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={false}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={jest.fn()}
       />,
     );
@@ -760,6 +760,8 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={true}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={jest.fn()}
       />,
     );
@@ -775,28 +777,49 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={true}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={jest.fn()}
       />,
     );
-    expect(
-      screen.getByText("Failed to load annotators"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load annotators")).toBeInTheDocument();
   });
 
-  it("shows an empty state with a link to add annotators", () => {
+  it("creates an annotator inline and selects it", async () => {
+    apiClient.mockResolvedValueOnce({ uuid: "new-1", message: "ok" });
+    const user = setupUser();
+    const onAnnotatorAdded = jest.fn();
+    const onSelectAnnotator = jest.fn();
     render(
       <AnnotationOptIn
         annotators={[]}
         loading={false}
         error={null}
+        accessToken="tok"
+        onAnnotatorAdded={onAnnotatorAdded}
         uploadAnnotations={true}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
-        onSelectAnnotator={jest.fn()}
+        onSelectAnnotator={onSelectAnnotator}
       />,
     );
-    const link = screen.getByRole("link", { name: "Add an annotator" });
-    expect(link).toHaveAttribute("href", "/human-alignment?tab=annotators");
+    // No picker until an annotator exists, only the inline add form.
+    expect(
+      screen.queryByRole("button", { name: "Select annotator" }),
+    ).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("New annotator name"), "Alice");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(onAnnotatorAdded).toHaveBeenCalledWith({
+        uuid: "new-1",
+        name: "Alice",
+      }),
+    );
+    expect(onSelectAnnotator).toHaveBeenCalledWith("new-1");
+    expect(apiClient).toHaveBeenCalledWith("/annotators", "tok", {
+      method: "POST",
+      body: { name: "Alice" },
+    });
   });
 
   it("renders a picker and reports the selected annotator", async () => {
@@ -813,6 +836,8 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={true}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={onSelectAnnotator}
       />,
     );
@@ -834,14 +859,13 @@ describe("AnnotationOptIn", () => {
         uploadAnnotations={true}
         onToggle={jest.fn()}
         selectedAnnotatorId={null}
+        accessToken="tok"
+        onAnnotatorAdded={jest.fn()}
         onSelectAnnotator={jest.fn()}
       />,
     );
     await user.click(screen.getByLabelText("Select annotator"));
-    await user.type(
-      screen.getByPlaceholderText("Search annotators"),
-      "bo",
-    );
+    await user.type(screen.getByPlaceholderText("Search annotators"), "bo");
     expect(screen.getByRole("option", { name: "Bob" })).toBeInTheDocument();
     expect(
       screen.queryByRole("option", { name: "Alice" }),
@@ -893,7 +917,9 @@ describe("EvaluatorAnnotationColumnsHelp", () => {
 
 describe("CsvDropzone", () => {
   it("shows the default prompt and helper text when no file is selected", () => {
-    render(<CsvDropzone csvFile={null} onFile={jest.fn()} onClear={jest.fn()} />);
+    render(
+      <CsvDropzone csvFile={null} onFile={jest.fn()} onClear={jest.fn()} />,
+    );
     expect(
       screen.getByText("Drop a CSV here or click to browse"),
     ).toBeInTheDocument();
@@ -964,9 +990,7 @@ describe("CsvDropzone", () => {
     const user = setupUser();
     const onClear = jest.fn();
     const file = new File(["a,b"], "chosen.csv", { type: "text/csv" });
-    render(
-      <CsvDropzone csvFile={file} onFile={jest.fn()} onClear={onClear} />,
-    );
+    render(<CsvDropzone csvFile={file} onFile={jest.fn()} onClear={onClear} />);
     expect(screen.getByText("chosen.csv")).toBeInTheDocument();
     await user.click(screen.getByLabelText("Remove file"));
     expect(onClear).toHaveBeenCalled();
@@ -1013,9 +1037,10 @@ describe("ConversationFormatDetails", () => {
     expect(screen.queryByText("Each turn must have:")).not.toBeInTheDocument();
 
     await user.click(toggle);
-    expect(
-      screen.getByRole("button", { name: "View less" }),
-    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "View less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(screen.getByText("Each turn must have:")).toBeInTheDocument();
     expect(screen.getByText('[{"role": "user"}]')).toBeInTheDocument();
 
@@ -1098,7 +1123,8 @@ describe("generateGuidelinesPdf", () => {
       columns: [
         {
           name: "transcript",
-          description: "A JSON array of chat turns describing the conversation.",
+          description:
+            "A JSON array of chat turns describing the conversation.",
           // A blank line between two non-blank ones exercises the
           // `wrapped.length === 0` fallback in `writeCodeBlock`, which
           // pushes an explicit blank line for empty split segments.
@@ -1174,12 +1200,10 @@ describe("BulkUploadDialogShell", () => {
     title: "Bulk upload items",
     buildSampleCsv: jest.fn(() => "name\nfoo\n"),
     sampleFilename: "sample.csv",
-    buildGuidelines: jest.fn(
-      (): GuidelineDoc => ({
-        title: "Guidelines",
-        columns: [{ name: "name", description: "desc" }],
-      }),
-    ),
+    buildGuidelines: jest.fn((): GuidelineDoc => ({
+      title: "Guidelines",
+      columns: [{ name: "name", description: "desc" }],
+    })),
     csvFile: null,
     onFile: jest.fn(),
     onClear: jest.fn(),
@@ -1223,17 +1247,17 @@ describe("BulkUploadDialogShell", () => {
   it("renders the title and the narrow width class when there are no items", () => {
     render(<BulkUploadDialogShell {...baseProps} />);
     expect(screen.getByText("Bulk upload items")).toBeInTheDocument();
-    const panel = screen.getByText("Bulk upload items").closest(
-      "div.bg-background",
-    ) as HTMLElement;
+    const panel = screen
+      .getByText("Bulk upload items")
+      .closest("div.bg-background") as HTMLElement;
     expect(panel.className).toContain("md:max-w-[37.5vw]");
   });
 
   it("uses the wide width class and shows the items preview when itemCount > 0", () => {
     render(<BulkUploadDialogShell {...baseProps} itemCount={5} />);
-    const panel = screen.getByText("Bulk upload items").closest(
-      "div.bg-background",
-    ) as HTMLElement;
+    const panel = screen
+      .getByText("Bulk upload items")
+      .closest("div.bg-background") as HTMLElement;
     expect(panel.className).toContain("md:max-w-[70vw]");
     expect(screen.getByTestId("items-preview")).toBeInTheDocument();
   });
@@ -1256,12 +1280,8 @@ describe("BulkUploadDialogShell", () => {
   });
 
   it("shows 'Uploading' and disables the footer buttons while uploading", () => {
-    render(
-      <BulkUploadDialogShell {...baseProps} itemCount={2} isUploading />,
-    );
-    expect(
-      screen.getByRole("button", { name: "Uploading" }),
-    ).toBeDisabled();
+    render(<BulkUploadDialogShell {...baseProps} itemCount={2} isUploading />);
+    expect(screen.getByRole("button", { name: "Uploading" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(screen.getByLabelText("Close")).toBeDisabled();
   });
@@ -1270,7 +1290,11 @@ describe("BulkUploadDialogShell", () => {
     const user = setupUser();
     const onUpload = jest.fn();
     render(
-      <BulkUploadDialogShell {...baseProps} itemCount={2} onUpload={onUpload} />,
+      <BulkUploadDialogShell
+        {...baseProps}
+        itemCount={2}
+        onUpload={onUpload}
+      />,
     );
     await user.click(screen.getByRole("button", { name: "Upload 2 items" }));
     expect(onUpload).toHaveBeenCalled();
@@ -1284,7 +1308,9 @@ describe("BulkUploadDialogShell", () => {
         parseError="bad csv"
       />,
     );
-    expect(screen.getByRole("button", { name: "Upload 2 items" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Upload 2 items" }),
+    ).toBeDisabled();
     expect(screen.getByText("bad csv")).toBeInTheDocument();
   });
 
@@ -1292,7 +1318,9 @@ describe("BulkUploadDialogShell", () => {
     render(
       <BulkUploadDialogShell {...baseProps} itemCount={2} uploadBlocked />,
     );
-    expect(screen.getByRole("button", { name: "Upload 2 items" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Upload 2 items" }),
+    ).toBeDisabled();
   });
 
   it("shows the upload error banner regardless of item count", () => {
@@ -1367,12 +1395,10 @@ describe("BulkUploadDialogShell", () => {
 
   it("downloads guidelines via the header button (string and function filename)", async () => {
     const user = setupUser();
-    const buildGuidelines = jest.fn(
-      (): GuidelineDoc => ({
-        title: "G",
-        columns: [{ name: "name", description: "d" }],
-      }),
-    );
+    const buildGuidelines = jest.fn((): GuidelineDoc => ({
+      title: "G",
+      columns: [{ name: "name", description: "d" }],
+    }));
     const { rerender } = render(
       <BulkUploadDialogShell
         {...baseProps}

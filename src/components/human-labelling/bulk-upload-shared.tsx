@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "@/lib/nav";
 import { jsPDF } from "jspdf";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
+import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
@@ -326,6 +327,7 @@ export function useAnnotators(
   annotators: Annotator[];
   loading: boolean;
   error: string | null;
+  addAnnotator: (annotator: Annotator) => void;
 } {
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
   const [loading, setLoading] = useState(false);
@@ -352,32 +354,58 @@ export function useAnnotators(
     };
   }, [isOpen, accessToken]);
 
-  return { annotators, loading, error };
+  // Appends an annotator created from inside the dialog so the picker can
+  // select it without refetching the list.
+  const addAnnotator = useCallback((annotator: Annotator) => {
+    setAnnotators((prev) =>
+      prev.some((a) => a.uuid === annotator.uuid) ? prev : [...prev, annotator],
+    );
+  }, []);
+
+  return { annotators, loading, error, addAnnotator };
 }
 
 type AnnotationOptInProps = {
   annotators: Annotator[];
   loading: boolean;
   error: string | null;
+  accessToken: string;
+  /** Adds an annotator created inside the dialog to the picker's list. */
+  onAnnotatorAdded: (annotator: Annotator) => void;
   uploadAnnotations: boolean;
   onToggle: (next: boolean) => void;
   selectedAnnotatorId: string | null;
   onSelectAnnotator: (uuid: string | null) => void;
 };
 
-// Renders the "Upload annotations too?" yes/no choice and, when yes,
-// either a single-select annotator picker, an empty state with a link to
-// add annotators, or load/error feedback. Used at the top of every bulk
-// upload items dialog when the parent task has linked evaluators.
+// Stands in for the "Add annotator" row at the top of the annotator list.
+// Picking it opens the name form instead of selecting an annotator.
+const ADD_ANNOTATOR_OPTION: Annotator = {
+  uuid: "__add_annotator__",
+  name: "Add annotator",
+};
+
+// Renders the "Upload annotations too?" yes/no choice and, when yes, the
+// annotator picker or load/error feedback. With no annotators yet the name
+// form is shown on its own; once there is a list, adding one moves into the
+// picker as the first row. Used at the top of every bulk upload items dialog
+// when the parent task has linked evaluators.
 export function AnnotationOptIn({
   annotators,
   loading,
   error,
+  accessToken,
+  onAnnotatorAdded,
   uploadAnnotations,
   onToggle,
   selectedAnnotatorId,
   onSelectAnnotator,
 }: AnnotationOptInProps) {
+  // Only true after picking "Add annotator" in the list. With no annotators
+  // at all the form shows on its own and this stays false.
+  const [addingAnnotator, setAddingAnnotator] = useState(false);
+  const showAddForm = annotators.length === 0 || addingAnnotator;
+
   return (
     <div className="space-y-3">
       <div>
@@ -420,39 +448,56 @@ export function AnnotationOptIn({
             <p className="text-xs text-muted-foreground">Loading annotators…</p>
           ) : error ? (
             <p className="text-xs text-red-500">{error}</p>
-          ) : annotators.length === 0 ? (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
-              No annotators exist yet.{" "}
-              <Link
-                href="/human-alignment?tab=annotators"
-                className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-              >
-                Add an annotator
-              </Link>{" "}
-              to your account first.
-            </div>
           ) : (
-            <SingleSelectPicker<Annotator>
-              items={annotators}
-              selectedId={selectedAnnotatorId}
-              onSelect={(a) => onSelectAnnotator(a.uuid)}
-              getId={(a) => a.uuid}
-              ariaLabel="Select annotator"
-              placeholder="Select an annotator"
-              className="w-full"
-              matchesSearch={(a, q) =>
-                a.name.toLowerCase().includes(q.toLowerCase())
-              }
-              searchPlaceholder="Search annotators"
-              renderTrigger={(a) => (
-                <span className="text-sm text-foreground">
-                  {a ? a.name : "Select an annotator"}
-                </span>
+            <div className="space-y-2">
+              {showAddForm && (
+                <AddAnnotatorInline
+                  accessToken={accessToken}
+                  onAdded={(a) => {
+                    onAnnotatorAdded(a);
+                    onSelectAnnotator(a.uuid);
+                    setAddingAnnotator(false);
+                  }}
+                />
               )}
-              renderOption={(a) => (
-                <span className="text-sm text-foreground">{a.name}</span>
+              {annotators.length > 0 && (
+                <SingleSelectPicker<Annotator>
+                  items={[ADD_ANNOTATOR_OPTION, ...annotators]}
+                  selectedId={selectedAnnotatorId}
+                  onSelect={(a) => {
+                    if (a.uuid === ADD_ANNOTATOR_OPTION.uuid) {
+                      setAddingAnnotator(true);
+                      return;
+                    }
+                    setAddingAnnotator(false);
+                    onSelectAnnotator(a.uuid);
+                  }}
+                  getId={(a) => a.uuid}
+                  ariaLabel="Select annotator"
+                  placeholder="Select an annotator"
+                  className="w-full"
+                  matchesSearch={(a, q) =>
+                    a.uuid === ADD_ANNOTATOR_OPTION.uuid ||
+                    a.name.toLowerCase().includes(q.toLowerCase())
+                  }
+                  searchPlaceholder="Search annotators"
+                  renderTrigger={(a) => (
+                    <span className="text-sm text-foreground">
+                      {a ? a.name : "Select an annotator"}
+                    </span>
+                  )}
+                  renderOption={(a) =>
+                    a.uuid === ADD_ANNOTATOR_OPTION.uuid ? (
+                      <span className="text-sm font-medium text-foreground">
+                        + {a.name}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-foreground">{a.name}</span>
+                    )
+                  }
+                />
               )}
-            />
+            </div>
           )}
         </div>
       )}
