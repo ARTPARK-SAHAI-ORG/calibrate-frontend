@@ -1,5 +1,6 @@
 ## August 2026
 
+- Drop the test for a video the IndiaFOSS post does not have ([#383](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/383))
 - Add a blog post announcing Calibrate at IndiaFOSS ([#377](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/377))
 - Fix what a shared link shows ([#375](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/375))
 - Fail the build when a new page is missing from the sitemap ([#374](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/374))
