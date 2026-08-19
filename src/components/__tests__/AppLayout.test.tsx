@@ -224,6 +224,18 @@ describe("AppLayout", () => {
     expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe("[]");
   });
 
+  it("folds the Agent Simulations section away and remembers the choice", async () => {
+    const user = setupUser();
+    renderLayout();
+    expect(screen.getByText("Personas")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Agent Simulations" }));
+    expect(screen.queryByText("Personas")).not.toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
+      JSON.stringify(["Agent Simulations"]),
+    );
+  });
+
   it("ignores a saved value that is not a list of sections", () => {
     localStorage.setItem("calibrate:collapsed-nav-sections", "not json");
     renderLayout();

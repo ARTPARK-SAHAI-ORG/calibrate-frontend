@@ -206,7 +206,8 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Conversation Simulation",
+    title: "Agent Simulations",
+    collapsible: true,
     items: [
       {
         id: "personas",
