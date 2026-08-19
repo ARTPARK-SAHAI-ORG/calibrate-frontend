@@ -433,6 +433,36 @@ describe("TextToSpeechEvaluation", () => {
     expect(onEvaluatingChange).toHaveBeenCalledWith(true);
   });
 
+  it("blocks a saved dataset that is bigger than the row limit", async () => {
+    const user = setupUser();
+    // 25 rows, over the limit of 20.
+    mockListDatasets.mockResolvedValue([
+      { uuid: "ds-1", name: "Big Dataset", item_count: 25 },
+    ]);
+    const evaluateRef = { current: null as (() => void) | null };
+    render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
+
+    await user.click(screen.getByText("Settings"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
+    await user.click(cartesiaRow);
+
+    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Use existing dataset"));
+    await waitFor(() => screen.getByTestId("pick-ds-1"));
+    await user.click(screen.getByTestId("pick-ds-1"));
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    expect(mockToastError).toHaveBeenCalled();
+    const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(calledUrls.some((u: string) => u.includes("/tts/evaluate"))).toBe(
+      false,
+    );
+  });
+
   it("submits a dataset-mode evaluation successfully", async () => {
     const user = setupUser();
     mockListDatasets.mockResolvedValue([

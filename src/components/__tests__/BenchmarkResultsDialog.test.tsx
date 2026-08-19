@@ -143,9 +143,13 @@ jest.mock("../../lib/exportTestResults", () => ({
 }));
 
 const useAccessTokenMock = jest.fn(() => "test-token");
+// The workspace limit on how many tests one run may cover. High by default so
+// the existing runs are never blocked; lowered in the limit test below.
+const getMaxRowsPerEvalMock = jest.fn(async () => 100);
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+  getMaxRowsPerEval: (...args: unknown[]) => getMaxRowsPerEvalMock(...args),
 }));
 
 jest.mock("../../lib/defaultEvaluators", () => ({
@@ -212,6 +216,55 @@ describe("BenchmarkResultsDialog", () => {
     );
     expect(container).toBeEmptyDOMElement();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not start a comparison bigger than the workspace limit", async () => {
+    // 2 tests across 3 models is 6 test runs, over a limit of 5.
+    getMaxRowsPerEvalMock.mockResolvedValueOnce(5);
+    const onBenchmarkCreated = jest.fn();
+    const onGoBack = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.reject(new Error(`Unexpected fetch ${url}`)),
+    );
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={["gpt-4", "gpt-5", "claude"]}
+        onBenchmarkCreated={onBenchmarkCreated}
+        onGoBack={onGoBack}
+      />,
+    );
+
+    // Back to the model picker, with the limit toast explaining why.
+    await waitFor(() => expect(onGoBack).toHaveBeenCalled());
+    expect(toast.error).toHaveBeenCalled();
+    expect(onBenchmarkCreated).not.toHaveBeenCalled();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("closes when there is no picker to go back to and the run is over the limit", async () => {
+    getMaxRowsPerEvalMock.mockResolvedValueOnce(1);
+    const onClose = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.reject(new Error(`Unexpected fetch ${url}`)),
+    );
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        onClose={onClose}
+        models={["gpt-4"]}
+      />,
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it("starts a new benchmark run, polls, and lands on the leaderboard tab when done", async () => {
