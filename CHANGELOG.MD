@@ -1,5 +1,6 @@
 ## August 2026
 
+- Remove the extra blank line under textareas ([#389](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/389))
 - Name the labelling job score row after the annotator ([#387](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/387))
 - Show human scores alongside evaluator scores ([#386](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/386))
 - Always give the assign annotators dialog a settings column ([#385](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/385))
