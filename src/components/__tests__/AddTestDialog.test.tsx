@@ -11,8 +11,9 @@ class MockResizeObserver {
 }
 
 beforeAll(() => {
-  (global as unknown as { ResizeObserver: typeof MockResizeObserver }).ResizeObserver =
-    MockResizeObserver;
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
   Element.prototype.scrollIntoView = jest.fn();
 });
 
@@ -22,13 +23,24 @@ beforeAll(() => {
 // on its internal search/filter logic.
 jest.mock("../ToolPicker", () => ({
   __esModule: true,
-  ToolPicker: ({ onSelectInbuiltTool, onSelectCustomTool, availableTools }: any) => (
+  ToolPicker: ({
+    onSelectInbuiltTool,
+    onSelectCustomTool,
+    availableTools,
+  }: any) => (
     <div data-testid="tool-picker">
-      <button type="button" onClick={() => onSelectInbuiltTool("end_call", "End conversation")}>
+      <button
+        type="button"
+        onClick={() => onSelectInbuiltTool("end_call", "End conversation")}
+      >
         Pick inbuilt tool
       </button>
       {availableTools.map((t: any) => (
-        <button key={t.uuid} type="button" onClick={() => onSelectCustomTool(t)}>
+        <button
+          key={t.uuid}
+          type="button"
+          onClick={() => onSelectCustomTool(t)}
+        >
           Pick {t.name}
         </button>
       ))}
@@ -89,7 +101,11 @@ const TONE_EVALUATOR = {
 
 function mockFetchImpl(
   tools: any[] = [WEATHER_TOOL],
-  evaluators: any[] = [CORRECTNESS_EVALUATOR, CONVERSATION_EVALUATOR, TONE_EVALUATOR],
+  evaluators: any[] = [
+    CORRECTNESS_EVALUATOR,
+    CONVERSATION_EVALUATOR,
+    TONE_EVALUATOR,
+  ],
 ) {
   return jest.fn((url: string) => {
     if (url.includes("/evaluators")) {
@@ -110,7 +126,9 @@ function mockFetchImpl(
   }) as unknown as typeof fetch;
 }
 
-function baseProps(overrides: Partial<Parameters<typeof AddTestDialog>[0]> = {}) {
+function baseProps(
+  overrides: Partial<Parameters<typeof AddTestDialog>[0]> = {},
+) {
   return {
     isOpen: true,
     onClose: jest.fn(),
@@ -161,16 +179,26 @@ function ControlledDialog(props: any) {
 
 describe("AddTestDialog", () => {
   it("renders nothing when closed", () => {
-    const { container } = render(<AddTestDialog {...baseProps({ isOpen: false })} />);
+    const { container } = render(
+      <AddTestDialog {...baseProps({ isOpen: false })} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the create-phase type intro picker with three test types", async () => {
+  it("offers next reply and tool call on the create-phase type intro picker", async () => {
     render(<AddTestDialog {...baseProps()} />);
     expect(screen.getByText("Create a test")).toBeInTheDocument();
     expect(screen.getByText("Next reply test")).toBeInTheDocument();
     expect(screen.getByText("Tool call test")).toBeInTheDocument();
-    expect(screen.getByText("Conversation test")).toBeInTheDocument();
+  });
+
+  it("does not offer the conversation type when creating a test", async () => {
+    const user = setupUser();
+    render(<AddTestDialog {...baseProps()} />);
+    expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
+    // Nor on the compact switcher shown once a type has been picked.
+    await user.click(screen.getByText("Next reply test"));
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("closes from the intro picker via the X button without a discard prompt", async () => {
@@ -186,7 +214,9 @@ describe("AddTestDialog", () => {
     const user = setupUser();
     const onClose = jest.fn();
     const { container } = render(<AddTestDialog {...baseProps({ onClose })} />);
-    const backdrop = container.querySelector(".absolute.inset-0.bg-black\\/50") as HTMLElement;
+    const backdrop = container.querySelector(
+      ".absolute.inset-0.bg-black\\/50",
+    ) as HTMLElement;
     await user.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -240,12 +270,16 @@ describe("AddTestDialog", () => {
     expect(screen.getByText("Next reply test")).toBeInTheDocument();
     // Compact type-switcher boxes ("Tool call", "Conversation" buttons) are
     // only rendered in create mode; editing shows a static header instead.
-    expect(screen.queryByRole("button", { name: "Tool call" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Tool call" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the loading spinner instead of the form while isLoading", () => {
     const { container } = render(
-      <AddTestDialog {...baseProps({ initialTab: "next-reply", isLoading: true })} />,
+      <AddTestDialog
+        {...baseProps({ initialTab: "next-reply", isLoading: true })}
+      />,
     );
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Test name")).not.toBeInTheDocument();
@@ -254,7 +288,10 @@ describe("AddTestDialog", () => {
   it("renders the createError message in the footer", () => {
     render(
       <AddTestDialog
-        {...baseProps({ initialTab: "next-reply", createError: "Name already exists" })}
+        {...baseProps({
+          initialTab: "next-reply",
+          createError: "Name already exists",
+        })}
       />,
     );
     expect(screen.getByText("Name already exists")).toBeInTheDocument();
@@ -263,7 +300,10 @@ describe("AddTestDialog", () => {
   it("renders the nameError message next to the name input", () => {
     render(
       <AddTestDialog
-        {...baseProps({ initialTab: "next-reply", nameError: "Duplicate name" })}
+        {...baseProps({
+          initialTab: "next-reply",
+          nameError: "Duplicate name",
+        })}
       />,
     );
     expect(screen.getByText("Duplicate name")).toBeInTheDocument();
@@ -272,7 +312,9 @@ describe("AddTestDialog", () => {
   describe("next-reply tab", () => {
     it("auto-attaches the default correctness evaluator once evaluators load", async () => {
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
     });
 
     it("auto-attaches the org default correctness fork via source_default_slug", async () => {
@@ -291,7 +333,9 @@ describe("AddTestDialog", () => {
         [forkCorrectness, TONE_EVALUATOR, CONVERSATION_EVALUATOR],
       );
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
     });
 
     it("splits the evaluator picker into Default and My evaluators sections", async () => {
@@ -307,11 +351,18 @@ describe("AddTestDialog", () => {
       };
       global.fetch = mockFetchImpl(
         [WEATHER_TOOL],
-        [CORRECTNESS_EVALUATOR, defaultTone, TONE_EVALUATOR, CONVERSATION_EVALUATOR],
+        [
+          CORRECTNESS_EVALUATOR,
+          defaultTone,
+          TONE_EVALUATOR,
+          CONVERSATION_EVALUATOR,
+        ],
       );
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByRole("button", { name: "Add evaluator" }));
       expect(screen.getByText("Default")).toBeInTheDocument();
@@ -323,21 +374,35 @@ describe("AddTestDialog", () => {
     it("blocks submission and shows validation errors when name/messages/criteria are empty", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
-      render(<ControlledDialog {...baseProps({ initialTab: "next-reply", onSubmit })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      render(
+        <ControlledDialog
+          {...baseProps({ initialTab: "next-reply", onSubmit })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByRole("button", { name: "Create" }));
 
       expect(onSubmit).not.toHaveBeenCalled();
       expect(screen.getByText("Test name cannot be empty")).toBeInTheDocument();
-      expect(screen.getAllByText("Message cannot be empty").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("Message cannot be empty").length,
+      ).toBeGreaterThan(0);
     });
 
     it("submits a fully-filled next-reply test with the built config and evaluator payload", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
-      render(<ControlledDialog {...baseProps({ initialTab: "next-reply", onSubmit })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      render(
+        <ControlledDialog
+          {...baseProps({ initialTab: "next-reply", onSubmit })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
 
@@ -347,7 +412,9 @@ describe("AddTestDialog", () => {
       await user.type(textareas[1], "Hello!");
       await user.type(textareas[2], "How are you?");
 
-      const criteriaInput = screen.getByPlaceholderText("Enter value for {{criteria}}");
+      const criteriaInput = screen.getByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
       await user.type(criteriaInput, "Reply is polite");
 
       await user.click(screen.getByRole("button", { name: "Create" }));
@@ -356,9 +423,15 @@ describe("AddTestDialog", () => {
       const [config, evaluators] = onSubmit.mock.calls[0];
       expect(config.evaluation.type).toBe("response");
       expect(config.history).toHaveLength(3);
-      expect(config.history[0]).toMatchObject({ role: "user", content: "Hi there" });
+      expect(config.history[0]).toMatchObject({
+        role: "user",
+        content: "Hi there",
+      });
       expect(evaluators).toEqual([
-        { evaluator_uuid: "eval-correctness", variable_values: { criteria: "Reply is polite" } },
+        {
+          evaluator_uuid: "eval-correctness",
+          variable_values: { criteria: "Reply is polite" },
+        },
       ]);
     });
 
@@ -430,9 +503,7 @@ describe("AddTestDialog", () => {
     });
 
     it("hides the custom-inputs section when the agent has no custom fields", () => {
-      render(
-        <AddTestDialog {...baseProps({ initialTab: "next-reply" })} />,
-      );
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
       expect(screen.queryByText("Custom inputs")).not.toBeInTheDocument();
     });
 
@@ -497,7 +568,9 @@ describe("AddTestDialog", () => {
     it("adds and removes a user message via the Add message dropdown", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       let textareas = document.querySelectorAll("textarea[data-msg-id]");
       expect(textareas.length).toBe(3);
@@ -518,7 +591,9 @@ describe("AddTestDialog", () => {
     it("adds an inbuilt tool call message via the Add message dropdown", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByTitle("Add message"));
       await user.click(screen.getByText("Agent tool call"));
@@ -532,16 +607,23 @@ describe("AddTestDialog", () => {
     it("opens the evaluator picker, excludes conversation-type evaluators, searches, and attaches a match", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByRole("button", { name: "Add evaluator" }));
       // Only "llm"-type evaluators are offered on the next-reply tab; the
       // conversation-type evaluator must not appear, and the already-attached
       // Correctness evaluator isn't offered again.
-      expect(screen.queryByText("Conversation quality")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Conversation quality"),
+      ).not.toBeInTheDocument();
       expect(screen.getByText("Tone check")).toBeInTheDocument();
 
-      await user.type(screen.getByPlaceholderText("Search evaluators"), "nonexistent");
+      await user.type(
+        screen.getByPlaceholderText("Search evaluators"),
+        "nonexistent",
+      );
       expect(screen.getByText(/No evaluators match/)).toBeInTheDocument();
 
       await user.clear(screen.getByPlaceholderText("Search evaluators"));
@@ -551,32 +633,41 @@ describe("AddTestDialog", () => {
 
       // The picker closes and the evaluator is now attached (appears outside
       // the picker, as a card with its own remove control).
-      expect(screen.queryByPlaceholderText("Search evaluators")).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText("Search evaluators"),
+      ).not.toBeInTheDocument();
     });
 
     it("removes an attached evaluator", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByRole("button", { name: "Add evaluator" }));
       await user.click(screen.getByRole("checkbox", { name: /Tone check/i }));
       await user.click(screen.getByRole("button", { name: "Add (1)" }));
       expect(screen.getByText("Tone check")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Remove Tone check" }));
+      await user.click(
+        screen.getByRole("button", { name: "Remove Tone check" }),
+      );
       expect(screen.queryByText("Tone check")).not.toBeInTheDocument();
     });
   });
 
   describe("conversation tab", () => {
-    it("switches to the conversation tab and offers the conversation-type evaluator only", async () => {
+    it("offers the conversation-type evaluator only on an existing conversation test", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps()} />);
-      await user.click(screen.getByText("Conversation test"));
+      // The type can no longer be picked when creating, so an existing
+      // conversation test opens straight onto its own tab.
+      render(<AddTestDialog {...baseProps({ initialTab: "conversation" })} />);
 
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Add evaluator" })).toBeEnabled(),
+        expect(
+          screen.getByRole("button", { name: "Add evaluator" }),
+        ).toBeEnabled(),
       );
       await user.click(screen.getByRole("button", { name: "Add evaluator" }));
       expect(screen.getByText("Conversation quality")).toBeInTheDocument();
@@ -585,7 +676,10 @@ describe("AddTestDialog", () => {
     it("shows six default messages ending on an agent-allowed transcript when allowAgentLastMessage", () => {
       render(
         <AddTestDialog
-          {...baseProps({ initialTab: "conversation", allowAgentLastMessage: true })}
+          {...baseProps({
+            initialTab: "conversation",
+            allowAgentLastMessage: true,
+          })}
         />,
       );
       const textareas = document.querySelectorAll("textarea[data-msg-id]");
@@ -597,20 +691,32 @@ describe("AddTestDialog", () => {
     it("blocks submission when name is empty and no tools are selected", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation", onSubmit })} />);
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "tool-invocation", onSubmit })}
+        />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Create" }));
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Add tool" })).toHaveClass("border-red-500");
+      expect(screen.getByRole("button", { name: "Add tool" })).toHaveClass(
+        "border-red-500",
+      );
     });
 
     it("adds a custom tool with a schema, fills required params, and submits", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
-      render(<ControlledDialog {...baseProps({ initialTab: "tool-invocation", onSubmit })} />);
+      render(
+        <ControlledDialog
+          {...baseProps({ initialTab: "tool-invocation", onSubmit })}
+        />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick get_weather"));
 
       expect(screen.getByText("get_weather")).toBeInTheDocument();
@@ -619,8 +725,14 @@ describe("AddTestDialog", () => {
       expect(screen.getByText("city")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /days/ })).toBeInTheDocument();
 
-      await user.type(screen.getByPlaceholderText("Your test name"), "Weather test");
-      await user.type(screen.getByPlaceholderText("Expected value"), "Bangalore");
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
 
       // The conversation-history messages (right column) are validated on
       // submit too, regardless of tab.
@@ -645,10 +757,14 @@ describe("AddTestDialog", () => {
 
     it("adds back an optional parameter chip and removes it again", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick get_weather"));
 
       await user.click(screen.getByRole("button", { name: /days/ }));
@@ -661,10 +777,14 @@ describe("AddTestDialog", () => {
 
     it("toggles Accept any parameter values and hides the expected-parameters section", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick get_weather"));
 
       expect(screen.getByText("city")).toBeInTheDocument();
@@ -677,10 +797,14 @@ describe("AddTestDialog", () => {
 
     it("removes a selected tool", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick get_weather"));
       expect(screen.getByText("get_weather")).toBeInTheDocument();
 
@@ -694,10 +818,14 @@ describe("AddTestDialog", () => {
 
     it("switches a tool's parameter editor into JSON mode and edits raw JSON", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick get_weather"));
 
       await user.click(screen.getByRole("button", { name: "JSON" }));
@@ -715,16 +843,22 @@ describe("AddTestDialog", () => {
 
     it("selects an inbuilt tool with no configurable parameters", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
 
       await user.click(screen.getByRole("button", { name: "Add tool" }));
-      await waitFor(() => expect(screen.getByText("Pick inbuilt tool")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Pick inbuilt tool")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Pick inbuilt tool"));
 
       expect(screen.getByText("End conversation")).toBeInTheDocument();
       expect(screen.getByText("Should have been called")).toBeInTheDocument();
       // No parameters section for an inbuilt tool.
-      expect(screen.queryByText("Accept any values for the parameters")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Accept any values for the parameters"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -735,9 +869,13 @@ describe("AddTestDialog", () => {
       const { container } = render(
         <AddTestDialog {...baseProps({ initialTab: "next-reply", onClose })} />,
       );
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
-      const backdrop = container.querySelector(".absolute.inset-0.bg-black\\/50") as HTMLElement;
+      const backdrop = container.querySelector(
+        ".absolute.inset-0.bg-black\\/50",
+      ) as HTMLElement;
       await user.click(backdrop);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -746,13 +884,19 @@ describe("AddTestDialog", () => {
       const user = setupUser();
       const onClose = jest.fn();
       const { container } = render(
-        <ControlledDialog {...baseProps({ initialTab: "next-reply", onClose })} />,
+        <ControlledDialog
+          {...baseProps({ initialTab: "next-reply", onClose })}
+        />,
       );
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
 
-      const backdrop = container.querySelector(".absolute.inset-0.bg-black\\/50") as HTMLElement;
+      const backdrop = container.querySelector(
+        ".absolute.inset-0.bg-black\\/50",
+      ) as HTMLElement;
       await user.click(backdrop);
 
       expect(screen.getByText("Discard changes?")).toBeInTheDocument();
@@ -765,12 +909,18 @@ describe("AddTestDialog", () => {
       const user = setupUser();
       const onClose = jest.fn();
       const { container } = render(
-        <ControlledDialog {...baseProps({ initialTab: "next-reply", onClose })} />,
+        <ControlledDialog
+          {...baseProps({ initialTab: "next-reply", onClose })}
+        />,
       );
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
-      const backdrop = container.querySelector(".absolute.inset-0.bg-black\\/50") as HTMLElement;
+      const backdrop = container.querySelector(
+        ".absolute.inset-0.bg-black\\/50",
+      ) as HTMLElement;
       await user.click(backdrop);
 
       await user.click(screen.getByRole("button", { name: "Discard" }));
@@ -780,8 +930,12 @@ describe("AddTestDialog", () => {
     it("Back button calls onClose directly (no discard guard)", async () => {
       const user = setupUser();
       const onClose = jest.fn();
-      render(<AddTestDialog {...baseProps({ initialTab: "next-reply", onClose })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "next-reply", onClose })} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
       await user.click(screen.getByRole("button", { name: "Back" }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -810,7 +964,11 @@ describe("AddTestDialog", () => {
         evaluation: {
           type: "tool_call",
           tool_calls: [
-            { tool: "tool-weather", arguments: { city: "Delhi" }, is_called: true },
+            {
+              tool: "tool-weather",
+              arguments: { city: "Delhi" },
+              is_called: true,
+            },
           ],
         },
       };
@@ -825,7 +983,9 @@ describe("AddTestDialog", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByText("get_weather")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("get_weather")).toBeInTheDocument(),
+      );
       expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
       expect(screen.getByDisplayValue("Book a flight")).toBeInTheDocument();
     });
@@ -847,7 +1007,11 @@ describe("AddTestDialog", () => {
     it("shows Creating... while isCreating during a fresh create submit", () => {
       render(
         <AddTestDialog
-          {...baseProps({ initialTab: "next-reply", isCreating: true, testName: "New" })}
+          {...baseProps({
+            initialTab: "next-reply",
+            isCreating: true,
+            testName: "New",
+          })}
         />,
       );
       expect(screen.getByText("Creating...")).toBeInTheDocument();
@@ -863,7 +1027,11 @@ describe("AddTestDialog", () => {
       };
       render(
         <AddTestDialog
-          {...baseProps({ initialTab: "next-reply", initialConfig, testName: "T" })}
+          {...baseProps({
+            initialTab: "next-reply",
+            initialConfig,
+            testName: "T",
+          })}
         />,
       );
       await waitFor(() =>
@@ -891,8 +1059,14 @@ describe("AddTestDialog", () => {
 
     it("updates the description field", async () => {
       const user = setupUser();
-      render(<ControlledDialog {...baseProps({ mode: "labelItem", setItemDescription: jest.fn() })} />);
-      const descriptionBox = screen.getByPlaceholderText(/Optional — what is this item about/);
+      render(
+        <ControlledDialog
+          {...baseProps({ mode: "labelItem", setItemDescription: jest.fn() })}
+        />,
+      );
+      const descriptionBox = screen.getByPlaceholderText(
+        /Optional — what is this item about/,
+      );
       await user.type(descriptionBox, "Some notes");
       expect(descriptionBox).toHaveValue("Some notes");
     });
@@ -917,7 +1091,9 @@ describe("AddTestDialog", () => {
   describe("save-and-run shortcut", () => {
     it("does not render the run button unless showRunAfterSave is set", async () => {
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
       expect(
         screen.queryByRole("button", { name: /Run test/ }),
       ).not.toBeInTheDocument();
@@ -962,7 +1138,9 @@ describe("AddTestDialog", () => {
           })}
         />,
       );
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
       const textareas = document.querySelectorAll("textarea[data-msg-id]");
@@ -1003,7 +1181,9 @@ describe("AddTestDialog", () => {
         );
       }
       render(<CreatingWrapper />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
 
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
       const textareas = document.querySelectorAll("textarea[data-msg-id]");

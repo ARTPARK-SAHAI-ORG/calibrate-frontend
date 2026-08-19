@@ -52,7 +52,9 @@ jest.mock("../human-labelling/bulk-upload-shared", () => ({
   ChatHistoryPreview: ({ turns }: { turns: unknown[] }) => (
     <div data-testid="chat-history-preview">{turns.length} turns</div>
   ),
-  generateGuidelinesPdf: jest.fn(() => new Blob(["pdf"], { type: "application/pdf" })),
+  generateGuidelinesPdf: jest.fn(
+    () => new Blob(["pdf"], { type: "application/pdf" }),
+  ),
 }));
 import { generateGuidelinesPdf } from "../human-labelling/bulk-upload-shared";
 
@@ -89,7 +91,14 @@ const EVALUATORS_RESPONSE = {
 };
 
 const TOOLS_RESPONSE = [
-  { uuid: "tool-1", name: "book_room", description: "", config: {}, created_at: "", updated_at: "" },
+  {
+    uuid: "tool-1",
+    name: "book_room",
+    description: "",
+    config: {},
+    created_at: "",
+    updated_at: "",
+  },
 ];
 
 function jsonResponse(body: unknown, status = 200) {
@@ -105,19 +114,29 @@ function makeFile(content: string, name = "tests.csv") {
 }
 
 async function uploadFile(content: string, name = "tests.csv") {
-  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  const input = document.querySelector(
+    'input[type="file"]',
+  ) as HTMLInputElement;
   const file = makeFile(content, name);
   await act(async () => {
-    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    Object.defineProperty(input, "files", {
+      value: [file],
+      configurable: true,
+    });
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
 
-async function selectTestType(user: ReturnType<typeof setupUser>, label: string) {
+async function selectTestType(
+  user: ReturnType<typeof setupUser>,
+  label: string,
+) {
   await user.click(screen.getByText(label));
 }
 
-function defaultProps(overrides: Partial<React.ComponentProps<typeof BulkUploadTestsModal>> = {}) {
+function defaultProps(
+  overrides: Partial<React.ComponentProps<typeof BulkUploadTestsModal>> = {},
+) {
   return {
     isOpen: true,
     onClose: jest.fn(),
@@ -135,15 +154,19 @@ beforeEach(() => {
   (Element.prototype as any).scrollIntoView = jest.fn();
   (Element.prototype as any).scrollTo = jest.fn();
   global.fetch = jest.fn((url: string) => {
-    if (String(url).includes("/evaluators")) return jsonResponse(EVALUATORS_RESPONSE) as any;
-    if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
+    if (String(url).includes("/evaluators"))
+      return jsonResponse(EVALUATORS_RESPONSE) as any;
+    if (String(url).includes("/tools"))
+      return jsonResponse(TOOLS_RESPONSE) as any;
     return jsonResponse({}) as any;
   }) as any;
 });
 
 describe("BulkUploadTestsModal", () => {
   it("renders nothing when isOpen is false", () => {
-    const { container } = render(<BulkUploadTestsModal {...defaultProps({ isOpen: false })} />);
+    const { container } = render(
+      <BulkUploadTestsModal {...defaultProps({ isOpen: false })} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -152,13 +175,19 @@ describe("BulkUploadTestsModal", () => {
     expect(screen.getByText("Bulk upload tests")).toBeInTheDocument();
     expect(screen.getByText("Next Reply")).toBeInTheDocument();
     expect(screen.getByText("Tool Call")).toBeInTheDocument();
-    expect(screen.getByText("Conversation")).toBeInTheDocument();
+  });
+
+  it("does not offer the conversation type", () => {
+    render(<BulkUploadTestsModal {...defaultProps()} />);
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("closes via the header X button", async () => {
     const user = setupUser();
     const onClose = jest.fn();
-    const { container } = render(<BulkUploadTestsModal {...defaultProps({ onClose })} />);
+    const { container } = render(
+      <BulkUploadTestsModal {...defaultProps({ onClose })} />,
+    );
     const closeBtn = container.querySelector("button") as HTMLButtonElement;
     await user.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
@@ -176,10 +205,12 @@ describe("BulkUploadTestsModal", () => {
     async function openToolCallDropzone(user: ReturnType<typeof setupUser>) {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/tools"),
-        expect.any(Object),
-      ));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/tools"),
+          expect.any(Object),
+        ),
+      );
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -198,9 +229,12 @@ describe("BulkUploadTestsModal", () => {
       await act(async () => {
         const dataTransfer = { files: [file] };
         dropzone.dispatchEvent(
-          Object.assign(new Event("drop", { bubbles: true, cancelable: true }), {
-            dataTransfer,
-          }),
+          Object.assign(
+            new Event("drop", { bubbles: true, cancelable: true }),
+            {
+              dataTransfer,
+            },
+          ),
         );
       });
       expect(screen.getByText("Please upload a .csv file")).toBeInTheDocument();
@@ -212,7 +246,9 @@ describe("BulkUploadTestsModal", () => {
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       expect(screen.getByText("Book room test")).toBeInTheDocument();
     });
 
@@ -233,7 +269,9 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       await openToolCallDropzone(user);
       await uploadFile("name,conversation_history,tool_calls\n");
-      await waitFor(() => expect(screen.getByText("CSV file is empty")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("CSV file is empty")).toBeInTheDocument(),
+      );
     });
 
     it("shows an error for missing required columns", async () => {
@@ -241,7 +279,9 @@ describe("BulkUploadTestsModal", () => {
       await openToolCallDropzone(user);
       await uploadFile(`name,conversation_history\n"a","[]"`);
       await waitFor(() =>
-        expect(screen.getByText(/Missing required columns/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/Missing required columns/),
+        ).toBeInTheDocument(),
       );
     });
 
@@ -253,7 +293,9 @@ describe("BulkUploadTestsModal", () => {
 "Dup","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/Duplicate test names found/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/Duplicate test names found/),
+        ).toBeInTheDocument(),
       );
     });
 
@@ -275,7 +317,9 @@ describe("BulkUploadTestsModal", () => {
 "Test A","","[{""tool"":""book_room""}]"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/missing conversation_history/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/missing conversation_history/),
+        ).toBeInTheDocument(),
       );
     });
 
@@ -323,7 +367,9 @@ describe("BulkUploadTestsModal", () => {
 "Test A","[{""role"":""user"",""content"":""hi""}]","not json"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/tool_calls is not valid JSON/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/tool_calls is not valid JSON/),
+        ).toBeInTheDocument(),
       );
     });
 
@@ -334,14 +380,20 @@ describe("BulkUploadTestsModal", () => {
 "Test A","[{""role"":""user"",""content"":""hi""}]","{""tool"":""book_room""}"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/tool_calls must be a JSON array/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/tool_calls must be a JSON array/),
+        ).toBeInTheDocument(),
       );
     });
 
     it("shows a fetch-error message and blocks parsing when /tools fails", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
         if (String(url).includes("/tools")) {
-          return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({});
       });
@@ -357,7 +409,11 @@ describe("BulkUploadTestsModal", () => {
       const { signOut } = jest.requireMock("next-auth/react");
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
         if (String(url).includes("/tools")) {
-          return Promise.resolve({ ok: false, status: 401, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 401,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({});
       });
@@ -374,7 +430,9 @@ describe("BulkUploadTestsModal", () => {
 "Empty history","[]","[{""tool"":""book_room""}]"
 "Empty calls","[{""role"":""user"",""content"":""hi""}]","[]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 2 tests")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 2 tests")).toBeInTheDocument(),
+      );
       expect(screen.getByText("(empty)")).toBeInTheDocument();
       expect(screen.getByText("empty tool_calls array")).toBeInTheDocument();
     });
@@ -385,7 +443,9 @@ describe("BulkUploadTestsModal", () => {
       const csv = `name,conversation_history,tool_calls
 "Args test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{""room"":""101"",""count"":3}},{""tool"":""book_room"",""is_called"":false},{""tool"":""book_room"",""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       expect(screen.getByText("should NOT be called")).toBeInTheDocument();
       expect(screen.getByText("any arguments accepted")).toBeInTheDocument();
     });
@@ -406,18 +466,29 @@ describe("BulkUploadTestsModal", () => {
 
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
       const file = makeFile(csv);
       await act(async () => {
-        Object.defineProperty(input, "files", { value: [file], configurable: true });
+        Object.defineProperty(input, "files", {
+          value: [file],
+          configurable: true,
+        });
         input.dispatchEvent(new Event("change", { bubbles: true }));
       });
       expect(screen.queryByText("Found 1 test")).not.toBeInTheDocument();
 
       await act(async () => {
-        resolveTools({ ok: true, status: 200, json: async () => TOOLS_RESPONSE });
+        resolveTools({
+          ok: true,
+          status: 200,
+          json: async () => TOOLS_RESPONSE,
+        });
       });
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
     });
 
     it("removes an uploaded file via the clear button", async () => {
@@ -426,30 +497,43 @@ describe("BulkUploadTestsModal", () => {
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("tests.csv")).toBeInTheDocument());
-      const clearBtn = screen.getByText("tests.csv").parentElement!.querySelector("button")!;
+      await waitFor(() =>
+        expect(screen.getByText("tests.csv")).toBeInTheDocument(),
+      );
+      const clearBtn = screen
+        .getByText("tests.csv")
+        .parentElement!.querySelector("button")!;
       await user.click(clearBtn);
       expect(screen.queryByText("tests.csv")).not.toBeInTheDocument();
     });
 
     it("submits successfully and calls onSuccess/onClose", async () => {
-      (global.fetch as jest.Mock).mockImplementation((url: string, opts?: any) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
-        if (String(url).includes("/tests/bulk")) {
-          return jsonResponse({ created: 1, warnings: [] }) as any;
-        }
-        return jsonResponse({}) as any;
-      });
+      (global.fetch as jest.Mock).mockImplementation(
+        (url: string, opts?: any) => {
+          if (String(url).includes("/tools"))
+            return jsonResponse(TOOLS_RESPONSE) as any;
+          if (String(url).includes("/tests/bulk")) {
+            return jsonResponse({ created: 1, warnings: [] }) as any;
+          }
+          return jsonResponse({}) as any;
+        },
+      );
       const user = setupUser();
       const onSuccess = jest.fn();
       const onClose = jest.fn();
-      render(<BulkUploadTestsModal {...defaultProps({ onSuccess, onClose })} />);
+      render(
+        <BulkUploadTestsModal {...defaultProps({ onSuccess, onClose })} />,
+      );
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
 
       const uploadBtn = screen.getByText(/Upload 1 test/);
       await user.click(uploadBtn);
@@ -467,9 +551,13 @@ describe("BulkUploadTestsModal", () => {
 
     it("shows upload warnings without closing, then Done closes it", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
         if (String(url).includes("/tests/bulk")) {
-          return jsonResponse({ created: 1, warnings: ["Test 1 had a minor issue"] }) as any;
+          return jsonResponse({
+            created: 1,
+            warnings: ["Test 1 had a minor issue"],
+          }) as any;
         }
         return jsonResponse({}) as any;
       });
@@ -477,15 +565,21 @@ describe("BulkUploadTestsModal", () => {
       const onClose = jest.fn();
       render(<BulkUploadTestsModal {...defaultProps({ onClose })} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText(/Upload 1 test/));
 
       await waitFor(() =>
-        expect(screen.getByText("Test 1 had a minor issue")).toBeInTheDocument(),
+        expect(
+          screen.getByText("Test 1 had a minor issue"),
+        ).toBeInTheDocument(),
       );
       expect(onClose).not.toHaveBeenCalled();
       await user.click(screen.getByText("Done"));
@@ -494,7 +588,8 @@ describe("BulkUploadTestsModal", () => {
 
     it("shows an upload error message on failed submit", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
         if (String(url).includes("/tests/bulk")) {
           return Promise.resolve({
             ok: false,
@@ -507,31 +602,46 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText(/Upload 1 test/));
-      await waitFor(() => expect(screen.getByText("Bad request")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Bad request")).toBeInTheDocument(),
+      );
     });
 
     it("falls back to a status-based error message when the body has no detail", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
         if (String(url).includes("/tests/bulk")) {
-          return Promise.resolve({ ok: false, status: 403, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 403,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({}) as any;
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText(/Upload 1 test/));
       await waitFor(() =>
         expect(
@@ -543,20 +653,29 @@ describe("BulkUploadTestsModal", () => {
     it("signs out on a 401 submit response", async () => {
       const { signOut } = jest.requireMock("next-auth/react");
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
         if (String(url).includes("/tests/bulk")) {
-          return Promise.resolve({ ok: false, status: 401, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 401,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({}) as any;
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText(/Upload 1 test/));
       await waitFor(() => expect(signOut).toHaveBeenCalled());
     });
@@ -572,20 +691,28 @@ describe("BulkUploadTestsModal", () => {
 
     it("assigns tests to agents and includes agent_uuids on submit", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
-        if (String(url).includes("/tests/bulk")) return jsonResponse({ created: 1 }) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tests/bulk"))
+          return jsonResponse({ created: 1 }) as any;
         return jsonResponse({}) as any;
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
 
-      await waitFor(() => expect(screen.getByTestId("multi-agent-picker")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByTestId("multi-agent-picker")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Agent One"));
 
       await user.click(screen.getByText(/Upload 1 test/));
@@ -604,19 +731,31 @@ describe("BulkUploadTestsModal", () => {
 
     it("hides the assign-to-agents section when lockedAgentUuid is set and sends it on submit", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/tools")) return jsonResponse(TOOLS_RESPONSE) as any;
-        if (String(url).includes("/tests/bulk")) return jsonResponse({ created: 1 }) as any;
+        if (String(url).includes("/tools"))
+          return jsonResponse(TOOLS_RESPONSE) as any;
+        if (String(url).includes("/tests/bulk"))
+          return jsonResponse({ created: 1 }) as any;
         return jsonResponse({}) as any;
       });
       const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps({ lockedAgentUuid: "locked-agent" })} />);
+      render(
+        <BulkUploadTestsModal
+          {...defaultProps({ lockedAgentUuid: "locked-agent" })}
+        />,
+      );
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText("Found 1 test")).toBeInTheDocument());
-      expect(screen.queryByTestId("multi-agent-picker")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByTestId("multi-agent-picker"),
+      ).not.toBeInTheDocument();
 
       await user.click(screen.getByText(/Upload 1 test/));
       await waitFor(() =>
@@ -634,7 +773,10 @@ describe("BulkUploadTestsModal", () => {
   });
 
   describe("Next Reply (evaluator-based) uploads", () => {
-    async function pickEvaluator(user: ReturnType<typeof setupUser>, name: string) {
+    async function pickEvaluator(
+      user: ReturnType<typeof setupUser>,
+      name: string,
+    ) {
       const trigger = screen.getByText("Select one or more evaluators");
       await user.click(trigger);
       await waitFor(() => expect(screen.getByText(name)).toBeInTheDocument());
@@ -647,10 +789,12 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/evaluators"),
-        expect.any(Object),
-      ));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/evaluators"),
+          expect.any(Object),
+        ),
+      );
       expect(screen.queryByText(/Drag and drop a CSV/)).not.toBeInTheDocument();
 
       await pickEvaluator(user, "Helpfulness");
@@ -663,9 +807,15 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
-      await waitFor(() => expect(screen.queryByText("Loading evaluators")).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(
+          screen.queryByText("Loading evaluators"),
+        ).not.toBeInTheDocument(),
+      );
       await pickEvaluator(user, "Helpfulness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const csv = `name,conversation_history,Helpfulness,Helpfulness/criteria
 "Greeting test","[{""role"":""user"",""content"":""hi""}]","true","Be nice"`;
@@ -681,7 +831,9 @@ describe("BulkUploadTestsModal", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await pickEvaluator(user, "Helpfulness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const csv = `name,conversation_history,Helpfulness,Helpfulness/criteria
 "Greeting test","[{""role"":""user"",""content"":""hi""}]","maybe","Be nice"`;
@@ -696,7 +848,9 @@ describe("BulkUploadTestsModal", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await pickEvaluator(user, "Helpfulness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const csv = `name,conversation_history,Helpfulness,Helpfulness/criteria
 "Greeting test","[{""role"":""user"",""content"":""hi""}]","true",""`;
@@ -711,7 +865,9 @@ describe("BulkUploadTestsModal", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await pickEvaluator(user, "Politeness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const csv = `name,conversation_history,Politeness
 "Greeting test","[{""role"":""user"",""content"":""hi""}]","false"`;
@@ -723,20 +879,26 @@ describe("BulkUploadTestsModal", () => {
 
     it("submits an evaluator-based upload with the resolved evaluators payload", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (String(url).includes("/evaluators")) return jsonResponse(EVALUATORS_RESPONSE) as any;
-        if (String(url).includes("/tests/bulk")) return jsonResponse({ created: 1 }) as any;
+        if (String(url).includes("/evaluators"))
+          return jsonResponse(EVALUATORS_RESPONSE) as any;
+        if (String(url).includes("/tests/bulk"))
+          return jsonResponse({ created: 1 }) as any;
         return jsonResponse({}) as any;
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await pickEvaluator(user, "Politeness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const csv = `name,conversation_history,Politeness
 "Greeting test","[{""role"":""user"",""content"":""hi""}]","true"`;
       await uploadFile(csv);
-      await waitFor(() => expect(screen.getByText(/ready to upload/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/ready to upload/)).toBeInTheDocument(),
+      );
 
       await user.click(screen.getByText(/Upload 1 test/));
       await waitFor(() =>
@@ -756,7 +918,11 @@ describe("BulkUploadTestsModal", () => {
     it("shows a fetch-error message when /evaluators fails", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
         if (String(url).includes("/evaluators")) {
-          return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({});
       });
@@ -764,7 +930,9 @@ describe("BulkUploadTestsModal", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await waitFor(() =>
-        expect(screen.getByText(/Failed to load evaluators/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/Failed to load evaluators/),
+        ).toBeInTheDocument(),
       );
     });
 
@@ -772,7 +940,11 @@ describe("BulkUploadTestsModal", () => {
       const { signOut } = jest.requireMock("next-auth/react");
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
         if (String(url).includes("/evaluators")) {
-          return Promise.resolve({ ok: false, status: 401, json: async () => ({}) });
+          return Promise.resolve({
+            ok: false,
+            status: 401,
+            json: async () => ({}),
+          });
         }
         return jsonResponse({});
       });
@@ -787,23 +959,11 @@ describe("BulkUploadTestsModal", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Next Reply");
       await pickEvaluator(user, "Helpfulness");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("download the sample CSV"));
       expect((global as any).URL.createObjectURL).toHaveBeenCalled();
-    });
-
-    it("filters evaluators by the conversation evaluator_type for Conversation uploads", async () => {
-      const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Conversation");
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/evaluators"),
-        expect.any(Object),
-      ));
-      const trigger = screen.getByText("Select one or more evaluators");
-      await user.click(trigger);
-      await waitFor(() => expect(screen.getByText("ConvoQuality")).toBeInTheDocument());
-      expect(screen.queryByText("Helpfulness")).not.toBeInTheDocument();
     });
   });
 
@@ -812,14 +972,18 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
       await selectTestType(user, "Tool Call");
-      await waitFor(() => expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
 
       const header = "name,conversation_history,tool_calls\n";
       const row = `"Test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room""}]"\n`;
       const csv = header + row.repeat(501);
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/the maximum is 500 tests per upload/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/the maximum is 500 tests per upload/),
+        ).toBeInTheDocument(),
       );
     });
   });

@@ -20,6 +20,7 @@ import {
 import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
+import { isCreatableTestType } from "@/constants/testTypes";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
@@ -1331,7 +1332,7 @@ export function BulkUploadTestsModal({
             <label className="block text-sm font-medium text-foreground mb-3">
               Select the type of test
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-3xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl">
               {[
                 {
                   value: "response" as const,
@@ -1351,50 +1352,53 @@ export function BulkUploadTestsModal({
                   description:
                     "Generate the agent's reply, then grade the full conversation",
                 },
-              ].map((opt) => {
-                const isSelected = testType === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setTestType(opt.value);
-                      setCsvFile(null);
-                      setParsedTests([]);
-                      setParseError(null);
-                      setUploadError(null);
-                      setPendingFile(null);
-                      setSelectedEvaluators([]);
-                      setCommittedEvaluators([]);
-                      // Reset cached evaluator list so the next-reply ↔
-                      // conversation switch re-fetches with the right
-                      // evaluator_type filter.
-                      setAvailableLLMEvaluators([]);
-                      setEvaluatorsFetched(false);
-                      setEvaluatorsFetchError(null);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                    className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-foreground text-background border-foreground"
-                        : "bg-background border-border hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="text-sm font-medium mb-0.5">
-                      {opt.label}
-                    </div>
-                    <div
-                      className={`text-xs leading-snug ${
+              ]
+                .filter((opt) => isCreatableTestType(opt.value))
+                .map((opt) => {
+                  const isSelected = testType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setTestType(opt.value);
+                        setCsvFile(null);
+                        setParsedTests([]);
+                        setParseError(null);
+                        setUploadError(null);
+                        setPendingFile(null);
+                        setSelectedEvaluators([]);
+                        setCommittedEvaluators([]);
+                        // Reset cached evaluator list so the next-reply ↔
+                        // conversation switch re-fetches with the right
+                        // evaluator_type filter.
+                        setAvailableLLMEvaluators([]);
+                        setEvaluatorsFetched(false);
+                        setEvaluatorsFetchError(null);
+                        if (fileInputRef.current)
+                          fileInputRef.current.value = "";
+                      }}
+                      className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                         isSelected
-                          ? "text-background/80"
-                          : "text-muted-foreground"
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-background border-border hover:bg-muted/50"
                       }`}
                     >
-                      {opt.description}
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="text-sm font-medium mb-0.5">
+                        {opt.label}
+                      </div>
+                      <div
+                        className={`text-xs leading-snug ${
+                          isSelected
+                            ? "text-background/80"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {opt.description}
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           </div>
 
@@ -1410,9 +1414,10 @@ export function BulkUploadTestsModal({
               </label>
               <p className="text-xs text-muted-foreground mb-3">
                 Every test gets all of these by default. To attach an evaluator
-                to only some rows, set its <code className="font-mono">true</code>
-                /<code className="font-mono">false</code> column in the CSV
-                (each test must keep at least one).
+                to only some rows, set its{" "}
+                <code className="font-mono">true</code>/
+                <code className="font-mono">false</code> column in the CSV (each
+                test must keep at least one).
               </p>
               {evaluatorsFetchError && (
                 <p className="text-xs text-red-500 mb-2">
@@ -1745,9 +1750,7 @@ export function BulkUploadTestsModal({
                                   );
                                 }
                               }
-                              const attachedNames = (
-                                test.evaluators ?? []
-                              ).map(
+                              const attachedNames = (test.evaluators ?? []).map(
                                 (ref) =>
                                   evaluatorNameByUuid.get(ref.evaluator_uuid) ??
                                   ref.evaluator_uuid,
@@ -1907,26 +1910,26 @@ export function BulkUploadTestsModal({
             parsedTests.length > 0 &&
             !lockedAgentUuid &&
             agentCount !== 0 && (
-            <div ref={assignAgentsSectionRef}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium text-foreground">
-                  Assign tests to agents
-                </span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  (optional)
-                </span>
+              <div ref={assignAgentsSectionRef}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-foreground">
+                    Assign tests to agents
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Automatically link these tests to one or more agents but you
+                  can also attach them later
+                </p>
+                <MultiAgentPicker
+                  selectedAgentUuids={selectedAgentUuids}
+                  onToggleAgent={toggleAgentSelection}
+                  onAgentsLoaded={(agents) => setAgentCount(agents.length)}
+                />
               </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Automatically link these tests to one or more agents but you can
-                also attach them later
-              </p>
-              <MultiAgentPicker
-                selectedAgentUuids={selectedAgentUuids}
-                onToggleAgent={toggleAgentSelection}
-                onAgentsLoaded={(agents) => setAgentCount(agents.length)}
-              />
-            </div>
-          )}
+            )}
         </div>
 
         {/* Footer */}
