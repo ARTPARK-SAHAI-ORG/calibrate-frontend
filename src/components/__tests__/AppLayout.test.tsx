@@ -201,15 +201,15 @@ describe("AppLayout", () => {
     },
   );
 
-  it("folds the Voice Evaluation section away and remembers the choice", async () => {
+  it("folds the Voice evaluation section away and remembers the choice", async () => {
     const user = setupUser();
     renderLayout();
     expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Voice Evaluation" }));
+    await user.click(screen.getByRole("button", { name: "Voice evaluation" }));
     expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
     expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
-      JSON.stringify(["Voice Evaluation"]),
+      JSON.stringify(["Voice evaluation"]),
     );
   });
 
@@ -217,25 +217,25 @@ describe("AppLayout", () => {
     const user = setupUser();
     localStorage.setItem(
       "calibrate:collapsed-nav-sections",
-      JSON.stringify(["Voice Evaluation"]),
+      JSON.stringify(["Voice evaluation"]),
     );
     renderLayout();
     expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Voice Evaluation" }));
+    await user.click(screen.getByRole("button", { name: "Voice evaluation" }));
     expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
     expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe("[]");
   });
 
-  it("folds the Agent Simulations section away and remembers the choice", async () => {
+  it("folds the Agent simulations section away and remembers the choice", async () => {
     const user = setupUser();
     renderLayout();
     expect(screen.getByText("Personas")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Agent Simulations" }));
+    await user.click(screen.getByRole("button", { name: "Agent simulations" }));
     expect(screen.queryByText("Personas")).not.toBeInTheDocument();
     expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
-      JSON.stringify(["Agent Simulations"]),
+      JSON.stringify(["Agent simulations"]),
     );
   });
 
