@@ -27,6 +27,8 @@ import {
   sampleEvaluatorValue,
   UnknownItemNamesWarning,
   unknownItemNames,
+  UnusedColumnsNote,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
@@ -141,6 +143,9 @@ export function BulkUploadItemsDialog({
 }: BulkUploadItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that the upload reads nothing from. Noted next
+  // to the preview so a mistyped score column is visible; it never blocks.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -205,6 +210,7 @@ export function BulkUploadItemsDialog({
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -218,6 +224,7 @@ export function BulkUploadItemsDialog({
   // Re-parse when the annotation toggle changes (column requirements differ).
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setCsvFile(null);
@@ -227,6 +234,7 @@ export function BulkUploadItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setCsvFile(file);
     if (!file) return;
     if (duplicateNames.length > 0) {
@@ -443,6 +451,24 @@ export function BulkUploadItemsDialog({
           setParseError("No rows with content were found in the CSV.");
           return;
         }
+        // Every title the rows above were read through, as it is spelled in
+        // the file (a name column titled "title" counts as read). Anything
+        // left over is noted for the reader; it changes nothing that is sent.
+        const usedHeaders = [
+          nameKey,
+          descriptionKey,
+          ...contentKeys.map((ck) => ck.key),
+          ...Array.from(variableHeaderMap.values()).flatMap((slots) =>
+            slots.map((slot) => slot.columnKey),
+          ),
+          ...(uploadAnnotations
+            ? annotationEvaluatorsMeta.flatMap((e) => [
+                evaluatorValueColumn(e.name),
+                evaluatorReasoningColumn(e.name),
+              ])
+            : []),
+        ];
+        setUnusedColumns(unusedCsvColumns(headers, usedHeaders));
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -788,6 +814,7 @@ export function BulkUploadItemsDialog({
         </div>
       </BulkUploadItemsPreviewShell>
       <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
     </div>
   );
 

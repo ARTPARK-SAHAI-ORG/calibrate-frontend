@@ -8,6 +8,7 @@ import {
   BulkUploadDialogShell,
   BulkUploadItemsPreviewShell,
   UnknownItemNamesWarning,
+  UnusedColumnsNote,
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
@@ -27,6 +28,7 @@ import {
   parseApiError,
   sampleEvaluatorValue,
   unknownItemNames,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
@@ -139,6 +141,9 @@ export function BulkUploadSttItemsDialog({
 }: BulkUploadSttItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that this upload reads nothing from, so a
+  // mistyped one is visible instead of quietly dropping what was typed in it.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -217,6 +222,7 @@ export function BulkUploadSttItemsDialog({
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -229,6 +235,7 @@ export function BulkUploadSttItemsDialog({
 
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setCsvFile(null);
@@ -238,6 +245,7 @@ export function BulkUploadSttItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setCsvFile(file);
     if (!file) return;
     Papa.parse<Record<string, string>>(file, {
@@ -336,6 +344,21 @@ export function BulkUploadSttItemsDialog({
           setParseError("No rows with content were found in the CSV.");
           return;
         }
+        // The resolved keys, not the canonical names, so a file using an
+        // alias for a column is not reported as unused.
+        setUnusedColumns(
+          unusedCsvColumns(headers, [
+            nameKey,
+            refKey,
+            predKey,
+            ...(uploadAnnotations
+              ? annotationEvaluatorsMeta.flatMap((e) => [
+                  evaluatorValueColumn(e.name),
+                  evaluatorReasoningColumn(e.name),
+                ])
+              : []),
+          ]),
+        );
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -554,6 +577,7 @@ export function BulkUploadSttItemsDialog({
         </div>
       </BulkUploadItemsPreviewShell>
       <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
     </div>
   );
 

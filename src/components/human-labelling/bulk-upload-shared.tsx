@@ -283,6 +283,29 @@ export function UnknownItemNamesWarning({
   );
 }
 
+// Column titles in the CSV that the upload reads nothing from. A title the
+// upload does not recognise is skipped in silence, so a mistyped score column
+// like "Tone/valu" would throw away everything typed into it. Listing them
+// makes the slip visible without refusing the file.
+export function unusedCsvColumns(
+  headers: readonly string[],
+  usedHeaders: readonly (string | null | undefined)[],
+): string[] {
+  const used = new Set(usedHeaders.filter((h): h is string => !!h));
+  return headers.filter((h) => h.trim() !== "" && !used.has(h));
+}
+
+/** Note listing the column titles the upload reads nothing from. */
+export function UnusedColumnsNote({ columns }: { columns: readonly string[] }) {
+  if (columns.length === 0) return null;
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
+      Nothing is read from {columns.map((c) => `"${c}"`).join(", ")}. Check the
+      spelling if one of them was meant to hold scores.
+    </div>
+  );
+}
+
 export function bulkUploadAnnotatedRowBgClass(
   index: number,
   check: AnnotatedCheckResult | null,

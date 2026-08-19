@@ -371,6 +371,44 @@ describe("BulkUploadItemsDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  describe("columns nothing is read from", () => {
+    it("names a column the upload reads nothing from", async () => {
+      render(<BulkUploadItemsDialog {...defaultProps()} />);
+      const csv = `name,body,data,Tone/valu\n"A","x","{}","true"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Nothing is read from/)).toHaveTextContent(
+        '"Tone/valu"',
+      );
+    });
+
+    it("does not name a column the upload read under another title", async () => {
+      render(<BulkUploadItemsDialog {...defaultProps()} />);
+      const csv = `title,body,data,extra\n"A","x","{}","hm"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      const note = screen.getByText(/Nothing is read from/);
+      expect(note).toHaveTextContent('"extra"');
+      expect(note).not.toHaveTextContent('"title"');
+    });
+
+    it("shows no note when every column is read", async () => {
+      render(<BulkUploadItemsDialog {...defaultProps()} />);
+      const csv = `name,description,body,data\n"A","d","x","{}"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(/Nothing is read from/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("evaluator variable columns", () => {
     it("parses variable columns and includes them in the payload", async () => {
       apiClient

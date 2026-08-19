@@ -32,6 +32,8 @@ import {
   turnContentString,
   UnknownItemNamesWarning,
   unknownItemNames,
+  UnusedColumnsNote,
+  unusedCsvColumns,
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
@@ -176,6 +178,9 @@ export function BulkUploadConversationItemsDialog({
 }: BulkUploadConversationItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  // Column titles in the file that this upload reads nothing from, so a
+  // mistyped one is visible instead of quietly dropping what was typed in it.
+  const [unusedColumns, setUnusedColumns] = useState<string[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -235,6 +240,7 @@ export function BulkUploadConversationItemsDialog({
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setUploadAnnotations(false);
@@ -247,6 +253,7 @@ export function BulkUploadConversationItemsDialog({
 
   useEffect(() => {
     setParsedItems([]);
+    setUnusedColumns([]);
     setParseError(null);
     setUploadError(null);
     setCsvFile(null);
@@ -256,6 +263,7 @@ export function BulkUploadConversationItemsDialog({
     setUploadError(null);
     setParseError(null);
     setParsedItems([]);
+    setUnusedColumns([]);
     setCsvFile(file);
     if (!file) return;
     Papa.parse<Record<string, string>>(file, {
@@ -381,6 +389,18 @@ export function BulkUploadConversationItemsDialog({
           setParseError("No rows with a transcript were found in the CSV.");
           return;
         }
+        // The resolved keys, not the canonical names: a file using an alias
+        // (say "title" for the name) is read from that column, so it is used.
+        const usedHeaders = [nameKey, descriptionKey, transcriptKey];
+        if (uploadAnnotations) {
+          for (const meta of annotationEvaluatorsMeta) {
+            usedHeaders.push(
+              evaluatorValueColumn(meta.name),
+              evaluatorReasoningColumn(meta.name),
+            );
+          }
+        }
+        setUnusedColumns(unusedCsvColumns(headers, usedHeaders));
         setParsedItems(items);
       },
       error: (err) => setParseError(err.message || "Failed to parse CSV"),
@@ -618,6 +638,7 @@ export function BulkUploadConversationItemsDialog({
         </div>
       </BulkUploadItemsPreviewShell>
       <UnknownItemNamesWarning names={unknownNames} />
+      <UnusedColumnsNote columns={unusedColumns} />
     </div>
   );
 

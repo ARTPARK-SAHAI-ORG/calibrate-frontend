@@ -140,6 +140,46 @@ describe("BulkUploadConversationItemsDialog", () => {
     expect(screen.getByText("Duplicate charge flow")).toBeInTheDocument();
   });
 
+  it("names a column the upload reads nothing from", async () => {
+    render(<BulkUploadConversationItemsDialog {...defaultProps()} />);
+    const csv = `name,transcript,Tone/valu
+"Card lost","[{""role"":""user"",""content"":""hi""}]","true"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/Nothing is read from "Tone\/valu"/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not name a column the upload reads under another title", async () => {
+    render(<BulkUploadConversationItemsDialog {...defaultProps()} />);
+    // "title" is read as the name and "conversation" as the transcript, so
+    // neither belongs in the note; only the made-up column does.
+    const csv = `title,conversation,Tone/valu
+"Card lost","[{""role"":""user"",""content"":""hi""}]","true"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    const note = screen.getByText(/Nothing is read from/);
+    expect(note).toHaveTextContent('"Tone/valu"');
+    expect(note).not.toHaveTextContent('"title"');
+    expect(note).not.toHaveTextContent('"conversation"');
+  });
+
+  it("shows no note when every column is read", async () => {
+    render(<BulkUploadConversationItemsDialog {...defaultProps()} />);
+    const csv = `name,description,transcript
+"Card lost","Lost card flow","[{""role"":""user"",""content"":""hi""}]"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Nothing is read from/)).not.toBeInTheDocument();
+  });
+
   it("pluralizes the item count", async () => {
     render(<BulkUploadConversationItemsDialog {...defaultProps()} />);
     const csv = `name,transcript

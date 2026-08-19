@@ -156,6 +156,47 @@ describe("BulkUploadSttItemsDialog", () => {
     expect(screen.getByText("Row A")).toBeInTheDocument();
   });
 
+  it("names the columns the upload reads nothing from", async () => {
+    render(<BulkUploadSttItemsDialog {...defaultProps()} />);
+    const csv = `name,reference_transcript,predicted_transcript,Tone/valu,notes
+"Greeting","Hello there","hello there","true","some note"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    const note = screen.getByText(/Nothing is read from/);
+    expect(note).toHaveTextContent('"Tone/valu"');
+    expect(note).toHaveTextContent('"notes"');
+    // It is a note, not a block: the upload still goes ahead.
+    expect(screen.getByRole("button", { name: "Upload item" })).toBeEnabled();
+  });
+
+  it("does not name a required column the CSV titles with an alias", async () => {
+    render(<BulkUploadSttItemsDialog {...defaultProps()} />);
+    const csv = `title,reference,prediction,notes
+"Row A","actual words","guessed words","some note"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    const note = screen.getByText(/Nothing is read from/);
+    expect(note).toHaveTextContent('"notes"');
+    expect(note).not.toHaveTextContent('"title"');
+    expect(note).not.toHaveTextContent('"reference"');
+    expect(note).not.toHaveTextContent('"prediction"');
+  });
+
+  it("shows no unused-column note when every column is read", async () => {
+    render(<BulkUploadSttItemsDialog {...defaultProps()} />);
+    const csv = `name,reference_transcript,predicted_transcript
+"Greeting","Hello there","hello there"`;
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Nothing is read from/)).not.toBeInTheDocument();
+  });
+
   it("pluralizes the item count", async () => {
     render(<BulkUploadSttItemsDialog {...defaultProps()} />);
     const csv = `name,reference_transcript,predicted_transcript
