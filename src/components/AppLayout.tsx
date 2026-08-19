@@ -30,7 +30,30 @@ type NavItem = {
 type NavSection = {
   title?: string;
   items: NavItem[];
+  /** Lets the reader fold this section away. The choice is remembered. */
+  collapsible?: boolean;
 };
+
+/** Titles of the sidebar sections the reader has folded away. */
+const COLLAPSED_SECTIONS_KEY = "calibrate:collapsed-nav-sections";
+
+/** The saved titles, or none when there is no choice yet, the saved value is
+ *  not a list of titles, or there is no browser (rendering on the server). */
+function savedCollapsedSections(): string[] {
+  if (typeof window === "undefined") return [];
+  // A browser set to block site data throws on both reading and writing here.
+  // Forgetting the choice is fine; taking the page down with it is not.
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(COLLAPSED_SECTIONS_KEY) || "[]",
+    );
+    return Array.isArray(parsed)
+      ? parsed.filter((title): title is string => typeof title === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 // The "Product tour" compass icon, shared by the sidebar nav item and the
 // profile-menu "Take a tour" entry so the two never drift apart.
@@ -139,7 +162,8 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Component Tests",
+    title: "Voice Evaluation",
+    collapsible: true,
     items: [
       {
         id: "stt",
@@ -157,15 +181,6 @@ const navSections: NavSection[] = [
               strokeLinejoin="round"
               d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
             />
-          </svg>
-        ),
-      },
-      {
-        id: "tests",
-        label: "LLM Tests",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 3h6v2h-1v4.5l4.5 7.5c.5.83.5 1.5-.17 2.17-.67.67-1.34.83-2.33.83H8c-1 0-1.67-.17-2.33-.83-.67-.67-.67-1.34-.17-2.17L10 9.5V5H9V3zm3 8.5L8.5 17h7L12 11.5z" />
           </svg>
         ),
       },
@@ -191,7 +206,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "End-to-End Tests",
+    title: "Conversation Simulation",
     items: [
       {
         id: "personas",
@@ -333,6 +348,21 @@ export function AppLayout({
   const [profileOpen, setProfileOpen] = useState(false);
   const [talkToUsOpen, setTalkToUsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("device");
+  const [collapsedSections, setCollapsedSections] = useState(
+    savedCollapsedSections,
+  );
+
+  const toggleSection = (title: string) => {
+    const next = collapsedSections.includes(title)
+      ? collapsedSections.filter((t) => t !== title)
+      : [...collapsedSections, title];
+    setCollapsedSections(next);
+    try {
+      window.localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(next));
+    } catch {
+      // Site data blocked: forget the choice rather than break the sidebar.
+    }
+  };
   const profileRef = useRef<HTMLDivElement>(null);
   const talkToUsRef = useRef<HTMLDivElement>(null);
 
@@ -548,84 +578,116 @@ export function AppLayout({
         {sidebarOpen && (
           <>
             <nav className="flex-1 overflow-y-auto py-3 px-3">
-              {navSections.map((section, index) => (
-                <div key={section.title || index} className="mb-5">
-                  {section.title && (
-                    <h3 className="px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {section.title}
-                    </h3>
-                  )}
-                  <ul className="space-y-1">
-                    {section.items.map((item) => (
-                      <li
-                        key={item.id}
-                        // The tour is desktop-only, so hide its launcher on phones.
-                        className={
-                          item.id === "guided-tour" ? "hidden md:block" : undefined
-                        }
-                      >
-                        {item.id === "guided-tour" ? (
-                          <button
-                            onClick={handleStartGuidedTour}
-                            data-tour="start-tour"
-                            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              {navSections.map((section, index) => {
+                const collapsed =
+                  !!section.collapsible &&
+                  !!section.title &&
+                  collapsedSections.includes(section.title);
+                return (
+                  <div key={section.title || index} className="mb-5">
+                    {section.title &&
+                      (section.collapsible ? (
+                        <button
+                          onClick={() => toggleSection(section.title!)}
+                          aria-expanded={!collapsed}
+                          className="w-full flex items-center gap-1 px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <svg
+                            className={`w-3 h-3 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
                           >
-                            {item.icon}
-                            {item.label}
-                          </button>
-                        ) : item.id === "tutorials" ? (
-                          <a
-                            href="/learn"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => {
-                              // Close sidebar on mobile when clicking external link
-                              if (window.innerWidth < 768 && sidebarOpen) {
-                                onSidebarToggle();
-                              }
-                            }}
-                            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                            />
+                          </svg>
+                          {section.title}
+                        </button>
+                      ) : (
+                        <h3 className="px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {section.title}
+                        </h3>
+                      ))}
+                    {!collapsed && (
+                      <ul className="space-y-1">
+                        {section.items.map((item) => (
+                          <li
+                            key={item.id}
+                            // The tour is desktop-only, so hide its launcher on phones.
+                            className={
+                              item.id === "guided-tour"
+                                ? "hidden md:block"
+                                : undefined
+                            }
                           >
-                            {item.icon}
-                            {item.label}
-                            <svg
-                              className="w-3 h-3 ml-auto text-muted-foreground"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                              />
-                            </svg>
-                          </a>
-                        ) : (
-                          <Link
-                            href={`/${item.id}`}
-                            onClick={() => {
-                              // Close sidebar on mobile when clicking nav link
-                              if (window.innerWidth < 768 && sidebarOpen) {
-                                onSidebarToggle();
-                              }
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                              activeItem === item.id
-                                ? "bg-accent text-accent-foreground"
-                                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                            }`}
-                          >
-                            {item.icon}
-                            {item.label}
-                          </Link>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                            {item.id === "guided-tour" ? (
+                              <button
+                                onClick={handleStartGuidedTour}
+                                data-tour="start-tour"
+                                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              >
+                                {item.icon}
+                                {item.label}
+                              </button>
+                            ) : item.id === "tutorials" ? (
+                              <a
+                                href="/learn"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  // Close sidebar on mobile when clicking external link
+                                  if (window.innerWidth < 768 && sidebarOpen) {
+                                    onSidebarToggle();
+                                  }
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              >
+                                {item.icon}
+                                {item.label}
+                                <svg
+                                  className="w-3 h-3 ml-auto text-muted-foreground"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                  />
+                                </svg>
+                              </a>
+                            ) : (
+                              <Link
+                                href={`/${item.id}`}
+                                onClick={() => {
+                                  // Close sidebar on mobile when clicking nav link
+                                  if (window.innerWidth < 768 && sidebarOpen) {
+                                    onSidebarToggle();
+                                  }
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                                  activeItem === item.id
+                                    ? "bg-accent text-accent-foreground"
+                                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                                }`}
+                              >
+                                {item.icon}
+                                {item.label}
+                              </Link>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
           </>
         )}
@@ -984,7 +1046,6 @@ export function AppLayout({
           <div className="w-full px-4 md:px-6 lg:px-8">{children}</div>
         </div>
       </main>
-
     </div>
   );
 }

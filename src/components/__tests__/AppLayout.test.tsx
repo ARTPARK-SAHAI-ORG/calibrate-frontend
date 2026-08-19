@@ -5,7 +5,9 @@ import { AppLayout } from "@/components/AppLayout";
 // without touching the network.
 jest.mock("../WorkspaceSwitcher", () => ({
   WorkspaceSwitcher: ({ collapsed }: { collapsed: boolean }) => (
-    <div data-testid={`workspace-switcher-${collapsed ? "collapsed" : "expanded"}`} />
+    <div
+      data-testid={`workspace-switcher-${collapsed ? "collapsed" : "expanded"}`}
+    />
   ),
 }));
 
@@ -54,7 +56,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function renderLayout(overrides: Partial<React.ComponentProps<typeof AppLayout>> = {}) {
+function renderLayout(
+  overrides: Partial<React.ComponentProps<typeof AppLayout>> = {},
+) {
   const onItemChange = jest.fn();
   const onSidebarToggle = jest.fn();
   render(
@@ -77,7 +81,9 @@ describe("AppLayout", () => {
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
-    expect(screen.getByTestId("workspace-switcher-expanded")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("workspace-switcher-expanded"),
+    ).toBeInTheDocument();
   });
 
   it("shows only a spinner while the workspace list is still loading", () => {
@@ -141,13 +147,19 @@ describe("AppLayout", () => {
 
   it("renders the collapsed rail when closed", () => {
     renderLayout({ sidebarOpen: false });
-    expect(screen.getByTestId("workspace-switcher-collapsed")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("workspace-switcher-collapsed"),
+    ).toBeInTheDocument();
   });
 
   it("shows the display name from localStorage when there is no session", () => {
     localStorage.setItem(
       "user",
-      JSON.stringify({ first_name: "Ada", last_name: "Lovelace", email: "ada@example.com" }),
+      JSON.stringify({
+        first_name: "Ada",
+        last_name: "Lovelace",
+        email: "ada@example.com",
+      }),
     );
     renderLayout();
     expect(screen.getByText("Page content")).toBeInTheDocument();
@@ -166,7 +178,9 @@ describe("AppLayout", () => {
 
   it("shows the Talk to us button in the collapsed rail", () => {
     renderLayout({ sidebarOpen: false });
-    expect(screen.getByRole("button", { name: "Talk to us" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Talk to us" }),
+    ).toBeInTheDocument();
   });
 
   it("links to the API keys tab from the profile dropdown", async () => {
@@ -177,6 +191,43 @@ describe("AppLayout", () => {
       "href",
       "/workspace-settings?tab=api-keys",
     );
+  });
+
+  it("does not offer LLM Tests in the sidebar", () => {
+    renderLayout();
+    expect(screen.queryByText("LLM Tests")).not.toBeInTheDocument();
+  });
+
+  it("folds the Voice Evaluation section away and remembers the choice", async () => {
+    const user = setupUser();
+    renderLayout();
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Voice Evaluation" }));
+    expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
+      JSON.stringify(["Voice Evaluation"]),
+    );
+  });
+
+  it("opens a folded section again and forgets the choice", async () => {
+    const user = setupUser();
+    localStorage.setItem(
+      "calibrate:collapsed-nav-sections",
+      JSON.stringify(["Voice Evaluation"]),
+    );
+    renderLayout();
+    expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Voice Evaluation" }));
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe("[]");
+  });
+
+  it("ignores a saved value that is not a list of sections", () => {
+    localStorage.setItem("calibrate:collapsed-nav-sections", "not json");
+    renderLayout();
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
   });
 
   it("renders custom header and header actions when provided", () => {
