@@ -15,6 +15,10 @@ import {
   HUMAN_SCORES_HEADING,
 } from "@/components/human-labelling/EvaluatorScoreCards";
 
+/** Nothing scored yet. A constant so the row is not handed a new array on
+ * every render. */
+const NO_SCORES: never[] = [];
+
 export default function PublicAnnotationJobViewerPage() {
   const params = useParams();
   const [meta, setMeta] = useState<AnnotationJobMeta | null>(null);
@@ -82,11 +86,17 @@ export default function PublicAnnotationJobViewerPage() {
         )}
 
         {meta && (
+          // Named after the person who labelled the job, the same as the
+          // signed-in job page. The scores and the line explaining them
+          // wait until labelling has started.
           <EvaluatorScoreCards
-            heading={HUMAN_SCORES_HEADING}
-            description={HUMAN_SCORES_DESCRIPTION}
-            cards={meta.humanScores}
+            heading={meta.annotator.name || HUMAN_SCORES_HEADING}
+            description={
+              meta.jobStatus === "pending" ? "" : HUMAN_SCORES_DESCRIPTION
+            }
+            cards={meta.jobStatus === "pending" ? NO_SCORES : meta.humanScores}
             linkEvaluators={false}
+            showWhenEmpty
             singleRow
           />
         )}
