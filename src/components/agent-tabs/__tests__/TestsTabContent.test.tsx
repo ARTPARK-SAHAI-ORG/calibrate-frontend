@@ -462,13 +462,15 @@ describe("TestsTabContent — empty states", () => {
     expect(screen.queryByText("Add test")).not.toBeInTheDocument();
   });
 
-  it("shows the Add-test button in the empty state when the library has tests", async () => {
+  it("does not offer Add test even when the library has tests", async () => {
     state.allTests = [libraryTest];
     renderComponent();
     await screen.findByText("No tests attached");
-    await screen.findByText("Add test");
+    // Attaching an existing test is hidden for now: new tests come from
+    // Create test and Bulk upload.
+    expect(screen.queryByText("Add test")).not.toBeInTheDocument();
+    expect(screen.getByText("Create test")).toBeInTheDocument();
   });
-
 });
 
 describe("TestsTabContent — populated table", () => {
@@ -520,7 +522,8 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
     expect(screen.getByText("Remove")).toBeInTheDocument();
-    expect(screen.getByText("Delete")).toBeInTheDocument();
+    // Deleting from the library is hidden for now; Remove detaches only.
+    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Clear"));
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
@@ -842,7 +845,9 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await release();
     await screen.findByTestId("test-runner-dialog");
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("button", { name: "Run" }),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -973,24 +978,17 @@ describe("TestsTabContent — delete flows", () => {
     expect(deleteCall).toBeTruthy();
   });
 
-  it("permanently deletes a single test via the dialog checkbox", async () => {
+  it("does not offer to delete a single test from the library", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getAllByTitle("Delete test")[0]);
     await screen.findByTestId("delete-dialog");
-    // Toggle the "delete permanently" checkbox rendered inside extraContent.
-    await user.click(screen.getByRole("checkbox"));
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
-    await user.click(screen.getByText("ConfirmDelete"));
-
-    await waitFor(() => {
-      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).includes("/agent-tests/bulk-delete-tests"),
-      );
-      expect(bulkCall).toBeTruthy();
-    });
+    // The window only takes the test off this agent now: no checkbox to turn
+    // it into a permanent library delete.
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
   });
 
   it("bulk-removes selected tests", async () => {
@@ -1009,27 +1007,6 @@ describe("TestsTabContent — delete flows", () => {
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
     );
-  });
-
-  it("bulk-deletes selected tests permanently", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
-    await screen.findByTestId("delete-dialog");
-    expect(screen.getByTestId("delete-title")).toHaveTextContent(
-      "Delete tests permanently",
-    );
-    await user.click(screen.getByText("ConfirmDelete"));
-
-    await waitFor(() => {
-      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).includes("/agent-tests/bulk-delete-tests"),
-      );
-      expect(bulkCall).toBeTruthy();
-    });
   });
 
   it("closes the delete dialog via Cancel/Close", async () => {
@@ -1125,42 +1102,6 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("BulkUploadSuccess"));
     await user.click(screen.getByText("CloseBulkUpload"));
     expect(screen.queryByTestId("bulk-upload-modal")).not.toBeInTheDocument();
-  });
-
-  it("attaches existing tests via the Add-test dropdown", async () => {
-    state.allTests = [libraryTest];
-    const user = setupUser();
-    renderComponent();
-    await screen.findByText("No tests attached");
-
-    await user.click(await screen.findByText("Add test"));
-    // dropdown search input appears
-    await screen.findByPlaceholderText("Search tests");
-    await user.click(await screen.findByText("Library only test"));
-    await user.click(screen.getByText("Add 1 test"));
-
-    await waitFor(() => {
-      const postCall = (global.fetch as jest.Mock).mock.calls.find(
-        (c: any[]) =>
-          c[1]?.method === "POST" && String(c[0]).endsWith("/agent-tests"),
-      );
-      expect(postCall).toBeTruthy();
-    });
-  });
-
-  it("select-all in the dropdown selects every available test", async () => {
-    state.allTests = [
-      libraryTest,
-      { ...libraryTest, uuid: "t4", name: "Second lib" },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findByText("No tests attached");
-
-    await user.click(await screen.findByText("Add test"));
-    await screen.findByText("Select all");
-    await user.click(screen.getByText("Select all"));
-    expect(screen.getByText("Add 2 tests")).toBeInTheDocument();
   });
 });
 

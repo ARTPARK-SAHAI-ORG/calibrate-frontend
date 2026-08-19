@@ -237,7 +237,7 @@ export function RunsTabContent({
     value === null ? "—" : String(value);
 
   return (
-    <div className="space-y-3 py-4 md:py-6">
+    <div className="flex flex-col space-y-4 md:space-y-6">
       <div className="flex flex-wrap gap-1.5">
         {RESULT_FILTERS.map((f) => (
           <button

@@ -74,19 +74,6 @@ type TestDetail = TestData & {
   }> | null;
 };
 
-type TestRunResult = {
-  name?: string; // Test name (used in in-progress responses)
-  passed: boolean | null; // null means test is still running
-  status?: string; // "passed" | "failed" | ... when present
-  error?: string | null; // set when the test errored out before evaluating
-  output?: Record<string, any> | null;
-  test_case?: {
-    name?: string;
-    history?: { role: string; content: string }[];
-    evaluation?: Record<string, any>;
-  } | null;
-};
-
 /**
  * Square check indicator shared by every test checkbox — the attach-existing
  * dropdown (select-all + rows) and the agent tests table (select-all + desktop
@@ -155,6 +142,10 @@ type TestsTabContentProps = {
   // up rather than showing a stale list.
   onRunStarted?: () => void;
 };
+
+// Attaching a test that already exists is hidden for now: new tests come from
+// Create test and Bulk upload. Flip this to true to bring the control back.
+const SHOW_ADD_EXISTING_TEST = false;
 
 export function TestsTabContent({
   agentUuid,
@@ -1569,7 +1560,7 @@ export function TestsTabContent({
 
           {/* Right group: add-more-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            {renderAddTestControl()}
+            {SHOW_ADD_EXISTING_TEST && renderAddTestControl()}
             {/* Create test / Bulk upload (new tests, auto-attached to this agent) */}
             {renderNewTestButtons()}
           </div>
@@ -1648,7 +1639,9 @@ export function TestsTabContent({
                 empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
                 leave it visible — clicking it re-fetches via the
                 dropdown's own effect. */}
-            {(allTests.length > 0 || (allTestsAttempted && !allTestsFetched)) &&
+            {SHOW_ADD_EXISTING_TEST &&
+              (allTests.length > 0 ||
+                (allTestsAttempted && !allTestsFetched)) &&
               renderAddTestControl()}
             {renderNewTestButtons()}
           </div>
@@ -1680,8 +1673,9 @@ export function TestsTabContent({
                 empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
                 leave it visible — clicking it re-fetches via the
                 dropdown's own effect. */}
-                {(allTests.length > 0 ||
-                  (allTestsAttempted && !allTestsFetched)) &&
+                {SHOW_ADD_EXISTING_TEST &&
+                  (allTests.length > 0 ||
+                    (allTestsAttempted && !allTestsFetched)) &&
                   renderAddTestControl()}
                 {renderNewTestButtons()}
               </div>
@@ -1777,13 +1771,6 @@ export function TestsTabContent({
                     className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
                   >
                     Remove
-                  </button>
-                  <button
-                    onClick={() => openBulkDeleteDialog("permanent")}
-                    title="Permanently delete from your test library"
-                    className="h-8 px-3 rounded-md text-sm font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
-                  >
-                    Delete
                   </button>
                   <CompareModelsButton
                     size="bulk"
@@ -2205,29 +2192,6 @@ export function TestsTabContent({
         // submitting by stripping a trailing 'e', which only works on one-token labels.
         confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
         isDeleting={isDeleting}
-        extraContent={
-          // Checkbox only on single-test deletes. Bulk deletes still pick their
-          // mode from the two top-bar buttons.
-          testToDelete && testsToDeleteBulk.length === 0 ? (
-            <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={deleteMode === "permanent"}
-                onChange={(e) =>
-                  setDeleteMode(e.target.checked ? "permanent" : "remove")
-                }
-                disabled={isDeleting}
-                className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
-              />
-              <span className="text-sm text-foreground">
-                Also delete this test permanently from my test library
-                <span className="block text-xs text-muted-foreground mt-0.5">
-                  Removes the test from every agent that uses it
-                </span>
-              </span>
-            </label>
-          ) : null
-        }
       />
 
       {/* Create/edit test dialog. In create mode, submits via POST
