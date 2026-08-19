@@ -357,11 +357,6 @@ export function BulkUploadItemsPreviewShell({
           </span>
         )}
       </div>
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[20rem]">
-          <div className="min-w-max">{children}</div>
-        </div>
-      </div>
       {annotatedCheck &&
         annotatedCheck.existing_without_annotations.length > 0 && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-foreground">
@@ -391,6 +386,11 @@ export function BulkUploadItemsPreviewShell({
             </span>
           </div>
         )}
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
