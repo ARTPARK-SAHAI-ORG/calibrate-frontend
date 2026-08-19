@@ -828,8 +828,8 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
     expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
   });
 
-  it("shows 'Reasoning (required)' when reasoningMode is required", () => {
-    render(
+  it("marks reasoning with a red star when it is required", () => {
+    const { container } = render(
       <EvaluatorVerdictCard
         mode="write"
         name="Eval"
@@ -837,13 +837,13 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         reasoningMode="required"
       />,
     );
-    expect(screen.getByText("Reasoning (required)")).toBeInTheDocument();
     expect(screen.queryByText("Reasoning (optional)")).not.toBeInTheDocument();
+    expect(container.querySelector(".text-red-500")?.textContent).toBe("*");
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  it("drops the '(required)' suffix while disabled, same as optional does", () => {
-    render(
+  it("drops the star while disabled, same as the optional wording", () => {
+    const { container } = render(
       <EvaluatorVerdictCard
         mode="write"
         name="Eval"
@@ -853,7 +853,40 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
       />,
     );
     expect(screen.getByText("Reasoning")).toBeInTheDocument();
-    expect(screen.queryByText("Reasoning (required)")).not.toBeInTheDocument();
+    expect(container.querySelector(".text-red-500")).toBeNull();
+  });
+
+  it("turns the box red and says what to do when reasoning is missing", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="required"
+        reasoningMissing
+      />,
+    );
+    expect(screen.getByRole("textbox").className).toContain("border-red-500");
+    expect(
+      screen.getByText("Add your reasoning for this score"),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the box unmarked until a save is refused", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        reasoningMode="required"
+      />,
+    );
+    expect(screen.getByRole("textbox").className).not.toContain(
+      "border-red-500",
+    );
+    expect(
+      screen.queryByText("Add your reasoning for this score"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders no reasoning box when reasoningMode is hidden", () => {

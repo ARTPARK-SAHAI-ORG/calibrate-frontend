@@ -69,14 +69,14 @@ function SettingChoice<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <fieldset className="space-y-2" disabled={disabled}>
+    <fieldset className="space-y-1" disabled={disabled}>
       <legend className="text-sm font-medium">{label}</legend>
       <p className="text-xs text-muted-foreground">{help}</p>
-      <div className="space-y-2 pt-1">
+      <div className="pt-1">
         {options.map((option) => (
           <label
             key={option.value}
-            className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+            className="flex items-center gap-3 py-1 cursor-pointer select-none"
           >
             <input
               type="radio"
@@ -162,7 +162,9 @@ export function AssignAnnotatorsDialog({
   const evaluatorIdsKey = evaluators.map((ev) => ev.uuid).join(",");
   useEffect(() => {
     if (!isOpen) return;
-    setPickedEvaluators(new Set(evaluatorIdsKey ? evaluatorIdsKey.split(",") : []));
+    setPickedEvaluators(
+      new Set(evaluatorIdsKey ? evaluatorIdsKey.split(",") : []),
+    );
   }, [isOpen, evaluatorIdsKey]);
 
   if (!isOpen) return null;
@@ -368,7 +370,7 @@ export function AssignAnnotatorsDialog({
             </div>
 
             {showEvaluatorChoice && (
-              <div className="space-y-2 md:col-span-2 flex flex-col min-h-0">
+              <div className="space-y-2 flex flex-col min-h-0">
                 <p className="text-xs font-medium text-muted-foreground">
                   Labels
                 </p>
@@ -406,7 +408,7 @@ export function AssignAnnotatorsDialog({
                     </span>
                   </label>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
+                <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
                   {evaluators.map((ev) => {
                     const checked = pickedEvaluators.has(ev.uuid);
                     return (
@@ -436,39 +438,45 @@ export function AssignAnnotatorsDialog({
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Outside the grid, so it runs the full width in the wide layout. */}
-          <div className="mt-6 pt-6 border-t border-border space-y-4">
-            <p className="text-xs font-medium text-muted-foreground">
-              Settings
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
-              <SettingChoice
-                label="Comments on each item"
-                help="The box where annotators write notes about an item."
-                name="comments-on-each-item"
-                value={commentsEnabled ? "show" : "hide"}
-                options={[
-                  { value: "show", label: "Show" },
-                  { value: "hide", label: "Do not show" },
-                ]}
-                disabled={submitting}
-                onChange={(v) => setCommentsEnabled(v === "show")}
-              />
-              <SettingChoice<ReasoningMode>
-                label="Reasoning on each label"
-                help="The box where annotators explain the score they gave."
-                name="reasoning-on-each-label"
-                value={reasoningMode}
-                options={[
-                  { value: "optional", label: "Optional" },
-                  { value: "required", label: "Required" },
-                  { value: "hidden", label: "Do not show" },
-                ]}
-                disabled={submitting}
-                onChange={setReasoningMode}
-              />
+            {/* Third column beside annotators and labels. In the narrow
+                layout there is no grid, so it stacks under the annotators
+                with a line above it. */}
+            <div
+              className={`space-y-4 flex flex-col min-h-0 ${
+                showEvaluatorChoice ? "" : "mt-6 pt-6 border-t border-border"
+              }`}
+            >
+              <p className="text-xs font-medium text-muted-foreground">
+                Settings
+              </p>
+              <div className="space-y-5">
+                <SettingChoice
+                  label="Comments on each item"
+                  help="The box where annotators write notes about an item."
+                  name="comments-on-each-item"
+                  value={commentsEnabled ? "show" : "hide"}
+                  options={[
+                    { value: "show", label: "Show" },
+                    { value: "hide", label: "Do not show" },
+                  ]}
+                  disabled={submitting}
+                  onChange={(v) => setCommentsEnabled(v === "show")}
+                />
+                <SettingChoice<ReasoningMode>
+                  label="Reasoning on each label"
+                  help="The box where annotators explain the score they gave."
+                  name="reasoning-on-each-label"
+                  value={reasoningMode}
+                  options={[
+                    { value: "optional", label: "Optional" },
+                    { value: "required", label: "Required" },
+                    { value: "hidden", label: "Do not show" },
+                  ]}
+                  disabled={submitting}
+                  onChange={setReasoningMode}
+                />
+              </div>
             </div>
           </div>
 

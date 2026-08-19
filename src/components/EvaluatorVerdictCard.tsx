@@ -100,6 +100,9 @@ type WriteProps = CommonProps & {
   disabled?: boolean;
   /** How the reasoning box behaves on this job. Absent means optional, which is how every job created before this behaves. */
   reasoningMode?: "optional" | "required" | "hidden";
+  /** Marks the reasoning box red, after a save was refused because it is
+   * empty on a job that requires reasoning. */
+  reasoningMissing?: boolean;
 };
 
 export type EvaluatorVerdictCardProps = ReadProps | WriteProps;
@@ -262,6 +265,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               onChange={(s) => props.onCommentChange?.(s)}
               disabled={props.disabled}
               required={props.reasoningMode === "required"}
+              missing={props.reasoningMissing}
             />
           )}
         </>
@@ -338,8 +342,8 @@ function ReadVerdictPill({
   if (outputType === "binary") {
     if (match === null || match === undefined) return null;
     const label = match
-      ? (trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL)
-      : (falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL);
+      ? trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL
+      : falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL;
     return (
       <span
         className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
@@ -628,16 +632,25 @@ function WriteReasoning({
   onChange,
   disabled,
   required,
+  missing,
 }: {
   value: string;
   onChange: (s: string) => void;
   disabled?: boolean;
   required?: boolean;
+  missing?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
-        Reasoning {disabled ? "" : required ? "(required)" : "(optional)"}
+        Reasoning{" "}
+        {disabled ? (
+          ""
+        ) : required ? (
+          <span className="text-red-500">*</span>
+        ) : (
+          "(optional)"
+        )}
       </div>
       <textarea
         value={value}
@@ -645,8 +658,15 @@ function WriteReasoning({
         disabled={disabled}
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
-        className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60"
+        className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
+          missing ? "border-red-500" : "border-border"
+        }`}
       />
+      {missing && (
+        <p className="text-xs text-red-500">
+          Add your reasoning for this score
+        </p>
+      )}
     </div>
   );
 }
