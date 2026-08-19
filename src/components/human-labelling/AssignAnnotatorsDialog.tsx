@@ -236,7 +236,7 @@ export function AssignAnnotatorsDialog({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-5xl" : "max-w-md"
+          showEvaluatorChoice ? "max-w-5xl" : "max-w-3xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -269,22 +269,18 @@ export function AssignAnnotatorsDialog({
         </div>
         <div className="p-4 md:p-6 overflow-y-auto">
           <div
-            className={
-              showEvaluatorChoice
-                ? "grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-4"
-                : ""
-            }
+            className={`grid grid-cols-1 gap-x-10 gap-y-4 ${
+              showEvaluatorChoice ? "md:grid-cols-3" : "md:grid-cols-2"
+            }`}
           >
             <div
               className={`space-y-2 flex flex-col min-h-0 ${
                 noAnnotators ? "-my-2" : ""
               }`}
             >
-              {showEvaluatorChoice && (
-                <p className="text-xs font-medium text-muted-foreground">
-                  Annotators
-                </p>
-              )}
+              <p className="text-xs font-medium text-muted-foreground">
+                Annotators
+              </p>
               <AddAnnotatorInline
                 accessToken={accessToken}
                 // Disabled until the list has loaded, otherwise the in-flight
@@ -439,14 +435,9 @@ export function AssignAnnotatorsDialog({
               </div>
             )}
 
-            {/* Third column beside annotators and labels. In the narrow
-                layout there is no grid, so it stacks under the annotators
-                with a line above it. */}
-            <div
-              className={`space-y-4 flex flex-col min-h-0 ${
-                showEvaluatorChoice ? "" : "mt-6 pt-6 border-t border-border"
-              }`}
-            >
+            {/* Always its own column, beside annotators (and labels, when
+                the task has more than one label to pick between). */}
+            <div className="space-y-4 flex flex-col min-h-0">
               <p className="text-xs font-medium text-muted-foreground">
                 Settings
               </p>
