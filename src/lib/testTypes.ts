@@ -62,9 +62,53 @@ export function getUnitTestBreakdown(
   const isPassed = (r: UnitTestResultLike) =>
     r.passed === true || r.status === "passed";
   const isErrored = (r: UnitTestResultLike) =>
-    !!r.error || r.status === "error" || r.passed === null || r.passed === undefined;
+    !!r.error ||
+    r.status === "error" ||
+    r.passed === null ||
+    r.passed === undefined;
   const passed = results.filter((r) => isPassed(r)).length;
   const errored = results.filter((r) => !isPassed(r) && isErrored(r)).length;
   const failed = results.length - passed - errored;
   return { passed, failed, errored };
+}
+
+/** A run row as the runs list returns it, trimmed to what the buckets need. */
+export type RunStatusLike = {
+  status: string;
+  failed?: number | null;
+  error?: boolean;
+};
+
+/** The run has not finished yet. */
+export function isRunInProgress(run: RunStatusLike): boolean {
+  return (
+    run.status === "pending" ||
+    run.status === "queued" ||
+    run.status === "in_progress"
+  );
+}
+
+/** The run itself broke, so it has no results to read. */
+export function isRunErrored(run: RunStatusLike): boolean {
+  return run.status === "failed" || !!run.error;
+}
+
+/** The run finished and every test in it passed. */
+export function isRunAllPassed(run: RunStatusLike): boolean {
+  return (
+    run.status === "done" &&
+    !run.error &&
+    (run.failed === null || run.failed === undefined || run.failed === 0)
+  );
+}
+
+/** The run finished and at least one test in it did not pass. */
+export function isRunAnyFailed(run: RunStatusLike): boolean {
+  return (
+    run.status === "done" &&
+    !run.error &&
+    run.failed !== null &&
+    run.failed !== undefined &&
+    run.failed > 0
+  );
 }

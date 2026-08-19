@@ -12,6 +12,7 @@ import {
   ToolsTabContent,
   // DataExtractionTabContent, // TODO: temporarily disabled — extraction UI removed for now
   TestsTabContent,
+  RunsTabContent,
   TracesTabContent,
   EvaluatorsTabContent,
   SettingsTabContent,
@@ -87,6 +88,7 @@ type TabType =
   | "tools"
   | "data-extraction"
   | "tests"
+  | "runs"
   | "traces"
   | "evaluators"
   | "settings";
@@ -97,6 +99,7 @@ const tabLabels: Record<TabType, string> = {
   tools: "Tools",
   "data-extraction": "Data extraction",
   tests: "Tests",
+  runs: "Runs",
   traces: "Traces",
   evaluators: "Evaluators",
   settings: "Settings",
@@ -108,6 +111,7 @@ const calibrateTabs: TabType[] = [
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
   "evaluators",
   "tests",
+  "runs",
   "traces",
   "settings",
 ];
@@ -115,6 +119,7 @@ const connectionTabs: TabType[] = [
   "connection",
   "evaluators",
   "tests",
+  "runs",
   "traces",
   "settings",
 ];
@@ -144,8 +149,11 @@ export function AgentDetail({
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureResponse } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureResponse,
+  } = usePageErrorState();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   // Keep-alive: track which tabs have been opened. Each tab is mounted the
   // first time it's opened and then hidden (not unmounted) when switching
@@ -169,6 +177,10 @@ export function AgentDetail({
   // Bumped when the Traces tab turns traces into tests, so the Tests tab shows
   // them even when it was already open earlier in this visit.
   const [testsReloadKey, setTestsReloadKey] = useState(0);
+
+  // Bumped when a run starts on the Tests tab, so the Runs tab shows it even
+  // when it was already open earlier in this visit.
+  const [runsReloadKey, setRunsReloadKey] = useState(0);
 
   // Name editing dialog state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
@@ -244,9 +256,9 @@ export function AgentDetail({
   const [showSaveToast, setShowSaveToast] = useState(false);
   // Resolves to true when the save landed. Duplicating waits on this so the
   // copy carries what is on screen, not the older version on the server.
-  const saveRef = useRef<
-    (options?: { silent?: boolean }) => Promise<boolean>
-  >(async () => true);
+  const saveRef = useRef<(options?: { silent?: boolean }) => Promise<boolean>>(
+    async () => true,
+  );
   const isSavingRef = useRef(false);
 
   // Tracks the verified state of the connection agent at the moment data was
@@ -1296,6 +1308,18 @@ export function AgentDetail({
                 }))
               }
               onGoToConnectionSettings={() => performTabSwitch("connection")}
+              onRunStarted={() => setRunsReloadKey((k) => k + 1)}
+            />
+          </div>
+        )}
+
+        {/* Runs Tab Content */}
+        {shouldRenderTab("runs") && (
+          <div className={activeTab === "runs" ? undefined : "hidden"}>
+            <RunsTabContent
+              key={runsReloadKey}
+              agentUuid={agentUuid}
+              agentName={agent.name}
             />
           </div>
         )}
@@ -1314,7 +1338,10 @@ export function AgentDetail({
         {/* Evaluators Tab Content */}
         {shouldRenderTab("evaluators") && (
           <div className={activeTab === "evaluators" ? undefined : "hidden"}>
-            <EvaluatorsTabContent agentUuid={agentUuid} agentName={agent.name} />
+            <EvaluatorsTabContent
+              agentUuid={agentUuid}
+              agentName={agent.name}
+            />
           </div>
         )}
 
@@ -1337,7 +1364,9 @@ export function AgentDetail({
           agentUuid={agentUuid}
           agentName={agent.name}
           onClose={() => setIsDuplicateDialogOpen(false)}
-          onDuplicated={(newAgentUuid) => router.push(`/agents/${newAgentUuid}`)}
+          onDuplicated={(newAgentUuid) =>
+            router.push(`/agents/${newAgentUuid}`)
+          }
           // The copy is made from the agent stored on the server, so save what
           // is on screen first.
           onBeforeDuplicate={() => saveRef.current({ silent: true })}

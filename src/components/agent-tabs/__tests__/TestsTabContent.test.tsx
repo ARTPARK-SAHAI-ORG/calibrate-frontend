@@ -469,28 +469,6 @@ describe("TestsTabContent — empty states", () => {
     await screen.findByText("Add test");
   });
 
-  it("shows the with-past-runs empty variant and the past runs panel", async () => {
-    state.pastRuns = [
-      {
-        uuid: "run-1",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 3,
-        passed: 3,
-        failed: 0,
-        results: null,
-      },
-    ];
-    renderComponent();
-    await screen.findByText("No tests attached");
-    expect(
-      screen.getByText(/doesn't have any tests linked right now/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Past runs")).toBeInTheDocument();
-    expect(screen.getByText("3 tests")).toBeInTheDocument();
-  });
 });
 
 describe("TestsTabContent — populated table", () => {
@@ -1212,234 +1190,19 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
   });
 
-  it("adds an optimistic run when a benchmark is created", async () => {
+  it("opens the run dialog and tells the parent a run started", async () => {
     state.agentTests = [responseTest];
+    const onRunStarted = jest.fn();
     const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByTestId("compare-header"));
-    await screen.findByTestId("benchmark-dialog");
-    await user.click(screen.getByText("TriggerBenchmarkCreated"));
-    // A benchmark run row appears in the past runs list. The optimistic run
-    // has no model_results yet, so it renders "0 models".
-    await screen.findByText("0 models");
-  });
-
-  it("adds an optimistic run as soon as a test run is created", async () => {
-    state.agentTests = [responseTest];
-    const user = setupUser();
-    renderComponent();
+    renderComponent({ onRunStarted });
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
-    // The pending row is added by the parent when the POST returns, before
-    // (and independently of) the dialog reporting anything back.
-    await screen.findByText("Running");
+    // The runs list lives in the Runs tab now, so this tab only opens the
+    // window on the new run and lets the parent refresh that tab.
     await screen.findByTestId("test-runner-dialog");
+    expect(onRunStarted).toHaveBeenCalled();
   });
-
-  it("renders past-run status pills (breakdown, error, complete)", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-breakdown",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 3,
-        passed: 1,
-        failed: 1,
-        results: [
-          { passed: true },
-          { passed: false },
-          { passed: null, status: "error", error: "boom" },
-        ],
-      },
-      {
-        uuid: "run-bench-failed",
-        name: "Bench",
-        status: "failed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }, { model: "b" }],
-      },
-    ];
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    expect(screen.getByText("1 Success")).toBeInTheDocument();
-    expect(screen.getByText("1 Fail")).toBeInTheDocument();
-    expect(screen.getByText("1 Error")).toBeInTheDocument();
-    expect(screen.getByText("Error")).toBeInTheDocument();
-    expect(screen.getByText("2 models")).toBeInTheDocument();
-  });
-
-  it("opens the unit-test results dialog when a past run row is clicked", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-unit",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 2,
-        passed: 2,
-        failed: 0,
-        results: [
-          { passed: true, test_case: { name: "A" } },
-          { passed: true, test_case: { name: "B" } },
-        ],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    // agentTests has 1 test ("1 test" count), so the run row's "2 tests"
-    // label is unambiguous.
-    await user.click(screen.getByText("2 tests"));
-    await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
-  });
-
-  it("opens the benchmark results dialog when a benchmark run row is clicked", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-bench",
-        name: "Bench",
-        status: "completed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("1 model"));
-    await screen.findByTestId("benchmark-results-dialog");
-  });
-
-  it("switches to the new run and prepends its row when the dialog reports a rerun (onNewRun)", async () => {
-    // The dialog now creates the rerun itself and hands the parent the new run
-    // id + the tests it ran; the parent shows the pending row and re-points the
-    // dialog at that run.
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-unit",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 2,
-        passed: 2,
-        failed: 0,
-        results: [
-          { passed: true, test_case: { name: "A" } },
-          { passed: true, test_case: { name: "B" } },
-        ],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("2 tests"));
-    await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
-    expect(screen.queryByText("Running")).not.toBeInTheDocument();
-
-    await act(async () => {
-      testRunnerProps.onNewRun("task-rerun", ["t1"]);
-    });
-
-    // Same single dialog, now viewing the new run, plus a pending row for it.
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
-      "task-rerun",
-    );
-    await screen.findByText("Running");
-  });
-
-  it("reruns a benchmark: opens a direct benchmark dialog with the given models, no picker", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-bench",
-        name: "Bench",
-        status: "completed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("1 model"));
-    await screen.findByTestId("benchmark-results-dialog");
-
-    await act(async () => {
-      benchmarkResultsProps.onRerun(
-        ["gpt-4", "claude"],
-        ["tu-1", "tu-2"],
-        ["A", "B"],
-      );
-    });
-
-    await screen.findByTestId("benchmark-results-dialog");
-    // The direct-rerun instance carries the models/test subset/testNames and no
-    // taskId, so it POSTs a fresh benchmark rather than viewing an existing one.
-    expect(benchmarkResultsProps.taskId).toBeUndefined();
-    expect(benchmarkResultsProps.models).toEqual(["gpt-4", "claude"]);
-    expect(benchmarkResultsProps.testUuids).toEqual(["tu-1", "tu-2"]);
-    expect(benchmarkResultsProps.testNames).toEqual(["A", "B"]);
-    expect(typeof benchmarkResultsProps.onBenchmarkCreated).toBe("function");
-  });
-
-  it("polls a pending run and updates its status", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-pending",
-        name: "",
-        status: "pending",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 1,
-        passed: null,
-        failed: null,
-        results: [{ passed: null }],
-      },
-    ];
-    state.pollUnit = {
-      status: "completed",
-      total_tests: 1,
-      passed: 1,
-      failed: 0,
-      results: [{ passed: true }],
-    };
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-    // The poll runs on the POLLING_INTERVAL_MS (3s) interval and flips the
-    // pending run to completed, surfacing the per-test breakdown.
-    await screen.findByText("1 Success", {}, { timeout: 5000 });
-  }, 10000);
 });
 
 describe("TestsTabContent — connection agent", () => {
