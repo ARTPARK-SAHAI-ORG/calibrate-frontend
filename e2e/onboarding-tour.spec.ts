@@ -421,10 +421,11 @@ const STEPS: { title: string; auto?: boolean }[] = [
   { title: "Build or connect" },
   { title: "Give it instructions" },
   { title: "Save your work" },
-  { title: "Add an evaluator" },
-  { title: "Choose what to check" },
+  { title: "Meet the evaluators" },
+  { title: "Already added for you" },
   { title: "Add another check" },
-  { title: "Add them to your agent" },
+  { title: "Pick it in the list" },
+  { title: "Add it to your agent" },
   { title: "Create your first test" },
   { title: "The scenario" },
   { title: "How your test is graded" },
@@ -524,13 +525,17 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
           page.locator('[data-tour="agent-system-prompt"]'),
         ).toHaveValue(/community health clinic/i, { timeout: 10000 });
       }
-      if (step.title === "Add another check") {
-        // The previous card's action ticked Correctness in the picker.
+      if (step.title === "Already added for you") {
+        // Correctness is on the agent already — the tour points at its card
+        // in the tab rather than creating or ticking anything.
+        await expect(
+          page.locator('[data-evaluator-name="Correctness"]'),
+        ).toBeVisible({ timeout: 15000 });
+      }
+      if (step.title === "Add it to your agent") {
+        // The previous card's action ticked the second evaluator.
         const dialog = page.locator('[data-tour="add-evaluators-dialog"]');
         await expect(dialog).toBeVisible();
-        await expect(
-          dialog.getByRole("checkbox", { name: /^Select Correctness/ }),
-        ).toBeChecked();
         // Picker steps stay interactive so the reader can scroll the list.
         await expect(dialog).not.toHaveClass(/driver-no-interaction/);
       }

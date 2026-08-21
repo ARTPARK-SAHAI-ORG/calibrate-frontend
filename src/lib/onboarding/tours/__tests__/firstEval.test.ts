@@ -100,19 +100,24 @@ describe("buildFirstEvalTour", () => {
     expect(tour.steps[0].description).toContain("catch issues before deploy");
   });
 
-  it("includes the second-evaluator step (named) only when one is available", () => {
+  it("includes the add-a-second-evaluator steps (named) only when one is available", () => {
     const two = titles(TWO);
     expect(two).toContain("Add another check");
-    expect(two).toContain("Add them to your agent");
+    expect(two).toContain("Pick it in the list");
+    expect(two).toContain("Add it to your agent");
     // The second evaluator is named in the step copy.
     const addAnother = build(TWO).steps.find(
       (s) => s.title === "Add another check",
     );
     expect(addAnother?.description).toContain("Reply Conciseness");
 
+    // With no second evaluator available, the tour shows the already-attached
+    // Correctness and adds nothing.
     const one = titles(ONE);
+    expect(one).toContain("Already added for you");
     expect(one).not.toContain("Add another check");
-    expect(one).toContain("Add it to your agent");
+    expect(one).not.toContain("Pick it in the list");
+    expect(one).not.toContain("Add it to your agent");
   });
 
   it("never claims multiple dimensions in the grading step", () => {
@@ -125,21 +130,22 @@ describe("buildFirstEvalTour", () => {
     }
   });
 
-  it("names Correctness by its resolved name in the pick step (rename-safe)", () => {
+  it("names Correctness by its resolved name, and anchors its card (rename-safe)", () => {
     const renamed = build({
       correctnessName: "Answer Accuracy",
       secondEvaluatorName: null,
     });
-    const pick = renamed.steps.find((s) => s.title === "Choose what to check");
-    expect(pick?.description).toContain("Answer Accuracy");
+    const shown = renamed.steps.find(
+      (s) => s.title === "Already added for you",
+    );
+    expect(shown?.description).toContain("Answer Accuracy");
+    // Points at that evaluator's own card in the tab.
+    expect(shown?.anchor).toBe('[data-evaluator-name="Answer Accuracy"]');
   });
 
-  it("still builds when Correctness was deleted (recreated silently)", () => {
-    const deleted = build({ correctnessName: null, secondEvaluatorName: null });
-    const titles = deleted.steps.map((s) => s.title);
-    expect(titles).toContain("Choose what to check");
-    // Falls back to the default Correctness name in the copy.
-    const pick = deleted.steps.find((s) => s.title === "Choose what to check");
-    expect(pick?.description).toContain("Correctness");
+  it("falls back to the default Correctness name when none was resolved", () => {
+    const none = build({ correctnessName: null, secondEvaluatorName: null });
+    const shown = none.steps.find((s) => s.title === "Already added for you");
+    expect(shown?.description).toContain("Correctness");
   });
 });

@@ -336,6 +336,8 @@ export function EvaluatorsTabContent({
             return (
               <div
                 key={evaluator.uuid}
+                data-tour="evaluator-card"
+                data-evaluator-name={evaluator.name}
                 className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">

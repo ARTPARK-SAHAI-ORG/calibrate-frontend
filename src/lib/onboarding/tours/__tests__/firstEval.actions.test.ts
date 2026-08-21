@@ -146,7 +146,7 @@ describe("first-eval tour step actions", () => {
   it("no-ops the pick when the picker dialog is absent", async () => {
     const tour = buildTour();
     await expect(
-      stepByTitle(tour, "Choose what to check").action?.(),
+      stepByTitle(tour, "Pick it in the list").action?.(),
     ).resolves.toBeUndefined();
   });
 
@@ -157,29 +157,28 @@ describe("first-eval tour step actions", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("ticks correctness and a second evaluator in the picker", async () => {
+  it("ticks only the second evaluator, never the already-attached one", async () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("data-tour", "add-evaluators-dialog");
     const correctness = document.createElement("div");
     correctness.innerHTML =
       '<input type="checkbox" aria-label="Select Correctness" /><span>Correctness</span>';
-    const tone = document.createElement("div");
-    tone.innerHTML =
+    const second = document.createElement("div");
+    second.innerHTML =
       '<input type="checkbox" aria-label="Select Politeness" /><span>Politeness</span>';
-    dialog.append(correctness, tone);
+    dialog.append(correctness, second);
     document.body.appendChild(dialog);
 
     const tour = buildTour();
-    await stepByTitle(tour, "Choose what to check").action?.();
+    await stepByTitle(tour, "Pick it in the list").action?.();
+    expect(
+      second.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+    ).toBe(true);
+    // Correctness is already on the agent, so the tour must not touch it.
     expect(
       correctness.querySelector<HTMLInputElement>('input[type="checkbox"]')
         ?.checked,
-    ).toBe(true);
-
-    await stepByTitle(tour, "Add another check").action?.();
-    expect(
-      tone.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("fills a demo test scenario and criteria", async () => {

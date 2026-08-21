@@ -491,6 +491,11 @@ async function appendPromptFix(): Promise<void> {
   window.setTimeout(selectNewLine, 300);
 }
 
+// CSS attribute selector for an attached evaluator's card, by its name.
+function evaluatorCardAnchor(name: string): string {
+  return `[data-evaluator-name="${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
+}
+
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   // The flow adapts to the workspace: add a second check only when a suitable
   // (conciseness) evaluator exists; otherwise use Correctness alone.
@@ -565,70 +570,73 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.tabEvaluators,
-      title: "Add an evaluator",
+      title: "Meet the evaluators",
       description:
-        "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
+        "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
         await clickElement(A.tabEvaluators);
-        await clickElement(A.evaluatorsAdd, { timeout: 8000 });
       },
     },
     {
-      anchor: A.addEvaluatorsDialog,
-      title: "Choose what to check",
-      description: secondName
-        ? `These are the checks you can grade your agent with. First, <strong>${escapeHtml(
-            correctnessName,
-          )}</strong>: does the answer get it right?`
-        : `These are the checks you can grade your agent with. We will use <strong>${escapeHtml(
-            correctnessName,
-          )}</strong>: does the answer get it right?`,
-      side: "left",
-      actionLabel: "Pick it",
-      // Let the reader scroll through the list of evaluators while this and
-      // the following picker cards are up.
-      allowInteraction: true,
-      action: async () => {
-        await pickEvaluatorByName(correctness.name);
-      },
+      // The card of the already-attached Correctness — nothing is created or
+      // picked here; the tab comes with it and the tour just points at it.
+      anchor: evaluatorCardAnchor(correctnessName),
+      title: "Already added for you",
+      description: `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
+        correctnessName,
+      )}</strong> is already here: does the answer get it right?`,
+      side: "bottom",
+      actionLabel: "Next",
+      timeout: 10000,
     },
-    // Only add a second check when the workspace actually has one to add.
+    // Add a second, independent check — only when the workspace has an
+    // existing default evaluator (other than Correctness) to add.
     ...(secondName
       ? [
           {
-            anchor: A.addEvaluatorsDialog,
+            anchor: A.evaluatorsAdd,
             title: "Add another check",
-            description: `${escapeHtml(
-              correctnessName,
-            )} is ticked. Now add <strong>${escapeHtml(
+            description: `One check rarely covers everything. Let us add <strong>${escapeHtml(
               secondName,
             )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
+            side: "bottom" as const,
+            actionLabel: "Next",
+            action: async () => {
+              await clickElement(A.evaluatorsAdd, { timeout: 8000 });
+            },
+          },
+          {
+            anchor: A.addEvaluatorsDialog,
+            title: "Pick it in the list",
+            description: `These are the evaluators you can add. We will tick <strong>${escapeHtml(
+              secondName,
+            )}</strong>.`,
             side: "left" as const,
             actionLabel: "Pick it",
+            // Let the reader scroll through the list of evaluators while the
+            // picker cards are up.
             allowInteraction: true,
             action: async () => {
               await pickEvaluatorByName(secondName);
             },
           },
+          {
+            anchor: A.addEvaluatorsDialog,
+            title: "Add it to your agent",
+            description: `${escapeHtml(
+              secondName,
+            )} is ticked. Let us <strong>add it</strong> so every test grades the reply on both checks. You can <strong>add more checks</strong> anytime.`,
+            side: "left" as const,
+            actionLabel: "Add it",
+            allowInteraction: true,
+            action: async () => {
+              await clickElement(A.evaluatorsAddConfirm);
+            },
+          },
         ]
       : []),
-    {
-      anchor: A.addEvaluatorsDialog,
-      title: secondName ? "Add them to your agent" : "Add it to your agent",
-      description: secondName
-        ? "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both."
-        : `${escapeHtml(
-            correctnessName,
-          )} is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.`,
-      side: "left",
-      actionLabel: secondName ? "Add them" : "Add it",
-      allowInteraction: true,
-      action: async () => {
-        await clickElement(A.evaluatorsAddConfirm);
-      },
-    },
     {
       anchor: A.tabTests,
       title: "Create your first test",
