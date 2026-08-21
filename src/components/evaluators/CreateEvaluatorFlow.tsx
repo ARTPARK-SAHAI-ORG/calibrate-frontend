@@ -224,8 +224,9 @@ export function CreateEvaluatorFlow({
       // Prefill is best-effort — leave the form blank on any failure.
       if (!response.ok) return;
 
+      // `name` is deliberately not read: the reader names their own
+      // evaluator, and a suggested name in the box reads as already filled in.
       const data: {
-        name: string | null;
         system_prompt: string;
         judge_model: string;
         output_type: "binary" | "rating";
@@ -239,7 +240,6 @@ export function CreateEvaluatorFlow({
         } | null;
       } = await response.json();
 
-      setEvaluatorName(data.name ?? "");
       setNewEvaluatorSystemPrompt(data.system_prompt ?? "");
       setNewEvaluatorOutputType(data.output_type);
 

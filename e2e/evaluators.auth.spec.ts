@@ -1,6 +1,7 @@
 // Backend-backed Evaluators flow: create an evaluator then delete it. The
-// create is two steps — a use-case picker, then a sidebar whose Name / judge
-// model / judge prompt are prefilled by GET /evaluators/default-prompt. We pick
+// create is two steps — a use-case picker, then a sidebar whose judge model and
+// judge prompt are prefilled by GET /evaluators/default-prompt (the Name is
+// left for the reader to type). We pick
 // the "Speech to Text" use case, which needs no per-variable descriptions, and
 // only override the Name to keep reruns unique. Run with
 // `npm run test:e2e:integration`.
@@ -33,8 +34,8 @@ async function createEvaluator(page: Page, name: string) {
   await expect(
     page.getByRole("heading", { name: "Add evaluator", exact: true }),
   ).toBeVisible();
-  // Wait for the async default-prompt prefill (it clobbers the Name field, so
-  // set our unique name only after it lands; also gates a real create).
+  // Wait for the async default-prompt prefill: without a judge model the
+  // create is refused.
   await expect(page.getByText("Select judge model")).toHaveCount(0, {
     timeout: 20000,
   });
@@ -89,12 +90,11 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await picker.getByText("Speech to Text", { exact: true }).click();
     await picker.getByRole("button", { name: "Continue" }).click();
 
-    // Step 2: create sidebar. The async default-prompt call prefills the Name,
-    // judge model, and judge prompt (all required). Wait for it to land FIRST —
-    // it also overwrites the Name field, so setting our unique name before the
-    // prefill would get clobbered (and clicking Create before the model is set
-    // just flags validation without creating). The model button reads "Select
-    // judge model" until the prefill resolves.
+    // Step 2: create sidebar. The async default-prompt call prefills the judge
+    // model and judge prompt, both required; the Name is ours to type. Wait for
+    // it to land FIRST, since clicking Create before the model is set just
+    // flags validation without creating. The model button reads "Select judge
+    // model" until the prefill resolves.
     await expect(
       page.getByRole("heading", { name: "Add evaluator", exact: true }),
     ).toBeVisible();
@@ -102,7 +102,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
 
-    // Now override the prefilled name with a unique one and create.
+    // Name it and create.
     await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
     await page.getByRole("button", { name: "Create evaluator" }).click();
 
