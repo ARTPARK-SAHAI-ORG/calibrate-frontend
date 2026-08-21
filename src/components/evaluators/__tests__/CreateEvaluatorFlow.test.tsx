@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { CreateEvaluatorFlow } from "../CreateEvaluatorFlow";
 
@@ -27,13 +28,31 @@ jest.mock("../CreateEvaluatorSidebar", () => ({
     isOpen,
     onCreate,
     onClose,
+    evaluatorName,
+    setEvaluatorName,
+    systemPrompt,
+    createNameError,
+    nameInputRef,
   }: {
     isOpen: boolean;
     onCreate: () => void;
     onClose: () => void;
+    evaluatorName: string;
+    setEvaluatorName: (value: string) => void;
+    systemPrompt: string;
+    createNameError: string | null;
+    nameInputRef?: React.RefObject<HTMLInputElement | null>;
   }) =>
     isOpen ? (
       <div data-testid="create-sidebar">
+        <span data-testid="prompt-field">{systemPrompt}</span>
+        <input
+          aria-label="Name"
+          ref={nameInputRef}
+          value={evaluatorName}
+          onChange={(e) => setEvaluatorName(e.target.value)}
+        />
+        {createNameError ? <span>{createNameError}</span> : null}
         <button type="button" onClick={onCreate}>
           Submit create
         </button>
@@ -155,6 +174,11 @@ describe("CreateEvaluatorFlow", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
 
+    // Nothing is created until the reader names it.
+    await user.click(screen.getByText("Submit create"));
+    expect(onCreated).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Name"), "Refund policy");
     await user.click(screen.getByText("Submit create"));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
@@ -164,5 +188,50 @@ describe("CreateEvaluatorFlow", () => {
       evaluator_type: "llm",
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("leaves the name empty for the reader to fill in", async () => {
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm"]}
+      />,
+    );
+
+    // The judge prompt is still filled in from the default for this use case.
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
+        "Judge the reply",
+      ),
+    );
+    // The name the backend suggests is not put in the box.
+    expect(screen.getByLabelText("Name")).toHaveValue("");
+  });
+
+  it("says the name is needed and puts the cursor back on the box", async () => {
+    const user = setupUser();
+    const onCreated = jest.fn();
+
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={onCreated}
+        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm"]}
+      />,
+    );
+
+    expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+    await user.click(screen.getByText("Submit create"));
+
+    expect(await screen.findByText("Name is required")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveFocus();
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });

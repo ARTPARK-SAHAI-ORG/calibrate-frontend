@@ -142,7 +142,7 @@ export function SimulationConfigTab({
       />
 
       {/* Evaluators — the same add and create flow as the agent page. */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         <label className="block text-sm md:text-base font-medium text-foreground">
           Select evaluators
         </label>
@@ -154,7 +154,7 @@ export function SimulationConfigTab({
           onSelectedChange={onEvaluatorsChange}
           onRefresh={onEvaluatorsRefresh}
           readOnly={isConfigured}
-          description="These evaluators score each simulated conversation"
+          description="These evaluators evaluate the agent's performance in each simulated conversation"
         />
       </div>
 

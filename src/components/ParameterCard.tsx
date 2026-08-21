@@ -22,7 +22,7 @@ type ParameterCardProps = {
   isProperty?: boolean;
   isArrayItem?: boolean;
   siblingNames?: string[]; // Names of sibling parameters (excluding this one)
-  hideDelete?: boolean; // Hide delete button (e.g., when only one parameter exists)
+  hideDelete?: boolean; // Hide delete button (e.g. when only one parameter exists)
   showRequired?: boolean; // Show required checkbox (default: true)
   requireDescription?: boolean; // Whether the description is mandatory (default: true)
 };
@@ -51,7 +51,7 @@ export const ParameterCard = ({
   const isDuplicateName =
     param.name.trim() !== "" &&
     siblingNames.some(
-      (name) => name.toLowerCase() === param.name.trim().toLowerCase()
+      (name) => name.toLowerCase() === param.name.trim().toLowerCase(),
     );
 
   return (
@@ -179,14 +179,18 @@ export const ParameterCard = ({
           rows={3}
           placeholder="This field will be passed to the LLM and should describe in detail what the parameter is for and how it should be populated"
           className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
-            validationAttempted && requireDescription && !param.description.trim()
+            validationAttempted &&
+            requireDescription &&
+            !param.description.trim()
               ? "border-red-500"
               : "border-border"
           }`}
         />
         <FieldError
           show={
-            validationAttempted && requireDescription && !param.description.trim()
+            validationAttempted &&
+            requireDescription &&
+            !param.description.trim()
           }
         >
           Description cannot be empty

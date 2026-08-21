@@ -15,13 +15,9 @@ import {
 } from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
+import { NotFoundState } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
-import {
-  EvaluatorTypePill,
-  OutputTypePill,
-  type EvaluatorType,
-} from "@/components/EvaluatorPills";
+import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
 import { RatingScaleEditor } from "@/components/evaluators/RatingScaleEditor";
@@ -39,7 +35,12 @@ import {
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
-import { supportsEvaluatorVariables } from "@/lib/evaluatorApi";
+import { toast } from "sonner";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import {
+  deleteEvaluator as deleteEvaluatorRequest,
+  supportsEvaluatorVariables,
+} from "@/lib/evaluatorApi";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -173,7 +174,9 @@ function EvaluatorDetailPageInner() {
   const resolvedInitialTab: EvaluatorPageTab =
     initialTab === "agreement" ? "agreement" : "prompts";
   const backendAccessToken = useAccessToken();
-  const [sidebarOpen, setSidebarOpen] = useSidebarState();
+  // This page is wide (versions beside their details), so it starts with
+  // the sidebar out of the way.
+  const [sidebarOpen, setSidebarOpen] = useSidebarState(false);
 
   const [evaluator, setEvaluator] = useState<EvaluatorDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,6 +187,11 @@ function EvaluatorDetailPageInner() {
     captureResponse,
   } = usePageErrorState();
   const [settingLiveUuid, setSettingLiveUuid] = useState<string | null>(null);
+  // The version whose details are on screen. Null means the current one,
+  // which is what the page opens on.
+  const [selectedVersionUuid, setSelectedVersionUuid] = useState<string | null>(
+    null,
+  );
   const [activeTab, setActiveTab] =
     useState<EvaluatorPageTab>(resolvedInitialTab);
 
@@ -200,6 +208,10 @@ function EvaluatorDetailPageInner() {
   // Full task list from the unfiltered fetch — kept stable so the picker
   // always shows all options regardless of which task is currently selected.
   const [trendAllTasks, setTrendAllTasks] = useState<TrendTask[]>([]);
+
+  // Delete confirmation state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -221,7 +233,6 @@ function EvaluatorDetailPageInner() {
     useState<BinaryScaleRow[]>(defaultBinaryScale());
   const [newVersionLlmModalOpen, setNewVersionLlmModalOpen] = useState(false);
   const [newVersionSaving, setNewVersionSaving] = useState(false);
-  const [newVersionError, setNewVersionError] = useState<string | null>(null);
   const [newVersionValidated, setNewVersionValidated] = useState(false);
   const [newVersionChangelog, setNewVersionChangelog] = useState("");
   const [newVersionMarkLive, setNewVersionMarkLive] = useState(true);
@@ -237,6 +248,10 @@ function EvaluatorDetailPageInner() {
     if (!evaluator?.name) return;
     document.title = `${evaluator.name} | Calibrate`;
   }, [evaluator?.name]);
+
+  useEffect(() => {
+    setSelectedVersionUuid(null);
+  }, [uuid]);
 
   useEffect(() => {
     setTrendFetchCompleted(false);
@@ -290,6 +305,18 @@ function EvaluatorDetailPageInner() {
     return all.sort((a, b) => b.version_number - a.version_number);
   }, [evaluator]);
 
+  // Falls back to the current version, then to the newest, so the panel always
+  // has something to show even when the chosen version has just been deleted
+  // or the evaluator has no current version set.
+  const selectedVersion = useMemo(() => {
+    if (versions.length === 0) return null;
+    return (
+      versions.find((v) => v.uuid === selectedVersionUuid) ??
+      versions.find((v) => v.uuid === evaluator?.live_version_id) ??
+      versions[0]
+    );
+  }, [versions, selectedVersionUuid, evaluator?.live_version_id]);
+
   const setVersionLive = async (versionUuid: string) => {
     if (!backendAccessToken || !uuid) return;
     try {
@@ -328,6 +355,34 @@ function EvaluatorDetailPageInner() {
       reportError("Error setting live version:", err);
     } finally {
       setSettingLiveUuid(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!backendAccessToken || !uuid || !evaluator) return;
+    try {
+      setDeleting(true);
+      await deleteEvaluatorRequest(uuid, backendAccessToken);
+      // Return to the page the reader came from, the same way Back does,
+      // rather than the evaluator list, which has no sidebar entry. Going
+      // back does nothing when the address was opened straight into this tab,
+      // which would leave the confirmation on screen with no way out, so
+      // that case goes to the agents page instead.
+      const cameFromAnotherPage =
+        typeof window !== "undefined" && window.history.length > 1;
+      if (cameFromAnotherPage) {
+        router.back();
+      } else {
+        router.push("/agents");
+      }
+    } catch (err) {
+      reportError("Error deleting evaluator:", err);
+      // Say why, reading the backend's own wording, rather than leaving the
+      // confirmation to quietly become clickable again.
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete evaluator",
+      );
+      setDeleting(false);
     }
   };
 
@@ -399,9 +454,10 @@ function EvaluatorDetailPageInner() {
     }
   };
 
-  const openNewVersionDialog = () => {
+  // Starts from the given version, or the current one when none is named.
+  const openNewVersionDialog = (baseVersion?: EvaluatorVersion) => {
     if (!evaluator) return;
-    const live = liveVersionOf(evaluator);
+    const live = baseVersion ?? liveVersionOf(evaluator);
     setNewVersionJudgeModel(
       live?.judge_model
         ? { id: live.judge_model, name: live.judge_model }
@@ -446,7 +502,6 @@ function EvaluatorDetailPageInner() {
         },
       ]);
     }
-    setNewVersionError(null);
     setNewVersionValidated(false);
     setNewVersionChangelog("");
     setNewVersionMarkLive(true);
@@ -485,7 +540,6 @@ function EvaluatorDetailPageInner() {
     }
     try {
       setNewVersionSaving(true);
-      setNewVersionError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
@@ -565,8 +619,9 @@ function EvaluatorDetailPageInner() {
         return;
       }
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Failed to create version");
+        throw new Error(
+          await getEvaluatorErrorMessage(res, "Failed to create version"),
+        );
       }
       // Refresh evaluator so the new version appears with the selected live state
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
@@ -578,17 +633,25 @@ function EvaluatorDetailPageInner() {
       if (refreshed.ok) {
         const data: EvaluatorDetail = await refreshed.json();
         setEvaluator(data);
+        // Read the version that was just written, whether or not it was made
+        // the current one. Without this the panel falls back to the current
+        // version and the screen looks unchanged after creating.
+        const newest = (data.versions ?? []).reduce<EvaluatorVersion | null>(
+          (best, v) =>
+            !best || v.version_number > best.version_number ? v : best,
+          null,
+        );
+        setSelectedVersionUuid(newest?.uuid ?? null);
       }
       setNewVersionOpen(false);
-      // The new version slots in at the top of the version list — scroll back
-      // up so the user can see it without manually scrolling past the (now
-      // collapsed) "New version" form.
+      // The page can be scrolled down on a phone, where the versions sit above
+      // their details, so start back at the top.
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (err) {
       reportError("Error creating version:", err);
-      setNewVersionError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to create version",
       );
     } finally {
@@ -640,26 +703,36 @@ function EvaluatorDetailPageInner() {
     }
   }, [activeTab, fetchTrend]);
 
+  // This page is reached from an agent, an evaluation, a simulation run or a
+  // labelling task, so it goes back to wherever that was. It sits in the top
+  // bar, where other pages show their trail.
+  const backButton = (
+    <button
+      onClick={() => router.back()}
+      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+        />
+      </svg>
+      Back
+    </button>
+  );
+
   const formatDateTime = (iso: string): string => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString();
   };
-
-  const crumbs: Crumb[] = [
-    {
-      label: "Evaluators",
-      // The list keeps its tab in the address, so send a built-in evaluator
-      // back to the tab it is listed on.
-      href:
-        evaluator && !evaluator.owner_user_id
-          ? "/evaluators?tab=default"
-          : "/evaluators",
-    },
-    { label: evaluator?.name ?? "Evaluator" },
-  ];
-
-  const customHeader = <Breadcrumbs items={crumbs} />;
 
   return (
     <AppLayout
@@ -667,12 +740,9 @@ function EvaluatorDetailPageInner() {
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      customHeader={customHeader}
+      customHeader={backButton}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* AppLayout hides `customHeader` below md. */}
-        <Breadcrumbs items={crumbs} className="md:hidden" />
-
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />
         ) : loading ? (
@@ -714,18 +784,31 @@ function EvaluatorDetailPageInner() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0 flex-1">
+                {/* AppLayout hides `customHeader` below md. */}
+                <div className="md:hidden mb-3">{backButton}</div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap mt-2">
-                  {evaluator.evaluator_type && (
-                    <EvaluatorTypePill
-                      evaluatorType={evaluator.evaluator_type}
-                    />
-                  )}
-                  <OutputTypePill outputType={evaluator.output_type} />
+                  <button
+                    onClick={openEditDialog}
+                    title="Edit name and description"
+                    className="w-9 h-9 flex items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
+                      />
+                    </svg>
+                  </button>
                 </div>
                 {evaluator.description && (
                   <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-2">
@@ -736,7 +819,7 @@ function EvaluatorDetailPageInner() {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  onClick={openEditDialog}
+                  onClick={() => openNewVersionDialog()}
                 >
                   <svg
                     className="w-4 h-4"
@@ -748,14 +831,20 @@ function EvaluatorDetailPageInner() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
+                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12.75h6m-6 3h6"
                     />
                   </svg>
                   Edit
                 </button>
                 <button
-                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
-                  onClick={openNewVersionDialog}
+                  onClick={() => setDeleteOpen(true)}
+                  title="Delete evaluator"
+                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                 >
                   <svg
                     className="w-4 h-4"
@@ -767,10 +856,9 @@ function EvaluatorDetailPageInner() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M12 4v16m8-8H4"
+                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
                     />
                   </svg>
-                  New version
                 </button>
               </div>
             </div>
@@ -801,20 +889,112 @@ function EvaluatorDetailPageInner() {
 
             {/* Prompts tab content */}
             {activeTab === "prompts" &&
-              (versions.length > 0 ? (
-                <div className="space-y-3 md:space-y-4">
-                  {versions.map((v) => (
+              (versions.length > 0 && selectedVersion ? (
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-4 md:gap-6 items-start md:h-[calc(100vh-17rem)]">
+                  {/* The versions, newest first. Scrolls on its own so the
+                      page behind it stays still. */}
+                  <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:h-full pb-1 md:pb-0 md:pr-1">
+                    {versions.map((v) => {
+                      const isSelected = v.uuid === selectedVersion.uuid;
+                      const isCurrent = v.uuid === evaluator.live_version_id;
+                      return (
+                        <div
+                          key={v.uuid}
+                          className={`flex-shrink-0 md:w-full flex items-start gap-1 px-3 py-2.5 rounded-md border transition-colors ${
+                            isSelected
+                              ? "border-foreground/20 bg-muted"
+                              : "border-border bg-background hover:bg-muted/50"
+                          }`}
+                        >
+                          <button
+                            onClick={() => setSelectedVersionUuid(v.uuid)}
+                            aria-current={isSelected ? "true" : undefined}
+                            className="flex-1 min-w-0 text-left cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">
+                                v{v.version_number}
+                              </span>
+                              {isCurrent && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 truncate">
+                              {formatDateTime(v.created_at)}
+                            </div>
+                          </button>
+
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => openNewVersionDialog(v)}
+                              title={`Edit, starting from v${v.version_number}`}
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors cursor-pointer"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.75}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 12.75h6m-6 3h6"
+                                />
+                              </svg>
+                            </button>
+                            {!isCurrent && (
+                              <button
+                                onClick={() => setVersionLive(v.uuid)}
+                                disabled={settingLiveUuid === v.uuid}
+                                title="Mark as current"
+                                className="w-7 h-7 flex items-center justify-center rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg
+                                  className={`w-4 h-4 ${settingLiveUuid === v.uuid ? "animate-spin" : ""}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.75}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Only the chosen version's details, scrolling on their own. */}
+                  <div className="md:h-full md:overflow-y-auto md:pr-1">
                     <VersionCard
-                      key={v.uuid}
-                      version={v}
+                      key={selectedVersion.uuid}
+                      version={selectedVersion}
                       outputType={evaluator.output_type}
                       isDefault={false}
-                      isLive={v.uuid === evaluator.live_version_id}
-                      isSettingLive={settingLiveUuid === v.uuid}
+                      isLive={
+                        selectedVersion.uuid === evaluator.live_version_id
+                      }
+                      isSettingLive={settingLiveUuid === selectedVersion.uuid}
                       onSetLive={setVersionLive}
                       formatDateTime={formatDateTime}
+                      isSelectedDetail
                     />
-                  ))}
+                  </div>
                 </div>
               ) : (
                 <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
@@ -1296,10 +1476,6 @@ function EvaluatorDetailPageInner() {
                   })()}
                 </div>
               </div>
-
-              {newVersionError && (
-                <p className="text-sm text-red-500">{newVersionError}</p>
-              )}
             </div>
 
             {/* Footer */}
@@ -1351,6 +1527,19 @@ function EvaluatorDetailPageInner() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteOpen}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete evaluator"
+        message={`Are you sure you want to delete "${evaluator?.name}"?`}
+        confirmText="Delete"
+        isDeleting={deleting}
+      />
 
       {/* LLM judge model selector for new version */}
       {evaluator && (

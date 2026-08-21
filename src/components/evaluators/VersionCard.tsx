@@ -37,6 +37,10 @@ type VersionCardProps = {
   isSettingLive: boolean;
   onSetLive: (versionUuid: string) => void;
   formatDateTime: (date: string) => string;
+  /** Rendered as the details for a version the reader picked from a list:
+   *  the prompt shows straight away, there is no show/hide button, and the
+   *  version number and Current pill are left to the list. */
+  isSelectedDetail?: boolean;
 };
 
 export function VersionCard({
@@ -47,8 +51,11 @@ export function VersionCard({
   isSettingLive,
   onSetLive,
   formatDateTime,
+  isSelectedDetail = false,
 }: VersionCardProps) {
-  const [promptVisible, setPromptVisible] = useState(isLive || isDefault);
+  const [promptVisible, setPromptVisible] = useState(
+    isLive || isDefault || isSelectedDetail,
+  );
   const [copied, setCopied] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
   // Whether the rendered prompt actually overflows the collapsed height.
@@ -56,6 +63,9 @@ export function VersionCard({
   // lines and no line breaks still get the toggle.
   const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
   const promptRef = useRef<HTMLPreElement>(null);
+  // Where the card is the details pane, that pane scrolls, so the prompt is
+  // shown whole rather than cut off behind a "View more" button.
+  const clampPrompt = isPromptOverflowing && !isSelectedDetail;
 
   useLayoutEffect(() => {
     if (!promptVisible) return;
@@ -74,8 +84,8 @@ export function VersionCard({
   }, [promptVisible, version.system_prompt]);
 
   useEffect(() => {
-    setPromptVisible(isLive || isDefault);
-  }, [isLive, isDefault]);
+    setPromptVisible(isLive || isDefault || isSelectedDetail);
+  }, [isLive, isDefault, isSelectedDetail]);
 
   function handleCopy() {
     navigator.clipboard.writeText(version.system_prompt).then(() => {
@@ -94,7 +104,7 @@ export function VersionCard({
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1 min-w-0">
-          {!isDefault && (
+          {!isDefault && !isSelectedDetail && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-muted text-foreground">
                 v{version.version_number}
@@ -106,11 +116,14 @@ export function VersionCard({
               )}
             </div>
           )}
-          <code className="text-xs md:text-sm font-mono text-muted-foreground truncate">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Model
+          </span>
+          <code className="text-sm md:text-base font-mono font-medium text-foreground truncate">
             {version.judge_model}
           </code>
         </div>
-        {!isDefault && (
+        {!isDefault && !isSelectedDetail && (
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isLive && (
               <button
@@ -121,76 +134,150 @@ export function VersionCard({
                 {isSettingLive ? "Marking..." : "Mark as current"}
               </button>
             )}
-            <button
-              onClick={() => setPromptVisible((v) => !v)}
-              className="h-9 px-3 rounded-md text-xs md:text-sm font-semibold border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-400/40 dark:bg-violet-500/15 dark:hover:bg-violet-500/25 transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              {promptVisible ? (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                  </svg>
-                  Hide prompt
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Show prompt
-                </>
-              )}
-            </button>
+            {!isSelectedDetail && (
+              <button
+                onClick={() => setPromptVisible((v) => !v)}
+                className="h-9 px-3 rounded-md text-xs md:text-sm font-semibold border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-400/40 dark:bg-violet-500/15 dark:hover:bg-violet-500/25 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                {promptVisible ? (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
+                      />
+                    </svg>
+                    Hide prompt
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Show prompt
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {promptVisible && <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</span>
-          {(
-            <button
-              onClick={handleCopy}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
+      {promptVisible && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Prompt
+            </span>
+            {
+              <button
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5 text-emerald-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                    <span className="text-emerald-500">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                      />
+                    </svg>
+                    Copy
+                  </>
+                )}
+              </button>
+            }
+          </div>
+          <div className="relative">
+            <pre
+              ref={promptRef}
+              className={`border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto ${
+                isPromptOverflowing && !promptExpanded
+                  ? "max-h-[7.5rem] overflow-hidden"
+                  : ""
+              }`}
             >
-              {copied ? (
-                <>
-                  <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              {version.system_prompt}
+            </pre>
+            {clampPrompt && !promptExpanded && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
+                <button
+                  type="button"
+                  onClick={() => setPromptExpanded(true)}
+                  className="pointer-events-auto mb-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
+                >
+                  View more
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
                   </svg>
-                  <span className="text-emerald-500">Copied</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                  </svg>
-                  Copy
-                </>
-              )}
-            </button>
-          )}
-        </div>
-        <div className="relative">
-          <pre
-            ref={promptRef}
-            className={`border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto ${
-              isPromptOverflowing && !promptExpanded
-                ? "max-h-[7.5rem] overflow-hidden"
-                : ""
-            }`}
-          >
-            {version.system_prompt}
-          </pre>
-          {isPromptOverflowing && !promptExpanded && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
+                </button>
+              </div>
+            )}
+          </div>
+          {clampPrompt && promptExpanded && (
+            <div className="flex justify-center">
               <button
                 type="button"
-                onClick={() => setPromptExpanded(true)}
-                className="pointer-events-auto mb-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
+                onClick={() => setPromptExpanded(false)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
               >
-                View more
+                View less
                 <svg
                   className="w-3.5 h-3.5"
                   fill="none"
@@ -201,38 +288,14 @@ export function VersionCard({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    d="M4.5 15.75l7.5-7.5 7.5 7.5"
                   />
                 </svg>
               </button>
             </div>
           )}
         </div>
-        {isPromptOverflowing && promptExpanded && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => setPromptExpanded(false)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
-            >
-              View less
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>}
+      )}
 
       {version.variables?.length ? (
         <div className="space-y-2">
@@ -290,57 +353,64 @@ export function VersionCard({
         </div>
       ) : null}
 
-      {promptVisible && outputType === "binary" ? (() => {
-        const scale = version.output_config?.scale ?? [];
-        const trueEntry = scale.find((e) => e.value === true);
-        const falseEntry = scale.find((e) => e.value === false);
-        const rows = [
-          {
-            value: true,
-            label: getBinaryLabel(scale, true),
-            description: trueEntry?.description,
-          },
-          {
-            value: false,
-            label: getBinaryLabel(scale, false),
-            description: falseEntry?.description,
-          },
-        ];
-        return (
-          <div className="space-y-2">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Output
-            </div>
-            <div className="border border-border rounded-md p-3 md:p-4 bg-muted/10 space-y-2">
-              {rows.map((row) => (
-                <div key={String(row.value)} className="flex items-start gap-3">
-                  <span
-                    className={`inline-flex items-center justify-center min-w-[48px] h-6 px-2 rounded-md text-xs font-semibold border ${
-                      row.value
-                        ? "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400"
-                        : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
-                    }`}
-                  >
-                    {row.value ? "True" : "False"}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">
-                      {row.label}
-                    </div>
-                    {row.description && (
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {row.description}
-                      </div>
-                    )}
-                  </div>
+      {promptVisible && outputType === "binary"
+        ? (() => {
+            const scale = version.output_config?.scale ?? [];
+            const trueEntry = scale.find((e) => e.value === true);
+            const falseEntry = scale.find((e) => e.value === false);
+            const rows = [
+              {
+                value: true,
+                label: getBinaryLabel(scale, true),
+                description: trueEntry?.description,
+              },
+              {
+                value: false,
+                label: getBinaryLabel(scale, false),
+                description: falseEntry?.description,
+              },
+            ];
+            return (
+              <div className="space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Output
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })() : null}
+                <div className="border border-border rounded-md p-3 md:p-4 bg-muted/10 space-y-2">
+                  {rows.map((row) => (
+                    <div
+                      key={String(row.value)}
+                      className="flex items-start gap-3"
+                    >
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[48px] h-6 px-2 rounded-md text-xs font-semibold border ${
+                          row.value
+                            ? "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400"
+                            : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
+                        }`}
+                      >
+                        {row.value ? "True" : "False"}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground">
+                          {row.label}
+                        </div>
+                        {row.description && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {row.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()
+        : null}
 
-      {promptVisible && outputType === "rating" && version.output_config?.scale?.length ? (
+      {promptVisible &&
+      outputType === "rating" &&
+      version.output_config?.scale?.length ? (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Output

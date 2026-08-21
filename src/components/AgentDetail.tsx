@@ -1088,7 +1088,7 @@ export function AgentDetail({
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 py-4 md:py-0">
+    <div className="space-y-4 md:space-y-6 py-4 md:py-6">
       {/* Agent Header - only shown when not using external header */}
       {!onHeaderStateChange && (
         <div className="flex items-center justify-between gap-3 -mt-2 md:-mt-4">

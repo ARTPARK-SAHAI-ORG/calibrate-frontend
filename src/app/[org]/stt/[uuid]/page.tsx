@@ -729,7 +729,7 @@ export default function STTEvaluationDetailPage() {
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
       customHeader={customHeader}
     >
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6 py-4 md:py-6">
         <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {/* Loading State */}

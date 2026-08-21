@@ -1,6 +1,7 @@
 // Backend-backed Evaluators flow: create an evaluator then delete it. The
-// create is two steps — a use-case picker, then a sidebar whose Name / judge
-// model / judge prompt are prefilled by GET /evaluators/default-prompt. We pick
+// create is two steps — a use-case picker, then a sidebar whose judge model and
+// judge prompt are prefilled by GET /evaluators/default-prompt (the Name is
+// left for the reader to type). We pick
 // the "Speech to Text" use case, which needs no per-variable descriptions, and
 // only override the Name to keep reruns unique. Run with
 // `npm run test:e2e:integration`.
@@ -33,13 +34,13 @@ async function createEvaluator(page: Page, name: string) {
   await expect(
     page.getByRole("heading", { name: "Add evaluator", exact: true }),
   ).toBeVisible();
-  // Wait for the async default-prompt prefill (it clobbers the Name field, so
-  // set our unique name only after it lands; also gates a real create).
+  // Wait for the async default-prompt prefill: without a judge model the
+  // create is refused.
   await expect(page.getByText("Select judge model")).toHaveCount(0, {
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
+  await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   const card = page.getByRole("link", { name: `Open ${name}` });
@@ -89,12 +90,11 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await picker.getByText("Speech to Text", { exact: true }).click();
     await picker.getByRole("button", { name: "Continue" }).click();
 
-    // Step 2: create sidebar. The async default-prompt call prefills the Name,
-    // judge model, and judge prompt (all required). Wait for it to land FIRST —
-    // it also overwrites the Name field, so setting our unique name before the
-    // prefill would get clobbered (and clicking Create before the model is set
-    // just flags validation without creating). The model button reads "Select
-    // judge model" until the prefill resolves.
+    // Step 2: create sidebar. The async default-prompt call prefills the judge
+    // model and judge prompt, both required; the Name is ours to type. Wait for
+    // it to land FIRST, since clicking Create before the model is set just
+    // flags validation without creating. The model button reads "Select judge
+    // model" until the prefill resolves.
     await expect(
       page.getByRole("heading", { name: "Add evaluator", exact: true }),
     ).toBeVisible();
@@ -102,8 +102,8 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
 
-    // Now override the prefilled name with a unique one and create.
-    await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
+    // Name it and create.
+    await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
     await page.getByRole("button", { name: "Create evaluator" }).click();
 
     // The new evaluator card appears on the "My evaluators" tab.
@@ -111,31 +111,29 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(card).toBeVisible({ timeout: 20000 });
 
     // Open the evaluator detail / versioning page (its own route, otherwise
-    // never exercised by E2E), confirm it loaded, then return to the list to
-    // delete. The heading renders the evaluator's name once the fetch resolves.
+    // never exercised by E2E), confirm it loaded, then delete it from the
+    // detail page's header delete button (confirmDelete), which navigates
+    // back to the list. The heading renders the evaluator's name once the
+    // fetch resolves.
     await card.click();
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
-    await expect(
-      page.getByRole("link", { name: "Evaluators" }).first(),
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
-    await page.goto("/evaluators");
-    await waitForOrgReady(page);
-    await expect(card).toBeVisible({ timeout: 20000 });
-
-    // Delete via the card's titled delete button + confirmation dialog.
-    await page
-      .locator(`[aria-label="Open ${name}"]`)
-      .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
-      .getByRole("button", { name: "Delete evaluator" })
-      .click();
+    await page.getByRole("button", { name: "Delete evaluator" }).click();
     await expect(
       page.getByRole("heading", { name: "Delete evaluator", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+    // Deleting sends the reader back to the list, where the card is gone.
+    await expect(page).toHaveURL(workspacePath("/evaluators"), {
+      timeout: 20000,
+    });
+    await waitForOrgReady(page);
     await expect(card).toHaveCount(0, { timeout: 15000 });
   });
 
@@ -153,19 +151,18 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
-    await expect(
-      page.getByRole("link", { name: "Evaluators" }).first(),
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
-
-    // The fresh evaluator has exactly one version, rendered as a "v1" badge.
-    await expect(page.getByText("v1", { exact: true })).toBeVisible({
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
       timeout: 20000,
     });
 
-    // Open the "New version" form. The header button and the dialog heading are
-    // both "New version" — target the button role for the opener.
-    await page.getByRole("button", { name: "New version" }).click();
+    // The fresh evaluator has exactly one version, listed on the left as v1.
+    await expect(page.getByRole("button", { name: /^v1/ })).toBeVisible({
+      timeout: 20000,
+    });
+
+    // Open the "New version" form. The header opener now reads "Edit"; the
+    // dialog it opens still has the "New version" heading.
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
       dialog.getByRole("heading", { name: "New version", exact: true }),
@@ -190,30 +187,31 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await dialog.getByRole("checkbox").uncheck();
     await dialog.getByRole("button", { name: "Create version" }).click();
 
-    // Dialog closes and the new v2 card appears in the versions list.
+    // Dialog closes and v2 joins the version list on the left.
     await expect(
       dialog.getByRole("heading", { name: "New version", exact: true }),
     ).toHaveCount(0, { timeout: 20000 });
-    await expect(page.getByText("v2", { exact: true })).toBeVisible({
-      timeout: 20000,
-    });
+    const v2 = page.getByRole("button", { name: /^v2/ });
+    await expect(v2).toBeVisible({ timeout: 20000 });
 
-    // Scope to the v2 version card (the only rounded-xl container holding the
-    // exact "v2" badge). It is not live yet, so it shows a "Mark as current"
-    // button; v1 carries the "Current" pill.
-    const v2Card = page
-      .locator("div.rounded-xl")
-      .filter({ has: page.getByText("v2", { exact: true }) });
-    const markCurrent = v2Card.getByRole("button", { name: "Mark as current" });
-    await expect(markCurrent).toBeVisible({ timeout: 20000 });
+    // The page opens on the current version (still v1), so pick v2 to read it.
+    await v2.click();
+
+    // Every version that is not the current one carries a "Mark as current"
+    // button in its own row, so right now that is v2's alone.
+    const markCurrent = page.getByRole("button", { name: "Mark as current" });
+    await expect(markCurrent).toHaveCount(1, { timeout: 20000 });
     await markCurrent.click();
 
-    // After the refresh v2 becomes live — its card now shows the "Current" pill
-    // and the "Mark as current" button disappears.
-    await expect(v2Card.getByText("Current", { exact: true })).toBeVisible({
+    // After the refresh the "Current" pill has moved from v1 to v2.
+    await expect(
+      page.getByRole("button", { name: /^v2.*Current/ }),
+    ).toBeVisible({
       timeout: 20000,
     });
-    await expect(markCurrent).toHaveCount(0, { timeout: 20000 });
+    await expect(
+      page.getByRole("button", { name: /^v1.*Current/ }),
+    ).toHaveCount(0, { timeout: 20000 });
 
     // Clean up.
     await deleteEvaluator(page, name);

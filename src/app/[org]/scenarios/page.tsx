@@ -44,7 +44,7 @@ export default function ScenariosPage() {
     null,
   );
   const [editingScenarioUuid, setEditingScenarioUuid] = useState<string | null>(
-    null
+    null,
   );
   const [isLoadingScenario, setIsLoadingScenario] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
@@ -57,7 +57,7 @@ export default function ScenariosPage() {
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [scenarioToDelete, setScenarioToDelete] = useState<ScenarioData | null>(
-    null
+    null,
   );
   const [isScenarioDeleting, setIsScenarioDeleting] = useState(false);
 
@@ -96,7 +96,7 @@ export default function ScenariosPage() {
       } catch (err) {
         reportError("Error fetching scenarios:", err);
         setScenariosError(
-          err instanceof Error ? err.message : "Failed to load scenarios"
+          err instanceof Error ? err.message : "Failed to load scenarios",
         );
       } finally {
         setScenariosLoading(false);
@@ -139,7 +139,7 @@ export default function ScenariosPage() {
             accept: "application/json",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -153,7 +153,7 @@ export default function ScenariosPage() {
 
       // Remove the scenario from local state
       setScenarios(
-        scenarios.filter((scenario) => scenario.uuid !== scenarioToDelete.uuid)
+        scenarios.filter((scenario) => scenario.uuid !== scenarioToDelete.uuid),
       );
       closeDeleteDialog();
     } catch (err) {
@@ -234,7 +234,7 @@ export default function ScenariosPage() {
     } catch (err) {
       reportError("Error creating scenario:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to create scenario"
+        err instanceof Error ? err.message : "Failed to create scenario",
       );
     } finally {
       setIsCreating(false);
@@ -279,7 +279,7 @@ export default function ScenariosPage() {
     } catch (err) {
       reportError("Error fetching scenario:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to load scenario"
+        err instanceof Error ? err.message : "Failed to load scenario",
       );
     } finally {
       setIsLoadingScenario(false);
@@ -317,7 +317,7 @@ export default function ScenariosPage() {
             name: scenarioLabel.trim(),
             description: scenarioDescription.trim(),
           }),
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -355,7 +355,7 @@ export default function ScenariosPage() {
     } catch (err) {
       reportError("Error updating scenario:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to update scenario"
+        err instanceof Error ? err.message : "Failed to update scenario",
       );
     } finally {
       setIsCreating(false);
@@ -368,7 +368,7 @@ export default function ScenariosPage() {
       (scenario.name &&
         scenario.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (scenario.description &&
-        scenario.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        scenario.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   return (
@@ -498,7 +498,8 @@ export default function ScenariosPage() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground mb-3">
-              {scenarios.length} {scenarios.length === 1 ? "scenario" : "scenarios"}
+              {scenarios.length}{" "}
+              {scenarios.length === 1 ? "scenario" : "scenarios"}
             </p>
             {/* Desktop Table View */}
             <div className="hidden md:block border border-border rounded-xl overflow-hidden">
@@ -697,7 +698,7 @@ export default function ScenariosPage() {
                           setScenarioLabel(e.target.value);
                           if (nameConflictError) setNameConflictError(null);
                         }}
-                        placeholder="e.g., Crop Insurance Inquiry"
+                        placeholder="e.g. Crop Insurance Inquiry"
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                           nameConflictError ||
                           (validationAttempted && !scenarioLabel.trim())
@@ -718,7 +719,7 @@ export default function ScenariosPage() {
                         Description <span className="text-red-500">*</span>
                       </label>
                       <p className="text-xs md:text-sm text-muted-foreground mb-2">
-                        Define WHAT the persona should do (e.g., &quot;Call to
+                        Define WHAT the persona should do (e.g. &quot;Call to
                         get a refund&quot;, &quot;Ask for PTO&quot;,
                         &quot;Inquire about balance&quot;). Use{" "}
                         <Link

@@ -43,7 +43,7 @@ alwaysApply: true
 className = "px-4 md:px-8 lg:px-12 py-16 md:py-24";
 ```
 
-**Image-heavy sections** (e.g., feature showcases):
+**Image-heavy sections** (e.g. feature showcases):
 
 ```tsx
 className = "px-6 md:px-8 lg:px-12 py-16 md:py-20";
