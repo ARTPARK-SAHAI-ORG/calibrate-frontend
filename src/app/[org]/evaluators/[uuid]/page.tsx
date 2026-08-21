@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
+import { NotFoundState } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
@@ -35,7 +35,6 @@ import {
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
-import { getParentPage, type ParentPage } from "@/lib/parentPage";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import {
@@ -689,29 +688,35 @@ function EvaluatorDetailPageInner() {
     return d.toLocaleString();
   };
 
-  // The page the reader came from (an agent, an evaluation, a simulation run,
-  // a labelling task). Read once on mount, before anything on this page can
-  // change it. With no record the trail is just the evaluator's own name.
-  const [parentPage] = useState<ParentPage | null>(() => getParentPage());
-
-  const crumbs: Crumb[] = [
-    ...(parentPage ? [{ label: parentPage.label, href: parentPage.href }] : []),
-    { label: evaluator?.name ?? "Evaluator" },
-  ];
-
-  const customHeader = <Breadcrumbs items={crumbs} />;
-
   return (
     <AppLayout
       activeItem="evaluators"
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      customHeader={customHeader}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* AppLayout hides `customHeader` below md. */}
-        <Breadcrumbs items={crumbs} className="md:hidden" />
+        {/* This page is reached from an agent, an evaluation, a simulation run
+            or a labelling task, so it goes back to wherever that was. */}
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+            />
+          </svg>
+          Back
+        </button>
 
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />

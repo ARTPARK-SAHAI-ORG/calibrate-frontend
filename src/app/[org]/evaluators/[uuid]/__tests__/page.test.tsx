@@ -11,15 +11,11 @@ import React from "react";
 import { render, screen, waitFor, setupUser } from "@/test-utils";
 
 const push = jest.fn();
+const back = jest.fn();
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
-  useRouter: () => ({
-    push,
-    replace: jest.fn(),
-    back: jest.fn(),
-    prefetch: jest.fn(),
-  }),
+  useRouter: () => ({ push, replace: jest.fn(), back, prefetch: jest.fn() }),
   usePathname: () => "/evaluators/eval-1",
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({ uuid: "eval-1" }),
@@ -219,30 +215,15 @@ describe("the versions and the one on screen", () => {
   });
 });
 
-describe("the trail at the top of the page", () => {
-  it("names the page the reader came from", async () => {
-    window.sessionStorage.setItem(
-      "calibrate:parent-page",
-      JSON.stringify({
-        href: "/agents/agent-1?tab=evaluators",
-        label: "Support bot",
-      }),
-    );
-
+describe("getting back out of the page", () => {
+  it("goes back to wherever the reader came from", async () => {
+    const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    const crumb = (
-      await screen.findAllByRole("link", { name: "Support bot" })
-    )[0];
-    expect(crumb).toHaveAttribute("href", "/agents/agent-1?tab=evaluators");
-    // The evaluator list is hidden, so it is never a step in the trail.
-    expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
-  });
+    await user.click(await screen.findByRole("button", { name: "Back" }));
 
-  it("shows the evaluator on its own when there is no page to go back to", async () => {
-    render(<EvaluatorDetailPage />);
-
-    await screen.findAllByText("Refund policy");
+    expect(back).toHaveBeenCalled();
+    // The evaluator list has no sidebar entry, so the page never links to it.
     expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
   });
 });

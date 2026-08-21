@@ -2,7 +2,6 @@
 import { reportError } from "@/lib/reportError";
 
 import React, { Suspense, useState, useEffect } from "react";
-import { forgetParentPage } from "@/lib/parentPage";
 import { Link, useRouter, useSearchParams } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
@@ -58,12 +57,6 @@ function MetricsPageInner() {
   });
 
   // Keep state in sync if the URL changes (e.g. back/forward navigation).
-  // This page shows no trail of its own, so nothing here should become
-  // the step before an evaluator opened from it.
-  useEffect(() => {
-    forgetParentPage();
-  }, []);
-
   useEffect(() => {
     const t = searchParams.get("tab");
     const next: EvaluatorTab = t === "default" ? "default" : "mine";

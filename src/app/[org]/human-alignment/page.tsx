@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback, FormEvent } from "react";
-import { forgetParentPage } from "@/lib/parentPage";
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import {
   CartesianGrid,
@@ -213,12 +212,6 @@ function HumanLabellingPageInner() {
   // list now carries an all-time `has_agreement` flag, so we filter in memory
   // instead of probing GET /annotation-tasks/{uuid}/agreement per task.
   const taskOptions: LabellingTaskSummary[] = taskOptionsWithAgreement(tasks);
-
-  // This page shows no trail of its own, so nothing here should become
-  // the step before an evaluator opened from it.
-  useEffect(() => {
-    forgetParentPage();
-  }, []);
 
   useEffect(() => {
     document.title = "Human alignment | Calibrate";
