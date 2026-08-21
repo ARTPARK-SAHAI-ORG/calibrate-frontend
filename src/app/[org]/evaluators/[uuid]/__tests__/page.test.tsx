@@ -38,6 +38,13 @@ jest.mock("../../../../../hooks", () => ({
   useAccessToken: () => "test-token",
 }));
 
+const toastError = jest.fn();
+
+jest.mock("sonner", () => ({
+  __esModule: true,
+  toast: { error: (...args: unknown[]) => toastError(...args) },
+}));
+
 const deleteEvaluator = jest.fn();
 
 jest.mock("../../../../../lib/evaluatorApi", () => ({
@@ -92,8 +99,18 @@ function mockEvaluator(overrides: Record<string, unknown> = {}) {
   }) as unknown as typeof fetch;
 }
 
+// jsdom reports a single history entry. Most tests stand for a reader who
+// arrived from another page in the app, so give them one to go back to.
+function setHistoryLength(value: number) {
+  Object.defineProperty(window.history, "length", {
+    configurable: true,
+    value,
+  });
+}
+
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000";
+  setHistoryLength(2);
   window.sessionStorage.clear();
   mockEvaluator();
 });
@@ -151,7 +168,9 @@ describe("evaluator page header actions", () => {
   });
 
   it("keeps the page open when the delete fails", async () => {
-    deleteEvaluator.mockRejectedValue(new Error("Failed to delete evaluator"));
+    deleteEvaluator.mockRejectedValue(
+      new Error("Evaluator is used by 2 tests"),
+    );
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
@@ -159,6 +178,10 @@ describe("evaluator page header actions", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(deleteEvaluator).toHaveBeenCalled());
+    // The reason the backend gave is shown, not swallowed.
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Evaluator is used by 2 tests"),
+    );
     expect(back).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
     // The confirmation stays up so the reader can try again.
@@ -248,5 +271,77 @@ describe("getting back out of the page", () => {
     expect(back).toHaveBeenCalled();
     // The evaluator list has no sidebar entry, so the page never links to it.
     expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
+  });
+});
+
+describe("deleting with nowhere to go back to", () => {
+  it("leaves the page instead of stranding the reader in the confirmation", async () => {
+    // A tab opened straight on this address has no earlier page.
+    setHistoryLength(1);
+    deleteEvaluator.mockResolvedValue(undefined);
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/agents"));
+    expect(back).not.toHaveBeenCalled();
+  });
+});
+
+describe("after creating a version", () => {
+  it("shows the version that was just created, even when it is not made current", async () => {
+    const user = setupUser();
+    const withV3 = {
+      ...EVALUATOR,
+      // v1 stays the current one: the tick box was unticked.
+      versions: [
+        ...EVALUATOR.versions,
+        {
+          uuid: "ver-3",
+          version_number: 3,
+          judge_model: "openai/gpt-4o",
+          system_prompt: "Grade the reply gently",
+          output_config: null,
+          variables: null,
+          created_at: "2026-07-17T10:00:00Z",
+        },
+      ],
+    };
+    // First load, then the POST, then the reload that follows it.
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => EVALUATOR,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ uuid: "ver-3" }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => withV3,
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Create version" }));
+
+    // The new v3 is on screen, not the current v1.
+    expect(
+      await screen.findByText("Grade the reply gently"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Grade the reply strictly")).toBeNull();
   });
 });

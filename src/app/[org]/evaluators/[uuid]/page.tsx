@@ -364,10 +364,24 @@ function EvaluatorDetailPageInner() {
       setDeleting(true);
       await deleteEvaluatorRequest(uuid, backendAccessToken);
       // Return to the page the reader came from, the same way Back does,
-      // rather than the evaluator list, which has no sidebar entry.
-      router.back();
+      // rather than the evaluator list, which has no sidebar entry. Going
+      // back does nothing when the address was opened straight into this tab,
+      // which would leave the confirmation on screen with no way out, so
+      // that case goes to the agents page instead.
+      const cameFromAnotherPage =
+        typeof window !== "undefined" && window.history.length > 1;
+      if (cameFromAnotherPage) {
+        router.back();
+      } else {
+        router.push("/agents");
+      }
     } catch (err) {
       reportError("Error deleting evaluator:", err);
+      // Say why, reading the backend's own wording, rather than leaving the
+      // confirmation to quietly become clickable again.
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete evaluator",
+      );
       setDeleting(false);
     }
   };
@@ -619,12 +633,19 @@ function EvaluatorDetailPageInner() {
       if (refreshed.ok) {
         const data: EvaluatorDetail = await refreshed.json();
         setEvaluator(data);
+        // Read the version that was just written, whether or not it was made
+        // the current one. Without this the panel falls back to the current
+        // version and the screen looks unchanged after creating.
+        const newest = (data.versions ?? []).reduce<EvaluatorVersion | null>(
+          (best, v) =>
+            !best || v.version_number > best.version_number ? v : best,
+          null,
+        );
+        setSelectedVersionUuid(newest?.uuid ?? null);
       }
       setNewVersionOpen(false);
-      setSelectedVersionUuid(null);
-      // The new version slots in at the top of the version list — scroll back
-      // up so the user can see it without manually scrolling past the (now
-      // collapsed) "New version" form.
+      // The page can be scrolled down on a phone, where the versions sit above
+      // their details, so start back at the top.
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
