@@ -44,22 +44,6 @@ export function runTestCount(run: AgentRun): number | null {
   return null;
 }
 
-/**
- * What judged this run, as plain labels: the evaluators it used, plus "Tool
- * call" when it covered a tool-call test, since those are checked against the
- * tool rather than by an evaluator. Empty when the list says nothing.
- */
-export function runEvaluatorLabels(run: AgentRun): string[] {
-  const labels = (run.evaluators ?? [])
-    .map((e) => e.name)
-    .filter((name): name is string => !!name);
-  const hasToolCall = (run.results ?? []).some(
-    (r) => r.type === "tool_call" || r.test_case?.type === "tool_call",
-  );
-  if (hasToolCall) labels.push("Tool call");
-  return Array.from(new Set(labels));
-}
-
 /** How many models the run tried the tests against. A plain run tries one. */
 export function runModelCount(run: AgentRun): number {
   return run.type === "llm-benchmark" ? (run.model_results?.length ?? 0) : 1;
@@ -143,26 +127,6 @@ function RunResult({ run }: { run: AgentRun }) {
         </span>
       )}
     </>
-  );
-}
-
-/** What judged the run, as plain pills. They are labels, not controls. */
-function EvaluatorLabels({ run }: { run: AgentRun }) {
-  const labels = runEvaluatorLabels(run);
-  if (labels.length === 0) {
-    return <span className="text-sm text-muted-foreground">—</span>;
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {labels.map((label) => (
-        <span
-          key={label}
-          className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[11px] font-medium bg-muted text-foreground"
-        >
-          {label}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -393,9 +357,6 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
                     Models
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                    Evaluators
-                  </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
                     Created at
                   </th>
@@ -427,9 +388,6 @@ export function RunsTabContent({
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runModelCount(run))}
                     </td>
-                    <td className="px-4 py-3">
-                      <EvaluatorLabels run={run} />
-                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {whenText(run)}
                     </td>
@@ -458,9 +416,6 @@ export function RunsTabContent({
                     {countCell(runTestCount(run))} tests,{" "}
                     {countCell(runModelCount(run))} models
                   </span>
-                </div>
-                <div className="mt-2">
-                  <EvaluatorLabels run={run} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />

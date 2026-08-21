@@ -1,11 +1,6 @@
 import React from "react";
 import { render, screen, setupUser, act, waitFor } from "@/test-utils";
-import {
-  RunsTabContent,
-  runTestCount,
-  runModelCount,
-  runEvaluatorLabels,
-} from "../RunsTabContent";
+import { RunsTabContent, runTestCount, runModelCount } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 
 const BACKEND = "http://test-backend";
@@ -151,29 +146,6 @@ describe("run counts", () => {
     expect(runModelCount(unitRun)).toBe(1);
     expect(runModelCount(benchmarkRun)).toBe(2);
   });
-
-  it("lists the evaluators, adding Tool call when the run had one", () => {
-    expect(
-      runEvaluatorLabels({
-        ...unitRun,
-        evaluators: [
-          { uuid: "e1", name: "Correctness" },
-          { uuid: "e2", name: "Tone" },
-        ],
-      }),
-    ).toEqual(["Correctness", "Tone"]);
-
-    expect(
-      runEvaluatorLabels({
-        ...unitRun,
-        evaluators: [{ uuid: "e1", name: "Correctness" }],
-        results: [{ passed: true, test_case: { type: "tool_call" } }],
-      }),
-    ).toEqual(["Correctness", "Tool call"]);
-
-    // Nothing known about this run: the cell stays empty rather than guessing.
-    expect(runEvaluatorLabels({ ...unitRun, results: null })).toEqual([]);
-  });
 });
 
 describe("RunsTabContent", () => {
@@ -200,21 +172,6 @@ describe("RunsTabContent", () => {
     expect(cells[cells.length - 1]).toBe("—");
   });
 
-  it("lists what judged the run, with tool calls named too", async () => {
-    state.runs = [
-      {
-        ...unitRun,
-        evaluators: [{ uuid: "e1", name: "Correctness" }],
-        results: [{ passed: true }, { passed: true, type: "tool_call" }],
-      },
-    ];
-    renderTab();
-    expect((await screen.findAllByText("Correctness")).length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.getAllByText("Tool call").length).toBeGreaterThan(0);
-  });
-
   it("shows both run kinds in one table with their test and model counts", async () => {
     renderTab();
     await screen.findAllByText("1 Success");
@@ -223,8 +180,8 @@ describe("RunsTabContent", () => {
     const cells = Array.from(table.querySelectorAll("tbody tr")).map((row) =>
       Array.from(row.querySelectorAll("td")).map((td) => td.textContent),
     );
-    // Run, result, number of tests, number of models: the counts sit third
-    // and fourth, for the plain run and the benchmark.
+    // Run, result, tests, models: the counts sit third and fourth, for the
+    // plain run and the benchmark.
     expect(cells[0]?.[2]).toBe("3");
     expect(cells[0]?.[3]).toBe("1");
     expect(cells[1]?.[2]).toBe("4");

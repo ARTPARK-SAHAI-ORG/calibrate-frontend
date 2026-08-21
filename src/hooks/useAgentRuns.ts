@@ -21,16 +21,8 @@ export type AgentRun = {
   passed: number | null;
   failed: number | null;
   error?: boolean;
-  results?:
-    | (UnitTestResultLike & {
-        /** Present on a tool-call test's row, on the row itself or its test case. */
-        type?: string | null;
-        test_case?: { type?: string | null } | null;
-      })[]
-    | null;
+  results?: UnitTestResultLike[] | null;
   model_results?: { model: string; test_results?: unknown[] }[] | null;
-  /** The evaluators this run judged with, when the list carries them. */
-  evaluators?: { uuid: string; name: string }[] | null;
   created_at?: string;
 };
 
