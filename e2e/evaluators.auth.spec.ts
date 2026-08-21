@@ -195,20 +195,23 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(v2).toBeVisible({ timeout: 20000 });
 
     // The page opens on the current version (still v1), so pick v2 to read it.
-    // It is not current yet, so its details carry a "Mark as current" button.
     await v2.click();
+
+    // Every version that is not the current one carries a "Mark as current"
+    // button in its own row, so right now that is v2's alone.
     const markCurrent = page.getByRole("button", { name: "Mark as current" });
-    await expect(markCurrent).toBeVisible({ timeout: 20000 });
+    await expect(markCurrent).toHaveCount(1, { timeout: 20000 });
     await markCurrent.click();
 
-    // After the refresh v2 is the current version: its entry in the list
-    // carries the "Current" pill and the button is gone.
+    // After the refresh the "Current" pill has moved from v1 to v2.
     await expect(
       page.getByRole("button", { name: /^v2.*Current/ }),
     ).toBeVisible({
       timeout: 20000,
     });
-    await expect(markCurrent).toHaveCount(0, { timeout: 20000 });
+    await expect(
+      page.getByRole("button", { name: /^v1.*Current/ }),
+    ).toHaveCount(0, { timeout: 20000 });
 
     // Clean up.
     await deleteEvaluator(page, name);
