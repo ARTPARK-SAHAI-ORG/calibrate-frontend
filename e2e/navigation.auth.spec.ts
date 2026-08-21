@@ -47,18 +47,20 @@ test.describe("Authenticated navigation (real backend)", () => {
 
     // Click a nav item and confirm client-side routing lands on its page. The
     // sidebar nav items are Next.js <Link>s (role=link) labelled with the
-    // section name.
-    await page.getByRole("link", { name: "Tools", exact: true }).click();
-    await expect(page).toHaveURL(workspacePath("/tools"));
-    // exact: the empty-state heading "No tools found" also contains "Tools".
+    // section name. Tools, Evaluators and LLM Tests are reachable by address
+    // only, so they are not in the sidebar to click.
+    await page.getByRole("link", { name: "Personas", exact: true }).click();
+    await expect(page).toHaveURL(workspacePath("/personas"));
     await expect(
-      page.getByRole("heading", { name: "Tools", exact: true }),
+      page.getByRole("heading", { name: "Personas", exact: true }),
     ).toBeVisible();
 
-    await page.getByRole("link", { name: "Evaluators", exact: true }).click();
-    await expect(page).toHaveURL(workspacePath("/evaluators"));
+    await page
+      .getByRole("link", { name: "Human alignment", exact: true })
+      .click();
+    await expect(page).toHaveURL(workspacePath("/human-alignment"));
     await expect(
-      page.getByRole("heading", { name: "Evaluators", exact: true }),
+      page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible();
   });
 

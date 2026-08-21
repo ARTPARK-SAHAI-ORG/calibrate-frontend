@@ -462,34 +462,14 @@ describe("TestsTabContent — empty states", () => {
     expect(screen.queryByText("Add test")).not.toBeInTheDocument();
   });
 
-  it("shows the Add-test button in the empty state when the library has tests", async () => {
+  it("does not offer Add test even when the library has tests", async () => {
     state.allTests = [libraryTest];
     renderComponent();
     await screen.findByText("No tests attached");
-    await screen.findByText("Add test");
-  });
-
-  it("shows the with-past-runs empty variant and the past runs panel", async () => {
-    state.pastRuns = [
-      {
-        uuid: "run-1",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 3,
-        passed: 3,
-        failed: 0,
-        results: null,
-      },
-    ];
-    renderComponent();
-    await screen.findByText("No tests attached");
-    expect(
-      screen.getByText(/doesn't have any tests linked right now/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Past runs")).toBeInTheDocument();
-    expect(screen.getByText("3 tests")).toBeInTheDocument();
+    // Attaching an existing test is hidden for now: new tests come from
+    // Create test and Bulk upload.
+    expect(screen.queryByText("Add test")).not.toBeInTheDocument();
+    expect(screen.getByText("Create test")).toBeInTheDocument();
   });
 });
 
@@ -542,7 +522,8 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
     expect(screen.getByText("Remove")).toBeInTheDocument();
-    expect(screen.getByText("Delete")).toBeInTheDocument();
+    // Deleting from the library is hidden for now; Remove detaches only.
+    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Clear"));
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
@@ -864,7 +845,9 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await release();
     await screen.findByTestId("test-runner-dialog");
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("button", { name: "Run" }),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -995,24 +978,17 @@ describe("TestsTabContent — delete flows", () => {
     expect(deleteCall).toBeTruthy();
   });
 
-  it("permanently deletes a single test via the dialog checkbox", async () => {
+  it("does not offer to delete a single test from the library", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getAllByTitle("Delete test")[0]);
     await screen.findByTestId("delete-dialog");
-    // Toggle the "delete permanently" checkbox rendered inside extraContent.
-    await user.click(screen.getByRole("checkbox"));
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
-    await user.click(screen.getByText("ConfirmDelete"));
-
-    await waitFor(() => {
-      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).includes("/agent-tests/bulk-delete-tests"),
-      );
-      expect(bulkCall).toBeTruthy();
-    });
+    // The window only takes the test off this agent now: no checkbox to turn
+    // it into a permanent library delete.
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
   });
 
   it("bulk-removes selected tests", async () => {
@@ -1031,27 +1007,6 @@ describe("TestsTabContent — delete flows", () => {
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
     );
-  });
-
-  it("bulk-deletes selected tests permanently", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
-    await screen.findByTestId("delete-dialog");
-    expect(screen.getByTestId("delete-title")).toHaveTextContent(
-      "Delete tests permanently",
-    );
-    await user.click(screen.getByText("ConfirmDelete"));
-
-    await waitFor(() => {
-      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).includes("/agent-tests/bulk-delete-tests"),
-      );
-      expect(bulkCall).toBeTruthy();
-    });
   });
 
   it("closes the delete dialog via Cancel/Close", async () => {
@@ -1148,42 +1103,6 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("CloseBulkUpload"));
     expect(screen.queryByTestId("bulk-upload-modal")).not.toBeInTheDocument();
   });
-
-  it("attaches existing tests via the Add-test dropdown", async () => {
-    state.allTests = [libraryTest];
-    const user = setupUser();
-    renderComponent();
-    await screen.findByText("No tests attached");
-
-    await user.click(await screen.findByText("Add test"));
-    // dropdown search input appears
-    await screen.findByPlaceholderText("Search tests");
-    await user.click(await screen.findByText("Library only test"));
-    await user.click(screen.getByText("Add 1 test"));
-
-    await waitFor(() => {
-      const postCall = (global.fetch as jest.Mock).mock.calls.find(
-        (c: any[]) =>
-          c[1]?.method === "POST" && String(c[0]).endsWith("/agent-tests"),
-      );
-      expect(postCall).toBeTruthy();
-    });
-  });
-
-  it("select-all in the dropdown selects every available test", async () => {
-    state.allTests = [
-      libraryTest,
-      { ...libraryTest, uuid: "t4", name: "Second lib" },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findByText("No tests attached");
-
-    await user.click(await screen.findByText("Add test"));
-    await screen.findByText("Select all");
-    await user.click(screen.getByText("Select all"));
-    expect(screen.getByText("Add 2 tests")).toBeInTheDocument();
-  });
 });
 
 describe("TestsTabContent — benchmark & past runs", () => {
@@ -1212,234 +1131,48 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
   });
 
-  it("adds an optimistic run when a benchmark is created", async () => {
-    state.agentTests = [responseTest];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByTestId("compare-header"));
-    await screen.findByTestId("benchmark-dialog");
-    await user.click(screen.getByText("TriggerBenchmarkCreated"));
-    // A benchmark run row appears in the past runs list. The optimistic run
-    // has no model_results yet, so it renders "0 models".
-    await screen.findByText("0 models");
-  });
-
-  it("adds an optimistic run as soon as a test run is created", async () => {
+  it("leaves ?runId= alone: that belongs to the Evaluations tab", async () => {
     state.agentTests = [responseTest];
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
-    // The pending row is added by the parent when the POST returns, before
-    // (and independently of) the dialog reporting anything back.
-    await screen.findByText("Running");
     await screen.findByTestId("test-runner-dialog");
+    // Both tabs stay mounted, so writing the run into the address here would
+    // open a second copy of this window in the Evaluations tab.
+    expect(new URLSearchParams(window.location.search).get("runId")).toBeNull();
   });
 
-  it("renders past-run status pills (breakdown, error, complete)", async () => {
+  it("tells the parent when the run window is closed", async () => {
     state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-breakdown",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 3,
-        passed: 1,
-        failed: 1,
-        results: [
-          { passed: true },
-          { passed: false },
-          { passed: null, status: "error", error: "boom" },
-        ],
-      },
-      {
-        uuid: "run-bench-failed",
-        name: "Bench",
-        status: "failed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }, { model: "b" }],
-      },
-    ];
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    expect(screen.getByText("1 Success")).toBeInTheDocument();
-    expect(screen.getByText("1 Fail")).toBeInTheDocument();
-    expect(screen.getByText("1 Error")).toBeInTheDocument();
-    expect(screen.getByText("Error")).toBeInTheDocument();
-    expect(screen.getByText("2 models")).toBeInTheDocument();
-  });
-
-  it("opens the unit-test results dialog when a past run row is clicked", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-unit",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 2,
-        passed: 2,
-        failed: 0,
-        results: [
-          { passed: true, test_case: { name: "A" } },
-          { passed: true, test_case: { name: "B" } },
-        ],
-      },
-    ];
+    const onRunWindowClosed = jest.fn();
     const user = setupUser();
-    renderComponent();
+    renderComponent({ onRunWindowClosed });
     await screen.findAllByText("Greeting test");
 
-    // agentTests has 1 test ("1 test" count), so the run row's "2 tests"
-    // label is unambiguous.
-    await user.click(screen.getByText("2 tests"));
+    await user.click(screen.getByText("Run all tests"));
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
-  });
-
-  it("opens the benchmark results dialog when a benchmark run row is clicked", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-bench",
-        name: "Bench",
-        status: "completed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("1 model"));
-    await screen.findByTestId("benchmark-results-dialog");
-  });
-
-  it("switches to the new run and prepends its row when the dialog reports a rerun (onNewRun)", async () => {
-    // The dialog now creates the rerun itself and hands the parent the new run
-    // id + the tests it ran; the parent shows the pending row and re-points the
-    // dialog at that run.
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-unit",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 2,
-        passed: 2,
-        failed: 0,
-        results: [
-          { passed: true, test_case: { name: "A" } },
-          { passed: true, test_case: { name: "B" } },
-        ],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("2 tests"));
-    await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
-    expect(screen.queryByText("Running")).not.toBeInTheDocument();
-
+    // The parent takes the reader to the Evaluations tab from here.
     await act(async () => {
-      testRunnerProps.onNewRun("task-rerun", ["t1"]);
+      testRunnerProps.onClose();
     });
-
-    // Same single dialog, now viewing the new run, plus a pending row for it.
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
-      "task-rerun",
-    );
-    await screen.findByText("Running");
+    expect(onRunWindowClosed).toHaveBeenCalled();
   });
 
-  it("reruns a benchmark: opens a direct benchmark dialog with the given models, no picker", async () => {
+  it("opens the run dialog and tells the parent a run started", async () => {
     state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-bench",
-        name: "Bench",
-        status: "completed",
-        type: "llm-benchmark",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: null,
-        passed: null,
-        failed: null,
-        model_results: [{ model: "a" }],
-      },
-    ];
+    const onRunStarted = jest.fn();
     const user = setupUser();
-    renderComponent();
+    renderComponent({ onRunStarted });
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByText("1 model"));
-    await screen.findByTestId("benchmark-results-dialog");
-
-    await act(async () => {
-      benchmarkResultsProps.onRerun(
-        ["gpt-4", "claude"],
-        ["tu-1", "tu-2"],
-        ["A", "B"],
-      );
-    });
-
-    await screen.findByTestId("benchmark-results-dialog");
-    // The direct-rerun instance carries the models/test subset/testNames and no
-    // taskId, so it POSTs a fresh benchmark rather than viewing an existing one.
-    expect(benchmarkResultsProps.taskId).toBeUndefined();
-    expect(benchmarkResultsProps.models).toEqual(["gpt-4", "claude"]);
-    expect(benchmarkResultsProps.testUuids).toEqual(["tu-1", "tu-2"]);
-    expect(benchmarkResultsProps.testNames).toEqual(["A", "B"]);
-    expect(typeof benchmarkResultsProps.onBenchmarkCreated).toBe("function");
+    await user.click(screen.getByText("Run all tests"));
+    // The runs list lives in the Runs tab now, so this tab only opens the
+    // window on the new run and lets the parent refresh that tab.
+    await screen.findByTestId("test-runner-dialog");
+    expect(onRunStarted).toHaveBeenCalled();
   });
-
-  it("polls a pending run and updates its status", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-pending",
-        name: "",
-        status: "pending",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 1,
-        passed: null,
-        failed: null,
-        results: [{ passed: null }],
-      },
-    ];
-    state.pollUnit = {
-      status: "completed",
-      total_tests: 1,
-      passed: 1,
-      failed: 0,
-      results: [{ passed: true }],
-    };
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-    // The poll runs on the POLLING_INTERVAL_MS (3s) interval and flips the
-    // pending run to completed, surfacing the per-test breakdown.
-    await screen.findByText("1 Success", {}, { timeout: 5000 });
-  }, 10000);
 });
 
 describe("TestsTabContent — connection agent", () => {

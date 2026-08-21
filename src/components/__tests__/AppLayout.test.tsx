@@ -5,7 +5,9 @@ import { AppLayout } from "@/components/AppLayout";
 // without touching the network.
 jest.mock("../WorkspaceSwitcher", () => ({
   WorkspaceSwitcher: ({ collapsed }: { collapsed: boolean }) => (
-    <div data-testid={`workspace-switcher-${collapsed ? "collapsed" : "expanded"}`} />
+    <div
+      data-testid={`workspace-switcher-${collapsed ? "collapsed" : "expanded"}`}
+    />
   ),
 }));
 
@@ -54,7 +56,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function renderLayout(overrides: Partial<React.ComponentProps<typeof AppLayout>> = {}) {
+function renderLayout(
+  overrides: Partial<React.ComponentProps<typeof AppLayout>> = {},
+) {
   const onItemChange = jest.fn();
   const onSidebarToggle = jest.fn();
   render(
@@ -76,8 +80,10 @@ describe("AppLayout", () => {
     renderLayout();
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
-    expect(screen.getByText("Tools")).toBeInTheDocument();
-    expect(screen.getByTestId("workspace-switcher-expanded")).toBeInTheDocument();
+    expect(screen.getByText("Human alignment")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("workspace-switcher-expanded"),
+    ).toBeInTheDocument();
   });
 
   it("shows only a spinner while the workspace list is still loading", () => {
@@ -121,8 +127,8 @@ describe("AppLayout", () => {
 
   it("renders nav items as links to their routes", () => {
     renderLayout();
-    const toolsLink = screen.getByText("Tools").closest("a");
-    expect(toolsLink).toHaveAttribute("href", "/tools");
+    const personasLink = screen.getByText("Personas").closest("a");
+    expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
   it("opens the learning resources page from Tutorials", () => {
@@ -141,13 +147,19 @@ describe("AppLayout", () => {
 
   it("renders the collapsed rail when closed", () => {
     renderLayout({ sidebarOpen: false });
-    expect(screen.getByTestId("workspace-switcher-collapsed")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("workspace-switcher-collapsed"),
+    ).toBeInTheDocument();
   });
 
   it("shows the display name from localStorage when there is no session", () => {
     localStorage.setItem(
       "user",
-      JSON.stringify({ first_name: "Ada", last_name: "Lovelace", email: "ada@example.com" }),
+      JSON.stringify({
+        first_name: "Ada",
+        last_name: "Lovelace",
+        email: "ada@example.com",
+      }),
     );
     renderLayout();
     expect(screen.getByText("Page content")).toBeInTheDocument();
@@ -166,7 +178,9 @@ describe("AppLayout", () => {
 
   it("shows the Talk to us button in the collapsed rail", () => {
     renderLayout({ sidebarOpen: false });
-    expect(screen.getByRole("button", { name: "Talk to us" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Talk to us" }),
+    ).toBeInTheDocument();
   });
 
   it("links to the API keys tab from the profile dropdown", async () => {
@@ -177,6 +191,58 @@ describe("AppLayout", () => {
       "href",
       "/workspace-settings?tab=api-keys",
     );
+  });
+
+  it.each(["LLM Tests", "Tools", "Evaluators"])(
+    "does not offer %s in the sidebar",
+    (label) => {
+      renderLayout();
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    },
+  );
+
+  it("folds the Voice evaluation section away and remembers the choice", async () => {
+    const user = setupUser();
+    renderLayout();
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Voice evaluation" }));
+    expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
+      JSON.stringify(["Voice evaluation"]),
+    );
+  });
+
+  it("opens a folded section again and forgets the choice", async () => {
+    const user = setupUser();
+    localStorage.setItem(
+      "calibrate:collapsed-nav-sections",
+      JSON.stringify(["Voice evaluation"]),
+    );
+    renderLayout();
+    expect(screen.queryByText("Speech-to-Text")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Voice evaluation" }));
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe("[]");
+  });
+
+  it("folds the Agent simulations section away and remembers the choice", async () => {
+    const user = setupUser();
+    renderLayout();
+    expect(screen.getByText("Personas")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Agent simulations" }));
+    expect(screen.queryByText("Personas")).not.toBeInTheDocument();
+    expect(localStorage.getItem("calibrate:collapsed-nav-sections")).toBe(
+      JSON.stringify(["Agent simulations"]),
+    );
+  });
+
+  it("ignores a saved value that is not a list of sections", () => {
+    localStorage.setItem("calibrate:collapsed-nav-sections", "not json");
+    renderLayout();
+    expect(screen.getByText("Speech-to-Text")).toBeInTheDocument();
   });
 
   it("renders custom header and header actions when provided", () => {

@@ -6,19 +6,16 @@ import { Tooltip } from "@/components/Tooltip";
 type Kind = "single" | "side_by_side";
 type OutputType = "binary" | "rating";
 export type EvaluatorType =
-  | "tts"
-  | "stt"
-  | "llm"
-  | "llm-general"
-  | "conversation";
+  "tts" | "stt" | "llm" | "llm-general" | "conversation";
 
 const baseClasses =
   "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
 
-export function DefaultPill() {
+/** Marks an evaluator that came with the product rather than being written here. */
+export function PreBuiltPill() {
   return (
     <span className={`${baseClasses} bg-foreground text-background`}>
-      Default
+      Pre-built
     </span>
   );
 }

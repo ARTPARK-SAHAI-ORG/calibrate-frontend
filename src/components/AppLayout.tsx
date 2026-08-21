@@ -30,7 +30,30 @@ type NavItem = {
 type NavSection = {
   title?: string;
   items: NavItem[];
+  /** Lets the reader fold this section away. The choice is remembered. */
+  collapsible?: boolean;
 };
+
+/** Titles of the sidebar sections the reader has folded away. */
+const COLLAPSED_SECTIONS_KEY = "calibrate:collapsed-nav-sections";
+
+/** The saved titles, or none when there is no choice yet, the saved value is
+ *  not a list of titles, or there is no browser (rendering on the server). */
+function savedCollapsedSections(): string[] {
+  if (typeof window === "undefined") return [];
+  // A browser set to block site data throws on both reading and writing here.
+  // Forgetting the choice is fine; taking the page down with it is not.
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(COLLAPSED_SECTIONS_KEY) || "[]",
+    );
+    return Array.isArray(parsed)
+      ? parsed.filter((title): title is string => typeof title === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 // The "Product tour" compass icon, shared by the sidebar nav item and the
 // profile-menu "Take a tour" entry so the two never drift apart.
@@ -52,6 +75,12 @@ function TourIcon({ className }: { className?: string }) {
   );
 }
 
+// Section headings title the nav items below them and are not places to go,
+// so they are darker and heavier than the items, carry no icon on the left,
+// and the items under them are indented. A folding section puts its arrow on
+// the right, in grey, where no nav item has one.
+const SECTION_HEADING_CLASS = "px-2 mb-1 text-sm font-semibold text-foreground";
+
 const navSections: NavSection[] = [
   {
     items: [
@@ -70,44 +99,6 @@ const navSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-            />
-          </svg>
-        ),
-      },
-      {
-        id: "tools",
-        label: "Tools",
-        icon: (
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-            />
-          </svg>
-        ),
-      },
-      {
-        id: "evaluators",
-        label: "Evaluators",
-        icon: (
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
             />
           </svg>
         ),
@@ -139,7 +130,8 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Component Tests",
+    title: "Voice evaluation",
+    collapsible: true,
     items: [
       {
         id: "stt",
@@ -157,15 +149,6 @@ const navSections: NavSection[] = [
               strokeLinejoin="round"
               d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
             />
-          </svg>
-        ),
-      },
-      {
-        id: "tests",
-        label: "LLM Tests",
-        icon: (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 3h6v2h-1v4.5l4.5 7.5c.5.83.5 1.5-.17 2.17-.67.67-1.34.83-2.33.83H8c-1 0-1.67-.17-2.33-.83-.67-.67-.67-1.34-.17-2.17L10 9.5V5H9V3zm3 8.5L8.5 17h7L12 11.5z" />
           </svg>
         ),
       },
@@ -191,7 +174,8 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "End-to-End Tests",
+    title: "Agent simulations",
+    collapsible: true,
     items: [
       {
         id: "personas",
@@ -333,6 +317,21 @@ export function AppLayout({
   const [profileOpen, setProfileOpen] = useState(false);
   const [talkToUsOpen, setTalkToUsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("device");
+  const [collapsedSections, setCollapsedSections] = useState(
+    savedCollapsedSections,
+  );
+
+  const toggleSection = (title: string) => {
+    const next = collapsedSections.includes(title)
+      ? collapsedSections.filter((t) => t !== title)
+      : [...collapsedSections, title];
+    setCollapsedSections(next);
+    try {
+      window.localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(next));
+    } catch {
+      // Site data blocked: forget the choice rather than break the sidebar.
+    }
+  };
   const profileRef = useRef<HTMLDivElement>(null);
   const talkToUsRef = useRef<HTMLDivElement>(null);
 
@@ -548,84 +547,118 @@ export function AppLayout({
         {sidebarOpen && (
           <>
             <nav className="flex-1 overflow-y-auto py-3 px-3">
-              {navSections.map((section, index) => (
-                <div key={section.title || index} className="mb-5">
-                  {section.title && (
-                    <h3 className="px-2 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {section.title}
-                    </h3>
-                  )}
-                  <ul className="space-y-1">
-                    {section.items.map((item) => (
-                      <li
-                        key={item.id}
-                        // The tour is desktop-only, so hide its launcher on phones.
-                        className={
-                          item.id === "guided-tour" ? "hidden md:block" : undefined
-                        }
+              {navSections.map((section, index) => {
+                const collapsed =
+                  !!section.collapsible &&
+                  !!section.title &&
+                  collapsedSections.includes(section.title);
+                return (
+                  <div key={section.title || index} className="mb-5">
+                    {section.title &&
+                      (section.collapsible ? (
+                        <button
+                          onClick={() => toggleSection(section.title!)}
+                          aria-expanded={!collapsed}
+                          className={`${SECTION_HEADING_CLASS} w-full flex items-center gap-2 rounded-md cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border`}
+                        >
+                          {section.title}
+                          <svg
+                            className={`ml-auto w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                            />
+                          </svg>
+                        </button>
+                      ) : (
+                        <h3 className={SECTION_HEADING_CLASS}>
+                          {section.title}
+                        </h3>
+                      ))}
+                    {!collapsed && (
+                      <ul
+                        className={`space-y-1 ${section.title ? "pl-2" : ""}`}
                       >
-                        {item.id === "guided-tour" ? (
-                          <button
-                            onClick={handleStartGuidedTour}
-                            data-tour="start-tour"
-                            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                        {section.items.map((item) => (
+                          <li
+                            key={item.id}
+                            // The tour is desktop-only, so hide its launcher on phones.
+                            className={
+                              item.id === "guided-tour"
+                                ? "hidden md:block"
+                                : undefined
+                            }
                           >
-                            {item.icon}
-                            {item.label}
-                          </button>
-                        ) : item.id === "tutorials" ? (
-                          <a
-                            href="/learn"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => {
-                              // Close sidebar on mobile when clicking external link
-                              if (window.innerWidth < 768 && sidebarOpen) {
-                                onSidebarToggle();
-                              }
-                            }}
-                            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                          >
-                            {item.icon}
-                            {item.label}
-                            <svg
-                              className="w-3 h-3 ml-auto text-muted-foreground"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                              />
-                            </svg>
-                          </a>
-                        ) : (
-                          <Link
-                            href={`/${item.id}`}
-                            onClick={() => {
-                              // Close sidebar on mobile when clicking nav link
-                              if (window.innerWidth < 768 && sidebarOpen) {
-                                onSidebarToggle();
-                              }
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                              activeItem === item.id
-                                ? "bg-accent text-accent-foreground"
-                                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                            }`}
-                          >
-                            {item.icon}
-                            {item.label}
-                          </Link>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                            {item.id === "guided-tour" ? (
+                              <button
+                                onClick={handleStartGuidedTour}
+                                data-tour="start-tour"
+                                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              >
+                                {item.icon}
+                                {item.label}
+                              </button>
+                            ) : item.id === "tutorials" ? (
+                              <a
+                                href="/learn"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  // Close sidebar on mobile when clicking external link
+                                  if (window.innerWidth < 768 && sidebarOpen) {
+                                    onSidebarToggle();
+                                  }
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              >
+                                {item.icon}
+                                {item.label}
+                                <svg
+                                  className="w-3 h-3 ml-auto text-muted-foreground"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                  />
+                                </svg>
+                              </a>
+                            ) : (
+                              <Link
+                                href={`/${item.id}`}
+                                onClick={() => {
+                                  // Close sidebar on mobile when clicking nav link
+                                  if (window.innerWidth < 768 && sidebarOpen) {
+                                    onSidebarToggle();
+                                  }
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                                  activeItem === item.id
+                                    ? "bg-accent text-accent-foreground"
+                                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                                }`}
+                              >
+                                {item.icon}
+                                {item.label}
+                              </Link>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
           </>
         )}
@@ -984,7 +1017,6 @@ export function AppLayout({
           <div className="w-full px-4 md:px-6 lg:px-8">{children}</div>
         </div>
       </main>
-
     </div>
   );
 }

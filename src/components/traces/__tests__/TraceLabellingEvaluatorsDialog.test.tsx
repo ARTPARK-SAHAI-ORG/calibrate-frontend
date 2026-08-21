@@ -80,7 +80,13 @@ it("offers exactly two actions", async () => {
   await waitFor(() =>
     expect(screen.getByText("Correctness")).toBeInTheDocument(),
   );
-  expect(screen.getAllByRole("button")).toHaveLength(2);
+  // Footer keeps exactly the two actions. Each evaluator row also carries a
+  // button, the one that opens its prompt on the right.
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter((b) => !b.className.includes("flex-1 text-left")),
+  ).toHaveLength(2);
   expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
 });
@@ -88,9 +94,7 @@ it("offers exactly two actions", async () => {
 it("hands back the picked evaluators", async () => {
   const user = setupUser();
   const { onChosen } = setup();
-  await waitFor(() =>
-    expect(screen.getByText("My Judge")).toBeInTheDocument(),
-  );
+  await waitFor(() => expect(screen.getByText("My Judge")).toBeInTheDocument());
 
   await user.click(screen.getByRole("checkbox", { name: /My Judge/ }));
   await user.click(screen.getByRole("button", { name: "Continue" }));

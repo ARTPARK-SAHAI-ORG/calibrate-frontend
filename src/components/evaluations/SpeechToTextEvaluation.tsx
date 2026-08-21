@@ -20,7 +20,8 @@ import {
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
-import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
+import { RunEvaluatorsPanel } from "./RunEvaluatorsPanel";
+import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { Tooltip } from "../Tooltip";
 import { pruneSelectionToAllowed } from "./providerSelection";
 import { SARVAM_ASR_BLOG_URL } from "@/constants/links";
@@ -30,7 +31,7 @@ type EvaluationResult = {
   status: "queued" | "in_progress" | "done";
 };
 
-type TabType = "input" | "models" | "settings";
+type TabType = "input" | "models" | "evaluators";
 
 type LanguageOption =
   | "english"
@@ -79,7 +80,6 @@ const getFilteredProviders = (
   );
 };
 
-
 type SpeechToTextEvaluationProps = {
   evaluateRef?: React.MutableRefObject<(() => void) | null>;
   onEvaluatingChange?: (v: boolean) => void;
@@ -93,7 +93,9 @@ export function SpeechToTextEvaluation({
 }: SpeechToTextEvaluationProps = {}) {
   const router = useRouter();
   const backendAccessToken = useAccessToken();
-  const [activeTab, setActiveTab] = useState<TabType>(initialDatasetId ? "models" : "input");
+  const [activeTab, setActiveTab] = useState<TabType>(
+    initialDatasetId ? "models" : "input",
+  );
   const editorRef = useRef<STTDatasetEditorHandle | null>(null);
   const maxRowsPerEval = useMaxRowsPerEval();
   const [providersInvalid, setProvidersInvalid] = useState(false);
@@ -128,7 +130,10 @@ export function SpeechToTextEvaluation({
   // Handle language change - clear providers that don't support the new language
   const handleLanguageChange = (newLanguage: LanguageOption) => {
     setLanguage(newLanguage);
-    const newFilteredProviders = getFilteredProviders(newLanguage, enabledProviders);
+    const newFilteredProviders = getFilteredProviders(
+      newLanguage,
+      enabledProviders,
+    );
     const supportedLabels = new Set(newFilteredProviders.map((p) => p.label));
     setSelectedProviders((prev) => {
       if (newFilteredProviders.length === 1) {
@@ -150,22 +155,28 @@ export function SpeechToTextEvaluation({
   };
 
   // Dataset mode
-  const [inputMode, setInputMode] = useState<"inline" | "dataset">(initialDatasetId ? "dataset" : "inline");
+  const [inputMode, setInputMode] = useState<"inline" | "dataset">(
+    initialDatasetId ? "dataset" : "inline",
+  );
   const [availableDatasets, setAvailableDatasets] = useState<Dataset[]>([]);
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(initialDatasetId ?? "");
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(
+    initialDatasetId ?? "",
+  );
   const [datasetName, setDatasetName] = useState("");
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
   // Evaluators (filtered to STT purpose). None are pre-selected — the user
   // chooses which (if any) to add, since STT evaluations no longer require an
   // evaluator.
-  const [availableEvaluators, setAvailableEvaluators] = useState<PickerItem[]>([]);
-  const [selectedEvaluators, setSelectedEvaluators] = useState<PickerItem[]>([]);
+  const [availableEvaluators, setAvailableEvaluators] = useState<
+    EvaluatorData[]
+  >([]);
+  const [selectedEvaluatorUuids, setSelectedEvaluatorUuids] = useState<
+    string[]
+  >([]);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
-
-  const handleEvaluatorsChange = (items: PickerItem[]) => {
-    setSelectedEvaluators(items);
-  };
+  // Bumped after an evaluator is created here, to re-read the library.
+  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
 
   useEffect(() => {
     if (!backendAccessToken) return;
@@ -211,22 +222,13 @@ export function SpeechToTextEvaluation({
         }
 
         const data = await response.json();
-        const sttEvaluators: PickerItem[] = unwrapList<{
-          uuid: string;
-          name: string;
-          description?: string;
-          evaluator_type?: string;
-        }>(data)
-          .filter((m) => m.evaluator_type === "stt")
-          .map((m) => ({
-            uuid: m.uuid,
-            name: m.name,
-            description: m.description,
-          }));
-
         // Show every STT evaluator but pre-select none — adding an evaluator
         // is entirely opt-in.
-        setAvailableEvaluators(sttEvaluators);
+        setAvailableEvaluators(
+          unwrapList<EvaluatorData>(data).filter(
+            (m) => m.evaluator_type === "stt",
+          ),
+        );
       } catch (err) {
         reportError("Error fetching evaluators:", err);
       } finally {
@@ -235,7 +237,7 @@ export function SpeechToTextEvaluation({
     };
 
     fetchEvaluators();
-  }, [backendAccessToken]);
+  }, [backendAccessToken, evaluatorsReloadKey]);
 
   // Keep evaluateRef current so the parent can call it
   const handleEvaluateRef = useRef<() => void>(() => {});
@@ -263,7 +265,6 @@ export function SpeechToTextEvaluation({
     setSelectedProviders(new Set(providerLabels));
     setProvidersInvalid(false);
   };
-
 
   const handleEvaluate = async () => {
     // Validate providers first
@@ -311,7 +312,7 @@ export function SpeechToTextEvaluation({
         return provider ? provider.value : label;
       });
 
-      const evaluatorUuids = selectedEvaluators.map((e) => e.uuid);
+      const evaluatorUuids = selectedEvaluatorUuids;
 
       let requestBody: Record<string, unknown>;
       if (inputMode === "dataset") {
@@ -392,582 +393,579 @@ export function SpeechToTextEvaluation({
           Models
         </button>
         <button
-          onClick={() => setActiveTab("settings")}
+          onClick={() => setActiveTab("evaluators")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "settings"
+            activeTab === "evaluators"
               ? "text-foreground border-b-2 border-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Settings
+          Evaluators
         </button>
+      </div>
+
+      {/* Evaluators Tab Content */}
+      <div className={activeTab === "evaluators" ? undefined : "hidden"}>
+        <RunEvaluatorsPanel
+          evaluatorType="stt"
+          available={availableEvaluators}
+          isLoading={evaluatorsLoading}
+          selectedUuids={selectedEvaluatorUuids}
+          onSelectedChange={setSelectedEvaluatorUuids}
+          onRefresh={() => setEvaluatorsReloadKey((k) => k + 1)}
+          description="These evaluators score the transcripts each model produces"
+          beforeList={
+            <div className="space-y-3">
+              <div className="space-y-3">
+                {/* WER is a built-in STT metric computed on every run regardless of
+                the evaluators chosen here — make that explicit up front so users
+                know they always get it. */}
+                <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-[12px] md:text-[13px] text-muted-foreground">
+                  <svg
+                    className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                    />
+                  </svg>
+                  <span>
+                    <span className="font-medium text-foreground">
+                      WER (Word Error Rate)
+                    </span>{" "}
+                    and{" "}
+                    <span className="font-medium text-foreground">
+                      CER (Character Error Rate)
+                    </span>{" "}
+                    are always computed for every STT run. Any evaluators you
+                    select here run in addition to them.
+                  </span>
+                </div>
+                {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
+                LLM-WER / LLM-CER (plus intent & entity scores) on top of
+                WER/CER. One switch for the whole bundle; on by default. */}
+                <div className="flex items-start gap-3 rounded-md border border-border p-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={sarvamJudges}
+                    aria-label="Toggle built-in LLM-based evaluation metrics"
+                    onClick={() => setSarvamJudges((v) => !v)}
+                    className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                      sarvamJudges ? "bg-foreground" : "bg-muted-foreground/40"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                        sarvamJudges ? "translate-x-4" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-foreground">
+                        Use built-in LLM-based evaluation metrics
+                      </span>
+                      <a
+                        href={SARVAM_ASR_BLOG_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Learn more
+                      </a>
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      Evaluate transcripts on meaning, not just exact word and
+                      character matches, using built-in LLM judges. This is more
+                      reliable than WER/CER for Indian-language speech.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+        />
       </div>
 
       {/* Models Tab Content */}
       <div className={activeTab === "models" ? "space-y-8" : "hidden"}>
-          {/* Language Selection */}
-          <div className="space-y-3">
-            <div className="flex items-center">
-              <label className="text-[13px] font-medium text-foreground">
-                Language
-              </label>
-            </div>
-            <div className="relative w-fit">
-              <select
-                value={language}
-                onChange={(e) =>
-                  handleLanguageChange(e.target.value as LanguageOption)
-                }
-                className="h-10 px-4 pr-10 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none min-w-[140px]"
-              >
-                <option value="english">English</option>
-                <option value="hindi">Hindi</option>
-                <option value="kannada">Kannada</option>
-                <option value="maithili">Maithili</option>
-                <option value="bengali">Bengali</option>
-                <option value="malayalam">Malayalam</option>
-                <option value="marathi">Marathi</option>
-                <option value="odia">Odia</option>
-                <option value="punjabi">Punjabi</option>
-                <option value="sindhi">Sindhi</option>
-                <option value="tamil">Tamil</option>
-                <option value="telugu">Telugu</option>
-                <option value="gujarati">Gujarati</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg
-                  className="w-4 h-4 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </div>
-            </div>
+        {/* Language Selection */}
+        <div className="space-y-3">
+          <div className="flex items-center">
+            <label className="text-[13px] font-medium text-foreground">
+              Language
+            </label>
           </div>
-
-          {/* Provider Selection */}
-          <div
-            className={`space-y-3 p-4 -m-4 rounded-lg transition-colors ${
-              providersInvalid ? "bg-red-500/10 border border-red-500" : ""
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <h3 className="text-[13px] font-medium text-foreground">
-                Select providers to evaluate
-              </h3>
-              <span className="text-[12px] text-muted-foreground">
-                ({selectedProviders.size} selected)
-              </span>
-            </div>
-            {/* Desktop: Table layout */}
-            <div className="hidden md:block border border-border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b border-border">
-                  <tr>
-                    <th className="w-12 px-4 py-2 text-left">
-                      <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedProviders.size === providerLabels.length
-                            ? "bg-foreground border-foreground"
-                            : selectedProviders.size > 0
-                              ? "bg-foreground/50 border-foreground"
-                              : "border-border hover:border-foreground/50"
-                        }`}
-                        onClick={() => {
-                          if (
-                            selectedProviders.size === providerLabels.length
-                          ) {
-                            setSelectedProviders(new Set());
-                          } else {
-                            selectAllProviders();
-                          }
-                        }}
-                      >
-                        {selectedProviders.size === providerLabels.length ? (
-                          <svg
-                            className="w-3 h-3 text-background"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12.75l6 6 9-13.5"
-                            />
-                          </svg>
-                        ) : selectedProviders.size > 0 ? (
-                          <svg
-                            className="w-3 h-3 text-background"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 12h14"
-                            />
-                          </svg>
-                        ) : null}
-                      </div>
-                    </th>
-                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
-                      Label
-                    </th>
-                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
-                      Model
-                    </th>
-                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        Mode
-                        <Tooltip
-                          content="Streaming transcribes audio incrementally in real time; batch sends the full audio in a single request."
-                          className="inline-flex"
-                        >
-                          <svg
-                            className="w-3.5 h-3.5 text-muted-foreground cursor-help"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                            />
-                          </svg>
-                        </Tooltip>
-                      </span>
-                    </th>
-                    <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
-                      Website
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProviders.map((provider) => {
-                    const isSelected = selectedProviders.has(provider.label);
-                    return (
-                      <tr
-                        key={provider.label}
-                        className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => toggleProvider(provider.label)}
-                      >
-                        <td className="w-12 px-4 py-2">
-                          <div
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                              isSelected
-                                ? "bg-foreground border-foreground"
-                                : "border-border"
-                            }`}
-                          >
-                            {isSelected && (
-                              <svg
-                                className="w-3 h-3 text-background"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={3}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M4.5 12.75l6 6 9-13.5"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                        </td>
-                        <td
-                          className={`px-4 py-2 text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
-                        >
-                          {provider.label}
-                        </td>
-                        <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
-                          {provider.modelOverrides?.[
-                            languageDisplayName[language]
-                          ] || provider.model}
-                        </td>
-                        <td className="px-4 py-2">
-                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
-                            {getSttApiType(provider.value)}
-                          </span>
-                        </td>
-                        <td className="w-12 px-4 py-2">
-                          {provider.website && (
-                            <a
-                              href={provider.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-muted-foreground hover:text-foreground transition-colors"
-                              title={`Visit ${provider.label} website`}
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                                />
-                              </svg>
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile: Card layout */}
-            <div className="md:hidden space-y-2">
-              {/* Select All */}
-              <div
-                className="flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => {
-                  if (selectedProviders.size === providerLabels.length) {
-                    setSelectedProviders(new Set());
-                  } else {
-                    selectAllProviders();
-                  }
-                }}
-              >
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-                    selectedProviders.size === providerLabels.length
-                      ? "bg-foreground border-foreground"
-                      : selectedProviders.size > 0
-                        ? "bg-foreground/50 border-foreground"
-                        : "border-border"
-                  }`}
-                >
-                  {selectedProviders.size === providerLabels.length ? (
-                    <svg
-                      className="w-3 h-3 text-background"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 12.75l6 6 9-13.5"
-                      />
-                    </svg>
-                  ) : selectedProviders.size > 0 ? (
-                    <svg
-                      className="w-3 h-3 text-background"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 12h14"
-                      />
-                    </svg>
-                  ) : null}
-                </div>
-                <span className="text-[13px] font-medium text-foreground">
-                  Select all
-                </span>
-              </div>
-
-              {filteredProviders.map((provider) => {
-                const isSelected = selectedProviders.has(provider.label);
-                return (
-                  <div
-                    key={provider.label}
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      isSelected
-                        ? "border-foreground/30 bg-muted/30"
-                        : "border-border hover:bg-muted/20"
-                    }`}
-                    onClick={() => toggleProvider(provider.label)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-                          isSelected
-                            ? "bg-foreground border-foreground"
-                            : "border-border"
-                        }`}
-                      >
-                        {isSelected && (
-                          <svg
-                            className="w-3 h-3 text-background"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12.75l6 6 9-13.5"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
-                          >
-                            {provider.label}
-                          </span>
-                          {provider.website && (
-                            <a
-                              href={provider.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                              title={`Visit ${provider.label} website`}
-                            >
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                                />
-                              </svg>
-                            </a>
-                          )}
-                        </div>
-                        <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">
-                          {provider.modelOverrides?.[
-                            languageDisplayName[language]
-                          ] || provider.model}
-                        </p>
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize mt-1">
-                          {getSttApiType(provider.value)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-      {/* Settings Tab Content */}
-      <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
-          {/* Evaluator Selection */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-[13px] font-medium text-foreground">
-                Select evaluators
-              </h3>
-              <span className="text-[12px] text-muted-foreground">
-                (optional · {selectedEvaluators.length} selected)
-              </span>
-            </div>
-            {/* WER is a built-in STT metric computed on every run regardless of
-                the evaluators chosen here — make that explicit up front so users
-                know they always get it. */}
-            <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-[12px] md:text-[13px] text-muted-foreground">
+          <div className="relative w-fit">
+            <select
+              value={language}
+              onChange={(e) =>
+                handleLanguageChange(e.target.value as LanguageOption)
+              }
+              className="h-10 px-4 pr-10 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none min-w-[140px]"
+            >
+              <option value="english">English</option>
+              <option value="hindi">Hindi</option>
+              <option value="kannada">Kannada</option>
+              <option value="maithili">Maithili</option>
+              <option value="bengali">Bengali</option>
+              <option value="malayalam">Malayalam</option>
+              <option value="marathi">Marathi</option>
+              <option value="odia">Odia</option>
+              <option value="punjabi">Punjabi</option>
+              <option value="sindhi">Sindhi</option>
+              <option value="tamil">Tamil</option>
+              <option value="telugu">Telugu</option>
+              <option value="gujarati">Gujarati</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <svg
-                className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
+                className="w-4 h-4 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={1.75}
+                strokeWidth={2}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                 />
               </svg>
-              <span>
-                <span className="font-medium text-foreground">
-                  WER (Word Error Rate)
-                </span>{" "}
-                and{" "}
-                <span className="font-medium text-foreground">
-                  CER (Character Error Rate)
-                </span>{" "}
-                are always computed for every STT run. Any evaluators you select
-                here run in addition to them.
-              </span>
             </div>
-            {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
-                LLM-WER / LLM-CER (plus intent & entity scores) on top of
-                WER/CER. One switch for the whole bundle; on by default. */}
-            <div className="flex items-start gap-3 rounded-md border border-border p-3">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={sarvamJudges}
-                aria-label="Toggle built-in LLM-based evaluation metrics"
-                onClick={() => setSarvamJudges((v) => !v)}
-                className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-                  sarvamJudges ? "bg-foreground" : "bg-muted-foreground/40"
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                    sarvamJudges ? "translate-x-4" : "translate-x-1"
-                  }`}
-                />
-              </button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-foreground">
-                    Use built-in LLM-based evaluation metrics
-                  </span>
-                  <a
-                    href={SARVAM_ASR_BLOG_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                  >
-                    Learn more
-                  </a>
-                </div>
-                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                  Evaluate transcripts on meaning, not just exact word and
-                  character matches, using built-in LLM judges. This is more
-                  reliable than WER/CER for Indian-language speech.
-                </p>
-              </div>
-            </div>
-            <MultiSelectPicker
-              items={availableEvaluators}
-              selectedItems={selectedEvaluators}
-              onSelectionChange={handleEvaluatorsChange}
-              placeholder="Choose one or more evaluators"
-              searchPlaceholder="Search evaluators"
-              isLoading={evaluatorsLoading}
-            />
           </div>
         </div>
 
-      {/* Input Tab Content */}
-      <div className={activeTab === "input" ? "space-y-4" : "hidden"}>
-          {/* Mode toggle */}
-          <div className="flex items-center gap-1 p-1 bg-muted border border-border rounded-lg w-fit">
-            <button
-              onClick={() => setInputMode("inline")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                inputMode === "inline"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Upload new
-            </button>
-            <button
-              onClick={() => setInputMode("dataset")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                inputMode === "dataset"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Use existing dataset
-            </button>
+        {/* Provider Selection */}
+        <div
+          className={`space-y-3 p-4 -m-4 rounded-lg transition-colors ${
+            providersInvalid ? "bg-red-500/10 border border-red-500" : ""
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-[13px] font-medium text-foreground">
+              Select providers to evaluate
+            </h3>
+            <span className="text-[12px] text-muted-foreground">
+              ({selectedProviders.size} selected)
+            </span>
+          </div>
+          {/* Desktop: Table layout */}
+          <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr>
+                  <th className="w-12 px-4 py-2 text-left">
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                        selectedProviders.size === providerLabels.length
+                          ? "bg-foreground border-foreground"
+                          : selectedProviders.size > 0
+                            ? "bg-foreground/50 border-foreground"
+                            : "border-border hover:border-foreground/50"
+                      }`}
+                      onClick={() => {
+                        if (selectedProviders.size === providerLabels.length) {
+                          setSelectedProviders(new Set());
+                        } else {
+                          selectAllProviders();
+                        }
+                      }}
+                    >
+                      {selectedProviders.size === providerLabels.length ? (
+                        <svg
+                          className="w-3 h-3 text-background"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 12.75l6 6 9-13.5"
+                          />
+                        </svg>
+                      ) : selectedProviders.size > 0 ? (
+                        <svg
+                          className="w-3 h-3 text-background"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 12h14"
+                          />
+                        </svg>
+                      ) : null}
+                    </div>
+                  </th>
+                  <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                    Label
+                  </th>
+                  <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                    Model
+                  </th>
+                  <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      Mode
+                      <Tooltip
+                        content="Streaming transcribes audio incrementally in real time; batch sends the full audio in a single request."
+                        className="inline-flex"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5 text-muted-foreground cursor-help"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                          />
+                        </svg>
+                      </Tooltip>
+                    </span>
+                  </th>
+                  <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                    Website
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProviders.map((provider) => {
+                  const isSelected = selectedProviders.has(provider.label);
+                  return (
+                    <tr
+                      key={provider.label}
+                      className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => toggleProvider(provider.label)}
+                    >
+                      <td className="w-12 px-4 py-2">
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            isSelected
+                              ? "bg-foreground border-foreground"
+                              : "border-border"
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="w-3 h-3 text-background"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4.5 12.75l6 6 9-13.5"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
+                      >
+                        {provider.label}
+                      </td>
+                      <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
+                        {provider.modelOverrides?.[
+                          languageDisplayName[language]
+                        ] || provider.model}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
+                          {getSttApiType(provider.value)}
+                        </span>
+                      </td>
+                      <td className="w-12 px-4 py-2">
+                        {provider.website && (
+                          <a
+                            href={provider.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title={`Visit ${provider.label} website`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                              />
+                            </svg>
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Dataset picker */}
-          {inputMode === "dataset" && (
-            <div className="space-y-2">
-              {availableDatasets.length === 0 ? (
-                <div className="border border-border rounded-xl p-6 flex flex-col items-center justify-center bg-muted/20 text-center">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-3">
-                    <svg
-                      className="w-5 h-5 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium mb-1">No STT datasets yet</p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Once a dataset is uploaded, it can be reused for future evaluations
-                  </p>
-                  <button
-                    onClick={() => setInputMode("inline")}
-                    className="h-8 px-3 rounded-md text-xs font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+          {/* Mobile: Card layout */}
+          <div className="md:hidden space-y-2">
+            {/* Select All */}
+            <div
+              className="flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => {
+                if (selectedProviders.size === providerLabels.length) {
+                  setSelectedProviders(new Set());
+                } else {
+                  selectAllProviders();
+                }
+              }}
+            >
+              <div
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                  selectedProviders.size === providerLabels.length
+                    ? "bg-foreground border-foreground"
+                    : selectedProviders.size > 0
+                      ? "bg-foreground/50 border-foreground"
+                      : "border-border"
+                }`}
+              >
+                {selectedProviders.size === providerLabels.length ? (
+                  <svg
+                    className="w-3 h-3 text-background"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
                   >
-                    Upload a dataset
-                  </button>
-                </div>
-              ) : (
-                <DatasetPicker
-                  datasets={availableDatasets}
-                  selectedId={selectedDatasetId}
-                  onSelect={setSelectedDatasetId}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Inline upload mode */}
-          {inputMode === "inline" && (
-            <div className="space-y-4">
-              {/* Dataset name */}
-              <div>
-                <label className="text-[13px] font-medium text-foreground block mb-2">
-                  Dataset name
-                </label>
-                <input
-                  type="text"
-                  value={datasetName}
-                  onChange={(e) => {
-                    setDatasetName(e.target.value);
-                    if (e.target.value.trim()) setDatasetNameInvalid(false);
-                  }}
-                  placeholder="e.g. English customer calls"
-                  className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
-                    datasetNameInvalid ? "border-red-500 bg-red-500/10" : "border-border"
-                  }`}
-                />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                ) : selectedProviders.size > 0 ? (
+                  <svg
+                    className="w-3 h-3 text-background"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 12h14"
+                    />
+                  </svg>
+                ) : null}
               </div>
-              <STTDatasetEditor
-                ref={editorRef}
-                accessToken={backendAccessToken}
-                maxRowsPerEval={maxRowsPerEval}
+              <span className="text-[13px] font-medium text-foreground">
+                Select all
+              </span>
+            </div>
+
+            {filteredProviders.map((provider) => {
+              const isSelected = selectedProviders.has(provider.label);
+              return (
+                <div
+                  key={provider.label}
+                  className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                    isSelected
+                      ? "border-foreground/30 bg-muted/30"
+                      : "border-border hover:bg-muted/20"
+                  }`}
+                  onClick={() => toggleProvider(provider.label)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                        isSelected
+                          ? "bg-foreground border-foreground"
+                          : "border-border"
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg
+                          className="w-3 h-3 text-background"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 12.75l6 6 9-13.5"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
+                        >
+                          {provider.label}
+                        </span>
+                        {provider.website && (
+                          <a
+                            href={provider.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                            title={`Visit ${provider.label} website`}
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                              />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">
+                        {provider.modelOverrides?.[
+                          languageDisplayName[language]
+                        ] || provider.model}
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize mt-1">
+                        {getSttApiType(provider.value)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Input Tab Content */}
+      <div className={activeTab === "input" ? "space-y-4" : "hidden"}>
+        {/* Mode toggle */}
+        <div className="flex items-center gap-1 p-1 bg-muted border border-border rounded-lg w-fit">
+          <button
+            onClick={() => setInputMode("inline")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+              inputMode === "inline"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Upload new
+          </button>
+          <button
+            onClick={() => setInputMode("dataset")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+              inputMode === "dataset"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Use existing dataset
+          </button>
+        </div>
+
+        {/* Dataset picker */}
+        {inputMode === "dataset" && (
+          <div className="space-y-2">
+            {availableDatasets.length === 0 ? (
+              <div className="border border-border rounded-xl p-6 flex flex-col items-center justify-center bg-muted/20 text-center">
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-3">
+                  <svg
+                    className="w-5 h-5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                    />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium mb-1">No STT datasets yet</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Once a dataset is uploaded, it can be reused for future
+                  evaluations
+                </p>
+                <button
+                  onClick={() => setInputMode("inline")}
+                  className="h-8 px-3 rounded-md text-xs font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  Upload a dataset
+                </button>
+              </div>
+            ) : (
+              <DatasetPicker
+                datasets={availableDatasets}
+                selectedId={selectedDatasetId}
+                onSelect={setSelectedDatasetId}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Inline upload mode */}
+        {inputMode === "inline" && (
+          <div className="space-y-4">
+            {/* Dataset name */}
+            <div>
+              <label className="text-[13px] font-medium text-foreground block mb-2">
+                Dataset name
+              </label>
+              <input
+                type="text"
+                value={datasetName}
+                onChange={(e) => {
+                  setDatasetName(e.target.value);
+                  if (e.target.value.trim()) setDatasetNameInvalid(false);
+                }}
+                placeholder="e.g. English customer calls"
+                className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
+                  datasetNameInvalid
+                    ? "border-red-500 bg-red-500/10"
+                    : "border-border"
+                }`}
               />
             </div>
-          )}
+            <STTDatasetEditor
+              ref={editorRef}
+              accessToken={backendAccessToken}
+              maxRowsPerEval={maxRowsPerEval}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

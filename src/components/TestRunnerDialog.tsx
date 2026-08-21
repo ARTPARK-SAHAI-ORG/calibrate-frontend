@@ -166,7 +166,11 @@ export function TestRunnerDialog({
 
     const tick = async () => {
       try {
-        const result = await fetchTestRun(backendUrl, backendAccessToken, taskId);
+        const result = await fetchTestRun(
+          backendUrl,
+          backendAccessToken,
+          taskId,
+        );
         if (cancelled) return;
         setRun(result);
         if (isTerminalRunStatus(result.status)) {
@@ -202,13 +206,14 @@ export function TestRunnerDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, backendAccessToken]);
 
-  const runStatus: "queued" | "in_progress" | "done" | "failed" = useMemo(() => {
-    if (!run) return "queued";
-    if (run.status === "completed" || run.status === "done") return "done";
-    if (run.status === "failed") return "failed";
-    if (run.status === "in_progress") return "in_progress";
-    return "queued";
-  }, [run]);
+  const runStatus: "queued" | "in_progress" | "done" | "failed" =
+    useMemo(() => {
+      if (!run) return "queued";
+      if (run.status === "completed" || run.status === "done") return "done";
+      if (run.status === "failed") return "failed";
+      if (run.status === "in_progress") return "in_progress";
+      return "queued";
+    }, [run]);
 
   const rows: Row[] = useMemo(() => {
     const results = run?.results ?? [];
@@ -218,7 +223,8 @@ export function TestRunnerDialog({
       if (r.passed === null || r.passed === undefined) {
         status = "running";
       } else {
-        status = r.passed === true || r.status === "passed" ? "passed" : "failed";
+        status =
+          r.passed === true || r.status === "passed" ? "passed" : "failed";
       }
       // A run-level failure ends any case the backend left mid-flight.
       const error =
@@ -355,15 +361,17 @@ export function TestRunnerDialog({
                   </span>
                 )}
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                  {runName ?? "Test run"}
+                  {runName ?? "Evaluation run"}
                 </h2>
-                {runStatus === "done" && onNewRun && runTestUuids.length > 0 && (
-                  <RerunIconButton
-                    onClick={() => startRun(runTestUuids)}
-                    loading={isStartingRun}
-                    className="shrink-0"
-                  />
-                )}
+                {runStatus === "done" &&
+                  onNewRun &&
+                  runTestUuids.length > 0 && (
+                    <RerunIconButton
+                      onClick={() => startRun(runTestUuids)}
+                      loading={isStartingRun}
+                      className="shrink-0"
+                    />
+                  )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {agentName}
@@ -539,7 +547,10 @@ export function TestRunnerDialog({
             )}
 
             {runStatus === "done" && activeTab === "summary" ? (
-              <div className="flex-1 overflow-hidden" data-tour="test-run-summary">
+              <div
+                className="flex-1 overflow-hidden"
+                data-tour="test-run-summary"
+              >
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}

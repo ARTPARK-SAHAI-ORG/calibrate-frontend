@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
-import { TestsTabContent } from "../TestsTabContent";
+import { RunsTabContent } from "../RunsTabContent";
 
 const BACKEND = "http://test-backend";
 const AGENT_UUID = "agent-1";
@@ -9,7 +9,6 @@ const AGENT_UUID = "agent-1";
 jest.mock("../../../hooks", () => ({
   ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
-  useMaxRowsPerEval: () => 100,
 }));
 
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
@@ -33,29 +32,29 @@ jest.mock("../../TestRunnerDialog", () => ({
       </div>
     ) : null,
 }));
-jest.mock("../../BenchmarkDialog", () => ({ BenchmarkDialog: () => null }));
 jest.mock("../../BenchmarkResultsDialog", () => ({
   BenchmarkResultsDialog: () => null,
 }));
-jest.mock("../../BulkUploadTestsModal", () => ({
-  BulkUploadTestsModal: () => null,
-}));
-jest.mock("../CompareModelsButton", () => ({ CompareModelsButton: () => null }));
-jest.mock("../../AddTestDialog", () => ({ AddTestDialog: () => null }));
-
-jest.mock("../../../lib/evaluatorApi", () => ({
-  fetchAgentEvaluators: jest.fn().mockResolvedValue([]),
-  fetchAllEvaluators: jest.fn().mockResolvedValue([]),
-  addEvaluatorsToAgent: jest.fn().mockResolvedValue(undefined),
+jest.mock("../../BenchmarkRerunDialog", () => ({
+  BenchmarkRerunDialog: () => null,
+  useBenchmarkRerun: () => ({
+    config: null,
+    key: 0,
+    start: jest.fn(),
+    clear: jest.fn(),
+  }),
 }));
 
 const pastRun = {
   uuid: "run-7",
+  name: "",
   type: "llm-unit-test",
-  status: "completed",
+  status: "done",
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   total_tests: 1,
+  passed: 1,
+  failed: 0,
 };
 
 function jsonResponse(data: unknown, ok = true, status = 200) {
@@ -64,13 +63,11 @@ function jsonResponse(data: unknown, ok = true, status = 200) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.history.replaceState(null, "", "/");
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
       return jsonResponse({ items: [pastRun], total: 1 });
-    }
-    if (url.includes(`/agent-tests/agent/${AGENT_UUID}/tests`)) {
-      return jsonResponse({ items: [], total: 0 });
     }
     return jsonResponse({}, false, 404);
   }) as jest.Mock;
@@ -80,12 +77,19 @@ function runIdInUrl() {
   return new URLSearchParams(window.location.search).get("runId");
 }
 
-describe("TestsTabContent run deep-link", () => {
+function renderTab() {
+  return render(
+    <RunsTabContent agentUuid={AGENT_UUID} agentName="Test agent" />,
+  );
+}
+
+describe("RunsTabContent run deep-link", () => {
   it("puts the opened run in the address bar and takes it out on close", async () => {
     const user = setupUser();
-    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+    renderTab();
 
-    await user.click(await screen.findByText("1 test"));
+    // Desktop table and mobile cards both render, so take the first row.
+    await user.click((await screen.findAllByText("Complete"))[0]);
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:run-7",
     );
@@ -98,7 +102,7 @@ describe("TestsTabContent run deep-link", () => {
 
   it("re-opens the run dialog when the address already names a run", async () => {
     window.history.replaceState(null, "", "/?runId=run-7");
-    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+    renderTab();
 
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:run-7",
@@ -107,31 +111,31 @@ describe("TestsTabContent run deep-link", () => {
 
   it("closes and forgets a run the agent does not have", async () => {
     window.history.replaceState(null, "", "/?runId=run-gone");
-    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+    renderTab();
 
-    // The list loads without that run, so the window closes and the address
-    // stops naming it.
+    // The run is not on this page, so it is asked for directly. The backend
+    // says there is no such run, so the window closes and the address stops
+    // naming it.
     await waitFor(() => expect(runIdInUrl()).toBeNull());
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
   });
 
-  it("keeps the run open while the run list has not loaded", async () => {
+  it("keeps the run open when asking about it fails", async () => {
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
         return jsonResponse({}, false, 500);
       }
-      return jsonResponse({ items: [], total: 0 });
+      // A server problem, not a "no such run" answer.
+      return jsonResponse({}, false, 500);
     });
     window.history.replaceState(null, "", "/?runId=run-7");
-    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+    renderTab();
 
     expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
-    // Let the failed list fetch settle: an empty list is not proof the run is
-    // gone, so the window stays open and the address keeps the run.
     await waitFor(() =>
       expect(
         (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).includes(`/agent-tests/agent/${AGENT_UUID}/runs`),
+          String(url).includes(`/agent-tests/run/run-7`),
         ),
       ).toBe(true),
     );

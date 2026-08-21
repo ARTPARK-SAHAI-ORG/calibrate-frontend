@@ -30,7 +30,6 @@ const baseProps = {
   isOpen: true as const,
   onClose: jest.fn(),
   agentUuid: "agent-1",
-  agentName: "Support bot",
   onVerified: jest.fn(),
   onGoToConnectionSettings: jest.fn(),
 };
@@ -50,13 +49,13 @@ describe("VerifyConnectionDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("explains the check and names the agent", () => {
+  it("explains the check", () => {
     render(<VerifyConnectionDialog {...baseProps} />);
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
-    expect(screen.getByText(/Support bot/)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Verify" }),
+      screen.getByText(/Before running tests, we need to verify your agent/),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verify" })).toBeInTheDocument();
   });
 
   it("checks the saved agent and, on a pass, hands back to the parent to run", async () => {
@@ -92,7 +91,9 @@ describe("VerifyConnectionDialog", () => {
     expect(screen.getByText("Connection refused")).toBeInTheDocument();
     expect(screen.getByText(/"detail": "boom"/)).toBeInTheDocument();
     // The Verify button becomes "Try again" once a failure is shown.
-    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
     // Two-button footer: Cancel is replaced by the two failure actions.
     expect(
       screen.queryByRole("button", { name: "Cancel" }),

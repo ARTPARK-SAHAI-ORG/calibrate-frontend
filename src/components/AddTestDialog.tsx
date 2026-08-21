@@ -14,6 +14,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import { isCreatableTestType } from "@/constants/testTypes";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { NestedContainer } from "@/components/ui/NestedContainer";
@@ -671,6 +672,12 @@ const TEST_TYPE_OPTIONS: Array<{
     description: "Generate the agent's reply, then grade the full conversation",
   },
 ];
+
+// The types offered when making a new test. An existing test of a hidden type
+// still opens and edits: only the choice is gone.
+const creatableTestTypes = TEST_TYPE_OPTIONS.filter((o) =>
+  isCreatableTestType(o.tab),
+);
 
 export type EvaluatorVariableDef = {
   name: string;
@@ -3130,8 +3137,8 @@ export function AddTestDialog({
             <label className="block text-sm font-medium text-foreground mb-3">
               Select the type of test
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {TEST_TYPE_OPTIONS.map((opt) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {creatableTestTypes.map((opt) => (
                 <button
                   key={opt.tab}
                   type="button"
@@ -3270,7 +3277,7 @@ export function AddTestDialog({
                 // rendered compactly in the top-left so the type can still be
                 // switched mid-create.
                 <div className="flex gap-2 p-3 border-b border-border">
-                  {TEST_TYPE_OPTIONS.map((opt) => (
+                  {creatableTestTypes.map((opt) => (
                     <button
                       key={opt.tab}
                       onClick={() => setActiveTab(opt.tab)}

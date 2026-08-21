@@ -42,9 +42,11 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   addEvaluatorsToAgent: (...args: unknown[]) => mockAttach(...args),
   detachEvaluatorFromAgent: (...args: unknown[]) => mockDetach(...args),
   deleteEvaluator: (...args: unknown[]) => mockDelete(...args),
-  // Mirror the real helper: owned unless flagged as a built-in default.
+  // Mirror the real helpers: owned unless flagged as a built-in default.
   isOwnedEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
+  isDefaultEvaluator: (e: EvaluatorData) =>
+    typeof e.is_default === "boolean" ? e.is_default : !e.owner_user_id,
 }));
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({

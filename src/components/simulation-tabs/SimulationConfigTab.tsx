@@ -3,6 +3,8 @@
 import React from "react";
 import { AgentPicker, Agent } from "@/components/AgentPicker";
 import { MultiSelectPicker, PickerItem } from "@/components/MultiSelectPicker";
+import { RunEvaluatorsPanel } from "@/components/evaluations/RunEvaluatorsPanel";
+import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 type SimulationConfigTabProps = {
   selectedAgent: Agent | null;
@@ -15,10 +17,12 @@ type SimulationConfigTabProps = {
   selectedScenarios: PickerItem[];
   onScenariosChange: (items: PickerItem[]) => void;
   scenariosLoading: boolean;
-  metrics: PickerItem[];
-  selectedMetrics: PickerItem[];
-  onMetricsChange: (items: PickerItem[]) => void;
-  metricsLoading: boolean;
+  /** Full-conversation evaluators, the only kind a simulation can be judged by. */
+  evaluators: EvaluatorData[];
+  selectedEvaluatorUuids: string[];
+  onEvaluatorsChange: (next: string[]) => void;
+  evaluatorsLoading: boolean;
+  onEvaluatorsRefresh: () => void;
   isConfigured: boolean;
   isCreating: boolean;
   onCreateClick: () => void;
@@ -37,10 +41,11 @@ export function SimulationConfigTab({
   selectedScenarios,
   onScenariosChange,
   scenariosLoading,
-  metrics,
-  selectedMetrics,
-  onMetricsChange,
-  metricsLoading,
+  evaluators,
+  selectedEvaluatorUuids,
+  onEvaluatorsChange,
+  evaluatorsLoading,
+  onEvaluatorsRefresh,
   isConfigured,
   isCreating,
   onCreateClick,
@@ -129,17 +134,22 @@ export function SimulationConfigTab({
         disabled={isConfigured}
       />
 
-      {/* Metrics Picker */}
-      <MultiSelectPicker
-        items={metrics}
-        selectedItems={selectedMetrics}
-        onSelectionChange={onMetricsChange}
-        label="Select metrics"
-        placeholder="Choose one or more metrics"
-        searchPlaceholder="Search metrics"
-        isLoading={metricsLoading}
-        disabled={isConfigured}
-      />
+      {/* Evaluators — the same add and create flow as the agent page. */}
+      <div className="space-y-2">
+        <label className="block text-sm md:text-base font-medium text-foreground">
+          Select evaluators
+        </label>
+        <RunEvaluatorsPanel
+          evaluatorType="conversation"
+          available={evaluators}
+          isLoading={evaluatorsLoading}
+          selectedUuids={selectedEvaluatorUuids}
+          onSelectedChange={onEvaluatorsChange}
+          onRefresh={onEvaluatorsRefresh}
+          readOnly={isConfigured}
+          description="These evaluators score each simulated conversation"
+        />
+      </div>
 
       {/* Create Button - shown when not configured */}
       {!isConfigured && (

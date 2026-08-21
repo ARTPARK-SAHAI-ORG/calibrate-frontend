@@ -1,6 +1,6 @@
 import { render, screen, setupUser } from "@/test-utils";
 import {
-  DefaultPill,
+  PreBuiltPill,
   EvaluatorTypePill,
   KindPill,
   OutputTypePill,
@@ -11,8 +11,8 @@ import {
 
 describe("EvaluatorPills", () => {
   it("renders the Default pill", () => {
-    render(<DefaultPill />);
-    expect(screen.getByText("Default")).toBeInTheDocument();
+    render(<PreBuiltPill />);
+    expect(screen.getByText("Pre-built")).toBeInTheDocument();
   });
 
   it.each(Object.keys(EVALUATOR_TYPE_LABELS) as EvaluatorType[])(

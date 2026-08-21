@@ -67,9 +67,20 @@ jest.mock("../../MultiSelectPicker", () => ({
 
 const PERSONAS: PickerItem[] = [{ uuid: "p1", name: "Persona One" }];
 const SCENARIOS: PickerItem[] = [{ uuid: "s1", name: "Scenario One" }];
-const METRICS: PickerItem[] = [{ uuid: "m1", name: "Metric One" }];
+const EVALUATORS = [
+  {
+    uuid: "m1",
+    name: "Metric One",
+    description: "",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    evaluator_type: "conversation" as const,
+  },
+];
 
-function baseProps(overrides: Partial<Parameters<typeof SimulationConfigTab>[0]> = {}) {
+function baseProps(
+  overrides: Partial<Parameters<typeof SimulationConfigTab>[0]> = {},
+) {
   return {
     selectedAgent: null,
     onSelectAgent: jest.fn(),
@@ -81,10 +92,11 @@ function baseProps(overrides: Partial<Parameters<typeof SimulationConfigTab>[0]>
     selectedScenarios: [],
     onScenariosChange: jest.fn(),
     scenariosLoading: false,
-    metrics: METRICS,
-    selectedMetrics: [],
-    onMetricsChange: jest.fn(),
-    metricsLoading: false,
+    evaluators: EVALUATORS,
+    selectedEvaluatorUuids: [],
+    onEvaluatorsChange: jest.fn(),
+    evaluatorsLoading: false,
+    onEvaluatorsRefresh: jest.fn(),
     isConfigured: false,
     isCreating: false,
     onCreateClick: jest.fn(),
@@ -96,16 +108,18 @@ describe("SimulationConfigTab", () => {
   it("renders the agent picker and the three multi-select pickers", () => {
     render(<SimulationConfigTab {...baseProps()} />);
     expect(screen.getByTestId("agent-picker")).toBeInTheDocument();
-    expect(screen.getByTestId("multiselect-Select personas")).toBeInTheDocument();
-    expect(screen.getByTestId("multiselect-Select scenarios")).toBeInTheDocument();
-    expect(screen.getByTestId("multiselect-Select metrics")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("multiselect-Select personas"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("multiselect-Select scenarios"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Select evaluators")).toBeInTheDocument();
   });
 
   it("does not show the unverified warning or the connection notice by default", () => {
     render(<SimulationConfigTab {...baseProps()} />);
-    expect(
-      screen.queryByText(/needs to be verified/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/needs to be verified/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Voice simulations are currently only supported/),
     ).not.toBeInTheDocument();
@@ -130,15 +144,11 @@ describe("SimulationConfigTab", () => {
         })}
       />,
     );
-    expect(
-      screen.queryByText(/needs to be verified/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/needs to be verified/)).not.toBeInTheDocument();
   });
 
   it("shows the agent-connection voice notice when isAgentConnection is true", () => {
-    render(
-      <SimulationConfigTab {...baseProps({ isAgentConnection: true })} />,
-    );
+    render(<SimulationConfigTab {...baseProps({ isAgentConnection: true })} />);
     expect(
       screen.getByText(/Voice simulations are currently only supported/),
     ).toBeInTheDocument();
@@ -160,17 +170,15 @@ describe("SimulationConfigTab", () => {
     expect(onSelectAgent).toHaveBeenCalledWith(null);
   });
 
-  it("wires personas/scenarios/metrics change callbacks independently", async () => {
+  it("wires the personas and scenarios change callbacks independently", async () => {
     const user = setupUser();
     const onPersonasChange = jest.fn();
     const onScenariosChange = jest.fn();
-    const onMetricsChange = jest.fn();
     render(
       <SimulationConfigTab
         {...baseProps({
           onPersonasChange,
           onScenariosChange,
-          onMetricsChange,
         })}
       />,
     );
@@ -180,15 +188,9 @@ describe("SimulationConfigTab", () => {
       { uuid: "new", name: "New Item" },
     ]);
     expect(onScenariosChange).not.toHaveBeenCalled();
-    expect(onMetricsChange).not.toHaveBeenCalled();
 
     await user.click(screen.getByText("change-Select scenarios"));
     expect(onScenariosChange).toHaveBeenCalledWith([
-      { uuid: "new", name: "New Item" },
-    ]);
-
-    await user.click(screen.getByText("change-Select metrics"));
-    expect(onMetricsChange).toHaveBeenCalledWith([
       { uuid: "new", name: "New Item" },
     ]);
   });
@@ -199,19 +201,15 @@ describe("SimulationConfigTab", () => {
         {...baseProps({
           personasLoading: true,
           scenariosLoading: false,
-          metricsLoading: true,
         })}
       />,
     );
-    expect(
-      screen.getByTestId("multiselect-Select personas"),
-    ).toHaveTextContent("loading");
+    expect(screen.getByTestId("multiselect-Select personas")).toHaveTextContent(
+      "loading",
+    );
     expect(
       screen.getByTestId("multiselect-Select scenarios"),
     ).toHaveTextContent("idle");
-    expect(
-      screen.getByTestId("multiselect-Select metrics"),
-    ).toHaveTextContent("loading");
   });
 
   it("disables all pickers and hides the Create button when isConfigured is true", () => {
@@ -219,15 +217,16 @@ describe("SimulationConfigTab", () => {
     expect(screen.getByTestId("agent-picker")).toHaveTextContent(
       "agent-disabled",
     );
-    expect(
-      screen.getByTestId("multiselect-Select personas"),
-    ).toHaveTextContent("disabled");
+    expect(screen.getByTestId("multiselect-Select personas")).toHaveTextContent(
+      "disabled",
+    );
     expect(
       screen.getByTestId("multiselect-Select scenarios"),
     ).toHaveTextContent("disabled");
+    // The evaluators panel has nothing to add or remove once configured.
     expect(
-      screen.getByTestId("multiselect-Select metrics"),
-    ).toHaveTextContent("disabled");
+      screen.queryByRole("button", { name: "Add evaluators" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Create")).not.toBeInTheDocument();
   });
 

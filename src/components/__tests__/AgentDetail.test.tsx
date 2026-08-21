@@ -27,7 +27,9 @@ jest.mock("../../lib/reportError", () => ({
 // not the internals of each tab.
 jest.mock("../agent-tabs", () => ({
   __esModule: true,
-  AgentTabContent: () => <div data-testid="agent-tab-content">AgentTabContent</div>,
+  AgentTabContent: () => (
+    <div data-testid="agent-tab-content">AgentTabContent</div>
+  ),
   AgentConnectionTabContent: (props: any) => (
     <div data-testid="connection-tab-content">
       <input
@@ -61,17 +63,29 @@ jest.mock("../agent-tabs", () => ({
       </button>
     </div>
   ),
-  ToolsTabContent: () => <div data-testid="tools-tab-content">ToolsTabContent</div>,
+  ToolsTabContent: () => (
+    <div data-testid="tools-tab-content">ToolsTabContent</div>
+  ),
   DataExtractionTabContent: () => (
-    <div data-testid="data-extraction-tab-content">DataExtractionTabContent</div>
+    <div data-testid="data-extraction-tab-content">
+      DataExtractionTabContent
+    </div>
   ),
   TestsTabContent: (props: any) => (
-    <div data-testid="tests-tab-content">
-      TestsTabContent-{props.agentType}
+    <div data-testid="tests-tab-content">TestsTabContent-{props.agentType}</div>
+  ),
+  RunsTabContent: (props: any) => (
+    <div data-testid="runs-tab-content">RunsTabContent-{props.agentUuid}</div>
+  ),
+  EvaluatorsTabContent: (props: any) => (
+    <div data-testid="evaluators-tab-content">
+      EvaluatorsTabContent-{props.agentUuid}
     </div>
   ),
   TracesTabContent: (props: any) => (
-    <div data-testid="traces-tab-content">TracesTabContent-{props.agentUuid}</div>
+    <div data-testid="traces-tab-content">
+      TracesTabContent-{props.agentUuid}
+    </div>
   ),
   SettingsTabContent: () => (
     <div data-testid="settings-tab-content">SettingsTabContent</div>
@@ -88,7 +102,9 @@ jest.mock("../VerifyRequestPreviewDialog", () => ({
   VerifyRequestPreviewDialog: (props: any) =>
     props.open ? (
       <div data-testid="verify-request-dialog">
-        <button onClick={() => props.onConfirm([{ role: "user", content: "hi" }])}>
+        <button
+          onClick={() => props.onConfirm([{ role: "user", content: "hi" }])}
+        >
           ConfirmVerify
         </button>
         <button onClick={props.onClose}>CloseVerifyDialog</button>
@@ -114,7 +130,6 @@ function jsonResponse(body: any, overrides: Partial<Response> = {}) {
     ...overrides,
   } as unknown as Response;
 }
-
 
 // A visited tab stays mounted and is merely hidden, so "is on the page" proves
 // nothing about which tab is showing. AgentDetail wraps each tab's content in a
@@ -243,14 +258,16 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("renders a connection agent's Connection tab by default with unverified badge", async () => {
+  it("opens a connection agent on its Evaluators tab with the unverified badge", async () => {
     mockFetchSequenceForAgent(connectionAgent);
     render(<AgentDetail agentUuid={connectionAgent.uuid} />);
 
     await waitFor(() =>
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("connection-tab-content")).toBeInTheDocument();
+    // Connection is set up once; evaluators and tests are the daily work, so
+    // the page opens there and Connection sits next to Settings.
+    expect(screen.getByTestId("evaluators-tab-content")).toBeInTheDocument();
     expect(screen.getByText("Verify")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
@@ -308,7 +325,7 @@ describe("AgentDetail", () => {
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${connectionAgent.uuid}`,
     );
-    expectVisibleTab("traces-tab-content", "connection-tab-content");
+    expectVisibleTab("traces-tab-content", "evaluators-tab-content");
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
@@ -316,8 +333,6 @@ describe("AgentDetail", () => {
     );
     expectVisibleTab("tests-tab-content", "traces-tab-content");
 
-    // The Connection tab is the one the page opened on, so it has been on the
-    // page the whole time: only the `hidden` class says it is showing again.
     await user.click(screen.getByText("Connection"));
     expect(screen.getByTestId("connection-tab-content")).toBeInTheDocument();
     expectVisibleTab("connection-tab-content", "tests-tab-content");
@@ -361,7 +376,9 @@ describe("AgentDetail", () => {
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
 
     await waitFor(() =>
-      expect(screen.getByText("This page is not available")).toBeInTheDocument(),
+      expect(
+        screen.getByText("This page is not available"),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -419,7 +436,9 @@ describe("AgentDetail", () => {
       return Promise.resolve(jsonResponse(buildAgent));
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("surfaces an agent-tools fetch failure without crashing", async () => {
@@ -449,7 +468,9 @@ describe("AgentDetail", () => {
       return Promise.resolve(jsonResponse(buildAgent));
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("opens the edit-name dialog, saves a new name, and shows the success toast", async () => {
@@ -530,7 +551,9 @@ describe("AgentDetail", () => {
     await clickLastSaveButton(user);
 
     expect(screen.queryByText("Edit Agent Name")).not.toBeInTheDocument();
-    expect((global.fetch as jest.Mock).mock.calls.length).toBe(fetchCallsBefore);
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(
+      fetchCallsBefore,
+    );
   });
 
   it("shows a name-conflict error inline when renaming hits 409, and clears it on edit", async () => {
@@ -581,7 +604,9 @@ describe("AgentDetail", () => {
       jsonResponse(null, { ok: false, status: 401 }),
     );
     await clickLastSaveButton(user);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
 
     alertSpy.mockRestore();
   });
@@ -671,7 +696,9 @@ describe("AgentDetail", () => {
       jsonResponse(null, { ok: false, status: 401 }),
     );
     await clickLastSaveButton(user);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
 
     alertSpy.mockRestore();
   });
@@ -723,9 +750,17 @@ describe("AgentDetail", () => {
   });
 
   it("resolves an unresolved LLM model id from providers once they load", async () => {
-    findModelInProvidersMock.mockReturnValue({ id: "custom/model", name: "Custom Model" });
+    findModelInProvidersMock.mockReturnValue({
+      id: "custom/model",
+      name: "Custom Model",
+    });
     useOpenRouterModelsMock.mockReturnValue({
-      providers: [{ name: "Custom", models: [{ id: "custom/model", name: "Custom Model" }] }],
+      providers: [
+        {
+          name: "Custom",
+          models: [{ id: "custom/model", name: "Custom Model" }],
+        },
+      ],
     });
     mockFetchSequenceForAgent({
       ...buildAgent,
@@ -779,6 +814,9 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
     await user.click(screen.getByText("SetBenchmarkProvider"));
     await user.click(screen.getByText("Tests"));
 
@@ -797,11 +835,16 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
     await user.click(screen.getByText("SetBenchmarkProvider"));
     await user.click(screen.getByText("Tests"));
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse(connectionAgent));
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(connectionAgent),
+    );
     await clickLastSaveButton(user);
 
     await waitFor(() =>
@@ -816,6 +859,9 @@ describe("AgentDetail", () => {
     await waitFor(() =>
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
+
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
 
     await user.click(screen.getByText("SetBenchmarkProvider"));
     await user.click(screen.getByText("Tests"));
@@ -835,7 +881,12 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(connectionAgent));
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(connectionAgent),
+    );
     await user.type(screen.getByLabelText("agent-url"), "x");
 
     act(() => {
@@ -861,15 +912,22 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
     await user.type(screen.getByLabelText("agent-url"), "-changed");
     await user.click(screen.getByText("TriggerVerifySuccess"));
 
     expect(screen.getByText("Save new configuration?")).toBeInTheDocument();
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse(connectionAgent));
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(connectionAgent),
+    );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(screen.queryByText("Save new configuration?")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("Save new configuration?"),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -884,12 +942,17 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
     await user.type(screen.getByLabelText("agent-url"), "-changed2");
     await user.click(screen.getByText("TriggerVerifySuccess"));
     expect(screen.getByText("Save new configuration?")).toBeInTheDocument();
 
     await user.click(screen.getByText("Not now"));
-    expect(screen.queryByText("Save new configuration?")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Save new configuration?"),
+    ).not.toBeInTheDocument();
   });
 
   it("skips the save-after-verify popup when re-verifying the same identity", async () => {
@@ -903,8 +966,13 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
     await user.click(screen.getByText("TriggerVerifySuccess"));
-    expect(screen.queryByText("Save new configuration?")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Save new configuration?"),
+    ).not.toBeInTheDocument();
   });
 
   it("auto-saves the benchmark toggle for a verified connection agent", async () => {
@@ -931,7 +999,12 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse(connectionAgent));
+    // The page opens on Evaluators now, so reach the Connection tab first.
+    await user.click(screen.getByText("Connection"));
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(connectionAgent),
+    );
     await user.click(screen.getByText("ToggleSupportsBenchmark"));
 
     await waitFor(() => {
@@ -954,11 +1027,15 @@ describe("AgentDetail", () => {
 
     await waitFor(() => {
       const lastCall =
-        onHeaderStateChange.mock.calls[onHeaderStateChange.mock.calls.length - 1][0];
+        onHeaderStateChange.mock.calls[
+          onHeaderStateChange.mock.calls.length - 1
+        ][0];
       expect(lastCall.agentName).toBe("Build Agent");
     });
     const lastCall =
-      onHeaderStateChange.mock.calls[onHeaderStateChange.mock.calls.length - 1][0];
+      onHeaderStateChange.mock.calls[
+        onHeaderStateChange.mock.calls.length - 1
+      ][0];
     expect(lastCall.activeTab).toBe("agent");
     // No inline back-link header rendered when the parent supplies one.
     expect(screen.queryByTitle("Back to agents")).not.toBeInTheDocument();
@@ -1059,10 +1136,13 @@ describe("AgentDetail", () => {
 
     await clickHeaderDuplicate(user);
     mockSaveThenDuplicate(
-      jsonResponse({ detail: "Agent name already exists" }, {
-        ok: false,
-        status: 409,
-      }),
+      jsonResponse(
+        { detail: "Agent name already exists" },
+        {
+          ok: false,
+          status: 409,
+        },
+      ),
     );
     await clickConfirmDuplicate(user);
 
@@ -1076,6 +1156,8 @@ describe("AgentDetail", () => {
     expect(
       screen.queryByText("Agent name already exists"),
     ).not.toBeInTheDocument();
-    expect(screen.getByDisplayValue("Copy of Build Agent2")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("Copy of Build Agent2"),
+    ).toBeInTheDocument();
   });
 });

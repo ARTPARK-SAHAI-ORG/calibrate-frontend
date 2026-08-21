@@ -186,9 +186,12 @@ it("does not offer an agent picker", async () => {
   expect(screen.queryByLabelText(/^Link to agent /)).not.toBeInTheDocument();
   // Footer keeps exactly the two actions.
   expect(
-    screen
-      .getAllByRole("button")
-      .filter((b) => !b.getAttribute("aria-label")?.startsWith("Select ")),
+    screen.getAllByRole("button").filter(
+      (b) =>
+        !b.getAttribute("aria-label")?.startsWith("Select ") &&
+        // Each evaluator row carries the button that opens its prompt.
+        !b.className.includes("flex-1 text-left"),
+    ),
   ).toHaveLength(2);
 });
 
@@ -209,7 +212,10 @@ it("submits a response test with the selected evaluator", async () => {
     evaluatorUuids: ["ev-default"],
     acceptAnyArguments: false,
   });
-  expect(onConverted).toHaveBeenCalledWith({ created: 2, test_uuids: ["t1", "t2"] });
+  expect(onConverted).toHaveBeenCalledWith({
+    created: 2,
+    test_uuids: ["t1", "t2"],
+  });
 });
 
 it("requires an evaluator for a response test", async () => {

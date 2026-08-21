@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccessToken,
   useOpenRouterModels,
@@ -138,11 +138,28 @@ export function CreateEvaluatorFlow({
   const [newEvaluatorOutputType, setNewEvaluatorOutputType] = useState<
     "binary" | "rating"
   >("binary");
-  const [newEvaluatorScale, setNewEvaluatorScale] = useState<
-    { value: number; name: string; description: string }[]
-  >(initialScale());
+  const [newEvaluatorScale, setNewEvaluatorScale] =
+    useState<{ value: number; name: string; description: string }[]>(
+      initialScale(),
+    );
   const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] =
     useState<BinaryScaleRow[]>(defaultBinaryScale());
+
+  const useCaseOptions = useMemo(() => {
+    let options = useCaseGroups
+      ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
+          useCaseGroups.includes(option.group),
+        )
+      : EVALUATOR_USE_CASE_OPTIONS;
+    if (useCaseTypes && useCaseTypes.length > 0) {
+      const allowed = new Set(useCaseTypes);
+      options = options.filter((option) => allowed.has(option.value));
+    }
+    return options;
+  }, [useCaseGroups, useCaseTypes]);
+
+  // The only use case on offer, when the caller left just one.
+  const onlyUseCase = useCaseOptions.length === 1 ? useCaseOptions[0] : null;
 
   // Reset all form state and (re)open the use-case picker whenever the flow is
   // toggled open; tear everything down when it closes.
@@ -160,14 +177,24 @@ export function CreateEvaluatorFlow({
       setNewEvaluatorOutputType("binary");
       setNewEvaluatorScale(initialScale());
       setNewEvaluatorBinaryScale(defaultBinaryScale());
-      setUseCasePickerOpen(true);
-      setSidebarOpen(false);
+      // With one use case to choose from there is nothing to ask: go straight
+      // to the form with that purpose already set.
+      if (onlyUseCase) {
+        setNewEvaluatorType(onlyUseCase.value);
+        setUseCasePickerOpen(false);
+        setSidebarOpen(true);
+        void prefillDefaultPrompt(onlyUseCase.value);
+      } else {
+        setUseCasePickerOpen(true);
+        setSidebarOpen(false);
+      }
     } else {
       setUseCasePickerOpen(false);
       setSidebarOpen(false);
       setLlmModalOpen(false);
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, onlyUseCase?.value]);
 
   // Once OpenRouter providers load, upgrade a stub `{ id, name: id }` judge
   // model (seeded from the default-prompt response) to the full LLMModel.
@@ -181,9 +208,7 @@ export function CreateEvaluatorFlow({
 
   const isNameDuplicate = (name: string): boolean => {
     const trimmedName = name.trim().toLowerCase();
-    return existingEvaluators.some(
-      (e) => e.name.toLowerCase() === trimmedName,
-    );
+    return existingEvaluators.some((e) => e.name.toLowerCase() === trimmedName);
   };
 
   // Prefill the form with the canonical default prompt for the chosen use case.
@@ -369,22 +394,11 @@ export function CreateEvaluatorFlow({
     }
   };
 
-  const detectedPromptVariables = extractVariableNames(newEvaluatorSystemPrompt);
+  const detectedPromptVariables = extractVariableNames(
+    newEvaluatorSystemPrompt,
+  );
   const variablesSupported =
     newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
-  const useCaseOptions = (() => {
-    let options = useCaseGroups
-      ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
-          useCaseGroups.includes(option.group),
-        )
-      : EVALUATOR_USE_CASE_OPTIONS;
-    if (useCaseTypes && useCaseTypes.length > 0) {
-      const allowed = new Set(useCaseTypes);
-      options = options.filter((option) => allowed.has(option.value));
-    }
-    return options;
-  })();
-
   if (!open) return null;
 
   return (
@@ -408,10 +422,6 @@ export function CreateEvaluatorFlow({
         isCreating={isCreating}
         isNameDuplicate={isNameDuplicate}
         onClose={onClose}
-        onOpenUseCasePicker={() => {
-          setSidebarOpen(false);
-          setUseCasePickerOpen(true);
-        }}
         onOpenModelPicker={() => setLlmModalOpen(true)}
         onCreate={createEvaluator}
         setEvaluatorName={setEvaluatorName}

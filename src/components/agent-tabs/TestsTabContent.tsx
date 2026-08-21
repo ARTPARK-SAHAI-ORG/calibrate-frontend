@@ -12,15 +12,10 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { VerifyConnectionDialog } from "@/components/VerifyConnectionDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
-import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
-import {
-  makeOptimisticTestRun,
-  makeOptimisticBenchmarkRun,
-} from "@/lib/optimisticRuns";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
 import { SpinnerIcon } from "@/components/icons";
 import {
@@ -33,9 +28,8 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
-import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
-import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
+import { testTypeLabel } from "@/lib/testTypes";
 import {
   TestTypeFilter,
   type TestTypeFilterValue,
@@ -79,94 +73,6 @@ type TestDetail = TestData & {
     variable_values?: Record<string, string> | null;
   }> | null;
 };
-
-type TestRunResult = {
-  name?: string; // Test name (used in in-progress responses)
-  passed: boolean | null; // null means test is still running
-  status?: string; // "passed" | "failed" | ... when present
-  error?: string | null; // set when the test errored out before evaluating
-  output?: Record<string, any> | null;
-  test_case?: {
-    name?: string;
-    history?: { role: string; content: string }[];
-    evaluation?: Record<string, any>;
-  } | null;
-};
-
-type TestRun = {
-  uuid: string;
-  name: string;
-  status: string;
-  type: "llm-unit-test" | "llm-benchmark";
-  updated_at: string;
-  total_tests: number | null;
-  passed: number | null;
-  failed: number | null;
-  results?: TestRunResult[] | null;
-  model_results?: { model: string }[] | null;
-};
-
-// Helper function to get display name for a test run
-function getTestRunDisplayName(run: TestRun): string {
-  if (run.type === "llm-benchmark") {
-    const modelCount = run.model_results?.length ?? 0;
-    return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
-  }
-
-  // For llm-unit-test: always show the test count ("1 test" / "N tests"),
-  // including single-test runs (previously these showed the test name).
-  const totalTests = run.total_tests ?? run.results?.length ?? 0;
-  return `${totalTests} test${totalTests !== 1 ? "s" : ""}`;
-}
-
-// Helper function to format relative time (short format)
-function formatRelativeTime(dateString: string): string {
-  // Handle both formats:
-  // - Backend format: "2026-01-18 09:30:00" (UTC without timezone indicator)
-  // - ISO format: "2026-01-18T09:30:00.000Z" (from new Date().toISOString())
-  let date: Date;
-  if (dateString.endsWith("Z") || dateString.includes("+")) {
-    // Already has timezone indicator, parse directly
-    date = new Date(dateString);
-  } else {
-    // Backend format: replace space with T and append Z
-    date = new Date(dateString.replace(" ", "T") + "Z");
-  }
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) {
-    return "now";
-  }
-
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} min ago`;
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours}h ago`;
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) {
-    return diffInDays === 1 ? "yesterday" : `${diffInDays}d ago`;
-  }
-
-  const diffInWeeks = Math.floor(diffInDays / 7);
-  if (diffInWeeks < 4) {
-    return `${diffInWeeks}w ago`;
-  }
-
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `${diffInMonths}m ago`;
-  }
-
-  const diffInYears = Math.floor(diffInDays / 365);
-  return `${diffInYears}y ago`;
-}
 
 /**
  * Square check indicator shared by every test checkbox — the attach-existing
@@ -231,7 +137,18 @@ type TestsTabContentProps = {
   onConnectionVerified?: () => void;
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
   onGoToConnectionSettings?: () => void;
+  // Called the moment a run or benchmark is created here. The runs list lives
+  // in the Evaluations tab, so the parent uses this to have that tab pick the
+  // new one up rather than showing a stale list.
+  onRunStarted?: () => void;
+  // Called when the run window is closed here. The parent takes the reader to
+  // the Evaluations tab, where the run they just watched is listed.
+  onRunWindowClosed?: () => void;
 };
+
+// Attaching a test that already exists is hidden for now: new tests come from
+// Create test and Bulk upload. Flip this to true to bring the control back.
+const SHOW_ADD_EXISTING_TEST = false;
 
 export function TestsTabContent({
   agentUuid,
@@ -245,6 +162,8 @@ export function TestsTabContent({
   agentDefaultInputTypes,
   onConnectionVerified,
   onGoToConnectionSettings,
+  onRunStarted,
+  onRunWindowClosed,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -372,23 +291,16 @@ export function TestsTabContent({
 
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
+  //
+  // The address is deliberately left alone. `?runId=` belongs to the
+  // Evaluations tab, which is where runs are listed; both tabs stay mounted
+  // once visited, so if this tab watched that param too, a run opened there
+  // would open a second, hidden copy of this window here.
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
-  // Deep-link the open test run to `?runId=<uuid>` so a reload re-opens the
-  // same run dialog and the URL can be shared. Only test runs use this;
-  // benchmark results keep their own dialog state.
-  const { setParam: setRunIdParam } = useDialogUrlParam({
-    param: "runId",
-    onOpen: (uuid) => setOpenTestRunId(uuid),
-    onClose: () => setOpenTestRunId(null),
-  });
-  // Open/close the run dialog and keep `?runId=` in step.
-  const openTestRun = (uuid: string) => {
-    setOpenTestRunId(uuid);
-    setRunIdParam(uuid);
-  };
+  const openTestRun = (uuid: string) => setOpenTestRunId(uuid);
   const closeTestRun = () => {
     setOpenTestRunId(null);
-    setRunIdParam(null);
+    onRunWindowClosed?.();
   };
   // Key of the run control whose "create run" call is in flight ("all",
   // "bulk", or a test uuid). Non-null disables every run control.
@@ -415,43 +327,9 @@ export function TestsTabContent({
   const isBenchmarkDisabled =
     agentType === "connection" && supportsBenchmark !== true;
 
-  // Past test runs state
-  const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
-  const [pastRunsLoading, setPastRunsLoading] = useState(true);
-
-  // Viewing past run state
-  const [selectedPastRun, setSelectedPastRun] = useState<TestRun | null>(null);
-  const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
-
   // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
   // models + test subset as a completed run and shows it live.
   const benchmarkRerun = useBenchmarkRerun();
-
-  // Track polling intervals for pending runs
-  const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Refs to track current viewing state for use in polling callbacks
-  const openTestRunIdRef = useRef<string | null>(null);
-  const viewingBenchmarkResultsRef = useRef(false);
-  const selectedPastRunRef = useRef<TestRun | null>(null);
-  const pastRunsRef = useRef<TestRun[]>([]);
-
-  // Keep refs in sync with state
-  useEffect(() => {
-    openTestRunIdRef.current = openTestRunId;
-  }, [openTestRunId]);
-
-  useEffect(() => {
-    viewingBenchmarkResultsRef.current = viewingBenchmarkResults;
-  }, [viewingBenchmarkResults]);
-
-  useEffect(() => {
-    selectedPastRunRef.current = selectedPastRun;
-  }, [selectedPastRun]);
-
-  useEffect(() => {
-    pastRunsRef.current = pastRuns;
-  }, [pastRuns]);
 
   // Fetch tests attached to this agent. Exposed as a callback so the
   // create/bulk-upload flows below can refresh the list after the bulk API
@@ -655,183 +533,6 @@ export function TestsTabContent({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showTestDropdown]);
-
-  // Fetch past test runs
-  useEffect(() => {
-    const fetchPastRuns = async () => {
-      if (!backendAccessToken) return;
-
-      try {
-        setPastRunsLoading(true);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("BACKEND_URL environment variable is not set");
-        }
-
-        const response = await fetch(
-          `${backendUrl}/agent-tests/agent/${agentUuid}/runs`,
-          {
-            method: "GET",
-            headers: getDefaultHeaders(backendAccessToken),
-          },
-        );
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          // Silently handle errors for past runs - it's not critical
-          reportError("Failed to fetch past runs");
-          return;
-        }
-
-        const data = await response.json();
-        setPastRuns(unwrapList<TestRun>(data));
-      } catch (err) {
-        reportError("Error fetching past runs:", err);
-      } finally {
-        setPastRunsLoading(false);
-      }
-    };
-
-    if (agentUuid && backendAccessToken) {
-      fetchPastRuns();
-    }
-  }, [agentUuid, backendAccessToken]);
-
-  // A `?runId=` this agent has no run for (deleted run, or a link from another
-  // agent or workspace) would otherwise open a run window that never fills in
-  // and keeps asking the backend for it. Once the run list has loaded, close it
-  // and drop the id from the address. An empty list means the fetch failed or
-  // has not landed, so it is not treated as proof the run is gone.
-  useEffect(() => {
-    if (!openTestRunId || pastRunsLoading || pastRuns.length === 0) return;
-    if (pastRuns.some((run) => run.uuid === openTestRunId)) return;
-    closeTestRun();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openTestRunId, pastRuns, pastRunsLoading]);
-
-  // Poll pending runs (excluding the one being viewed in dialog)
-  useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl || !backendAccessToken) return;
-
-    // Clear existing polling interval
-    if (pendingRunsPollingRef.current) {
-      clearInterval(pendingRunsPollingRef.current);
-      pendingRunsPollingRef.current = null;
-    }
-
-    const pollPendingRuns = async () => {
-      // Get the ID of the run currently being viewed in the dialog (use refs for current values)
-      const viewingRunId =
-        openTestRunIdRef.current ??
-        (viewingBenchmarkResultsRef.current && selectedPastRunRef.current
-          ? selectedPastRunRef.current.uuid
-          : null);
-
-      // Find pending runs that need polling (excluding the one being viewed)
-      // Use ref to get current pastRuns to avoid stale closure
-      const pendingRuns = pastRunsRef.current.filter(
-        (run) =>
-          (run.status === "pending" ||
-            run.status === "queued" ||
-            run.status === "in_progress") &&
-          run.uuid !== viewingRunId,
-      );
-
-      // If no pending runs to poll, skip this poll cycle
-      if (pendingRuns.length === 0) return;
-
-      for (const run of pendingRuns) {
-        // Double-check if this run is now being viewed in dialog
-        if (
-          openTestRunIdRef.current === run.uuid ||
-          (viewingBenchmarkResultsRef.current &&
-            selectedPastRunRef.current?.uuid === run.uuid)
-        ) {
-          continue;
-        }
-
-        try {
-          const endpoint =
-            run.type === "llm-unit-test"
-              ? `${backendUrl}/agent-tests/run/${run.uuid}`
-              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
-
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: getDefaultHeaders(backendAccessToken),
-          });
-
-          if (!response.ok) continue;
-
-          const result = await response.json();
-
-          // Update the run in pastRuns
-          setPastRuns((prev) =>
-            prev.map((r) => {
-              if (r.uuid !== run.uuid) return r;
-
-              if (run.type === "llm-unit-test") {
-                return {
-                  ...r,
-                  status: result.status,
-                  total_tests: result.total_tests ?? r.total_tests,
-                  passed: result.passed ?? r.passed,
-                  failed: result.failed ?? r.failed,
-                  results: result.results ?? r.results,
-                  updated_at: new Date().toISOString(),
-                };
-              } else {
-                return {
-                  ...r,
-                  status: result.status,
-                  model_results: result.model_results ?? r.model_results,
-                  updated_at: new Date().toISOString(),
-                };
-              }
-            }),
-          );
-        } catch (err) {
-          reportError(`Error polling run ${run.uuid}:`, err);
-          // Mark this specific run as failed
-          setPastRuns((prev) =>
-            prev.map((r) =>
-              r.uuid === run.uuid
-                ? {
-                    ...r,
-                    status: "failed",
-                    updated_at: new Date().toISOString(),
-                  }
-                : r,
-            ),
-          );
-        }
-      }
-    };
-
-    // Start polling every 3 seconds
-    pollPendingRuns(); // Poll immediately on mount/dependency change
-    pendingRunsPollingRef.current = setInterval(
-      pollPendingRuns,
-      POLLING_INTERVAL_MS,
-    );
-
-    return () => {
-      if (pendingRunsPollingRef.current) {
-        clearInterval(pendingRunsPollingRef.current);
-        pendingRunsPollingRef.current = null;
-      }
-    };
-  }, [
-    backendAccessToken,
-    openTestRunId,
-    viewingBenchmarkResults,
-    selectedPastRun,
-  ]);
 
   // Filter out tests already attached to the agent
   const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
@@ -1099,17 +800,6 @@ export function TestsTabContent({
     resetTestDialog();
   };
 
-  // Prepend the "pending" row for a run that was just created, so it shows in
-  // the past-runs list straight away. The poller below takes it from there.
-  const addOptimisticTestRun = (taskId: string, tests: TestData[]) => {
-    const newRun: TestRun = makeOptimisticTestRun(
-      taskId,
-      tests,
-      new Date().toISOString(),
-    );
-    setPastRuns((prev) => [newRun, ...prev]);
-  };
-
   // The one place a run is started from this tab: create it, show its pending
   // row, then open the dialog on the new run id. Pass `allLinked` to run every
   // test linked to the agent rather than the given subset.
@@ -1138,7 +828,7 @@ export function TestsTabContent({
         allLinked ? null : tests.map((t) => t.uuid),
       );
       if (!taskId) return null;
-      addOptimisticTestRun(taskId, tests);
+      onRunStarted?.();
       openTestRun(taskId);
       return taskId;
     } finally {
@@ -1494,46 +1184,6 @@ export function TestsTabContent({
     }
   };
 
-  // Handle clicking on a past run row
-  const handlePastRunClick = (run: TestRun) => {
-    if (run.type === "llm-unit-test") {
-      openTestRun(run.uuid);
-      return;
-    }
-    setSelectedPastRun(run);
-    setViewingBenchmarkResults(true);
-  };
-
-  // Rerun a completed benchmark with the same models and test subset, swapping
-  // the view dialog for a fresh live benchmark (skips the model picker).
-  const handleRerunBenchmark = (
-    models: string[],
-    testUuids: string[],
-    testNames: string[],
-  ) => {
-    setViewingBenchmarkResults(false);
-    setSelectedPastRun(null);
-    benchmarkRerun.start({
-      agentUuid,
-      agentName,
-      models,
-      testUuids,
-      testNames,
-    });
-  };
-
-  // Handle when a new benchmark is created. Models aren't known here (the
-  // picker owns them), so the row shows "0 models" until the poller fills it in.
-  const handleBenchmarkCreated = (taskId: string) => {
-    const newRun: TestRun = makeOptimisticBenchmarkRun(
-      taskId,
-      [],
-      new Date().toISOString(),
-    );
-    setPastRuns((prev) => [newRun, ...prev]);
-    // Polling is handled by the useEffect that watches pastRuns for pending items
-  };
-
   // Remove test(s) from agent OR delete them permanently from the user's
   // entire test library, depending on `deleteMode`.
   const handleRemoveTest = async () => {
@@ -1832,154 +1482,6 @@ export function TestsTabContent({
     </div>
   );
 
-  const pastRunsPanel = (
-    <div className="w-full lg:w-[400px] xl:w-[560px] flex-shrink-0 border border-border rounded-xl overflow-hidden">
-      <div className="px-3 md:px-4 py-2 md:py-3">
-        <h3 className="text-sm md:text-base font-semibold text-foreground">
-          Past runs
-        </h3>
-      </div>
-
-      <div className="overflow-y-auto max-h-[300px] lg:max-h-[500px]">
-        {pastRunsLoading ? (
-          <div className="flex items-center justify-center py-6 md:py-8">
-            <svg
-              className="w-5 h-5 animate-spin text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          </div>
-        ) : pastRuns.length === 0 ? (
-          <div className="py-6 md:py-8 text-center">
-            <p className="text-xs md:text-sm text-muted-foreground">
-              No test runs yet
-            </p>
-          </div>
-        ) : (
-          pastRuns.map((run) => (
-            <div
-              key={run.uuid}
-              onClick={() => handlePastRunClick(run)}
-              className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_5.75rem_5rem_9.25rem] sm:items-start sm:justify-items-stretch gap-2 sm:gap-2 xl:grid-cols-[minmax(0,1fr)_6.25rem_5.75rem_11.5rem] xl:gap-3 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-2 sm:block min-w-0">
-                <span
-                  className="text-xs md:text-sm font-medium text-foreground block min-w-0 truncate"
-                  title={getTestRunDisplayName(run)}
-                >
-                  {getTestRunDisplayName(run)}
-                </span>
-                <span className="sm:hidden text-xs text-muted-foreground">
-                  {formatRelativeTime(run.updated_at)}
-                </span>
-              </div>
-              <span
-                className={`hidden sm:flex sm:w-full sm:min-w-0 sm:items-center sm:justify-center px-2 py-0.5 rounded text-xs font-medium ${
-                  run.type === "llm-unit-test"
-                    ? "bg-blue-500/20 text-blue-400"
-                    : "bg-purple-500/20 text-purple-400"
-                }`}
-              >
-                {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
-              </span>
-              <span className="hidden sm:block sm:w-full sm:min-w-0 text-sm text-muted-foreground text-right tabular-nums">
-                {formatRelativeTime(run.updated_at)}
-              </span>
-              <div className="flex flex-wrap items-center sm:justify-end gap-2 sm:justify-self-end">
-                {run.status === "pending" ||
-                run.status === "queued" ||
-                run.status === "in_progress" ? (
-                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
-                    <svg
-                      className="w-3 h-3 animate-spin mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Running
-                  </span>
-                ) : run.type === "llm-unit-test" ? (
-                  (() => {
-                    // Prefer a per-test breakdown so a run whose tests errored
-                    // out shows "N Success / N Fail / N Error" instead of a
-                    // single blanket "Error" pill. Fall back to the run-level
-                    // status only when there are no usable results.
-                    const breakdown = getUnitTestBreakdown(run.results);
-                    if (!breakdown) {
-                      return run.status === "failed" ? (
-                        <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
-                          Error
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
-                          Complete
-                        </span>
-                      );
-                    }
-                    return (
-                      <>
-                        {breakdown.passed > 0 && (
-                          <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
-                            {breakdown.passed} Success
-                          </span>
-                        )}
-                        {breakdown.failed > 0 && (
-                          <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
-                            {breakdown.failed} Fail
-                          </span>
-                        )}
-                        {breakdown.errored > 0 && (
-                          <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500">
-                            {breakdown.errored} Error
-                          </span>
-                        )}
-                      </>
-                    );
-                  })()
-                ) : run.status === "failed" ? (
-                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
-                    Error
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
-                    Complete
-                  </span>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex flex-col">
       {/* Header — only shown when the agent has at least one test
@@ -2055,7 +1557,7 @@ export function TestsTabContent({
 
           {/* Right group: add-more-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            {renderAddTestControl()}
+            {SHOW_ADD_EXISTING_TEST && renderAddTestControl()}
             {/* Create test / Bulk upload (new tests, auto-attached to this agent) */}
             {renderNewTestButtons()}
           </div>
@@ -2106,9 +1608,7 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : agentTests.length === 0 &&
-        !pastRunsLoading &&
-        pastRuns.length === 0 ? (
+      ) : agentTests.length === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -2136,13 +1636,15 @@ export function TestsTabContent({
                 empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
                 leave it visible — clicking it re-fetches via the
                 dropdown's own effect. */}
-            {(allTests.length > 0 || (allTestsAttempted && !allTestsFetched)) &&
+            {SHOW_ADD_EXISTING_TEST &&
+              (allTests.length > 0 ||
+                (allTestsAttempted && !allTestsFetched)) &&
               renderAddTestControl()}
             {renderNewTestButtons()}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
+        <div className="flex-1 flex flex-col">
           <div className="flex-1 flex flex-col min-w-0">
             <div className="flex-1 border border-border rounded-xl p-6 md:p-10 flex flex-col items-center justify-center bg-muted/20 min-h-[220px] md:min-h-[280px]">
               <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
@@ -2168,17 +1670,17 @@ export function TestsTabContent({
                 empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
                 leave it visible — clicking it re-fetches via the
                 dropdown's own effect. */}
-                {(allTests.length > 0 ||
-                  (allTestsAttempted && !allTestsFetched)) &&
+                {SHOW_ADD_EXISTING_TEST &&
+                  (allTests.length > 0 ||
+                    (allTestsAttempted && !allTestsFetched)) &&
                   renderAddTestControl()}
                 {renderNewTestButtons()}
               </div>
             </div>
           </div>
-          {pastRunsPanel}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
+        <div className="flex-1 flex flex-col">
           {/* Left Panel - Tests Table */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Search input with inline match-mode selector — full width so
@@ -2266,13 +1768,6 @@ export function TestsTabContent({
                     className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
                   >
                     Remove
-                  </button>
-                  <button
-                    onClick={() => openBulkDeleteDialog("permanent")}
-                    title="Permanently delete from your test library"
-                    className="h-8 px-3 rounded-md text-sm font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
-                  >
-                    Delete
                   </button>
                   <CompareModelsButton
                     size="bulk"
@@ -2662,8 +2157,6 @@ export function TestsTabContent({
               </>
             )}
           </div>
-
-          {pastRunsPanel}
         </div>
       )}
 
@@ -2696,29 +2189,6 @@ export function TestsTabContent({
         // submitting by stripping a trailing 'e', which only works on one-token labels.
         confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
         isDeleting={isDeleting}
-        extraContent={
-          // Checkbox only on single-test deletes. Bulk deletes still pick their
-          // mode from the two top-bar buttons.
-          testToDelete && testsToDeleteBulk.length === 0 ? (
-            <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={deleteMode === "permanent"}
-                onChange={(e) =>
-                  setDeleteMode(e.target.checked ? "permanent" : "remove")
-                }
-                disabled={isDeleting}
-                className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
-              />
-              <span className="text-sm text-foreground">
-                Also delete this test permanently from my test library
-                <span className="block text-xs text-muted-foreground mt-0.5">
-                  Removes the test from every agent that uses it
-                </span>
-              </span>
-            </label>
-          ) : null
-        }
       />
 
       {/* Create/edit test dialog. In create mode, submits via POST
@@ -2801,14 +2271,7 @@ export function TestsTabContent({
           agentUuid={agentUuid}
           agentName={agentName}
           taskId={openTestRunId}
-          onNewRun={(taskId, testUuids) => {
-            const uuids = new Set(testUuids);
-            addOptimisticTestRun(
-              taskId,
-              agentTests.filter((t) => uuids.has(t.uuid)),
-            );
-            openTestRun(taskId);
-          }}
+          onNewRun={(taskId) => openTestRun(taskId)}
         />
       )}
 
@@ -2819,7 +2282,6 @@ export function TestsTabContent({
         <VerifyConnectionDialog
           isOpen
           agentUuid={agentUuid}
-          agentName={agentName}
           onClose={() => setPendingRun(null)}
           onVerified={() => {
             const p = pendingRun;
@@ -2844,29 +2306,11 @@ export function TestsTabContent({
         agentUuid={agentUuid}
         agentName={agentName}
         tests={benchmarkTestSubset ?? agentTests}
-        onBenchmarkCreated={handleBenchmarkCreated}
+        onBenchmarkCreated={() => onRunStarted?.()}
         agentType={agentType}
         benchmarkModelsVerified={benchmarkModelsVerified}
         benchmarkProvider={benchmarkProvider}
       />
-
-      {/* View Past Benchmark Results Dialog */}
-      {selectedPastRun && selectedPastRun.type === "llm-benchmark" && (
-        <BenchmarkResultsDialog
-          isOpen={viewingBenchmarkResults}
-          onClose={() => {
-            setViewingBenchmarkResults(false);
-            setSelectedPastRun(null);
-          }}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          testUuids={[]}
-          testNames={[]}
-          models={[]}
-          taskId={selectedPastRun.uuid}
-          onRerun={handleRerunBenchmark}
-        />
-      )}
 
       {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
           test subset, skipping the model picker. */}
@@ -2874,7 +2318,7 @@ export function TestsTabContent({
         config={benchmarkRerun.config}
         rerunKey={benchmarkRerun.key}
         onClose={benchmarkRerun.clear}
-        onBenchmarkCreated={(taskId) => handleBenchmarkCreated(taskId)}
+        onBenchmarkCreated={() => onRunStarted?.()}
         onRerun={benchmarkRerun.start}
       />
     </div>

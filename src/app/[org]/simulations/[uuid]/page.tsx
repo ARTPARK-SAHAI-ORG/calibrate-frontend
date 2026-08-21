@@ -5,7 +5,11 @@ import { unwrapList } from "@/lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import { replaceUrl, useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useVerifyConnection, usePageErrorState } from "@/hooks";
+import {
+  useAccessToken,
+  useVerifyConnection,
+  usePageErrorState,
+} from "@/hooks";
 import { toast } from "sonner";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
@@ -17,6 +21,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
 import { Agent } from "@/components/AgentPicker";
 import { PickerItem } from "@/components/MultiSelectPicker";
+// The library shape, distinct from this page's own `EvaluatorData` row.
+import type { EvaluatorData as LibraryEvaluator } from "@/lib/evaluatorApi";
 import {
   SimulationConfigTab,
   SimulationRunsTab,
@@ -88,8 +94,11 @@ export default function SimulationDetailPage() {
   const [simulation, setSimulation] = useState<SimulationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureResponse } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureResponse,
+  } = usePageErrorState();
 
   // Form state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -104,10 +113,12 @@ export default function SimulationDetailPage() {
   const [scenariosLoading, setScenariosLoading] = useState(false);
   const [selectedScenarios, setSelectedScenarios] = useState<PickerItem[]>([]);
 
-  // Metrics state
-  const [metrics, setMetrics] = useState<PickerItem[]>([]);
+  // Evaluators state
+  const [metrics, setMetrics] = useState<LibraryEvaluator[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [selectedMetrics, setSelectedMetrics] = useState<PickerItem[]>([]);
+  const [selectedMetricUuids, setSelectedMetricUuids] = useState<string[]>([]);
+  // Bumped after an evaluator is created here, to re-read the library.
+  const [metricsReloadKey, setMetricsReloadKey] = useState(0);
 
   // Tab state
   type TabType = "config" | "runs";
@@ -164,7 +175,9 @@ export default function SimulationDetailPage() {
   // Handle personas change with limit check
   const handlePersonasChange = (items: PickerItem[]) => {
     if (items.length > LIMITS.SIMULATION_MAX_PERSONAS) {
-      showLimitToast(`You can only select up to ${LIMITS.SIMULATION_MAX_PERSONAS} personas at a time.`);
+      showLimitToast(
+        `You can only select up to ${LIMITS.SIMULATION_MAX_PERSONAS} personas at a time.`,
+      );
       return;
     }
     setSelectedPersonas(items);
@@ -173,7 +186,9 @@ export default function SimulationDetailPage() {
   // Handle scenarios change with limit check
   const handleScenariosChange = (items: PickerItem[]) => {
     if (items.length > LIMITS.SIMULATION_MAX_SCENARIOS) {
-      showLimitToast(`You can only select up to ${LIMITS.SIMULATION_MAX_SCENARIOS} scenarios at a time.`);
+      showLimitToast(
+        `You can only select up to ${LIMITS.SIMULATION_MAX_SCENARIOS} scenarios at a time.`,
+      );
       return;
     }
     setSelectedScenarios(items);
@@ -267,7 +282,9 @@ export default function SimulationDetailPage() {
         agent_uuid: selectedAgent?.uuid,
         persona_uuids: selectedPersonas.map((p) => p.uuid),
         scenario_uuids: selectedScenarios.map((s) => s.uuid),
-        evaluators: selectedMetrics.map((m) => ({ evaluator_uuid: m.uuid })),
+        evaluators: selectedMetricUuids.map((uuid) => ({
+          evaluator_uuid: uuid,
+        })),
       };
 
       const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
@@ -331,7 +348,8 @@ export default function SimulationDetailPage() {
 
         // Pre-populate agent if present
         if (data.agent) {
-          const agentType = data.agent.type === "connection" ? "connection" : "agent";
+          const agentType =
+            data.agent.type === "connection" ? "connection" : "agent";
           setSelectedAgent({
             uuid: data.agent.uuid,
             name: data.agent.name,
@@ -358,7 +376,7 @@ export default function SimulationDetailPage() {
                 uuid: p.uuid,
                 name: p.name,
                 description: p.description,
-              }))
+              })),
             );
           }
           if (data.scenarios) {
@@ -367,23 +385,17 @@ export default function SimulationDetailPage() {
                 uuid: s.uuid,
                 name: s.name,
                 description: s.description,
-              }))
+              })),
             );
           }
           if (data.evaluators) {
-            setSelectedMetrics(
-              data.evaluators.map((m) => ({
-                uuid: m.uuid,
-                name: m.name,
-                description: m.description,
-              }))
-            );
+            setSelectedMetricUuids(data.evaluators.map((m) => m.uuid));
           }
         }
       } catch (err) {
         reportError("Error fetching simulation:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load simulation"
+          err instanceof Error ? err.message : "Failed to load simulation",
         );
       } finally {
         setIsLoading(false);
@@ -521,19 +533,11 @@ export default function SimulationDetailPage() {
         }
 
         const data = await response.json();
-        const formattedMetrics: PickerItem[] = unwrapList<{
-          uuid: string;
-          name: string;
-          description?: string;
-          evaluator_type?: string;
-        }>(data)
-          .filter((m) => m.evaluator_type === "conversation")
-          .map((m) => ({
-            uuid: m.uuid,
-            name: m.name,
-            description: m.description,
-          }));
-        setMetrics(formattedMetrics);
+        setMetrics(
+          unwrapList<LibraryEvaluator>(data).filter(
+            (m) => m.evaluator_type === "conversation",
+          ),
+        );
       } catch (err) {
         reportError("Error fetching evaluators:", err);
       } finally {
@@ -542,7 +546,7 @@ export default function SimulationDetailPage() {
     };
 
     fetchMetrics();
-  }, [backendAccessToken]);
+  }, [backendAccessToken, metricsReloadKey]);
 
   // Name editing handlers
   const handleOpenEditName = () => {
@@ -554,7 +558,11 @@ export default function SimulationDetailPage() {
   };
 
   const handleSaveName = async () => {
-    if (!simulation || !editedName.trim() || editedName.trim() === simulation.name) {
+    if (
+      !simulation ||
+      !editedName.trim() ||
+      editedName.trim() === simulation.name
+    ) {
       setIsEditNameDialogOpen(false);
       return;
     }
@@ -634,7 +642,9 @@ export default function SimulationDetailPage() {
       {!errorCode && (
         <span
           className={`text-base font-semibold text-foreground ${
-            !isLoading && simulation ? "cursor-pointer hover:opacity-70 transition-opacity" : ""
+            !isLoading && simulation
+              ? "cursor-pointer hover:opacity-70 transition-opacity"
+              : ""
           }`}
           onClick={!isLoading && simulation ? handleOpenEditName : undefined}
           title={!isLoading && simulation ? "Click to edit name" : undefined}
@@ -694,107 +704,113 @@ export default function SimulationDetailPage() {
           </div>
         )}
         <div className="relative group" ref={launchDropdownRef}>
-        <button
-          onClick={() => !isAgentUnverified && setLaunchDropdownOpen(!launchDropdownOpen)}
-          disabled={isLaunching || isAgentUnverified}
-          className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isLaunching ? (
-            <>
-              <SpinnerIcon className="w-4 h-4 animate-spin" />
-              <span>Launching...</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              <span>Launch</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${
-                  launchDropdownOpen ? "rotate-180" : ""
-                }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </>
+          <button
+            onClick={() =>
+              !isAgentUnverified && setLaunchDropdownOpen(!launchDropdownOpen)
+            }
+            disabled={isLaunching || isAgentUnverified}
+            className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isLaunching ? (
+              <>
+                <SpinnerIcon className="w-4 h-4 animate-spin" />
+                <span>Launching...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                <span>Launch</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${
+                    launchDropdownOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {isAgentUnverified && (
+            <div className="absolute right-0 top-full mt-1 w-56 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+              Agent must be verified before launching a simulation
+            </div>
           )}
-        </button>
 
-        {isAgentUnverified && (
-          <div className="absolute right-0 top-full mt-1 w-56 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
-            Agent must be verified before launching a simulation
-          </div>
-        )}
-
-        {/* Dropdown Menu */}
-        {launchDropdownOpen && (
-          <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[180px]">
-            <div className="relative group/text">
-              <button
-                onClick={() => handleLaunch("text")}
-                disabled={isLaunching || selectedAgent?.hasDefaultInputs}
-                className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
+          {/* Dropdown Menu */}
+          {launchDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[180px]">
+              <div className="relative group/text">
+                <button
+                  onClick={() => handleLaunch("text")}
+                  disabled={isLaunching || selectedAgent?.hasDefaultInputs}
+                  className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-                  />
-                </svg>
-                Text Simulation
-              </button>
-              {selectedAgent?.hasDefaultInputs && (
-                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/text:opacity-100 pointer-events-none transition-opacity z-[60]">
-                  Text simulation is not supported for connections with custom
-                  fields
-                </div>
-              )}
-            </div>
-            <div className="relative group/voice">
-              <button
-                onClick={() => handleLaunch("voice")}
-                disabled={isLaunching || selectedAgent?.type === "connection"}
-                className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-3 rounded-b-xl"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                    />
+                  </svg>
+                  Text Simulation
+                </button>
+                {selectedAgent?.hasDefaultInputs && (
+                  <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/text:opacity-100 pointer-events-none transition-opacity z-[60]">
+                    Text simulation is not supported for connections with custom
+                    fields
+                  </div>
+                )}
+              </div>
+              <div className="relative group/voice">
+                <button
+                  onClick={() => handleLaunch("voice")}
+                  disabled={isLaunching || selectedAgent?.type === "connection"}
+                  className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-3 rounded-b-xl"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                  />
-                </svg>
-                Voice Simulation
-              </button>
-              {selectedAgent?.type === "connection" && (
-                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/voice:opacity-100 pointer-events-none transition-opacity z-[60]">
-                  Agent connections don&apos;t support voice simulations yet
-                </div>
-              )}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                  Voice Simulation
+                </button>
+                {selectedAgent?.type === "connection" && (
+                  <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/voice:opacity-100 pointer-events-none transition-opacity z-[60]">
+                    Agent connections don&apos;t support voice simulations yet
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
     ) : null;
@@ -873,10 +889,11 @@ export default function SimulationDetailPage() {
                 selectedScenarios={selectedScenarios}
                 onScenariosChange={handleScenariosChange}
                 scenariosLoading={scenariosLoading}
-                metrics={metrics}
-                selectedMetrics={selectedMetrics}
-                onMetricsChange={setSelectedMetrics}
-                metricsLoading={metricsLoading}
+                evaluators={metrics}
+                selectedEvaluatorUuids={selectedMetricUuids}
+                onEvaluatorsChange={setSelectedMetricUuids}
+                evaluatorsLoading={metricsLoading}
+                onEvaluatorsRefresh={() => setMetricsReloadKey((k) => k + 1)}
                 isConfigured={isConfigured}
                 isCreating={isCreating}
                 onCreateClick={handleCreate}

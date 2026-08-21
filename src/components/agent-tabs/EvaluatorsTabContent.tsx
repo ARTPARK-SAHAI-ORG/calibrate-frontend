@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
-import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
+import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
+  isDefaultEvaluator,
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
@@ -30,8 +31,9 @@ const ADD_BUTTON_CLASS =
 const CREATE_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
 
-// Agent tests only use next-reply (`llm`) and conversation evaluators.
-const AGENT_EVALUATOR_TYPES = new Set(["llm", "conversation"]);
+// Full-conversation evaluators are hidden for now, so an agent lists only the
+// next-reply (`llm`) ones.
+const AGENT_EVALUATOR_TYPES = new Set(["llm"]);
 
 export function EvaluatorsTabContent({
   agentUuid,
@@ -241,14 +243,10 @@ export function EvaluatorsTabContent({
           carries its own call-to-action. */}
       {attachedEvaluators.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
-          <div>
-            <h2 className="text-base md:text-lg font-semibold text-foreground">
-              Evaluators
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              LLM judges for evaluating the agent&rsquo;s responses
-            </p>
-          </div>
+          {/* No heading: the tab strip above already says Evaluators. */}
+          <p className="text-sm md:text-base font-medium text-foreground">
+            LLM judges for evaluating the agent&rsquo;s responses
+          </p>
           {renderHeaderButtons()}
         </div>
       )}
@@ -330,25 +328,20 @@ export function EvaluatorsTabContent({
             return (
               <div
                 key={evaluator.uuid}
-                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-4 md:px-5 md:py-4 transition-colors"
+                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base md:text-lg font-semibold text-foreground">
+                      <h3 className="text-base font-semibold text-foreground">
                         {evaluator.name}
                       </h3>
-                      {evaluator.evaluator_type && (
-                        <EvaluatorTypePill
-                          evaluatorType={evaluator.evaluator_type}
-                        />
-                      )}
-                      {evaluator.output_type && (
-                        <OutputTypePill outputType={evaluator.output_type} />
-                      )}
+                      {/* Only "where did this come from". What it judges and
+                          how it scores are in the evaluator itself. */}
+                      {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
                     </div>
                     {evaluator.description && (
-                      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                      <p className="text-sm text-muted-foreground mt-0.5">
                         {evaluator.description}
                       </p>
                     )}
@@ -381,6 +374,7 @@ export function EvaluatorsTabContent({
         isOpen={addDialogOpen}
         availableEvaluators={availableEvaluators}
         onClose={() => setAddDialogOpen(false)}
+        onCreateEvaluator={() => setCreateFlowOpen(true)}
         onAdd={handleAddEvaluators}
       />
 
@@ -390,7 +384,8 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
-        useCaseGroups={["conversation"]}
+        // Next-reply only, so the flow skips the "what is this for?" step.
+        useCaseTypes={["llm"]}
       />
 
       {/* Shared detach/delete confirmation */}

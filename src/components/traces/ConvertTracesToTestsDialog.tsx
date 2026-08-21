@@ -118,7 +118,7 @@ export function ConvertTracesToTestsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-xl w-full max-w-6xl max-h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             Add {count} trace{count === 1 ? "" : "s"} to your tests

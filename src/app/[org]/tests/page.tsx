@@ -1989,7 +1989,6 @@ function LLMPageInner() {
         <VerifyConnectionDialog
           isOpen
           agentUuid={pendingVerify.agentUuid}
-          agentName={pendingVerify.agentName}
           onClose={() => setPendingVerify(null)}
           onVerified={() => {
             const p = pendingVerify;

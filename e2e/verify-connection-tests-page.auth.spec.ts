@@ -103,6 +103,10 @@ async function createUnverifiedConnectionAgent(
 ): Promise<void> {
   await createAgent(page, name, "connection");
 
+  // A connection agent opens on Evaluators now, so reach the Connection tab,
+  // which sits just before Settings.
+  await page.getByRole("button", { name: "Connection", exact: true }).click();
+
   const urlInput = page.getByPlaceholder("https://your-agent.example.com/chat");
   await expect(urlInput).toBeVisible({ timeout: 15000 });
   await urlInput.fill("https://example.com/agent");
