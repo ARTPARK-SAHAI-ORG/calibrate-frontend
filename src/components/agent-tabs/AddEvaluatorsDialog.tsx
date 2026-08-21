@@ -77,7 +77,9 @@ export function AddEvaluatorsDialog({
     >
       <div
         data-tour="add-evaluators-dialog"
-        className="bg-background border border-border rounded-xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh]"
+        // A real height, not just a cap: the columns inside fill the body, and a
+        // percentage of a content-sized box would leave them unscrollable.
+        className="bg-background border border-border rounded-xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] md:h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
