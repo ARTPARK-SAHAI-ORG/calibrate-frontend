@@ -10,7 +10,6 @@ import {
   type RunResultFilter,
 } from "@/hooks";
 import { getDefaultHeaders } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/relativeTime";
 import {
   getUnitTestBreakdown,
   isRunErrored,
@@ -43,6 +42,22 @@ export function runTestCount(run: AgentRun): number | null {
   const firstModel = run.model_results?.[0];
   if (firstModel?.test_results) return firstModel.test_results.length;
   return null;
+}
+
+/**
+ * What judged this run, as plain labels: the evaluators it used, plus "Tool
+ * call" when it covered a tool-call test, since those are checked against the
+ * tool rather than by an evaluator. Empty when the list says nothing.
+ */
+export function runEvaluatorLabels(run: AgentRun): string[] {
+  const labels = (run.evaluators ?? [])
+    .map((e) => e.name)
+    .filter((name): name is string => !!name);
+  const hasToolCall = (run.results ?? []).some(
+    (r) => r.type === "tool_call" || r.test_case?.type === "tool_call",
+  );
+  if (hasToolCall) labels.push("Tool call");
+  return Array.from(new Set(labels));
 }
 
 /** How many models the run tried the tests against. A plain run tries one. */
@@ -128,6 +143,26 @@ function RunResult({ run }: { run: AgentRun }) {
         </span>
       )}
     </>
+  );
+}
+
+/** What judged the run, as plain pills. They are labels, not controls. */
+function EvaluatorLabels({ run }: { run: AgentRun }) {
+  const labels = runEvaluatorLabels(run);
+  if (labels.length === 0) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {labels.map((label) => (
+        <span
+          key={label}
+          className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[11px] font-medium bg-muted text-foreground"
+        >
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -235,6 +270,17 @@ export function RunsTabContent({
   const currentPage = Math.floor(offset / pageSize) + 1;
   const countCell = (value: number | null) =>
     value === null ? "—" : String(value);
+  // The whole date and time, not "3 min ago": a run is a record, and two runs
+  // minutes apart need telling apart.
+  const whenText = (run: AgentRun) => {
+    const raw = run.created_at ?? run.updated_at;
+    const date = new Date(
+      raw.endsWith("Z") || raw.includes("+")
+        ? raw
+        : raw.replace(" ", "T") + "Z",
+    );
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
+  };
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
@@ -318,16 +364,22 @@ export function RunsTabContent({
               <thead className="bg-muted/30">
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                    When
+                    Run
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
-                    Tests
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-36">
+                    Number of tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
-                    Models
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-40">
+                    Number of models
                   </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                    Evaluators
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Result
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                    Created at
                   </th>
                 </tr>
               </thead>
@@ -338,8 +390,13 @@ export function RunsTabContent({
                     onClick={() => openRun(run)}
                     className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
                   >
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {formatRelativeTime(run.updated_at)}
+                    <td className="px-4 py-3">
+                      <span
+                        className="block max-w-[14rem] truncate font-mono text-xs text-foreground"
+                        title={run.uuid}
+                      >
+                        {run.uuid}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runTestCount(run))}
@@ -348,9 +405,15 @@ export function RunsTabContent({
                       {countCell(runModelCount(run))}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                      <EvaluatorLabels run={run} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <RunResult run={run} />
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                      {whenText(run)}
                     </td>
                   </tr>
                 ))}
@@ -367,17 +430,26 @@ export function RunsTabContent({
                 className="border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatRelativeTime(run.updated_at)}
+                  <span
+                    className="min-w-0 truncate font-mono text-xs text-foreground"
+                    title={run.uuid}
+                  >
+                    {run.uuid}
                   </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                     {countCell(runTestCount(run))} tests,{" "}
                     {countCell(runModelCount(run))} models
                   </span>
                 </div>
+                <div className="mt-2">
+                  <EvaluatorLabels run={run} />
+                </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {whenText(run)}
+                </p>
               </div>
             ))}
           </div>

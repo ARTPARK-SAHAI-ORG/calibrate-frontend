@@ -1,6 +1,11 @@
 import React from "react";
 import { render, screen, setupUser, act, waitFor } from "@/test-utils";
-import { RunsTabContent, runTestCount, runModelCount } from "../RunsTabContent";
+import {
+  RunsTabContent,
+  runTestCount,
+  runModelCount,
+  runEvaluatorLabels,
+} from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 
 const BACKEND = "http://test-backend";
@@ -146,9 +151,57 @@ describe("run counts", () => {
     expect(runModelCount(unitRun)).toBe(1);
     expect(runModelCount(benchmarkRun)).toBe(2);
   });
+
+  it("lists the evaluators, adding Tool call when the run had one", () => {
+    expect(
+      runEvaluatorLabels({
+        ...unitRun,
+        evaluators: [
+          { uuid: "e1", name: "Correctness" },
+          { uuid: "e2", name: "Tone" },
+        ],
+      }),
+    ).toEqual(["Correctness", "Tone"]);
+
+    expect(
+      runEvaluatorLabels({
+        ...unitRun,
+        evaluators: [{ uuid: "e1", name: "Correctness" }],
+        results: [{ passed: true, test_case: { type: "tool_call" } }],
+      }),
+    ).toEqual(["Correctness", "Tool call"]);
+
+    // Nothing known about this run: the cell stays empty rather than guessing.
+    expect(runEvaluatorLabels({ ...unitRun, results: null })).toEqual([]);
+  });
 });
 
 describe("RunsTabContent", () => {
+  it("names each run and when it was created", async () => {
+    state.runs = [{ ...unitRun, created_at: "2026-01-18 09:30:00" }];
+    renderTab();
+    await screen.findAllByText("1 Success");
+    // The whole id, so two runs can be told apart and one can be quoted.
+    expect(screen.getAllByTitle("run-unit").length).toBeGreaterThan(0);
+    // The date and time it started, not "3 min ago".
+    expect(screen.getAllByText(/2026/).length).toBeGreaterThan(0);
+  });
+
+  it("lists what judged the run, with tool calls named too", async () => {
+    state.runs = [
+      {
+        ...unitRun,
+        evaluators: [{ uuid: "e1", name: "Correctness" }],
+        results: [{ passed: true }, { passed: true, type: "tool_call" }],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("Correctness")).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText("Tool call").length).toBeGreaterThan(0);
+  });
+
   it("shows both run kinds in one table with their test and model counts", async () => {
     renderTab();
     await screen.findAllByText("1 Success");
@@ -157,7 +210,8 @@ describe("RunsTabContent", () => {
     const cells = Array.from(table.querySelectorAll("tbody tr")).map((row) =>
       Array.from(row.querySelectorAll("td")).map((td) => td.textContent),
     );
-    // Tests then models, for the plain run and the benchmark.
+    // Number of tests then number of models, for the plain run and the
+    // benchmark.
     expect(cells[0]?.[1]).toBe("3");
     expect(cells[0]?.[2]).toBe("1");
     expect(cells[1]?.[1]).toBe("4");
