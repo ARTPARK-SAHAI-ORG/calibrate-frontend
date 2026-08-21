@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  EvaluatorTypePill,
-  OutputTypePill,
-} from "@/components/EvaluatorPills";
+import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
+import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 
@@ -29,6 +27,8 @@ export function EvaluatorPicker({
   emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
+  // The evaluator whose prompt is on show. Null until one is clicked.
+  const [previewUuid, setPreviewUuid] = useState<string | null>(null);
 
   const q = search.trim().toLowerCase();
   const filteredEvaluators = evaluators.filter((ev) => {
@@ -46,17 +46,26 @@ export function EvaluatorPicker({
   const renderEvaluatorRow = (ev: EvaluatorData) => {
     const checked = selectedIds.has(ev.uuid);
     return (
-      <label
+      <div
         key={ev.uuid}
-        className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+        className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
+          previewUuid === ev.uuid ? "bg-muted/50" : "hover:bg-muted/30"
+        }`}
       >
         <input
           type="checkbox"
+          aria-label={`Select ${ev.name}`}
           checked={checked}
           onChange={() => onToggle(ev.uuid)}
           className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
         />
-        <div className="min-w-0 flex-1">
+        {/* The body opens the prompt on the right rather than ticking the box,
+            so an evaluator can be read before it is added. */}
+        <button
+          type="button"
+          onClick={() => setPreviewUuid(ev.uuid)}
+          className="min-w-0 flex-1 text-left cursor-pointer"
+        >
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-foreground">
               {ev.name}
@@ -64,17 +73,15 @@ export function EvaluatorPicker({
             {ev.evaluator_type && (
               <EvaluatorTypePill evaluatorType={ev.evaluator_type} />
             )}
-            {ev.output_type && (
-              <OutputTypePill outputType={ev.output_type} />
-            )}
+            {ev.output_type && <OutputTypePill outputType={ev.output_type} />}
           </div>
           {ev.description && (
             <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
               {ev.description}
             </div>
           )}
-        </div>
-      </label>
+        </button>
+      </div>
     );
   };
 
@@ -110,36 +117,44 @@ export function EvaluatorPicker({
   };
 
   return (
-    <div className="space-y-3">
-      {/* Search */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          <svg
-            className="w-4 h-4 text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-            />
-          </svg>
+    <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+      <div className="space-y-3 md:flex-1 md:min-w-0">
+        {/* Search */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <svg
+              className="w-4 h-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search evaluators"
+            className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+          />
         </div>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search evaluators"
-          className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-        />
+
+        {/* Checkbox list */}
+        <div className="border border-border rounded-md max-h-96 overflow-y-auto divide-y divide-border">
+          {renderEvaluatorList()}
+        </div>
       </div>
 
-      {/* Checkbox list */}
-      <div className="border border-border rounded-md max-h-96 overflow-y-auto divide-y divide-border">
-        {renderEvaluatorList()}
+      {/* How the picked evaluator judges. Below the list on a phone, where two
+          columns will not fit. */}
+      <div className="md:flex-1 md:min-w-0 border border-border rounded-md md:max-h-[27.75rem] overflow-hidden">
+        <EvaluatorPromptPreview evaluatorUuid={previewUuid} />
       </div>
     </div>
   );

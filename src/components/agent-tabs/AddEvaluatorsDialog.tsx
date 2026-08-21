@@ -79,7 +79,7 @@ export function AddEvaluatorsDialog({
     >
       <div
         data-tour="add-evaluators-dialog"
-        className="bg-background border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

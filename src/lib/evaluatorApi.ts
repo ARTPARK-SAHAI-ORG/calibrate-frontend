@@ -63,7 +63,9 @@ export type EvaluatorData = {
  * NOTE: categorization only — NOT a permissions check. Org defaults are
  * editable/deletable forks, so edit/delete/new-version are allowed on both.
  */
-export function isDefaultEvaluator(e: { is_default?: boolean | null }): boolean {
+export function isDefaultEvaluator(e: {
+  is_default?: boolean | null;
+}): boolean {
   return !!e.is_default;
 }
 
@@ -133,6 +135,61 @@ export async function fetchAllEvaluators(
     if (!response.ok) throw new Error("Failed to fetch evaluators");
     return unwrapList<EvaluatorData>(await response.json());
   });
+}
+
+/** One saved version of an evaluator: how it judges and what it scores. */
+export type EvaluatorVersionDetail = {
+  uuid: string;
+  version_number: number;
+  judge_model: string;
+  system_prompt: string;
+  output_config: {
+    scale?: {
+      value: boolean | number | string;
+      name: string;
+      description?: string;
+    }[];
+  } | null;
+  variables?: EvaluatorVariableDef[] | null;
+};
+
+/**
+ * One evaluator with every saved version. `live_version_index` points at the
+ * version in use; the list endpoints do not carry the prompt text, so anything
+ * showing a prompt has to read it from here.
+ */
+export type EvaluatorDetail = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  output_type?: "binary" | "rating";
+  evaluator_type?: EvaluatorType;
+  live_version_index?: number | null;
+  versions?: EvaluatorVersionDetail[];
+};
+
+/** Fetch one evaluator with its versions. */
+export async function fetchEvaluatorDetail(
+  uuid: string,
+  accessToken: string,
+): Promise<EvaluatorDetail> {
+  const response = await fetch(`${getBackendUrl()}/evaluators/${uuid}`, {
+    method: "GET",
+    headers: getDefaultHeaders(accessToken),
+  });
+  if (!response.ok) throw new Error("Failed to fetch evaluator");
+  return (await response.json()) as EvaluatorDetail;
+}
+
+/** The version an evaluator judges with: the live one, else the newest saved. */
+export function liveVersionOf(
+  evaluator: EvaluatorDetail,
+): EvaluatorVersionDetail | null {
+  const versions = evaluator.versions ?? [];
+  if (versions.length === 0) return null;
+  const index = evaluator.live_version_index;
+  if (typeof index === "number" && versions[index]) return versions[index];
+  return versions[versions.length - 1];
 }
 
 /** Fetch the evaluators currently attached to an agent. */
