@@ -32,7 +32,7 @@ type EvaluationResult = {
   status: "queued" | "in_progress" | "done";
 };
 
-type TabType = "input" | "evaluators" | "models" | "settings";
+type TabType = "input" | "models" | "evaluators";
 
 type LanguageOption =
   | "english"
@@ -393,16 +393,6 @@ export function TextToSpeechEvaluation({
           Dataset
         </button>
         <button
-          onClick={() => setActiveTab("evaluators")}
-          className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "evaluators"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Evaluators
-        </button>
-        <button
           onClick={() => setActiveTab("models")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
             activeTab === "models"
@@ -413,14 +403,14 @@ export function TextToSpeechEvaluation({
           Models
         </button>
         <button
-          onClick={() => setActiveTab("settings")}
+          onClick={() => setActiveTab("evaluators")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "settings"
+            activeTab === "evaluators"
               ? "text-foreground border-b-2 border-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Settings
+          Evaluators
         </button>
       </div>
 
@@ -443,7 +433,7 @@ export function TextToSpeechEvaluation({
             selectedUuids={selectedEvaluatorUuids}
             onSelectedChange={handleEvaluatorsChange}
             onRefresh={() => setEvaluatorsReloadKey((k) => k + 1)}
-            description="These judges score the speech this run produces."
+            description="These evaluators score the speech each model produces"
           />
         </div>
       </div>
@@ -834,10 +824,6 @@ export function TextToSpeechEvaluation({
       </div>
 
       {/* Settings Tab Content */}
-      <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
-        {/* Evaluator Selection */}
-      </div>
-
       {/* Input Tab Content */}
       <div className={activeTab === "input" ? "space-y-4" : "hidden"}>
         {/* Mode toggle */}

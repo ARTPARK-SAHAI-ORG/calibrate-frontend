@@ -29,6 +29,8 @@ type RunEvaluatorsPanelProps = {
   description: string;
   /** Show the chosen evaluators with nothing to add, create or remove. */
   readOnly?: boolean;
+  /** Anything that belongs above the cards, such as what a run always measures. */
+  beforeList?: React.ReactNode;
 };
 
 /**
@@ -48,6 +50,7 @@ export function RunEvaluatorsPanel({
   onRefresh,
   description,
   readOnly = false,
+  beforeList,
 }: RunEvaluatorsPanelProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
@@ -89,6 +92,8 @@ export function RunEvaluatorsPanel({
         </div>
       )}
 
+      {beforeList && <div className="mb-5 md:mb-6">{beforeList}</div>}
+
       {isLoading ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex items-center justify-center bg-muted/20">
           <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -114,7 +119,7 @@ export function RunEvaluatorsPanel({
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             {description}
-            {readOnly ? "" : " Add one from your library or create a new one."}
+            {readOnly ? "" : ". Add one from your library or create a new one"}
           </p>
           {headerButtons}
         </div>
@@ -140,11 +145,16 @@ export function RunEvaluatorsPanel({
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Same buttons as the agent's Evaluators tab. A new tab
+                      keeps the run being set up on screen. */}
                   <Link
                     href={`/evaluators/${evaluator.uuid}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+                    title="View evaluator"
                   >
-                    Open
+                    View
                   </Link>
                   {!readOnly && (
                     <button
@@ -156,7 +166,8 @@ export function RunEvaluatorsPanel({
                           ),
                         )
                       }
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background text-muted-foreground hover:text-red-500 hover:border-red-500/40 transition-colors cursor-pointer"
+                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      title="Remove from this run"
                     >
                       Remove
                     </button>
@@ -171,6 +182,8 @@ export function RunEvaluatorsPanel({
       <AddEvaluatorsDialog
         isOpen={addDialogOpen}
         availableEvaluators={unselected}
+        description="Choose evaluators from your library to use in this run"
+        allowConversationType={evaluatorType === "conversation"}
         onClose={() => setAddDialogOpen(false)}
         onAdd={(uuids) => {
           onSelectedChange([...selectedUuids, ...uuids]);

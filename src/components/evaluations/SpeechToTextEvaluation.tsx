@@ -31,7 +31,7 @@ type EvaluationResult = {
   status: "queued" | "in_progress" | "done";
 };
 
-type TabType = "input" | "evaluators" | "models" | "settings";
+type TabType = "input" | "models" | "evaluators";
 
 type LanguageOption =
   | "english"
@@ -383,16 +383,6 @@ export function SpeechToTextEvaluation({
           Dataset
         </button>
         <button
-          onClick={() => setActiveTab("evaluators")}
-          className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "evaluators"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Evaluators
-        </button>
-        <button
           onClick={() => setActiveTab("models")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
             activeTab === "models"
@@ -403,14 +393,14 @@ export function SpeechToTextEvaluation({
           Models
         </button>
         <button
-          onClick={() => setActiveTab("settings")}
+          onClick={() => setActiveTab("evaluators")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "settings"
+            activeTab === "evaluators"
               ? "text-foreground border-b-2 border-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Settings
+          Evaluators
         </button>
       </div>
 
@@ -423,7 +413,84 @@ export function SpeechToTextEvaluation({
           selectedUuids={selectedEvaluatorUuids}
           onSelectedChange={setSelectedEvaluatorUuids}
           onRefresh={() => setEvaluatorsReloadKey((k) => k + 1)}
-          description="These judges score the transcripts this run produces."
+          description="These evaluators score the transcripts each model produces"
+          beforeList={
+            <div className="space-y-3">
+              <div className="space-y-3">
+                {/* WER is a built-in STT metric computed on every run regardless of
+                the evaluators chosen here — make that explicit up front so users
+                know they always get it. */}
+                <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-[12px] md:text-[13px] text-muted-foreground">
+                  <svg
+                    className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                    />
+                  </svg>
+                  <span>
+                    <span className="font-medium text-foreground">
+                      WER (Word Error Rate)
+                    </span>{" "}
+                    and{" "}
+                    <span className="font-medium text-foreground">
+                      CER (Character Error Rate)
+                    </span>{" "}
+                    are always computed for every STT run. Any evaluators you
+                    select here run in addition to them.
+                  </span>
+                </div>
+                {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
+                LLM-WER / LLM-CER (plus intent & entity scores) on top of
+                WER/CER. One switch for the whole bundle; on by default. */}
+                <div className="flex items-start gap-3 rounded-md border border-border p-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={sarvamJudges}
+                    aria-label="Toggle built-in LLM-based evaluation metrics"
+                    onClick={() => setSarvamJudges((v) => !v)}
+                    className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                      sarvamJudges ? "bg-foreground" : "bg-muted-foreground/40"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                        sarvamJudges ? "translate-x-4" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-foreground">
+                        Use built-in LLM-based evaluation metrics
+                      </span>
+                      <a
+                        href={SARVAM_ASR_BLOG_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Learn more
+                      </a>
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      Evaluate transcripts on meaning, not just exact word and
+                      character matches, using built-in LLM judges. This is more
+                      reliable than WER/CER for Indian-language speech.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
         />
       </div>
 
@@ -797,83 +864,6 @@ export function SpeechToTextEvaluation({
                 </div>
               );
             })}
-          </div>
-        </div>
-      </div>
-
-      {/* Settings Tab Content */}
-      <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
-        <div className="space-y-3">
-          {/* WER is a built-in STT metric computed on every run regardless of
-                the evaluators chosen here — make that explicit up front so users
-                know they always get it. */}
-          <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-[12px] md:text-[13px] text-muted-foreground">
-            <svg
-              className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.75}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-              />
-            </svg>
-            <span>
-              <span className="font-medium text-foreground">
-                WER (Word Error Rate)
-              </span>{" "}
-              and{" "}
-              <span className="font-medium text-foreground">
-                CER (Character Error Rate)
-              </span>{" "}
-              are always computed for every STT run. Any evaluators you select
-              here run in addition to them.
-            </span>
-          </div>
-          {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
-                LLM-WER / LLM-CER (plus intent & entity scores) on top of
-                WER/CER. One switch for the whole bundle; on by default. */}
-          <div className="flex items-start gap-3 rounded-md border border-border p-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={sarvamJudges}
-              aria-label="Toggle built-in LLM-based evaluation metrics"
-              onClick={() => setSarvamJudges((v) => !v)}
-              className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-                sarvamJudges ? "bg-foreground" : "bg-muted-foreground/40"
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                  sarvamJudges ? "translate-x-4" : "translate-x-1"
-                }`}
-              />
-            </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-medium text-foreground">
-                  Use built-in LLM-based evaluation metrics
-                </span>
-                <a
-                  href={SARVAM_ASR_BLOG_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  Learn more
-                </a>
-              </div>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
-                Evaluate transcripts on meaning, not just exact word and
-                character matches, using built-in LLM judges. This is more
-                reliable than WER/CER for Indian-language speech.
-              </p>
-            </div>
           </div>
         </div>
       </div>

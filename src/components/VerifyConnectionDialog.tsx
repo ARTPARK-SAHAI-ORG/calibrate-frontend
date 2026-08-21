@@ -9,7 +9,6 @@ type VerifyConnectionDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   agentUuid: string;
-  agentName: string;
   /** Called after the endpoint check passes. The parent closes this dialog and
    *  starts the run it was holding. */
   onVerified: () => void;
@@ -27,7 +26,6 @@ export function VerifyConnectionDialog({
   isOpen,
   onClose,
   agentUuid,
-  agentName,
   onVerified,
   onGoToConnectionSettings,
 }: VerifyConnectionDialogProps) {
@@ -82,10 +80,8 @@ export function VerifyConnectionDialog({
         {/* Content */}
         <div className="px-4 md:px-6 pb-2 space-y-3 md:space-y-4">
           <p className="text-muted-foreground text-xs md:text-sm leading-relaxed">
-            Before running tests, we need to check that we can reach{" "}
-            <span className="font-medium text-foreground">{agentName}</span>. This
-            sends one message to the agent&apos;s endpoint. Once it responds, your
-            tests start automatically.
+            Before running tests, we need to verify your agent. Once verified,
+            your tests start automatically
           </p>
 
           {/* Failure: error + the agent's own response */}

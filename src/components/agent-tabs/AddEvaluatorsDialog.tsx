@@ -12,6 +12,10 @@ type AddEvaluatorsDialogProps = {
   onClose: () => void;
   /** Parent does the attaching + refresh; we just hand back the picked uuids. */
   onAdd: (selectedUuids: string[]) => Promise<void> | void;
+  /** The line under the title. Says where the evaluators are going. */
+  description?: string;
+  /** Offer full-conversation evaluators, hidden everywhere else. */
+  allowConversationType?: boolean;
 };
 
 export function AddEvaluatorsDialog({
@@ -19,6 +23,8 @@ export function AddEvaluatorsDialog({
   availableEvaluators,
   onClose,
   onAdd,
+  description = "Choose evaluators from your library to add to this agent",
+  allowConversationType = false,
 }: AddEvaluatorsDialogProps) {
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(isOpen);
@@ -89,7 +95,7 @@ export function AddEvaluatorsDialog({
               Add evaluators
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Choose evaluators from your library to add to this agent
+              {description}
             </p>
           </div>
           <button
@@ -123,6 +129,7 @@ export function AddEvaluatorsDialog({
             selectedIds={selectedIds}
             onToggle={toggle}
             emptyMessage="All evaluators are already added"
+            allowConversationType={allowConversationType}
             fillHeight
           />
         </div>

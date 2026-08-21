@@ -84,12 +84,15 @@ jest.mock("../RunEvaluatorsPanel", () => ({
     available,
     selectedUuids,
     onSelectedChange,
+    beforeList,
   }: {
     available: { uuid: string; name: string }[];
     selectedUuids: string[];
     onSelectedChange: (next: string[]) => void;
+    beforeList?: React.ReactNode;
   }) => (
     <div data-testid="evaluator-picker">
+      {beforeList}
       {available.map((it) => {
         const isSelected = selectedUuids.includes(it.uuid);
         return (
@@ -182,7 +185,7 @@ describe("SpeechToTextEvaluation", () => {
   it("renders with the input tab active by default", async () => {
     render(<SpeechToTextEvaluation />);
     expect(screen.getByText("Dataset")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getByText("Evaluators")).toBeInTheDocument();
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
     await waitFor(() =>
       expect(mockListDatasets).toHaveBeenCalledWith("test-token", "stt"),
@@ -203,7 +206,7 @@ describe("SpeechToTextEvaluation", () => {
   it("lists STT evaluators (excluding other types) with none pre-selected", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => {
       expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument();
     });
@@ -247,7 +250,7 @@ describe("SpeechToTextEvaluation", () => {
   it("switches tabs on click", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     expect(screen.getByText("Language")).toBeInTheDocument();
     await user.click(screen.getByText("Dataset"));
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
@@ -256,7 +259,7 @@ describe("SpeechToTextEvaluation", () => {
   it("toggles provider selection and reflects selected count", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
 
     const providerCount = () =>
       screen
@@ -274,7 +277,7 @@ describe("SpeechToTextEvaluation", () => {
   it("selects and deselects all providers via header checkbox", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
 
     const providerCount = () =>
       screen
@@ -293,7 +296,7 @@ describe("SpeechToTextEvaluation", () => {
   it("auto-selects the single supported provider when switching to a narrowly-supported language", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
 
     const select = screen.getByRole("combobox");
     await user.selectOptions(select, "maithili");
@@ -322,7 +325,7 @@ describe("SpeechToTextEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
 
     await selectProvider(user, "Deepgram");
@@ -346,7 +349,7 @@ describe("SpeechToTextEvaluation", () => {
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
 
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -382,7 +385,7 @@ describe("SpeechToTextEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -398,7 +401,7 @@ describe("SpeechToTextEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -448,7 +451,7 @@ describe("SpeechToTextEvaluation", () => {
         onEvaluatingChange={onEvaluatingChange}
       />,
     );
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -502,7 +505,7 @@ describe("SpeechToTextEvaluation", () => {
       });
 
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -560,7 +563,7 @@ describe("SpeechToTextEvaluation", () => {
       });
 
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
@@ -601,7 +604,7 @@ describe("SpeechToTextEvaluation", () => {
       });
 
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
     const nameInput = screen.getByPlaceholderText(
@@ -648,7 +651,7 @@ describe("SpeechToTextEvaluation", () => {
         onEvaluatingChange={onEvaluatingChange}
       />,
     );
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
     const nameInput = screen.getByPlaceholderText(
@@ -676,7 +679,7 @@ describe("SpeechToTextEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
     const nameInput = screen.getByPlaceholderText(

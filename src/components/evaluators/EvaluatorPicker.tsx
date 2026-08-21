@@ -13,6 +13,11 @@ type EvaluatorPickerProps = {
   /** Shown when `evaluators` is empty. Override where the reason differs. */
   emptyMessage?: string;
   /**
+   * Show full-conversation evaluators, which are hidden everywhere else. Set
+   * where they are the only kind that works, such as simulation setup.
+   */
+  allowConversationType?: boolean;
+  /**
    * Stretch both columns to the height the parent gives them, instead of the
    * built-in one. For a dialog that holds nothing but this picker, so the
    * prompt reaches the footer instead of stopping short. The parent must be a
@@ -32,6 +37,7 @@ export function EvaluatorPicker({
   onToggle,
   emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
   fillHeight = false,
+  allowConversationType = false,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
   // The evaluator whose prompt is on show. Null until one is clicked.
@@ -39,10 +45,10 @@ export function EvaluatorPicker({
 
   const q = search.trim().toLowerCase();
   const filteredEvaluators = evaluators.filter((ev) => {
-    // Full-conversation evaluators are hidden for now. They are still listed
-    // where they are the only kind that works: simulation setup and a
-    // conversation labelling task.
-    if (ev.evaluator_type === "conversation") return false;
+    // Full-conversation evaluators are hidden unless the caller is a place
+    // where they are the only kind that works, such as simulation setup.
+    if (!allowConversationType && ev.evaluator_type === "conversation")
+      return false;
     if (!q) return true;
     return (
       ev.name.toLowerCase().includes(q) ||

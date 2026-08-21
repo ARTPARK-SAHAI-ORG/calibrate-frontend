@@ -197,6 +197,24 @@ describe("EvaluatorPicker prompt column", () => {
 });
 
 describe("EvaluatorPicker hidden types", () => {
+  it("shows full-conversation evaluators when the caller allows them", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({
+            uuid: "b",
+            name: "Whole chat judge",
+            evaluator_type: "conversation",
+          }),
+        ]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        allowConversationType
+      />,
+    );
+    expect(screen.getByText("Whole chat judge")).toBeInTheDocument();
+  });
+
   it("leaves out full-conversation evaluators", () => {
     render(
       <EvaluatorPicker

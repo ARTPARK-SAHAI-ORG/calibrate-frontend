@@ -128,7 +128,7 @@ export function CreateEvaluatorSidebar({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 md:gap-6">
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
               Name <span className="text-red-500">*</span>
@@ -375,7 +375,6 @@ export function CreateEvaluatorSidebar({
                 </span>
               </div>
             )}
-          <div className="h-4 md:h-6 shrink-0" aria-hidden="true" />
         </div>
 
         <div className="px-6 py-4 border-t border-border space-y-3">

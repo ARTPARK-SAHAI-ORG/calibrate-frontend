@@ -2285,7 +2285,6 @@ export function TestsTabContent({
         <VerifyConnectionDialog
           isOpen
           agentUuid={agentUuid}
-          agentName={agentName}
           onClose={() => setPendingRun(null)}
           onVerified={() => {
             const p = pendingRun;

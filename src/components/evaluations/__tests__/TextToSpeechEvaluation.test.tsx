@@ -189,7 +189,7 @@ describe("TextToSpeechEvaluation", () => {
   it("renders with the input tab active by default", async () => {
     render(<TextToSpeechEvaluation />);
     expect(screen.getByText("Dataset")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getByText("Evaluators")).toBeInTheDocument();
     expect(screen.getByTestId("tts-editor")).toBeInTheDocument();
     await waitFor(() =>
       expect(mockListDatasets).toHaveBeenCalledWith("test-token", "tts"),
@@ -253,7 +253,7 @@ describe("TextToSpeechEvaluation", () => {
   it("switches tabs on click", async () => {
     const user = setupUser();
     render(<TextToSpeechEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     expect(screen.getByText("Language")).toBeInTheDocument();
     await user.click(screen.getByText("Dataset"));
     expect(screen.getByTestId("tts-editor")).toBeInTheDocument();
@@ -262,7 +262,7 @@ describe("TextToSpeechEvaluation", () => {
   it("changes language and filters providers, deselecting unsupported ones", async () => {
     const user = setupUser();
     render(<TextToSpeechEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
 
     // Select a provider supported broadly, e.g. OpenAI (supports English)
     const openaiRow = screen.getAllByText("OpenAI")[0].closest("tr")!;
@@ -284,7 +284,7 @@ describe("TextToSpeechEvaluation", () => {
   it("selects and deselects all providers via header checkbox", async () => {
     const user = setupUser();
     render(<TextToSpeechEvaluation />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
 
     const selectAllCheckbox = screen
       .getAllByText("Select all")[0]
@@ -311,7 +311,7 @@ describe("TextToSpeechEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
 
     // Select a provider first so provider validation passes
@@ -336,7 +336,7 @@ describe("TextToSpeechEvaluation", () => {
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
 
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -374,7 +374,7 @@ describe("TextToSpeechEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -391,7 +391,7 @@ describe("TextToSpeechEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -414,7 +414,7 @@ describe("TextToSpeechEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -459,7 +459,7 @@ describe("TextToSpeechEvaluation", () => {
         onEvaluatingChange={onEvaluatingChange}
       />,
     );
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -504,7 +504,7 @@ describe("TextToSpeechEvaluation", () => {
       });
 
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -546,7 +546,7 @@ describe("TextToSpeechEvaluation", () => {
       });
 
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -590,7 +590,7 @@ describe("TextToSpeechEvaluation", () => {
         onEvaluatingChange={onEvaluatingChange}
       />,
     );
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -615,7 +615,7 @@ describe("TextToSpeechEvaluation", () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
-    await user.click(screen.getByText("Settings"));
+    await user.click(screen.getByText("Evaluators"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
@@ -637,5 +637,5 @@ describe("TextToSpeechEvaluation", () => {
 
 async function user_switchToSettings() {
   const user = setupUser();
-  await user.click(screen.getByText("Settings"));
+  await user.click(screen.getByText("Evaluators"));
 }

@@ -147,7 +147,7 @@ export function SimulationConfigTab({
           onSelectedChange={onEvaluatorsChange}
           onRefresh={onEvaluatorsRefresh}
           readOnly={isConfigured}
-          description="These judges score each simulated conversation."
+          description="These evaluators score each simulated conversation"
         />
       </div>
 
