@@ -182,6 +182,13 @@ describe("AddEvaluatorsDialog", () => {
     expect(
       screen.queryByText("Select an evaluator to see its details"),
     ).not.toBeInTheDocument();
+    // Nothing to tick, so nothing to confirm or cancel either.
+    expect(
+      screen.queryByRole("button", { name: "Add" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows the error when adding fails", async () => {
