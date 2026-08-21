@@ -366,6 +366,27 @@ describe("RunsTabContent", () => {
     await screen.findByText("No evaluations match this filter");
   });
 
+  it("asks once whether an opened run exists, not on every refresh", async () => {
+    // A run that is not on this page, next to one that is still going, so the
+    // rows keep refreshing underneath it.
+    state.runs = [
+      { ...unitRun, uuid: "run-pending", status: "pending", results: null },
+    ];
+    state.pollUnit = { status: "pending", results: null };
+    window.history.replaceState(null, "", "/?runId=run-elsewhere");
+    renderTab();
+    await screen.findAllByText("Running");
+
+    const existsCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes("/agent-tests/run/run-elsewhere"),
+      ).length;
+    await waitFor(() => expect(existsCalls()).toBe(1));
+    // Let a couple of row refreshes go by: still one.
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(existsCalls()).toBe(1);
+  }, 10000);
+
   it("keeps an unfinished run up to date", async () => {
     state.runs = [
       {

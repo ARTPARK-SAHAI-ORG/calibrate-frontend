@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useAccessToken,
   useAgentRuns,
@@ -233,8 +233,17 @@ export function RunsTabContent({
   // another agent) would leave a window open that keeps asking for a run that
   // is not there. The list only holds one page, so the run is checked directly
   // rather than by looking through the rows on screen.
+  //
+  // Asked once per run. The rows are deliberately not a trigger here: they are
+  // rewritten every few seconds while a run is going, and re-asking whether the
+  // open run exists on every one of those is wasted.
+  const checkedRunIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!openTestRunId) return;
+    if (checkedRunIdRef.current === openTestRunId) return;
+    // Wait for the rows: a run listed on this page needs no asking.
+    if (isLoading) return;
+    checkedRunIdRef.current = openTestRunId;
     if (items.some((run) => run.uuid === openTestRunId)) return;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl || !backendAccessToken) return;
@@ -256,7 +265,7 @@ export function RunsTabContent({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openTestRunId, items, backendAccessToken]);
+  }, [openTestRunId, backendAccessToken, isLoading]);
 
   const openRun = (run: AgentRun) => {
     if (run.type === "llm-unit-test") {
