@@ -1,5 +1,6 @@
 ## August 2026
 
+- Add a delete button to the evaluator page and move editing to a pencil ([#400](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/400))
 - Let general LLM evaluators edit their variables ([#401](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/401))
 - Show a breadcrumb trail instead of a back arrow on every detail page ([#399](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/399))
 - Show the evaluators that judged each run on the agent Evaluations tab ([#398](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/398))
