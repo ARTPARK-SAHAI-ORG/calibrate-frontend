@@ -6,17 +6,19 @@ import {
   fetchEvaluatorDetail,
   liveVersionOf,
   type EvaluatorDetail,
-  type EvaluatorVersionDetail,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
 import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
-import { getBinaryLabel } from "@/lib/binaryLabels";
+import { VersionCard } from "./VersionCard";
 
 /**
  * How an evaluator judges, shown beside the picker so the reader can read the
- * prompt before adding it. The lists the pickers are given carry no prompt
- * text, so this asks for the evaluator itself the first time each one is
- * opened and keeps what it got while the dialog is open.
+ * prompt before adding it. The body is the evaluator page's own Prompts-tab
+ * card, so the two screens cannot drift apart.
+ *
+ * The lists the pickers are given carry no prompt text, so this asks for the
+ * evaluator itself the first time each one is opened and keeps what it got
+ * while the dialog is open.
  */
 export function EvaluatorPromptPreview({
   evaluatorUuid,
@@ -118,10 +120,10 @@ export function EvaluatorPromptPreview({
   const version = liveVersionOf(detail);
 
   return (
-    <div className="h-full overflow-y-auto p-3 space-y-3">
+    <div className="h-full overflow-y-auto p-4 md:p-5 space-y-3 md:space-y-4">
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-base font-semibold text-foreground">
             {detail.name}
           </span>
           {detail.evaluator_type && (
@@ -132,7 +134,7 @@ export function EvaluatorPromptPreview({
           )}
         </div>
         {detail.description && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {detail.description}
           </p>
         )}
@@ -143,84 +145,27 @@ export function EvaluatorPromptPreview({
           This evaluator has no saved prompt yet.
         </p>
       ) : (
-        <VersionBody version={version} outputType={detail.output_type} />
+        // The evaluator page's own Prompts-tab card. `isDefault` is that card's
+        // read-only shape: prompt already open, no version pill, no "Mark as
+        // current" button and no border of its own.
+        <VersionCard
+          version={{
+            uuid: version.uuid,
+            version_number: version.version_number,
+            judge_model: version.judge_model,
+            system_prompt: version.system_prompt,
+            output_config: version.output_config ?? null,
+            variables: version.variables ?? null,
+            created_at: "",
+          }}
+          outputType={detail.output_type ?? "binary"}
+          isDefault
+          isLive
+          isSettingLive={false}
+          onSetLive={() => {}}
+          formatDateTime={(date) => date}
+        />
       )}
-    </div>
-  );
-}
-
-function VersionBody({
-  version,
-  outputType,
-}: {
-  version: EvaluatorVersionDetail;
-  outputType?: "binary" | "rating";
-}) {
-  const scale = version.output_config?.scale ?? [];
-  const variables = version.variables ?? [];
-
-  return (
-    <>
-      <Field label="Judge model">
-        <span className="text-xs font-mono text-foreground break-all">
-          {version.judge_model}
-        </span>
-      </Field>
-
-      <Field label="Judge prompt">
-        <pre className="text-xs text-foreground whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-2 max-h-72 overflow-y-auto">
-          {version.system_prompt}
-        </pre>
-      </Field>
-
-      {variables.length > 0 && (
-        <Field label="Values it asks for">
-          <ul className="space-y-1">
-            {variables.map((v) => (
-              <li key={v.name} className="text-xs text-muted-foreground">
-                <span className="font-mono text-foreground">{v.name}</span>
-                {v.description ? ` — ${v.description}` : ""}
-              </li>
-            ))}
-          </ul>
-        </Field>
-      )}
-
-      {scale.length > 0 && (
-        <Field label="Scores it gives">
-          <ul className="space-y-1">
-            {scale.map((entry) => (
-              <li key={String(entry.value)} className="text-xs">
-                <span className="text-foreground font-medium">
-                  {typeof entry.value === "boolean" && outputType === "binary"
-                    ? getBinaryLabel(scale, entry.value)
-                    : String(entry.value)}
-                </span>
-                <span className="text-muted-foreground">
-                  {entry.name ? ` — ${entry.name}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Field>
-      )}
-    </>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-        {label}
-      </div>
-      {children}
     </div>
   );
 }

@@ -144,7 +144,7 @@ export type EvaluatorVersionDetail = {
   judge_model: string;
   system_prompt: string;
   output_config: {
-    scale?: {
+    scale: {
       value: boolean | number | string;
       name: string;
       description?: string;

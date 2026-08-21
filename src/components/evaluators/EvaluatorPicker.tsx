@@ -49,7 +49,9 @@ export function EvaluatorPicker({
       <div
         key={ev.uuid}
         className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
-          previewUuid === ev.uuid ? "bg-muted/50" : "hover:bg-muted/30"
+          previewUuid === ev.uuid
+            ? "bg-muted/60 border-l-2 border-foreground/40 pl-[calc(0.75rem-2px)]"
+            : "hover:bg-muted/30"
         }`}
       >
         <input
@@ -64,7 +66,7 @@ export function EvaluatorPicker({
         <button
           type="button"
           onClick={() => setPreviewUuid(ev.uuid)}
-          className="min-w-0 flex-1 text-left cursor-pointer"
+          className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
         >
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-foreground">
@@ -146,14 +148,14 @@ export function EvaluatorPicker({
         </div>
 
         {/* Checkbox list */}
-        <div className="border border-border rounded-md max-h-96 overflow-y-auto divide-y divide-border">
+        <div className="border border-border rounded-md md:h-[32rem] max-h-[60vh] overflow-y-auto divide-y divide-border">
           {renderEvaluatorList()}
         </div>
       </div>
 
       {/* How the picked evaluator judges. Below the list on a phone, where two
           columns will not fit. */}
-      <div className="md:flex-1 md:min-w-0 border border-border rounded-md md:max-h-[27.75rem] overflow-hidden">
+      <div className="md:flex-1 md:min-w-0 border border-border rounded-md md:h-[35.25rem] max-h-[60vh] overflow-hidden">
         <EvaluatorPromptPreview evaluatorUuid={previewUuid} />
       </div>
     </div>

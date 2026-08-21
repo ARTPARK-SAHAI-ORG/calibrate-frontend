@@ -14,6 +14,18 @@ jest.mock("../../../lib/evaluatorApi", () => ({
 
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 
+// jsdom has no ResizeObserver; the prompt card measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
 const mockFetch = fetchEvaluatorDetail as jest.Mock;
 
 const DETAIL = {
@@ -69,8 +81,9 @@ describe("EvaluatorPromptPreview", () => {
       await screen.findByText("Judge whether the reply is concise."),
     ).toBeInTheDocument();
     expect(screen.getByText("google/gemini-2.5-flash")).toBeInTheDocument();
-    expect(screen.getByText("criteria")).toBeInTheDocument();
-    expect(screen.getByText(/Rambling/)).toBeInTheDocument();
+    expect(screen.getByText("{{criteria}}")).toBeInTheDocument();
+    expect(screen.getByText("Rambling")).toBeInTheDocument();
+    expect(screen.getByText("Tight")).toBeInTheDocument();
     // The older version is not the one it judges with.
     expect(screen.queryByText("The old prompt")).not.toBeInTheDocument();
   });
