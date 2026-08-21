@@ -127,7 +127,7 @@ describe("evaluator page header actions", () => {
     expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
   });
 
-  it("deletes the evaluator and returns to the list", async () => {
+  it("deletes the evaluator and returns to the page it was opened from", async () => {
     deleteEvaluator.mockResolvedValue(undefined);
     const user = setupUser();
     render(<EvaluatorDetailPage />);
@@ -145,21 +145,9 @@ describe("evaluator page header actions", () => {
     await waitFor(() =>
       expect(deleteEvaluator).toHaveBeenCalledWith("eval-1", "test-token"),
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/evaluators"));
-  });
-
-  it("returns a built-in evaluator to the tab it is listed on", async () => {
-    mockEvaluator({ owner_user_id: null });
-    deleteEvaluator.mockResolvedValue(undefined);
-    const user = setupUser();
-    render(<EvaluatorDetailPage />);
-
-    await user.click(await screen.findByTitle("Delete evaluator"));
-    await user.click(screen.getByRole("button", { name: "Delete" }));
-
-    await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/evaluators?tab=default"),
-    );
+    // Not the evaluator list, which has no sidebar entry.
+    await waitFor(() => expect(back).toHaveBeenCalled());
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("keeps the page open when the delete fails", async () => {
@@ -171,6 +159,7 @@ describe("evaluator page header actions", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(deleteEvaluator).toHaveBeenCalled());
+    expect(back).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
     // The confirmation stays up so the reader can try again.
     expect(
@@ -203,6 +192,40 @@ describe("the versions and the one on screen", () => {
     expect(
       screen.getByRole("button", { name: "Mark as current" }),
     ).toBeInTheDocument();
+  });
+
+  it("starts the judge prompt form from the version whose Edit was used", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    // v2 is not the current version, so its prompt is not on screen yet.
+    await user.click(await screen.findByTitle("Edit, starting from v2"));
+
+    // The form is seeded from v2, not from the current version.
+    expect(
+      screen.getByDisplayValue("Grade the reply strictly"),
+    ).toBeInTheDocument();
+  });
+
+  it("makes a version the current one from its own row", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    // Only the version that is not current offers this.
+    const markButtons = await screen.findAllByTitle("Mark as current");
+    expect(markButtons).toHaveLength(1);
+
+    await user.click(markButtons[0]);
+
+    await waitFor(() =>
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/evaluators/eval-1/versions/live") &&
+            JSON.parse(String(init.body)).version_uuid === "ver-2",
+        ),
+      ).toBe(true),
+    );
   });
 
   it("opens on the newest version when none is marked current", async () => {

@@ -363,10 +363,9 @@ function EvaluatorDetailPageInner() {
     try {
       setDeleting(true);
       await deleteEvaluatorRequest(uuid, backendAccessToken);
-      // Send the reader back to the list tab this evaluator is filed under.
-      router.push(
-        evaluator.owner_user_id ? "/evaluators" : "/evaluators?tab=default",
-      );
+      // Return to the page the reader came from, the same way Back does,
+      // rather than the evaluator list, which has no sidebar entry.
+      router.back();
     } catch (err) {
       reportError("Error deleting evaluator:", err);
       setDeleting(false);
@@ -441,9 +440,10 @@ function EvaluatorDetailPageInner() {
     }
   };
 
-  const openNewVersionDialog = () => {
+  // Starts from the given version, or the current one when none is named.
+  const openNewVersionDialog = (baseVersion?: EvaluatorVersion) => {
     if (!evaluator) return;
-    const live = liveVersionOf(evaluator);
+    const live = baseVersion ?? liveVersionOf(evaluator);
     setNewVersionJudgeModel(
       live?.judge_model
         ? { id: live.judge_model, name: live.judge_model }
@@ -798,7 +798,7 @@ function EvaluatorDetailPageInner() {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  onClick={openNewVersionDialog}
+                  onClick={() => openNewVersionDialog()}
                 >
                   <svg
                     className="w-4 h-4"
@@ -869,37 +869,91 @@ function EvaluatorDetailPageInner() {
             {/* Prompts tab content */}
             {activeTab === "prompts" &&
               (versions.length > 0 && selectedVersion ? (
-                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] gap-4 md:gap-6 items-start md:h-[calc(100vh-17rem)]">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-4 md:gap-6 items-start md:h-[calc(100vh-17rem)]">
                   {/* The versions, newest first. Scrolls on its own so the
                       page behind it stays still. */}
                   <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:h-full pb-1 md:pb-0 md:pr-1">
                     {versions.map((v) => {
                       const isSelected = v.uuid === selectedVersion.uuid;
+                      const isCurrent = v.uuid === evaluator.live_version_id;
                       return (
-                        <button
+                        <div
                           key={v.uuid}
-                          onClick={() => setSelectedVersionUuid(v.uuid)}
-                          aria-current={isSelected ? "true" : undefined}
-                          className={`flex-shrink-0 md:w-full text-left px-3 py-2.5 rounded-md border transition-colors cursor-pointer ${
+                          className={`flex-shrink-0 md:w-full flex items-start gap-1 px-3 py-2.5 rounded-md border transition-colors ${
                             isSelected
                               ? "border-foreground/20 bg-muted"
                               : "border-border bg-background hover:bg-muted/50"
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground">
-                              v{v.version_number}
-                            </span>
-                            {v.uuid === evaluator.live_version_id && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                Current
+                          <button
+                            onClick={() => setSelectedVersionUuid(v.uuid)}
+                            aria-current={isSelected ? "true" : undefined}
+                            className="flex-1 min-w-0 text-left cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">
+                                v{v.version_number}
                               </span>
+                              {isCurrent && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 truncate">
+                              {formatDateTime(v.created_at)}
+                            </div>
+                          </button>
+
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => openNewVersionDialog(v)}
+                              title={`Edit, starting from v${v.version_number}`}
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors cursor-pointer"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.75}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 12.75h6m-6 3h6"
+                                />
+                              </svg>
+                            </button>
+                            {!isCurrent && (
+                              <button
+                                onClick={() => setVersionLive(v.uuid)}
+                                disabled={settingLiveUuid === v.uuid}
+                                title="Mark as current"
+                                className="w-7 h-7 flex items-center justify-center rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg
+                                  className={`w-4 h-4 ${settingLiveUuid === v.uuid ? "animate-spin" : ""}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.75}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </button>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1 truncate">
-                            {formatDateTime(v.created_at)}
-                          </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>

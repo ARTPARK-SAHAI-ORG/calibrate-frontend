@@ -123,7 +123,7 @@ export function VersionCard({
             {version.judge_model}
           </code>
         </div>
-        {!isDefault && (
+        {!isDefault && !isSelectedDetail && (
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isLive && (
               <button
