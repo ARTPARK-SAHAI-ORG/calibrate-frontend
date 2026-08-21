@@ -15,6 +15,7 @@
 
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
   clickByText,
@@ -104,23 +105,6 @@ const DEMO_PROMPT_FIX = " Our clinic helpline number is 1800-123-4567.";
 // when the library lookup fails and as the name to recreate it under if a
 // workspace has deleted it.
 const CORRECTNESS_NAME = "Correctness";
-const CORRECTNESS_DESCRIPTION = "Does the answer get it right?";
-// Its single criteria variable (the tour sets its value per test).
-const CORRECTNESS_CRITERIA_VARIABLE = {
-  name: "criteria",
-  description: "Criteria that the agent's response should satisfy",
-};
-// The canonical Correctness judge prompt, HARD-CODED so reuse and creation never
-// depend on a backend endpoint. The tour both creates Correctness with this exact
-// text and reuses an existing one only if its prompt equals this — so the two
-// sides can never drift and re-trigger duplicate creation. This is the exact
-// seeded-default correctness prompt.
-export const CANONICAL_CORRECTNESS_PROMPT =
-  "You are a highly accurate evaluator evaluating the response of an agent to a " +
-  "user's message.\n\nYou will be given a conversation between a user and an " +
-  "agent along with the response of the agent to the final user message.\n\nYou " +
-  "need to evaluate if the response adheres to the evaluation criteria:\n\n" +
-  "{{criteria}}";
 
 // The evaluator name goes into a card's description HTML, so escape it (names are
 // user-authored). driver.js renders the description as raw HTML.
@@ -186,6 +170,8 @@ type EvaluatorLike = {
   evaluator_type?: string;
   slug?: string | null;
   source_default_slug?: string | null;
+  is_default?: boolean | null;
+  owner_user_id?: string | null;
 };
 
 // The second check must be a genuine "Conciseness" evaluator. Match the WHOLE
@@ -195,111 +181,20 @@ type EvaluatorLike = {
 // not mean.
 const CONCISENESS_NAME = /\bconciseness\b/i;
 
-/** The live version's judge prompt for evaluator `uuid`, or null. */
-async function fetchLivePrompt(
-  uuid: string,
-  accessToken: string,
-): Promise<string | null> {
-  try {
-    const res = await fetch(`${getBackendUrl()}/evaluators/${uuid}`, {
-      method: "GET",
-      headers: getDefaultHeaders(accessToken),
-    });
-    if (!res.ok) return null;
-    const d = (await res.json()) as {
-      versions?: { uuid?: string; system_prompt?: string }[];
-      live_version_index?: number | null;
-      live_version_id?: string | null;
-    };
-    const versions = Array.isArray(d.versions) ? d.versions : [];
-    const live =
-      (typeof d.live_version_index === "number" &&
-        versions[d.live_version_index]) ||
-      versions.find((v) => v.uuid === d.live_version_id);
-    return typeof live?.system_prompt === "string" ? live.system_prompt : null;
-  } catch {
-    return null;
-  }
-}
-
-// Cheap pre-filter for correctness candidates whose prompt we then verify. The
-// name hint also catches evaluators the tour created on a previous run
-// ("Correctness (2)", "(3)", …) — which carry no default slug — so re-running
-// reuses one instead of endlessly creating the next number.
+// Identifies the workspace's existing Correctness — the built-in default (by
+// slug) or any "Correctness"-named LLM-reply evaluator.
 const CORRECTNESS_NAME_HINT = /correctness/i;
 
 /**
- * Find an existing evaluator the tour can REUSE as Correctness: an LLM-reply
- * evaluator whose live prompt EXACTLY matches the hard-coded canonical prompt.
- * Considers the built-in default (by slug) AND any "Correctness"-named evaluator
- * (e.g. one the tour created before, which has no slug), preferring the built-in.
- * Returns its name, or null when none qualifies (so a proper one is created).
- * Bounds the number of detail fetches.
- */
-async function findUsableCorrectness(
-  list: EvaluatorLike[],
-  accessToken: string,
-): Promise<string | null> {
-  const candidates = list
-    // Do NOT gate candidates on the list's `variables` — the list may omit them
-    // for custom (tour-created) evaluators, which would wrongly exclude a good
-    // copy. The prompt check below is authoritative.
-    .filter(
-      (e) =>
-        e.evaluator_type === "llm" &&
-        (isDefaultLLMNextReplyEvaluator(e) ||
-          CORRECTNESS_NAME_HINT.test(e.name ?? "")),
-    )
-    // Prefer the built-in default (by slug) first.
-    .sort(
-      (a, b) =>
-        Number(isDefaultLLMNextReplyEvaluator(b)) -
-        Number(isDefaultLLMNextReplyEvaluator(a)),
-    )
-    .slice(0, 6);
-  const target = CANONICAL_CORRECTNESS_PROMPT.trim();
-  for (const c of candidates) {
-    if (!c.uuid) continue;
-    const live = await fetchLivePrompt(c.uuid, accessToken);
-    if (live && live.trim() === target) return c.name ?? null;
-  }
-  return null;
-}
-
-/**
- * Find a usable second "Conciseness" check. Like the Correctness reuse, this does
- * NOT trust the list's `variables` (the list omits them for custom evaluators,
- * which would wrongly drop a valid one). Instead it verifies each Conciseness-
- * named LLM-reply evaluator's live prompt actually references the `{{criteria}}`
- * variable the tour fills — otherwise the tour cannot control what it grades.
- * Returns its name, or null when none qualifies (the flow then uses one check).
- */
-async function findUsableSecond(
-  list: EvaluatorLike[],
-  accessToken: string,
-): Promise<string | null> {
-  const candidates = list
-    .filter(
-      (e) =>
-        e.evaluator_type === "llm" &&
-        CONCISENESS_NAME.test(e.name ?? "") &&
-        !isDefaultLLMNextReplyEvaluator(e),
-    )
-    .slice(0, 6);
-  for (const c of candidates) {
-    if (!c.uuid) continue;
-    const live = await fetchLivePrompt(c.uuid, accessToken);
-    if (live && live.includes("{{criteria}}")) return c.name ?? null;
-  }
-  return null;
-}
-
-/**
- * Fetch the workspace evaluators and resolve the plan. Reuses an existing
- * Correctness ONLY if its live prompt exactly matches the canonical one (else it
- * is recreated). Falls back to the built-in "Correctness" default, second-check-
- * free (the safe path — one reliable, tour-controlled check) if the token is
- * missing or the request fails, so the tour never blocks on the lookup.
+ * Resolve the plan from the evaluators that ALREADY exist in the workspace.
+ * The tour never creates an evaluator:
+ *  - Correctness: the built-in next-reply default (by slug), else any
+ *    "Correctness"-named LLM-reply evaluator, taken as-is.
+ *  - Second check: an existing DEFAULT LLM-reply evaluator that is not
+ *    Correctness — Conciseness when present, else the first such default —
+ *    or none (the flow then uses Correctness alone).
+ * Falls back to Correctness-only if the token is missing or the request
+ * fails, so the tour never blocks on the lookup.
  */
 export async function resolveEvaluatorPlan(
   accessToken: string | null,
@@ -316,112 +211,26 @@ export async function resolveEvaluatorPlan(
     );
     if (!res.ok) return fallback;
     const list = unwrapList<EvaluatorLike>(await res.json());
-    // Resolve BOTH checks by prompt identity (verified against the actual live
-    // prompt, not the list's possibly-omitted variables): reuse a Correctness
-    // whose prompt equals the hard-coded canonical — including one the tour
-    // created on a previous run (no default slug), so re-running does not keep
-    // creating Correctness (2), (3), … — and add a Conciseness second only if its
-    // prompt genuinely uses {{criteria}} the tour can control.
+    const llm = list.filter((e) => e.evaluator_type === "llm");
+    const correctness =
+      llm.find(isDefaultLLMNextReplyEvaluator) ??
+      llm.find((e) => CORRECTNESS_NAME_HINT.test(e.name ?? ""));
+    const secondCandidates = llm.filter(
+      (e) =>
+        isDefaultEvaluator(e as EvaluatorData) &&
+        !isDefaultLLMNextReplyEvaluator(e) &&
+        e.name &&
+        e.name !== correctness?.name,
+    );
+    const second =
+      secondCandidates.find((e) => CONCISENESS_NAME.test(e.name ?? "")) ??
+      secondCandidates[0];
     return {
-      correctnessName: await findUsableCorrectness(list, accessToken),
-      secondEvaluatorName: await findUsableSecond(list, accessToken),
+      correctnessName: correctness?.name ?? CORRECTNESS_NAME,
+      secondEvaluatorName: second?.name ?? null,
     };
   } catch {
     return fallback;
-  }
-}
-
-/** What the backend's default-prompt endpoint returns for a purpose. */
-type DefaultPrompt = {
-  system_prompt?: string;
-  judge_model?: string;
-  output_type?: "binary" | "rating";
-};
-
-/**
- * Build the `POST /evaluators` body for recreating the Correctness default,
- * mirroring what the Create Evaluator flow sends. Pure, so it is unit-testable.
- * The prompt is the HARD-CODED canonical one (so a created evaluator matches what
- * the reuse check looks for, and nothing depends on a backend prompt endpoint);
- * only the judge model comes from the backend default (which model to use). `name`
- * lets the caller avoid colliding with an existing evaluator.
- */
-export function buildCorrectnessPayload(
-  dp: DefaultPrompt | null,
-  name: string = CORRECTNESS_NAME,
-): {
-  name: string;
-  description: string;
-  evaluator_type: "llm";
-  data_type: "text";
-  kind: "single";
-  output_type: "binary" | "rating";
-  version: {
-    judge_model?: string;
-    system_prompt: string;
-    variables: { name: string; description: string }[];
-  };
-} {
-  return {
-    name,
-    description: CORRECTNESS_DESCRIPTION,
-    evaluator_type: "llm",
-    data_type: "text",
-    kind: "single",
-    output_type: dp?.output_type ?? "binary",
-    version: {
-      ...(dp?.judge_model ? { judge_model: dp.judge_model } : {}),
-      system_prompt: CANONICAL_CORRECTNESS_PROMPT,
-      variables: [CORRECTNESS_CRITERIA_VARIABLE],
-    },
-  };
-}
-
-/**
- * Recreate a proper Correctness evaluator when the workspace has no built-in one
- * — either it was deleted, OR the user replaced it with a custom evaluator that
- * does not carry the default slug (so the plan cannot find it). In both cases the
- * tour needs a check whose `{{criteria}}` it controls, so it creates its own.
- *
- * Crucially it picks a FREE name (the backend rejects duplicate names, and a
- * user's own "Correctness" would otherwise both collide and, if we reused the
- * name, get picked instead of ours). Returns the name actually created so the
- * tour picks THAT exact evaluator — or null on any failure (best-effort; the
- * tour then degrades gracefully).
- */
-async function createCorrectnessEvaluator(
-  accessToken: string | null,
-): Promise<string | null> {
-  if (!accessToken) return null;
-  try {
-    let dp: DefaultPrompt | null = null;
-    const dpRes = await fetch(
-      `${getBackendUrl()}/evaluators/default-prompt?purpose=llm`,
-      { method: "GET", headers: getDefaultHeaders(accessToken) },
-    );
-    if (dpRes.ok) dp = (await dpRes.json()) as DefaultPrompt;
-    // Without a judge model the backend rejects the create, so only proceed when
-    // the default-prompt lookup gave us one.
-    if (!dp?.judge_model) return null;
-    // Avoid colliding with an existing evaluator named "Correctness" (e.g. the
-    // user's own custom one). Pick a free name and create under it.
-    const name = await resolveFreeName(
-      CORRECTNESS_NAME,
-      "/evaluators",
-      accessToken,
-    );
-    const res = await fetch(`${getBackendUrl()}/evaluators`, {
-      method: "POST",
-      headers: {
-        ...getDefaultHeaders(accessToken),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(buildCorrectnessPayload(dp, name)),
-    });
-    return res.ok ? name : null;
-  } catch {
-    /* best-effort: the tour proceeds without it */
-    return null;
   }
 }
 
@@ -686,13 +495,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   // The flow adapts to the workspace: add a second check only when a suitable
   // (conciseness) evaluator exists; otherwise use Correctness alone.
   const secondName = deps.plan.secondEvaluatorName;
-  // Correctness is identified by its CURRENT name (rename-safe). If the workspace
-  // deleted it (null), recreate it under its default name before the picker opens.
-  const needsCorrectness = deps.plan.correctnessName === null;
   const correctnessName = deps.plan.correctnessName ?? CORRECTNESS_NAME;
-  // Mutable: when Correctness is recreated we may create it under a free,
-  // non-colliding name; the later pick + criteria steps must target whatever we
-  // actually created, not the placeholder name.
   const correctness = { name: correctnessName };
   const steps: TourStep[] = [
     {
@@ -767,16 +570,6 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
       side: "bottom",
       actionLabel: "Next",
-      prepare: async () => {
-        // If the workspace has no built-in Correctness (deleted, or replaced by a
-        // custom evaluator without the default slug), silently recreate a proper
-        // one now — under a free name — so it is in the picker the next click
-        // opens, and remember that name so the pick + criteria target it.
-        if (needsCorrectness) {
-          const created = await createCorrectnessEvaluator(deps.getAccessToken());
-          if (created) correctness.name = created;
-        }
-      },
       action: async () => {
         await clickElement(A.tabEvaluators);
         await clickElement(A.evaluatorsAdd, { timeout: 8000 });

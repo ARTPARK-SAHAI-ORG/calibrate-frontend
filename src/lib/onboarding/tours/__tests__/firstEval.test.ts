@@ -7,7 +7,6 @@
  */
 
 import {
-  buildCorrectnessPayload,
   chooseEvaluatorCheckbox,
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
@@ -74,40 +73,6 @@ describe("chooseEvaluatorCheckbox", () => {
   });
 });
 
-describe("buildCorrectnessPayload", () => {
-  it("always uses the hard-coded canonical prompt, ignoring the backend prompt", () => {
-    // Even if the backend hands back a different prompt, we create with the
-    // canonical one so a created evaluator matches what the reuse check expects.
-    const payload = buildCorrectnessPayload({
-      system_prompt: "Some other backend prompt without a variable",
-      judge_model: "openai/gpt-5.4-mini",
-      output_type: "binary",
-    });
-    expect(payload.name).toBe("Correctness");
-    expect(payload.evaluator_type).toBe("llm");
-    expect(payload.data_type).toBe("text");
-    expect(payload.version.judge_model).toBe("openai/gpt-5.4-mini");
-    expect(payload.version.system_prompt).toContain("{{criteria}}");
-    expect(payload.version.system_prompt).toContain("highly accurate evaluator");
-    expect(payload.version.system_prompt).not.toContain("Some other backend");
-    expect(payload.version.variables).toEqual([
-      { name: "criteria", description: expect.any(String) },
-    ]);
-  });
-
-  it("uses the canonical prompt and no judge model when none is given", () => {
-    const payload = buildCorrectnessPayload(null);
-    expect(payload.version.system_prompt).toContain("{{criteria}}");
-    expect(payload.version.judge_model).toBeUndefined();
-    expect(payload.output_type).toBe("binary");
-  });
-
-  it("creates under the given (free) name", () => {
-    expect(buildCorrectnessPayload(null, "Correctness (2)").name).toBe(
-      "Correctness (2)",
-    );
-  });
-});
 
 describe("buildFirstEvalTour", () => {
   const TWO: EvaluatorPlan = {
