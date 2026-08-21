@@ -616,9 +616,8 @@ export function TestsTabContent({
   // to this agent). The backend rejects the whole batch with a 400 when a
   // test's type doesn't match the agent's kind (e.g. a general test on a
   // conversation agent), so we try to recognise that case and word it for a
-  // non-technical reader. Falls back to `fallback` for anything else
-  // recognisable, and to the type-mismatch wording when the body can't be
-  // read at all (can't tell which failure it was).
+  // non-technical reader. Anything else, including a body we cannot read,
+  // uses `fallback` rather than guessing at a mismatch.
   const readLinkTestsErrorMessage = async (
     response: Response,
     fallback: string,
@@ -628,12 +627,15 @@ export function TestsTabContent({
     try {
       const data = (await response.clone().json()) as { detail?: unknown };
       const detail = typeof data?.detail === "string" ? data.detail : "";
-      if (!detail) return typeMismatchMessage;
+      // Only claim a type mismatch when the backend actually says so. An
+      // unreadable body (an HTML 502, a gateway timeout) tells us nothing
+      // about types, and guessing sends the reader off to change test types
+      // over what is really an outage.
       return /type|interaction|kind|nature|mismatch/i.test(detail)
         ? typeMismatchMessage
         : fallback;
     } catch {
-      return typeMismatchMessage;
+      return fallback;
     }
   };
 

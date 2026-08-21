@@ -1493,6 +1493,54 @@ describe("AddTestDialog", () => {
       expect(evaluators).toEqual([{ evaluator_uuid: "eval-general" }]);
     });
 
+    it("treats an existing general test as general even with no agentNature (the /tests page)", async () => {
+      // The standalone /tests page has no agent, so it cannot pass
+      // agentNature. Without recognising the test's own type, the dialog
+      // would show the conversation builder and save it back as a
+      // `response` test, losing the input.
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      const initialConfig: TestConfig = {
+        input: "Summarise this article",
+        evaluation: { type: "general" },
+      };
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            initialConfig,
+            initialEvaluators: [
+              {
+                evaluator_uuid: GENERAL_EVALUATOR.uuid,
+                name: "Output check",
+                slug: null,
+                variables: [],
+              },
+            ],
+            testName: "Existing general test",
+            onSubmit,
+          })}
+        />,
+      );
+
+      // The single input box is shown, holding the test's own input.
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("Summarise this article"),
+        ).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      // Saved back as a general test, not converted to a response one.
+      expect(config.evaluation.type).toBe("general");
+      expect(config.input).toBe("Summarise this article");
+      expect(config.history).toBeUndefined();
+    });
+
     it("populates the input box from an existing general test's config.input on edit", async () => {
       const initialConfig: TestConfig = {
         input: "What is the capital of France?",

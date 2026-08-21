@@ -1079,6 +1079,31 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await screen.findByTestId("add-test-name-error");
   });
 
+  it("does not blame the test type when the failure body cannot be read", async () => {
+    // A 502 that returns an HTML error page says nothing about types.
+    // Guessing "your types don't match" sends the reader off to change
+    // test types over what is really an outage.
+    state.createInit = { ok: false, status: 502 };
+    state.createResult = "<html>Bad Gateway</html>";
+    const user = setupUser();
+    renderComponent();
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-error")).toHaveTextContent(
+        "Failed to create test",
+      ),
+    );
+    expect(screen.getByTestId("add-test-error")).not.toHaveTextContent(
+      /type doesn't match/,
+    );
+  });
+
   it("shows a plain-language error when create-and-link fails because the type doesn't match", async () => {
     state.createInit = { ok: false, status: 400 };
     state.createResult = { detail: "interaction_type mismatch" };

@@ -919,8 +919,15 @@ export function AddTestDialog({
   );
   // A general agent's next-reply test is judged by output-type evaluators
   // (llm-general) instead of the conversational reply evaluator (llm).
-  const nextReplyEvaluatorType =
-    agentNature === "general" ? "llm-general" : "llm";
+  // A test already saved as `general` stays general however it was opened —
+  // the standalone /tests page has no agent, so it cannot pass agentNature,
+  // and without this an existing general test would open in the conversation
+  // editor and be saved back as a `response` test.
+  const isGeneralTest =
+    agentNature === "general" ||
+    initialConfig?.evaluation?.type === "general" ||
+    typeof initialConfig?.input === "string";
+  const nextReplyEvaluatorType = isGeneralTest ? "llm-general" : "llm";
   const [activeTab, setActiveTab] = useState<TestTab>(
     isLabelItem ? "next-reply" : resolveTab(initialTab),
   );
@@ -931,8 +938,7 @@ export function AddTestDialog({
     activeTab === "next-reply" || activeTab === "conversation";
   // A general agent's "LLM response" tab has no conversation history — it's
   // a single plain-text input instead of the multi-turn message builder.
-  const isGeneralOutputTab =
-    agentNature === "general" && activeTab === "next-reply";
+  const isGeneralOutputTab = isGeneralTest && activeTab === "next-reply";
 
   // A general agent has no ongoing conversation, so the Conversation test
   // type does not apply — it is excluded (on top of whatever's already
@@ -1879,8 +1885,7 @@ export function AddTestDialog({
   // default-correctness evaluator on next-reply when the agent has none.
   const buildDefaultAttachedForTab = useCallback(
     (tab: TestTab): AttachedEvaluator[] => {
-      const isGeneralNextReply =
-        agentNature === "general" && tab === "next-reply";
+      const isGeneralNextReply = isGeneralTest && tab === "next-reply";
       const wantedType = isGeneralNextReply
         ? "llm-general"
         : tab === "conversation"
@@ -1909,7 +1914,7 @@ export function AddTestDialog({
       }
       return [];
     },
-    [agentEvaluatorUuids, availableLLMEvaluators, agentNature],
+    [agentEvaluatorUuids, availableLLMEvaluators, isGeneralTest],
   );
 
   // Initialize attached evaluators once props + evaluator list have settled.
@@ -4487,7 +4492,7 @@ export function AddTestDialog({
                         ? "Given the conversation history, the agent's response is added to the conversation and the full updated conversation is graded using the evaluators added to the test"
                         : activeTab === "tool-invocation"
                           ? "Given the conversation history, check whether the agent calls the right tools with the expected parameters"
-                          : agentNature === "general"
+                          : isGeneralTest
                             ? "The agent's output is graded using the evaluators added to the test"
                             : "Given the conversation history, the agent's response is graded using the evaluators added to the test"}
                   </p>
