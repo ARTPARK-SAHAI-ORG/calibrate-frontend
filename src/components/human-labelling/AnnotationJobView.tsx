@@ -13,8 +13,15 @@ import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
+import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
+import {
+  CorrectedToolCallsEditor,
+  callsToEditable,
+  editableToStoredCalls,
+  type EditableToolCall,
+} from "./CorrectedToolCallsEditor";
 import {
   ItemValueFilter,
   matchesAllValueFilters,
@@ -67,7 +74,13 @@ type Annotator = { uuid: string; name: string };
 export type Task = {
   uuid: string;
   name: string;
-  type: "llm" | "llm-general" | "stt" | "tts" | "conversation";
+  type:
+    | "llm"
+    | "llm-general"
+    | "llm-tool-call"
+    | "stt"
+    | "tts"
+    | "conversation";
   description: string | null;
 };
 
@@ -141,6 +154,15 @@ type FieldValue = { value: unknown; comment: string };
 
 function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
+}
+
+// `llm-tool-call` tasks have no evaluators — the verdict is a single pass/fail
+// per item. We store it in the same `fields` map (and `savedKeys`) under a
+// synthetic evaluator id so the completion / save machinery works unchanged;
+// on save it rides the `evaluator_id: null` annotation as `value.value`.
+const TOOL_CALL_VERDICT_KEY = "__tool_call_verdict__";
+function toolCallVerdictKey(itemId: string): FieldKey {
+  return fieldKey(itemId, TOOL_CALL_VERDICT_KEY);
 }
 
 /** The evaluators an annotator must answer before an item counts as done.
@@ -267,6 +289,15 @@ export function AnnotationJobView({
   const [savedComments, setSavedComments] = useState<Record<string, string>>(
     {},
   );
+  // Per-item corrected expected tool calls (llm-tool-call tasks only), stored
+  // on the same `evaluator_id IS NULL` slot as `value.expected_tool_calls`
+  // when the verdict is a fail. `saved…` snapshots the server value.
+  const [correctedCalls, setCorrectedCalls] = useState<
+    Record<string, EditableToolCall[]>
+  >({});
+  const [savedCorrectedCalls, setSavedCorrectedCalls] = useState<
+    Record<string, EditableToolCall[]>
+  >({});
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
   // Admin-only "show items scored X" filter over the annotator's answers.
@@ -286,10 +317,23 @@ export function AnnotationJobView({
       const next: Record<FieldKey, FieldValue> = {};
       const saved = new Set<FieldKey>();
       const comments: Record<string, string> = {};
+      const corrected: Record<string, EditableToolCall[]> = {};
+      const isToolCall = data.task.type === "llm-tool-call";
       for (const a of data.annotations) {
         if (!a.evaluator_id) {
           const c = readSavedComment(a.value);
           if (c) comments[a.item_id] = c;
+          // Tool-call verdict + correction ride the item-level (null) slot.
+          if (isToolCall && a.value && typeof a.value === "object") {
+            const v = (a.value as Record<string, unknown>).value;
+            if (typeof v === "boolean") {
+              const vk = toolCallVerdictKey(a.item_id);
+              next[vk] = { value: v, comment: "" };
+              saved.add(vk);
+            }
+            const ec = (a.value as Record<string, unknown>).expected_tool_calls;
+            if (Array.isArray(ec)) corrected[a.item_id] = callsToEditable(ec);
+          }
           continue;
         }
         const k = fieldKey(a.item_id, a.evaluator_id);
@@ -303,6 +347,8 @@ export function AnnotationJobView({
       setSavedKeys(saved);
       setItemComments(comments);
       setSavedComments(comments);
+      setCorrectedCalls(corrected);
+      setSavedCorrectedCalls(corrected);
 
       // Read-only views (admin, public-readonly) always start on the first
       // item — they're reviewing what's been labelled, not picking up where
@@ -314,7 +360,9 @@ export function AnnotationJobView({
       }
       const required = requiredOnly(data.evaluators);
       const firstIncomplete = data.items.findIndex((it) =>
-        required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+        isToolCall
+          ? !saved.has(toolCallVerdictKey(it.uuid))
+          : required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
@@ -505,6 +553,10 @@ export function AnnotationJobView({
       setItemComments={setItemComments}
       savedComments={savedComments}
       setSavedComments={setSavedComments}
+      correctedCalls={correctedCalls}
+      setCorrectedCalls={setCorrectedCalls}
+      savedCorrectedCalls={savedCorrectedCalls}
+      setSavedCorrectedCalls={setSavedCorrectedCalls}
       submitting={submitting}
       setSubmitting={setSubmitting}
       topError={topError}
@@ -540,6 +592,14 @@ type ViewProps = {
   setSavedComments: React.Dispatch<
     React.SetStateAction<Record<string, string>>
   >;
+  correctedCalls: Record<string, EditableToolCall[]>;
+  setCorrectedCalls: React.Dispatch<
+    React.SetStateAction<Record<string, EditableToolCall[]>>
+  >;
+  savedCorrectedCalls: Record<string, EditableToolCall[]>;
+  setSavedCorrectedCalls: React.Dispatch<
+    React.SetStateAction<Record<string, EditableToolCall[]>>
+  >;
   submitting: boolean;
   setSubmitting: (b: boolean) => void;
   topError: string | null;
@@ -568,6 +628,10 @@ function AnnotateView({
   setItemComments,
   savedComments,
   setSavedComments,
+  correctedCalls,
+  setCorrectedCalls,
+  savedCorrectedCalls,
+  setSavedCorrectedCalls,
   submitting,
   setSubmitting,
   topError,
@@ -577,6 +641,9 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // llm-tool-call tasks have no evaluators; the annotator records one pass/fail
+  // verdict per item (and, on a fail, corrects the expected tool call).
+  const isToolCall = data.task.type === "llm-tool-call";
   // Both settings are frozen on the job. Absent keeps today's behaviour:
   // the comments box is offered and reasoning is optional.
   const commentsEnabled = data.job.comments_enabled !== false;
@@ -628,6 +695,8 @@ function AnnotateView({
   // when the annotator moves on.
   const itemCompleted = useCallback(
     (itemId: string) => {
+      // Tool-call items are done once their single pass/fail verdict is saved.
+      if (isToolCall) return savedKeys.has(toolCallVerdictKey(itemId));
       const savedFor = (ev: Evaluator) =>
         savedKeys.has(fieldKey(itemId, ev.uuid));
       if (!requiredEvaluators.every(savedFor)) return false;
@@ -637,7 +706,7 @@ function AnnotateView({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requiredEvaluators, evaluators, savedKeys, fields],
+    [isToolCall, requiredEvaluators, evaluators, savedKeys, fields],
   );
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !==
@@ -742,14 +811,42 @@ function AnnotateView({
       });
     }
 
-    // Item-level free-text comment lives on the `evaluator_id IS NULL`
-    // slot. Only send when it actually changed since the last save — the
-    // backend overwrites whatever's there, so an unchanged value is wasted
-    // work, and we'd erase a saved comment if we sent an empty string for
-    // an item that never had one edited.
+    // Item-level free-text comment lives on the `evaluator_id IS NULL` slot.
     const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
     const commentChanged = commentChangedFor(currentItem.uuid);
-    if (commentChanged) {
+
+    // Tool-call tasks record their whole state on that same null slot: the
+    // pass/fail verdict (required), the comment, and — on a fail — the
+    // corrected expected tool calls. The backend overwrites the value, so we
+    // always send the full object once a verdict is chosen.
+    let toolCallVerdict: boolean | null = null;
+    let currentCorrected: EditableToolCall[] | null = null;
+    if (isToolCall) {
+      const v = fields[toolCallVerdictKey(currentItem.uuid)]?.value;
+      if (typeof v !== "boolean") return false; // verdict is required
+      toolCallVerdict = v;
+      const expectedBaseline = callsToEditable(
+        ((currentItem.payload ?? {}) as Record<string, unknown>)
+          .expected_tool_calls as unknown[] | undefined,
+      );
+      currentCorrected =
+        correctedCalls[currentItem.uuid] ??
+        savedCorrectedCalls[currentItem.uuid] ??
+        expectedBaseline;
+      const storedCorrected = editableToStoredCalls(currentCorrected);
+      annotationsBody.push({
+        evaluator_id: null,
+        value: {
+          value: v,
+          ...(currentComment ? { comment: currentComment } : {}),
+          ...(v === false && storedCorrected.length > 0
+            ? { expected_tool_calls: storedCorrected }
+            : {}),
+        },
+      });
+    } else if (commentChanged) {
+      // Only send when it actually changed — an unchanged value is wasted
+      // work, and an empty string would erase a saved comment.
       annotationsBody.push({
         evaluator_id: null,
         value: { comment: currentComment },
@@ -783,6 +880,9 @@ function AnnotateView({
         if (a.evaluator_id)
           justSaved.add(fieldKey(currentItem.uuid, a.evaluator_id));
       }
+      if (isToolCall && toolCallVerdict !== null) {
+        justSaved.add(toolCallVerdictKey(currentItem.uuid));
+      }
       setSavedKeys((prev) => {
         const next = new Set(prev);
         justSaved.forEach((k) => next.add(k));
@@ -792,6 +892,12 @@ function AnnotateView({
         setSavedComments((prev) => ({
           ...prev,
           [currentItem.uuid]: currentComment,
+        }));
+      }
+      if (isToolCall && currentCorrected) {
+        setSavedCorrectedCalls((prev) => ({
+          ...prev,
+          [currentItem.uuid]: currentCorrected!,
         }));
       }
 
@@ -971,10 +1077,13 @@ function AnnotateView({
                   !!currentItem && !currentItemSaved && unsavedCount === 1;
                 const allEvaluatorsAnswered =
                   !!currentItem &&
-                  evaluators.length > 0 &&
-                  requiredEvaluators.every((ev) =>
-                    evaluatorAnswered(currentItem.uuid, ev),
-                  );
+                  (isToolCall
+                    ? typeof fields[toolCallVerdictKey(currentItem.uuid)]
+                        ?.value === "boolean"
+                    : evaluators.length > 0 &&
+                      requiredEvaluators.every((ev) =>
+                        evaluatorAnswered(currentItem.uuid, ev),
+                      ));
                 const disabled =
                   submitting || total === 0 || !allEvaluatorsAnswered;
                 const label = submitting
@@ -985,7 +1094,9 @@ function AnnotateView({
                       ? "Mark as complete"
                       : "Submit & Next";
                 const tooltip = !allEvaluatorsAnswered
-                  ? "Judgements should be given for all required evaluators before submitting"
+                  ? isToolCall
+                    ? "Choose pass or fail before submitting"
+                    : "Judgements should be given for all required evaluators before submitting"
                   : undefined;
                 return (
                   <button
@@ -1142,6 +1253,22 @@ function AnnotateView({
                         [currentItem.uuid]: s,
                       }))
                     }
+                    taskType={data.task.type}
+                    correctedCalls={
+                      correctedCalls[currentItem.uuid] ??
+                      savedCorrectedCalls[currentItem.uuid] ??
+                      callsToEditable(
+                        (
+                          (currentItem.payload ?? {}) as Record<string, unknown>
+                        ).expected_tool_calls as unknown[] | undefined,
+                      )
+                    }
+                    onCorrectedCallsChange={(v) =>
+                      setCorrectedCalls((prev) => ({
+                        ...prev,
+                        [currentItem.uuid]: v,
+                      }))
+                    }
                   />
                 </div>
               </>
@@ -1203,6 +1330,8 @@ export function ItemPane({
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
+  if (taskType === "llm-tool-call")
+    return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
   if (taskType === "conversation")
@@ -1229,6 +1358,9 @@ function EvaluatorsPane({
   missingReasoningKeys,
   itemComment,
   onItemCommentChange,
+  taskType,
+  correctedCalls,
+  onCorrectedCallsChange,
 }: {
   evaluators: Evaluator[];
   item: Item;
@@ -1245,6 +1377,11 @@ function EvaluatorsPane({
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
   onItemCommentChange: (s: string) => void;
+  /** Task type — drives the tool-call verdict + correction UI. */
+  taskType?: Task["type"];
+  /** Corrected expected tool calls for this item (llm-tool-call only). */
+  correctedCalls?: EditableToolCall[];
+  onCorrectedCallsChange?: (v: EditableToolCall[]) => void;
 }) {
   // Per-item, per-evaluator variable values live on
   // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
@@ -1292,6 +1429,61 @@ function EvaluatorsPane({
   ) : null;
 
   if (evaluators.length === 0) {
+    // Tool-call tasks have no evaluators — the annotator gives one pass/fail
+    // verdict and, on a fail, corrects the expected tool call.
+    if (taskType === "llm-tool-call") {
+      const vkey = fieldKey(item.uuid, TOOL_CALL_VERDICT_KEY);
+      const verdict = fields[vkey]?.value;
+      const setVerdict = (v: boolean) => setField(vkey, { value: v });
+      const btn = (v: boolean, label: string, on: string) =>
+        `h-9 px-4 rounded-md text-sm font-medium border transition-colors ${
+          readOnly ? "" : "cursor-pointer"
+        } ${verdict === v ? on : "border-border bg-background text-foreground hover:bg-muted/50"}`;
+      return (
+        <div className="space-y-4">
+          {descriptionBlock}
+          <div className="border border-border rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              Did the tool call match the expected?
+            </h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => setVerdict(true)}
+                className={btn(true, "Pass", "border-green-600 bg-green-600 text-white")}
+              >
+                Pass
+              </button>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => setVerdict(false)}
+                className={btn(false, "Fail", "border-red-600 bg-red-600 text-white")}
+              >
+                Fail
+              </button>
+            </div>
+          </div>
+          {verdict === false && onCorrectedCallsChange && (
+            <div className="border border-border rounded-xl p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">
+                What should the expected tool call have been?
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Correct the tool call below to what it should be.
+              </p>
+              <CorrectedToolCallsEditor
+                value={correctedCalls ?? []}
+                onChange={onCorrectedCallsChange}
+                disabled={readOnly}
+              />
+            </div>
+          )}
+          {commentBlock}
+        </div>
+      );
+    }
     return (
       <div className="space-y-3">
         {descriptionBlock}

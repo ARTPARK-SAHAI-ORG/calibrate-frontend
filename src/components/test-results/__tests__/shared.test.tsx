@@ -5,6 +5,7 @@ import {
   LabellingRowCheckbox,
   SmallStatusBadge,
   normalizeToolCall,
+  collectToolCallCriteriaParams,
   ToolCallCard,
   JudgeResultsList,
   formatTurnTimestamp,
@@ -69,6 +70,48 @@ describe("SmallStatusBadge", () => {
   it("renders an x for passed=false", () => {
     const { container } = render(<SmallStatusBadge passed={false} />);
     expect(container.querySelector(".bg-red-500\\/20")).toBeInTheDocument();
+  });
+});
+
+describe("collectToolCallCriteriaParams", () => {
+  it("returns nothing for empty / missing input", () => {
+    expect(collectToolCallCriteriaParams(null)).toEqual([]);
+    expect(collectToolCallCriteriaParams(undefined)).toEqual([]);
+    expect(collectToolCallCriteriaParams([])).toEqual([]);
+  });
+
+  it("collects only llm_judge params, recursing into nested layers", () => {
+    expect(
+      collectToolCallCriteriaParams([
+        {
+          tool: "book_flight",
+          arguments: {
+            destination: { match_type: "llm_judge", criteria: "a valid city" },
+            seat: { match_type: "exact", value: "12A" },
+            notes: { match_type: "any" },
+            passenger: {
+              name: { match_type: "llm_judge", criteria: "full legal name" },
+              age: { match_type: "exact", value: 30 },
+            },
+          },
+        },
+      ]),
+    ).toEqual([
+      { toolName: "book_flight", path: "destination", criteria: "a valid city" },
+      {
+        toolName: "book_flight",
+        path: "passenger.name",
+        criteria: "full legal name",
+      },
+    ]);
+  });
+
+  it("ignores llm_judge specs with blank criteria", () => {
+    expect(
+      collectToolCallCriteriaParams([
+        { tool: "t", arguments: { x: { match_type: "llm_judge", criteria: " " } } },
+      ]),
+    ).toEqual([]);
   });
 });
 

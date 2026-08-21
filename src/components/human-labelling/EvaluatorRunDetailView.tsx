@@ -162,7 +162,13 @@ export type EvaluatorRunJob = {
 export type LabellingTaskFull = {
   uuid: string;
   name: string;
-  type: "llm" | "llm-general" | "stt" | "tts" | "conversation";
+  type:
+    | "llm"
+    | "llm-general"
+    | "llm-tool-call"
+    | "stt"
+    | "tts"
+    | "conversation";
   description?: string | null;
   evaluators?: { uuid: string; name: string }[];
   items?: Item[];

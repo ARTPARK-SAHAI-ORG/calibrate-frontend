@@ -1594,4 +1594,123 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Some context")).toBeInTheDocument(),
     );
   });
+
+  const toolCallJob = () =>
+    jobResponse({
+      task: { uuid: "task-1", name: "Tool Task", type: "llm-tool-call" },
+      evaluators: [],
+      items: [
+        {
+          id: 1,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload: {
+            name: "Item One",
+            chat_history: [{ role: "user", content: "hi" }],
+            expected_tool_calls: [
+              {
+                tool: "book_flight",
+                arguments: {
+                  city: { match_type: "llm_judge", criteria: "a valid city" },
+                },
+              },
+            ],
+            actual_tool_calls: [
+              { tool: "book_flight", arguments: { city: "NYC" } },
+            ],
+          },
+          created_at: "2024-01-01",
+          deleted_at: null,
+        },
+      ],
+      annotations: [],
+    });
+
+  function lastAnnotationsPost() {
+    const call = fetchMock.mock.calls.find(
+      ([url, opts]) =>
+        typeof url === "string" &&
+        url.endsWith("/annotations") &&
+        (opts as RequestInit | undefined)?.method === "POST",
+    );
+    return JSON.parse((call![1] as RequestInit).body as string);
+  }
+
+  it("records a fail verdict with the corrected expected tool call", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(toolCallJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(
+        screen.getByText("Did the tool call match the expected?"),
+      ).toBeInTheDocument(),
+    );
+    // Fail reveals the correction editor, seeded from the expected call.
+    await user.click(screen.getByRole("button", { name: "Fail" }));
+    expect(
+      screen.getByText("What should the expected tool call have been?"),
+    ).toBeInTheDocument();
+    const valueInput = screen.getByPlaceholderText("Value");
+    await user.clear(valueInput);
+    await user.type(valueInput, "Delhi");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 1, status: "completed" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const body = lastAnnotationsPost();
+    expect(body.item_id).toBe("item-1");
+    expect(body.annotations).toHaveLength(1);
+    expect(body.annotations[0].evaluator_id).toBeNull();
+    expect(body.annotations[0].value.value).toBe(false);
+    expect(body.annotations[0].value.expected_tool_calls).toEqual([
+      { tool: "book_flight", arguments: { city: "Delhi" } },
+    ]);
+  });
+
+  it("records a pass verdict with no expected_tool_calls, and seeds a saved verdict", async () => {
+    const user = setupUser();
+    // A saved fail verdict should seed the UI (verdict + correction).
+    const job = toolCallJob();
+    (job as { annotations: unknown[] }).annotations = [
+      {
+        uuid: "v1",
+        job_id: "job-1",
+        item_id: "item-1",
+        evaluator_id: null,
+        value: {
+          value: false,
+          expected_tool_calls: [
+            { tool: "book_flight", arguments: { city: "Delhi" } },
+          ],
+        },
+        created_at: "",
+        updated_at: "",
+      },
+    ];
+    fetchMock.mockResolvedValueOnce(jsonResponse(job));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    // Saved verdict → item shows as done ("Update").
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Update" }),
+      ).toBeInTheDocument(),
+    );
+    // Switch to Pass — the correction editor disappears.
+    await user.click(screen.getByRole("button", { name: "Pass" }));
+    expect(
+      screen.queryByText("What should the expected tool call have been?"),
+    ).not.toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 1, status: "completed" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Update" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = lastAnnotationsPost();
+    expect(body.annotations[0].value.value).toBe(true);
+    expect(body.annotations[0].value.expected_tool_calls).toBeUndefined();
+  });
 });

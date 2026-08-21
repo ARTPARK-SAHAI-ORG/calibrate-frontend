@@ -674,7 +674,7 @@ describe("BenchmarkOutputsPanel", () => {
       const checkboxButton = within(row).getAllByRole("button")[0];
       expect(checkboxButton).toHaveAttribute(
         "title",
-        "Tool-call tests will be skipped when submitting for labelling",
+        "This test can't be submitted for labelling",
       );
     });
 

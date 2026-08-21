@@ -4,6 +4,7 @@ import {
   buildItemsFromSource,
   isLabellingEligibleRaw,
   itemNounForSource,
+  labellingTaskTypeForRaw,
   targetTaskTypeForSource,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
@@ -934,7 +935,9 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     expect(
-      screen.getByText("Tool call tests are not added to labelling tasks"),
+      screen.getByText(
+        "Tool call tests are not added here — submit them to a tool-call task separately",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -948,5 +951,90 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     expect(apiClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("llm-tool-call labelling", () => {
+  const toolCallWithCriteria = {
+    test_case: {
+      name: "Book flight",
+      evaluation: {
+        type: "tool_call",
+        tool_calls: [
+          {
+            tool: "book_flight",
+            arguments: {
+              city: { match_type: "llm_judge", criteria: "a valid city" },
+            },
+          },
+        ],
+      },
+      history: [{ role: "user", content: "book it" }],
+    },
+    output: { tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }] },
+  } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
+
+  const toolCallNoCriteria = {
+    test_case: {
+      name: "Deterministic",
+      evaluation: {
+        type: "tool_call",
+        tool_calls: [
+          { tool: "t", arguments: { x: { match_type: "exact", value: 1 } } },
+        ],
+      },
+    },
+  } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
+
+  it("maps evaluation type + criteria to the task type", () => {
+    expect(
+      labellingTaskTypeForRaw({ test_case: { evaluation: { type: "response" } } }),
+    ).toBe("llm");
+    expect(labellingTaskTypeForRaw(toolCallWithCriteria)).toBe("llm-tool-call");
+    // A tool-call test with no llm_judge criteria is not labellable.
+    expect(labellingTaskTypeForRaw(toolCallNoCriteria)).toBeNull();
+    expect(labellingTaskTypeForRaw({})).toBeNull();
+    expect(isLabellingEligibleRaw(toolCallWithCriteria)).toBe(true);
+    expect(isLabellingEligibleRaw(toolCallNoCriteria)).toBe(false);
+  });
+
+  it("targets llm-tool-call for a tool-call-only selection, llm when mixed", () => {
+    const toolOnly: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallWithCriteria],
+    };
+    expect(targetTaskTypeForSource(toolOnly)).toBe("llm-tool-call");
+
+    const mixed: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: { name: "R", evaluation: { type: "response" } },
+          output: { response: "hi" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        toolCallWithCriteria,
+      ],
+    };
+    expect(targetTaskTypeForSource(mixed)).toBe("llm");
+  });
+
+  it("builds tool-call items with expected + actual calls, no evaluators", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallWithCriteria],
+    };
+    const { items, skippedCount, evaluatorUuids } = buildItemsFromSource(source);
+    expect(items).toHaveLength(1);
+    expect(skippedCount).toBe(0);
+    expect(evaluatorUuids.size).toBe(0);
+    const p = items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Book flight — run-uuid");
+    expect(p.expected_tool_calls).toHaveLength(1);
+    expect(p.actual_tool_calls).toHaveLength(1);
+    // The per-parameter model is gone — no annotatable_params on the payload.
+    expect(p.annotatable_params).toBeUndefined();
   });
 });
