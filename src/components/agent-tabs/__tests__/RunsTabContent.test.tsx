@@ -387,6 +387,34 @@ describe("RunsTabContent", () => {
     expect(existsCalls()).toBe(1);
   }, 10000);
 
+  it("leaves a running run alone when one ask for it fails", async () => {
+    state.runs = [
+      {
+        ...unitRun,
+        uuid: "run-pending",
+        status: "pending",
+        results: [{ passed: null }],
+      },
+    ];
+    // Every ask about this run fails, as a dropped connection would.
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        return jsonResponse({ items: state.runs, total: state.runs.length });
+      }
+      if (url.includes("/agent-tests/run/")) throw new Error("offline");
+      return jsonResponse({});
+    });
+
+    renderTab();
+    await screen.findAllByText("Running");
+    // Give the poller a couple of turns: the row still says Running, not Error.
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
+    // Scoped to the table: "Error" is also one of the filter buttons.
+    const table = document.querySelector("table") as HTMLElement;
+    expect(table.textContent).not.toContain("Error");
+  }, 10000);
+
   it("keeps an unfinished run up to date", async () => {
     state.runs = [
       {

@@ -182,18 +182,10 @@ export function useAgentRuns({
             ),
           );
         } catch (err) {
+          // A failed ask says nothing about the run: it is still going as far
+          // as anyone here knows. Marking it failed would strand it, since a
+          // run that is no longer in progress is never asked about again.
           reportError(`Error polling run ${run.uuid}:`, err);
-          setItems((prev) =>
-            prev.map((r) =>
-              r.uuid === run.uuid
-                ? {
-                    ...r,
-                    status: "failed",
-                    updated_at: new Date().toISOString(),
-                  }
-                : r,
-            ),
-          );
         }
       }
     };

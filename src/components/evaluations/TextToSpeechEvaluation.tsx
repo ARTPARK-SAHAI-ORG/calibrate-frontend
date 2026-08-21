@@ -132,6 +132,8 @@ export function TextToSpeechEvaluation({
   >([]);
   // Bumped after an evaluator is created here, to re-read the library.
   const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
+  // Whether the pre-built evaluators have already been chosen for this page.
+  const preselectedRef = useRef(false);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
   const [evaluatorsInvalid, setEvaluatorsInvalid] = useState(false);
 
@@ -189,10 +191,15 @@ export function TextToSpeechEvaluation({
         );
 
         setAvailableEvaluators(ttsEvaluators);
-        // A run needs at least one, so the pre-built ones start chosen.
-        setSelectedEvaluatorUuids(
-          ttsEvaluators.filter(isDefaultEvaluator).map((e) => e.uuid),
-        );
+        // A run needs at least one, so the pre-built ones start chosen. Only
+        // the first time: re-reading the library after an evaluator is created
+        // here must not throw away what the reader has picked since.
+        if (!preselectedRef.current) {
+          preselectedRef.current = true;
+          setSelectedEvaluatorUuids(
+            ttsEvaluators.filter(isDefaultEvaluator).map((e) => e.uuid),
+          );
+        }
       } catch (err) {
         reportError("Error fetching evaluators:", err);
       } finally {
