@@ -1,5 +1,6 @@
 ## August 2026
 
+- Add previous/next buttons to the trace detail dialog ([#393](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/393))
 - Remove the extra blank line under textareas ([#389](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/389))
 - Name the labelling job score row after the annotator ([#387](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/387))
 - Show human scores alongside evaluator scores ([#386](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/386))
