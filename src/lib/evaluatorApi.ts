@@ -181,17 +181,6 @@ export async function fetchEvaluatorDetail(
   return (await response.json()) as EvaluatorDetail;
 }
 
-/** The version an evaluator judges with: the live one, else the newest saved. */
-export function liveVersionOf(
-  evaluator: EvaluatorDetail,
-): EvaluatorVersionDetail | null {
-  const versions = evaluator.versions ?? [];
-  if (versions.length === 0) return null;
-  const index = evaluator.live_version_index;
-  if (typeof index === "number" && versions[index]) return versions[index];
-  return versions[versions.length - 1];
-}
-
 /** Fetch the evaluators currently attached to an agent. */
 export async function fetchAgentEvaluators(
   agentUuid: string,

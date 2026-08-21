@@ -88,19 +88,23 @@ describe("EvaluatorPromptPreview", () => {
     expect(screen.queryByText("The old prompt")).not.toBeInTheDocument();
   });
 
-  it("falls back to the newest version when none is marked live", async () => {
+  it("shows only the version marked as current", async () => {
+    // The same helper the evaluator page uses, so the two cannot disagree.
+    mockFetch.mockResolvedValue({ ...DETAIL, live_version_index: 0 });
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
+    expect(await screen.findByText("The old prompt")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Judge whether the reply is concise."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says so when no version is marked as current", async () => {
     mockFetch.mockResolvedValue({ ...DETAIL, live_version_index: null });
     render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     expect(
-      await screen.findByText("Judge whether the reply is concise."),
-    ).toBeInTheDocument();
-  });
-
-  it("says so when the evaluator has no saved prompt", async () => {
-    mockFetch.mockResolvedValue({ ...DETAIL, versions: [] });
-    render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
-    expect(
-      await screen.findByText("This evaluator has no saved prompt yet."),
+      await screen.findByText(
+        "This evaluator has no version marked as current.",
+      ),
     ).toBeInTheDocument();
   });
 

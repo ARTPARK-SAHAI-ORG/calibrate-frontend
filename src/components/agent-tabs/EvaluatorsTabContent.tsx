@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
-import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
+import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
+  isDefaultEvaluator,
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
@@ -242,7 +243,7 @@ export function EvaluatorsTabContent({
       {attachedEvaluators.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* No heading: the tab strip above already says Evaluators. */}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm md:text-base font-medium text-foreground">
             LLM judges for evaluating the agent&rsquo;s responses
           </p>
           {renderHeaderButtons()}
@@ -334,14 +335,9 @@ export function EvaluatorsTabContent({
                       <h3 className="text-base md:text-lg font-semibold text-foreground">
                         {evaluator.name}
                       </h3>
-                      {evaluator.evaluator_type && (
-                        <EvaluatorTypePill
-                          evaluatorType={evaluator.evaluator_type}
-                        />
-                      )}
-                      {evaluator.output_type && (
-                        <OutputTypePill outputType={evaluator.output_type} />
-                      )}
+                      {/* Only "where did this come from". What it judges and
+                          how it scores are in the evaluator itself. */}
+                      {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
                     </div>
                     {evaluator.description && (
                       <p className="text-sm text-muted-foreground mt-2 leading-relaxed">

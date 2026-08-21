@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccessToken } from "@/hooks";
-import {
-  fetchEvaluatorDetail,
-  liveVersionOf,
-  type EvaluatorDetail,
-} from "@/lib/evaluatorApi";
+import { fetchEvaluatorDetail, type EvaluatorDetail } from "@/lib/evaluatorApi";
+// The one helper the evaluator page uses to find the version marked current,
+// so this column can never show a different one.
+import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { reportError } from "@/lib/reportError";
 import { VersionCard } from "./VersionCard";
 
@@ -122,7 +121,7 @@ export function EvaluatorPromptPreview({
     <div className="h-full overflow-y-auto p-4 md:p-5">
       {!version ? (
         <p className="text-sm text-muted-foreground">
-          This evaluator has no saved prompt yet.
+          This evaluator has no version marked as current.
         </p>
       ) : (
         // The evaluator page's own Prompts-tab card, in that card's read-only
