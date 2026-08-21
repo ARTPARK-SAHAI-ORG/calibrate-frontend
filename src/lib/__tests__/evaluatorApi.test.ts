@@ -9,6 +9,7 @@ import {
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
+  supportsEvaluatorVariables,
   type EvaluatorData,
 } from "../evaluatorApi";
 import { clearAllRequestCaches } from "../requestCache";
@@ -345,5 +346,17 @@ describe("fetch helpers", () => {
     ).resolves.toBeUndefined();
     await expect(deleteEvaluator("ev-3", "token")).resolves.toBeUndefined();
     expect(signOut).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("supportsEvaluatorVariables", () => {
+  it("allows variables on both LLM-judged types and no others", () => {
+    expect(supportsEvaluatorVariables("llm")).toBe(true);
+    expect(supportsEvaluatorVariables("llm-general")).toBe(true);
+    expect(supportsEvaluatorVariables("stt")).toBe(false);
+    expect(supportsEvaluatorVariables("tts")).toBe(false);
+    expect(supportsEvaluatorVariables("conversation")).toBe(false);
+    expect(supportsEvaluatorVariables(undefined)).toBe(false);
+    expect(supportsEvaluatorVariables(null)).toBe(false);
   });
 });

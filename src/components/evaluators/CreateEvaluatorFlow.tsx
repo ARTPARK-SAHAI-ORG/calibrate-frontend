@@ -12,6 +12,7 @@ import {
   type EvaluatorData,
   getEvaluatorErrorMessage,
   isEvaluatorNameConflict,
+  supportsEvaluatorVariables,
 } from "@/lib/evaluatorApi";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { type EvaluatorType } from "@/components/EvaluatorPills";
@@ -282,7 +283,7 @@ export function CreateEvaluatorFlow({
         newEvaluatorScale.every((row) => row.name.trim().length > 0));
     const detectedVars = extractVariableNames(newEvaluatorSystemPrompt);
     const variableDescriptionsValid =
-      (newEvaluatorType !== "llm" && newEvaluatorType !== "llm-general") ||
+      !supportsEvaluatorVariables(newEvaluatorType) ||
       detectedVars.every(
         (name) =>
           (newEvaluatorVariableDescriptions[name] ?? "").trim().length > 0,
@@ -320,8 +321,7 @@ export function CreateEvaluatorFlow({
           version: {
             judge_model: newEvaluatorJudgeModel.id,
             system_prompt: newEvaluatorSystemPrompt.trim(),
-            ...((newEvaluatorType === "llm" ||
-              newEvaluatorType === "llm-general") &&
+            ...(supportsEvaluatorVariables(newEvaluatorType) &&
             detectedVars.length > 0
               ? {
                   variables: detectedVars.map((name) => {
@@ -397,8 +397,7 @@ export function CreateEvaluatorFlow({
   const detectedPromptVariables = extractVariableNames(
     newEvaluatorSystemPrompt,
   );
-  const variablesSupported =
-    newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
+  const variablesSupported = supportsEvaluatorVariables(newEvaluatorType);
   if (!open) return null;
 
   return (
