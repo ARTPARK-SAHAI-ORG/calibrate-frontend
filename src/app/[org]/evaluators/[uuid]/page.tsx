@@ -722,9 +722,6 @@ function EvaluatorDetailPageInner() {
       customHeader={backButton}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* AppLayout hides `customHeader` below md. */}
-        <div className="md:hidden">{backButton}</div>
-
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />
         ) : loading ? (
@@ -766,6 +763,8 @@ function EvaluatorDetailPageInner() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0 flex-1">
+                {/* AppLayout hides `customHeader` below md. */}
+                <div className="md:hidden mb-3">{backButton}</div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
