@@ -22,6 +22,14 @@ import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
+import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
+
+// Which page of results is open, so a reload reopens on the same one instead
+// of resetting to the first. Written with `replaceState` like the other
+// address-bar view settings: it's where you're looking, not somewhere you
+// navigated to, so the Back button shouldn't have to undo it one page at a
+// time.
+const PAGE_PARAM = "page";
 
 const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "all", label: "All results" },
@@ -146,6 +154,14 @@ export function RunsTabContent({
   const [pageSize, setPageSize] = usePageSize();
   const [filter, setFilter] = useState<RunResultFilter>("all");
 
+  // The page a reload should reopen on, read once from `?page=` at start-up.
+  // A `?runId=` link is more specific about where to land (it names the run,
+  // not just a page number), so it takes over below regardless of this.
+  const [initialOffset] = useState(() => {
+    const page = Number(readUrlParam(PAGE_PARAM));
+    return Number.isInteger(page) && page > 1 ? (page - 1) * pageSize : 0;
+  });
+
   // A `?runId=` in the URL — from a shared link, a reload, or the Back/
   // Forward buttons — names a run whose type (plain run vs. multi-model
   // benchmark) isn't known yet, so it's held here until the list (landed on
@@ -194,7 +210,17 @@ export function RunsTabContent({
     pageSize,
     filter,
     aroundRunId: pendingRunId,
+    initialOffset,
   });
+
+  // Keep `?page=` in step with whichever page is actually showing — paging,
+  // a filter change resetting to page one, or a run link landing somewhere
+  // else — so the next reload reopens on it. Page one is the default, so
+  // it's left out of the address rather than written as `page=1`.
+  useEffect(() => {
+    const page = Math.floor(offset / pageSize) + 1;
+    writeUrlParam(PAGE_PARAM, page > 1 ? String(page) : null);
+  }, [offset, pageSize]);
 
   const openTestRun = (uuid: string) => {
     // A row click always wins over a `?runId=` link that's still being

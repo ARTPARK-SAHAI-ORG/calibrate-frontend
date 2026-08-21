@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@/test-utils";
-import { useAgentRuns } from "../useAgentRuns";
+import { useAgentRuns, type RunResultFilter } from "../useAgentRuns";
 
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -140,5 +140,65 @@ describe("useAgentRuns around", () => {
       expect(lastRunsUrl().searchParams.get("offset")).toBe("0"),
     );
     expect(lastRunsUrl().searchParams.has("around")).toBe(false);
+  });
+});
+
+describe("useAgentRuns initialOffset", () => {
+  /** Renders with a starting page, and lets the filter be changed after. */
+  function setupWithInitialOffset(initialOffset: number) {
+    return renderHook(
+      ({ filter }: { filter: RunResultFilter }) =>
+        useAgentRuns({
+          agentUuid: AGENT_UUID,
+          accessToken: "tok",
+          pageSize: 50,
+          filter,
+          initialOffset,
+        }),
+      { initialProps: { filter: "all" as RunResultFilter } },
+    );
+  }
+
+  beforeEach(() => {
+    global.fetch = jest.fn(async (url: string) =>
+      jsonResponse({
+        items: [runA],
+        total: 200,
+        offset: Number(new URL(url).searchParams.get("offset")),
+      }),
+    ) as jest.Mock;
+  });
+
+  it("starts on the page it was given rather than page one", async () => {
+    const { result } = setupWithInitialOffset(50);
+
+    await waitFor(() => expect(result.current.items).toEqual([runA]));
+    expect(result.current.offset).toBe(50);
+    expect(lastRunsUrl().searchParams.get("offset")).toBe("50");
+  });
+
+  it("stays on that page when nothing about the list has changed", async () => {
+    const { result, rerender } = setupWithInitialOffset(50);
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    // Re-rendering on its own must not send the list back to page one —
+    // this is what broke the page surviving a reload in development, where
+    // React renders and mounts everything an extra time.
+    rerender({ filter: "all" });
+    rerender({ filter: "all" });
+
+    await waitFor(() => expect(result.current.offset).toBe(50));
+    expect(lastRunsUrl().searchParams.get("offset")).toBe("50");
+  });
+
+  it("goes back to page one when the filter really does change", async () => {
+    const { result, rerender } = setupWithInitialOffset(50);
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ filter: "failed" });
+
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(lastRunsUrl().searchParams.get("offset")).toBe("0");
+    expect(lastRunsUrl().searchParams.get("has_failures")).toBe("true");
   });
 });

@@ -271,6 +271,41 @@ describe("RunsTabContent", () => {
     await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("0"));
   });
 
+  it("puts the page number in the address as you page, so a reload reopens on it", async () => {
+    state.runs = [unitRun];
+    state.total = 120;
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+    expect(new URLSearchParams(window.location.search).get("page")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("page")).toBe(
+        "2",
+      ),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Previous page" }));
+    await waitFor(() =>
+      // Page one is the default, so it's left out rather than written as
+      // `page=1`.
+      expect(
+        new URLSearchParams(window.location.search).get("page"),
+      ).toBeNull(),
+    );
+  });
+
+  it("reopens on the page named in the address instead of resetting to page one", async () => {
+    state.runs = [unitRun];
+    state.total = 120;
+    window.history.replaceState(null, "", "/?page=2");
+    renderTab();
+
+    await screen.findAllByText("1 Success");
+    await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
+  });
+
   it("opens the run window for a plain run", async () => {
     state.runs = [unitRun];
     const user = setupUser();

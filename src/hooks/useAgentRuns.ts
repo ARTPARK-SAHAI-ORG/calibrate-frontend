@@ -56,6 +56,13 @@ type UseAgentRunsArgs = {
    * hook stops sending it, so ordinary paging afterwards is unaffected.
    */
   aroundRunId?: string | null;
+  /**
+   * Which row to start the list on — e.g. the page a reload should reopen
+   * on. Only read for the very first fetch; ordinary paging afterwards is
+   * unaffected. Superseded entirely by `aroundRunId` whenever both are set,
+   * since a linked run's own page is more specific than a remembered one.
+   */
+  initialOffset?: number;
 };
 
 /**
@@ -72,10 +79,11 @@ export function useAgentRuns({
   pageSize,
   filter,
   aroundRunId,
+  initialOffset = 0,
 }: UseAgentRunsArgs) {
   const [items, setItems] = useState<AgentRun[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(initialOffset);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The run was not among the current results (wrong filter, or it doesn't
@@ -101,9 +109,21 @@ export function useAgentRuns({
   // `offset` change it's about to see.
   const skipNextFetchRef = useRef(false);
 
+  // Which agent / page size / filter the current page of rows belongs to.
+  // Changing any of them makes the page number meaningless, so the list goes
+  // back to page one — but only on a real change. Comparing the values,
+  // rather than counting mounts, is what keeps `initialOffset` alive: in
+  // development React mounts every component twice, and a "have I run
+  // before" flag would see its second run as a change and reset the page the
+  // reader asked for.
+  const listKey = `${agentUuid}|${pageSize}|${filter}`;
+  const listKeyRef = useRef(listKey);
+
   useEffect(() => {
+    if (listKeyRef.current === listKey) return;
+    listKeyRef.current = listKey;
     setOffset(0);
-  }, [agentUuid, pageSize, filter]);
+  }, [listKey]);
 
   const load = useCallback(
     async (targetOffset: number) => {
