@@ -264,6 +264,29 @@ export async function deleteEvaluator(
 }
 
 /**
+ * Permanently delete one saved version of an evaluator. The backend refuses to
+ * delete the current version (400) — make another version current first — so
+ * the page hides the control on that row and shows the backend's own wording
+ * if it comes back anyway. Finished runs keep naming the version they used.
+ */
+export async function deleteEvaluatorVersion(
+  evaluatorId: string,
+  versionId: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch(
+    `${getBackendUrl()}/evaluators/${evaluatorId}/versions/${versionId}`,
+    { method: "DELETE", headers: getDefaultHeaders(accessToken) },
+  );
+  if (await handledUnauthorized(response)) return;
+  if (!response.ok) {
+    throw new Error(
+      await getEvaluatorErrorMessage(response, "Failed to delete version"),
+    );
+  }
+}
+
+/**
  * Whether an evaluator of this type can carry `{{variable}}` placeholders in
  * its judge prompt. Only the two LLM-judged types can: the STT/TTS/conversation
  * judges have no per-test place to fill values in. This is the ONE place the

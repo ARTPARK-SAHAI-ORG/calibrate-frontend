@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import {
   deleteEvaluator as deleteEvaluatorRequest,
+  deleteEvaluatorVersion,
   supportsEvaluatorVariables,
 } from "@/lib/evaluatorApi";
 
@@ -213,6 +214,12 @@ function EvaluatorDetailPageInner() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // The version waiting on its delete confirmation, and whether that delete
+  // is in flight.
+  const [versionToDelete, setVersionToDelete] =
+    useState<EvaluatorVersion | null>(null);
+  const [deletingVersion, setDeletingVersion] = useState(false);
+
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -355,6 +362,48 @@ function EvaluatorDetailPageInner() {
       reportError("Error setting live version:", err);
     } finally {
       setSettingLiveUuid(null);
+    }
+  };
+
+  const confirmDeleteVersion = async () => {
+    if (!backendAccessToken || !uuid || !versionToDelete) return;
+    try {
+      setDeletingVersion(true);
+      await deleteEvaluatorVersion(
+        uuid,
+        versionToDelete.uuid,
+        backendAccessToken,
+      );
+      // The details panel falls back to the current version on its own once
+      // the deleted one is gone from the list.
+      setEvaluator((prev) => {
+        if (!prev) return prev;
+        const remaining = (prev.versions ?? []).filter(
+          (v) => v.uuid !== versionToDelete.uuid,
+        );
+        // The current version is found by its position in this list, so
+        // dropping an earlier version moves it and the position has to be
+        // worked out again.
+        const liveIndex = remaining.findIndex(
+          (v) => v.uuid === prev.live_version_id,
+        );
+        return {
+          ...prev,
+          versions: remaining,
+          live_version_index: liveIndex === -1 ? null : liveIndex,
+        };
+      });
+      setVersionToDelete(null);
+    } catch (err) {
+      reportError("Error deleting version:", err);
+      // Say why in the backend's own wording, which is what explains the one
+      // case the hidden control cannot cover: the version went current in
+      // another tab.
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete version",
+      );
+    } finally {
+      setDeletingVersion(false);
     }
   };
 
@@ -973,6 +1022,27 @@ function EvaluatorDetailPageInner() {
                                 </svg>
                               </button>
                             )}
+                            {!isCurrent && (
+                              <button
+                                onClick={() => setVersionToDelete(v)}
+                                title={`Delete v${v.version_number}`}
+                                className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.75}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1539,6 +1609,19 @@ function EvaluatorDetailPageInner() {
         message={`Are you sure you want to delete "${evaluator?.name}"?`}
         confirmText="Delete"
         isDeleting={deleting}
+      />
+
+      {/* Version delete confirmation dialog */}
+      <DeleteConfirmationDialog
+        isOpen={versionToDelete !== null}
+        onClose={() => {
+          if (!deletingVersion) setVersionToDelete(null);
+        }}
+        onConfirm={confirmDeleteVersion}
+        title="Delete version"
+        message={`Are you sure you want to delete v${versionToDelete?.version_number}? Finished runs judged by this version keep showing it.`}
+        confirmText="Delete"
+        isDeleting={deletingVersion}
       />
 
       {/* LLM judge model selector for new version */}
