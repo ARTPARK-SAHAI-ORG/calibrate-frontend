@@ -39,7 +39,11 @@ import {
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
-import { supportsEvaluatorVariables } from "@/lib/evaluatorApi";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import {
+  deleteEvaluator as deleteEvaluatorRequest,
+  supportsEvaluatorVariables,
+} from "@/lib/evaluatorApi";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -201,6 +205,10 @@ function EvaluatorDetailPageInner() {
   // always shows all options regardless of which task is currently selected.
   const [trendAllTasks, setTrendAllTasks] = useState<TrendTask[]>([]);
 
+  // Delete confirmation state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -328,6 +336,21 @@ function EvaluatorDetailPageInner() {
       reportError("Error setting live version:", err);
     } finally {
       setSettingLiveUuid(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!backendAccessToken || !uuid || !evaluator) return;
+    try {
+      setDeleting(true);
+      await deleteEvaluatorRequest(uuid, backendAccessToken);
+      // Send the reader back to the list tab this evaluator is filed under.
+      router.push(
+        evaluator.owner_user_id ? "/evaluators" : "/evaluators?tab=default",
+      );
+    } catch (err) {
+      reportError("Error deleting evaluator:", err);
+      setDeleting(false);
     }
   };
 
@@ -718,6 +741,25 @@ function EvaluatorDetailPageInner() {
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
+                  <button
+                    onClick={openEditDialog}
+                    title="Edit name and description"
+                    className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
+                      />
+                    </svg>
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mt-2">
                   {evaluator.evaluator_type && (
@@ -735,8 +777,8 @@ function EvaluatorDetailPageInner() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  onClick={openEditDialog}
+                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
+                  onClick={openNewVersionDialog}
                 >
                   <svg
                     className="w-4 h-4"
@@ -754,8 +796,9 @@ function EvaluatorDetailPageInner() {
                   Edit
                 </button>
                 <button
-                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
-                  onClick={openNewVersionDialog}
+                  onClick={() => setDeleteOpen(true)}
+                  title="Delete evaluator"
+                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                 >
                   <svg
                     className="w-4 h-4"
@@ -767,10 +810,9 @@ function EvaluatorDetailPageInner() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M12 4v16m8-8H4"
+                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
                     />
                   </svg>
-                  New version
                 </button>
               </div>
             </div>
@@ -1351,6 +1393,19 @@ function EvaluatorDetailPageInner() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteOpen}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete evaluator"
+        message={`Are you sure you want to delete "${evaluator?.name}"?`}
+        confirmText="Delete"
+        isDeleting={deleting}
+      />
 
       {/* LLM judge model selector for new version */}
       {evaluator && (

@@ -111,8 +111,10 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(card).toBeVisible({ timeout: 20000 });
 
     // Open the evaluator detail / versioning page (its own route, otherwise
-    // never exercised by E2E), confirm it loaded, then return to the list to
-    // delete. The heading renders the evaluator's name once the fetch resolves.
+    // never exercised by E2E), confirm it loaded, then delete it from the
+    // detail page's header delete button (confirmDelete), which navigates
+    // back to the list. The heading renders the evaluator's name once the
+    // fetch resolves.
     await card.click();
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
@@ -122,20 +124,17 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
 
-    await page.goto("/evaluators");
-    await waitForOrgReady(page);
-    await expect(card).toBeVisible({ timeout: 20000 });
-
-    // Delete via the card's titled delete button + confirmation dialog.
-    await page
-      .locator(`[aria-label="Open ${name}"]`)
-      .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
-      .getByRole("button", { name: "Delete evaluator" })
-      .click();
+    await page.getByRole("button", { name: "Delete evaluator" }).click();
     await expect(
       page.getByRole("heading", { name: "Delete evaluator", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+    // Deleting sends the reader back to the list, where the card is gone.
+    await expect(page).toHaveURL(workspacePath("/evaluators"), {
+      timeout: 20000,
+    });
+    await waitForOrgReady(page);
     await expect(card).toHaveCount(0, { timeout: 15000 });
   });
 
@@ -163,9 +162,9 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
 
-    // Open the "New version" form. The header button and the dialog heading are
-    // both "New version" — target the button role for the opener.
-    await page.getByRole("button", { name: "New version" }).click();
+    // Open the "New version" form. The header opener now reads "Edit"; the
+    // dialog it opens still has the "New version" heading.
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
       dialog.getByRole("heading", { name: "New version", exact: true }),

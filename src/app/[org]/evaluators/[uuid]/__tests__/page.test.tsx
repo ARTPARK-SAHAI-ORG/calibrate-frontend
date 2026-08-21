@@ -1,0 +1,171 @@
+/**
+ * Header actions on the evaluator page.
+ *
+ * Covers the three controls next to the evaluator name: the pencil that opens
+ * the name/description form, the "Edit" button that opens the judge prompt
+ * form, and the bin that deletes the evaluator and returns to the list.
+ * The page chrome and the judge model picker are stubbed so only the header
+ * and its dialogs run.
+ */
+import React from "react";
+import { render, screen, waitFor, setupUser } from "@/test-utils";
+
+const push = jest.fn();
+
+jest.mock("next/navigation", () => ({
+  __esModule: true,
+  useRouter: () => ({ push, replace: jest.fn(), back: jest.fn(), prefetch: jest.fn() }),
+  usePathname: () => "/evaluators/eval-1",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ uuid: "eval-1" }),
+  redirect: jest.fn(),
+  notFound: jest.fn(),
+}));
+
+jest.mock("../../../../../components/AppLayout", () => ({
+  AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useHideFloatingButton: () => {},
+}));
+
+// Reaches out to OpenRouter for the model list; not part of the header.
+jest.mock("../../../../../components/agent-tabs/LLMSelectorModal", () => ({
+  LLMSelectorModal: () => null,
+}));
+
+jest.mock("../../../../../hooks", () => ({
+  ...jest.requireActual("../../../../../hooks"),
+  useAccessToken: () => "test-token",
+}));
+
+const deleteEvaluator = jest.fn();
+
+jest.mock("../../../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../../../lib/evaluatorApi"),
+  deleteEvaluator: (...args: unknown[]) => deleteEvaluator(...args),
+}));
+
+import EvaluatorDetailPage from "../page";
+
+const EVALUATOR = {
+  uuid: "eval-1",
+  name: "Refund policy",
+  description: "Checks the reply follows the refund policy",
+  data_type: "text",
+  kind: "single",
+  output_type: "binary",
+  owner_user_id: "user-1",
+  slug: null,
+  live_version_id: "ver-1",
+  live_version_index: 0,
+  evaluator_type: "llm",
+  versions: [
+    {
+      uuid: "ver-1",
+      version_number: 1,
+      judge_model: "openai/gpt-4o",
+      system_prompt: "Grade the reply",
+      output_config: null,
+      variables: null,
+      created_at: "2026-07-15T10:00:00Z",
+    },
+  ],
+};
+
+const originalFetch = global.fetch;
+
+function mockEvaluator(overrides: Record<string, unknown> = {}) {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "application/json" }),
+    json: async () => ({ ...EVALUATOR, ...overrides }),
+  }) as unknown as typeof fetch;
+}
+
+beforeEach(() => {
+  process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000";
+  mockEvaluator();
+});
+
+afterEach(() => {
+  global.fetch = originalFetch;
+  jest.clearAllMocks();
+});
+
+describe("evaluator page header actions", () => {
+  it("opens the name and description form from the pencil next to the name", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(
+      await screen.findByTitle("Edit name and description"),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Edit evaluator" }),
+    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Refund policy")).toBeInTheDocument();
+  });
+
+  it("opens the judge prompt form from the Edit button", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    expect(screen.getByText("Judge prompt")).toBeInTheDocument();
+    // Seeded from the live version rather than starting blank.
+    expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
+  });
+
+  it("deletes the evaluator and returns to the list", async () => {
+    deleteEvaluator.mockResolvedValue(undefined);
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete evaluator"));
+    expect(
+      screen.getByRole("heading", { name: "Delete evaluator" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Are you sure you want to delete "Refund policy"/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(deleteEvaluator).toHaveBeenCalledWith("eval-1", "test-token"),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/evaluators"));
+  });
+
+  it("returns a built-in evaluator to the tab it is listed on", async () => {
+    mockEvaluator({ owner_user_id: null });
+    deleteEvaluator.mockResolvedValue(undefined);
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/evaluators?tab=default"),
+    );
+  });
+
+  it("keeps the page open when the delete fails", async () => {
+    deleteEvaluator.mockRejectedValue(new Error("Failed to delete evaluator"));
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteEvaluator).toHaveBeenCalled());
+    expect(push).not.toHaveBeenCalled();
+    // The confirmation stays up so the reader can try again.
+    expect(
+      screen.getByRole("heading", { name: "Delete evaluator" }),
+    ).toBeInTheDocument();
+  });
+});

@@ -56,3 +56,15 @@ afterEach(() => {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = jest.fn();
 }
+
+// jsdom has no layout, so it ships no ResizeObserver. Components that measure
+// themselves (the evaluator version card's prompt clamp) construct one on
+// mount; stub it here rather than guarding product code for a browser feature
+// that always exists outside tests.
+if (!global.ResizeObserver) {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
