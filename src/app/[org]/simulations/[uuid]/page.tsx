@@ -18,7 +18,7 @@ import {
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
 import { AppLayout } from "@/components/AppLayout";
-import { NotFoundState } from "@/components/ui";
+import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { Agent } from "@/components/AgentPicker";
 import { PickerItem } from "@/components/MultiSelectPicker";
 // The library shape, distinct from this page's own `EvaluatorData` row.
@@ -618,42 +618,24 @@ export default function SimulationDetailPage() {
   };
 
   // Header with back button and simulation name
-  const customHeader = (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => router.push("/simulations")}
-        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-        title="Back to simulations"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
-        </svg>
-      </button>
-      {!errorCode && (
-        <span
-          className={`text-base font-semibold text-foreground ${
-            !isLoading && simulation
-              ? "cursor-pointer hover:opacity-70 transition-opacity"
-              : ""
-          }`}
-          onClick={!isLoading && simulation ? handleOpenEditName : undefined}
-          title={!isLoading && simulation ? "Click to edit name" : undefined}
-        >
-          {isLoading ? "Loading..." : simulation?.name || "Simulation"}
-        </span>
-      )}
-    </div>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Simulations", href: "/simulations" },
+    ...(errorCode
+      ? []
+      : [
+          {
+            label: isLoading
+              ? "Loading..."
+              : simulation?.name || "Simulation",
+            onClick:
+              !isLoading && simulation ? handleOpenEditName : undefined,
+            title:
+              !isLoading && simulation ? "Click to edit name" : undefined,
+          },
+        ]),
+  ];
+
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   const isAgentUnverified = selectedAgent?.verified === false;
   const verify = useVerifyConnection();
@@ -825,6 +807,8 @@ export default function SimulationDetailPage() {
       headerActions={headerActions}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
+        {/* AppLayout hides `customHeader` below md. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
         {/* Content */}
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />

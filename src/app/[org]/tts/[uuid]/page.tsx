@@ -9,7 +9,8 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import {
-  BackHeader,
+  Breadcrumbs,
+  type Crumb,
   StatusBadge,
   NotFoundState,
   RetryIcon,
@@ -643,13 +644,12 @@ export default function TTSEvaluationDetailPage() {
       ? "outputs"
       : activeTab;
 
-  const customHeader = (
-    <BackHeader
-      label="Back to all TTS evaluations"
-      onBack={() => router.push("/tts")}
-      title="Back to TTS evaluations"
-    />
-  );
+  const crumbs: Crumb[] = [
+    { label: "Text-to-Speech", href: "/tts" },
+    { label: evaluationResult?.dataset_name ?? "Evaluation" },
+  ];
+
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   return (
     <AppLayout
@@ -660,6 +660,8 @@ export default function TTSEvaluationDetailPage() {
       customHeader={customHeader}
     >
       <div className="space-y-4 md:space-y-6">
+        <Breadcrumbs items={crumbs} className="md:hidden" />
+
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center gap-3 py-8">

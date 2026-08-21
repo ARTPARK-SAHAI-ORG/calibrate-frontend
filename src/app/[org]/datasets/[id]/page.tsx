@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { useAccessToken, useMaxRowsPerEval, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { NotFoundState } from "@/components/ui";
+import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   getDataset,
@@ -138,36 +138,27 @@ export default function DatasetDetailPage() {
     }
   };
 
+  const datasetType = dataset?.dataset_type ?? "stt";
+  const crumbs: Crumb[] = [
+    {
+      label: datasetType === "tts" ? "Text-to-Speech" : "Speech-to-Text",
+      href: `/${datasetType}`,
+    },
+    { label: "Datasets", href: `/${datasetType}?tab=datasets` },
+    { label: dataset?.name ?? "Dataset" },
+  ];
+
   return (
     <AppLayout
-      activeItem={dataset?.dataset_type ?? "stt"}
+      activeItem={datasetType}
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={<Breadcrumbs items={crumbs} />}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* Back link */}
-        <button
-          onClick={() =>
-            router.push(`/${dataset?.dataset_type ?? "stt"}?tab=datasets`)
-          }
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-            />
-          </svg>
-          Back to Datasets
-        </button>
+        {/* AppLayout hides `customHeader` below md. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />

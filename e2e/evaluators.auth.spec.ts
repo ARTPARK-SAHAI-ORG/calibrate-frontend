@@ -118,7 +118,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
     await expect(
-      page.getByRole("button", { name: "Back to evaluators" }).first(),
+      page.getByRole("link", { name: "Evaluators" }).first(),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
 
@@ -154,7 +154,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
       timeout: 20000,
     });
     await expect(
-      page.getByRole("button", { name: "Back to evaluators" }).first(),
+      page.getByRole("link", { name: "Evaluators" }).first(),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
 

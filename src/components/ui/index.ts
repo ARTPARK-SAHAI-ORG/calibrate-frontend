@@ -10,7 +10,7 @@ export {
   NotFoundState,
   ResourceState,
 } from "./LoadingState";
-export { BackHeader } from "./BackHeader";
+export { Breadcrumbs, type Crumb } from "./Breadcrumbs";
 export { StatusBadge } from "./StatusBadge";
 export { NestedContainer } from "./NestedContainer";
 export { RetryIcon } from "./RetryIcon";

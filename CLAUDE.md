@@ -217,6 +217,20 @@ of the wide banner. The words are what a screen reader says in place of it.
 - A page in `PAGES`: pass `image` to `pageMetadata()` and put the file under `public/share/`. A blog post: set `image` on the post and put the file under `public/blog/`.
 - Every picture is 1200 by 630 and under 300 KB. The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) reads the file's own header and its weight, so a picture of another size cannot ship quietly, and neither can one exported at full quality by mistake. WhatsApp stops showing a heavy picture with no warning: the link simply appears as bare text.
 
+### Breadcrumbs, not back buttons
+
+Every page you reach from a list shows the trail of pages leading to it in the
+top bar, e.g. `Agents / Support bot` or `Human alignment / Task one / Evaluation
+run`. Use `Breadcrumbs` from `@/components/ui` with a `Crumb[]`: every step
+except the last carries an `href`, the last is the page you are on. A step can
+take an `onClick` instead when the name is editable in place (the agent and
+simulation names).
+
+`AppLayout` hides `customHeader` below the `md` breakpoint, so each page renders
+the same trail twice: `customHeader={<Breadcrumbs items={crumbs} />}` and
+`<Breadcrumbs items={crumbs} className="md:hidden" />` at the top of the page
+body. No page uses a back arrow for this any more; `BackHeader` is gone.
+
 ### Server-paginated list bar
 
 Use this whenever a list is backed by server-side `limit`/`offset` paging (today: **Traces tab** and **human-alignment task items tab**). Copy the markup from `TracesTabContent` or `src/app/[org]/human-alignment/tasks/[uuid]/page.tsx` — do not invent a new layout.

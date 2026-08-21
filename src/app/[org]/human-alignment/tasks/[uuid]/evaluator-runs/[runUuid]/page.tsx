@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RetryIcon } from "@/components/ui";
+import { Breadcrumbs, RetryIcon, type Crumb } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
@@ -466,27 +466,15 @@ export default function EvaluatorRunDetailPage() {
     }
   }, [job, task, itemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
 
-  const customHeader = (
-    <button
-      onClick={() => router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)}
-      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-    >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 19.5L8.25 12l7.5-7.5"
-        />
-      </svg>
-      Back to evaluation runs
-    </button>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Human alignment", href: "/human-alignment?tab=tasks" },
+    {
+      label: task?.name ?? "Task",
+      href: `/human-alignment/tasks/${taskUuid}?tab=runs`,
+    },
+    { label: "Evaluation run" },
+  ];
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   if (errorCode) {
     return (
@@ -512,28 +500,8 @@ export default function EvaluatorRunDetailPage() {
         className="py-4 md:py-6 flex flex-col gap-4"
         style={{ height: "calc(100dvh - 56px)" }}
       >
-        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
-        <button
-          onClick={() =>
-            router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)
-          }
-          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          Back to evaluation runs
-        </button>
+        {/* AppLayout hides `customHeader` below md, so repeat the trail here. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {loading && !job && (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">

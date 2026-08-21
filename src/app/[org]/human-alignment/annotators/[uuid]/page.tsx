@@ -14,6 +14,7 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
+import { Breadcrumbs, type Crumb } from "@/components/ui";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -233,6 +234,12 @@ function AnnotatorDetailPageInner() {
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
 
+  const crumbs: Crumb[] = [
+    { label: "Human alignment", href: "/human-alignment?tab=annotators" },
+    { label: annotator?.name ?? "Annotator" },
+  ];
+  const customHeader = <Breadcrumbs items={crumbs} />;
+
   if (errorCode) {
     return (
       <NotFoundPage
@@ -240,6 +247,7 @@ function AnnotatorDetailPageInner() {
         errorCode={errorCode}
         sidebarOpen={sidebarOpen}
         onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+        customHeader={customHeader}
       />
     );
   }
@@ -250,27 +258,11 @@ function AnnotatorDetailPageInner() {
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div className="py-4 md:py-6 space-y-6">
-        <button
-          onClick={() => router.push("/human-alignment?tab=annotators")}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          All annotators
-        </button>
+        {/* AppLayout hides `customHeader` below md, so repeat the trail here. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {/* Header */}
         <div>
