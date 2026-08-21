@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   useAccessToken,
   useAgentRuns,
@@ -9,7 +10,6 @@ import {
   type AgentRun,
   type RunResultFilter,
 } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
 import {
   getUnitTestBreakdown,
   isRunErrored,
@@ -22,6 +22,14 @@ import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
+import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
+
+// Which page of results is open, so a reload reopens on the same one instead
+// of resetting to the first. Written with `replaceState` like the other
+// address-bar view settings: it's where you're looking, not somewhere you
+// navigated to, so the Back button shouldn't have to undo it one page at a
+// time.
+const PAGE_PARAM = "page";
 
 const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "all", label: "All results" },
@@ -146,12 +154,50 @@ export function RunsTabContent({
   const [pageSize, setPageSize] = usePageSize();
   const [filter, setFilter] = useState<RunResultFilter>("all");
 
+  // The page a reload should reopen on, read once from `?page=` at start-up.
+  // A `?runId=` link is more specific about where to land (it names the run,
+  // not just a page number), so it takes over below regardless of this.
+  const [initialOffset] = useState(() => {
+    const page = Number(readUrlParam(PAGE_PARAM));
+    return Number.isInteger(page) && page > 1 ? (page - 1) * pageSize : 0;
+  });
+
+  // A `?runId=` in the URL — from a shared link, a reload, or the Back/
+  // Forward buttons — names a run whose type (plain run vs. multi-model
+  // benchmark) isn't known yet, so it's held here until the list (landed on
+  // that run's actual page via `around`) resolves it to the right dialog.
+  //
+  // Read straight from the address on the very first render, rather than
+  // waiting for `useDialogUrlParam`'s effect to report it a moment later —
+  // otherwise the list's own first fetch would already have gone out for
+  // plain page one before anyone told it which run to land on, wasting that
+  // request.
+  const [pendingRunId, setPendingRunId] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("runId"),
+  );
+  const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
+  const [openBenchmarkRun, setOpenBenchmarkRun] = useState<AgentRun | null>(
+    null,
+  );
+  const { setParam: setRunIdParam } = useDialogUrlParam({
+    param: "runId",
+    onOpen: (uuid) => setPendingRunId(uuid),
+    onClose: () => {
+      setPendingRunId(null);
+      setOpenTestRunId(null);
+      setOpenBenchmarkRun(null);
+    },
+  });
+
   const {
     items,
     total,
     offset,
     isLoading,
     error,
+    aroundNotFound,
     refetch,
     setPollSkip,
     hasPrev,
@@ -163,17 +209,26 @@ export function RunsTabContent({
     accessToken: backendAccessToken,
     pageSize,
     filter,
+    aroundRunId: pendingRunId,
+    initialOffset,
   });
 
-  // The one open test run window, deep-linked to `?runId=` so a reload
-  // re-opens it and the address can be shared.
-  const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
-  const { setParam: setRunIdParam } = useDialogUrlParam({
-    param: "runId",
-    onOpen: (uuid) => setOpenTestRunId(uuid),
-    onClose: () => setOpenTestRunId(null),
-  });
+  // Keep `?page=` in step with whichever page is actually showing — paging,
+  // a filter change resetting to page one, or a run link landing somewhere
+  // else — so the next reload reopens on it. Page one is the default, so
+  // it's left out of the address rather than written as `page=1`.
+  useEffect(() => {
+    const page = Math.floor(offset / pageSize) + 1;
+    writeUrlParam(PAGE_PARAM, page > 1 ? String(page) : null);
+  }, [offset, pageSize]);
+
   const openTestRun = (uuid: string) => {
+    // A row click always wins over a `?runId=` link that's still being
+    // looked up — otherwise that lookup could resolve later and reopen the
+    // run the link named, snapping the reader back out of the one they just
+    // picked.
+    setPendingRunId(null);
+    setOpenBenchmarkRun(null);
     setOpenTestRunId(uuid);
     setRunIdParam(uuid);
   };
@@ -181,11 +236,22 @@ export function RunsTabContent({
     setOpenTestRunId(null);
     setRunIdParam(null);
   };
+  const closeBenchmarkRun = () => {
+    setOpenBenchmarkRun(null);
+    setRunIdParam(null);
+  };
 
-  // A run tried against several models opens its own results window.
-  const [openBenchmarkRun, setOpenBenchmarkRun] = useState<AgentRun | null>(
-    null,
-  );
+  const openRun = (run: AgentRun) => {
+    if (run.type === "llm-unit-test") {
+      openTestRun(run.uuid);
+      return;
+    }
+    setPendingRunId(null);
+    setOpenTestRunId(null);
+    setOpenBenchmarkRun(run);
+    setRunIdParam(run.uuid);
+  };
+
   const benchmarkRerun = useBenchmarkRerun();
 
   // Whichever run is open asks for itself, so the list stops asking for it.
@@ -193,51 +259,25 @@ export function RunsTabContent({
     setPollSkip(openTestRunId ?? openBenchmarkRun?.uuid ?? null);
   }, [openTestRunId, openBenchmarkRun, setPollSkip]);
 
-  // A `?runId=` this agent has no run for (a deleted run, or a link from
-  // another agent) would leave a window open that keeps asking for a run that
-  // is not there. The list only holds one page, so the run is checked directly
-  // rather than by looking through the rows on screen.
-  //
-  // Asked once per run. The rows are deliberately not a trigger here: they are
-  // rewritten every few seconds while a run is going, and re-asking whether the
-  // open run exists on every one of those is wasted.
-  const checkedRunIdRef = useRef<string | null>(null);
+  // Once the list (possibly landed on a different page via `around`) has
+  // loaded, resolve the pending `?runId=` to the run it names and open the
+  // dialog that matches its actual type. If it isn't there — wrong filter,
+  // or the run doesn't exist — the hook has already fallen back to page one.
   useEffect(() => {
-    if (!openTestRunId) return;
-    if (checkedRunIdRef.current === openTestRunId) return;
-    // Wait for the rows: a run listed on this page needs no asking.
-    if (isLoading) return;
-    checkedRunIdRef.current = openTestRunId;
-    if (items.some((run) => run.uuid === openTestRunId)) return;
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl || !backendAccessToken) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch(
-          `${backendUrl}/agent-tests/run/${openTestRunId}`,
-          { method: "GET", headers: getDefaultHeaders(backendAccessToken) },
-        );
-        // Only a plain "there is no such run" closes it. A server or network
-        // problem is not proof the run is gone.
-        if (!cancelled && response.status === 404) closeTestRun();
-      } catch {
-        // Left open on purpose: see above.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openTestRunId, backendAccessToken, isLoading]);
-
-  const openRun = (run: AgentRun) => {
-    if (run.type === "llm-unit-test") {
-      openTestRun(run.uuid);
+    if (!pendingRunId || isLoading) return;
+    const match = items.find((run) => run.uuid === pendingRunId);
+    if (match) {
+      setPendingRunId(null);
+      openRun(match);
       return;
     }
-    setOpenBenchmarkRun(run);
-  };
+    if (aroundNotFound) {
+      setPendingRunId(null);
+      setRunIdParam(null);
+      toast.error("That run could not be found.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRunId, isLoading, items, aroundNotFound]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.floor(offset / pageSize) + 1;
@@ -446,7 +486,7 @@ export function RunsTabContent({
       {openBenchmarkRun && (
         <BenchmarkResultsDialog
           isOpen
-          onClose={() => setOpenBenchmarkRun(null)}
+          onClose={closeBenchmarkRun}
           agentUuid={agentUuid}
           agentName={agentName}
           testUuids={[]}
@@ -454,7 +494,7 @@ export function RunsTabContent({
           models={[]}
           taskId={openBenchmarkRun.uuid}
           onRerun={(models, testUuids, testNames) => {
-            setOpenBenchmarkRun(null);
+            closeBenchmarkRun();
             benchmarkRerun.start({
               agentUuid,
               agentName,

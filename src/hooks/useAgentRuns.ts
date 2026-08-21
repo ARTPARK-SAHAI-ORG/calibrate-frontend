@@ -49,44 +49,101 @@ type UseAgentRunsArgs = {
   accessToken: string | null;
   pageSize: number;
   filter: RunResultFilter;
+  /**
+   * A run to land the list on directly, wherever its page actually is,
+   * instead of always starting at page one — for opening a run from a link.
+   * Read once per value: after that first fetch resolves (found or not), the
+   * hook stops sending it, so ordinary paging afterwards is unaffected.
+   */
+  aroundRunId?: string | null;
+  /**
+   * Which row to start the list on — e.g. the page a reload should reopen
+   * on. Only read for the very first fetch; ordinary paging afterwards is
+   * unaffected. Superseded entirely by `aroundRunId` whenever both are set,
+   * since a linked run's own page is more specific than a remembered one.
+   */
+  initialOffset?: number;
 };
 
 /**
  * Server-paginated list of one agent's past runs. `GET
  * /agent-tests/agent/{uuid}/runs` takes `limit`/`offset` and the result
  * filters, so only one page is ever held here, and unfinished runs on that
- * page are re-asked for until they settle.
+ * page are re-asked for until they settle. Passing `aroundRunId` swaps
+ * `offset` for `around=<uuid>` on the first fetch, which the backend answers
+ * with whichever page that run is actually on.
  */
 export function useAgentRuns({
   agentUuid,
   accessToken,
   pageSize,
   filter,
+  aroundRunId,
+  initialOffset = 0,
 }: UseAgentRunsArgs) {
   const [items, setItems] = useState<AgentRun[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(initialOffset);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The run was not among the current results (wrong filter, or it doesn't
+  // exist) — the hook already fell back to page one on its own.
+  const [aroundNotFound, setAroundNotFound] = useState(false);
   // Monotonic id so a slow, superseded response cannot overwrite a newer one.
   const requestIdRef = useRef(0);
+  // Which `aroundRunId` value has already been asked for (or is being asked
+  // for right now), so it's sent once. Set the moment a request for it goes
+  // out, not when the response comes back — otherwise clearing `aroundRunId`
+  // back to null once it's resolved would still look "new" to `load` and
+  // trigger a pointless extra plain fetch for the page already in hand.
+  const consumedAroundIdRef = useRef<string | null>(null);
+  // Mirrors `aroundRunId` so `load` can read the latest value without it
+  // being a dependency — see above: `load`'s identity reacting to every
+  // `aroundRunId` transition (including the routine "done, back to null")
+  // is exactly what caused the extra fetch.
+  const aroundRunIdRef = useRef(aroundRunId);
+  aroundRunIdRef.current = aroundRunId;
+  // Set right before landing `offset` on the page an `around` lookup just
+  // answered with — that page's rows are already in hand, so the fetch
+  // effect below should skip the request it would otherwise send for the
+  // `offset` change it's about to see.
+  const skipNextFetchRef = useRef(false);
+
+  // Which agent / page size / filter the current page of rows belongs to.
+  // Changing any of them makes the page number meaningless, so the list goes
+  // back to page one — but only on a real change. Comparing the values,
+  // rather than counting mounts, is what keeps `initialOffset` alive: in
+  // development React mounts every component twice, and a "have I run
+  // before" flag would see its second run as a change and reset the page the
+  // reader asked for.
+  const listKey = `${agentUuid}|${pageSize}|${filter}`;
+  const listKeyRef = useRef(listKey);
 
   useEffect(() => {
+    if (listKeyRef.current === listKey) return;
+    listKeyRef.current = listKey;
     setOffset(0);
-  }, [agentUuid, pageSize, filter]);
+  }, [listKey]);
 
   const load = useCallback(
     async (targetOffset: number) => {
       if (!accessToken) return;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
+      const requestedAroundId = aroundRunIdRef.current ?? null;
+      const useAround =
+        !!requestedAroundId && consumedAroundIdRef.current !== requestedAroundId;
+      if (useAround) consumedAroundIdRef.current = requestedAroundId;
       const requestId = ++requestIdRef.current;
       setIsLoading(true);
       setError(null);
+      if (useAround) setAroundNotFound(false);
       try {
         const params = new URLSearchParams({
           limit: String(pageSize),
-          offset: String(targetOffset),
+          ...(useAround
+            ? { around: requestedAroundId as string }
+            : { offset: String(targetOffset) }),
           ...filterParams(filter),
         });
         const response = await fetch(
@@ -94,10 +151,33 @@ export function useAgentRuns({
           { method: "GET", headers: getDefaultHeaders(accessToken) },
         );
         if (requestId !== requestIdRef.current) return;
+        if (useAround && response.status === 404) {
+          // Not in the current results — fall back to the normal first page.
+          // `offset` may already be 0, which wouldn't retrigger the fetch
+          // effect, so ask for page one directly instead of just setting it.
+          setAroundNotFound(true);
+          if (targetOffset === 0) {
+            void load(0);
+          } else {
+            setOffset(0);
+          }
+          return;
+        }
         if (!response.ok) throw new Error("Failed to fetch runs");
         const data = await response.json();
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
+        if (useAround) {
+          const landedOffset =
+            typeof data?.offset === "number" ? data.offset : 0;
+          // Already have this page's rows right here — only bother the
+          // fetch effect if landing actually moves `offset` off of what it
+          // was, and tell it to skip the request that move would trigger.
+          if (landedOffset !== targetOffset) {
+            skipNextFetchRef.current = true;
+            setOffset(landedOffset);
+          }
+        }
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
         reportError("Error fetching agent runs:", err);
@@ -108,12 +188,28 @@ export function useAgentRuns({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
+    // `aroundRunId` deliberately left out — see `aroundRunIdRef` above.
     [accessToken, agentUuid, pageSize, filter],
   );
 
   useEffect(() => {
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false;
+      return;
+    }
     void load(offset);
   }, [load, offset]);
+
+  // A run link arriving after the first render — e.g. Back/Forward to a
+  // different `?runId=` while this tab stays mounted — needs its own nudge,
+  // since `load` no longer reacts to `aroundRunId` on its own (that's what
+  // stopped the "done, back to null" case from firing a pointless fetch).
+  useEffect(() => {
+    if (aroundRunId && consumedAroundIdRef.current !== aroundRunId) {
+      void load(offset);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aroundRunId]);
 
   const refetch = useCallback(() => load(offset), [load, offset]);
 
@@ -206,6 +302,7 @@ export function useAgentRuns({
     offset,
     isLoading,
     error,
+    aroundNotFound,
     refetch,
     setPollSkip,
     hasPrev,
