@@ -3,7 +3,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
   EVALUATOR_TYPE_LABELS,
-  EVALUATOR_TYPE_TOOLTIPS,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
@@ -39,7 +38,6 @@ type CreateEvaluatorSidebarProps = {
   isCreating: boolean;
   isNameDuplicate: (name: string) => boolean;
   onClose: () => void;
-  onOpenUseCasePicker: () => void;
   onOpenModelPicker: () => void;
   onCreate: () => void;
   setEvaluatorName: (value: string) => void;
@@ -71,7 +69,6 @@ export function CreateEvaluatorSidebar({
   isCreating,
   isNameDuplicate,
   onClose,
-  onOpenUseCasePicker,
   onOpenModelPicker,
   onCreate,
   setEvaluatorName,
@@ -177,32 +174,11 @@ export function CreateEvaluatorSidebar({
             />
           </div>
 
-          {evaluatorType && (
-            <div>
-              <label className="block text-xs md:text-sm font-medium mb-2">
-                Use case
-              </label>
-              <div className="flex items-center justify-between gap-3 px-3 md:px-4 h-9 md:h-10 rounded-md border border-border bg-muted/40 dark:bg-muted">
-                <span className="text-sm md:text-base text-foreground">
-                  {EVALUATOR_TYPE_LABELS[evaluatorType]}
-                </span>
-                <button
-                  type="button"
-                  onClick={onOpenUseCasePicker}
-                  className="text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  Change
-                </button>
-              </div>
-              <p className="text-xs md:text-sm text-muted-foreground mt-2">
-                {EVALUATOR_TYPE_TOOLTIPS[evaluatorType]}
-              </p>
-            </div>
-          )}
+          {/* No use-case row: the place this was opened from decides it. */}
 
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Output type <span className="text-red-500">*</span>
+              Review type <span className="text-red-500">*</span>
             </label>
             <div className="inline-flex rounded-md border border-border p-1">
               {(["binary", "rating"] as const).map((type) => {

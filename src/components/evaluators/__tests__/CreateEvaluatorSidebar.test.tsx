@@ -8,7 +8,11 @@ jest.mock("../RatingScaleEditor", () => ({
     <div data-testid="rating-scale-editor">
       <span>{description}</span>
       <span>rows:{rows.length}</span>
-      <button onClick={() => onChange([...rows, { value: 1, name: "New", description: "" }])}>
+      <button
+        onClick={() =>
+          onChange([...rows, { value: 1, name: "New", description: "" }])
+        }
+      >
         add-rating-row
       </button>
     </div>
@@ -21,7 +25,11 @@ jest.mock("../BinaryScaleEditor", () => ({
       <span>rows:{rows.length}</span>
       <button
         onClick={() =>
-          onChange(rows.map((r: any, i: number) => (i === 0 ? { ...r, name: "Pass" } : r)))
+          onChange(
+            rows.map((r: any, i: number) =>
+              i === 0 ? { ...r, name: "Pass" } : r,
+            ),
+          )
         }
       >
         edit-binary-row
@@ -36,10 +44,9 @@ const judgeModel: LLMModel = {
 } as LLMModel;
 
 function renderComponent(
-  overrides: Partial<React.ComponentProps<typeof CreateEvaluatorSidebar>> = {}
+  overrides: Partial<React.ComponentProps<typeof CreateEvaluatorSidebar>> = {},
 ) {
   const onClose = jest.fn();
-  const onOpenUseCasePicker = jest.fn();
   const onOpenModelPicker = jest.fn();
   const onCreate = jest.fn();
   const setEvaluatorName = jest.fn();
@@ -74,7 +81,6 @@ function renderComponent(
     isCreating: false,
     isNameDuplicate,
     onClose,
-    onOpenUseCasePicker,
     onOpenModelPicker,
     onCreate,
     setEvaluatorName,
@@ -92,7 +98,6 @@ function renderComponent(
   return {
     ...utils,
     onClose,
-    onOpenUseCasePicker,
     onOpenModelPicker,
     onCreate,
     setEvaluatorName,
@@ -121,12 +126,15 @@ describe("CreateEvaluatorSidebar", () => {
 
     const closeButtons = screen.getAllByRole("button");
     const xButton = closeButtons.find(
-      (b) => b.querySelector("path")?.getAttribute("d") === "M6 18L18 6M6 6l12 12"
+      (b) =>
+        b.querySelector("path")?.getAttribute("d") === "M6 18L18 6M6 6l12 12",
     ) as HTMLButtonElement;
     await user.click(xButton);
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    const backdrop = container.querySelector(".backdrop-blur-sm") as HTMLElement;
+    const backdrop = container.querySelector(
+      ".backdrop-blur-sm",
+    ) as HTMLElement;
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(2);
   });
@@ -136,7 +144,9 @@ describe("CreateEvaluatorSidebar", () => {
     const { setEvaluatorName, setCreateNameError } = renderComponent({
       createNameError: "taken",
     });
-    const nameInput = screen.getByPlaceholderText("e.g., Follows Refund Policy");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g., Follows Refund Policy",
+    );
     await user.type(nameInput, "X");
     expect(setEvaluatorName).toHaveBeenCalledWith("X");
     expect(setCreateNameError).toHaveBeenCalledWith(null);
@@ -149,7 +159,7 @@ describe("CreateEvaluatorSidebar", () => {
       isNameDuplicate: jest.fn(() => true),
     });
     expect(
-      screen.getByText("An evaluator with this name already exists")
+      screen.getByText("An evaluator with this name already exists"),
     ).toBeInTheDocument();
   });
 
@@ -160,7 +170,7 @@ describe("CreateEvaluatorSidebar", () => {
       isNameDuplicate: jest.fn(() => true),
     });
     expect(
-      screen.queryByText("An evaluator with this name already exists")
+      screen.queryByText("An evaluator with this name already exists"),
     ).not.toBeInTheDocument();
   });
 
@@ -172,64 +182,18 @@ describe("CreateEvaluatorSidebar", () => {
   it("updates the description", async () => {
     const user = setupUser();
     const { setEvaluatorDescription } = renderComponent();
-    const descInput = screen.getByPlaceholderText("One-line summary shown in the list");
+    const descInput = screen.getByPlaceholderText(
+      "One-line summary shown in the list",
+    );
     await user.type(descInput, "d");
     expect(setEvaluatorDescription).toHaveBeenCalledWith("d");
   });
 
-  it("hides the use-case block when evaluatorType is null and shows it otherwise", () => {
-    const { rerender } = renderComponent({ evaluatorType: null });
+  it("never shows a use case row: where it was opened from decides it", () => {
+    renderComponent({ evaluatorType: "llm" });
     expect(screen.queryByText("Use case")).not.toBeInTheDocument();
-
-    rerender(
-      <CreateEvaluatorSidebar
-        {...({
-          isOpen: true,
-          evaluatorName: "",
-          evaluatorDescription: "",
-          evaluatorType: "llm",
-          evaluatorOutputType: "binary",
-          evaluatorScale: [],
-          evaluatorBinaryScale: [],
-          judgeModel: null,
-          systemPrompt: "",
-          detectedPromptVariables: [],
-          variableDescriptions: {},
-          variablesSupported: true,
-          validationAttempted: false,
-          createNameError: null,
-          createError: null,
-          isCreating: false,
-          isNameDuplicate: () => false,
-          onClose: jest.fn(),
-          onOpenUseCasePicker: jest.fn(),
-          onOpenModelPicker: jest.fn(),
-          onCreate: jest.fn(),
-          setEvaluatorName: jest.fn(),
-          setEvaluatorDescription: jest.fn(),
-          setEvaluatorOutputType: jest.fn(),
-          setEvaluatorScale: jest.fn(),
-          setEvaluatorBinaryScale: jest.fn(),
-          setSystemPrompt: jest.fn(),
-          setVariableDescriptions: jest.fn(),
-          setCreateNameError: jest.fn(),
-        } as React.ComponentProps<typeof CreateEvaluatorSidebar>)}
-      />
-    );
-    expect(screen.getByText("Use case")).toBeInTheDocument();
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
-    expect(
-      screen.getByText("Evaluate the agent's next reply in a conversation")
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Change")).not.toBeInTheDocument();
   });
-
-  it("calls onOpenUseCasePicker when Change is clicked", async () => {
-    const user = setupUser();
-    const { onOpenUseCasePicker } = renderComponent({ evaluatorType: "tts" });
-    await user.click(screen.getByText("Change"));
-    expect(onOpenUseCasePicker).toHaveBeenCalled();
-  });
-
   it("switches output type and shows the corresponding editor and copy", async () => {
     const user = setupUser();
     const { setEvaluatorOutputType, rerender } = renderComponent({
@@ -237,7 +201,7 @@ describe("CreateEvaluatorSidebar", () => {
     });
     expect(screen.getByTestId("binary-scale-editor")).toBeInTheDocument();
     expect(
-      screen.getByText("Returns a pass/fail judgement for each evaluation.")
+      screen.getByText("Returns a pass/fail judgement for each evaluation."),
     ).toBeInTheDocument();
 
     await user.click(screen.getByText("rating"));
@@ -276,11 +240,13 @@ describe("CreateEvaluatorSidebar", () => {
           setVariableDescriptions: jest.fn(),
           setCreateNameError: jest.fn(),
         } as React.ComponentProps<typeof CreateEvaluatorSidebar>)}
-      />
+      />,
     );
     expect(screen.getByTestId("rating-scale-editor")).toBeInTheDocument();
     expect(
-      screen.getByText("Returns a score on a custom rating scale you define below.")
+      screen.getByText(
+        "Returns a score on a custom rating scale you define below.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -331,7 +297,9 @@ describe("CreateEvaluatorSidebar", () => {
   it("updates the system prompt", async () => {
     const user = setupUser();
     const { setSystemPrompt } = renderComponent();
-    const textarea = screen.getByPlaceholderText(/Describe how the judge should grade/);
+    const textarea = screen.getByPlaceholderText(
+      /Describe how the judge should grade/,
+    );
     await user.type(textarea, "g");
     expect(setSystemPrompt).toHaveBeenCalledWith("g");
   });
@@ -339,14 +307,16 @@ describe("CreateEvaluatorSidebar", () => {
   it("uses variable-aware placeholder text when variablesSupported is true", () => {
     renderComponent({ variablesSupported: true });
     expect(
-      screen.getByPlaceholderText(/Use \{\{variable\}\} to mark values/)
+      screen.getByPlaceholderText(/Use \{\{variable\}\} to mark values/),
     ).toBeInTheDocument();
   });
 
   it("uses the plain placeholder when variablesSupported is false", () => {
     renderComponent({ variablesSupported: false });
     expect(
-      screen.getByPlaceholderText("Describe how the judge should grade a response")
+      screen.getByPlaceholderText(
+        "Describe how the judge should grade a response",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -363,7 +333,7 @@ describe("CreateEvaluatorSidebar", () => {
     expect(screen.getByDisplayValue("Existing")).toBeInTheDocument();
 
     const inputs = screen.getAllByPlaceholderText(
-      "Short description explaining the purpose of the variable"
+      "Short description explaining the purpose of the variable",
     );
     await user.type(inputs[1], "d");
 
@@ -399,7 +369,6 @@ describe("CreateEvaluatorSidebar", () => {
           isCreating={false}
           isNameDuplicate={() => false}
           onClose={jest.fn()}
-          onOpenUseCasePicker={jest.fn()}
           onOpenModelPicker={jest.fn()}
           onCreate={jest.fn()}
           setEvaluatorName={jest.fn()}
@@ -416,7 +385,7 @@ describe("CreateEvaluatorSidebar", () => {
 
     render(<Harness />);
     const input = screen.getByPlaceholderText(
-      "Short description explaining the purpose of the variable"
+      "Short description explaining the purpose of the variable",
     );
     await user.type(input, "hi");
     expect(screen.getByDisplayValue("hi")).toBeInTheDocument();
@@ -430,7 +399,7 @@ describe("CreateEvaluatorSidebar", () => {
       validationAttempted: true,
     });
     const input = screen.getByPlaceholderText(
-      "Short description explaining the purpose of the variable"
+      "Short description explaining the purpose of the variable",
     );
     expect(input.className).toContain("border-red-500");
   });
@@ -449,10 +418,10 @@ describe("CreateEvaluatorSidebar", () => {
       evaluatorType: "stt",
       detectedPromptVariables: ["policy"],
     });
+    // The kind is named inside that sentence, not in a row of its own.
     expect(
-      screen.getByText(/Variables are not supported for/)
-    ).toBeInTheDocument();
-    expect(screen.getByText("Speech to Text")).toBeInTheDocument();
+      screen.getByText(/Variables are not supported for/),
+    ).toHaveTextContent("Speech to Text");
   });
 
   it("does not show the unsupported-variables warning without an evaluatorType", () => {
@@ -462,19 +431,23 @@ describe("CreateEvaluatorSidebar", () => {
       detectedPromptVariables: ["policy"],
     });
     expect(
-      screen.queryByText(/Variables are not supported for/)
+      screen.queryByText(/Variables are not supported for/),
     ).not.toBeInTheDocument();
   });
 
   it("shows a red border on the prompt textarea when validation fails and it's empty", () => {
     renderComponent({ validationAttempted: true, systemPrompt: "" });
-    const textarea = screen.getByPlaceholderText(/Describe how the judge should grade/);
+    const textarea = screen.getByPlaceholderText(
+      /Describe how the judge should grade/,
+    );
     expect(textarea.className).toContain("border-red-500");
   });
 
   it("shows the create error and calls onCreate / onClose from the footer", async () => {
     const user = setupUser();
-    const { onCreate, onClose } = renderComponent({ createError: "Something broke" });
+    const { onCreate, onClose } = renderComponent({
+      createError: "Something broke",
+    });
     expect(screen.getByText("Something broke")).toBeInTheDocument();
 
     await user.click(screen.getByText("Cancel"));

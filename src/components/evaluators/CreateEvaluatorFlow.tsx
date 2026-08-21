@@ -422,10 +422,6 @@ export function CreateEvaluatorFlow({
         isCreating={isCreating}
         isNameDuplicate={isNameDuplicate}
         onClose={onClose}
-        onOpenUseCasePicker={() => {
-          setSidebarOpen(false);
-          setUseCasePickerOpen(true);
-        }}
         onOpenModelPicker={() => setLlmModalOpen(true)}
         onCreate={createEvaluator}
         setEvaluatorName={setEvaluatorName}
