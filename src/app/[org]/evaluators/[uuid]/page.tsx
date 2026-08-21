@@ -682,6 +682,31 @@ function EvaluatorDetailPageInner() {
     }
   }, [activeTab, fetchTrend]);
 
+  // This page is reached from an agent, an evaluation, a simulation run or a
+  // labelling task, so it goes back to wherever that was. It sits in the top
+  // bar, where other pages show their trail.
+  const backButton = (
+    <button
+      onClick={() => router.back()}
+      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+        />
+      </svg>
+      Back
+    </button>
+  );
+
   const formatDateTime = (iso: string): string => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
@@ -694,29 +719,11 @@ function EvaluatorDetailPageInner() {
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={backButton}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* This page is reached from an agent, an evaluation, a simulation run
-            or a labelling task, so it goes back to wherever that was. */}
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-            />
-          </svg>
-          Back
-        </button>
+        {/* AppLayout hides `customHeader` below md. */}
+        <div className="md:hidden">{backButton}</div>
 
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />
