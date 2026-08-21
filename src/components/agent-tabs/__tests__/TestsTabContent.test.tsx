@@ -276,7 +276,10 @@ function installFetch() {
       return jsonResponse(state.pollBench, state.pollInit);
     }
     if (url.endsWith("/agent-tests")) {
-      return jsonResponse({}, state.agentTestsMutInit);
+      return jsonResponse(
+        state.agentTestsMutBody ?? {},
+        state.agentTestsMutInit,
+      );
     }
     if (url.endsWith("/tests/bulk")) {
       return jsonResponse(state.createResult ?? {}, state.createInit);
@@ -1074,6 +1077,26 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("SubmitResponse"));
 
     await screen.findByTestId("add-test-name-error");
+  });
+
+  it("shows a plain-language error when create-and-link fails because the type doesn't match", async () => {
+    state.createInit = { ok: false, status: 400 };
+    state.createResult = { detail: "interaction_type mismatch" };
+    const user = setupUser();
+    renderComponent();
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-error")).toHaveTextContent(
+        "These tests can't be linked to this agent because their type doesn't match the agent's kind.",
+      ),
+    );
+    expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows a warning on partial attach failure", async () => {

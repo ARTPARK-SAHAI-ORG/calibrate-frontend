@@ -37,7 +37,11 @@ const CONVERSATION_EVALUATOR_TYPE = "conversation";
 
 type ParsedTest = {
   name: string;
-  conversation_history: string;
+  // Present for conversation-based rows (next reply / conversation / tool
+  // call). Absent for general-agent "Output" rows, which carry `input`
+  // instead — a plain string, not JSON.
+  conversation_history?: string;
+  input?: string;
   evaluators?: EvaluatorRefPayload[];
   tool_calls?: string;
 };
@@ -117,7 +121,10 @@ function csvEscape(s: string): string {
 // then one column per variable across all selected evaluators (in the
 // order the user picked them). Evaluators with no variables don't add
 // any columns — they still get attached to every test on submit.
-function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
+function buildResponseSampleCsv(
+  selected: LLMEvaluatorOption[],
+  isGeneral: boolean,
+): string {
   // Ordered column descriptors: each evaluator contributes an "include"
   // boolean column followed by one column per variable. This keeps an
   // evaluator's flag adjacent to its variable values in the sheet.
@@ -132,25 +139,41 @@ function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
     }
   }
 
-  const rows = [
-    {
-      name: "Greeting test",
-      conversation: [
-        { role: "assistant", content: "Hello, how can I help you today?" },
-        { role: "user", content: "What is your return policy?" },
-      ],
-      sampleValue:
-        "The agent should clearly explain the return policy in a helpful and friendly tone",
-    },
-    {
-      name: "Billing question",
-      conversation: [
-        { role: "user", content: "I was charged twice for my order" },
-      ],
-      sampleValue:
-        "The agent should apologize and offer to investigate the duplicate charge",
-    },
-  ];
+  // General-agent rows have no conversation — just a plain-text `input`
+  // string — while conversation-based rows carry a JSON `conversation`
+  // array under `conversation_history`.
+  const rows = isGeneral
+    ? [
+        {
+          name: "Summary test",
+          input: "Summarize this article: The city council voted today to...",
+          sampleValue: "The summary should be concise and capture the key facts",
+        },
+        {
+          name: "Translation test",
+          input: "Translate 'Good morning' to French",
+          sampleValue: "The translation should be accurate and natural",
+        },
+      ]
+    : [
+        {
+          name: "Greeting test",
+          conversation: [
+            { role: "assistant", content: "Hello, how can I help you today?" },
+            { role: "user", content: "What is your return policy?" },
+          ],
+          sampleValue:
+            "The agent should clearly explain the return policy in a helpful and friendly tone",
+        },
+        {
+          name: "Billing question",
+          conversation: [
+            { role: "user", content: "I was charged twice for my order" },
+          ],
+          sampleValue:
+            "The agent should apologize and offer to investigate the duplicate charge",
+        },
+      ];
 
   // When the user picked 2+ evaluators, demonstrate per-row selection by
   // excluding the last evaluator from the second sample row (flag "false"
@@ -161,7 +184,7 @@ function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
 
   const headerCells = [
     "name",
-    "conversation_history",
+    isGeneral ? "input" : "conversation_history",
     ...columns.map((c) =>
       csvEscape(
         c.kind === "include"
@@ -174,7 +197,7 @@ function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
     const isDemoRow = rowIdx === 1 && demoExcludedEvalName !== null;
     return [
       csvEscape(r.name),
-      csvEscape(JSON.stringify(r.conversation)),
+      "input" in r ? csvEscape(r.input) : csvEscape(JSON.stringify(r.conversation)),
       ...columns.map((c) => {
         const excluded = isDemoRow && c.evalName === demoExcludedEvalName;
         if (c.kind === "include") return csvEscape(excluded ? "false" : "true");
@@ -194,6 +217,11 @@ const SAMPLE_TOOL_CALL_CSV = `name,conversation_history,tool_calls
 
 const CONVERSATION_HISTORY_DESC =
   'A JSON array of chat messages that represents the conversation that has happened so far, before the agent\'s response is evaluated. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role';
+
+// Description for the `input` column used by general-agent (one input, one
+// output) "Output" tests in place of `conversation_history`.
+const GENERAL_INPUT_DESC =
+  "A plain text string — the input given to the agent. Not JSON, just the text itself.";
 
 // Per-leaf matcher shapes available inside a tool-call `arguments` object.
 // These mirror the per-parameter match modes available in the single-test
@@ -274,6 +302,10 @@ export function BulkUploadTestsModal({
   // Both "Next Reply" (response) and "Conversation" use attached evaluators
   // rather than tool_calls — they share most of the response code path.
   const usesEvaluators = isResponseType || isConversationType;
+  // A general agent has no conversation — its "Output" option (the
+  // relabeled response type) takes a single plain-text input instead of a
+  // conversation history, and is graded by output-type evaluators.
+  const isGeneralResponse = isResponseType && agentNature === "general";
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedTests, setParsedTests] = useState<ParsedTest[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -398,7 +430,11 @@ export function BulkUploadTestsModal({
         }>(await response.json());
 
         const wanted =
-          testType === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
+          testType === "conversation"
+            ? CONVERSATION_EVALUATOR_TYPE
+            : agentNature === "general"
+              ? "llm-general"
+              : "llm";
         const llm: LLMEvaluatorOption[] = raw
           .filter((e) => e.evaluator_type === wanted)
           .map((e) => ({
@@ -426,6 +462,7 @@ export function BulkUploadTestsModal({
     isOpen,
     backendAccessToken,
     testType,
+    agentNature,
     evaluatorsFetched,
     evaluatorsLoading,
   ]);
@@ -549,16 +586,22 @@ export function BulkUploadTestsModal({
     if (usesEvaluators) {
       const columns: GuidelineColumn[] = [
         { name: "name", description: "A unique test name." },
-        {
-          name: "conversation_history",
-          description: isConversationType
-            ? `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message. On run, the agent generates its reply to that message and the full conversation (history plus the generated reply) is graded as a whole.`
-            : CONVERSATION_HISTORY_DESC,
-          example: `[
+        isGeneralResponse
+          ? {
+              name: "input",
+              description: GENERAL_INPUT_DESC,
+              example: '"Summarize this article: ..."',
+            }
+          : {
+              name: "conversation_history",
+              description: isConversationType
+                ? `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message. On run, the agent generates its reply to that message and the full conversation (history plus the generated reply) is graded as a whole.`
+                : CONVERSATION_HISTORY_DESC,
+              example: `[
   {"role": "user", "content": "What is your return policy?"},
   {"role": "assistant", "content": "You can return any item within 30 days."}
 ]`,
-        },
+            },
       ];
       for (const e of committedEvaluators) {
         columns.push({
@@ -583,7 +626,9 @@ export function BulkUploadTestsModal({
       return {
         title: isConversationType
           ? "Bulk upload — Conversation tests"
-          : "Bulk upload — Next reply tests",
+          : isGeneralResponse
+            ? "Bulk upload — Output tests"
+            : "Bulk upload — Next reply tests",
         intro:
           "Upload a CSV with the following columns. Each row creates one test.",
         columns,
@@ -642,9 +687,11 @@ export function BulkUploadTestsModal({
     const blob = generateGuidelinesPdf(buildGuidelines());
     const filename = isConversationType
       ? "conversation_tests_csv_guidelines.pdf"
-      : isResponseType
-        ? "next_reply_tests_csv_guidelines.pdf"
-        : "tool_call_tests_csv_guidelines.pdf";
+      : isGeneralResponse
+        ? "output_tests_csv_guidelines.pdf"
+        : isResponseType
+          ? "next_reply_tests_csv_guidelines.pdf"
+          : "tool_call_tests_csv_guidelines.pdf";
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -660,14 +707,16 @@ export function BulkUploadTestsModal({
 
     if (usesEvaluators) {
       // Single-CSV download tailored to the user's selected evaluators.
-      const csv = buildResponseSampleCsv(committedEvaluators);
+      const csv = buildResponseSampleCsv(committedEvaluators, isGeneralResponse);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = isConversationType
         ? "sample_conversation_tests.csv"
-        : "sample_next_reply_tests.csv";
+        : isGeneralResponse
+          ? "sample_output_tests.csv"
+          : "sample_next_reply_tests.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -740,9 +789,11 @@ export function BulkUploadTestsModal({
         }
 
         const headers = Object.keys(data[0]);
-        const baseColumns = usesEvaluators
-          ? ["name", "conversation_history"]
-          : ["name", "conversation_history", "tool_calls"];
+        const baseColumns = isGeneralResponse
+          ? ["name", "input"]
+          : usesEvaluators
+            ? ["name", "conversation_history"]
+            : ["name", "conversation_history", "tool_calls"];
         const variableColumns: {
           evaluator: LLMEvaluatorOption;
           varName: string;
@@ -798,30 +849,37 @@ export function BulkUploadTestsModal({
             return;
           }
 
-          if (!row.conversation_history?.trim()) {
-            errors.push(`Row ${rowNum}: missing conversation_history`);
-            return;
-          }
+          if (isGeneralResponse) {
+            if (!row.input?.trim()) {
+              errors.push(`Row ${rowNum}: missing input`);
+              return;
+            }
+          } else {
+            if (!row.conversation_history?.trim()) {
+              errors.push(`Row ${rowNum}: missing conversation_history`);
+              return;
+            }
 
-          // `parseJsonLenient` first attempts a vanilla JSON.parse and only
-          // falls back to smart-quote sanitisation if that fails — so
-          // legitimate curly quotes inside conversation content (e.g. a
-          // user message containing `She said "hello"`) are preserved
-          // whenever the file already parses cleanly. Eagerly rewriting
-          // the row up front would corrupt that case.
-          try {
-            const history = parseJsonLenient(row.conversation_history);
-            if (!Array.isArray(history)) {
+            // `parseJsonLenient` first attempts a vanilla JSON.parse and only
+            // falls back to smart-quote sanitisation if that fails — so
+            // legitimate curly quotes inside conversation content (e.g. a
+            // user message containing `She said "hello"`) are preserved
+            // whenever the file already parses cleanly. Eagerly rewriting
+            // the row up front would corrupt that case.
+            try {
+              const history = parseJsonLenient(row.conversation_history);
+              if (!Array.isArray(history)) {
+                errors.push(
+                  `Row ${rowNum}: conversation_history must be a JSON array`,
+                );
+                return;
+              }
+            } catch {
               errors.push(
-                `Row ${rowNum}: conversation_history must be a JSON array`,
+                `Row ${rowNum}: conversation_history is not valid JSON`,
               );
               return;
             }
-          } catch {
-            errors.push(
-              `Row ${rowNum}: conversation_history is not valid JSON`,
-            );
-            return;
           }
 
           if (usesEvaluators) {
@@ -893,7 +951,9 @@ export function BulkUploadTestsModal({
 
             tests.push({
               name: row.name.trim(),
-              conversation_history: row.conversation_history.trim(),
+              ...(isGeneralResponse
+                ? { input: row.input.trim() }
+                : { conversation_history: row.conversation_history.trim() }),
               evaluators: refs,
             });
           } else {
@@ -1018,22 +1078,28 @@ export function BulkUploadTestsModal({
       }
 
       const tests = parsedTests.map((test) => {
-        const conversation_history = parseJsonLenient(
-          test.conversation_history,
-        );
-
         if (usesEvaluators) {
           // Send the resolved EvaluatorRefPayload[] (same shape as the
           // single-test POST /tests `evaluators` field). The legacy
           // `criteria` field is no longer sent — its value lives inside
           // `variable_values.criteria` on the attached default evaluator
           // when the user provided a plain-string evaluators cell.
+          if (isGeneralResponse) {
+            return {
+              name: test.name,
+              input: test.input!,
+              evaluators: test.evaluators ?? [],
+            };
+          }
           return {
             name: test.name,
-            conversation_history,
+            conversation_history: parseJsonLenient(test.conversation_history!),
             evaluators: test.evaluators ?? [],
           };
         } else {
+          const conversation_history = parseJsonLenient(
+            test.conversation_history!,
+          );
           const tool_calls = parseJsonLenient(test.tool_calls!);
           return {
             name: test.name,
@@ -1044,10 +1110,10 @@ export function BulkUploadTestsModal({
       });
 
       const body: {
-        type: TestType;
+        type: TestType | "general";
         tests: typeof tests;
         agent_uuids?: string[];
-      } = { type: testType, tests };
+      } = { type: isGeneralResponse ? "general" : testType, tests };
       if (lockedAgentUuid) {
         body.agent_uuids = [lockedAgentUuid];
       } else if (selectedAgentUuids.length > 0) {
@@ -1724,7 +1790,7 @@ export function BulkUploadTestsModal({
                               Name
                             </div>
                             <div className="text-xs font-medium text-muted-foreground">
-                              Chat history
+                              {isGeneralResponse ? "Input" : "Chat history"}
                             </div>
                             <div className="text-xs font-medium text-muted-foreground">
                               Evaluators
@@ -1742,14 +1808,16 @@ export function BulkUploadTestsModal({
                           <div className="divide-y divide-border">
                             {parsedTests.slice(0, 50).map((test, idx) => {
                               let turns: TurnObject[] = [];
-                              try {
-                                const parsed = JSON.parse(
-                                  test.conversation_history,
-                                );
-                                if (Array.isArray(parsed)) turns = parsed;
-                              } catch {
-                                // Parsed-tests entries already passed JSON
-                                // validation; this is a defensive fallback.
+                              if (!isGeneralResponse) {
+                                try {
+                                  const parsed = JSON.parse(
+                                    test.conversation_history!,
+                                  );
+                                  if (Array.isArray(parsed)) turns = parsed;
+                                } catch {
+                                  // Parsed-tests entries already passed JSON
+                                  // validation; this is a defensive fallback.
+                                }
                               }
                               const valuesByKey = new Map<string, string>();
                               const attachedUuids = new Set<string>();
@@ -1783,7 +1851,13 @@ export function BulkUploadTestsModal({
                                     {test.name}
                                   </div>
                                   <div className="min-w-0">
-                                    <ChatHistoryPreview turns={turns} />
+                                    {isGeneralResponse ? (
+                                      <span className="line-clamp-3 break-words">
+                                        {test.input}
+                                      </span>
+                                    ) : (
+                                      <ChatHistoryPreview turns={turns} />
+                                    )}
                                   </div>
                                   <div className="min-w-0 flex flex-wrap gap-1 content-start">
                                     {attachedNames.length > 0 ? (
@@ -1899,7 +1973,7 @@ export function BulkUploadTestsModal({
                             </td>
                             <td className="px-3 py-2 text-foreground">
                               {renderConversationHistory(
-                                test.conversation_history,
+                                test.conversation_history!,
                               )}
                             </td>
                             <td className="px-3 py-2 text-foreground">

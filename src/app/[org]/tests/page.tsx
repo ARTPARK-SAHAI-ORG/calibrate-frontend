@@ -77,7 +77,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call" | "conversation";
+  type: "response" | "tool_call" | "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -1079,7 +1079,7 @@ function LLMPageInner() {
       // untouched.
       const body: {
         name: string;
-        type: "response" | "tool_call" | "conversation";
+        type: "response" | "tool_call" | "conversation" | "general";
         config: TestConfig;
         evaluators?: EvaluatorRefPayload[];
       } = {

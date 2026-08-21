@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
@@ -54,7 +55,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call" | "conversation";
+  type: "response" | "tool_call" | "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -610,6 +611,32 @@ export function TestsTabContent({
     });
   };
 
+  // Reads a plain-language message out of a failed link-tests-to-agent
+  // response (POST /agent-tests, or /tests/bulk when it best-effort links
+  // to this agent). The backend rejects the whole batch with a 400 when a
+  // test's type doesn't match the agent's kind (e.g. a general test on a
+  // conversation agent), so we try to recognise that case and word it for a
+  // non-technical reader. Falls back to `fallback` for anything else
+  // recognisable, and to the type-mismatch wording when the body can't be
+  // read at all (can't tell which failure it was).
+  const readLinkTestsErrorMessage = async (
+    response: Response,
+    fallback: string,
+  ): Promise<string> => {
+    const typeMismatchMessage =
+      "These tests can't be linked to this agent because their type doesn't match the agent's kind.";
+    try {
+      const data = (await response.clone().json()) as { detail?: unknown };
+      const detail = typeof data?.detail === "string" ? data.detail : "";
+      if (!detail) return typeMismatchMessage;
+      return /type|interaction|kind|nature|mismatch/i.test(detail)
+        ? typeMismatchMessage
+        : fallback;
+    } catch {
+      return typeMismatchMessage;
+    }
+  };
+
   // Attach all selected tests to the agent in a single request. The
   // /agent-tests endpoint accepts an array of test_uuids, so a multi-select
   // add is one POST rather than one per test.
@@ -641,7 +668,12 @@ export function TestsTabContent({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to add tests to agent");
+        throw new Error(
+          await readLinkTestsErrorMessage(
+            response,
+            "Failed to add tests to agent",
+          ),
+        );
       }
 
       // Refetch the agent's tests instead of locally splicing them in, so the
@@ -654,6 +686,9 @@ export function TestsTabContent({
       await fetchAgentTests();
     } catch (err) {
       reportError("Error adding tests to agent:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add tests to agent",
+      );
     } finally {
       setIsAddingTests(false);
     }
@@ -734,7 +769,9 @@ export function TestsTabContent({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to create test");
+        throw new Error(
+          await readLinkTestsErrorMessage(response, "Failed to create test"),
+        );
       }
 
       // Bulk endpoint creates the test atomically but links it best-effort.
@@ -1072,7 +1109,7 @@ export function TestsTabContent({
       // tool-invocation tests so existing links are left untouched.
       const body: {
         name: string;
-        type: "response" | "tool_call" | "conversation";
+        type: "response" | "tool_call" | "conversation" | "general";
         config: TestConfig;
         evaluators?: EvaluatorRefPayload[];
       } = {

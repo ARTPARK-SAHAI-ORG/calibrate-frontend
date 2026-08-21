@@ -228,7 +228,7 @@ describe("Agents", () => {
 
     await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("new-agent-uuid"));
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
-    expect(body.agent_type).toBe("conversation");
+    expect(body.interaction_type).toBe("conversation");
   });
 
   it("creates a connection-kind agent", async () => {
@@ -254,7 +254,7 @@ describe("Agents", () => {
     await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("conn-uuid"));
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
     expect(body.type).toBe("connection");
-    expect(body.agent_type).toBe("general");
+    expect(body.interaction_type).toBe("general");
   });
 
   it("keeps the second step's Create button disabled until a nature is chosen", async () => {

@@ -33,14 +33,14 @@ jest.mock("../AddEvaluatorsDialog", () => ({
 jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   CreateEvaluatorFlow: ({
     open,
-    useCaseGroups,
+    useCaseTypes,
   }: {
     open: boolean;
-    useCaseGroups: string[];
+    useCaseTypes: string[];
   }) =>
     open ? (
       <div data-testid="create-flow">
-        <span data-testid="use-case-groups">{useCaseGroups.join(",")}</span>
+        <span data-testid="use-case-types">{useCaseTypes.join(",")}</span>
       </div>
     ) : null,
 }));
@@ -287,7 +287,7 @@ describe("EvaluatorsTabContent", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("uses the text use-case group and llm-general evaluator type for a general agent", async () => {
+  it("uses the llm-general use-case type for a general agent", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
     mockFetchAllEvaluators.mockResolvedValue([
       evaluator({ uuid: "ev-1" }),
@@ -306,7 +306,9 @@ describe("EvaluatorsTabContent", () => {
     await screen.findByText("Follows Refund Policy");
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
-    expect(screen.getByTestId("use-case-groups")).toHaveTextContent("text");
+    expect(screen.getByTestId("use-case-types")).toHaveTextContent(
+      "llm-general",
+    );
 
     await user.click(screen.getByRole("button", { name: "Add evaluators" }));
     // ev-1 is already attached (filtered out); ev-2 is llm-general so it's
@@ -316,7 +318,7 @@ describe("EvaluatorsTabContent", () => {
     );
   });
 
-  it("keeps the conversation use-case group and default types when agentNature is omitted", async () => {
+  it("keeps the default (llm) use-case type when agentNature is omitted", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
     mockFetchAllEvaluators.mockResolvedValue([evaluator({ uuid: "ev-1" })]);
     const user = setupUser();
@@ -329,8 +331,6 @@ describe("EvaluatorsTabContent", () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
-    expect(screen.getByTestId("use-case-groups")).toHaveTextContent(
-      "conversation",
-    );
+    expect(screen.getByTestId("use-case-types")).toHaveTextContent("llm");
   });
 });

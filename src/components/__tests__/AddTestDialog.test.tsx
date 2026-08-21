@@ -1334,11 +1334,12 @@ describe("AddTestDialog", () => {
   });
 
   describe("agentNature", () => {
-    it("still shows all three test types when agentNature is omitted (conversation, unchanged)", () => {
+    it("still shows Next reply and Tool call when agentNature is omitted (conversation, unchanged)", () => {
       render(<AddTestDialog {...baseProps()} />);
       expect(screen.getByText("Next reply test")).toBeInTheDocument();
       expect(screen.getByText("Tool call test")).toBeInTheDocument();
-      expect(screen.getByText("Conversation test")).toBeInTheDocument();
+      // Conversation is hidden for every agent, not just general ones.
+      expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
     });
 
     it("hides Conversation and relabels Next reply to Output for a general agent", () => {
@@ -1356,7 +1357,7 @@ describe("AddTestDialog", () => {
       expect(screen.queryByRole("button", { name: "Conversation" })).not.toBeInTheDocument();
     });
 
-    it("shows the Conversation option and the Next reply label for a conversation agent", () => {
+    it("shows the Next reply label (not Output) for a conversation agent", () => {
       render(
         <AddTestDialog
           {...baseProps({
@@ -1366,7 +1367,10 @@ describe("AddTestDialog", () => {
         />,
       );
       expect(screen.getByRole("button", { name: "Next reply" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Conversation" })).toBeInTheDocument();
+      // Conversation is hidden for every agent, not just general ones.
+      expect(
+        screen.queryByRole("button", { name: "Conversation" }),
+      ).not.toBeInTheDocument();
     });
 
     it("describes a general agent's grading as output-based rather than conversation-based", async () => {
@@ -1419,6 +1423,110 @@ describe("AddTestDialog", () => {
         />,
       );
       await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    });
+
+    const GENERAL_EVALUATOR = {
+      uuid: "eval-general",
+      name: "Output check",
+      description: "Checks the output",
+      slug: null,
+      is_default: false,
+      evaluator_type: "llm-general",
+      live_version: { variables: [] },
+    };
+
+    it("shows a single input box instead of the conversation builder for a general agent's Output tab", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("Enter the input given to the agent")).toBeInTheDocument(),
+      );
+      // The multi-turn chat-message builder is gone entirely for this case.
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+      expect(screen.queryByText("Add message")).not.toBeInTheDocument();
+    });
+
+    it("blocks submission when a general agent's input is empty", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [GENERAL_EVALUATOR.uuid],
+            onSubmit,
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
+      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText("Input cannot be empty")).toBeInTheDocument();
+    });
+
+    it("submits a general test with `input`, `evaluation.type: general`, and no history key", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [GENERAL_EVALUATOR.uuid],
+            onSubmit,
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
+      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+      await user.type(
+        screen.getByPlaceholderText("Enter the input given to the agent"),
+        "Summarize this article: ...",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config, evaluators] = onSubmit.mock.calls[0];
+      expect(config).toEqual({
+        input: "Summarize this article: ...",
+        evaluation: { type: "general" },
+      });
+      expect(config.history).toBeUndefined();
+      expect(evaluators).toEqual([{ evaluator_uuid: "eval-general" }]);
+    });
+
+    it("populates the input box from an existing general test's config.input on edit", async () => {
+      const initialConfig: TestConfig = {
+        input: "What is the capital of France?",
+        evaluation: { type: "general" },
+      };
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            agentNature: "general",
+            initialConfig,
+            testName: "Existing general test",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("What is the capital of France?"),
+        ).toBeInTheDocument(),
+      );
     });
   });
 });

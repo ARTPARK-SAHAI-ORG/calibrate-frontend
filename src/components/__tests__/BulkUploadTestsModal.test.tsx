@@ -979,11 +979,119 @@ describe("BulkUploadTestsModal", () => {
       expect(screen.getByText("Tool Call")).toBeInTheDocument();
     });
 
-    it("still shows Next Reply and Conversation when agentNature is omitted", () => {
+    it("still shows Next Reply (not Output) when agentNature is omitted", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
       expect(screen.getByText("Next Reply")).toBeInTheDocument();
-      expect(screen.getByText("Conversation")).toBeInTheDocument();
       expect(screen.queryByText("Output")).not.toBeInTheDocument();
+      // Conversation is hidden for every agent, not just general ones.
+      expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Output (general agent) uploads", () => {
+    const GENERAL_EVALUATORS_RESPONSE = {
+      items: [
+        {
+          uuid: "eval-4",
+          name: "OutputQuality",
+          slug: "output-quality",
+          evaluator_type: "llm-general",
+          live_version: { variables: [] },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (String(url).includes("/evaluators"))
+          return jsonResponse(GENERAL_EVALUATORS_RESPONSE) as any;
+        if (String(url).includes("/tests/bulk"))
+          return jsonResponse({ created: 1 }) as any;
+        return jsonResponse({}) as any;
+      });
+    });
+
+    async function pickGeneralEvaluator(user: ReturnType<typeof setupUser>) {
+      const trigger = screen.getByText("Select one or more evaluators");
+      await user.click(trigger);
+      await waitFor(() =>
+        expect(screen.getByText("OutputQuality")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("OutputQuality"));
+      await user.click(document.body);
+    }
+
+    it("fetches the llm-general evaluator type and shows an input column, not conversation_history, in the guidelines", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
+      await selectTestType(user, "Output");
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/evaluators"),
+          expect.any(Object),
+        ),
+      );
+      await pickGeneralEvaluator(user);
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Download CSV format guidelines"));
+      const call = (generateGuidelinesPdf as jest.Mock).mock.calls[0][0];
+      expect(call.columns.some((c: any) => c.name === "input")).toBe(true);
+      expect(
+        call.columns.some((c: any) => c.name === "conversation_history"),
+      ).toBe(false);
+    });
+
+    it("parses a row with input into { input, evaluators } and sends type general", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
+      await selectTestType(user, "Output");
+      await pickGeneralEvaluator(user);
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+
+      const csv = `name,input,OutputQuality\n"Summary test","Summarize this","true"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText(/ready to upload/)).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Summary test")).toBeInTheDocument();
+
+      await user.click(screen.getByText(/Upload 1 test/));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/tests/bulk"),
+          expect.any(Object),
+        ),
+      );
+      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).includes("/tests/bulk"),
+      );
+      const body = JSON.parse(bulkCall[1].body);
+      expect(body.type).toBe("general");
+      expect(body.tests[0]).toEqual({
+        name: "Summary test",
+        input: "Summarize this",
+        evaluators: [{ evaluator_uuid: "eval-4" }],
+      });
+    });
+
+    it("shows a per-row error for missing input, the same way a missing conversation history fails", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
+      await selectTestType(user, "Output");
+      await pickGeneralEvaluator(user);
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+
+      const csv = `name,input,OutputQuality\n"Summary test","","true"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText(/missing input/)).toBeInTheDocument(),
+      );
     });
   });
 

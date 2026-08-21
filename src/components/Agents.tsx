@@ -16,7 +16,7 @@ type Agent = {
   uuid: string;
   name: string;
   type: "agent" | "connection";
-  agent_type?: "conversation" | "general";
+  interaction_type?: "conversation" | "general";
   updatedAt: string; // Formatted display date
   updatedAtRaw: string; // Original date for sorting
 };
@@ -726,7 +726,7 @@ function NewAgentDialog({
           ? {
               name: agentName.trim(),
               type: "connection",
-              agent_type: agentNature,
+              interaction_type: agentNature,
               config: {
                 agent_url: "",
                 agent_headers: {},
@@ -739,7 +739,7 @@ function NewAgentDialog({
           : {
               name: agentName.trim(),
               type: "agent",
-              agent_type: agentNature,
+              interaction_type: agentNature,
             };
 
       const response = await fetch(`${backendUrl}/agents`, {

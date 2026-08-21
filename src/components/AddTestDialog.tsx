@@ -607,7 +607,8 @@ const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 const RESPONSE_PLACEHOLDER = `// any valid JSON value\n${DEFAULT_WEBHOOK_RESPONSE}`;
 
 export type TestConfig = {
-  history: Array<{
+  /** Absent for a general test — see `input` below instead. */
+  history?: Array<{
     role: "assistant" | "user" | "tool";
     content?: string;
     tool_calls?: Array<{
@@ -624,8 +625,10 @@ export type TestConfig = {
      * edited. The dialog never asks the user to set this. */
     created_at?: string;
   }>;
+  /** A general test has no conversation history — just this plain input string. */
+  input?: string;
   evaluation: {
-    type: "tool_call" | "response" | "conversation";
+    type: "tool_call" | "response" | "conversation" | "general";
     tool_calls?: Array<{
       tool: string;
       arguments: Record<string, any>;
@@ -890,6 +893,10 @@ export function AddTestDialog({
   // shared evaluator-related UI and validation paths below.
   const isEvaluatorTab =
     activeTab === "next-reply" || activeTab === "conversation";
+  // A general agent's relabeled "Output" tab has no conversation history —
+  // it's a single plain-text input instead of the multi-turn message builder.
+  const isGeneralOutputTab =
+    agentNature === "general" && activeTab === "next-reply";
 
   // A general agent has no ongoing conversation, so the Conversation test
   // type does not apply — it is excluded (on top of whatever's already
@@ -1204,6 +1211,9 @@ export function AddTestDialog({
         if (withResponses.length > 0) {
           setChatMessages(withResponses);
         }
+      } else if (typeof initialConfig.input === "string") {
+        // A general test has no conversation history, just a single input.
+        setGeneralInput(initialConfig.input);
       }
 
       // Populate evaluation fields. Note: response-type tests no longer keep a
@@ -1337,6 +1347,9 @@ export function AddTestDialog({
       else next.add(paramId);
       return next;
     });
+  // Plain-text input for a general agent's Output tab (replaces chatMessages
+  // for that case — a general test has no conversation history).
+  const [generalInput, setGeneralInput] = useState("");
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;
@@ -2914,6 +2927,8 @@ export function AddTestDialog({
           tool_calls: [],
         };
       }
+    } else if (isGeneralOutputTab) {
+      evaluation = { type: "general" };
     } else {
       // Evaluator-based tests (next-reply or conversation). The legacy
       // free-text `criteria` field is no longer sent — the user-supplied
@@ -2921,6 +2936,16 @@ export function AddTestDialog({
       // (sent separately on the POST/PUT body's `evaluators` array).
       evaluation = {
         type: activeTab === "conversation" ? "conversation" : "response",
+      };
+    }
+
+    if (isGeneralOutputTab) {
+      return {
+        input: generalInput,
+        evaluation,
+        ...(Object.keys(overrideInputs).length > 0 && {
+          inputs: overrideInputs,
+        }),
       };
     }
 
@@ -2953,7 +2978,7 @@ export function AddTestDialog({
   // on every call, so those volatile ids are stripped before comparing.
   const serializeFormState = (): string => {
     const config = buildConfig();
-    const history = config.history.map((item) => {
+    const history = (config.history ?? []).map((item) => {
       const next: Record<string, unknown> = { ...item };
       if (Array.isArray(next.tool_calls)) {
         next.tool_calls = (
@@ -2967,6 +2992,7 @@ export function AddTestDialog({
       name: testName,
       description: itemDescription ?? "",
       history,
+      input: config.input ?? "",
       evaluation: config.evaluation,
       evaluators: buildEvaluatorsPayload(),
       inputs: config.inputs ?? {},
@@ -3019,27 +3045,35 @@ export function AddTestDialog({
       return; // Don't submit if any tool call has empty params
     }
 
-    // Every user/agent message must have non-empty content.
-    const hasEmptyChatMessage = chatMessages.some(
-      (m) => (m.role === "user" || m.role === "agent") && !m.content.trim(),
-    );
-    if (hasEmptyChatMessage) {
-      return;
-    }
+    // The general Output tab has no conversation history to validate — its
+    // own "empty input" check runs below instead.
+    if (!isGeneralOutputTab) {
+      // Every user/agent message must have non-empty content.
+      const hasEmptyChatMessage = chatMessages.some(
+        (m) => (m.role === "user" || m.role === "agent") && !m.content.trim(),
+      );
+      if (hasEmptyChatMessage) {
+        return;
+      }
 
-    // Webhook tool responses are required — the asterisk on the label means
-    // it. Structured-output responses are optional and may stay blank.
-    const hasEmptyWebhookResponse = chatMessages.some(
-      (m) => m.role === "tool_response" && m.isWebhook && !m.content.trim(),
-    );
-    if (hasEmptyWebhookResponse) {
-      return;
+      // Webhook tool responses are required — the asterisk on the label means
+      // it. Structured-output responses are optional and may stay blank.
+      const hasEmptyWebhookResponse = chatMessages.some(
+        (m) => m.role === "tool_response" && m.isWebhook && !m.content.trim(),
+      );
+      if (hasEmptyWebhookResponse) {
+        return;
+      }
     }
 
     // Validate required fields based on test type
     if (isEvaluatorTab) {
       if (!testName.trim()) {
         return; // Don't submit if validation fails
+      }
+      // A general test's single input box must not be blank.
+      if (isGeneralOutputTab && !generalInput.trim()) {
+        return;
       }
       // At least one evaluator and every variable on every attached evaluator
       // must have a non-empty value.
@@ -4068,7 +4102,11 @@ export function AddTestDialog({
                   const lastMessage = chatMessages[chatMessages.length - 1];
                   const isEmpty = chatMessages.length === 0;
                   let isLastMessageInvalid: boolean;
-                  if (requireAssistantLastMessage) {
+                  if (isGeneralOutputTab) {
+                    // A general test has no conversation history to check —
+                    // its own "empty input" validation runs on submit instead.
+                    isLastMessageInvalid = false;
+                  } else if (requireAssistantLastMessage) {
                     isLastMessageInvalid =
                       isEmpty || lastMessage?.role !== "agent";
                   } else if (allowAgentLastMessage) {
@@ -4213,7 +4251,26 @@ export function AddTestDialog({
               data-tour="test-conversation"
               className="flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 md:p-6"
             >
-              {chatMessages.length === 0 ? (
+              {isGeneralOutputTab ? (
+                /* General agent: a single plain-text input, no conversation. */
+                <div className="h-full flex flex-col">
+                  <label className="block text-base font-medium text-foreground mb-2">
+                    Input
+                  </label>
+                  <textarea
+                    value={generalInput}
+                    onChange={(e) => setGeneralInput(e.target.value)}
+                    placeholder="Enter the input given to the agent"
+                    rows={10}
+                    className="w-full flex-1 px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                  />
+                  {localValidationAttempted && !generalInput.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Input cannot be empty
+                    </p>
+                  )}
+                </div>
+              ) : chatMessages.length === 0 ? (
                 /* Empty State Placeholder */
                 <div className="h-full flex flex-col items-center justify-center text-center px-8">
                   {/* Globe with chat icon */}

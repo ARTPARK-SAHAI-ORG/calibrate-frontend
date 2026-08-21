@@ -324,7 +324,7 @@ describe("AgentDetail", () => {
   });
 
   it("passes the agent's nature down to the Tests and Evaluators tabs", async () => {
-    const generalAgent = { ...buildAgent, uuid: "agent-3", agent_type: "general" };
+    const generalAgent = { ...buildAgent, uuid: "agent-3", interaction_type: "general" };
     mockFetchSequenceForAgent(generalAgent);
     const user = setupUser();
     render(<AgentDetail agentUuid={generalAgent.uuid} />);
@@ -340,11 +340,11 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Evaluators"));
     expect(screen.getByTestId("evaluators-tab-content")).toHaveTextContent(
-      "EvaluatorsTabContent-general",
+      "EvaluatorsTabContent-agent-3-general",
     );
   });
 
-  it("defaults the agent's nature to conversation when agent_type is absent", async () => {
+  it("defaults the agent's nature to conversation when interaction_type is absent", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
@@ -355,7 +355,7 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Evaluators"));
     expect(screen.getByTestId("evaluators-tab-content")).toHaveTextContent(
-      "EvaluatorsTabContent-conversation",
+      "EvaluatorsTabContent-agent-1-conversation",
     );
   });
 
