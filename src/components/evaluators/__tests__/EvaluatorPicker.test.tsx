@@ -195,3 +195,43 @@ describe("EvaluatorPicker prompt column", () => {
     );
   });
 });
+
+describe("EvaluatorPicker hidden types", () => {
+  it("leaves out full-conversation evaluators", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "a", name: "Reply judge", evaluator_type: "llm" }),
+          evaluator({
+            uuid: "b",
+            name: "Whole chat judge",
+            evaluator_type: "conversation",
+          }),
+        ]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("Reply judge")).toBeInTheDocument();
+    expect(screen.queryByText("Whole chat judge")).not.toBeInTheDocument();
+  });
+
+  it("shows the name without type or scoring pills", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({
+            uuid: "a",
+            name: "Reply judge",
+            evaluator_type: "llm",
+            output_type: "binary",
+          }),
+        ]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText("LLM reply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Binary")).not.toBeInTheDocument();
+  });
+});

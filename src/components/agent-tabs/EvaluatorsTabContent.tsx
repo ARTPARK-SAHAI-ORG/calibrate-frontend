@@ -31,8 +31,9 @@ const ADD_BUTTON_CLASS =
 const CREATE_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
 
-// Agent tests only use next-reply (`llm`) and conversation evaluators.
-const AGENT_EVALUATOR_TYPES = new Set(["llm", "conversation"]);
+// Full-conversation evaluators are hidden for now, so an agent lists only the
+// next-reply (`llm`) ones.
+const AGENT_EVALUATOR_TYPES = new Set(["llm"]);
 
 export function EvaluatorsTabContent({
   agentUuid,

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
-import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 
@@ -40,6 +39,10 @@ export function EvaluatorPicker({
 
   const q = search.trim().toLowerCase();
   const filteredEvaluators = evaluators.filter((ev) => {
+    // Full-conversation evaluators are hidden for now. They are still listed
+    // where they are the only kind that works: simulation setup and a
+    // conversation labelling task.
+    if (ev.evaluator_type === "conversation") return false;
     if (!q) return true;
     return (
       ev.name.toLowerCase().includes(q) ||
@@ -76,15 +79,9 @@ export function EvaluatorPicker({
           onClick={() => setPreviewUuid(ev.uuid)}
           className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
         >
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-foreground">
-              {ev.name}
-            </span>
-            {ev.evaluator_type && (
-              <EvaluatorTypePill evaluatorType={ev.evaluator_type} />
-            )}
-            {ev.output_type && <OutputTypePill outputType={ev.output_type} />}
-          </div>
+          {/* Name only: what it judges and how it scores are in the prompt
+              on the right. */}
+          <span className="text-sm font-medium text-foreground">{ev.name}</span>
           {ev.description && (
             <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
               {ev.description}
