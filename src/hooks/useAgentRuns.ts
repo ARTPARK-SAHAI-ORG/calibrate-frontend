@@ -22,6 +22,12 @@ export type AgentRun = {
   failed: number | null;
   error?: boolean;
   results?: UnitTestResultLike[] | null;
+  /**
+   * Names of the evaluators that judged this run, no duplicates. "Tool call"
+   * is added last when the run included a tool-call test. Absent on older
+   * backends, empty when the run had no evaluators.
+   */
+  evaluators?: string[] | null;
   model_results?: { model: string; test_results?: unknown[] }[] | null;
   created_at?: string;
 };

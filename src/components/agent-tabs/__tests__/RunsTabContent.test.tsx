@@ -195,6 +195,39 @@ describe("RunsTabContent", () => {
     expect(screen.queryByText("Benchmark")).not.toBeInTheDocument();
   });
 
+  it("names the evaluators that judged each run as chips", async () => {
+    state.runs = [
+      { ...unitRun, evaluators: ["Correctness", "Script Fidelity", "Tool call"] },
+    ];
+    renderTab();
+    await screen.findAllByText("1 Success");
+
+    const row = document.querySelector("tbody tr") as HTMLElement;
+    const cells = Array.from(row.querySelectorAll("td")).map(
+      (td) => td.textContent,
+    );
+    // Run, result, tests, models, evaluators, created at.
+    expect(cells[4]).toBe("CorrectnessScript FidelityTool call");
+    // Plain chips, nothing to click.
+    expect(
+      (row.querySelectorAll("td")[4] as HTMLElement).querySelector(
+        "a, button",
+      ),
+    ).toBeNull();
+  });
+
+  it("shows a dash when no evaluators judged the run", async () => {
+    state.runs = [{ ...unitRun, evaluators: [] }];
+    renderTab();
+    await screen.findAllByText("1 Success");
+    const cells = Array.from(
+      (document.querySelector("tbody tr") as HTMLElement).querySelectorAll(
+        "td",
+      ),
+    ).map((td) => td.textContent);
+    expect(cells[4]).toBe("—");
+  });
+
   it("shows a dash when the run does not say how many tests it covered", async () => {
     state.runs = [{ ...benchmarkRun, total_tests: null, results: null }];
     renderTab();
