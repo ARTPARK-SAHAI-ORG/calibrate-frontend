@@ -15,7 +15,11 @@
 
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
-import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import {
+  fetchAgentEvaluators,
+  isDefaultEvaluator,
+  type EvaluatorData,
+} from "@/lib/evaluatorApi";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
   clickByText,
@@ -190,14 +194,62 @@ const CONCISENESS_NAME = /\bconciseness\b/i;
 // slug) or any "Correctness"-named LLM-reply evaluator.
 const CORRECTNESS_NAME_HINT = /correctness/i;
 
+/** The live version's judge prompt for evaluator `uuid`, or null. */
+async function fetchLivePrompt(
+  uuid: string,
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${getBackendUrl()}/evaluators/${uuid}`, {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as {
+      versions?: { uuid?: string; system_prompt?: string }[];
+      live_version_index?: number | null;
+      live_version_id?: string | null;
+    };
+    const versions = Array.isArray(d.versions) ? d.versions : [];
+    const live =
+      (typeof d.live_version_index === "number" &&
+        versions[d.live_version_index]) ||
+      versions.find((v) => v.uuid === d.live_version_id);
+    return typeof live?.system_prompt === "string" ? live.system_prompt : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The first candidate the tour can actually control: its live judge prompt must
+ * carry the `{{criteria}}` slot, because the tour overwrites that criteria with
+ * a mild one every demo answer passes. An evaluator with a fixed rubric of its
+ * own (Faithfulness, Instruction Following) could fail a demo answer while the
+ * tour's card says the run passes, so it is skipped. Bounded to a few detail
+ * fetches so the lookup never holds the tour up.
+ */
+async function findControllableSecond(
+  candidates: EvaluatorLike[],
+  accessToken: string,
+): Promise<string | null> {
+  for (const c of candidates.slice(0, 6)) {
+    if (!c.uuid) continue;
+    const live = await fetchLivePrompt(c.uuid, accessToken);
+    if (live && live.includes("{{criteria}}")) return c.name ?? null;
+  }
+  return null;
+}
+
 /**
  * Resolve the plan from the evaluators that ALREADY exist in the workspace.
  * The tour never creates an evaluator:
  *  - Correctness: the built-in next-reply default (by slug), else any
  *    "Correctness"-named LLM-reply evaluator, taken as-is.
  *  - Second check: an existing DEFAULT LLM-reply evaluator that is not
- *    Correctness — Conciseness when present, else the first such default —
- *    or none (the flow then uses Correctness alone).
+ *    Correctness (Conciseness first) AND whose live judge prompt has the
+ *    `{{criteria}}` slot the tour writes into — or none, in which case the
+ *    flow uses Correctness alone.
  * Falls back to Correctness-only if the token is missing or the request
  * fails, so the tour never blocks on the lookup.
  */
@@ -227,12 +279,15 @@ export async function resolveEvaluatorPlan(
         e.name &&
         e.name !== correctness?.name,
     );
-    const second =
-      secondCandidates.find((e) => CONCISENESS_NAME.test(e.name ?? "")) ??
-      secondCandidates[0];
+    // Conciseness first, then the rest, so the intended second check is tried
+    // before any other default.
+    const ordered = [
+      ...secondCandidates.filter((e) => CONCISENESS_NAME.test(e.name ?? "")),
+      ...secondCandidates.filter((e) => !CONCISENESS_NAME.test(e.name ?? "")),
+    ];
     return {
       correctnessName: correctness?.name ?? CORRECTNESS_NAME,
-      secondEvaluatorName: second?.name ?? null,
+      secondEvaluatorName: await findControllableSecond(ordered, accessToken),
     };
   } catch {
     return fallback;
@@ -498,6 +553,32 @@ async function appendPromptFix(): Promise<void> {
   window.setTimeout(selectNewLine, 300);
 }
 
+/** The uuid in an `/…/agents/<uuid>` address, or null when there is none. */
+export function agentUuidFromPath(pathname: string): string | null {
+  return /\/agents\/([^/?#]+)/.exec(pathname)?.[1] ?? null;
+}
+
+/**
+ * The name of an evaluator the agent on screen ACTUALLY has: `preferred` when it
+ * is one of them, else the first one. Null when the agent has none, or when the
+ * lookup cannot be made — the card then says the tab is empty rather than
+ * pointing at something that is not there.
+ */
+async function attachedEvaluatorName(
+  preferred: string,
+  accessToken: string | null,
+): Promise<string | null> {
+  const uuid = agentUuidFromPath(window.location.pathname);
+  if (!uuid || !accessToken) return null;
+  try {
+    const list = await fetchAgentEvaluators(uuid, accessToken);
+    const match = list.find((e) => e.name === preferred) ?? list[0];
+    return match?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // CSS attribute selector for an attached evaluator's card, by its name.
 function evaluatorCardAnchor(name: string): string {
   return `[data-evaluator-name="${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
@@ -509,6 +590,72 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   const secondName = deps.plan.secondEvaluatorName;
   const correctnessName = deps.plan.correctnessName ?? CORRECTNESS_NAME;
   const correctness = { name: correctnessName };
+
+  // The first card of the add-a-check trio. Held in a variable because the card
+  // before it rewrites its wording when the agent turns out to have no
+  // evaluators at all (there is no "another" check to add then).
+  const addCheckStep: TourStep | null = secondName
+    ? {
+        anchor: A.evaluatorsAdd,
+        title: "Add another check",
+        description: `One check rarely covers everything. Let us add <strong>${escapeHtml(
+          secondName,
+        )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
+        side: "bottom",
+        actionLabel: "Next",
+        action: async () => {
+          await clickElement(A.evaluatorsAdd, { timeout: 8000 });
+        },
+      }
+    : null;
+
+  // What this agent already has can only be known once the agent exists, which
+  // happens partway through the tour. So the card looks it up in its own
+  // prepare and rewrites its anchor and wording before the engine reads them.
+  // Without that it pointed at a card that may never exist and claimed an
+  // evaluator was there over an empty tab.
+  // Said when the agent has no evaluators. Also the card's starting state, so it
+  // never claims an evaluator is there before the lookup has answered.
+  const emptyTabDescription = secondName
+    ? `This tab holds every evaluator added to your agent, and it is empty. Let us add <strong>${escapeHtml(
+        secondName,
+      )}</strong> so your tests have something grading them.`
+    : "This tab holds every evaluator added to your agent, and it is empty. You can add a check here whenever you are ready.";
+
+  const attachedStep: TourStep = {
+    title: "No checks yet",
+    description: emptyTabDescription,
+    side: "bottom",
+    actionLabel: "Next",
+    timeout: 10000,
+    prepare: async () => {
+      const attached = await attachedEvaluatorName(
+        correctnessName,
+        deps.getAccessToken(),
+      );
+      if (attached) {
+        attachedStep.anchor = evaluatorCardAnchor(attached);
+        attachedStep.title = "Already added for you";
+        attachedStep.description =
+          `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
+            attached,
+          )}</strong> is already here: does the answer get it right?`;
+        return;
+      }
+      // Nothing is attached. Drop the anchor so the card sits in the middle
+      // instead of waiting on an element that will never appear.
+      attachedStep.anchor = undefined;
+      attachedStep.title = "No checks yet";
+      attachedStep.description = emptyTabDescription;
+      if (addCheckStep && secondName) {
+        addCheckStep.title = "Add your first check";
+        addCheckStep.description = `Let us add <strong>${escapeHtml(
+          secondName,
+        )}</strong>, so every test grades the reply on it.`;
+      }
+    },
+  };
+
   const steps: TourStep[] = [
     {
       title: "Welcome to Calibrate 👋",
@@ -586,34 +733,12 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         await clickElement(A.tabEvaluators);
       },
     },
-    {
-      // The card of the already-attached Correctness — nothing is created or
-      // picked here; the tab comes with it and the tour just points at it.
-      anchor: evaluatorCardAnchor(correctnessName),
-      title: "Already added for you",
-      description: `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
-        correctnessName,
-      )}</strong> is already here: does the answer get it right?`,
-      side: "bottom",
-      actionLabel: "Next",
-      timeout: 10000,
-    },
+    attachedStep,
     // Add a second, independent check — only when the workspace has an
     // existing default evaluator (other than Correctness) to add.
-    ...(secondName
+    ...(secondName && addCheckStep
       ? [
-          {
-            anchor: A.evaluatorsAdd,
-            title: "Add another check",
-            description: `One check rarely covers everything. Let us add <strong>${escapeHtml(
-              secondName,
-            )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
-            side: "bottom" as const,
-            actionLabel: "Next",
-            action: async () => {
-              await clickElement(A.evaluatorsAdd, { timeout: 8000 });
-            },
-          },
+          addCheckStep,
           {
             anchor: A.addEvaluatorsDialog,
             title: "Pick it in the list",

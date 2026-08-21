@@ -13,7 +13,7 @@
 
 import { driver, type Driver } from "driver.js";
 import { reportError } from "@/lib/reportError";
-import { waitForElement } from "./dom";
+import { isVisible, waitForElement } from "./dom";
 import { markTourSeen, type TourSeenStatus } from "./state";
 
 export type TourStep = {
@@ -279,10 +279,19 @@ async function showStep(): Promise<void> {
     const sel = step.anchor;
     active.anchorWatch = window.setInterval(() => {
       if (!active) return;
+      // `isVisible` (layout boxes) rather than `offsetParent`, which is null for
+      // anything inside a fixed-position dialog and would fire this watchdog on
+      // an element that is plainly on screen.
       const el = document.querySelector<HTMLElement>(sel);
-      if (!el || el.offsetParent === null) {
+      if (!el || !isVisible(el)) {
         clearAnchorWatch();
-        driverObj.highlight({ popover });
+        // Keep this step's interaction unlock: re-highlighting without it lets
+        // driver fall back to the global lock, killing scrolling and ticking
+        // mid-step on a card that invites both.
+        driverObj.highlight({
+          popover,
+          disableActiveInteraction: !step.allowInteraction,
+        });
       }
     }, 400);
   }

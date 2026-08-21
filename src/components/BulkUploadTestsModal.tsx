@@ -37,9 +37,9 @@ const CONVERSATION_EVALUATOR_TYPE = "conversation";
 
 type ParsedTest = {
   name: string;
-  // Present for conversation-based rows (LLM response / conversation / tool
-  // call). Absent for general-agent LLM response rows, which carry `input`
-  // instead — a plain string, not JSON.
+  // Present for conversation-agent rows (LLM response / conversation / tool
+  // call). Absent for general-agent rows (LLM response and tool call), which
+  // carry `input` instead — a plain string, not JSON.
   conversation_history?: string;
   input?: string;
   evaluators?: EvaluatorRefPayload[];
@@ -216,6 +216,14 @@ const SAMPLE_TOOL_CALL_CSV = `name,conversation_history,tool_calls
 "Nested address arguments","[{""role"":""user"",""content"":""Ship to 221B Baker Street, London, no second line""}]","[{""tool"":""create_shipment"",""arguments"":{""address"":{""line1"":{""match_type"":""exact"",""value"":""221B Baker Street""},""line2"":{""match_type"":""exact"",""value"":null},""city"":{""match_type"":""exact"",""value"":""London""}}}}]"
 "End the call","[{""role"":""assistant"",""content"":""Anything else?""},{""role"":""user"",""content"":""No that's all, thanks""}]","[{""tool"":""end_call"",""arguments"":{},""accept_any_arguments"":true}]"`;
 
+// Tool call sample for a general agent (one input, one output): same
+// `tool_calls` column, with the plain-text `input` column in place of the
+// JSON `conversation_history` one.
+const SAMPLE_GENERAL_TOOL_CALL_CSV = `name,input,tool_calls
+"Book room test","Book room 101 for tomorrow","[{""tool"":""book_room"",""arguments"":{""room"":{""match_type"":""exact"",""value"":""101""}},""accept_any_arguments"":false}]"
+"Weather lookup","What is the weather in Bangalore?","[{""tool"":""get_weather"",""arguments"":{},""accept_any_arguments"":true}]"
+"LLM-judged summary","Log a note that the customer was upset about the delayed delivery","[{""tool"":""log_note"",""arguments"":{""note"":{""match_type"":""llm_judge"",""criteria"":""The note should mention that the customer was upset about a delivery delay.""}}}]"`;
+
 const CONVERSATION_HISTORY_DESC =
   'A JSON array of chat messages that represents the conversation that has happened so far, before the agent\'s response is evaluated. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role';
 
@@ -307,6 +315,12 @@ export function BulkUploadTestsModal({
   // single plain-text input instead of a conversation history, and is
   // graded by output-type evaluators.
   const isGeneralResponse = isResponseType && agentNature === "general";
+  // A general agent's rows carry a plain-text `input` column instead of the
+  // JSON `conversation_history` column, for BOTH the LLM response and the
+  // tool call type. The test type sent to the backend is unaffected: a tool
+  // call test stays `tool_call`, and the two shapes are told apart by whether
+  // the row carries `input` or `conversation_history` (exactly one of them).
+  const usesPlainInput = agentNature === "general";
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedTests, setParsedTests] = useState<ParsedTest[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -587,7 +601,7 @@ export function BulkUploadTestsModal({
     if (usesEvaluators) {
       const columns: GuidelineColumn[] = [
         { name: "name", description: "A unique test name." },
-        isGeneralResponse
+        usesPlainInput
           ? {
               name: "input",
               description: GENERAL_INPUT_DESC,
@@ -645,13 +659,19 @@ export function BulkUploadTestsModal({
             "A unique name for the test. This must be different from every other test in the CSV and from any test you have already created.",
           example: '"Book room test"',
         },
-        {
-          name: "conversation_history",
-          description: `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message, since the test evaluates which tools the agent calls after this conversation.`,
-          example: `[
+        usesPlainInput
+          ? {
+              name: "input",
+              description: GENERAL_INPUT_DESC,
+              example: '"Book room 101 for tomorrow"',
+            }
+          : {
+              name: "conversation_history",
+              description: `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message, since the test evaluates which tools the agent calls after this conversation.`,
+              example: `[
   {"role": "user", "content": "I want to book room 101 for tomorrow"}
 ]`,
-        },
+            },
         {
           name: "tool_calls",
           description:
@@ -686,7 +706,7 @@ export function BulkUploadTestsModal({
     const blob = generateGuidelinesPdf(buildGuidelines());
     const filename = isConversationType
       ? "conversation_tests_csv_guidelines.pdf"
-      : isResponseType || isGeneralResponse
+      : isResponseType
         ? "llm_response_tests_csv_guidelines.pdf"
         : "tool_call_tests_csv_guidelines.pdf";
     const url = URL.createObjectURL(blob);
@@ -704,7 +724,7 @@ export function BulkUploadTestsModal({
 
     if (usesEvaluators) {
       // Single-CSV download tailored to the user's selected evaluators.
-      const csv = buildResponseSampleCsv(committedEvaluators, isGeneralResponse);
+      const csv = buildResponseSampleCsv(committedEvaluators, usesPlainInput);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -719,7 +739,10 @@ export function BulkUploadTestsModal({
       return;
     }
 
-    const blob = new Blob([SAMPLE_TOOL_CALL_CSV], { type: "text/csv" });
+    const blob = new Blob(
+      [usesPlainInput ? SAMPLE_GENERAL_TOOL_CALL_CSV : SAMPLE_TOOL_CALL_CSV],
+      { type: "text/csv" },
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -784,11 +807,10 @@ export function BulkUploadTestsModal({
         }
 
         const headers = Object.keys(data[0]);
-        const baseColumns = isGeneralResponse
-          ? ["name", "input"]
-          : usesEvaluators
-            ? ["name", "conversation_history"]
-            : ["name", "conversation_history", "tool_calls"];
+        const inputColumn = usesPlainInput ? "input" : "conversation_history";
+        const baseColumns = usesEvaluators
+          ? ["name", inputColumn]
+          : ["name", inputColumn, "tool_calls"];
         const variableColumns: {
           evaluator: LLMEvaluatorOption;
           varName: string;
@@ -844,7 +866,7 @@ export function BulkUploadTestsModal({
             return;
           }
 
-          if (isGeneralResponse) {
+          if (usesPlainInput) {
             if (!row.input?.trim()) {
               errors.push(`Row ${rowNum}: missing input`);
               return;
@@ -946,7 +968,7 @@ export function BulkUploadTestsModal({
 
             tests.push({
               name: row.name.trim(),
-              ...(isGeneralResponse
+              ...(usesPlainInput
                 ? { input: row.input.trim() }
                 : { conversation_history: row.conversation_history.trim() }),
               evaluators: refs,
@@ -998,7 +1020,9 @@ export function BulkUploadTestsModal({
 
             tests.push({
               name: row.name.trim(),
-              conversation_history: row.conversation_history.trim(),
+              ...(usesPlainInput
+                ? { input: row.input.trim() }
+                : { conversation_history: row.conversation_history.trim() }),
               tool_calls: row.tool_calls.trim(),
             });
           }
@@ -1079,7 +1103,7 @@ export function BulkUploadTestsModal({
           // `criteria` field is no longer sent — its value lives inside
           // `variable_values.criteria` on the attached default evaluator
           // when the user provided a plain-string evaluators cell.
-          if (isGeneralResponse) {
+          if (usesPlainInput) {
             return {
               name: test.name,
               input: test.input!,
@@ -1092,13 +1116,18 @@ export function BulkUploadTestsModal({
             evaluators: test.evaluators ?? [],
           };
         } else {
-          const conversation_history = parseJsonLenient(
-            test.conversation_history!,
-          );
           const tool_calls = parseJsonLenient(test.tool_calls!);
+          // Exactly one of `input` / `conversation_history` may be sent; the
+          // backend rejects a tool call item carrying both or neither.
           return {
             name: test.name,
-            conversation_history,
+            ...(usesPlainInput
+              ? { input: test.input! }
+              : {
+                  conversation_history: parseJsonLenient(
+                    test.conversation_history!,
+                  ),
+                }),
             tool_calls,
           };
         }
@@ -1785,7 +1814,7 @@ export function BulkUploadTestsModal({
                               Name
                             </div>
                             <div className="text-xs font-medium text-muted-foreground">
-                              {isGeneralResponse ? "Input" : "Chat history"}
+                              {usesPlainInput ? "Input" : "Chat history"}
                             </div>
                             <div className="text-xs font-medium text-muted-foreground">
                               Evaluators
@@ -1803,7 +1832,7 @@ export function BulkUploadTestsModal({
                           <div className="divide-y divide-border">
                             {parsedTests.slice(0, 50).map((test, idx) => {
                               let turns: TurnObject[] = [];
-                              if (!isGeneralResponse) {
+                              if (!usesPlainInput) {
                                 try {
                                   const parsed = JSON.parse(
                                     test.conversation_history!,
@@ -1846,7 +1875,7 @@ export function BulkUploadTestsModal({
                                     {test.name}
                                   </div>
                                   <div className="min-w-0">
-                                    {isGeneralResponse ? (
+                                    {usesPlainInput ? (
                                       <span className="line-clamp-3 break-words">
                                         {test.input}
                                       </span>
@@ -1947,7 +1976,7 @@ export function BulkUploadTestsModal({
                             Name
                           </th>
                           <th className="px-3 py-2 font-medium min-w-[240px]">
-                            Conversation history
+                            {usesPlainInput ? "Input" : "Conversation history"}
                           </th>
                           <th className="px-3 py-2 font-medium min-w-[240px]">
                             Expected tool calls
@@ -1967,8 +1996,14 @@ export function BulkUploadTestsModal({
                               {test.name}
                             </td>
                             <td className="px-3 py-2 text-foreground">
-                              {renderConversationHistory(
-                                test.conversation_history!,
+                              {usesPlainInput ? (
+                                <span className="line-clamp-3 break-words">
+                                  {test.input}
+                                </span>
+                              ) : (
+                                renderConversationHistory(
+                                  test.conversation_history!,
+                                )
                               )}
                             </td>
                             <td className="px-3 py-2 text-foreground">

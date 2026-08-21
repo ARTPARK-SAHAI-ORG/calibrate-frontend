@@ -1564,5 +1564,187 @@ describe("AddTestDialog", () => {
         ).toBeInTheDocument(),
       );
     });
+
+    it("shows a single input box instead of the conversation builder on a general agent's Tool call tab", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByPlaceholderText("Enter the input given to the agent"),
+        ).toBeInTheDocument(),
+      );
+      // The multi-turn chat-message builder is gone; the tool picker stays.
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+      expect(screen.getByText("Tools to test")).toBeInTheDocument();
+    });
+
+    it("submits a general agent's tool call test with `input`, no history, and evaluation.type tool_call", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Enter the input given to the agent"),
+        "What is the weather in Bangalore?",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config).toEqual({
+        input: "What is the weather in Bangalore?",
+        evaluation: {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: "get_weather",
+              arguments: { city: { match_type: "exact", value: "Bangalore" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      });
+      expect(config.history).toBeUndefined();
+    });
+
+    it("blocks submission when a general agent's tool call test has an empty input", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText("Input cannot be empty")).toBeInTheDocument();
+    });
+
+    it("keeps a conversation agent's tool call test on history, with no input", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "conversation",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+      expect(
+        screen.queryByPlaceholderText("Enter the input given to the agent"),
+      ).not.toBeInTheDocument();
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      for (const ta of Array.from(textareas)) {
+        await user.type(ta, "message");
+      }
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config.input).toBeUndefined();
+      expect(Array.isArray(config.history)).toBe(true);
+      expect(config.history.length).toBeGreaterThan(0);
+      expect(config.evaluation.type).toBe("tool_call");
+    });
+
+    it("opens a saved tool call test that carries `input` on the input box, with no agentNature", async () => {
+      const initialConfig: TestConfig = {
+        input: "What is the weather in Bangalore?",
+        evaluation: {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: "get_weather",
+              arguments: { city: { match_type: "exact", value: "Bangalore" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      };
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "tool-invocation",
+            initialConfig,
+            testName: "Saved general tool call test",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("What is the weather in Bangalore?"),
+        ).toBeInTheDocument(),
+      );
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+    });
   });
 });

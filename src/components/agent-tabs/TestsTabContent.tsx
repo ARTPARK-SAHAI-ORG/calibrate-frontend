@@ -33,6 +33,7 @@ import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel } from "@/lib/testTypes";
 import {
   TestTypeFilter,
+  matchesTestTypeFilter,
   type TestTypeFilterValue,
 } from "@/components/TestTypeFilter";
 import {
@@ -158,6 +159,13 @@ type TestsTabContentProps = {
 // Attaching a test that already exists is hidden for now: new tests come from
 // Create test and Bulk upload. Flip this to true to bring the control back.
 const SHOW_ADD_EXISTING_TEST = false;
+
+// Which test types carry their own evaluators. "response" and "conversation"
+// are a conversation agent's; "general" is a general agent's single
+// input/output test. Only "tool_call" is judged by its tool calls instead.
+// One place, so the create and update paths cannot drift apart.
+const carriesEvaluators = (type: string) =>
+  type === "response" || type === "conversation" || type === "general";
 
 export function TestsTabContent({
   agentUuid,
@@ -555,8 +563,7 @@ export function TestsTabContent({
   // so the select-all checkbox — which keys off `filteredAvailableTests` — only
   // picks rows matching the active type filter and query.
   const filteredAvailableTests = availableTests.filter((test) => {
-    if (dropdownTypeFilter !== "all" && test.type !== dropdownTypeFilter)
-      return false;
+    if (!matchesTestTypeFilter(test.type, dropdownTypeFilter)) return false;
     const q = searchQuery.toLowerCase();
     if (!q) return true;
     return test.name.toLowerCase().includes(q);
@@ -574,7 +581,7 @@ export function TestsTabContent({
   // together (AND). The type filter also constrains the select-all checkbox
   // since it operates on `filteredAgentTests`.
   const filteredAgentTests = agentTests.filter((test) => {
-    if (typeFilter !== "all" && test.type !== typeFilter) return false;
+    if (!matchesTestTypeFilter(test.type, typeFilter)) return false;
     const q = testsSearchQuery.trim();
     if (!q) return true;
     return matchesSearchMode(test.name, q, testsSearchMode);
@@ -723,17 +730,22 @@ export function TestsTabContent({
       }
 
       const evalType = config.evaluation.type;
-      const usesEvaluators =
-        evalType === "response" || evalType === "conversation";
+      const usesEvaluators = carriesEvaluators(evalType);
       const testItem: {
         name: string;
-        conversation_history: TestConfig["history"];
+        input?: string;
+        conversation_history?: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
         tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
         inputs?: Record<string, unknown>;
       } = {
         name: newTestName.trim(),
-        conversation_history: config.history,
+        // Exactly one of the two: a general agent's test holds its single
+        // input, a conversation agent's holds the history. Sending both, or
+        // neither, is rejected by the backend.
+        ...(typeof config.input === "string"
+          ? { input: config.input }
+          : { conversation_history: config.history }),
         ...(config.inputs &&
           Object.keys(config.inputs).length > 0 && { inputs: config.inputs }),
       };
@@ -1119,10 +1131,7 @@ export function TestsTabContent({
         type: config.evaluation.type,
         config: config,
       };
-      if (
-        config.evaluation.type === "response" ||
-        config.evaluation.type === "conversation"
-      ) {
+      if (carriesEvaluators(config.evaluation.type)) {
         body.evaluators = evaluators;
       }
 
@@ -1168,11 +1177,9 @@ export function TestsTabContent({
         );
         return;
       }
-      const prompted =
-        config.evaluation.type === "response" ||
-        config.evaluation.type === "conversation"
-          ? await maybePromptAgentDefaults(evaluators)
-          : false;
+      const prompted = carriesEvaluators(config.evaluation.type)
+        ? await maybePromptAgentDefaults(evaluators)
+        : false;
       if (!prompted) {
         closeTestDialogAfterSave();
       }
@@ -1781,7 +1788,7 @@ export function TestsTabContent({
                     const next = new Set<string>();
                     for (const t of agentTests) {
                       if (!prev.has(t.uuid)) continue;
-                      if (value !== "all" && t.type !== value) continue;
+                      if (!matchesTestTypeFilter(t.type, value)) continue;
                       next.add(t.uuid);
                     }
                     return next;

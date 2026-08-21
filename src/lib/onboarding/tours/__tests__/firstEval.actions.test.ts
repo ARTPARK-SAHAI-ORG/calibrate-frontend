@@ -294,10 +294,10 @@ describe("resolveEvaluatorPlan", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  // The plan is resolved purely from the workspace list: the built-in
-  // Correctness (by slug) as the first check, and an existing DEFAULT
-  // LLM-reply evaluator (Conciseness preferred) as the second. Nothing is
-  // ever created and no per-evaluator detail is fetched.
+  // The plan takes the built-in Correctness (by slug) as the first check, and
+  // as the second an existing DEFAULT LLM-reply evaluator (Conciseness first)
+  // whose live judge prompt has the `{{criteria}}` slot the tour writes into.
+  // Nothing is ever created.
   const ITEMS = [
     {
       uuid: "ev-correct",
@@ -327,11 +327,31 @@ describe("resolveEvaluatorPlan", () => {
     },
   ];
 
-  function mockList(items: unknown[] = ITEMS) {
-    (global.fetch as jest.Mock).mockImplementation(async () => ({
-      ok: true,
-      json: async () => ({ items }),
-    }));
+  // Judge prompts by evaluator uuid. Anything not named here answers with a
+  // fixed rubric, i.e. no `{{criteria}}` slot for the tour to write into.
+  const CRITERIA_PROMPT = "Grade the reply against:\n\n{{criteria}}";
+  const FIXED_PROMPT = "Grade whether the reply is faithful to the source.";
+
+  function mockList(
+    items: unknown[] = ITEMS,
+    prompts: Record<string, string> = {
+      "ev-conc": CRITERIA_PROMPT,
+      "ev-faith": FIXED_PROMPT,
+    },
+  ) {
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      const detail = /\/evaluators\/([^/?]+)$/.exec(url)?.[1];
+      if (detail) {
+        return {
+          ok: true,
+          json: async () => ({
+            live_version_index: 0,
+            versions: [{ uuid: "v1", system_prompt: prompts[detail] ?? FIXED_PROMPT }],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({ items }) };
+    });
   }
 
   it("uses the existing Correctness and prefers Conciseness as the second", async () => {
@@ -340,29 +360,74 @@ describe("resolveEvaluatorPlan", () => {
       correctnessName: "Correctness",
       secondEvaluatorName: "Conciseness",
     });
-    // One list request, nothing else: no detail fetches, no creation.
-    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("uses a Correctness-named evaluator as-is when the default slug is gone", async () => {
-    mockList([
-      { uuid: "ev-c", name: "Correctness", evaluator_type: "llm", is_default: false, owner_user_id: "u1" },
-      { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
-    ]);
+    mockList(
+      [
+        { uuid: "ev-c", name: "Correctness", evaluator_type: "llm", is_default: false, owner_user_id: "u1" },
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": CRITERIA_PROMPT },
+    );
     expect(await resolveEvaluatorPlan("tok")).toEqual({
       correctnessName: "Correctness",
       secondEvaluatorName: "Faithfulness",
     });
   });
 
-  it("takes the first default evaluator when no Conciseness exists", async () => {
-    mockList([
-      ITEMS[0],
-      { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
-    ]);
+  it("takes another default evaluator when no Conciseness exists", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": CRITERIA_PROMPT },
+    );
     expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBe(
       "Faithfulness",
     );
+  });
+
+  // The tour overwrites the second check's criteria so every demo answer
+  // passes. An evaluator with a fixed rubric cannot be told what to grade, so
+  // it is skipped rather than left to fail an answer the tour calls a pass.
+  it("skips a second evaluator whose judge prompt has no criteria slot", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": FIXED_PROMPT },
+    );
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBeNull();
+  });
+
+  it("falls through the fixed-rubric ones to a default it can control", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+        { uuid: "ev-polite", name: "Politeness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": FIXED_PROMPT, "ev-polite": CRITERIA_PROMPT },
+    );
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBe(
+      "Politeness",
+    );
+  });
+
+  it("checks at most a handful of candidates", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      uuid: `ev-${i}`,
+      name: `Judge ${i}`,
+      evaluator_type: "llm",
+      is_default: true,
+    }));
+    mockList([ITEMS[0], ...many], {});
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBeNull();
+    // One list request plus at most six detail requests.
+    expect((global.fetch as jest.Mock).mock.calls.length).toBeLessThanOrEqual(7);
   });
 
   it("never offers a user-owned evaluator or a non-llm default as the second", async () => {

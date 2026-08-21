@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { TestTypeFilter } from "../TestTypeFilter";
+import { TestTypeFilter, matchesTestTypeFilter } from "../TestTypeFilter";
 
 describe("TestTypeFilter", () => {
   it("renders all filter options with default md size", () => {
@@ -36,5 +36,43 @@ describe("TestTypeFilter", () => {
       <TestTypeFilter value="all" onChange={jest.fn()} className="mt-2" />,
     );
     expect(container.firstChild).toHaveClass("mt-2");
+  });
+});
+
+describe("matchesTestTypeFilter", () => {
+  it('"all" matches every type, including general', () => {
+    ["response", "general", "tool_call", "conversation", "wat"].forEach(
+      (type) => {
+        expect(matchesTestTypeFilter(type, "all")).toBe(true);
+      },
+    );
+  });
+
+  it('"response" matches both response and general', () => {
+    expect(matchesTestTypeFilter("response", "response")).toBe(true);
+    expect(matchesTestTypeFilter("general", "response")).toBe(true);
+    expect(matchesTestTypeFilter("tool_call", "response")).toBe(false);
+    expect(matchesTestTypeFilter("conversation", "response")).toBe(false);
+  });
+
+  it('"tool_call" matches only tool_call', () => {
+    expect(matchesTestTypeFilter("tool_call", "tool_call")).toBe(true);
+    expect(matchesTestTypeFilter("general", "tool_call")).toBe(false);
+    expect(matchesTestTypeFilter("response", "tool_call")).toBe(false);
+  });
+
+  it('"conversation" matches only conversation', () => {
+    expect(matchesTestTypeFilter("conversation", "conversation")).toBe(true);
+    expect(matchesTestTypeFilter("general", "conversation")).toBe(false);
+    expect(matchesTestTypeFilter("response", "conversation")).toBe(false);
+  });
+
+  it("a missing type matches only all", () => {
+    expect(matchesTestTypeFilter(null, "all")).toBe(true);
+    expect(matchesTestTypeFilter(undefined, "all")).toBe(true);
+    expect(matchesTestTypeFilter(null, "response")).toBe(false);
+    expect(matchesTestTypeFilter(undefined, "response")).toBe(false);
+    expect(matchesTestTypeFilter(null, "tool_call")).toBe(false);
+    expect(matchesTestTypeFilter(undefined, "conversation")).toBe(false);
   });
 });

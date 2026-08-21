@@ -6,6 +6,14 @@
  * tour finds the box to tick by that aria-label, matched exactly.
  */
 
+const mockFetchAgentEvaluators = jest.fn();
+
+jest.mock("../../../evaluatorApi", () => ({
+  ...jest.requireActual("../../../evaluatorApi"),
+  fetchAgentEvaluators: (...args: unknown[]) =>
+    mockFetchAgentEvaluators(...args),
+}));
+
 import {
   chooseEvaluatorCheckbox,
   buildFirstEvalTour,
@@ -111,10 +119,9 @@ describe("buildFirstEvalTour", () => {
     );
     expect(addAnother?.description).toContain("Reply Conciseness");
 
-    // With no second evaluator available, the tour shows the already-attached
-    // Correctness and adds nothing.
+    // With no second evaluator available, the tour shows the agent's own
+    // evaluators tab and adds nothing.
     const one = titles(ONE);
-    expect(one).toContain("Already added for you");
     expect(one).not.toContain("Add another check");
     expect(one).not.toContain("Pick it in the list");
     expect(one).not.toContain("Add it to your agent");
@@ -130,22 +137,76 @@ describe("buildFirstEvalTour", () => {
     }
   });
 
-  it("names Correctness by its resolved name, and anchors its card (rename-safe)", () => {
-    const renamed = build({
-      correctnessName: "Answer Accuracy",
-      secondEvaluatorName: null,
-    });
-    const shown = renamed.steps.find(
-      (s) => s.title === "Already added for you",
-    );
-    expect(shown?.description).toContain("Answer Accuracy");
-    // Points at that evaluator's own card in the tab.
-    expect(shown?.anchor).toBe('[data-evaluator-name="Answer Accuracy"]');
-  });
+  // The card that points at what the agent already has resolves itself when the
+  // step is reached: only then does the agent exist. `stepAtIndex` finds it by
+  // position, since its title changes with what it finds.
+  describe("the card for what the agent already has", () => {
+    const evaluatorStepIndex = (tour: ReturnType<typeof build>) =>
+      tour.steps.findIndex((s) => s.title === "Meet the evaluators") + 1;
 
-  it("falls back to the default Correctness name when none was resolved", () => {
-    const none = build({ correctnessName: null, secondEvaluatorName: null });
-    const shown = none.steps.find((s) => s.title === "Already added for you");
-    expect(shown?.description).toContain("Correctness");
+    beforeEach(() => {
+      mockFetchAgentEvaluators.mockReset();
+      window.history.replaceState({}, "", "/acme/agents/agent-1");
+      localStorage.setItem("access_token", "tok");
+    });
+
+    it("names the attached evaluator and anchors its card (rename-safe)", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([
+        { uuid: "e1", name: "Answer Accuracy" },
+      ]);
+      const tour = build({
+        correctnessName: "Answer Accuracy",
+        secondEvaluatorName: null,
+      });
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(mockFetchAgentEvaluators).toHaveBeenCalledWith("agent-1", "token");
+      expect(step.title).toBe("Already added for you");
+      expect(step.description).toContain("Answer Accuracy");
+      expect(step.anchor).toBe('[data-evaluator-name="Answer Accuracy"]');
+    });
+
+    it("points at what the agent really has, not the name from the library", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([
+        { uuid: "e2", name: "Politeness" },
+      ]);
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.description).toContain("Politeness");
+      expect(step.anchor).toBe('[data-evaluator-name="Politeness"]');
+    });
+
+    // The bug this guards: the card used to say "Correctness is already here"
+    // over an empty tab, anchored to a card that never appears.
+    it("says the tab is empty when the agent has no evaluators", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([]);
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.anchor).toBeUndefined();
+      expect(step.description).not.toContain("already here");
+      expect(step.description).toContain("empty");
+      expect(step.title).not.toMatch(/already added/i);
+    });
+
+    it("says the tab is empty when the lookup fails", async () => {
+      mockFetchAgentEvaluators.mockRejectedValue(new Error("network"));
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.anchor).toBeUndefined();
+      expect(step.description).toContain("empty");
+    });
+
+    it("stops calling the next card 'another check' when nothing is attached", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([]);
+      const tour = build(TWO);
+      const i = evaluatorStepIndex(tour);
+      await tour.steps[i].prepare?.();
+      expect(tour.steps[i].description).toContain("Reply Conciseness");
+      expect(tour.steps[i + 1].title).toBe("Add your first check");
+      expect(tour.steps[i + 1].description).not.toContain("second");
+    });
   });
 });

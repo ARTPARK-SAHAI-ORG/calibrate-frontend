@@ -13,6 +13,7 @@ jest.mock("../../reportError", () => ({
 
 jest.mock("../dom", () => ({
   waitForElement: jest.fn(),
+  isVisible: jest.requireActual("../dom").isVisible,
 }));
 
 jest.mock("driver.js", () => ({
@@ -146,6 +147,78 @@ describe("onboarding engine", () => {
     jest.advanceTimersByTime(400);
     expect(mockHighlight.mock.calls.length).toBeGreaterThan(1);
 
+    jest.useRealTimers();
+  });
+
+  it("keeps a step's interaction unlock when it recentres the card", async () => {
+    jest.useFakeTimers();
+    const anchor = document.createElement("div");
+    anchor.id = "anchor";
+    document.body.appendChild(anchor);
+    (waitForElement as jest.Mock).mockResolvedValue(anchor);
+
+    await runTour({
+      id: "demo",
+      steps: [
+        {
+          title: "Scroll it",
+          description: "Look through the list",
+          anchor: "#anchor",
+          allowInteraction: true,
+        },
+        { title: "Done", description: "Finish" },
+      ],
+    });
+
+    expect(mockHighlight.mock.calls[0][0].disableActiveInteraction).toBe(false);
+
+    anchor.remove();
+    jest.advanceTimersByTime(400);
+
+    // The recentred card must stay unlocked: without this the list goes dead to
+    // scrolling and ticking while the card still asks the reader to use it.
+    const recentred = mockHighlight.mock.calls.at(-1)?.[0];
+    expect(recentred.element).toBeUndefined();
+    expect(recentred.disableActiveInteraction).toBe(false);
+
+    jest.useRealTimers();
+  });
+
+  it("leaves the card alone when the anchor is inside a fixed dialog", async () => {
+    jest.useFakeTimers();
+    const anchor = document.createElement("div");
+    anchor.id = "anchor";
+    // Laid out, but with no offset parent — what every element inside a
+    // fixed-position dialog reports.
+    Object.defineProperty(anchor, "getClientRects", {
+      configurable: true,
+      value: () => [{ width: 10, height: 10 }],
+    });
+    Object.defineProperty(anchor, "offsetParent", {
+      configurable: true,
+      value: null,
+    });
+    document.body.appendChild(anchor);
+    (waitForElement as jest.Mock).mockResolvedValue(anchor);
+
+    await runTour({
+      id: "demo",
+      steps: [
+        {
+          title: "Pick it",
+          description: "Tick a row",
+          anchor: "#anchor",
+          allowInteraction: true,
+        },
+        { title: "Done", description: "Finish" },
+      ],
+    });
+
+    const before = mockHighlight.mock.calls.length;
+    jest.advanceTimersByTime(1200);
+    expect(mockHighlight.mock.calls.length).toBe(before);
+
+    anchor.remove();
     jest.useRealTimers();
   });
 

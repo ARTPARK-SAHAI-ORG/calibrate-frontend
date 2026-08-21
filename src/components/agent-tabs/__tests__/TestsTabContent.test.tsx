@@ -117,6 +117,19 @@ jest.mock("../../AddTestDialog", () => ({
         >
           SubmitToolCall
         </button>
+        <button
+          onClick={() =>
+            props.onSubmit(
+              {
+                input: "What is the capital of France?",
+                evaluation: { type: "general" },
+              },
+              [{ evaluator_uuid: "e1" }],
+            )
+          }
+        >
+          SubmitGeneral
+        </button>
         <button onClick={props.onClose}>CloseAddTest</button>
       </div>
     ) : null;
@@ -227,6 +240,15 @@ const toolCallTest = {
   description: "",
   type: "tool_call" as const,
   config: {},
+  created_at: "2026-01-01 09:00:00",
+  updated_at: "2026-01-01 09:00:00",
+};
+const generalTest = {
+  uuid: "t4",
+  name: "Capital question test",
+  description: "",
+  type: "general" as const,
+  config: { input: "What is the capital of France?" },
   created_at: "2026-01-01 09:00:00",
   updated_at: "2026-01-01 09:00:00",
 };
@@ -514,6 +536,41 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByRole("button", { name: "Tool Call" }));
     expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
+  });
+
+  it("keeps a general agent's tests under the LLM response filter", async () => {
+    state.agentTests = [responseTest, toolCallTest, generalTest];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Capital question test");
+
+    // "LLM response" is also a type label in the table, so scope to the chip.
+    await user.click(screen.getByRole("button", { name: "LLM response" }));
+    expect(screen.getAllByText("Capital question test")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test")[0]).toBeInTheDocument();
+    expect(screen.queryAllByText("Weather tool test")).toHaveLength(0);
+  });
+
+  it("sends the evaluators when a general test is edited", async () => {
+    state.agentTests = [generalTest];
+    state.testDetail = { ...generalTest, evaluators: [] };
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findAllByText("Capital question test");
+
+    await user.click(screen.getAllByText("Capital question test")[0]);
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SubmitGeneral"));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find(
+        (c: any[]) => c[1]?.method === "PUT",
+      );
+      expect(putCall).toBeTruthy();
+      expect(JSON.parse(putCall![1].body).evaluators).toEqual([
+        { evaluator_uuid: "e1" },
+      ]);
+    });
   });
 
   it("selects all rows and shows the bulk-action toolbar, then clears", async () => {
@@ -1061,6 +1118,30 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
         String(c[0]).endsWith("/tests/bulk"),
       );
       expect(bulkCall).toBeTruthy();
+    });
+  });
+
+  it("creates a general test with its input and its evaluators", async () => {
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitGeneral"));
+
+    await waitFor(() => {
+      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/tests/bulk"),
+      );
+      expect(bulkCall).toBeTruthy();
+      const item = JSON.parse(bulkCall![1].body).tests[0];
+      // Exactly one of the two content fields, and the evaluators must ride
+      // along or the test is created with nothing judging it.
+      expect(item.input).toBe("What is the capital of France?");
+      expect(item).not.toHaveProperty("conversation_history");
+      expect(item.evaluators).toEqual([{ evaluator_uuid: "e1" }]);
     });
   });
 

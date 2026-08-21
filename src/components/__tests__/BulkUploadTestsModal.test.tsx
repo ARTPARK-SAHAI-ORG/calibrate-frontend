@@ -1122,6 +1122,125 @@ describe("BulkUploadTestsModal", () => {
     });
   });
 
+  describe("Tool call uploads (general agent)", () => {
+    async function openGeneralToolCallDropzone(
+      user: ReturnType<typeof setupUser>,
+    ) {
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      await selectTestType(user, "Tool Call");
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+    }
+
+    it("shows an input column, not conversation_history, in the guidelines", async () => {
+      const user = setupUser();
+      await openGeneralToolCallDropzone(user);
+      await user.click(screen.getByText("Download CSV format guidelines"));
+      const call = (generateGuidelinesPdf as jest.Mock).mock.calls[0][0];
+      expect(call.columns.map((c: any) => c.name)).toEqual([
+        "name",
+        "input",
+        "tool_calls",
+      ]);
+    });
+
+    it("parses a row with input + tool_calls and posts type tool_call with input only", async () => {
+      const user = setupUser();
+      await openGeneralToolCallDropzone(user);
+      const csv = `name,input,tool_calls
+"Book room test","Book room 101 for tomorrow","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Book room 101 for tomorrow")).toBeInTheDocument();
+
+      await user.click(screen.getByText(/Upload 1 test/));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/tests/bulk"),
+          expect.any(Object),
+        ),
+      );
+      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).includes("/tests/bulk"),
+      );
+      const body = JSON.parse(bulkCall[1].body);
+      expect(body.type).toBe("tool_call");
+      expect(body.tests[0]).toEqual({
+        name: "Book room test",
+        input: "Book room 101 for tomorrow",
+        tool_calls: [
+          { tool: "book_room", arguments: {}, accept_any_arguments: true },
+        ],
+      });
+      expect(body.tests[0]).not.toHaveProperty("conversation_history");
+    });
+
+    it("rejects a CSV that still carries conversation_history", async () => {
+      const user = setupUser();
+      await openGeneralToolCallDropzone(user);
+      const csv = `name,conversation_history,tool_calls
+"Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText(/Missing required columns/)).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Missing required columns: input/)).toBeInTheDocument();
+    });
+
+    it("fails the row when input is blank", async () => {
+      const user = setupUser();
+      await openGeneralToolCallDropzone(user);
+      const csv = `name,input,tool_calls
+"Book room test","","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText(/Row 1: missing input/)).toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe("Tool call uploads (conversation agent) stay unchanged", () => {
+    it("posts conversation_history and no input", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps()} />);
+      await selectTestType(user, "Tool Call");
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+      const csv = `name,conversation_history,tool_calls
+"Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
+      await uploadFile(csv);
+      await waitFor(() =>
+        expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/Upload 1 test/));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/tests/bulk"),
+          expect.any(Object),
+        ),
+      );
+      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).includes("/tests/bulk"),
+      );
+      const body = JSON.parse(bulkCall[1].body);
+      expect(body.type).toBe("tool_call");
+      expect(body.tests[0]).toEqual({
+        name: "Book room test",
+        conversation_history: [{ role: "user", content: "hi" }],
+        tool_calls: [
+          { tool: "book_room", arguments: {}, accept_any_arguments: true },
+        ],
+      });
+      expect(body.tests[0]).not.toHaveProperty("input");
+    });
+  });
+
   describe("row/column limits", () => {
     it("rejects a CSV with more than 500 rows", async () => {
       const user = setupUser();

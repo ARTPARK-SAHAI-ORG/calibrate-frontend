@@ -939,6 +939,13 @@ export function AddTestDialog({
   // A general agent's "LLM response" tab has no conversation history — it's
   // a single plain-text input instead of the multi-turn message builder.
   const isGeneralOutputTab = isGeneralTest && activeTab === "next-reply";
+  // A general agent has no conversation on EITHER authoring tab: both the
+  // "LLM response" and "Tool call" tests are written as one plain input.
+  // The test type is unaffected — a tool call test stays `tool_call`, it
+  // just stores `input` instead of `history`.
+  const usesPlainInput =
+    isGeneralTest &&
+    (activeTab === "next-reply" || activeTab === "tool-invocation");
 
   // A general agent has no ongoing conversation, so the Conversation test
   // type does not apply — it is excluded (on top of whatever's already
@@ -3052,7 +3059,7 @@ export function AddTestDialog({
       };
     }
 
-    if (isGeneralOutputTab) {
+    if (usesPlainInput) {
       return {
         input: generalInput,
         evaluation,
@@ -3158,9 +3165,9 @@ export function AddTestDialog({
       return; // Don't submit if any tool call has empty params
     }
 
-    // The general Output tab has no conversation history to validate — its
-    // own "empty input" check runs below instead.
-    if (!isGeneralOutputTab) {
+    // A general agent's tabs have no conversation history to validate — the
+    // "empty input" check below runs instead.
+    if (!usesPlainInput) {
       // Every user/agent message must have non-empty content.
       const hasEmptyChatMessage = chatMessages.some(
         (m) => (m.role === "user" || m.role === "agent") && !m.content.trim(),
@@ -3179,14 +3186,15 @@ export function AddTestDialog({
       }
     }
 
+    // A general test's single input box must not be blank, on either tab.
+    if (usesPlainInput && !generalInput.trim()) {
+      return;
+    }
+
     // Validate required fields based on test type
     if (isEvaluatorTab) {
       if (!testName.trim()) {
         return; // Don't submit if validation fails
-      }
-      // A general test's single input box must not be blank.
-      if (isGeneralOutputTab && !generalInput.trim()) {
-        return;
       }
       // At least one evaluator and every variable on every attached evaluator
       // must have a non-empty value.
@@ -4491,7 +4499,9 @@ export function AddTestDialog({
                       : activeTab === "conversation"
                         ? "Given the conversation history, the agent's response is added to the conversation and the full updated conversation is graded using the evaluators added to the test"
                         : activeTab === "tool-invocation"
-                          ? "Given the conversation history, check whether the agent calls the right tools with the expected parameters"
+                          ? isGeneralTest
+                            ? "Given the input, check whether the agent calls the right tools with the expected parameters"
+                            : "Given the conversation history, check whether the agent calls the right tools with the expected parameters"
                           : isGeneralTest
                             ? "The agent's output is graded using the evaluators added to the test"
                             : "Given the conversation history, the agent's response is graded using the evaluators added to the test"}
@@ -4503,7 +4513,7 @@ export function AddTestDialog({
                 data-tour="test-conversation"
                 className="flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 md:p-6"
               >
-                {isGeneralOutputTab ? (
+                {usesPlainInput ? (
                   /* General agent: a single plain-text input, no conversation. */
                   <div className="h-full flex flex-col">
                     <label className="block text-base font-medium text-foreground mb-2">
@@ -5553,7 +5563,7 @@ export function AddTestDialog({
                 const lastMessage = chatMessages[chatMessages.length - 1];
                 const isEmpty = chatMessages.length === 0;
                 let isLastMessageInvalid: boolean;
-                if (isGeneralOutputTab) {
+                if (usesPlainInput) {
                   // A general test has no conversation history to check —
                   // its own "empty input" validation runs on submit instead.
                   isLastMessageInvalid = false;
