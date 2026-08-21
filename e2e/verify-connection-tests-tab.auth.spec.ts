@@ -137,10 +137,11 @@ async function createNextReplyTestOnAgent(
   await page.getByRole("button", { name: "Create", exact: true }).click();
 
   // The new test seeds the default Correctness evaluator, which isn't on the
-  // agent yet, so TestsTabContent pops an "Update default evaluators?" prompt.
-  // Dismiss it — it otherwise overlays the Run/Compare buttons.
+  // agent yet, so TestsTabContent pops an "Attach this evaluator to the
+  // agent?" prompt. Dismiss it — it otherwise overlays the Run/Compare
+  // buttons.
   const evalPrompt = page.getByRole("heading", {
-    name: "Update default evaluators?",
+    name: "Attach this evaluator to the agent?",
     exact: true,
   });
   await expect(evalPrompt).toBeVisible({ timeout: 15000 });

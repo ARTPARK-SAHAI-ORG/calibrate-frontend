@@ -893,7 +893,11 @@ export function TestsTabContent({
     } catch (err) {
       reportError("Error adding evaluators to agent defaults:", err);
       setAgentDefaultsError(
-        err instanceof Error ? err.message : "Failed to attach the evaluator",
+        err instanceof Error
+          ? err.message
+          : agentDefaultsPrompt.length === 1
+            ? "Failed to attach the evaluator"
+            : "Failed to attach the evaluators",
       );
     } finally {
       setIsAttachingDefaults(false);

@@ -120,7 +120,7 @@ async function createUnverifiedConnectionAgent(
 // editor opens pre-seeded with a user/agent/user conversation + the default
 // Correctness evaluator, so a valid create only needs every seeded message
 // filled and the evaluator criteria set. (The /tests page — unlike the agent
-// Tests tab — does not pop the "Update default evaluators?" prompt.)
+// Tests tab — does not pop the "Attach this evaluator to the agent?" prompt.)
 async function createStandaloneTest(page: Page, name: string): Promise<void> {
   await page.goto("/tests");
   await waitForOrgReady(page);
