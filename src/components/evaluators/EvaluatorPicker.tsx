@@ -13,6 +13,11 @@ type EvaluatorPickerProps = {
   /** Shown when `evaluators` is empty. Override where the reason differs. */
   emptyMessage?: string;
   /**
+   * Offered under `emptyMessage` when there is nothing left to pick, so the
+   * reader can make one instead of leaving empty-handed.
+   */
+  emptyAction?: React.ReactNode;
+  /**
    * Show full-conversation evaluators, which are hidden everywhere else. Set
    * where they are the only kind that works, such as simulation setup.
    */
@@ -36,6 +41,7 @@ export function EvaluatorPicker({
   selectedIds,
   onToggle,
   emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
+  emptyAction,
   fillHeight = false,
   allowConversationType = false,
 }: EvaluatorPickerProps) {
@@ -100,9 +106,14 @@ export function EvaluatorPicker({
 
   const renderEvaluatorList = () => {
     if (filteredEvaluators.length === 0) {
+      // A search that found nothing is the reader's own doing; offer the
+      // create action only when the library itself has nothing left to give.
       return (
-        <div className="p-4 text-sm text-muted-foreground">
-          {q ? "No matching evaluators." : emptyMessage}
+        <div className="p-6 flex flex-col items-center justify-center text-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {q ? "No matching evaluators." : emptyMessage}
+          </p>
+          {!q && emptyAction}
         </div>
       );
     }

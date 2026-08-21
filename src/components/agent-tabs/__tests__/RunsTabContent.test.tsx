@@ -382,10 +382,18 @@ describe("RunsTabContent", () => {
         String(url).includes("/agent-tests/run/run-elsewhere"),
       ).length;
     await waitFor(() => expect(existsCalls()).toBe(1));
-    // Let a couple of row refreshes go by: still one.
-    await new Promise((resolve) => setTimeout(resolve, 3500));
+
+    // Wait for the rows to be refreshed twice rather than for a fixed time, so
+    // a slow machine cannot make this pass by accident.
+    const pollCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes("/agent-tests/run/run-pending"),
+      ).length;
+    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+      timeout: 8000,
+    });
     expect(existsCalls()).toBe(1);
-  }, 10000);
+  }, 12000);
 
   it("leaves a running run alone when one ask for it fails", async () => {
     state.runs = [
@@ -407,13 +415,21 @@ describe("RunsTabContent", () => {
 
     renderTab();
     await screen.findAllByText("Running");
-    // Give the poller a couple of turns: the row still says Running, not Error.
-    await new Promise((resolve) => setTimeout(resolve, 3500));
+
+    // Wait for two failed asks rather than for a fixed time.
+    const pollCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes("/agent-tests/run/"),
+      ).length;
+    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+      timeout: 8000,
+    });
+
     expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
     // Scoped to the table: "Error" is also one of the filter buttons.
     const table = document.querySelector("table") as HTMLElement;
     expect(table.textContent).not.toContain("Error");
-  }, 10000);
+  }, 12000);
 
   it("keeps an unfinished run up to date", async () => {
     state.runs = [

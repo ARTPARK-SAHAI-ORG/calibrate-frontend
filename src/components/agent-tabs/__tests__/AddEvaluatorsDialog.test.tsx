@@ -95,9 +95,7 @@ describe("AddEvaluatorsDialog", () => {
         isOpen
         onClose={jest.fn()}
         onAdd={onAdd}
-        availableEvaluators={[
-          evaluator({ uuid: "ev-a", name: "Tone check" }),
-        ]}
+        availableEvaluators={[evaluator({ uuid: "ev-a", name: "Tone check" })]}
       />,
     );
 
@@ -141,9 +139,7 @@ describe("AddEvaluatorsDialog", () => {
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: "Add (1)" }));
 
-    await waitFor(() =>
-      expect(onAdd).toHaveBeenCalledWith(["ev-a"]),
-    );
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(["ev-a"]));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -155,9 +151,7 @@ describe("AddEvaluatorsDialog", () => {
         isOpen
         onClose={jest.fn()}
         onAdd={jest.fn()}
-        availableEvaluators={[
-          evaluator({ uuid: "ev-a", name: "Tone check" }),
-        ]}
+        availableEvaluators={[evaluator({ uuid: "ev-a", name: "Tone check" })]}
       />,
     );
 
@@ -179,7 +173,7 @@ describe("AddEvaluatorsDialog", () => {
     );
 
     expect(
-      screen.getByText("All evaluators are already added"),
+      screen.getByText("Every evaluator in your library is already added"),
     ).toBeInTheDocument();
   });
 
@@ -207,5 +201,44 @@ describe("AddEvaluatorsDialog", () => {
       "Backend is down",
     );
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddEvaluatorsDialog with nothing left to add", () => {
+  it("offers to create one, and hands the reader to the create flow", async () => {
+    const user = setupUser();
+    const onClose = jest.fn();
+    const onCreateEvaluator = jest.fn();
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        availableEvaluators={[]}
+        onClose={onClose}
+        onAdd={jest.fn()}
+        onCreateEvaluator={onCreateEvaluator}
+      />,
+    );
+
+    expect(
+      screen.getByText("Every evaluator in your library is already added"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+    // The dialog gets out of the way first, then the create flow opens.
+    expect(onClose).toHaveBeenCalled();
+    expect(onCreateEvaluator).toHaveBeenCalled();
+  });
+
+  it("shows no create button when the caller offers no create flow", () => {
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        availableEvaluators={[]}
+        onClose={jest.fn()}
+        onAdd={jest.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Create evaluator" }),
+    ).not.toBeInTheDocument();
   });
 });

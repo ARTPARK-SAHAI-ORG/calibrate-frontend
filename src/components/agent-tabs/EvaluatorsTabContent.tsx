@@ -374,6 +374,7 @@ export function EvaluatorsTabContent({
         isOpen={addDialogOpen}
         availableEvaluators={availableEvaluators}
         onClose={() => setAddDialogOpen(false)}
+        onCreateEvaluator={() => setCreateFlowOpen(true)}
         onAdd={handleAddEvaluators}
       />
 

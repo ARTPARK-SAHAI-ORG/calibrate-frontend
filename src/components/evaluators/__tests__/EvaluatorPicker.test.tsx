@@ -137,10 +137,13 @@ describe("EvaluatorPicker", () => {
   });
 
   it("shows the caller's message when there are no evaluators at all", () => {
-    setup({ evaluators: [], emptyMessage: "All evaluators are already added" });
+    setup({
+      evaluators: [],
+      emptyMessage: "Every evaluator in your library is already added",
+    });
 
     expect(
-      screen.getByText("All evaluators are already added"),
+      screen.getByText("Every evaluator in your library is already added"),
     ).toBeInTheDocument();
   });
 });

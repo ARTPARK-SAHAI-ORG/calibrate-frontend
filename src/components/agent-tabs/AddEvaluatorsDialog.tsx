@@ -16,6 +16,11 @@ type AddEvaluatorsDialogProps = {
   description?: string;
   /** Offer full-conversation evaluators, hidden everywhere else. */
   allowConversationType?: boolean;
+  /**
+   * Called from the "Create evaluator" button shown when there is nothing left
+   * to add. The dialog closes itself first; the parent opens its create flow.
+   */
+  onCreateEvaluator?: () => void;
 };
 
 export function AddEvaluatorsDialog({
@@ -25,6 +30,7 @@ export function AddEvaluatorsDialog({
   onAdd,
   description = "Choose evaluators from your library to add to this agent",
   allowConversationType = false,
+  onCreateEvaluator,
 }: AddEvaluatorsDialogProps) {
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(isOpen);
@@ -128,7 +134,21 @@ export function AddEvaluatorsDialog({
             evaluators={availableEvaluators}
             selectedIds={selectedIds}
             onToggle={toggle}
-            emptyMessage="All evaluators are already added"
+            emptyMessage="Every evaluator in your library is already added"
+            emptyAction={
+              onCreateEvaluator && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onCreateEvaluator();
+                  }}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                >
+                  Create evaluator
+                </button>
+              )
+            }
             allowConversationType={allowConversationType}
             fillHeight
           />
