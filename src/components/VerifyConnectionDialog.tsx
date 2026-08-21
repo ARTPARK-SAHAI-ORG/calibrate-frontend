@@ -81,7 +81,7 @@ export function VerifyConnectionDialog({
         <div className="px-4 md:px-6 pb-2 space-y-3 md:space-y-4">
           <p className="text-muted-foreground text-xs md:text-sm leading-relaxed">
             Before running tests, we need to verify your agent. Once verified,
-            your tests start automatically
+            your tests start automatically.
           </p>
 
           {/* Failure: error + the agent's own response */}

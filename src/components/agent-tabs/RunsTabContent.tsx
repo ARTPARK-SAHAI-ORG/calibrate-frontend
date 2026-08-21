@@ -375,11 +375,11 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Result
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
-                    Number of tests
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
+                    Tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">
-                    Number of models
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
+                    Models
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Evaluators

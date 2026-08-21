@@ -138,9 +138,12 @@ type TestsTabContentProps = {
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
   onGoToConnectionSettings?: () => void;
   // Called the moment a run or benchmark is created here. The runs list lives
-  // in the Runs tab, so the parent uses this to have that tab pick the new one
-  // up rather than showing a stale list.
+  // in the Evaluations tab, so the parent uses this to have that tab pick the
+  // new one up rather than showing a stale list.
   onRunStarted?: () => void;
+  // Called when the run window is closed here. The parent takes the reader to
+  // the Evaluations tab, where the run they just watched is listed.
+  onRunWindowClosed?: () => void;
 };
 
 // Attaching a test that already exists is hidden for now: new tests come from
@@ -160,6 +163,7 @@ export function TestsTabContent({
   onConnectionVerified,
   onGoToConnectionSettings,
   onRunStarted,
+  onRunWindowClosed,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -304,6 +308,7 @@ export function TestsTabContent({
   const closeTestRun = () => {
     setOpenTestRunId(null);
     setRunIdParam(null);
+    onRunWindowClosed?.();
   };
   // Key of the run control whose "create run" call is in flight ("all",
   // "bulk", or a test uuid). Non-null disables every run control.

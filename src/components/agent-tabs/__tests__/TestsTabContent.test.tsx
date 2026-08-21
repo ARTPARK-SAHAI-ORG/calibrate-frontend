@@ -1131,6 +1131,22 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
   });
 
+  it("tells the parent when the run window is closed", async () => {
+    state.agentTests = [responseTest];
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await screen.findByTestId("test-runner-dialog");
+    // The parent takes the reader to the Evaluations tab from here.
+    await act(async () => {
+      testRunnerProps.onClose();
+    });
+    expect(onRunWindowClosed).toHaveBeenCalled();
+  });
+
   it("opens the run dialog and tells the parent a run started", async () => {
     state.agentTests = [responseTest];
     const onRunStarted = jest.fn();

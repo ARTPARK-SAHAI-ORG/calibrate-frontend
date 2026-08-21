@@ -103,7 +103,7 @@ describe("EvaluatorPromptPreview", () => {
     render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     expect(
       await screen.findByText(
-        "This evaluator has no version marked as current.",
+        "This evaluator has no version marked as current",
       ),
     ).toBeInTheDocument();
   });

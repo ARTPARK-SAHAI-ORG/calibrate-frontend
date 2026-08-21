@@ -423,7 +423,7 @@ export function TextToSpeechEvaluation({
         >
           {evaluatorsInvalid && (
             <p className="text-sm text-red-600 dark:text-red-400 mb-3">
-              Add at least one evaluator before starting the run.
+              Add at least one evaluator before starting the run
             </p>
           )}
           <RunEvaluatorsPanel

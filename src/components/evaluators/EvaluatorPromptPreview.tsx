@@ -121,7 +121,7 @@ export function EvaluatorPromptPreview({
     <div className="h-full overflow-y-auto p-4 md:p-5">
       {!version ? (
         <p className="text-sm text-muted-foreground">
-          This evaluator has no version marked as current.
+          This evaluator has no version marked as current
         </p>
       ) : (
         // The evaluator page's own Prompts-tab card, in that card's read-only

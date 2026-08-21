@@ -1313,6 +1313,12 @@ export function AgentDetail({
               }
               onGoToConnectionSettings={() => performTabSwitch("connection")}
               onRunStarted={() => setRunsReloadKey((k) => k + 1)}
+              // Closing the run window lands on Evaluations, where that run is
+              // listed, rather than back on the tests that started it.
+              onRunWindowClosed={() => {
+                setRunsReloadKey((k) => k + 1);
+                performTabSwitch("runs");
+              }}
             />
           </div>
         )}
