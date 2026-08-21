@@ -119,16 +119,33 @@ describe("EvaluatorPromptPreview", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not repeat the name and pills already on the row", async () => {
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(screen.queryByText("Conciseness")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Rates how concise the output is"),
+    ).not.toBeInTheDocument();
+  });
+
   it("asks for each evaluator once, even when the reader comes back to it", async () => {
+    const other = {
+      ...DETAIL,
+      uuid: "e2",
+      versions: [
+        { ...DETAIL.versions[1], system_prompt: "A different prompt" },
+      ],
+      live_version_index: 0,
+    };
     const { rerender } = render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     await screen.findByText("Judge whether the reply is concise.");
 
-    mockFetch.mockResolvedValue({ ...DETAIL, uuid: "e2", name: "Other" });
+    mockFetch.mockResolvedValue(other);
     rerender(<EvaluatorPromptPreview evaluatorUuid="e2" />);
-    await screen.findByText("Other");
+    await screen.findByText("A different prompt");
 
     rerender(<EvaluatorPromptPreview evaluatorUuid="e1" />);
-    await screen.findByText("Conciseness");
+    await screen.findByText("Judge whether the reply is concise.");
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
   });
 });

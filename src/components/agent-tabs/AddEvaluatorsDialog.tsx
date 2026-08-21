@@ -64,9 +64,7 @@ export function AddEvaluatorsDialog({
     } catch (err) {
       // Keep the dialog open and surface the failure instead of closing as if
       // the add succeeded.
-      setError(
-        err instanceof Error ? err.message : "Failed to add evaluators",
-      );
+      setError(err instanceof Error ? err.message : "Failed to add evaluators");
     } finally {
       setSaving(false);
     }
@@ -115,12 +113,15 @@ export function AddEvaluatorsDialog({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+        {/* The picker is the whole body, so let it have the height rather
+            than scrolling the body around it. */}
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-4 md:p-6">
           <EvaluatorPicker
             evaluators={availableEvaluators}
             selectedIds={selectedIds}
             onToggle={toggle}
             emptyMessage="All evaluators are already added"
+            fillHeight
           />
         </div>
 
@@ -135,44 +136,44 @@ export function AddEvaluatorsDialog({
             </p>
           )}
           <div className="flex items-center justify-end gap-2 md:gap-3">
-          <button
-            onClick={handleClose}
-            disabled={saving}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            data-tour="evaluators-add-confirm"
-            onClick={handleAdd}
-            disabled={selectedIds.size === 0 || saving}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {saving && (
-              <svg
-                className="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-            )}
-            {saving
-              ? "Adding..."
-              : `Add${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
-          </button>
+            <button
+              onClick={handleClose}
+              disabled={saving}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              data-tour="evaluators-add-confirm"
+              onClick={handleAdd}
+              disabled={selectedIds.size === 0 || saving}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving && (
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              )}
+              {saving
+                ? "Adding..."
+                : `Add${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+            </button>
           </div>
         </div>
       </div>

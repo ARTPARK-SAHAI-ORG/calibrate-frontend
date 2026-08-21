@@ -8,7 +8,6 @@ import {
   type EvaluatorDetail,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
-import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
 import { VersionCard } from "./VersionCard";
 
 /**
@@ -120,34 +119,16 @@ export function EvaluatorPromptPreview({
   const version = liveVersionOf(detail);
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-5 space-y-3 md:space-y-4">
-      <div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-base font-semibold text-foreground">
-            {detail.name}
-          </span>
-          {detail.evaluator_type && (
-            <EvaluatorTypePill evaluatorType={detail.evaluator_type} />
-          )}
-          {detail.output_type && (
-            <OutputTypePill outputType={detail.output_type} />
-          )}
-        </div>
-        {detail.description && (
-          <p className="text-sm text-muted-foreground mt-1">
-            {detail.description}
-          </p>
-        )}
-      </div>
-
+    <div className="h-full overflow-y-auto p-4 md:p-5">
       {!version ? (
         <p className="text-sm text-muted-foreground">
           This evaluator has no saved prompt yet.
         </p>
       ) : (
-        // The evaluator page's own Prompts-tab card. `isDefault` is that card's
-        // read-only shape: prompt already open, no version pill, no "Mark as
-        // current" button and no border of its own.
+        // The evaluator page's own Prompts-tab card, in that card's read-only
+        // shape: judge model, prompt, the values it asks for and the output.
+        // The name, type and description are already on the row to the left,
+        // so they are not repeated here.
         <VersionCard
           version={{
             uuid: version.uuid,

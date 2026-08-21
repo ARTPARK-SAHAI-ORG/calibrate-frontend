@@ -13,6 +13,13 @@ type EvaluatorPickerProps = {
   onToggle: (uuid: string) => void;
   /** Shown when `evaluators` is empty. Override where the reason differs. */
   emptyMessage?: string;
+  /**
+   * Stretch both columns to the height the parent gives them, instead of the
+   * built-in one. For a dialog that holds nothing but this picker, so the
+   * prompt reaches the footer instead of stopping short. The parent must be a
+   * flex child with a real height (`flex-1 min-h-0`).
+   */
+  fillHeight?: boolean;
 };
 
 /**
@@ -25,6 +32,7 @@ export function EvaluatorPicker({
   selectedIds,
   onToggle,
   emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
+  fillHeight = false,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
   // The evaluator whose prompt is on show. Null until one is clicked.
@@ -119,8 +127,16 @@ export function EvaluatorPicker({
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-      <div className="space-y-3 md:flex-1 md:min-w-0">
+    <div
+      className={`flex flex-col md:flex-row gap-3 md:gap-4 ${
+        fillHeight ? "md:h-full md:min-h-0" : ""
+      }`}
+    >
+      <div
+        className={`space-y-3 md:flex-1 md:min-w-0 ${
+          fillHeight ? "md:flex md:flex-col md:min-h-0" : ""
+        }`}
+      >
         {/* Search */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -148,14 +164,26 @@ export function EvaluatorPicker({
         </div>
 
         {/* Checkbox list */}
-        <div className="border border-border rounded-md md:h-[32rem] max-h-[60vh] overflow-y-auto divide-y divide-border">
+        <div
+          className={`border border-border rounded-md overflow-y-auto divide-y divide-border ${
+            fillHeight
+              ? "max-h-96 md:max-h-none md:flex-1 md:min-h-0"
+              : "md:h-[32rem] max-h-[60vh]"
+          }`}
+        >
           {renderEvaluatorList()}
         </div>
       </div>
 
       {/* How the picked evaluator judges. Below the list on a phone, where two
           columns will not fit. */}
-      <div className="md:flex-1 md:min-w-0 border border-border rounded-md md:h-[35.25rem] max-h-[60vh] overflow-hidden">
+      <div
+        className={`md:flex-1 md:min-w-0 border border-border rounded-md overflow-hidden ${
+          fillHeight
+            ? "max-h-[60vh] md:max-h-none md:h-full md:min-h-0"
+            : "md:h-[35.25rem] max-h-[60vh]"
+        }`}
+      >
         <EvaluatorPromptPreview evaluatorUuid={previewUuid} />
       </div>
     </div>
