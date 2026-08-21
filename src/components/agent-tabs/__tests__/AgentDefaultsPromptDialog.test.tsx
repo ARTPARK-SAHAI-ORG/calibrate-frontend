@@ -19,7 +19,7 @@ describe("AgentDefaultsPromptDialog", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Could not update default evaluators",
+      "Could not attach the evaluator",
     );
     expect(screen.getByRole("alert")).toHaveTextContent("Network error");
     expect(screen.getByRole("alert")).toHaveTextContent("Your test was saved");
@@ -29,7 +29,7 @@ describe("AgentDefaultsPromptDialog", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("shows Update as the primary action when there is no error", () => {
+  it("shows Attach as the primary action when there is no error", () => {
     render(
       <AgentDefaultsPromptDialog
         evaluators={evaluators}
@@ -40,7 +40,7 @@ describe("AgentDefaultsPromptDialog", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Update" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Attach" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -59,13 +59,13 @@ describe("AgentDefaultsPromptDialog", () => {
     );
 
     expect(
-      screen.getByText(/The following evaluators are not in this agent/),
+      screen.getByText(/evaluators that are not yet attached to this agent/),
     ).toBeInTheDocument();
     expect(screen.getByText("Persona Adherence")).toBeInTheDocument();
     expect(screen.getByText("Tone check")).toBeInTheDocument();
   });
 
-  it("calls onDismiss from Not now and shows Updating while saving", async () => {
+  it("calls onDismiss from Not now and shows Attaching while saving", async () => {
     const user = setupUser();
     const onDismiss = jest.fn();
 
@@ -93,7 +93,7 @@ describe("AgentDefaultsPromptDialog", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Updating..." }),
+      screen.getByRole("button", { name: "Attaching..." }),
     ).toBeDisabled();
   });
 });

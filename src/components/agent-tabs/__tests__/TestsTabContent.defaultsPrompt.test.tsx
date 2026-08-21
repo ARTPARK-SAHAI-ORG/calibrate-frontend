@@ -187,7 +187,7 @@ async function createTestWithPrompt(user: ReturnType<typeof setupUser>) {
   expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Submit test" }));
   expect(
-    await screen.findByRole("heading", { name: "Update default evaluators?" }),
+    await screen.findByRole("heading", { name: "Attach this evaluator to the agent?" }),
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
   expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
@@ -222,7 +222,7 @@ describe("TestsTabContent agent defaults prompt", () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole("heading", { name: "Update default evaluators?" }),
+        screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
       ).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
@@ -234,7 +234,7 @@ describe("TestsTabContent agent defaults prompt", () => {
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
     await createTestWithPrompt(user);
-    await user.click(screen.getByRole("button", { name: "Update" }));
+    await user.click(screen.getByRole("button", { name: "Attach" }));
 
     await waitFor(() => {
       // Add-only: POST just the evaluators not already on the agent.
@@ -245,9 +245,28 @@ describe("TestsTabContent agent defaults prompt", () => {
       );
     });
     expect(
-      screen.queryByRole("heading", { name: "Update default evaluators?" }),
+      screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
+  it("tells the parent an evaluator was attached, so the Evaluators tab can refresh", async () => {
+    const onAgentDefaultsAttached = jest.fn();
+    const user = setupUser();
+    render(
+      <TestsTabContent
+        agentUuid={AGENT_UUID}
+        onAgentDefaultsAttached={onAgentDefaultsAttached}
+      />,
+    );
+
+    await createTestWithPrompt(user);
+    expect(onAgentDefaultsAttached).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Attach" }));
+
+    await waitFor(() => {
+      expect(onAgentDefaultsAttached).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("closes the test dialog without a prompt when all evaluators are already on the agent", async () => {
@@ -266,7 +285,7 @@ describe("TestsTabContent agent defaults prompt", () => {
       expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
     });
     expect(
-      screen.queryByRole("heading", { name: "Update default evaluators?" }),
+      screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
     ).not.toBeInTheDocument();
     expect(mockAttachEvaluatorToAgent).not.toHaveBeenCalled();
   });
@@ -287,7 +306,7 @@ describe("TestsTabContent agent defaults prompt", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "Update default evaluators?",
+        name: "Attach this evaluator to the agent?",
       }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
@@ -302,10 +321,10 @@ describe("TestsTabContent agent defaults prompt", () => {
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
     await createTestWithPrompt(user);
-    await user.click(screen.getByRole("button", { name: "Update" }));
+    await user.click(screen.getByRole("button", { name: "Attach" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Could not update default evaluators");
+    expect(alert).toHaveTextContent("Could not attach the evaluator");
     expect(alert).toHaveTextContent("Network error");
     expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
 
@@ -315,7 +334,7 @@ describe("TestsTabContent agent defaults prompt", () => {
       expect(mockAttachEvaluatorToAgent).toHaveBeenCalledTimes(2);
     });
     expect(
-      screen.queryByRole("heading", { name: "Update default evaluators?" }),
+      screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
     ).not.toBeInTheDocument();
   });
 });

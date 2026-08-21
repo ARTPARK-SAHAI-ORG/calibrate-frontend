@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { signOut } from "next-auth/react";
 import { AgentDetail } from "../AgentDetail";
@@ -72,16 +73,26 @@ jest.mock("../agent-tabs", () => ({
     </div>
   ),
   TestsTabContent: (props: any) => (
-    <div data-testid="tests-tab-content">TestsTabContent-{props.agentType}</div>
+    <div data-testid="tests-tab-content">
+      TestsTabContent-{props.agentType}
+      <button onClick={() => props.onAgentDefaultsAttached?.()}>
+        AttachDefaultEvaluator
+      </button>
+    </div>
   ),
   RunsTabContent: (props: any) => (
     <div data-testid="runs-tab-content">RunsTabContent-{props.agentUuid}</div>
   ),
-  EvaluatorsTabContent: (props: any) => (
-    <div data-testid="evaluators-tab-content">
-      EvaluatorsTabContent-{props.agentUuid}
-    </div>
-  ),
+  EvaluatorsTabContent: (props: any) => {
+    // Mounted once per `key` value: a ref initialized on mount lets a test
+    // tell "still the same instance" apart from "remounted from scratch".
+    const mountId = React.useRef(Math.random()).current;
+    return (
+      <div data-testid="evaluators-tab-content" data-mount-id={mountId}>
+        EvaluatorsTabContent-{props.agentUuid}
+      </div>
+    );
+  },
   TracesTabContent: (props: any) => (
     <div data-testid="traces-tab-content">
       TracesTabContent-{props.agentUuid}
@@ -336,6 +347,35 @@ describe("AgentDetail", () => {
     await user.click(screen.getByText("Connection"));
     expect(screen.getByTestId("connection-tab-content")).toBeInTheDocument();
     expectVisibleTab("connection-tab-content", "tests-tab-content");
+  });
+
+  it("remounts the Evaluators tab when the Tests tab attaches a default evaluator", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    // Visit Evaluators first so it is kept mounted (not remounted) on later
+    // tab switches, matching the keep-alive behavior this bug depends on.
+    await user.click(screen.getByText("Evaluators"));
+    const firstMountId = screen
+      .getByTestId("evaluators-tab-content")
+      .getAttribute("data-mount-id");
+
+    await user.click(screen.getByText("Tests"));
+    await user.click(
+      screen.getByRole("button", { name: "AttachDefaultEvaluator" }),
+    );
+
+    await user.click(screen.getByText("Evaluators"));
+    const secondMountId = screen
+      .getByTestId("evaluators-tab-content")
+      .getAttribute("data-mount-id");
+
+    expect(secondMountId).not.toEqual(firstMountId);
   });
 
   it("drops the open test and run from the address when leaving the Tests tab", async () => {

@@ -305,7 +305,7 @@ describe("TestsTabContent save-and-run shortcut", () => {
       test_uuids: ["test-saved"],
     });
     expect(
-      screen.queryByRole("heading", { name: "Update default evaluators?" }),
+      screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
@@ -332,7 +332,7 @@ describe("TestsTabContent save-and-run shortcut", () => {
       test_uuids: ["test-1"],
     });
     expect(
-      screen.queryByRole("heading", { name: "Update default evaluators?" }),
+      screen.queryByRole("heading", { name: "Attach this evaluator to the agent?" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
@@ -433,7 +433,7 @@ describe("TestsTabContent save-and-run shortcut", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "Update default evaluators?",
+        name: "Attach this evaluator to the agent?",
       }),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();

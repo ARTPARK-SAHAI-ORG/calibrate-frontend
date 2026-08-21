@@ -105,11 +105,73 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
+// Create a standalone "LLM reply" evaluator via /evaluators, unattached to any
+// agent. Mirrors runs.auth.spec.ts / evaluators.auth.spec.ts — its default
+// prompt has no `{{variables}}`, so only a name is needed.
+async function createUnattachedLlmEvaluator(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await page.goto("/evaluators");
+  await waitForOrgReady(page);
+  await page.getByRole("button", { name: "Add evaluator" }).first().click();
+  const picker = page.locator(".fixed.inset-0.z-50");
+  await expect(
+    picker.getByRole("heading", {
+      name: "What is this evaluator for?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await picker.getByText("LLM reply", { exact: true }).click();
+  await picker.getByRole("button", { name: "Continue" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Add evaluator", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Select judge model")).toHaveCount(0, {
+    timeout: 20000,
+  });
+
+  await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
+  await page.getByRole("button", { name: "Create evaluator" }).click();
+
+  await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({
+    timeout: 20000,
+  });
+}
+
+// Delete `name` from the "My evaluators" list. Mirrors runs.auth.spec.ts.
+async function deleteEvaluatorFromLibrary(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await page.goto("/evaluators");
+  await waitForOrgReady(page);
+  const card = page.getByRole("link", { name: `Open ${name}` });
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await page
+    .locator(`[aria-label="Open ${name}"]`)
+    .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
+    .getByRole("button", { name: "Delete evaluator" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Delete evaluator", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(card).toHaveCount(0, { timeout: 15000 });
+}
+
 // From an agent's detail page, open the Tests tab and create a minimal
 // next-reply test attached to this agent. Mirrors runs.auth.spec.ts.
+// `extraEvaluatorName` is added on top via the dialog's own "Add evaluator"
+// picker — every agent now gets Correctness auto-attached on creation
+// (calibrate-backend #193), so a second, genuinely unattached evaluator is
+// what makes the "Attach this evaluator to the agent?" prompt below have
+// something real to fire on.
 async function createNextReplyTestOnAgent(
   page: Page,
   testName: string,
+  extraEvaluatorName: string,
 ): Promise<void> {
   await page.getByRole("button", { name: "Tests", exact: true }).click();
   await expect(page).toHaveURL(/tab=tests/);
@@ -134,13 +196,21 @@ async function createNextReplyTestOnAgent(
     .getByPlaceholder("Criteria that the agent's response should satisfy")
     .fill("The agent answers the user's question clearly and politely.");
 
+  // Add the second evaluator (no variables to fill in — see
+  // createUnattachedLlmEvaluator).
+  await page.getByRole("button", { name: "Add evaluator" }).click();
+  await page.getByPlaceholder("Search evaluators").fill(extraEvaluatorName);
+  await page.getByText(extraEvaluatorName, { exact: true }).first().click();
+  await page.getByRole("button", { name: "Add (1)" }).click();
+
   await page.getByRole("button", { name: "Create", exact: true }).click();
 
-  // The new test seeds the default Correctness evaluator, which isn't on the
-  // agent yet, so TestsTabContent pops an "Update default evaluators?" prompt.
-  // Dismiss it — it otherwise overlays the Run/Compare buttons.
+  // Correctness is auto-attached to every agent on creation, but the second
+  // evaluator isn't, so TestsTabContent pops an "Attach this evaluator to the
+  // agent?" prompt for it. Dismiss it — it otherwise overlays the Run/Compare
+  // buttons.
   const evalPrompt = page.getByRole("heading", {
-    name: "Update default evaluators?",
+    name: "Attach this evaluator to the agent?",
     exact: true,
   });
   await expect(evalPrompt).toBeVisible({ timeout: 15000 });
@@ -169,10 +239,12 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
   }) => {
     const name = `verify-tab ${Date.now()}`;
     const testName = `verify-tab test ${Date.now()}`;
+    const evaluatorName = `verify-tab evaluator ${Date.now()}`;
 
+    await createUnattachedLlmEvaluator(page, evaluatorName);
     await createConnectionAgent(page, name);
     await setConnectionUrl(page, "https://example.com/agent");
-    await createNextReplyTestOnAgent(page, testName);
+    await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // Click Run all — for an unverified connection agent this opens the verify
     // dialog rather than starting a run.
@@ -212,6 +284,7 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
 
     await page.keyboard.press("Escape");
     await deleteAgent(page, name);
+    await deleteEvaluatorFromLibrary(page, evaluatorName);
   });
 
   // Pass path: mock ONLY the verify endpoint to succeed, then let the held run
@@ -221,6 +294,7 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
   }) => {
     const name = `verify-tab pass ${Date.now()}`;
     const testName = `verify-tab pass test ${Date.now()}`;
+    const evaluatorName = `verify-tab pass evaluator ${Date.now()}`;
 
     // Mock the verify call and the whole run (start + poll) before anything
     // triggers them: the backend rejects a run on an unverified connection
@@ -251,9 +325,10 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
       }),
     );
 
+    await createUnattachedLlmEvaluator(page, evaluatorName);
     await createConnectionAgent(page, name);
     await setConnectionUrl(page, "https://example.com/agent");
-    await createNextReplyTestOnAgent(page, testName);
+    await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     await page.getByRole("button", { name: /Run all/ }).click();
 
@@ -283,5 +358,6 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
 
     await page.keyboard.press("Escape");
     await deleteAgent(page, name);
+    await deleteEvaluatorFromLibrary(page, evaluatorName);
   });
 });
