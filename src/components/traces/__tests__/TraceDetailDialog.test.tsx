@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@/test-utils";
+import { act, render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   TraceDetailDialog,
   humanTraceName,
@@ -363,6 +363,84 @@ it("never shows the previous trace under the next one's heading", async () => {
   });
   expect(await screen.findByText("At the block health centre.")).toBeInTheDocument();
   expect(screen.getByText("msg-2")).toBeInTheDocument();
+});
+
+it("does not render previous/next controls when neither callback is passed", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+  expect(
+    screen.queryByRole("button", { name: "Previous trace" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Next trace" }),
+  ).not.toBeInTheDocument();
+});
+
+it("shows position, disables the exhausted side, and fires the click handlers", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const onPrev = jest.fn();
+  const onNext = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      onPrev={onPrev}
+      onNext={onNext}
+      hasPrev={false}
+      hasNext={true}
+      position={{ index: 0, total: 3 }}
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+
+  expect(screen.getByText("1 of 3")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Previous trace" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Next trace" })).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: "Next trace" }));
+  expect(onNext).toHaveBeenCalledTimes(1);
+  expect(onPrev).not.toHaveBeenCalled();
+});
+
+it("navigates with arrow keys but leaves the disabled side alone", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const onPrev = jest.fn();
+  const onNext = jest.fn();
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      onPrev={onPrev}
+      onNext={onNext}
+      hasPrev={false}
+      hasNext={true}
+      position={{ index: 0, total: 3 }}
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+  });
+  expect(onPrev).not.toHaveBeenCalled();
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+  });
+  expect(onNext).toHaveBeenCalledTimes(1);
 });
 
 it("surfaces an error when the fetch fails", async () => {

@@ -22,6 +22,9 @@ jest.mock("../../../hooks", () => ({
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
     .useTraceDeletion,
   useDialogUrlParam: (args: unknown) => mockUseDialogUrlParam(args),
+  // Real, so the previous/next buttons on the detail dialog are exercised
+  // end to end rather than stubbed away.
+  useItemPager: jest.requireActual("../../../hooks/useItemPager").useItemPager,
   // The remembered page size is real, so choosing one is exercised end to end.
   usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
   PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
@@ -123,10 +126,44 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
   TraceDetailDialog: ({
     isOpen,
     traceUuid,
+    hasPrev,
+    hasNext,
+    onPrev,
+    onNext,
+    position,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
-  }) => (isOpen ? <div data-testid="trace-detail">{traceUuid}</div> : null),
+    hasPrev?: boolean;
+    hasNext?: boolean;
+    onPrev?: () => void;
+    onNext?: () => void;
+    position?: { index: number; total: number };
+  }) =>
+    isOpen ? (
+      <div data-testid="trace-detail">
+        {traceUuid}
+        <span data-testid="trace-detail-position">
+          {position ? `${position.index + 1} of ${position.total}` : ""}
+        </span>
+        <button
+          type="button"
+          disabled={!hasPrev}
+          onClick={onPrev}
+          data-testid="trace-detail-prev"
+        >
+          prev
+        </button>
+        <button
+          type="button"
+          disabled={!hasNext}
+          onClick={onNext}
+          data-testid="trace-detail-next"
+        >
+          next
+        </button>
+      </div>
+    ) : null,
 }));
 // The stub also exposes onConverted, so the "created N tests" message the tab
 // builds from the response is exercised rather than assumed.
@@ -184,6 +221,7 @@ function tracesResult(
     total: items.length,
     loadedQ: "",
     offset: 0,
+    setOffset: jest.fn(),
     isLoading: false,
     error: null,
     handleDeleted,
@@ -935,6 +973,38 @@ describe("TracesTabContent", () => {
 
     await user.click(screen.getAllByText("Second")[0]);
 
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("steps to the next and previous trace within the loaded page", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace(),
+        trace({
+          uuid: "trace-2",
+          message_id: "msg-002",
+          input_preview: "Second",
+        }),
+      ]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByText("Second")[0]);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "2 of 2",
+    );
+    expect(screen.getByTestId("trace-detail-next")).toBeDisabled();
+
+    await user.click(screen.getByTestId("trace-detail-prev"));
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-1");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "1 of 2",
+    );
+    expect(screen.getByTestId("trace-detail-prev")).toBeDisabled();
+
+    await user.click(screen.getByTestId("trace-detail-next"));
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });
 });

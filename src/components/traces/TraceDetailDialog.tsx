@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Tooltip } from "@/components/Tooltip";
 import { LoadingState } from "@/components/ui";
 import {
   TestDetailView,
@@ -24,6 +25,11 @@ type TraceDetailDialogProps = {
   onClose: () => void;
   accessToken: string | null;
   traceUuid: string | null;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  position?: { index: number; total: number };
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -180,6 +186,11 @@ export function TraceDetailDialog({
   onClose,
   accessToken,
   traceUuid,
+  onPrev,
+  onNext,
+  hasPrev = false,
+  hasNext = false,
+  position,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -217,6 +228,38 @@ export function TraceDetailDialog({
     };
   }, [isOpen, traceUuid, accessToken]);
 
+  // Close on Escape; navigate with arrow keys.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+      if (e.key === "ArrowLeft" && hasPrev && onPrev) {
+        e.preventDefault();
+        onPrev();
+      } else if (e.key === "ArrowRight" && hasNext && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose, hasPrev, hasNext, onPrev, onNext]);
+
   const history = useMemo(
     () => (trace ? turnsToHistory(trace.input) : []),
     [trace],
@@ -231,10 +274,71 @@ export function TraceDetailDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-background rounded-xl w-full max-w-6xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div className="flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
+        <div className="relative flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground truncate min-w-0">
             {trace ? humanTraceName(trace) : "Trace"}
           </h2>
+          {(onPrev || onNext) && (
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
+              <div className="pointer-events-auto">
+                <Tooltip position="bottom" content="Previous trace">
+                  <button
+                    type="button"
+                    onClick={onPrev}
+                    disabled={!hasPrev}
+                    aria-label="Previous trace"
+                    className="flex items-center justify-center w-8 h-8 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
+              </div>
+              {position && position.total > 0 ? (
+                <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
+                  {position.index + 1} of {position.total}
+                </span>
+              ) : (
+                <span className="min-w-[4rem]" />
+              )}
+              <div className="pointer-events-auto">
+                <Tooltip position="bottom" content="Next trace">
+                  <button
+                    type="button"
+                    onClick={onNext}
+                    disabled={!hasNext}
+                    aria-label="Next trace"
+                    className="flex items-center justify-center w-8 h-8 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={onClose}

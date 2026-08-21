@@ -121,6 +121,7 @@ export function useTraces({
     total,
     loadedQ,
     offset,
+    setOffset,
     pageSize,
     isLoading,
     error,
