@@ -39,6 +39,7 @@ import {
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
+import { supportsEvaluatorVariables } from "@/lib/evaluatorApi";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -468,7 +469,7 @@ function EvaluatorDetailPageInner() {
         newVersionScale.every((r) => r.name.trim().length > 0));
     const existingVariables = liveVersionOf(evaluator)?.variables ?? [];
     const variableDescriptionsValid =
-      evaluator.evaluator_type !== "llm" ||
+      !supportsEvaluatorVariables(evaluator.evaluator_type) ||
       existingVariables.every(
         (v) =>
           (newVersionVariableDescriptions[v.name] ?? v.description ?? "").trim()
@@ -525,9 +526,9 @@ function EvaluatorDetailPageInner() {
       // Variable name set is pinned to the live version (we don't allow add /
       // rename / remove on a new version — see the amber callout in the UI).
       // We forward the existing names with their (possibly edited)
-      // descriptions and preserve `default`. Only LLM evaluators can carry
-      // variables; for other types we omit the field entirely.
-      if (evaluator.evaluator_type === "llm") {
+      // descriptions and preserve `default`. Only the LLM-judged types can
+      // carry variables; for other types we omit the field entirely.
+      if (supportsEvaluatorVariables(evaluator.evaluator_type)) {
         const existing = liveVersionOf(evaluator)?.variables ?? [];
         if (existing.length > 0) {
           body.variables = existing.map((v) => {
@@ -999,7 +1000,7 @@ function EvaluatorDetailPageInner() {
                     value={newVersionSystemPrompt}
                     onChange={(e) => setNewVersionSystemPrompt(e.target.value)}
                     placeholder={
-                      evaluator.evaluator_type === "llm"
+                      supportsEvaluatorVariables(evaluator.evaluator_type)
                         ? "Describe how the judge should grade a response. Reference existing variables with {{name}}."
                         : "Describe how the judge should grade a response"
                     }
@@ -1120,7 +1121,9 @@ function EvaluatorDetailPageInner() {
                     const newNames = detected.filter(
                       (name) => !existingNames.has(name),
                     );
-                    const isLLM = evaluator.evaluator_type === "llm";
+                    const isLLM = supportsEvaluatorVariables(
+                      evaluator.evaluator_type,
+                    );
 
                     if (isLLM && existingVariables.length > 0) {
                       return (
@@ -1257,7 +1260,8 @@ function EvaluatorDetailPageInner() {
                       );
                     }
 
-                    // Non-LLM evaluator types don't support variables at all.
+                    // Types other than the LLM-judged ones don't support
+                    // variables at all.
                     if (
                       !isLLM &&
                       detected.length > 0 &&
