@@ -51,7 +51,7 @@ export default function PersonasPage() {
     null,
   );
   const [editingPersonaUuid, setEditingPersonaUuid] = useState<string | null>(
-    null
+    null,
   );
   const [isLoadingPersona, setIsLoadingPersona] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
@@ -59,7 +59,7 @@ export default function PersonasPage() {
   // Form fields
   const [personaLabel, setPersonaLabel] = useState("");
   const [personaCharacteristics, setPersonaCharacteristics] = useState(
-    DEFAULT_CHARACTERISTICS
+    DEFAULT_CHARACTERISTICS,
   );
   const [personaGender, setPersonaGender] = useState<"male" | "female">("male");
   const [personaInterruptionSensitivity, setPersonaInterruptionSensitivity] =
@@ -71,7 +71,7 @@ export default function PersonasPage() {
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [personaToDelete, setPersonaToDelete] = useState<PersonaData | null>(
-    null
+    null,
   );
   const [isPersonaDeleting, setIsPersonaDeleting] = useState(false);
 
@@ -110,7 +110,7 @@ export default function PersonasPage() {
       } catch (err) {
         reportError("Error fetching personas:", err);
         setPersonasError(
-          err instanceof Error ? err.message : "Failed to load personas"
+          err instanceof Error ? err.message : "Failed to load personas",
         );
       } finally {
         setPersonasLoading(false);
@@ -153,7 +153,7 @@ export default function PersonasPage() {
             accept: "application/json",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -167,7 +167,7 @@ export default function PersonasPage() {
 
       // Remove the persona from local state
       setPersonas(
-        personas.filter((persona) => persona.uuid !== personaToDelete.uuid)
+        personas.filter((persona) => persona.uuid !== personaToDelete.uuid),
       );
       closeDeleteDialog();
     } catch (err) {
@@ -258,7 +258,7 @@ export default function PersonasPage() {
     } catch (err) {
       reportError("Error creating persona:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to create persona"
+        err instanceof Error ? err.message : "Failed to create persona",
       );
     } finally {
       setIsCreating(false);
@@ -300,17 +300,17 @@ export default function PersonasPage() {
       // Populate form fields with persona data
       setPersonaLabel(personaData.name || "");
       setPersonaCharacteristics(
-        personaData.description || DEFAULT_CHARACTERISTICS
+        personaData.description || DEFAULT_CHARACTERISTICS,
       );
       setPersonaGender(personaData.config?.gender || "male");
       setPersonaInterruptionSensitivity(
-        personaData.config?.interruption_sensitivity || "medium"
+        personaData.config?.interruption_sensitivity || "medium",
       );
       setPersonaLanguage(personaData.config?.language || "english");
     } catch (err) {
       reportError("Error fetching persona:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to load persona"
+        err instanceof Error ? err.message : "Failed to load persona",
       );
     } finally {
       setIsLoadingPersona(false);
@@ -353,7 +353,7 @@ export default function PersonasPage() {
               language: personaLanguage,
             },
           }),
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -391,7 +391,7 @@ export default function PersonasPage() {
     } catch (err) {
       reportError("Error updating persona:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to update persona"
+        err instanceof Error ? err.message : "Failed to update persona",
       );
     } finally {
       setIsCreating(false);
@@ -404,12 +404,12 @@ export default function PersonasPage() {
       (persona.name &&
         persona.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (persona.description &&
-        persona.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        persona.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   // Helper to display interruption sensitivity
   const getInterruptionSensitivityLabel = (
-    value: "none" | "low" | "medium" | "high"
+    value: "none" | "low" | "medium" | "high",
   ) => {
     const labels: Record<string, string> = {
       none: "None",
@@ -604,7 +604,7 @@ export default function PersonasPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {getInterruptionSensitivityLabel(
-                      persona.config?.interruption_sensitivity || "medium"
+                      persona.config?.interruption_sensitivity || "medium",
                     )}
                   </p>
                   <button
@@ -669,7 +669,7 @@ export default function PersonasPage() {
                       {/* Interruption Sensitivity */}
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-foreground">
                         {getInterruptionSensitivityLabel(
-                          persona.config?.interruption_sensitivity || "medium"
+                          persona.config?.interruption_sensitivity || "medium",
                         )}
                       </span>
                     </div>
@@ -801,7 +801,7 @@ export default function PersonasPage() {
                           setPersonaLabel(e.target.value);
                           if (nameConflictError) setNameConflictError(null);
                         }}
-                        placeholder="e.g., Rural Farmer - Karnataka"
+                        placeholder="e.g. Rural Farmer - Karnataka"
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                           nameConflictError ||
                           (validationAttempted && !personaLabel.trim())
@@ -822,7 +822,7 @@ export default function PersonasPage() {
                         Characteristics <span className="text-red-500">*</span>
                       </label>
                       <p className="text-sm text-muted-foreground mb-2">
-                        Define WHO the persona is emulating (e.g., specific
+                        Define WHO the persona is emulating (e.g. specific
                         details like their name, age, gender, etc.) and HOW they
                         behave (e.g. polite, friendly, impatient, speaks slowly,
                         etc.). Avoid task instructions here — use{" "}
@@ -901,7 +901,7 @@ export default function PersonasPage() {
                             >
                               {lang.charAt(0).toUpperCase() + lang.slice(1)}
                             </button>
-                          )
+                          ),
                         )}
                       </div>
                     </div>
@@ -953,7 +953,7 @@ export default function PersonasPage() {
                             ) : (
                               button
                             );
-                          }
+                          },
                         )}
                       </div>
                     </div>

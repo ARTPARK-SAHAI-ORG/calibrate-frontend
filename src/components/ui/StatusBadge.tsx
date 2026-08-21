@@ -8,7 +8,7 @@ import {
 } from "@/lib/status";
 
 type StatusBadgeProps = {
-  /** The status string (e.g., "queued", "in_progress", "done", "failed") */
+  /** The status string (e.g. "queued", "in_progress", "done", "failed") */
   status: string;
   /** Whether to show a spinner for active statuses (queued, in_progress) */
   showSpinner?: boolean;
@@ -25,7 +25,7 @@ export function StatusBadge({ status, showSpinner = false }: StatusBadgeProps) {
     <div className="flex items-center gap-3">
       <span
         className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
-          status
+          status,
         )}`}
       >
         {formatStatus(status)}

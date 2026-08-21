@@ -140,7 +140,7 @@ export function CreateEvaluatorSidebar({
               type="text"
               ref={nameInputRef}
               value={evaluatorName}
-              placeholder="e.g., Follows Refund Policy"
+              placeholder="e.g. Follows Refund Policy"
               onChange={(e) => {
                 setEvaluatorName(e.target.value);
                 setCreateNameError(null);
