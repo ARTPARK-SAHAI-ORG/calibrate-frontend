@@ -50,11 +50,13 @@ export function EvaluatorPicker({
   const [previewUuid, setPreviewUuid] = useState<string | null>(null);
 
   const q = search.trim().toLowerCase();
-  const filteredEvaluators = evaluators.filter((ev) => {
+  // Everything this picker could offer, before the reader's own search.
+  const offerable = evaluators.filter(
     // Full-conversation evaluators are hidden unless the caller is a place
     // where they are the only kind that works, such as simulation setup.
-    if (!allowConversationType && ev.evaluator_type === "conversation")
-      return false;
+    (ev) => allowConversationType || ev.evaluator_type !== "conversation",
+  );
+  const filteredEvaluators = offerable.filter((ev) => {
     if (!q) return true;
     return (
       ev.name.toLowerCase().includes(q) ||
@@ -106,14 +108,9 @@ export function EvaluatorPicker({
 
   const renderEvaluatorList = () => {
     if (filteredEvaluators.length === 0) {
-      // A search that found nothing is the reader's own doing; offer the
-      // create action only when the library itself has nothing left to give.
       return (
-        <div className="p-6 flex flex-col items-center justify-center text-center gap-3">
-          <p className="text-sm text-muted-foreground">
-            {q ? "No matching evaluators." : emptyMessage}
-          </p>
-          {!q && emptyAction}
+        <div className="p-6 text-sm text-muted-foreground text-center">
+          No matching evaluators.
         </div>
       );
     }
@@ -139,6 +136,21 @@ export function EvaluatorPicker({
       </>
     );
   };
+
+  if (offerable.length === 0) {
+    return (
+      <div
+        className={`flex flex-col items-center justify-center text-center gap-4 p-8 ${
+          fillHeight ? "md:h-full md:min-h-0" : "min-h-[12rem]"
+        }`}
+      >
+        <p className="text-sm md:text-base text-muted-foreground">
+          {emptyMessage}
+        </p>
+        {emptyAction}
+      </div>
+    );
+  }
 
   return (
     <div

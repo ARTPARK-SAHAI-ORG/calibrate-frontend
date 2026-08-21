@@ -175,6 +175,13 @@ describe("AddEvaluatorsDialog", () => {
     expect(
       screen.getByText("Every evaluator in your library is already added"),
     ).toBeInTheDocument();
+    // One block, not a search box and an empty prompt column beside it.
+    expect(
+      screen.queryByPlaceholderText("Search evaluators"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Select an evaluator to see its details"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows the error when adding fails", async () => {
