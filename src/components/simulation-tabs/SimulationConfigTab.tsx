@@ -142,7 +142,7 @@ export function SimulationConfigTab({
       />
 
       {/* Evaluators — the same add and create flow as the agent page. */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         <label className="block text-sm md:text-base font-medium text-foreground">
           Select evaluators
         </label>
