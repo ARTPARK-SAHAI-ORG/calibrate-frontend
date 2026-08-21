@@ -103,6 +103,38 @@ describe("useAgentRuns around", () => {
     expect(result.current.offset).toBe(0);
   });
 
+  it("falls back to page one from a later page when the run isn't found there either", async () => {
+    global.fetch = jest.fn(async (url: string) => {
+      if (url.includes("around=")) return jsonResponse({}, false, 404);
+      const offset = Number(new URL(url).searchParams.get("offset"));
+      return jsonResponse({ items: [runA], total: 200, offset });
+    }) as jest.Mock;
+
+    const { result, rerender } = renderHook(
+      ({ aroundRunId }: { aroundRunId: string | null }) =>
+        useAgentRuns({
+          agentUuid: AGENT_UUID,
+          accessToken: "tok",
+          pageSize: 50,
+          filter: "all",
+          aroundRunId,
+        }),
+      { initialProps: { aroundRunId: null as string | null } },
+    );
+    await waitFor(() => expect(result.current.items).toEqual([runA]));
+
+    // Land on a later page first, same as ordinary paging.
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    // A run link comes in for a run that turns out not to exist either. The
+    // fallback has to explicitly ask for page one — offset is already 50, so
+    // just setting it to 0 wouldn't retrigger the fetch on its own.
+    rerender({ aroundRunId: "run-gone" });
+    await waitFor(() => expect(result.current.aroundNotFound).toBe(true));
+    await waitFor(() => expect(result.current.offset).toBe(0));
+  });
+
   it("pages normally with no aroundRunId", async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse({ items: [runA], total: 1, offset: 0 }),

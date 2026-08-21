@@ -187,6 +187,11 @@ export function RunsTabContent({
   });
 
   const openTestRun = (uuid: string) => {
+    // A row click always wins over a `?runId=` link that's still being
+    // looked up — otherwise that lookup could resolve later and reopen the
+    // run the link named, snapping the reader back out of the one they just
+    // picked.
+    setPendingRunId(null);
     setOpenBenchmarkRun(null);
     setOpenTestRunId(uuid);
     setRunIdParam(uuid);
@@ -195,12 +200,17 @@ export function RunsTabContent({
     setOpenTestRunId(null);
     setRunIdParam(null);
   };
+  const closeBenchmarkRun = () => {
+    setOpenBenchmarkRun(null);
+    setRunIdParam(null);
+  };
 
   const openRun = (run: AgentRun) => {
     if (run.type === "llm-unit-test") {
       openTestRun(run.uuid);
       return;
     }
+    setPendingRunId(null);
     setOpenTestRunId(null);
     setOpenBenchmarkRun(run);
     setRunIdParam(run.uuid);
@@ -440,7 +450,7 @@ export function RunsTabContent({
       {openBenchmarkRun && (
         <BenchmarkResultsDialog
           isOpen
-          onClose={() => setOpenBenchmarkRun(null)}
+          onClose={closeBenchmarkRun}
           agentUuid={agentUuid}
           agentName={agentName}
           testUuids={[]}
@@ -448,7 +458,7 @@ export function RunsTabContent({
           models={[]}
           taskId={openBenchmarkRun.uuid}
           onRerun={(models, testUuids, testNames) => {
-            setOpenBenchmarkRun(null);
+            closeBenchmarkRun();
             benchmarkRerun.start({
               agentUuid,
               agentName,
