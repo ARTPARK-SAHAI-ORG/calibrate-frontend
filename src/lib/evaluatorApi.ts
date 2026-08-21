@@ -267,11 +267,11 @@ export async function deleteEvaluator(
  * Whether an evaluator of this type can carry `{{variable}}` placeholders in
  * its judge prompt. Only the two LLM-judged types can: the STT/TTS/conversation
  * judges have no per-test place to fill values in. This is the ONE place the
- * rule lives — the create flow and the new-version form on the evaluator detail
- * page both call it, so they cannot drift apart (they did: edit used to accept
+ * rule lives. The create flow and the new-version form on the evaluator detail
+ * page both call it, so they cannot drift apart. They did: edit used to accept
  * `llm` only, which hid the variable fields on an `llm-general` evaluator and
  * made saving a new version fail, since the backend refuses a version whose
- * variable names differ from the previous one).
+ * variable names differ from the previous one.
  */
 export function supportsEvaluatorVariables(
   type: EvaluatorType | undefined | null,
