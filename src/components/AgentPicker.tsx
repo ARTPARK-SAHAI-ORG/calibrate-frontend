@@ -191,9 +191,10 @@ export function AgentPicker({
       renderOption={(agent, isSelected) => (
         <>
           {/* The tick sits with the name, so the type pill stays flush right
-              and lines up across every row. */}
-          <span className="truncate flex items-center gap-1.5">
-            {agent.name}
+              and lines up across every row. Only the name itself is cut short
+              when it is too long, so the pill and the tick stay on screen. */}
+          <span className="min-w-0 flex items-center gap-1.5">
+            <span className="truncate">{agent.name}</span>
             {agent.verified === false && <UnverifiedPill />}
             {isSelected && <CheckIcon />}
           </span>
@@ -430,9 +431,11 @@ export function MultiAgentPicker({
                       }`}
                     >
                       {/* The tick sits with the name, so the type pill stays
-                          flush right and lines up across every row. */}
-                      <span className="truncate flex items-center gap-1.5">
-                        {agent.name}
+                          flush right and lines up across every row. Only the
+                          name itself is cut short when it is too long, so the
+                          pill and the tick stay on screen. */}
+                      <span className="min-w-0 flex items-center gap-1.5">
+                        <span className="truncate">{agent.name}</span>
                         {agent.verified === false && <UnverifiedPill />}
                         {isSelected && <CheckIcon />}
                       </span>
