@@ -132,6 +132,7 @@ export const A = {
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
+  testTypePicker: '[data-tour="test-type-picker"]',
   testTypeNextReply: '[data-test-type="next-reply"]',
   testTypeNext: '[data-tour="test-type-next"]',
   testConversation: '[data-tour="test-conversation"]',
@@ -285,15 +286,13 @@ export async function fillSystemPromptResilient(
 }
 
 /**
- * Open the Create Test dialog and pick "LLM response", which seeds a
- * conversation and the default evaluator. Leaves the editor open for the
- * scenario/criteria to be filled in.
+ * Confirm the test type in the picker and name the test. Leaves the editor
+ * open for the scenario/criteria to be filled in.
  */
-async function openCreateTestEditor(
+async function confirmTestTypeAndName(
   baseName: string,
   deps: FirstEvalDeps,
 ): Promise<void> {
-  await clickElement(A.testsCreate, { timeout: 10000 });
   // The type picker is a two-step pick: choose the reply/answer type (it also
   // opens preselected), then confirm with Next to enter the editor. Driven by
   // anchors so the picker's wording can change without breaking the tour.
@@ -654,7 +653,20 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         await clickElement(A.tabTests);
       },
       action: async () => {
-        await openCreateTestEditor(DEMO_TESTS[0].name, deps);
+        await clickElement(A.testsCreate, { timeout: 10000 });
+      },
+    },
+    {
+      anchor: A.testTypePicker,
+      title: "Pick what to test",
+      description:
+        "First, choose <strong>what you want to check</strong>: the reply your agent gives, or the tool it reaches for. The example on the right shows what that kind of test looks like once it runs. We will check the <strong>reply</strong>.",
+      side: "left",
+      actionLabel: "Next",
+      timeout: 12000,
+      allowInteraction: true,
+      action: async () => {
+        await confirmTestTypeAndName(DEMO_TESTS[0].name, deps);
       },
     },
     {
@@ -702,7 +714,20 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Add it",
       timeout: 12000,
       action: async () => {
-        await openCreateTestEditor(DEMO_TESTS[1].name, deps);
+        await clickElement(A.testsCreate, { timeout: 10000 });
+      },
+    },
+    {
+      anchor: A.testTypePicker,
+      title: "The same choice again",
+      description:
+        "Same picker as before: we are checking the <strong>reply</strong> again, this time with a question the agent cannot answer.",
+      side: "left",
+      actionLabel: "Next",
+      timeout: 12000,
+      allowInteraction: true,
+      action: async () => {
+        await confirmTestTypeAndName(DEMO_TESTS[1].name, deps);
       },
     },
     {

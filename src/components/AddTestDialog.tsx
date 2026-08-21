@@ -3301,7 +3301,10 @@ export function AddTestDialog({
           with Create to confirm. Once confirmed, the type is locked for
           this test — same as an existing test's type can't be changed. */}
       {!typeChosen && (
-        <div className="relative w-full max-w-7xl h-[92vh] mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden animate-in-scale">
+        <div
+          data-tour="test-type-picker"
+          className="relative w-full max-w-7xl h-[92vh] mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden animate-in-scale"
+        >
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">
               Create a test

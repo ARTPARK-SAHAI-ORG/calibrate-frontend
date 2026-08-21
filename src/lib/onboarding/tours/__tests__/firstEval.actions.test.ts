@@ -145,7 +145,7 @@ describe("first-eval tour step actions", () => {
 
   it("drives the test-type picker's two steps by anchor, not by copy", async () => {
     const tour = buildTour("tok");
-    await stepByTitle(tour, "Create your first test").action?.();
+    await stepByTitle(tour, "Pick what to test").action?.();
     // Pick the reply/answer type, then confirm with Next: clicking the option
     // alone only previews it, so both are needed to reach the editor. Anchored
     // so the picker's wording can change without stalling the tour.
