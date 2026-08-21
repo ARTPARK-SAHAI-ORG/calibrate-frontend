@@ -66,6 +66,14 @@ type BulkUploadTestsModalProps = {
    * Used by the agent page's Tests tab.
    */
   lockedAgentUuid?: string;
+  /**
+   * Whether the agent this modal is uploading tests for holds an ongoing
+   * conversation ("conversation", the default) or takes one input and
+   * produces one output ("general"). A general agent has no conversation to
+   * grade, so the "Conversation" test type is hidden and the "Next Reply"
+   * option is relabelled to match (see the type-option list below).
+   */
+  agentNature?: "conversation" | "general";
 };
 
 // Column header for an evaluator variable in the response-type CSV. We
@@ -253,6 +261,7 @@ export function BulkUploadTestsModal({
   onClose,
   onSuccess,
   lockedAgentUuid,
+  agentNature = "conversation",
 }: BulkUploadTestsModalProps) {
   const backendAccessToken = useAccessToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1336,9 +1345,11 @@ export function BulkUploadTestsModal({
               {[
                 {
                   value: "response" as const,
-                  label: "Next Reply",
+                  label: agentNature === "general" ? "Output" : "Next Reply",
                   description:
-                    "Evaluate the agent's response given a conversation history",
+                    agentNature === "general"
+                      ? "Evaluate the agent's output given the input"
+                      : "Evaluate the agent's response given a conversation history",
                 },
                 {
                   value: "tool_call" as const,
@@ -1354,6 +1365,10 @@ export function BulkUploadTestsModal({
                 },
               ]
                 .filter((opt) => isCreatableTestType(opt.value))
+                .filter(
+                  (opt) =>
+                    agentNature !== "general" || opt.value !== "conversation",
+                )
                 .map((opt) => {
                   const isSelected = testType === opt.value;
                   return (

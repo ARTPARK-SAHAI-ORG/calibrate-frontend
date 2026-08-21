@@ -148,6 +148,10 @@ type TestsTabContentProps = {
   // Evaluators tab loads its list once, so the parent uses this to have that
   // tab pick the newly attached evaluator up rather than showing a stale list.
   onAgentDefaultsAttached?: () => void;
+  // Whether the agent under test is a conversation agent or a general one.
+  // Forwarded to AddTestDialog / BulkUploadTestsModal to shape their evaluator
+  // options; both default to "conversation" when unset.
+  agentNature?: "conversation" | "general";
 };
 
 // Attaching a test that already exists is hidden for now: new tests come from
@@ -169,6 +173,7 @@ export function TestsTabContent({
   onRunStarted,
   onRunWindowClosed,
   onAgentDefaultsAttached,
+  agentNature,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -2229,6 +2234,7 @@ export function TestsTabContent({
           agentDefaultInputs={agentDefaultInputs}
           agentDefaultInputTypes={agentDefaultInputTypes}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
+          agentNature={agentNature}
           showRunAfterSave={!isConnectionUnverified}
           onRun={() => {
             // Run the already-saved version of the test being edited (the
@@ -2268,6 +2274,7 @@ export function TestsTabContent({
           fetchAgentTests();
         }}
         lockedAgentUuid={agentUuid}
+        agentNature={agentNature}
       />
 
       {/* Test Runner Dialog — one instance for both a just-started run and a

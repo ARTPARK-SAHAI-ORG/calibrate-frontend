@@ -1103,6 +1103,21 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("CloseBulkUpload"));
     expect(screen.queryByTestId("bulk-upload-modal")).not.toBeInTheDocument();
   });
+
+  it("passes agentNature through to the create dialog and bulk-upload modal", async () => {
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Bulk upload"));
+    await screen.findByTestId("bulk-upload-modal");
+    expect(bulkUploadProps.agentNature).toBe("general");
+    await user.click(screen.getByText("CloseBulkUpload"));
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    expect(addTestDialogProps.agentNature).toBe("general");
+  });
 });
 
 describe("TestsTabContent — benchmark & past runs", () => {

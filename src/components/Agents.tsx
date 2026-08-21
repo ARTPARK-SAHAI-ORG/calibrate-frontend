@@ -16,6 +16,7 @@ type Agent = {
   uuid: string;
   name: string;
   type: "agent" | "connection";
+  agent_type?: "conversation" | "general";
   updatedAt: string; // Formatted display date
   updatedAtRaw: string; // Original date for sorting
 };
@@ -689,6 +690,10 @@ function NewAgentDialog({
 }) {
   const [agentName, setAgentName] = useState("");
   const [agentKind, setAgentKind] = useState<"agent" | "connection">("agent");
+  const [agentNature, setAgentNature] = useState<
+    "conversation" | "general" | null
+  >(null);
+  const [step, setStep] = useState<1 | 2>(1);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameConflictError, setNameConflictError] = useState<string | null>(
@@ -696,8 +701,13 @@ function NewAgentDialog({
   );
   const maxLength = 50;
 
-  const handleCreate = async () => {
+  const handleNext = () => {
     if (!agentName.trim()) return;
+    setStep(2);
+  };
+
+  const handleCreate = async () => {
+    if (!agentName.trim() || !agentNature) return;
 
     // Keep the dialog open (spinner up) through navigation so the agents list
     // never flashes between "Create" and the new agent's page loading.
@@ -716,6 +726,7 @@ function NewAgentDialog({
           ? {
               name: agentName.trim(),
               type: "connection",
+              agent_type: agentNature,
               config: {
                 agent_url: "",
                 agent_headers: {},
@@ -728,6 +739,7 @@ function NewAgentDialog({
           : {
               name: agentName.trim(),
               type: "agent",
+              agent_type: agentNature,
             };
 
       const response = await fetch(`${backendUrl}/agents`, {
@@ -750,6 +762,7 @@ function NewAgentDialog({
         if (conflict) {
           setNameConflictError(conflict);
           setIsCreating(false);
+          setStep(1);
           return;
         }
         throw new Error("Failed to create agent");
@@ -786,176 +799,276 @@ function NewAgentDialog({
             New agent
           </h2>
           <p className="text-muted-foreground text-[15px]">
-            Choose a name and how you want to set up your agent
+            {step === 1
+              ? "Choose a name and how you want to set up your agent"
+              : "Choose what your agent does"}
           </p>
         </div>
 
-        {/* Agent Name Input */}
-        <div className="mb-5">
-          <label className="block text-[13px] font-medium text-foreground mb-2">
-            Agent name <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              data-tour="agent-name-input"
-              value={agentName}
-              onChange={(e) => {
-                if (e.target.value.length <= maxLength) {
-                  setAgentName(e.target.value);
-                  if (nameConflictError) setNameConflictError(null);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && agentName.trim() && !isCreating) {
-                  handleCreate();
-                }
-              }}
-              placeholder="Enter agent name"
-              className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                nameConflictError ? "border-red-500" : "border-border"
-              }`}
-              maxLength={maxLength}
-              autoFocus
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <span className="text-[12px] text-muted-foreground">
-                {agentName.length}/{maxLength}
-              </span>
+        {step === 1 ? (
+          <>
+            {/* Agent Name Input */}
+            <div className="mb-5">
+              <label className="block text-[13px] font-medium text-foreground mb-2">
+                Agent name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  data-tour="agent-name-input"
+                  value={agentName}
+                  onChange={(e) => {
+                    if (e.target.value.length <= maxLength) {
+                      setAgentName(e.target.value);
+                      if (nameConflictError) setNameConflictError(null);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && agentName.trim()) {
+                      handleNext();
+                    }
+                  }}
+                  placeholder="Enter agent name"
+                  className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                    nameConflictError ? "border-red-500" : "border-border"
+                  }`}
+                  maxLength={maxLength}
+                  autoFocus
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <span className="text-[12px] text-muted-foreground">
+                    {agentName.length}/{maxLength}
+                  </span>
+                </div>
+              </div>
+              {nameConflictError && (
+                <p className="mt-1 text-[13px] text-red-500">
+                  {nameConflictError}
+                </p>
+              )}
             </div>
-          </div>
-          {nameConflictError && (
-            <p className="mt-1 text-[13px] text-red-500">
-              {nameConflictError}
-            </p>
-          )}
-        </div>
 
-        {/* Agent Kind Selection */}
-        <div data-tour="agent-type-options" className="mb-5 space-y-2">
-          <label className="block text-[13px] font-medium text-foreground mb-2">
-            Setup
-          </label>
+            {/* Agent Kind Selection */}
+            <div data-tour="agent-type-options" className="mb-5 space-y-2">
+              <label className="block text-[13px] font-medium text-foreground mb-2">
+                Setup
+              </label>
 
-          {/* Build option */}
-          <button
-            type="button"
-            onClick={() => setAgentKind("agent")}
-            className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
-              agentKind === "agent"
-                ? "border-foreground bg-muted/30"
-                : "border-border hover:border-muted-foreground"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              {/* Build option */}
+              <button
+                type="button"
+                onClick={() => setAgentKind("agent")}
+                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentKind === "agent"
-                    ? "border-foreground"
-                    : "border-muted-foreground"
+                    ? "border-foreground bg-muted/30"
+                    : "border-border hover:border-muted-foreground"
                 }`}
               >
-                {agentKind === "agent" && (
-                  <div className="w-2 h-2 rounded-full bg-foreground" />
-                )}
-              </div>
-              <div>
-                <div className="text-[13px] font-medium text-foreground">
-                  Build your agent in Calibrate
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      agentKind === "agent"
+                        ? "border-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {agentKind === "agent" && (
+                      <div className="w-2 h-2 rounded-full bg-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      Build your agent in Calibrate
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
+                      Configure the LLM/STT/TTS models for your agent, set the
+                      instructions and define the tools your agent can use.
+                      All within Calibrate.
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[12px] text-muted-foreground mt-0.5">
-                  Configure the LLM/STT/TTS models for your agent, set the
-                  instructions and define the tools your agent can use. All
-                  within Calibrate.
-                </div>
-              </div>
-            </div>
-          </button>
+              </button>
 
-          {/* Connect option */}
-          <button
-            type="button"
-            onClick={() => setAgentKind("connection")}
-            className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
-              agentKind === "connection"
-                ? "border-foreground bg-muted/30"
-                : "border-border hover:border-muted-foreground"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              {/* Connect option */}
+              <button
+                type="button"
+                onClick={() => setAgentKind("connection")}
+                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentKind === "connection"
-                    ? "border-foreground"
-                    : "border-muted-foreground"
+                    ? "border-foreground bg-muted/30"
+                    : "border-border hover:border-muted-foreground"
                 }`}
               >
-                {agentKind === "connection" && (
-                  <div className="w-2 h-2 rounded-full bg-foreground" />
-                )}
-              </div>
-              <div>
-                <div className="text-[13px] font-medium text-foreground">
-                  Connect your existing agent
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      agentKind === "connection"
+                        ? "border-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {agentKind === "connection" && (
+                      <div className="w-2 h-2 rounded-full bg-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      Connect your existing agent
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
+                      Provide a URL for your deployed agent. Calibrate will
+                      call it directly to run evals, benchmarks and
+                      simulations.
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[12px] text-muted-foreground mt-0.5">
-                  Provide a URL for your deployed agent. Calibrate will call it
-                  directly to run evals, benchmarks and simulations.
-                </div>
-              </div>
+              </button>
             </div>
-          </button>
-        </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-5 p-3 rounded-md bg-red-500/10 border border-red-500/20">
-            <p className="text-[13px] text-red-500">{error}</p>
-          </div>
-        )}
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onClose}
+                className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={!agentName.trim()}
+                className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Agent Nature Selection */}
+            <div data-tour="agent-nature-options" className="mb-5 space-y-2">
+              <label className="block text-[13px] font-medium text-foreground mb-2">
+                What does your agent do?
+              </label>
 
-        {/* Footer Buttons */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            data-tour="agent-create-submit"
-            onClick={handleCreate}
-            disabled={!agentName.trim() || isCreating}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isCreating ? (
-              <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Creating...
-              </>
-            ) : (
-              "Create"
+              {/* Conversation option */}
+              <button
+                type="button"
+                onClick={() => setAgentNature("conversation")}
+                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+                  agentNature === "conversation"
+                    ? "border-foreground bg-muted/30"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      agentNature === "conversation"
+                        ? "border-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {agentNature === "conversation" && (
+                      <div className="w-2 h-2 rounded-full bg-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      Conversation
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
+                      Talks back and forth with a person or system.
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* General option */}
+              <button
+                type="button"
+                onClick={() => setAgentNature("general")}
+                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+                  agentNature === "general"
+                    ? "border-foreground bg-muted/30"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      agentNature === "general"
+                        ? "border-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {agentNature === "general" && (
+                      <div className="w-2 h-2 rounded-full bg-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      General
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
+                      Takes a single input and produces an output.
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-5 p-3 rounded-md bg-red-500/10 border border-red-500/20">
+                <p className="text-[13px] text-red-500">{error}</p>
+              </div>
             )}
-          </button>
-        </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setStep(1)}
+                disabled={isCreating}
+                className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Back
+              </button>
+              <button
+                data-tour="agent-create-submit"
+                onClick={handleCreate}
+                disabled={!agentNature || isCreating}
+                className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isCreating ? (
+                  <>
+                    <svg
+                      className="w-4 h-4 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  "Create"
+                )}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

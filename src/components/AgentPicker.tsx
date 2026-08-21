@@ -11,6 +11,7 @@ export type Agent = {
   uuid: string;
   name: string;
   type?: "agent" | "connection";
+  agent_type?: "conversation" | "general";
   verified?: boolean;
   // True for connection agents that have custom fields (backend `default_inputs`).
   hasDefaultInputs?: boolean;

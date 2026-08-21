@@ -69,6 +69,7 @@ type AgentData = {
   uuid: string;
   name: string;
   type?: "agent" | "connection";
+  agent_type?: "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -1277,6 +1278,7 @@ export function AgentDetail({
               agentUuid={agentUuid}
               agentName={agent.name}
               agentType={agent.type}
+              agentNature={agent.agent_type ?? "conversation"}
               connectionVerified={
                 agent.type === "connection"
                   ? connectionConfig.connection_verified === true
@@ -1359,6 +1361,7 @@ export function AgentDetail({
               key={evaluatorsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
+              agentNature={agent.agent_type ?? "conversation"}
             />
           </div>
         )}

@@ -967,6 +967,26 @@ describe("BulkUploadTestsModal", () => {
     });
   });
 
+  describe("agentNature: general", () => {
+    it("hides Conversation and relabels Next Reply to Output", () => {
+      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
+      expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+      expect(screen.queryByText("Next Reply")).not.toBeInTheDocument();
+      expect(screen.getByText("Output")).toBeInTheDocument();
+      expect(
+        screen.getByText("Evaluate the agent's output given the input"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Tool Call")).toBeInTheDocument();
+    });
+
+    it("still shows Next Reply and Conversation when agentNature is omitted", () => {
+      render(<BulkUploadTestsModal {...defaultProps()} />);
+      expect(screen.getByText("Next Reply")).toBeInTheDocument();
+      expect(screen.getByText("Conversation")).toBeInTheDocument();
+      expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    });
+  });
+
   describe("row/column limits", () => {
     it("rejects a CSV with more than 500 rows", async () => {
       const user = setupUser();

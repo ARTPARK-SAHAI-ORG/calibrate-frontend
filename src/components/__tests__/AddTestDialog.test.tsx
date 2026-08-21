@@ -1332,4 +1332,93 @@ describe("AddTestDialog", () => {
       expect(onSubmit.mock.calls[0][2]).toEqual({ runAfterSave: true });
     });
   });
+
+  describe("agentNature", () => {
+    it("still shows all three test types when agentNature is omitted (conversation, unchanged)", () => {
+      render(<AddTestDialog {...baseProps()} />);
+      expect(screen.getByText("Next reply test")).toBeInTheDocument();
+      expect(screen.getByText("Tool call test")).toBeInTheDocument();
+      expect(screen.getByText("Conversation test")).toBeInTheDocument();
+    });
+
+    it("hides Conversation and relabels Next reply to Output for a general agent", () => {
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
+        />,
+      );
+      // Compact type-switcher boxes render the short `label`, which is what
+      // gets relabeled ("Next reply" -> "Output"); "Conversation" is dropped
+      // entirely rather than merely hidden.
+      expect(screen.queryByRole("button", { name: "Next reply" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Output" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Tool call" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Conversation" })).not.toBeInTheDocument();
+    });
+
+    it("shows the Conversation option and the Next reply label for a conversation agent", () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "conversation",
+          })}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Next reply" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Conversation" })).toBeInTheDocument();
+    });
+
+    it("describes a general agent's grading as output-based rather than conversation-based", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "The agent's output is graded using the evaluators added to the test",
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    });
+
+    it("seeds a general agent's next-reply evaluators from llm-general, not llm, and skips the default-correctness fallback", async () => {
+      // TONE_EVALUATOR is an "llm" evaluator linked to the agent. For a
+      // general agent the seeding looks for "llm-general" evaluators
+      // instead, so it should find nothing here, and — unlike the
+      // conversation-agent case — must not fall back to the seeded default
+      // correctness evaluator either.
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [TONE_EVALUATOR.uuid],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByText("Add at least one evaluator to grade the agent's next reply"),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tone check")).not.toBeInTheDocument();
+    });
+
+    it("still seeds the default-correctness evaluator for a conversation agent with no agent evaluators", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "conversation",
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    });
+  });
 });

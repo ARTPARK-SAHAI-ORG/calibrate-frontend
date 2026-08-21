@@ -823,6 +823,13 @@ type AddTestDialogProps = {
    * editing; create-only contexts may omit it.
    */
   onRun?: () => void;
+  /**
+   * The connected agent's nature: "conversation" (default, has an ongoing
+   * back-and-forth) or "general" (takes one input, produces one output — no
+   * conversation, so the Conversation test type is hidden and the next-reply
+   * type is relabeled "Output").
+   */
+  agentNature?: "conversation" | "general";
 };
 
 export function AddTestDialog({
@@ -851,6 +858,7 @@ export function AddTestDialog({
   requireAssistantLastMessage = false,
   showRunAfterSave = false,
   onRun,
+  agentNature = "conversation",
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -860,14 +868,50 @@ export function AddTestDialog({
   const ItemNoun = isLabelItem ? "Item" : "Test";
 
   const backendAccessToken = useAccessToken();
+  // A general agent has no conversation test type, so a tab of "conversation"
+  // is never valid for one — fall back to "next-reply" instead.
+  const resolveTab = useCallback(
+    (tab: TestTab | undefined): TestTab => {
+      if (tab === "conversation" && agentNature === "general")
+        return "next-reply";
+      return tab || "next-reply";
+    },
+    [agentNature],
+  );
+  // A general agent's next-reply test is judged by output-type evaluators
+  // (llm-general) instead of the conversational reply evaluator (llm).
+  const nextReplyEvaluatorType =
+    agentNature === "general" ? "llm-general" : "llm";
   const [activeTab, setActiveTab] = useState<TestTab>(
-    isLabelItem ? "next-reply" : initialTab || "next-reply",
+    isLabelItem ? "next-reply" : resolveTab(initialTab),
   );
   // Tabs that pair the conversation history with attached evaluators (vs. the
   // tool-invocation tab, which uses a tool picker instead). Used to gate the
   // shared evaluator-related UI and validation paths below.
   const isEvaluatorTab =
     activeTab === "next-reply" || activeTab === "conversation";
+
+  // A general agent has no ongoing conversation, so the Conversation test
+  // type does not apply — it is excluded (on top of whatever's already
+  // hidden for everyone via creatableTestTypes), and the next-reply type is
+  // relabeled "Output" since there's no "next reply" without a conversation.
+  const testTypeOptions = useMemo(
+    () =>
+      agentNature === "general"
+        ? creatableTestTypes
+            .filter((opt) => opt.tab !== "conversation")
+            .map((opt) =>
+              opt.tab === "next-reply"
+                ? {
+                    ...opt,
+                    label: "Output",
+                    description: "Evaluate the agent's output given the input",
+                  }
+                : opt,
+            )
+        : creatableTestTypes,
+    [agentNature],
+  );
 
   // Two-phase create flow: when creating a brand-new test we first show a
   // centred type picker (the same three boxes as the bulk-upload modal),
@@ -937,9 +981,9 @@ export function AddTestDialog({
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      setActiveTab(resolveTab(initialTab));
     }
-  }, [initialTab]);
+  }, [initialTab, resolveTab]);
 
   // Track if tools have been fetched (even if the result is empty)
   const [toolsFetched, setToolsFetched] = useState(false);
@@ -1659,6 +1703,7 @@ export function AddTestDialog({
         .filter(
           (e) =>
             e.evaluator_type === "llm" ||
+            e.evaluator_type === "llm-general" ||
             e.evaluator_type === CONVERSATION_EVALUATOR_TYPE,
         )
         .map((e) => ({
@@ -1713,8 +1758,13 @@ export function AddTestDialog({
   // default-correctness evaluator on next-reply when the agent has none.
   const buildDefaultAttachedForTab = useCallback(
     (tab: TestTab): AttachedEvaluator[] => {
-      const wantedType =
-        tab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
+      const isGeneralNextReply =
+        agentNature === "general" && tab === "next-reply";
+      const wantedType = isGeneralNextReply
+        ? "llm-general"
+        : tab === "conversation"
+          ? CONVERSATION_EVALUATOR_TYPE
+          : "llm";
       const toAttached = (o: LLMEvaluatorOption): AttachedEvaluator => ({
         evaluator_uuid: o.uuid,
         name: o.name,
@@ -1727,6 +1777,8 @@ export function AddTestDialog({
       const agentMatches = availableLLMEvaluators.filter(
         (o) => agentSet.has(o.uuid) && o.evaluator_type === wantedType,
       );
+      if (isGeneralNextReply)
+        return agentMatches.length > 0 ? agentMatches.map(toAttached) : [];
       if (agentMatches.length > 0) return agentMatches.map(toAttached);
       if (tab === "next-reply") {
         const correctness = availableLLMEvaluators.find((o) =>
@@ -1736,7 +1788,7 @@ export function AddTestDialog({
       }
       return [];
     },
-    [agentEvaluatorUuids, availableLLMEvaluators],
+    [agentEvaluatorUuids, availableLLMEvaluators, agentNature],
   );
 
   // Initialize attached evaluators once props + evaluator list have settled.
@@ -1987,7 +2039,7 @@ export function AddTestDialog({
         !attachedEvaluators.some((a) => a.evaluator_uuid === o.uuid) &&
         (activeTab === "conversation"
           ? o.evaluator_type === CONVERSATION_EVALUATOR_TYPE
-          : o.evaluator_type === "llm"),
+          : o.evaluator_type === nextReplyEvaluatorType),
     );
     const query = evaluatorPickerSearch.trim().toLowerCase();
     if (!query) return remaining;
@@ -3138,7 +3190,7 @@ export function AddTestDialog({
               Select the type of test
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {creatableTestTypes.map((opt) => (
+              {testTypeOptions.map((opt) => (
                 <button
                   key={opt.tab}
                   type="button"
@@ -3277,7 +3329,7 @@ export function AddTestDialog({
                 // rendered compactly in the top-left so the type can still be
                 // switched mid-create.
                 <div className="flex gap-2 p-3 border-b border-border">
-                  {creatableTestTypes.map((opt) => (
+                  {testTypeOptions.map((opt) => (
                     <button
                       key={opt.tab}
                       onClick={() => setActiveTab(opt.tab)}
@@ -3391,7 +3443,7 @@ export function AddTestDialog({
                                 (activeTab === "conversation"
                                   ? o.evaluator_type ===
                                     CONVERSATION_EVALUATOR_TYPE
-                                  : o.evaluator_type === "llm"),
+                                  : o.evaluator_type === nextReplyEvaluatorType),
                             );
                           const noOptionsLeft = remainingOptions.length === 0;
                           return (
@@ -3455,7 +3507,7 @@ export function AddTestDialog({
                                   (activeTab === "conversation"
                                     ? o.evaluator_type ===
                                       CONVERSATION_EVALUATOR_TYPE
-                                    : o.evaluator_type === "llm"),
+                                    : o.evaluator_type === nextReplyEvaluatorType),
                               );
                               if (remaining.length === 0) {
                                 return (
@@ -4150,7 +4202,9 @@ export function AddTestDialog({
                       ? "Given the conversation history, the agent's response is added to the conversation and the full updated conversation is graded using the evaluators added to the test"
                       : activeTab === "tool-invocation"
                         ? "Given the conversation history, check whether the agent calls the right tools with the expected parameters"
-                        : "Given the conversation history, the agent's response is graded using the evaluators added to the test"}
+                        : agentNature === "general"
+                          ? "The agent's output is graded using the evaluators added to the test"
+                          : "Given the conversation history, the agent's response is graded using the evaluators added to the test"}
                 </p>
               </div>
             </div>

@@ -216,6 +216,10 @@ describe("Agents", () => {
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Build your agent in Calibrate"));
 
+    await user.click(screen.getByText("Next"));
+    expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
+    await user.click(screen.getByText("Conversation"));
+
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "new-agent-uuid" }),
     );
@@ -223,6 +227,8 @@ describe("Agents", () => {
     await user.click(screen.getByText("Create"));
 
     await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("new-agent-uuid"));
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
+    expect(body.agent_type).toBe("conversation");
   });
 
   it("creates a connection-kind agent", async () => {
@@ -237,6 +243,8 @@ describe("Agents", () => {
     await user.click(screen.getAllByText("New agent")[0]);
     await user.type(screen.getByPlaceholderText("Enter agent name"), "Conn Agent");
     await user.click(screen.getByText("Connect your existing agent"));
+    await user.click(screen.getByText("Next"));
+    await user.click(screen.getByText("General"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "conn-uuid" }),
@@ -246,6 +254,52 @@ describe("Agents", () => {
     await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("conn-uuid"));
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
     expect(body.type).toBe("connection");
+    expect(body.agent_type).toBe("general");
+  });
+
+  it("keeps the second step's Create button disabled until a nature is chosen", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getByText("No agents found")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+    await user.type(screen.getByPlaceholderText("Enter agent name"), "Gated Agent");
+    await user.click(screen.getByText("Next"));
+
+    expect(screen.getByText("Create")).toBeDisabled();
+    await user.click(screen.getByText("Conversation"));
+    expect(screen.getByText("Create")).not.toBeDisabled();
+  });
+
+  it("goes back from the nature step to the setup step", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getByText("No agents found")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+    await user.type(screen.getByPlaceholderText("Enter agent name"), "Back Agent");
+    await user.click(screen.getByText("Next"));
+    expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Back"));
+    expect(
+      screen.getByText("Choose a name and how you want to set up your agent"),
+    ).toBeInTheDocument();
+  });
+
+  it("disables Next on the setup step until a name is entered", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getByText("No agents found")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+    expect(screen.getByText("Next")).toBeDisabled();
   });
 
   it("shows a name-conflict error inline when creating hits 409", async () => {
@@ -257,6 +311,8 @@ describe("Agents", () => {
     );
     await user.click(screen.getAllByText("New agent")[0]);
     await user.type(screen.getByPlaceholderText("Enter agent name"), "Dup Agent");
+    await user.click(screen.getByText("Next"));
+    await user.click(screen.getByText("Conversation"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
@@ -269,6 +325,8 @@ describe("Agents", () => {
 
     await user.click(screen.getByText("Create"));
 
+    // A name conflict returns the dialog to the setup step so the error
+    // shows next to the name field.
     await waitFor(() =>
       expect(screen.getByText("Agent name already exists")).toBeInTheDocument(),
     );
@@ -289,6 +347,8 @@ describe("Agents", () => {
     );
     await user.click(screen.getAllByText("New agent")[0]);
     await user.type(screen.getByPlaceholderText("Enter agent name"), "Agent X");
+    await user.click(screen.getByText("Next"));
+    await user.click(screen.getByText("Conversation"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse(null, { ok: false, status: 401 }),
@@ -307,6 +367,8 @@ describe("Agents", () => {
     );
     await user.click(screen.getAllByText("New agent")[0]);
     await user.type(screen.getByPlaceholderText("Enter agent name"), "Agent Y");
+    await user.click(screen.getByText("Next"));
+    await user.click(screen.getByText("Conversation"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
@@ -323,7 +385,7 @@ describe("Agents", () => {
     );
   });
 
-  it("submits create via Enter key when name is non-empty", async () => {
+  it("submits Next via Enter key on the setup step, reaching the nature step", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
     const onNavigateToAgent = jest.fn();
     const user = setupUser();
@@ -334,11 +396,15 @@ describe("Agents", () => {
     await user.click(screen.getAllByText("New agent")[0]);
     const input = screen.getByPlaceholderText("Enter agent name");
     await user.type(input, "Enter Agent");
+    await user.type(input, "{Enter}");
+
+    expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
+    await user.click(screen.getByText("General"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "enter-uuid" }),
     );
-    await user.type(input, "{Enter}");
+    await user.click(screen.getByText("Create"));
 
     await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("enter-uuid"));
   });
