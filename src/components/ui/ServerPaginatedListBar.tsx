@@ -54,16 +54,9 @@ export function ServerPaginatedListBar({
         {total === 0 ? (
           `0 ${itemNounPlural}`
         ) : !showPagination ? (
-          <>
-            <span className="text-foreground font-medium">{total}</span> {plural}
-          </>
+          `${total} ${plural}`
         ) : (
-          <>
-            Showing{" "}
-            <span className="text-foreground font-medium">{rangeStart}</span>–
-            <span className="text-foreground font-medium">{rangeEnd}</span> of{" "}
-            <span className="text-foreground font-medium">{total}</span> {plural}
-          </>
+          `Showing ${rangeStart}–${rangeEnd} of ${total} ${plural}`
         )}
       </div>
       {showPagination && (

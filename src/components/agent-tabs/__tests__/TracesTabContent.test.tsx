@@ -286,8 +286,7 @@ describe("TracesTabContent", () => {
     expect(
       screen.getAllByText("When is the next vaccination?").length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("trace")).toBeInTheDocument();
+    expect(screen.getByText("1 trace")).toBeInTheDocument();
     expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
     expect(mockUseTraces).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "agent-1" }),

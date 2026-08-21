@@ -123,7 +123,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     // Rows show the caller's question, not the message id, so the id goes in
     // the question itself to make each row easy to pick out.
     const targetInput = `Tell me about booster doses ${targetMsgId}`;
-    await page.request.post(`${BACKEND}/traces`, {
+    const ingested = await page.request.post(`${BACKEND}/traces`, {
       headers,
       data: {
         agent_id: agentUuid,
@@ -134,6 +134,9 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         metadata: [{ key: "env", value: "e2e" }],
       },
     });
+    expect(ingested.ok()).toBeTruthy();
+    const targetTraceUuid = (await ingested.json()).uuid as string;
+    expect(targetTraceUuid).toBeTruthy();
     await page.request.post(`${BACKEND}/traces`, {
       headers,
       data: {
@@ -179,12 +182,13 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await expect(page.getByText(otherMsgId)).toHaveCount(0);
 
     // Open the detail dialog and confirm it renders the output. The dialog is
-    // titled with the last thing the caller said, not the word "Trace".
+    // titled with the trace's own id, not a guess at what the caller said.
     await row.click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
-      dialog.getByRole("heading", { name: targetInput, exact: true }),
+      dialog.getByRole("heading", { name: targetTraceUuid, exact: true }),
     ).toBeVisible();
+    await expect(dialog.getByText(targetInput)).toBeVisible();
     await expect(
       dialog.getByText("Boosters are due at 16 months."),
     ).toBeVisible();

@@ -17,8 +17,7 @@ it("shows a simple count when everything fits on one page", () => {
     />,
   );
 
-  expect(screen.getByText("3")).toBeInTheDocument();
-  expect(screen.getByText("traces")).toBeInTheDocument();
+  expect(screen.getByText("3 traces")).toBeInTheDocument();
   expect(screen.queryByLabelText("Per page")).not.toBeInTheDocument();
 });
 
