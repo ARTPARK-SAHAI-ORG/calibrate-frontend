@@ -25,9 +25,7 @@ function lastRunsUrl() {
   const all = urls();
   return all[all.length - 1];
 }
-/** The one call (if any) that named this run via `around`. Landing on that
- * run's page fires a second, plain follow-up fetch for the same page, so the
- * `around` call itself isn't always the last one sent. */
+/** The one call (if any) that named this run via `around`. */
 function aroundUrl(runId: string) {
   return urls().find((u) => u.searchParams.get("around") === runId);
 }
@@ -66,7 +64,7 @@ describe("useAgentRuns around", () => {
     expect(result.current.aroundNotFound).toBe(false);
   });
 
-  it("asks for around once, then pages normally on top of the landed offset", async () => {
+  it("asks for around once, doesn't re-ask for the page it just landed on, then pages normally from there", async () => {
     global.fetch = jest.fn(async (url: string) =>
       jsonResponse({
         items: [runB],
@@ -77,18 +75,15 @@ describe("useAgentRuns around", () => {
 
     const { result } = setup("run-b");
     await waitFor(() => expect(result.current.offset).toBe(50));
-    // Let the plain follow-up fetch for the landed page settle too.
-    await waitFor(() =>
-      expect(
-        urls().some(
-          (u) => !u.searchParams.has("around") && u.searchParams.get("offset") === "50",
-        ),
-      ).toBe(true),
-    );
+
+    // The page it landed on is already in hand — no follow-up request for
+    // the same page.
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
 
     act(() => result.current.nextPage());
     await waitFor(() => expect(lastRunsUrl().searchParams.get("offset")).toBe("100"));
     expect(lastRunsUrl().searchParams.has("around")).toBe(false);
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
   });
 
   it("falls back to page one and reports not-found when the run isn't in the results", async () => {

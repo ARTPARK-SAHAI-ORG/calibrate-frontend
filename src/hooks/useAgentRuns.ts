@@ -83,8 +83,23 @@ export function useAgentRuns({
   const [aroundNotFound, setAroundNotFound] = useState(false);
   // Monotonic id so a slow, superseded response cannot overwrite a newer one.
   const requestIdRef = useRef(0);
-  // Which `aroundRunId` value has already been sent, so it's asked for once.
+  // Which `aroundRunId` value has already been asked for (or is being asked
+  // for right now), so it's sent once. Set the moment a request for it goes
+  // out, not when the response comes back — otherwise clearing `aroundRunId`
+  // back to null once it's resolved would still look "new" to `load` and
+  // trigger a pointless extra plain fetch for the page already in hand.
   const consumedAroundIdRef = useRef<string | null>(null);
+  // Mirrors `aroundRunId` so `load` can read the latest value without it
+  // being a dependency — see above: `load`'s identity reacting to every
+  // `aroundRunId` transition (including the routine "done, back to null")
+  // is exactly what caused the extra fetch.
+  const aroundRunIdRef = useRef(aroundRunId);
+  aroundRunIdRef.current = aroundRunId;
+  // Set right before landing `offset` on the page an `around` lookup just
+  // answered with — that page's rows are already in hand, so the fetch
+  // effect below should skip the request it would otherwise send for the
+  // `offset` change it's about to see.
+  const skipNextFetchRef = useRef(false);
 
   useEffect(() => {
     setOffset(0);
@@ -95,7 +110,10 @@ export function useAgentRuns({
       if (!accessToken) return;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
-      const useAround = !!aroundRunId && consumedAroundIdRef.current !== aroundRunId;
+      const requestedAroundId = aroundRunIdRef.current ?? null;
+      const useAround =
+        !!requestedAroundId && consumedAroundIdRef.current !== requestedAroundId;
+      if (useAround) consumedAroundIdRef.current = requestedAroundId;
       const requestId = ++requestIdRef.current;
       setIsLoading(true);
       setError(null);
@@ -104,7 +122,7 @@ export function useAgentRuns({
         const params = new URLSearchParams({
           limit: String(pageSize),
           ...(useAround
-            ? { around: aroundRunId as string }
+            ? { around: requestedAroundId as string }
             : { offset: String(targetOffset) }),
           ...filterParams(filter),
         });
@@ -113,7 +131,6 @@ export function useAgentRuns({
           { method: "GET", headers: getDefaultHeaders(accessToken) },
         );
         if (requestId !== requestIdRef.current) return;
-        if (useAround) consumedAroundIdRef.current = aroundRunId as string;
         if (useAround && response.status === 404) {
           // Not in the current results — fall back to the normal first page.
           // `offset` may already be 0, which wouldn't retrigger the fetch
@@ -131,7 +148,15 @@ export function useAgentRuns({
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
         if (useAround) {
-          setOffset(typeof data?.offset === "number" ? data.offset : 0);
+          const landedOffset =
+            typeof data?.offset === "number" ? data.offset : 0;
+          // Already have this page's rows right here — only bother the
+          // fetch effect if landing actually moves `offset` off of what it
+          // was, and tell it to skip the request that move would trigger.
+          if (landedOffset !== targetOffset) {
+            skipNextFetchRef.current = true;
+            setOffset(landedOffset);
+          }
         }
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
@@ -143,12 +168,28 @@ export function useAgentRuns({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, agentUuid, pageSize, filter, aroundRunId],
+    // `aroundRunId` deliberately left out — see `aroundRunIdRef` above.
+    [accessToken, agentUuid, pageSize, filter],
   );
 
   useEffect(() => {
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false;
+      return;
+    }
     void load(offset);
   }, [load, offset]);
+
+  // A run link arriving after the first render — e.g. Back/Forward to a
+  // different `?runId=` while this tab stays mounted — needs its own nudge,
+  // since `load` no longer reacts to `aroundRunId` on its own (that's what
+  // stopped the "done, back to null" case from firing a pointless fetch).
+  useEffect(() => {
+    if (aroundRunId && consumedAroundIdRef.current !== aroundRunId) {
+      void load(offset);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aroundRunId]);
 
   const refetch = useCallback(() => load(offset), [load, offset]);
 

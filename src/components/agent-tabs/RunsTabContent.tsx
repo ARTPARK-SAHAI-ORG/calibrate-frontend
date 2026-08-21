@@ -150,7 +150,17 @@ export function RunsTabContent({
   // Forward buttons — names a run whose type (plain run vs. multi-model
   // benchmark) isn't known yet, so it's held here until the list (landed on
   // that run's actual page via `around`) resolves it to the right dialog.
-  const [pendingRunId, setPendingRunId] = useState<string | null>(null);
+  //
+  // Read straight from the address on the very first render, rather than
+  // waiting for `useDialogUrlParam`'s effect to report it a moment later —
+  // otherwise the list's own first fetch would already have gone out for
+  // plain page one before anyone told it which run to land on, wasting that
+  // request.
+  const [pendingRunId, setPendingRunId] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("runId"),
+  );
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
   const [openBenchmarkRun, setOpenBenchmarkRun] = useState<AgentRun | null>(
     null,

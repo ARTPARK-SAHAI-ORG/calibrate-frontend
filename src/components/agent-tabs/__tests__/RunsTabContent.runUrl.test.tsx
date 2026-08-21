@@ -138,6 +138,18 @@ describe("RunsTabContent run deep-link", () => {
     expect(runIdInUrl()).toBeNull();
   });
 
+  it("asks for the linked run straight away, not a wasted plain page one first", async () => {
+    window.history.replaceState(null, "", "/?runId=run-7");
+    renderTab();
+
+    await screen.findByTestId("test-runner");
+    const runsCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes(`/agent-tests/agent/${AGENT_UUID}/runs`),
+    );
+    expect(runsCalls).toHaveLength(1);
+    expect(String(runsCalls[0][0])).toContain("around=run-7");
+  });
+
   it("re-opens the run dialog when the address already names a run", async () => {
     window.history.replaceState(null, "", "/?runId=run-7");
     renderTab();
@@ -251,7 +263,7 @@ describe("RunsTabContent run deep-link", () => {
     expect(runIdInUrl()).toBe("run-bench");
   });
 
-  it("closes and forgets a run the agent does not have", async () => {
+  it("closes and forgets a run the agent does not have, without asking more than needed", async () => {
     window.history.replaceState(null, "", "/?runId=run-gone");
     renderTab();
 
@@ -260,6 +272,13 @@ describe("RunsTabContent run deep-link", () => {
     await waitFor(() => expect(runIdInUrl()).toBeNull());
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
     expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+
+    // The lookup itself, then the fallback to page one — clearing the
+    // address afterwards must not cost a third ask.
+    const runsCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes(`/agent-tests/agent/${AGENT_UUID}/runs`),
+    );
+    expect(runsCalls).toHaveLength(2);
   });
 
   it("shows the error banner instead of guessing a dialog when the list can't be checked", async () => {
