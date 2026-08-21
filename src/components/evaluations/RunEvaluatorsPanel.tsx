@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@/lib/nav";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
@@ -60,6 +60,20 @@ export function RunEvaluatorsPanel({
   const selected = selectedUuids
     .map((uuid) => byUuid.get(uuid))
     .filter((e): e is EvaluatorData => !!e);
+
+  // A chosen evaluator that is not in the library any more (deleted since a
+  // simulation was set up, say) would have no card yet still be sent with the
+  // run. Take it out of the choice, once, so the cards and what is sent agree.
+  // Only after a library has actually arrived, and only once, so a re-read
+  // after creating an evaluator cannot drop the new one.
+  const prunedRef = useRef(false);
+  useEffect(() => {
+    if (prunedRef.current || isLoading || available.length === 0) return;
+    prunedRef.current = true;
+    const known = new Set(available.map((e) => e.uuid));
+    const kept = selectedUuids.filter((uuid) => known.has(uuid));
+    if (kept.length !== selectedUuids.length) onSelectedChange(kept);
+  }, [isLoading, available, selectedUuids, onSelectedChange]);
   const unselected = available.filter((e) => !selectedUuids.includes(e.uuid));
 
   const headerButtons = readOnly ? null : (

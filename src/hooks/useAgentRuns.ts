@@ -171,13 +171,13 @@ export function useAgentRuns({
                       passed: result.passed ?? r.passed,
                       failed: result.failed ?? r.failed,
                       results: result.results ?? r.results,
-                      updated_at: new Date().toISOString(),
+                      updated_at: result.updated_at ?? r.updated_at,
                     }
                   : {
                       ...r,
                       status: result.status,
                       model_results: result.model_results ?? r.model_results,
-                      updated_at: new Date().toISOString(),
+                      updated_at: result.updated_at ?? r.updated_at,
                     },
             ),
           );

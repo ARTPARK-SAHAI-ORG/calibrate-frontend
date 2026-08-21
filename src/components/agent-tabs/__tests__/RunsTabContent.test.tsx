@@ -187,6 +187,19 @@ describe("RunsTabContent", () => {
     expect(screen.getAllByText(/Jan 18/).length).toBeGreaterThan(0);
   });
 
+  it("shows a dash when the run does not say when it started", async () => {
+    // Only created_at will do: updated_at moves as the run progresses.
+    state.runs = [{ ...unitRun, created_at: undefined }];
+    renderTab();
+    await screen.findAllByText("1 Success");
+    const cells = Array.from(
+      (document.querySelector("tbody tr") as HTMLElement).querySelectorAll(
+        "td",
+      ),
+    ).map((td) => td.textContent);
+    expect(cells[cells.length - 1]).toBe("—");
+  });
+
   it("lists what judged the run, with tool calls named too", async () => {
     state.runs = [
       {

@@ -279,10 +279,13 @@ export function RunsTabContent({
   const currentPage = Math.floor(offset / pageSize) + 1;
   const countCell = (value: number | null) =>
     value === null ? "—" : String(value);
-  // The whole date and time, not "3 min ago": a run is a record, and two runs
-  // minutes apart need telling apart.
+  // The day and time it started, not "3 min ago": a run is a record, and two
+  // runs minutes apart need telling apart. Only `created_at` will do here;
+  // `updated_at` moves as the run progresses, so it would be a different
+  // answer every few seconds under a heading that says Created at.
   const whenText = (run: AgentRun) => {
-    const raw = run.created_at ?? run.updated_at;
+    const raw = run.created_at;
+    if (!raw) return "—";
     const date = new Date(
       raw.endsWith("Z") || raw.includes("+")
         ? raw

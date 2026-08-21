@@ -215,13 +215,12 @@ export function AgentDetail({
     setActiveTab(tab);
     const params = new URLSearchParams(window.location.search);
     params.set("tab", tab);
-    // `testId` and `runId` belong to the Tests tab. Leaving them on the address
-    // while the user is elsewhere would re-open that test or run the next time
-    // the Tests tab is shown, and after a reload nothing would clear them.
-    if (tab !== "tests") {
-      params.delete("testId");
-      params.delete("runId");
-    }
+    // `testId` belongs to the Tests tab and `runId` to Evaluations. Leaving
+    // either on the address while the reader is elsewhere would re-open that
+    // test or run the next time its tab is shown, and after a reload nothing
+    // would clear them.
+    if (tab !== "tests") params.delete("testId");
+    if (tab !== "runs") params.delete("runId");
     window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
