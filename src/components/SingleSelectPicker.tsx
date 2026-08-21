@@ -245,18 +245,20 @@ export function SingleSelectPicker<T>({
                     const isSelected = id === selectedId;
                     const disabledReason = isItemDisabled?.(item) ?? null;
                     if (disabledReason) {
+                      // Two columns: the name and the reason stack on the
+                      // left, and whatever the row puts on the right (a pill,
+                      // say) spans both rows, so it sits in the middle of the
+                      // row, level with the pills on the one-line rows.
                       return (
                         <div
                           key={id}
                           role="option"
                           aria-selected={isSelected}
                           aria-disabled={true}
-                          className={`w-full ${optionPaddingClass} text-left text-sm cursor-not-allowed opacity-50 text-foreground`}
+                          className={`w-full ${optionPaddingClass} text-left text-sm cursor-not-allowed opacity-50 text-foreground grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 [&>*:nth-child(2)]:row-span-2`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            {renderOption(item, isSelected)}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {renderOption(item, isSelected)}
+                          <div className="col-start-1 text-[11px] text-muted-foreground mt-0.5">
                             {disabledReason}
                           </div>
                         </div>
