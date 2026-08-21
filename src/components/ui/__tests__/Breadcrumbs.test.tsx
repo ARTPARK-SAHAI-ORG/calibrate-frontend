@@ -23,6 +23,17 @@ describe("Breadcrumbs", () => {
     );
   });
 
+  it("keeps the last step clickable when it still has a page to open", () => {
+    // Error pages trim the trail down to the section name, which has to stay
+    // clickable or there is no way back to the list.
+    render(<Breadcrumbs items={[{ label: "Agents", href: "/agents" }]} />);
+
+    expect(screen.getByRole("link", { name: "Agents" })).toHaveAttribute(
+      "href",
+      "/agents",
+    );
+  });
+
   it("shows a separator between steps", () => {
     const { container } = render(
       <Breadcrumbs

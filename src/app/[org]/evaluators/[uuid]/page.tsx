@@ -646,7 +646,15 @@ function EvaluatorDetailPageInner() {
   };
 
   const crumbs: Crumb[] = [
-    { label: "Evaluators", href: "/evaluators" },
+    {
+      label: "Evaluators",
+      // The list keeps its tab in the address, so send a built-in evaluator
+      // back to the tab it is listed on.
+      href:
+        evaluator && !evaluator.owner_user_id
+          ? "/evaluators?tab=default"
+          : "/evaluators",
+    },
     { label: evaluator?.name ?? "Evaluator" },
   ];
 

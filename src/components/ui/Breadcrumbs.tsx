@@ -6,7 +6,9 @@ import { Link } from "@/lib/nav";
 export type Crumb = {
   /** Text shown for this step. */
   label: string;
-  /** Page this step opens. Leave out for the page you are already on. */
+  /** Page this step opens. Leave out for the page you are already on. On an
+   * error page the trail can end on a step that still has one, and it stays
+   * clickable so there is always a way back. */
   href?: string;
   /** Action on the last step, used where the name is editable in place. */
   onClick?: () => void;
@@ -41,10 +43,15 @@ export function Breadcrumbs({
                 /
               </span>
             )}
-            {item.href && !isLast ? (
+            {item.href ? (
               <Link
                 href={item.href}
-                className="text-muted-foreground hover:text-foreground transition-colors truncate cursor-pointer"
+                aria-current={isLast ? "page" : undefined}
+                className={`truncate cursor-pointer transition-colors hover:text-foreground ${
+                  isLast
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground"
+                }`}
               >
                 {item.label}
               </Link>

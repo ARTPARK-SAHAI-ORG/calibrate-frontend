@@ -764,8 +764,9 @@ export default function SimulationRunPage() {
       customHeader={getHeader()}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* AppLayout hides `customHeader` below md. */}
-        <Breadcrumbs items={crumbs} className="md:hidden" />
+        {/* AppLayout hides `customHeader` below md. Skipped when the run is
+            missing, matching the empty header the top bar shows. */}
+        {!errorCode && <Breadcrumbs items={crumbs} className="md:hidden" />}
         {isLoading ? (
           <div className="flex items-center justify-center gap-3 py-8">
             <svg
