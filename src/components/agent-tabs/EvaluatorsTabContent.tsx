@@ -328,12 +328,12 @@ export function EvaluatorsTabContent({
             return (
               <div
                 key={evaluator.uuid}
-                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-4 md:px-5 md:py-4 transition-colors"
+                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base md:text-lg font-semibold text-foreground">
+                      <h3 className="text-base font-semibold text-foreground">
                         {evaluator.name}
                       </h3>
                       {/* Only "where did this come from". What it judges and
@@ -341,7 +341,7 @@ export function EvaluatorsTabContent({
                       {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
                     </div>
                     {evaluator.description && (
-                      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                      <p className="text-sm text-muted-foreground mt-0.5">
                         {evaluator.description}
                       </p>
                     )}
@@ -383,7 +383,8 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
-        useCaseGroups={["conversation"]}
+        // Next-reply only, so the flow skips the "what is this for?" step.
+        useCaseTypes={["llm"]}
       />
 
       {/* Shared detach/delete confirmation */}

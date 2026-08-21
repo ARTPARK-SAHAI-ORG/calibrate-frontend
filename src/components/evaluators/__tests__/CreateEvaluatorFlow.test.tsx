@@ -133,7 +133,7 @@ describe("CreateEvaluatorFlow", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("creates an evaluator after choosing a use case", async () => {
+  it("skips the use-case step when only one use case is on offer", async () => {
     const user = setupUser();
     const onCreated = jest.fn();
     const onClose = jest.fn();
@@ -149,8 +149,10 @@ describe("CreateEvaluatorFlow", () => {
       />,
     );
 
-    await user.click(screen.getByText("LLM reply"));
-    await user.click(screen.getByText("Continue"));
+    // One use case means there is nothing to ask: the form opens straight away.
+    expect(
+      screen.queryByText("What is this evaluator for?"),
+    ).not.toBeInTheDocument();
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
 
     await user.click(screen.getByText("Submit create"));
