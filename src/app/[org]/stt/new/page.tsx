@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
+import { Breadcrumbs } from "@/components/ui";
 import { SpeechToTextEvaluation } from "@/components/evaluations/SpeechToTextEvaluation";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -20,26 +21,12 @@ function NewSTTEvaluationPageInner() {
 
   const customHeader = (
     <div className="flex items-center gap-3">
-      <button
-        onClick={() => router.push("/stt")}
-        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-        title="Back to STT evaluations"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
-        </svg>
-      </button>
-      <span className="text-base font-semibold text-foreground">Back</span>
+      <Breadcrumbs
+        items={[
+          { label: "Speech-to-Text", href: "/stt" },
+          { label: "New evaluation" },
+        ]}
+      />
       <div className="w-px h-5 bg-border mx-1" />
       {isEvaluating ? (
         <div className="flex items-center gap-2 h-8 px-3 text-sm text-muted-foreground">

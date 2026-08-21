@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { NotFoundState } from "@/components/ui";
+import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   EvaluatorTypePill,
@@ -645,27 +645,12 @@ function EvaluatorDetailPageInner() {
     return d.toLocaleString();
   };
 
-  const customHeader = (
-    <button
-      onClick={() => router.back()}
-      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-    >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15 19l-7-7 7-7"
-        />
-      </svg>
-      Back to evaluators
-    </button>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Evaluators", href: "/evaluators" },
+    { label: evaluator?.name ?? "Evaluator" },
+  ];
+
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   return (
     <AppLayout
@@ -676,26 +661,8 @@ function EvaluatorDetailPageInner() {
       customHeader={customHeader}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
-        <button
-          onClick={() => router.back()}
-          className="md:hidden inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to evaluators
-        </button>
+        {/* AppLayout hides `customHeader` below md. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />

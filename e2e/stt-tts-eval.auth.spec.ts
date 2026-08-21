@@ -8,9 +8,9 @@
 import { test, expect } from "./fixtures";
 import { waitForOrgReady, workspacePath } from "./helpers";
 
-const BUILDERS: ReadonlyArray<{ path: string; back: string }> = [
-  { path: "/stt/new", back: "Back to STT evaluations" },
-  { path: "/tts/new", back: "Back to TTS evaluations" },
+const BUILDERS: ReadonlyArray<{ path: string }> = [
+  { path: "/stt/new" },
+  { path: "/tts/new" },
 ];
 
 test.describe("STT/TTS evaluation builder (authenticated, real backend)", () => {
@@ -22,7 +22,7 @@ test.describe("STT/TTS evaluation builder (authenticated, real backend)", () => 
       // We stayed on the route (seeded token cleared middleware).
       await expect(page).toHaveURL(workspacePath(path));
 
-      // The custom header renders a "Back" affordance and the primary
+      // The custom header renders the breadcrumb trail and the primary
       // "Evaluate" action once the builder component has mounted.
       await expect(
         page.getByRole("button", { name: "Evaluate" }).first(),

@@ -12,6 +12,7 @@ import {
   SaveIcon,
 } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
+import { Breadcrumbs, type Crumb } from "@/components/ui";
 
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
@@ -51,39 +52,20 @@ export default function AgentDetailPage() {
     []
   );
 
-  // Header with back button and agent name
-  const customHeader = (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => router.push("/agents")}
-        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-        title="Back to agents"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
-        </svg>
-      </button>
-      {!headerState?.hasError && (
-        <span
-          className="text-sm md:text-base font-semibold text-foreground cursor-pointer hover:opacity-70 transition-opacity truncate"
-          onClick={() => headerState?.onEditName()}
-          title="Click to edit name"
-        >
-          {headerState?.agentName || "Loading..."}
-        </span>
-      )}
-    </div>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Agents", href: "/agents" },
+    ...(headerState?.hasError
+      ? []
+      : [
+          {
+            label: headerState?.agentName || "Loading...",
+            onClick: () => headerState?.onEditName(),
+            title: "Click to edit name",
+          },
+        ]),
+  ];
+
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   // Header actions: Verify button (for unverified connection agents) + Save button
   const headerActions =
@@ -150,6 +132,8 @@ export default function AgentDetailPage() {
       customHeader={customHeader}
       headerActions={headerActions}
     >
+      {/* AppLayout hides `customHeader` below md. */}
+      <Breadcrumbs items={crumbs} className="md:hidden pt-4" />
       <AgentDetail
         agentUuid={uuid}
         onHeaderStateChange={handleHeaderStateChange}

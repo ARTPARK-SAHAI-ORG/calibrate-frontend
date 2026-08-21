@@ -13,7 +13,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
-import { NotFoundState } from "@/components/ui";
+import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
@@ -712,77 +712,37 @@ export default function SimulationRunPage() {
     );
   };
 
-  // Custom header with back button and title
-  const customHeader = (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={() => router.push(`/simulations/${uuid}?tab=runs`)}
-        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
-        </svg>
-      </button>
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl md:text-2xl font-semibold">
-          {runData?.name || "Loading..."}
-        </h1>
-        {(runData?.status.toLowerCase() === "in_progress" ||
-          runData?.status.toLowerCase() === "queued") && (
-          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-        )}
-      </div>
-    </div>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Simulations", href: "/simulations" },
+    {
+      label: simulationName ?? "Simulation",
+      href: `/simulations/${uuid}?tab=runs`,
+    },
+    { label: runData?.name ?? "Loading..." },
+  ];
 
-  // Loading header
-  const loadingHeader = (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={() => router.push(`/simulations/${uuid}?tab=runs`)}
-        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
+  // Breadcrumb trail plus the running indicator.
+  const customHeader = (
+    <div className="flex items-center gap-3 min-w-0">
+      <Breadcrumbs items={crumbs} />
+      {(runData?.status.toLowerCase() === "in_progress" ||
+        runData?.status.toLowerCase() === "queued") && (
+        <svg className="w-5 h-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
           <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
-      </button>
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold">Loading...</h1>
-      </div>
+      )}
     </div>
   );
 
@@ -791,7 +751,6 @@ export default function SimulationRunPage() {
 
   // Determine which header to show
   const getHeader = () => {
-    if (isLoading) return loadingHeader;
     if (errorCode) return notFoundHeader;
     return customHeader;
   };
@@ -805,6 +764,8 @@ export default function SimulationRunPage() {
       customHeader={getHeader()}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
+        {/* AppLayout hides `customHeader` below md. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
         {isLoading ? (
           <div className="flex items-center justify-center gap-3 py-8">
             <svg

@@ -9,7 +9,8 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import {
-  BackHeader,
+  Breadcrumbs,
+  type Crumb,
   StatusBadge,
   NotFoundState,
   RetryIcon,
@@ -713,9 +714,12 @@ export default function STTEvaluationDetailPage() {
       ? "outputs"
       : activeTab;
 
-  const customHeader = (
-    <BackHeader label="Back" onBack={() => router.push("/stt")} title="Back" />
-  );
+  const crumbs: Crumb[] = [
+    { label: "Speech-to-Text", href: "/stt" },
+    { label: evaluationResult?.dataset_name ?? "Evaluation" },
+  ];
+
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   return (
     <AppLayout
@@ -726,6 +730,8 @@ export default function STTEvaluationDetailPage() {
       customHeader={customHeader}
     >
       <div className="space-y-4 md:space-y-6">
+        <Breadcrumbs items={crumbs} className="md:hidden" />
+
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center gap-3 py-8">

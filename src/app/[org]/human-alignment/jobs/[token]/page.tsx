@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
+import { Breadcrumbs, type Crumb } from "@/components/ui";
 import {
   AnnotationJobView,
   jobStatusLabel,
@@ -123,27 +124,17 @@ export default function AdminAnnotateJobPage() {
     </span>
   ) : null;
 
-  const customHeader = (
-    <button
-      onClick={() => router.back()}
-      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-    >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 19.5L8.25 12l7.5-7.5"
-        />
-      </svg>
-      Back to labelling jobs
-    </button>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Human alignment", href: "/human-alignment?tab=tasks" },
+    {
+      label: meta?.task.name ?? "Task",
+      href: meta
+        ? `/human-alignment/tasks/${meta.task.uuid}?tab=jobs`
+        : undefined,
+    },
+    { label: meta?.annotator.name ?? "Labelling job" },
+  ];
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   return (
     <AppLayout
@@ -157,26 +148,8 @@ export default function AdminAnnotateJobPage() {
         className="py-4 md:py-6 flex flex-col gap-4"
         style={{ height: "calc(100dvh - 56px)" }}
       >
-        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
-        <button
-          onClick={() => router.back()}
-          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          Back to labelling jobs
-        </button>
+        {/* AppLayout hides `customHeader` below md, so repeat the trail here. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {meta && (
           <>

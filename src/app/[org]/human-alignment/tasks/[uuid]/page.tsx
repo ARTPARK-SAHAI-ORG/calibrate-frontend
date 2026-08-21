@@ -67,6 +67,7 @@ import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { ServerPaginatedListBar } from "@/components/ui/ServerPaginatedListBar";
+import { Breadcrumbs, type Crumb } from "@/components/ui";
 import {
   useAccessToken,
   useItemPager,
@@ -2419,27 +2420,11 @@ function LabellingTaskPageInner() {
   const [createItemError, setCreateItemError] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
 
-  const customHeader = (
-    <button
-      onClick={() => router.push("/human-alignment?tab=tasks")}
-      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-    >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 19.5L8.25 12l7.5-7.5"
-        />
-      </svg>
-      All tasks
-    </button>
-  );
+  const crumbs: Crumb[] = [
+    { label: "Human alignment", href: "/human-alignment?tab=tasks" },
+    { label: task?.name ?? "Task" },
+  ];
+  const customHeader = <Breadcrumbs items={crumbs} />;
 
   if (errorCode) {
     return (
@@ -2462,28 +2447,8 @@ function LabellingTaskPageInner() {
       customHeader={customHeader}
     >
       <div className="py-4 md:py-6 space-y-6">
-        {/* Mobile-only back button — AppLayout hides `customHeader` below
-            md, so without this small-screen users would lose the back
-            affordance. */}
-        <button
-          onClick={() => router.push("/human-alignment?tab=tasks")}
-          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          All tasks
-        </button>
+        {/* AppLayout hides `customHeader` below md, so repeat the trail here. */}
+        <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {error && (
           <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
