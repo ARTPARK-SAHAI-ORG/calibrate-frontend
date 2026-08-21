@@ -1,5 +1,6 @@
 ## August 2026
 
+- Make the agent-defaults evaluator prompt plain and keep the Evaluators tab in sync ([#396](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/396))
 - Trim the sidebar, split runs into their own tab ([#391](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/391))
 - Add previous/next buttons to the trace detail dialog ([#393](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/393))
 - Remove the extra blank line under textareas ([#389](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/389))
