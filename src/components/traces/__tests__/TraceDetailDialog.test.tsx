@@ -128,7 +128,7 @@ it("renders nothing when closed and never fetches", () => {
   expect(mockFetchTrace).not.toHaveBeenCalled();
 });
 
-it("uses the last user turn as the heading and the shared conversation view", async () => {
+it("titles the dialog with the trace's own id and renders the shared conversation view", async () => {
   mockFetchTrace.mockResolvedValue(detail);
   render(
     <TraceDetailDialog
@@ -143,8 +143,9 @@ it("uses the last user turn as the heading and the shared conversation view", as
     expect(screen.getByText("At 14 weeks, for OPV and DPT.")).toBeInTheDocument(),
   );
   expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t1");
+  expect(screen.getByRole("heading", { name: "t1" })).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "When is the next vaccination?" }),
+    screen.getByText("When is the next vaccination?"),
   ).toBeInTheDocument();
   // The agent's instructions are stored on the trace but never drawn.
   expect(
@@ -240,26 +241,16 @@ it.each<{
   },
 );
 
-it("falls back to Trace when history has no user turn", async () => {
-  mockFetchTrace.mockResolvedValue({
-    ...detail,
-    input: [{ role: "assistant", content: "Hello." }],
-    output: { response: "Hello.", tool_calls: [] },
-    metadata: null,
-    message_id: null,
-    conversation_id: null,
-  });
+it("falls back to Trace when there is no trace id to show", () => {
   render(
     <TraceDetailDialog
       isOpen
       onClose={jest.fn()}
       accessToken="tok"
-      traceUuid="t1"
+      traceUuid={null}
     />,
   );
-  await waitFor(() =>
-    expect(screen.getByRole("heading", { name: "Trace" })).toBeInTheDocument(),
-  );
+  expect(screen.getByRole("heading", { name: "Trace" })).toBeInTheDocument();
 });
 
 it("renders a tool-call-only output without a missing-reply placeholder", async () => {
@@ -293,12 +284,10 @@ it("leaves no empty block where the agent's instructions were", async () => {
     />,
   );
 
-  const matches = await screen.findAllByText("When is the next vaccination?");
-  // The same text is the heading; take the one in the conversation.
-  const question = matches.find((el) => el.tagName === "P");
+  const question = await screen.findByText("When is the next vaccination?");
   // The trace has three turns: instructions, the question, the tool call.
   // Only the last two are drawn, so the conversation has two blocks.
-  const conversation = question?.closest("div.space-y-4");
+  const conversation = question.closest("div.space-y-4");
   expect(conversation?.children).toHaveLength(2);
 });
 
@@ -339,7 +328,8 @@ it("never shows the previous trace under the next one's heading", async () => {
   }
 
   const { rerender } = render(<Harness traceUuid="t1" />);
-  await screen.findByRole("heading", { name: "When is the next vaccination?" });
+  await screen.findByText("At 14 weeks, for OPV and DPT.");
+  expect(screen.getByRole("heading", { name: "t1" })).toBeInTheDocument();
 
   painted.length = 0;
   rerender(<Harness traceUuid="t2" />);
@@ -350,13 +340,14 @@ it("never shows the previous trace under the next one's heading", async () => {
     ),
   ).toEqual([]);
 
+  // The title tracks the id it was asked to open, straight from the prop, so
+  // it swaps before the second trace's content has even started loading.
+  expect(screen.getByRole("heading", { name: "t2" })).toBeInTheDocument();
+
   // The second trace has not arrived yet, so nothing of the first is left.
   expect(screen.queryByText("At 14 weeks, for OPV and DPT.")).not.toBeInTheDocument();
   expect(screen.queryByText("msg-1")).not.toBeInTheDocument();
   expect(screen.queryByText("gpt-4")).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("heading", { name: "When is the next vaccination?" }),
-  ).not.toBeInTheDocument();
 
   await act(async () => {
     resolveB(traceB);
@@ -373,6 +364,30 @@ it("does not render previous/next controls when neither callback is passed", asy
       onClose={jest.fn()}
       accessToken="tok"
       traceUuid="t1"
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+  expect(
+    screen.queryByRole("button", { name: "Previous trace" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Next trace" }),
+  ).not.toBeInTheDocument();
+});
+
+it("hides the controls when there is only one trace to page through", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      onPrev={jest.fn()}
+      onNext={jest.fn()}
+      hasPrev={false}
+      hasNext={false}
+      position={{ index: 0, total: 1 }}
     />,
   );
   await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());

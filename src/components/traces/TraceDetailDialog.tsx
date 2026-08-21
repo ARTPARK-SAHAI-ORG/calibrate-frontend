@@ -273,12 +273,15 @@ export function TraceDetailDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-6xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
         <div className="relative flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
-          <h2 className="text-base md:text-lg font-semibold text-foreground truncate min-w-0">
-            {trace ? humanTraceName(trace) : "Trace"}
+          <h2
+            className="text-base md:text-lg font-semibold text-foreground truncate min-w-0"
+            title={traceUuid ?? undefined}
+          >
+            {traceUuid ?? "Trace"}
           </h2>
-          {(onPrev || onNext) && (
+          {(onPrev || onNext) && (!position || position.total > 1) && (
             <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
               <div className="pointer-events-auto">
                 <Tooltip position="bottom" content="Previous trace">

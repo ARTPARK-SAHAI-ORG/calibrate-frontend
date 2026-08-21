@@ -475,6 +475,29 @@ describe("ItemDetailDialog", () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
+  it("hides Previous/Next when there is only one item to page through", async () => {
+    apiClientMock.mockResolvedValue(baseSummary());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+        onPrev={jest.fn()}
+        onNext={jest.fn()}
+        hasPrev={false}
+        hasNext={false}
+        position={{ index: 0, total: 1 }}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText("Previous item")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Next item")).not.toBeInTheDocument();
+  });
+
   it("resets the live-versions toggle and annotator filter when the dialog closes then reopens", async () => {
     const user = setupUser();
     apiClientMock.mockResolvedValue(baseSummary());

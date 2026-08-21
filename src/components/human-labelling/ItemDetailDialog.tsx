@@ -556,7 +556,7 @@ export function ItemDetailDialog({
               {itemTitle(item)}
             </h2>
           </div>
-          {(onPrev || onNext) && (
+          {(onPrev || onNext) && (!position || position.total > 1) && (
             <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
               <div className="pointer-events-auto">
                 <Tooltip position="bottom" content="Previous item">
