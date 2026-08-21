@@ -63,50 +63,57 @@ export function SimulationConfigTab({
         disableCustomFieldConnections
       />
 
-      {/* Unverified agent warning */}
-      {selectedAgent && selectedAgent.verified === false && (
-        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-          <svg
-            className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
-          </svg>
-          <p className="text-xs text-yellow-300/90">
-            This agent needs to be verified before the simulation can be run.
-            Please verify the agent connection in the agent settings first.
-          </p>
-        </div>
-      )}
+      {/* The two notices sit closer to each other than to the rest of the
+          form, since they both answer "what about this agent". */}
+      {(selectedAgent?.verified === false || isAgentConnection) && (
+        <div className="space-y-2">
+          {/* Unverified agent warning */}
+          {selectedAgent?.verified === false && (
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <svg
+                className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300/90">
+                This agent needs to be verified before the simulation can be
+                run. Please verify the agent connection in the agent settings
+                first.
+              </p>
+            </div>
+          )}
 
-      {/* Voice simulation notice for agent connections */}
-      {isAgentConnection && (
-        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-          <svg
-            className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-            />
-          </svg>
-          <p className="text-xs text-blue-600 dark:text-blue-300/90">
-            Voice simulations are currently only supported for agents built
-            within Calibrate but you can still run text simulations on your
-            connected agent
-          </p>
+          {/* Voice simulation notice for agent connections */}
+          {isAgentConnection && (
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <svg
+                className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                />
+              </svg>
+              <p className="text-xs text-blue-600 dark:text-blue-300/90">
+                Voice simulations are currently only supported for agents built
+                within Calibrate but you can still run text simulations on your
+                connected agent
+              </p>
+            </div>
+          )}
         </div>
       )}
 

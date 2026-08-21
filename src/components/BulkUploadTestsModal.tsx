@@ -1939,10 +1939,10 @@ export function BulkUploadTestsModal({
           )}
           {uploadWarnings && uploadWarnings.length > 0 && (
             <div className="mb-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <p className="text-sm font-medium text-yellow-500 mb-1">
+              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-500 mb-1">
                 Tests created, but with warnings:
               </p>
-              <ul className="text-sm text-yellow-500 list-disc list-inside">
+              <ul className="text-sm text-yellow-700 dark:text-yellow-500 list-disc list-inside">
                 {uploadWarnings.map((warning, idx) => (
                   <li key={idx}>{warning}</li>
                 ))}

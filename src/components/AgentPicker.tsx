@@ -59,7 +59,7 @@ type AgentPickerProps = {
 
 function UnverifiedPill() {
   return (
-    <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-500 flex-shrink-0">
+    <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 flex-shrink-0">
       <svg
         className="w-3 h-3"
         fill="none"
@@ -432,7 +432,7 @@ export function MultiAgentPicker({
                       <span className="truncate flex items-center gap-1.5">
                         {agent.name}
                         {agent.verified === false && (
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-500 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 flex-shrink-0">
                             <svg
                               className="w-3 h-3"
                               fill="none"
