@@ -1,7 +1,8 @@
 "use client";
 
-import React, { Fragment } from "react";
-import { Link } from "@/lib/nav";
+import React, { Fragment, useEffect } from "react";
+import { Link, usePathname } from "@/lib/nav";
+import { rememberParentPage } from "@/lib/parentPage";
 
 export type Crumb = {
   /** Text shown for this step. */
@@ -29,6 +30,17 @@ export function Breadcrumbs({
   items: Crumb[];
   className?: string;
 }) {
+  const pathname = usePathname();
+  // Record this page so a page reached from several places (the evaluator
+  // page) can name the one the reader came from. The evaluator page is left
+  // out so it never records itself as its own parent.
+  const label = items[items.length - 1]?.label ?? "";
+  useEffect(() => {
+    if (!label || pathname.startsWith("/evaluators/")) return;
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    rememberParentPage({ href: `${pathname}${search}`, label });
+  }, [pathname, label]);
+
   return (
     <nav
       aria-label="Breadcrumb"

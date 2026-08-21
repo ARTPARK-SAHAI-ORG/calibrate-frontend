@@ -14,7 +14,12 @@ const push = jest.fn();
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
-  useRouter: () => ({ push, replace: jest.fn(), back: jest.fn(), prefetch: jest.fn() }),
+  useRouter: () => ({
+    push,
+    replace: jest.fn(),
+    back: jest.fn(),
+    prefetch: jest.fn(),
+  }),
   usePathname: () => "/evaluators/eval-1",
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({ uuid: "eval-1" }),
@@ -68,6 +73,15 @@ const EVALUATOR = {
       variables: null,
       created_at: "2026-07-15T10:00:00Z",
     },
+    {
+      uuid: "ver-2",
+      version_number: 2,
+      judge_model: "anthropic/claude-sonnet-4",
+      system_prompt: "Grade the reply strictly",
+      output_config: null,
+      variables: null,
+      created_at: "2026-07-16T10:00:00Z",
+    },
   ],
 };
 
@@ -84,6 +98,7 @@ function mockEvaluator(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000";
+  window.sessionStorage.clear();
   mockEvaluator();
 });
 
@@ -97,9 +112,7 @@ describe("evaluator page header actions", () => {
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(
-      await screen.findByTitle("Edit name and description"),
-    );
+    await user.click(await screen.findByTitle("Edit name and description"));
 
     expect(
       screen.getByRole("heading", { name: "Edit evaluator" }),
@@ -167,5 +180,69 @@ describe("evaluator page header actions", () => {
     expect(
       screen.getByRole("heading", { name: "Delete evaluator" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the versions and the one on screen", () => {
+  it("opens on the current version and shows only its details", async () => {
+    render(<EvaluatorDetailPage />);
+
+    // v1 is the current one, so its prompt is what the reader sees.
+    expect(await screen.findByText("Grade the reply")).toBeInTheDocument();
+    expect(screen.queryByText("Grade the reply strictly")).toBeNull();
+    // Both versions are listed to switch between.
+    expect(screen.getByRole("button", { name: /^v1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^v2/ })).toBeInTheDocument();
+  });
+
+  it("shows a version's details when it is picked from the list", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByRole("button", { name: /^v2/ }));
+
+    expect(screen.getByText("Grade the reply strictly")).toBeInTheDocument();
+    expect(screen.queryByText("Grade the reply")).toBeNull();
+    // The version that is not current can be made current from its details.
+    expect(
+      screen.getByRole("button", { name: "Mark as current" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens on the newest version when none is marked current", async () => {
+    mockEvaluator({ live_version_id: null, live_version_index: null });
+    render(<EvaluatorDetailPage />);
+
+    expect(
+      await screen.findByText("Grade the reply strictly"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the trail at the top of the page", () => {
+  it("names the page the reader came from", async () => {
+    window.sessionStorage.setItem(
+      "calibrate:parent-page",
+      JSON.stringify({
+        href: "/agents/agent-1?tab=evaluators",
+        label: "Support bot",
+      }),
+    );
+
+    render(<EvaluatorDetailPage />);
+
+    const crumb = (
+      await screen.findAllByRole("link", { name: "Support bot" })
+    )[0];
+    expect(crumb).toHaveAttribute("href", "/agents/agent-1?tab=evaluators");
+    // The evaluator list is hidden, so it is never a step in the trail.
+    expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
+  });
+
+  it("shows the evaluator on its own when there is no page to go back to", async () => {
+    render(<EvaluatorDetailPage />);
+
+    await screen.findAllByText("Refund policy");
+    expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
   });
 });

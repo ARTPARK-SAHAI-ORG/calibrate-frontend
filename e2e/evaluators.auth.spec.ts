@@ -119,10 +119,9 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
-    await expect(
-      page.getByRole("link", { name: "Evaluators" }).first(),
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
     await page.getByRole("button", { name: "Delete evaluator" }).click();
     await expect(
@@ -152,13 +151,12 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
-    await expect(
-      page.getByRole("link", { name: "Evaluators" }).first(),
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
-    // The fresh evaluator has exactly one version, rendered as a "v1" badge.
-    await expect(page.getByText("v1", { exact: true })).toBeVisible({
+    // The fresh evaluator has exactly one version, listed on the left as v1.
+    await expect(page.getByRole("button", { name: /^v1/ })).toBeVisible({
       timeout: 20000,
     });
 
@@ -189,27 +187,25 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await dialog.getByRole("checkbox").uncheck();
     await dialog.getByRole("button", { name: "Create version" }).click();
 
-    // Dialog closes and the new v2 card appears in the versions list.
+    // Dialog closes and v2 joins the version list on the left.
     await expect(
       dialog.getByRole("heading", { name: "New version", exact: true }),
     ).toHaveCount(0, { timeout: 20000 });
-    await expect(page.getByText("v2", { exact: true })).toBeVisible({
-      timeout: 20000,
-    });
+    const v2 = page.getByRole("button", { name: /^v2/ });
+    await expect(v2).toBeVisible({ timeout: 20000 });
 
-    // Scope to the v2 version card (the only rounded-xl container holding the
-    // exact "v2" badge). It is not live yet, so it shows a "Mark as current"
-    // button; v1 carries the "Current" pill.
-    const v2Card = page
-      .locator("div.rounded-xl")
-      .filter({ has: page.getByText("v2", { exact: true }) });
-    const markCurrent = v2Card.getByRole("button", { name: "Mark as current" });
+    // The page opens on the current version (still v1), so pick v2 to read it.
+    // It is not current yet, so its details carry a "Mark as current" button.
+    await v2.click();
+    const markCurrent = page.getByRole("button", { name: "Mark as current" });
     await expect(markCurrent).toBeVisible({ timeout: 20000 });
     await markCurrent.click();
 
-    // After the refresh v2 becomes live — its card now shows the "Current" pill
-    // and the "Mark as current" button disappears.
-    await expect(v2Card.getByText("Current", { exact: true })).toBeVisible({
+    // After the refresh v2 is the current version: its entry in the list
+    // carries the "Current" pill and the button is gone.
+    await expect(
+      page.getByRole("button", { name: /^v2.*Current/ }),
+    ).toBeVisible({
       timeout: 20000,
     });
     await expect(markCurrent).toHaveCount(0, { timeout: 20000 });
