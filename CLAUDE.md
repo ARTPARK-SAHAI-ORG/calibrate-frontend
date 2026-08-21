@@ -226,8 +226,8 @@ Use this whenever a list is backed by server-side `limit`/`offset` paging (today
 **Left (count):**
 
 - `0` → `0 {nouns}` (e.g. `0 traces`, `0 items`)
-- `total ≤ 10` → **`{total}`** `{noun}` — number in `text-foreground font-medium`
-- `total > 10` → **Showing `{start}`–`{end}` of `{total}` `{nouns}`** — the three numbers in `text-foreground font-medium`. `start = offset + 1`, `end = min(offset + items.length, total)`.
+- `total ≤ 10` → `{total} {noun}`, plain text — same weight and color as the count on the plain (fetch-everything) list pages, e.g. `/agents`. No bolding.
+- `total > 10` → `Showing {start}–{end} of {total} {nouns}`, plain text. `start = offset + 1`, `end = min(offset + items.length, total)`.
 
 **Right** (only when `total > 10`): handled inside `ServerPaginatedListBar` — `PageSizeSelect` plus icon prev/next and `Page X of Y` when `pageCount > 1`. Reset `offset` to `0` when page size changes. Disable nav while a fetch is in flight.
 
