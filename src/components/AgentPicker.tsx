@@ -190,14 +190,14 @@ export function AgentPicker({
       renderTrigger={(agent) => agent?.name ?? ""}
       renderOption={(agent, isSelected) => (
         <>
+          {/* The tick sits with the name, so the type pill stays flush right
+              and lines up across every row. */}
           <span className="truncate flex items-center gap-1.5">
             {agent.name}
             {agent.verified === false && <UnverifiedPill />}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <AgentTypePill type={agent.type} />
             {isSelected && <CheckIcon />}
-          </div>
+          </span>
+          <AgentTypePill type={agent.type} />
         </>
       )}
     />
@@ -429,55 +429,14 @@ export function MultiAgentPicker({
                           : "text-foreground hover:bg-muted"
                       }`}
                     >
+                      {/* The tick sits with the name, so the type pill stays
+                          flush right and lines up across every row. */}
                       <span className="truncate flex items-center gap-1.5">
                         {agent.name}
-                        {agent.verified === false && (
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 flex-shrink-0">
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                              />
-                            </svg>
-                            Unverified
-                          </span>
-                        )}
+                        {agent.verified === false && <UnverifiedPill />}
+                        {isSelected && <CheckIcon />}
                       </span>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                            agent.type === "connection"
-                              ? "bg-blue-500/10 text-blue-500"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {agent.type === "connection"
-                            ? "Connection"
-                            : "Agent"}
-                        </span>
-                        {isSelected && (
-                          <svg
-                            className="w-4 h-4 text-foreground"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12.75l6 6 9-13.5"
-                            />
-                          </svg>
-                        )}
-                      </div>
+                      <AgentTypePill type={agent.type} />
                     </button>
                   );
                 })

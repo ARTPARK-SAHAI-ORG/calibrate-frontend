@@ -161,6 +161,23 @@ describe("AgentPicker", () => {
     ).toBeInTheDocument();
   });
 
+  it("puts the tick with the agent name so the type pill stays last", async () => {
+    mockFetchOnce({ json: async () => agentsPayload });
+    const user = setupUser();
+    render(<AgentPicker selectedAgentUuid="a1" onSelectAgent={jest.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Support Bot" }));
+
+    const optionEl = await screen.findByRole("option", { name: /Support Bot/ });
+    const tick = optionEl.querySelector("path[d='M4.5 12.75l6 6 9-13.5']");
+    // The tick lives with the name, and the pill is the last thing in the row,
+    // so pills line up down the list.
+    const nameEl = optionEl.firstElementChild;
+    expect(nameEl).toHaveTextContent("Support Bot");
+    expect(nameEl?.contains(tick)).toBe(true);
+    expect(optionEl.lastElementChild).toHaveTextContent("Agent");
+  });
+
   it("normalises legacy agent shapes: agent_name fallback, stringified fallback, and config.connection_verified", async () => {
     const legacyPayload = [
       // name missing -> falls back to agent_name
