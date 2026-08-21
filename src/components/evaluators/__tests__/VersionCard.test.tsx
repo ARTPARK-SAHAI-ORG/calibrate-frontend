@@ -328,4 +328,41 @@ describe("VersionCard", () => {
       expect(screen.queryByText("View more")).not.toBeInTheDocument();
     });
   });
+
+  describe("comparing with the previous version", () => {
+    it("does not offer a comparison when there is no previous version", () => {
+      setup({ isLive: true });
+      expect(screen.queryByText(/Compare with/)).not.toBeInTheDocument();
+    });
+
+    it("does not offer a comparison when the prompt is unchanged", () => {
+      setup({
+        isLive: true,
+        previousPrompt: "You are a helpful judge.",
+        previousVersionNumber: 1,
+      });
+      expect(screen.queryByText(/Compare with/)).not.toBeInTheDocument();
+    });
+
+    it("shows added and removed lines when the comparison is turned on", async () => {
+      const user = setupUser();
+      setup({
+        isLive: true,
+        version: makeVersion({ version_number: 2, system_prompt: "one\nthree" }),
+        previousPrompt: "one\ntwo",
+        previousVersionNumber: 1,
+      });
+
+      await user.click(screen.getByText("Compare with v1"));
+
+      expect(screen.getByText("- two")).toBeInTheDocument();
+      expect(screen.getByText("+ three")).toBeInTheDocument();
+      expect(screen.getAllByTestId("diff-line-same")).toHaveLength(1);
+
+      await user.click(screen.getByText("Hide changes"));
+      expect(screen.queryByText("- two")).not.toBeInTheDocument();
+      expect(screen.queryAllByTestId("diff-line-same")).toHaveLength(0);
+      expect(screen.getByText("Compare with v1")).toBeInTheDocument();
+    });
+  });
 });

@@ -827,10 +827,12 @@ function EvaluatorDetailPageInner() {
             {activeTab === "prompts" &&
               (versions.length > 0 ? (
                 <div className="space-y-3 md:space-y-4">
-                  {versions.map((v) => (
+                  {versions.map((v, i) => (
                     <VersionCard
                       key={v.uuid}
                       version={v}
+                      previousPrompt={versions[i + 1]?.system_prompt}
+                      previousVersionNumber={versions[i + 1]?.version_number}
                       outputType={evaluator.output_type}
                       isDefault={false}
                       isLive={v.uuid === evaluator.live_version_id}
