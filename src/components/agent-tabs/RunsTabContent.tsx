@@ -292,7 +292,7 @@ export function RunsTabContent({
           <p className="text-sm md:text-base text-muted-foreground text-center">
             {filter === "all"
               ? "Run this agent's tests from the Tests tab. Every evaluation appears here with what it covered and how it went."
-              : "Choose another result to see more runs."}
+              : "Choose another result to see more runs"}
           </p>
         </div>
       ) : (

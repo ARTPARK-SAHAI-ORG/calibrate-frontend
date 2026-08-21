@@ -10,6 +10,9 @@ jest.mock("../../../hooks", () => ({
   useEnabledProviders: () => null,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),
+  // Pulled in by the create-evaluator flow behind the Evaluators tab.
+  useOpenRouterModels: () => ({ providers: [], isLoading: false }),
+  findModelInProviders: () => null,
 }));
 
 // ─── reportError ────────────────────────────────────────────────────────────
@@ -68,35 +71,37 @@ jest.mock("../STTDatasetEditor", () => {
       (_props: { accessToken: string | null }, ref: React.Ref<unknown>) => {
         React.useImperativeHandle(ref, () => editorHandleMock);
         return <div data-testid="stt-editor" />;
-      }
+      },
     ),
   };
 });
 
-// ─── MultiSelectPicker ──────────────────────────────────────────────────────
-jest.mock("../../MultiSelectPicker", () => ({
-  MultiSelectPicker: ({
-    items,
-    selectedItems,
-    onSelectionChange,
+// ─── RunEvaluatorsPanel ─────────────────────────────────────────────────────
+// The real panel brings the add dialog and the create flow with it; this file
+// is about the page, so it drives the selection directly.
+jest.mock("../RunEvaluatorsPanel", () => ({
+  RunEvaluatorsPanel: ({
+    available,
+    selectedUuids,
+    onSelectedChange,
   }: {
-    items: { uuid: string; name: string }[];
-    selectedItems: { uuid: string; name: string }[];
-    onSelectionChange: (items: { uuid: string; name: string }[]) => void;
+    available: { uuid: string; name: string }[];
+    selectedUuids: string[];
+    onSelectedChange: (next: string[]) => void;
   }) => (
     <div data-testid="evaluator-picker">
-      {items.map((it) => {
-        const isSelected = selectedItems.some((s) => s.uuid === it.uuid);
+      {available.map((it) => {
+        const isSelected = selectedUuids.includes(it.uuid);
         return (
           <button
             key={it.uuid}
             data-testid={`evaluator-${it.uuid}`}
             aria-pressed={isSelected}
             onClick={() =>
-              onSelectionChange(
+              onSelectedChange(
                 isSelected
-                  ? selectedItems.filter((s) => s.uuid !== it.uuid)
-                  : [...selectedItems, it]
+                  ? selectedUuids.filter((uuid) => uuid !== it.uuid)
+                  : [...selectedUuids, it.uuid],
               )
             }
           >
@@ -106,7 +111,7 @@ jest.mock("../../MultiSelectPicker", () => ({
       })}
       <button
         data-testid="clear-evaluators"
-        onClick={() => onSelectionChange([])}
+        onClick={() => onSelectedChange([])}
       >
         Clear
       </button>
@@ -120,7 +125,7 @@ const mockEvaluatorsResponse = (
     name: string;
     evaluator_type: string;
     is_default?: boolean;
-  }[]
+  }[],
 ) => ({
   ok: true,
   status: 200,
@@ -134,13 +139,30 @@ beforeEach(() => {
     validate: jest.fn().mockReturnValue(true),
     getNewRows: jest.fn().mockReturnValue([]),
   };
-  (global as unknown as { fetch: jest.Mock }).fetch = jest.fn().mockResolvedValue(
-    mockEvaluatorsResponse([
-      { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-      { uuid: "e2", name: "Custom Eval", evaluator_type: "stt", is_default: false },
-      { uuid: "e3", name: "TTS Eval", evaluator_type: "tts", is_default: false },
-    ])
-  );
+  (global as unknown as { fetch: jest.Mock }).fetch = jest
+    .fn()
+    .mockResolvedValue(
+      mockEvaluatorsResponse([
+        {
+          uuid: "e1",
+          name: "Default Eval",
+          evaluator_type: "stt",
+          is_default: true,
+        },
+        {
+          uuid: "e2",
+          name: "Custom Eval",
+          evaluator_type: "stt",
+          is_default: false,
+        },
+        {
+          uuid: "e3",
+          name: "TTS Eval",
+          evaluator_type: "tts",
+          is_default: false,
+        },
+      ]),
+    );
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend.test";
 });
 
@@ -148,7 +170,10 @@ afterEach(() => {
   delete (global as unknown as { fetch?: jest.Mock }).fetch;
 });
 
-async function selectProvider(user: ReturnType<typeof setupUser>, label: string) {
+async function selectProvider(
+  user: ReturnType<typeof setupUser>,
+  label: string,
+) {
   const row = screen.getAllByText(label)[0].closest("tr")!;
   await user.click(row);
 }
@@ -159,14 +184,20 @@ describe("SpeechToTextEvaluation", () => {
     expect(screen.getByText("Dataset")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
-    await waitFor(() => expect(mockListDatasets).toHaveBeenCalledWith("test-token", "stt"));
-    await waitFor(() => expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(mockListDatasets).toHaveBeenCalledWith("test-token", "stt"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument(),
+    );
   });
 
   it("starts on the settings tab when initialDatasetId is provided", async () => {
     render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
     expect(screen.getByText("Language")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument(),
+    );
   });
 
   it("lists STT evaluators (excluding other types) with none pre-selected", async () => {
@@ -180,19 +211,35 @@ describe("SpeechToTextEvaluation", () => {
     expect(screen.queryByTestId("evaluator-e3")).not.toBeInTheDocument();
     // Nothing is pre-selected — adding an evaluator is entirely opt-in, so even
     // an org-default evaluator starts unchecked.
-    expect(screen.getByTestId("evaluator-e1")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("evaluator-e2")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("evaluator-e1")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("evaluator-e2")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("signs out on 401 when fetching evaluators", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 401, ok: false, json: async () => ({}) });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+      json: async () => ({}),
+    });
     const { signOut } = require("next-auth/react");
     render(<SpeechToTextEvaluation />);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("reports an error when fetching evaluators fails", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 500, ok: false, json: async () => ({}) });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      status: 500,
+      ok: false,
+      json: async () => ({}),
+    });
     render(<SpeechToTextEvaluation />);
     await waitFor(() => expect(mockReportError).toHaveBeenCalled());
   });
@@ -212,8 +259,9 @@ describe("SpeechToTextEvaluation", () => {
     await user.click(screen.getByText("Settings"));
 
     const providerCount = () =>
-      screen.getByText("Select providers to evaluate").parentElement!
-        .querySelector("span")!.textContent;
+      screen
+        .getByText("Select providers to evaluate")
+        .parentElement!.querySelector("span")!.textContent;
 
     expect(providerCount()).toBe("(0 selected)");
     await selectProvider(user, "Deepgram");
@@ -229,8 +277,9 @@ describe("SpeechToTextEvaluation", () => {
     await user.click(screen.getByText("Settings"));
 
     const providerCount = () =>
-      screen.getByText("Select providers to evaluate").parentElement!
-        .querySelector("span")!.textContent;
+      screen
+        .getByText("Select providers to evaluate")
+        .parentElement!.querySelector("span")!.textContent;
 
     const selectAllRow = screen.getAllByText("Select all")[0].closest("div")!;
     await user.click(selectAllRow);
@@ -251,10 +300,13 @@ describe("SpeechToTextEvaluation", () => {
 
     // Only Sarvam supports Maithili STT — it should be auto-selected.
     const providerCount = () =>
-      screen.getByText("Select providers to evaluate").parentElement!
-        .querySelector("span")!.textContent;
+      screen
+        .getByText("Select providers to evaluate")
+        .parentElement!.querySelector("span")!.textContent;
     expect(providerCount()).toBe("(1 selected)");
-    expect(screen.getAllByText("Sarvam")[0].closest("tr")).toHaveTextContent("Sarvam");
+    expect(screen.getAllByText("Sarvam")[0].closest("tr")).toHaveTextContent(
+      "Sarvam",
+    );
   });
 
   it("shows validation error and switches to settings tab when no provider selected on evaluate", async () => {
@@ -350,7 +402,9 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My rows");
 
     editorHandleMock.validate.mockReturnValue(false);
@@ -361,7 +415,9 @@ describe("SpeechToTextEvaluation", () => {
 
     // Should remain blocked - evaluate not triggered (no fetch to /stt/evaluate)
     const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
-    expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(false);
+    expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
+      false,
+    );
     expect(screen.getByText("Dataset")).toBeInTheDocument();
   });
 
@@ -372,8 +428,13 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-        ])
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "stt",
+            is_default: true,
+          },
+        ]),
       )
       .mockResolvedValueOnce({
         ok: true,
@@ -385,13 +446,15 @@ describe("SpeechToTextEvaluation", () => {
       <SpeechToTextEvaluation
         evaluateRef={evaluateRef}
         onEvaluatingChange={onEvaluatingChange}
-      />
+      />,
     );
     await user.click(screen.getByText("Settings"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My dataset");
 
     editorHandleMock.getNewRows.mockReturnValue([
@@ -424,8 +487,13 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-        ])
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "stt",
+            is_default: true,
+          },
+        ]),
       )
       .mockResolvedValueOnce({
         ok: true,
@@ -439,10 +507,14 @@ describe("SpeechToTextEvaluation", () => {
     await selectProvider(user, "Deepgram");
 
     await user.click(
-      screen.getByRole("switch", { name: "Toggle built-in LLM-based evaluation metrics" }),
+      screen.getByRole("switch", {
+        name: "Toggle built-in LLM-based evaluation metrics",
+      }),
     );
 
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My dataset");
     editorHandleMock.getNewRows.mockReturnValue([
       { audio_path: "s3://bucket/a.wav", text: "hello world" },
@@ -473,8 +545,13 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-        ])
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "stt",
+            is_default: true,
+          },
+        ]),
       )
       .mockResolvedValueOnce({
         ok: true,
@@ -509,16 +586,27 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-        ])
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "stt",
+            is_default: true,
+          },
+        ]),
       )
-      .mockResolvedValueOnce({ status: 401, ok: false, json: async () => ({}) });
+      .mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+        json: async () => ({}),
+      });
 
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
     await user.click(screen.getByText("Settings"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My dataset");
     editorHandleMock.getNewRows.mockReturnValue([
       { audio_path: "s3://bucket/a.wav", text: "hello" },
@@ -528,7 +616,9 @@ describe("SpeechToTextEvaluation", () => {
       evaluateRef.current?.();
     });
 
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("reports an error and resets isEvaluating when the evaluate request fails", async () => {
@@ -538,21 +628,32 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
-        ])
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "stt",
+            is_default: true,
+          },
+        ]),
       )
-      .mockResolvedValueOnce({ status: 500, ok: false, json: async () => ({}) });
+      .mockResolvedValueOnce({
+        status: 500,
+        ok: false,
+        json: async () => ({}),
+      });
 
     render(
       <SpeechToTextEvaluation
         evaluateRef={evaluateRef}
         onEvaluatingChange={onEvaluatingChange}
-      />
+      />,
     );
     await user.click(screen.getByText("Settings"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My dataset");
     editorHandleMock.getNewRows.mockReturnValue([
       { audio_path: "s3://bucket/a.wav", text: "hello" },
@@ -562,7 +663,12 @@ describe("SpeechToTextEvaluation", () => {
       evaluateRef.current?.();
     });
 
-    await waitFor(() => expect(mockReportError).toHaveBeenCalledWith("Error evaluating:", expect.any(Error)));
+    await waitFor(() =>
+      expect(mockReportError).toHaveBeenCalledWith(
+        "Error evaluating:",
+        expect.any(Error),
+      ),
+    );
     expect(onEvaluatingChange).toHaveBeenCalledWith(false);
   });
 
@@ -573,7 +679,9 @@ describe("SpeechToTextEvaluation", () => {
     await user.click(screen.getByText("Settings"));
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
-    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    const nameInput = screen.getByPlaceholderText(
+      "e.g. English customer calls",
+    );
     await user.type(nameInput, "My dataset");
     editorHandleMock.getNewRows.mockReturnValue([
       { audio_path: "s3://bucket/a.wav", text: "hello" },
@@ -586,7 +694,7 @@ describe("SpeechToTextEvaluation", () => {
     });
 
     expect(mockReportError).toHaveBeenCalledWith(
-      "BACKEND_URL environment variable is not set"
+      "BACKEND_URL environment variable is not set",
     );
   });
 });
