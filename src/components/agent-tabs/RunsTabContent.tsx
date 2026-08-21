@@ -285,11 +285,13 @@ export function RunsTabContent({
       ) : items.length === 0 ? (
         <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <h3 className="text-base md:text-lg font-semibold text-foreground mb-1">
-            {filter === "all" ? "No runs yet" : "No runs match this filter"}
+            {filter === "all"
+              ? "No evaluations yet"
+              : "No evaluations match this filter"}
           </h3>
           <p className="text-sm md:text-base text-muted-foreground text-center">
             {filter === "all"
-              ? "Run this agent's tests from the Tests tab. Every run appears here with what it covered and how it went."
+              ? "Run this agent's tests from the Tests tab. Every evaluation appears here with what it covered and how it went."
               : "Choose another result to see more runs."}
           </p>
         </div>
@@ -307,7 +309,7 @@ export function RunsTabContent({
             onNext={nextPage}
             prevDisabled={!hasPrev || isLoading}
             nextDisabled={!hasNext || isLoading}
-            itemNoun="run"
+            itemNoun="evaluation"
           />
 
           {/* Desktop table */}

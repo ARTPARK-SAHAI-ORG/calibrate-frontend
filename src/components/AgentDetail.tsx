@@ -99,7 +99,7 @@ const tabLabels: Record<TabType, string> = {
   tools: "Tools",
   "data-extraction": "Data extraction",
   tests: "Tests",
-  runs: "Runs",
+  runs: "Evaluations",
   traces: "Traces",
   evaluators: "Evaluators",
   settings: "Settings",

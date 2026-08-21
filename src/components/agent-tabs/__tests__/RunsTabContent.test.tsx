@@ -297,19 +297,19 @@ describe("RunsTabContent", () => {
   it("says what to do when the agent has never run its tests", async () => {
     state.runs = [];
     renderTab();
-    await screen.findByText("No runs yet");
+    await screen.findByText("No evaluations yet");
     expect(
       screen.getByText(/Run this agent's tests from the Tests tab/),
     ).toBeInTheDocument();
   });
 
-  it("says a filter is hiding the runs rather than that there are none", async () => {
+  it("says a filter is hiding the evaluations rather than that there are none", async () => {
     state.runs = [];
     const user = setupUser();
     renderTab();
-    await screen.findByText("No runs yet");
+    await screen.findByText("No evaluations yet");
     await user.click(screen.getByRole("button", { name: "All passed" }));
-    await screen.findByText("No runs match this filter");
+    await screen.findByText("No evaluations match this filter");
   });
 
   it("keeps an unfinished run up to date", async () => {
