@@ -138,6 +138,22 @@ function RunResult({ run }: { run: AgentRun }) {
   );
 }
 
+/** The evaluators that judged a run, as plain chips. A dash when there are none. */
+function RunEvaluators({ run }: { run: AgentRun }) {
+  const names = run.evaluators ?? [];
+  if (names.length === 0)
+    return <span className="text-sm text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {names.map((name) => (
+        <span key={name} className={`${PILL_CLASS} bg-muted text-muted-foreground`}>
+          {name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The Runs tab on the agent page: every past run of this agent's tests, newest
  * first, in one table showing how many tests and how many models each run
@@ -397,6 +413,9 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
                     Models
                   </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                    Evaluators
+                  </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
                     Created at
                   </th>
@@ -427,6 +446,9 @@ export function RunsTabContent({
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runModelCount(run))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <RunEvaluators run={run} />
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {whenText(run)}
@@ -459,6 +481,9 @@ export function RunsTabContent({
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />
+                </div>
+                <div className="mt-2">
+                  <RunEvaluators run={run} />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {whenText(run)}
