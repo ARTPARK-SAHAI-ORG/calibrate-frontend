@@ -119,7 +119,7 @@ export function RunEvaluatorsPanel({
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             {description}
-            {readOnly ? "" : ". Add one from your library or create a new one"}
+            {readOnly ? "." : ". Add one from your library or create a new one."}
           </p>
           {headerButtons}
         </div>

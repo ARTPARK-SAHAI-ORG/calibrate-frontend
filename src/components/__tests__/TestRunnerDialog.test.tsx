@@ -994,7 +994,7 @@ describe("TestRunnerDialog", () => {
         taskId="task-noenv"
       />,
     );
-    expect(await screen.findByText("Test run")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation run")).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

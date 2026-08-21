@@ -183,8 +183,8 @@ describe("RunsTabContent", () => {
     await screen.findAllByText("1 Success");
     // The whole id, so two runs can be told apart and one can be quoted.
     expect(screen.getAllByTitle("run-unit").length).toBeGreaterThan(0);
-    // The date and time it started, not "3 min ago".
-    expect(screen.getAllByText(/2026/).length).toBeGreaterThan(0);
+    // The day and time it started, not "3 min ago".
+    expect(screen.getAllByText(/Jan 18/).length).toBeGreaterThan(0);
   });
 
   it("lists what judged the run, with tool calls named too", async () => {
@@ -210,12 +210,12 @@ describe("RunsTabContent", () => {
     const cells = Array.from(table.querySelectorAll("tbody tr")).map((row) =>
       Array.from(row.querySelectorAll("td")).map((td) => td.textContent),
     );
-    // Number of tests then number of models, for the plain run and the
-    // benchmark.
-    expect(cells[0]?.[1]).toBe("3");
-    expect(cells[0]?.[2]).toBe("1");
-    expect(cells[1]?.[1]).toBe("4");
-    expect(cells[1]?.[2]).toBe("2");
+    // Run, result, number of tests, number of models: the counts sit third
+    // and fourth, for the plain run and the benchmark.
+    expect(cells[0]?.[2]).toBe("3");
+    expect(cells[0]?.[3]).toBe("1");
+    expect(cells[1]?.[2]).toBe("4");
+    expect(cells[1]?.[3]).toBe("2");
     // No Test or Benchmark label anywhere.
     expect(screen.queryByText("Benchmark")).not.toBeInTheDocument();
   });
@@ -225,7 +225,7 @@ describe("RunsTabContent", () => {
     renderTab();
     await screen.findAllByText("Complete");
     const firstRow = document.querySelector("tbody tr") as HTMLElement;
-    expect(firstRow.querySelectorAll("td")[1].textContent).toBe("—");
+    expect(firstRow.querySelectorAll("td")[2].textContent).toBe("—");
   });
 
   it("shows the per-test tally for a finished run", async () => {

@@ -279,7 +279,13 @@ export function RunsTabContent({
         ? raw
         : raw.replace(" ", "T") + "Z",
     );
-    return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -363,22 +369,22 @@ export function RunsTabContent({
             <table className="w-full">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">
                     Run
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-36">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                    Result
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
                     Number of tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-40">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">
                     Number of models
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Evaluators
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                    Result
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
                     Created at
                   </th>
                 </tr>
@@ -392,11 +398,16 @@ export function RunsTabContent({
                   >
                     <td className="px-4 py-3">
                       <span
-                        className="block max-w-[14rem] truncate font-mono text-xs text-foreground"
+                        className="block truncate font-mono text-xs text-foreground"
                         title={run.uuid}
                       >
                         {run.uuid}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <RunResult run={run} />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runTestCount(run))}
@@ -407,12 +418,7 @@ export function RunsTabContent({
                     <td className="px-4 py-3">
                       <EvaluatorLabels run={run} />
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <RunResult run={run} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {whenText(run)}
                     </td>
                   </tr>
