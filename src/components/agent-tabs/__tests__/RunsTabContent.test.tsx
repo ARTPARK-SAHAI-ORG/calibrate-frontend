@@ -81,9 +81,14 @@ let state: { runs: AgentRun[]; total?: number; pollUnit?: unknown };
 function installFetch() {
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+      const around = new URL(url).searchParams.get("around");
+      if (around && !state.runs.some((r) => r.uuid === around)) {
+        return jsonResponse({}, false, 404);
+      }
       return jsonResponse({
         items: state.runs,
         total: state.total ?? state.runs.length,
+        offset: 0,
       });
     }
     if (url.includes("/agent-tests/run/")) {
@@ -336,7 +341,7 @@ describe("RunsTabContent", () => {
     await screen.findByText("No evaluations match this filter");
   });
 
-  it("asks once whether an opened run exists, not on every refresh", async () => {
+  it("asks the list for a run not on this page once, not on every refresh", async () => {
     // A run that is not on this page, next to one that is still going, so the
     // rows keep refreshing underneath it.
     state.runs = [
@@ -349,7 +354,7 @@ describe("RunsTabContent", () => {
 
     const existsCalls = () =>
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).includes("/agent-tests/run/run-elsewhere"),
+        String(url).includes("around=run-elsewhere"),
       ).length;
     await waitFor(() => expect(existsCalls()).toBe(1));
 

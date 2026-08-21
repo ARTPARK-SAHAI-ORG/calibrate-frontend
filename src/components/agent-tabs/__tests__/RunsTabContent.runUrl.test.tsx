@@ -33,7 +33,13 @@ jest.mock("../../TestRunnerDialog", () => ({
     ) : null,
 }));
 jest.mock("../../BenchmarkResultsDialog", () => ({
-  BenchmarkResultsDialog: () => null,
+  BenchmarkResultsDialog: ({
+    isOpen,
+    taskId,
+  }: {
+    isOpen: boolean;
+    taskId: string;
+  }) => (isOpen ? <div data-testid="benchmark-results">bench:{taskId}</div> : null),
 }));
 jest.mock("../../BenchmarkRerunDialog", () => ({
   BenchmarkRerunDialog: () => null,
@@ -57,17 +63,39 @@ const pastRun = {
   failed: 0,
 };
 
+const benchRun = {
+  uuid: "run-bench",
+  name: "",
+  type: "llm-benchmark",
+  status: "done",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+  total_tests: 2,
+  passed: null,
+  failed: null,
+  model_results: [{ model: "a" }],
+};
+
 function jsonResponse(data: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => data };
 }
+
+/** The runs the list endpoint answers with, and whether an `around` id it's
+ * asked about is among them. */
+let listedRuns: Array<typeof pastRun | typeof benchRun>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   window.history.replaceState(null, "", "/");
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
+  listedRuns = [pastRun];
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
-      return jsonResponse({ items: [pastRun], total: 1 });
+      const around = new URL(url).searchParams.get("around");
+      if (around && !listedRuns.some((r) => r.uuid === around)) {
+        return jsonResponse({}, false, 404);
+      }
+      return jsonResponse({ items: listedRuns, total: listedRuns.length, offset: 0 });
     }
     return jsonResponse({}, false, 404);
   }) as jest.Mock;
@@ -109,37 +137,37 @@ describe("RunsTabContent run deep-link", () => {
     );
   });
 
+  it("opens the model comparison dialog, not the run dialog, for a benchmark link", async () => {
+    listedRuns = [pastRun, benchRun];
+    window.history.replaceState(null, "", "/?runId=run-bench");
+    renderTab();
+
+    expect(await screen.findByTestId("benchmark-results")).toHaveTextContent(
+      "bench:run-bench",
+    );
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+  });
+
   it("closes and forgets a run the agent does not have", async () => {
     window.history.replaceState(null, "", "/?runId=run-gone");
     renderTab();
 
-    // The run is not on this page, so it is asked for directly. The backend
-    // says there is no such run, so the window closes and the address stops
-    // naming it.
+    // Not among the results, so the backend says 404 for it and the window
+    // never opens; the address stops naming it.
     await waitFor(() => expect(runIdInUrl()).toBeNull());
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
   });
 
-  it("keeps the run open when asking about it fails", async () => {
-    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
-        return jsonResponse({}, false, 500);
-      }
-      // A server problem, not a "no such run" answer.
-      return jsonResponse({}, false, 500);
-    });
+  it("shows the error banner instead of guessing a dialog when the list can't be checked", async () => {
+    global.fetch = jest.fn(async () => jsonResponse({}, false, 500)) as jest.Mock;
     window.history.replaceState(null, "", "/?runId=run-7");
     renderTab();
 
-    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).includes(`/agent-tests/run/run-7`),
-        ),
-      ).toBe(true),
-    );
-    expect(screen.getByTestId("test-runner")).toBeInTheDocument();
+    expect(await screen.findByText(/Failed to load runs/)).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+    // The link stays in the address so a retry (or reload) can pick it up.
     expect(runIdInUrl()).toBe("run-7");
   });
 });

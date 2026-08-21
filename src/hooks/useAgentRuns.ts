@@ -49,27 +49,42 @@ type UseAgentRunsArgs = {
   accessToken: string | null;
   pageSize: number;
   filter: RunResultFilter;
+  /**
+   * A run to land the list on directly, wherever its page actually is,
+   * instead of always starting at page one — for opening a run from a link.
+   * Read once per value: after that first fetch resolves (found or not), the
+   * hook stops sending it, so ordinary paging afterwards is unaffected.
+   */
+  aroundRunId?: string | null;
 };
 
 /**
  * Server-paginated list of one agent's past runs. `GET
  * /agent-tests/agent/{uuid}/runs` takes `limit`/`offset` and the result
  * filters, so only one page is ever held here, and unfinished runs on that
- * page are re-asked for until they settle.
+ * page are re-asked for until they settle. Passing `aroundRunId` swaps
+ * `offset` for `around=<uuid>` on the first fetch, which the backend answers
+ * with whichever page that run is actually on.
  */
 export function useAgentRuns({
   agentUuid,
   accessToken,
   pageSize,
   filter,
+  aroundRunId,
 }: UseAgentRunsArgs) {
   const [items, setItems] = useState<AgentRun[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The run was not among the current results (wrong filter, or it doesn't
+  // exist) — the hook already fell back to page one on its own.
+  const [aroundNotFound, setAroundNotFound] = useState(false);
   // Monotonic id so a slow, superseded response cannot overwrite a newer one.
   const requestIdRef = useRef(0);
+  // Which `aroundRunId` value has already been sent, so it's asked for once.
+  const consumedAroundIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setOffset(0);
@@ -80,13 +95,17 @@ export function useAgentRuns({
       if (!accessToken) return;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
+      const useAround = !!aroundRunId && consumedAroundIdRef.current !== aroundRunId;
       const requestId = ++requestIdRef.current;
       setIsLoading(true);
       setError(null);
+      if (useAround) setAroundNotFound(false);
       try {
         const params = new URLSearchParams({
           limit: String(pageSize),
-          offset: String(targetOffset),
+          ...(useAround
+            ? { around: aroundRunId as string }
+            : { offset: String(targetOffset) }),
           ...filterParams(filter),
         });
         const response = await fetch(
@@ -94,10 +113,26 @@ export function useAgentRuns({
           { method: "GET", headers: getDefaultHeaders(accessToken) },
         );
         if (requestId !== requestIdRef.current) return;
+        if (useAround) consumedAroundIdRef.current = aroundRunId as string;
+        if (useAround && response.status === 404) {
+          // Not in the current results — fall back to the normal first page.
+          // `offset` may already be 0, which wouldn't retrigger the fetch
+          // effect, so ask for page one directly instead of just setting it.
+          setAroundNotFound(true);
+          if (targetOffset === 0) {
+            void load(0);
+          } else {
+            setOffset(0);
+          }
+          return;
+        }
         if (!response.ok) throw new Error("Failed to fetch runs");
         const data = await response.json();
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
+        if (useAround) {
+          setOffset(typeof data?.offset === "number" ? data.offset : 0);
+        }
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
         reportError("Error fetching agent runs:", err);
@@ -108,7 +143,7 @@ export function useAgentRuns({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, agentUuid, pageSize, filter],
+    [accessToken, agentUuid, pageSize, filter, aroundRunId],
   );
 
   useEffect(() => {
@@ -206,6 +241,7 @@ export function useAgentRuns({
     offset,
     isLoading,
     error,
+    aroundNotFound,
     refetch,
     setPollSkip,
     hasPrev,
