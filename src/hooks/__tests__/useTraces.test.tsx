@@ -130,6 +130,41 @@ describe("useTraces", () => {
     await waitFor(() => expect(result.current.offset).toBe(0));
   });
 
+  it("keeps loadedOffset on the old page until the new page's fetch resolves", async () => {
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a" }, { uuid: "b" }], 4),
+    );
+    const { result } = renderHook(() =>
+      useTraces({
+        accessToken: "tok",
+        agentId: "ag-1",
+        pageSize: 2,
+      }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.loadedOffset).toBe(0);
+
+    let resolveNext: (value: unknown) => void = () => {};
+    mockFetchTraces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNext = resolve;
+      }),
+    );
+    act(() => result.current.nextPage());
+    // The requested offset moves right away; a caller stepping through items
+    // (useItemPager) needs to know the second page hasn't landed yet, so
+    // loadedOffset must still say 0, matching the still-old `items`.
+    expect(result.current.offset).toBe(2);
+    expect(result.current.loadedOffset).toBe(0);
+    expect(result.current.items).toEqual([{ uuid: "a" }, { uuid: "b" }]);
+
+    await act(async () => {
+      resolveNext(page([{ uuid: "c" }, { uuid: "d" }], 4));
+    });
+    expect(result.current.loadedOffset).toBe(2);
+    expect(result.current.items).toEqual([{ uuid: "c" }, { uuid: "d" }]);
+  });
+
   it("does not page past the last page", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }], 1));
     const { result } = renderHook(() =>

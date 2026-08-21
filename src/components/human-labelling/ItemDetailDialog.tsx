@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
+import { DialogNavHeader } from "@/components/ui";
+import { useDialogNavKeys } from "@/hooks";
 import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
@@ -192,37 +194,7 @@ export function ItemDetailDialog({
     setSummary(null);
   }, [taskUuid, itemUuid]);
 
-  // Close on Escape; navigate with arrow keys.
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      const target = e.target as HTMLElement | null;
-      if (target) {
-        const tag = target.tagName;
-        if (
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          target.isContentEditable
-        ) {
-          return;
-        }
-      }
-      if (e.key === "ArrowLeft" && hasPrev && onPrev) {
-        e.preventDefault();
-        onPrev();
-      } else if (e.key === "ArrowRight" && hasNext && onNext) {
-        e.preventDefault();
-        onNext();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose, hasPrev, hasNext, onPrev, onNext]);
+  useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
 
   const evaluatorVariables = useMemo(
     () => (item ? extractEvaluatorVariables(item.payload) : {}),
@@ -556,67 +528,14 @@ export function ItemDetailDialog({
               {itemTitle(item)}
             </h2>
           </div>
-          {(onPrev || onNext) && (!position || position.total > 1) && (
-            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
-              <div className="pointer-events-auto">
-                <Tooltip position="bottom" content="Previous item">
-                  <button
-                    type="button"
-                    onClick={onPrev}
-                    disabled={!hasPrev}
-                    aria-label="Previous item"
-                    className="flex items-center justify-center w-8 h-8 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-                </Tooltip>
-              </div>
-              {position && position.total > 0 ? (
-                <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
-                  {position.index + 1} of {position.total}
-                </span>
-              ) : (
-                <span className="min-w-[4rem]" />
-              )}
-              <div className="pointer-events-auto">
-                <Tooltip position="bottom" content="Next item">
-                  <button
-                    type="button"
-                    onClick={onNext}
-                    disabled={!hasNext}
-                    aria-label="Next item"
-                    className="flex items-center justify-center w-8 h-8 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
-          )}
+          <DialogNavHeader
+            noun="item"
+            onPrev={onPrev}
+            onNext={onNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
           <div className="flex items-center gap-2 shrink-0">
             {loading && summary && (
               <svg

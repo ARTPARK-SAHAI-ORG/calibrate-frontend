@@ -68,6 +68,7 @@ export function TracesTabContent({
     loadedQ,
     offset,
     setOffset,
+    loadedOffset,
     isLoading,
     error,
     handleDeleted,
@@ -228,7 +229,7 @@ export function TracesTabContent({
   const itemPager = useItemPager({
     items,
     openUuid: openTraceUuid,
-    pageStart: offset,
+    pageStart: loadedOffset,
     pageSize,
     total,
     onOpen: openTrace,

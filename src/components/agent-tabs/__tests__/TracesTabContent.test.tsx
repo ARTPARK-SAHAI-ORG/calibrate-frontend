@@ -222,6 +222,7 @@ function tracesResult(
     loadedQ: "",
     offset: 0,
     setOffset: jest.fn(),
+    loadedOffset: 0,
     isLoading: false,
     error: null,
     handleDeleted,
@@ -1005,5 +1006,71 @@ describe("TracesTabContent", () => {
 
     await user.click(screen.getByTestId("trace-detail-next"));
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("waits for the next page to actually load before opening its first trace", async () => {
+    const user = setupUser();
+    const setOffset = jest.fn();
+    const page1 = [
+      trace(),
+      trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+    ];
+    mockUseTraces.mockReturnValue(
+      tracesResult(page1, {
+        total: 4,
+        offset: 0,
+        loadedOffset: 0,
+        hasNext: true,
+        setOffset,
+      }),
+    );
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByText("Second")[0]);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "2 of 4",
+    );
+
+    // Step past the last trace of the loaded page. The request for page two
+    // has gone out (`setOffset` was called) but hasn't come back yet, so the
+    // rows on screen are still page one's.
+    await user.click(screen.getByTestId("trace-detail-next"));
+    expect(setOffset).toHaveBeenCalledWith(50);
+
+    // Simulate the state a moment after that click: the requested offset has
+    // moved, but the trace rows have not arrived yet — same shape `useTraces`
+    // is in mid-fetch. The dialog must not jump to a trace off page one
+    // (the bug this guards: opening an old-page trace while page two loads).
+    mockUseTraces.mockReturnValue(
+      tracesResult(page1, {
+        total: 4,
+        offset: 50,
+        loadedOffset: 0,
+        hasNext: true,
+        setOffset,
+      }),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+
+    // Page two lands: `loadedOffset` catches up to match the new rows. Only
+    // now should the dialog step onto the new page, opening its first trace.
+    const page2 = [
+      trace({ uuid: "trace-3", message_id: "msg-003", input_preview: "Third" }),
+      trace({ uuid: "trace-4", message_id: "msg-004", input_preview: "Fourth" }),
+    ];
+    mockUseTraces.mockReturnValue(
+      tracesResult(page2, {
+        total: 4,
+        offset: 50,
+        loadedOffset: 50,
+        hasPrev: true,
+        hasNext: false,
+        setOffset,
+      }),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-3");
   });
 });
