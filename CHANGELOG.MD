@@ -1,5 +1,6 @@
 ## August 2026
 
+- Show the evaluators that judged each run on the agent Evaluations tab ([#398](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/398))
 - Fix run links on the agent Evaluations tab to open the right dialog on the right page ([#395](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/395))
 - Make the agent-defaults evaluator prompt plain and keep the Evaluators tab in sync ([#396](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/396))
 - Trim the sidebar, split runs into their own tab ([#391](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/391))
