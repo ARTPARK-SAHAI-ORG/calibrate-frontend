@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { CreateEvaluatorFlow } from "../CreateEvaluatorFlow";
 
@@ -30,6 +31,8 @@ jest.mock("../CreateEvaluatorSidebar", () => ({
     evaluatorName,
     setEvaluatorName,
     systemPrompt,
+    createNameError,
+    nameInputRef,
   }: {
     isOpen: boolean;
     onCreate: () => void;
@@ -37,15 +40,19 @@ jest.mock("../CreateEvaluatorSidebar", () => ({
     evaluatorName: string;
     setEvaluatorName: (value: string) => void;
     systemPrompt: string;
+    createNameError: string | null;
+    nameInputRef?: React.RefObject<HTMLInputElement | null>;
   }) =>
     isOpen ? (
       <div data-testid="create-sidebar">
         <span data-testid="prompt-field">{systemPrompt}</span>
         <input
           aria-label="Name"
+          ref={nameInputRef}
           value={evaluatorName}
           onChange={(e) => setEvaluatorName(e.target.value)}
         />
+        {createNameError ? <span>{createNameError}</span> : null}
         <button type="button" onClick={onCreate}>
           Submit create
         </button>
@@ -203,5 +210,28 @@ describe("CreateEvaluatorFlow", () => {
     );
     // The name the backend suggests is not put in the box.
     expect(screen.getByLabelText("Name")).toHaveValue("");
+  });
+
+  it("says the name is needed and puts the cursor back on the box", async () => {
+    const user = setupUser();
+    const onCreated = jest.fn();
+
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={onCreated}
+        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm"]}
+      />,
+    );
+
+    expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+    await user.click(screen.getByText("Submit create"));
+
+    expect(await screen.findByText("Name is required")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveFocus();
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });

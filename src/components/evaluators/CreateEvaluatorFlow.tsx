@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccessToken,
   useOpenRouterModels,
@@ -207,6 +207,9 @@ export function CreateEvaluatorFlow({
     }
   }, [llmProviders, newEvaluatorJudgeModel]);
 
+  // Lets a create that the name blocked put the cursor back on the box.
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
   const isNameDuplicate = (name: string): boolean => {
     const trimmedName = name.trim().toLowerCase();
     return existingEvaluators.some((e) => e.name.toLowerCase() === trimmedName);
@@ -273,8 +276,22 @@ export function CreateEvaluatorFlow({
 
   const createEvaluator = async () => {
     setValidationAttempted(true);
+    // Anything wrong with the name says so under the box and puts the cursor
+    // back there, which also scrolls it into view on a long form.
+    const focusName = () => nameInputRef.current?.focus();
     if (isReservedEvaluatorName(evaluatorName)) {
       setCreateNameError(reservedEvaluatorNameError(evaluatorName));
+      focusName();
+      return;
+    }
+    if (!evaluatorName.trim()) {
+      setCreateNameError("Name is required");
+      focusName();
+      return;
+    }
+    if (isNameDuplicate(evaluatorName)) {
+      // The form prints its own line for a name already in the library.
+      focusName();
       return;
     }
     const scaleValid =
@@ -420,6 +437,7 @@ export function CreateEvaluatorFlow({
         createError={createError}
         isCreating={isCreating}
         isNameDuplicate={isNameDuplicate}
+        nameInputRef={nameInputRef}
         onClose={onClose}
         onOpenModelPicker={() => setLlmModalOpen(true)}
         onCreate={createEvaluator}

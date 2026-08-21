@@ -37,6 +37,8 @@ type CreateEvaluatorSidebarProps = {
   createError: string | null;
   isCreating: boolean;
   isNameDuplicate: (name: string) => boolean;
+  /** Lets the create action put the cursor back on a name it cannot accept. */
+  nameInputRef?: React.RefObject<HTMLInputElement | null>;
   onClose: () => void;
   onOpenModelPicker: () => void;
   onCreate: () => void;
@@ -68,6 +70,7 @@ export function CreateEvaluatorSidebar({
   createError,
   isCreating,
   isNameDuplicate,
+  nameInputRef,
   onClose,
   onOpenModelPicker,
   onCreate,
@@ -135,6 +138,7 @@ export function CreateEvaluatorSidebar({
             </label>
             <input
               type="text"
+              ref={nameInputRef}
               value={evaluatorName}
               placeholder="e.g., Follows Refund Policy"
               onChange={(e) => {
