@@ -132,7 +132,9 @@ export const A = {
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
-  testTypePicker: '[data-tour="test-type-picker"]',
+  // The whole picker body (options + example), so the card's "compare these
+  // with the example" reads against a lit example rather than a dimmed one.
+  testTypePicker: '[data-tour="test-type-body"]',
   testTypeNextReply: '[data-test-type="next-reply"]',
   testTypeNext: '[data-tour="test-type-next"]',
   testConversation: '[data-tour="test-conversation"]',
@@ -661,7 +663,8 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       title: "Pick what to test",
       description:
         "First, choose <strong>what you want to check</strong>: the reply your agent gives, or the tool it reaches for. The example on the right shows what that kind of test looks like once it runs. We will check the <strong>reply</strong>.",
-      side: "left",
+      side: "bottom",
+      align: "start",
       actionLabel: "Next",
       timeout: 12000,
       allowInteraction: true,
@@ -722,7 +725,8 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       title: "The same choice again",
       description:
         "Same picker as before: we are checking the <strong>reply</strong> again, this time with a question the agent cannot answer.",
-      side: "left",
+      side: "bottom",
+      align: "start",
       actionLabel: "Next",
       timeout: 12000,
       allowInteraction: true,
@@ -939,7 +943,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       timeout: 10000,
       prepare: async () => {
+        // Closing the run window sends the app to the Evaluations tab, so come
+        // back to Tests before pointing at its Create test button.
         await clickElement(A.runClose, { timeout: 8000 });
+        await clickElement(A.tabTests, { timeout: 8000 });
         await waitForElement(A.testsCreate, { timeout: 8000 });
       },
     },

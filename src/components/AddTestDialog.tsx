@@ -3301,10 +3301,7 @@ export function AddTestDialog({
           with Create to confirm. Once confirmed, the type is locked for
           this test — same as an existing test's type can't be changed. */}
       {!typeChosen && (
-        <div
-          data-tour="test-type-picker"
-          className="relative w-full max-w-7xl h-[92vh] mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden animate-in-scale"
-        >
+        <div className="relative w-full max-w-7xl h-[92vh] mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden animate-in-scale">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">
               Create a test
@@ -3330,13 +3327,16 @@ export function AddTestDialog({
               </svg>
             </button>
           </div>
-          <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+          <div
+            data-tour="test-type-body"
+            className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden"
+          >
             {/* Left — the type options, one after another. */}
             <div className="px-6 py-5 md:w-96 md:shrink-0 md:border-r border-border overflow-y-auto">
               <label className="block text-base font-medium text-foreground mb-5">
                 Select what you want to test about the agent
               </label>
-              <div className="space-y-2">
+              <div data-tour="test-type-options-list" className="space-y-2">
                 {testTypeOptions.map((opt) => {
                   const isSelected = previewTab === opt.tab;
                   return (

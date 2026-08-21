@@ -256,7 +256,10 @@ async function installFakeBackend(
   appOrigin: string,
 ): Promise<void> {
   const state: FakeState = {
-    attachedEvaluators: [],
+    // A new agent comes with the built-in Correctness already attached (the
+    // real app does this on creation), which is what the tour points at
+    // before it adds a second check.
+    attachedEvaluators: [LIBRARY_EVALUATORS[0]],
     tests: [],
     runsCreated: 0,
   };
