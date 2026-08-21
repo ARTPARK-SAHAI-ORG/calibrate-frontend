@@ -10,16 +10,20 @@ describe("testTypeLabel", () => {
   });
 
   it("labels response", () => {
-    expect(testTypeLabel("response")).toBe("Next Reply");
+    expect(testTypeLabel("response")).toBe("LLM response");
+  });
+
+  it("labels general the same as response", () => {
+    expect(testTypeLabel("general")).toBe("LLM response");
   });
 
   it("uses default fallback for unknown type", () => {
-    expect(testTypeLabel("mystery")).toBe("Next Reply");
+    expect(testTypeLabel("mystery")).toBe("LLM response");
   });
 
   it("uses default fallback for null/undefined", () => {
-    expect(testTypeLabel(null)).toBe("Next Reply");
-    expect(testTypeLabel(undefined)).toBe("Next Reply");
+    expect(testTypeLabel(null)).toBe("LLM response");
+    expect(testTypeLabel(undefined)).toBe("LLM response");
   });
 
   it("uses custom fallback when provided", () => {

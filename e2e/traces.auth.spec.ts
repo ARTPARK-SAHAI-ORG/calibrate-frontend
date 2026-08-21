@@ -33,6 +33,10 @@ async function createAgent(page: Page, name: string): Promise<string> {
     page.getByRole("heading", { name: "New agent", exact: true }),
   ).toBeVisible();
   await page.getByPlaceholder("Enter agent name").fill(name);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  // Second step: what the agent does. Pick Conversation — traces are
+  // conversation-shaped either way.
+  await page.getByText("Conversation", { exact: true }).click();
 
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
   await expect(async () => {

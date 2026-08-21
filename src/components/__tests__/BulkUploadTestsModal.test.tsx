@@ -173,7 +173,7 @@ describe("BulkUploadTestsModal", () => {
   it("renders the test type selector when open", () => {
     render(<BulkUploadTestsModal {...defaultProps()} />);
     expect(screen.getByText("Bulk upload tests")).toBeInTheDocument();
-    expect(screen.getByText("Next Reply")).toBeInTheDocument();
+    expect(screen.getByText("LLM Response")).toBeInTheDocument();
     expect(screen.getByText("Tool Call")).toBeInTheDocument();
   });
 
@@ -772,7 +772,7 @@ describe("BulkUploadTestsModal", () => {
     });
   });
 
-  describe("Next Reply (evaluator-based) uploads", () => {
+  describe("LLM Response (evaluator-based) uploads", () => {
     async function pickEvaluator(
       user: ReturnType<typeof setupUser>,
       name: string,
@@ -788,7 +788,7 @@ describe("BulkUploadTestsModal", () => {
     it("fetches llm evaluators and requires a selection before showing the dropzone", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining("/evaluators"),
@@ -806,7 +806,7 @@ describe("BulkUploadTestsModal", () => {
     it("parses a valid response CSV with a variable evaluator", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await waitFor(() =>
         expect(
           screen.queryByText("Loading evaluators"),
@@ -829,7 +829,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when a row has an invalid include flag", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -846,7 +846,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when a required variable value is missing", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -863,7 +863,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when every evaluator is excluded on a row", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Politeness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -887,7 +887,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Politeness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -928,7 +928,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await waitFor(() =>
         expect(
           screen.getByText(/Failed to load evaluators/),
@@ -950,14 +950,14 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await waitFor(() => expect(signOut).toHaveBeenCalled());
     });
 
     it("downloads the sample CSV tailored to the selected evaluators", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -966,17 +966,17 @@ describe("BulkUploadTestsModal", () => {
       expect((global as any).URL.createObjectURL).toHaveBeenCalled();
     });
 
-    it("downloads the guidelines PDF for Next Reply, with a conversation_history column", async () => {
+    it("downloads the guidelines PDF for LLM Response, with a conversation_history column", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Next Reply");
+      await selectTestType(user, "LLM Response");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
       await user.click(screen.getByText("Download CSV format guidelines"));
       const call = (generateGuidelinesPdf as jest.Mock).mock.calls[0][0];
-      expect(call.title).toBe("Bulk upload — Next reply tests");
+      expect(call.title).toBe("Bulk upload — LLM response tests");
       expect(
         call.columns.some((c: any) => c.name === "conversation_history"),
       ).toBe(true);
@@ -985,21 +985,19 @@ describe("BulkUploadTestsModal", () => {
   });
 
   describe("agentNature: general", () => {
-    it("hides Conversation and relabels Next Reply to Output", () => {
+    it("hides Conversation but keeps the LLM Response label", () => {
       render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
       expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
-      expect(screen.queryByText("Next Reply")).not.toBeInTheDocument();
-      expect(screen.getByText("Output")).toBeInTheDocument();
+      expect(screen.getByText("LLM Response")).toBeInTheDocument();
       expect(
         screen.getByText("Evaluate the agent's output given the input"),
       ).toBeInTheDocument();
       expect(screen.getByText("Tool Call")).toBeInTheDocument();
     });
 
-    it("still shows Next Reply (not Output) when agentNature is omitted", () => {
+    it("still shows the LLM Response label when agentNature is omitted", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      expect(screen.getByText("Next Reply")).toBeInTheDocument();
-      expect(screen.queryByText("Output")).not.toBeInTheDocument();
+      expect(screen.getByText("LLM Response")).toBeInTheDocument();
       // Conversation is hidden for every agent, not just general ones.
       expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
     });
@@ -1041,7 +1039,7 @@ describe("BulkUploadTestsModal", () => {
     it("fetches the llm-general evaluator type and shows an input column, not conversation_history, in the guidelines", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Output");
+      await selectTestType(user, "LLM Response");
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining("/evaluators"),
@@ -1063,7 +1061,7 @@ describe("BulkUploadTestsModal", () => {
     it("parses a row with input into { input, evaluators } and sends type general", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Output");
+      await selectTestType(user, "LLM Response");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -1098,7 +1096,7 @@ describe("BulkUploadTestsModal", () => {
     it("downloads a sample CSV for a general agent (input column, not conversation JSON)", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Output");
+      await selectTestType(user, "LLM Response");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -1110,7 +1108,7 @@ describe("BulkUploadTestsModal", () => {
     it("shows a per-row error for missing input, the same way a missing conversation history fails", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Output");
+      await selectTestType(user, "LLM Response");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),

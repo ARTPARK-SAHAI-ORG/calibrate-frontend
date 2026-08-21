@@ -37,8 +37,8 @@ const CONVERSATION_EVALUATOR_TYPE = "conversation";
 
 type ParsedTest = {
   name: string;
-  // Present for conversation-based rows (next reply / conversation / tool
-  // call). Absent for general-agent "Output" rows, which carry `input`
+  // Present for conversation-based rows (LLM response / conversation / tool
+  // call). Absent for general-agent LLM response rows, which carry `input`
   // instead — a plain string, not JSON.
   conversation_history?: string;
   input?: string;
@@ -74,8 +74,9 @@ type BulkUploadTestsModalProps = {
    * Whether the agent this modal is uploading tests for holds an ongoing
    * conversation ("conversation", the default) or takes one input and
    * produces one output ("general"). A general agent has no conversation to
-   * grade, so the "Conversation" test type is hidden and the "Next Reply"
-   * option is relabelled to match (see the type-option list below).
+   * grade, so the "Conversation" test type is hidden; the "LLM Response"
+   * option stays, with a different description and CSV column (see the
+   * type-option list below).
    */
   agentNature?: "conversation" | "general";
 };
@@ -219,7 +220,7 @@ const CONVERSATION_HISTORY_DESC =
   'A JSON array of chat messages that represents the conversation that has happened so far, before the agent\'s response is evaluated. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role';
 
 // Description for the `input` column used by general-agent (one input, one
-// output) "Output" tests in place of `conversation_history`.
+// output) LLM response tests in place of `conversation_history`.
 const GENERAL_INPUT_DESC =
   "A plain text string — the input given to the agent. Not JSON, just the text itself.";
 
@@ -299,12 +300,12 @@ export function BulkUploadTestsModal({
   const [testType, setTestType] = useState<TestType | null>(null);
   const isResponseType = testType === "response";
   const isConversationType = testType === "conversation";
-  // Both "Next Reply" (response) and "Conversation" use attached evaluators
+  // Both "LLM Response" (response) and "Conversation" use attached evaluators
   // rather than tool_calls — they share most of the response code path.
   const usesEvaluators = isResponseType || isConversationType;
-  // A general agent has no conversation — its "Output" option (the
-  // relabeled response type) takes a single plain-text input instead of a
-  // conversation history, and is graded by output-type evaluators.
+  // A general agent has no conversation — its "LLM Response" option takes a
+  // single plain-text input instead of a conversation history, and is
+  // graded by output-type evaluators.
   const isGeneralResponse = isResponseType && agentNature === "general";
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedTests, setParsedTests] = useState<ParsedTest[]>([]);
@@ -386,7 +387,7 @@ export function BulkUploadTestsModal({
     }
   }, [isOpen]);
 
-  // Fetch the evaluators list as soon as the user picks "Next Reply" or
+  // Fetch the evaluators list as soon as the user picks "LLM Response" or
   // "Conversation" so we can validate the CSV against it. We only need it
   // for evaluator-based uploads, so don't preload it on modal open — keeps
   // the round-trip off the path for users who only ever do tool-call uploads.
@@ -626,9 +627,7 @@ export function BulkUploadTestsModal({
       return {
         title: isConversationType
           ? "Bulk upload — Conversation tests"
-          : isGeneralResponse
-            ? "Bulk upload — Output tests"
-            : "Bulk upload — Next reply tests",
+          : "Bulk upload — LLM response tests",
         intro:
           "Upload a CSV with the following columns. Each row creates one test.",
         columns,
@@ -687,11 +686,9 @@ export function BulkUploadTestsModal({
     const blob = generateGuidelinesPdf(buildGuidelines());
     const filename = isConversationType
       ? "conversation_tests_csv_guidelines.pdf"
-      : isGeneralResponse
-        ? "output_tests_csv_guidelines.pdf"
-        : isResponseType
-          ? "next_reply_tests_csv_guidelines.pdf"
-          : "tool_call_tests_csv_guidelines.pdf";
+      : isResponseType || isGeneralResponse
+        ? "llm_response_tests_csv_guidelines.pdf"
+        : "tool_call_tests_csv_guidelines.pdf";
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -714,9 +711,7 @@ export function BulkUploadTestsModal({
       link.href = url;
       link.download = isConversationType
         ? "sample_conversation_tests.csv"
-        : isGeneralResponse
-          ? "sample_output_tests.csv"
-          : "sample_next_reply_tests.csv";
+        : "sample_llm_response_tests.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -940,7 +935,7 @@ export function BulkUploadTestsModal({
             }
             if (rowFailed) return;
 
-            // Next Reply / Conversation tests are graded by their evaluators,
+            // LLM Response / Conversation tests are graded by their evaluators,
             // so a row that excluded all of them can't be scored.
             if (refs.length === 0) {
               errors.push(
@@ -1411,7 +1406,7 @@ export function BulkUploadTestsModal({
               {[
                 {
                   value: "response" as const,
-                  label: agentNature === "general" ? "Output" : "Next Reply",
+                  label: "LLM Response",
                   description:
                     agentNature === "general"
                       ? "Evaluate the agent's output given the input"

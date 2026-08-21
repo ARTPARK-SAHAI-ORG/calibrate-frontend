@@ -217,8 +217,8 @@ describe("first-eval tour step actions", () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("data-tour", "add-evaluators-dialog");
     const labelRow = (name: string) => {
-      const el = document.createElement("label");
-      el.innerHTML = `<input type="checkbox" /><span>${name}</span><span>LLM reply</span>`;
+      const el = document.createElement("div");
+      el.innerHTML = `<input type="checkbox" aria-label="Select ${name}" /><span>${name}</span>`;
       return el;
     };
     const userRow = labelRow("Correctness");
@@ -311,12 +311,12 @@ describe("first-eval tour step actions", () => {
   it("ticks correctness and a second evaluator in the picker", async () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("data-tour", "add-evaluators-dialog");
-    const correctness = document.createElement("label");
+    const correctness = document.createElement("div");
     correctness.innerHTML =
-      '<input type="checkbox" /><span>Correctness</span><span>LLM reply</span>';
-    const tone = document.createElement("label");
+      '<input type="checkbox" aria-label="Select Correctness" /><span>Correctness</span>';
+    const tone = document.createElement("div");
     tone.innerHTML =
-      '<input type="checkbox" /><span>Politeness</span><span>LLM reply</span>';
+      '<input type="checkbox" aria-label="Select Politeness" /><span>Politeness</span>';
     dialog.append(correctness, tone);
     document.body.appendChild(dialog);
 

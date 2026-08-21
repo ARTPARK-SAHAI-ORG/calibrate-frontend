@@ -486,7 +486,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
     expect(screen.getByText("2 tests")).toBeInTheDocument();
-    expect(screen.getAllByText("Next Reply").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("LLM response").length).toBeGreaterThan(0);
   });
 
   it("filters the list via the search input", async () => {

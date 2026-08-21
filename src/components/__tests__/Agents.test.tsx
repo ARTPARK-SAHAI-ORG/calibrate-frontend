@@ -244,7 +244,7 @@ describe("Agents", () => {
     await user.type(screen.getByPlaceholderText("Enter agent name"), "Conn Agent");
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
-    await user.click(screen.getByText("General"));
+    await user.click(screen.getByText("General response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "conn-uuid" }),
@@ -399,7 +399,7 @@ describe("Agents", () => {
     await user.type(input, "{Enter}");
 
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
-    await user.click(screen.getByText("General"));
+    await user.click(screen.getByText("General response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "enter-uuid" }),

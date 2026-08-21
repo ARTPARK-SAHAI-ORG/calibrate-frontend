@@ -142,7 +142,7 @@ export async function clickByText(
       document.querySelectorAll<HTMLElement>('button, a, [role="button"]'),
     ).filter((el) => isVisible(el));
     // Exact first (e.g. "Create", "Not now"); then starts-with, so an option
-    // card whose text is a title + description ("Next reply test Evaluate …")
+    // card whose text is a title + description ("LLM response test Evaluate …")
     // still matches on the title.
     return (
       candidates.find((el) => (el.textContent ?? "").trim() === text) ??

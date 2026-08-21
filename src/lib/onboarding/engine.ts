@@ -43,6 +43,12 @@ export type TourStep = {
   autoAdvance?: boolean;
   /** Extra popover class(es) for this step, merged with the base theme class. */
   popoverClass?: string;
+  /**
+   * Let the user interact with the spotlighted element (scroll a list, tick a
+   * box) instead of the default lock. For steps whose card invites reading or
+   * scrolling through the highlighted content.
+   */
+  allowInteraction?: boolean;
 };
 
 export type Tour = {
@@ -259,7 +265,13 @@ async function showStep(): Promise<void> {
   // The new card is set up and about to render — allow onPopoverRender to
   // reveal it (and keep it revealed across any later re-render this step).
   popoverHidden = false;
-  driverObj.highlight({ element: element ?? undefined, popover });
+  driverObj.highlight({
+    element: element ?? undefined,
+    popover,
+    // Per-step unlock: scrollable/tickable content stays usable on steps that
+    // ask the reader to look through it.
+    disableActiveInteraction: !step.allowInteraction,
+  });
 
   // If the anchored element later disappears (e.g. the user closes the dialog it
   // was pointing at), recenter the card so it does not dangle over empty space.

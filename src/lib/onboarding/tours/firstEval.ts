@@ -474,16 +474,16 @@ export async function fillSystemPromptResilient(
 }
 
 /**
- * Open the Create Test dialog and pick "Next reply", which seeds a conversation
- * and the default evaluator. Leaves the editor open for the scenario/criteria
- * to be filled in.
+ * Open the Create Test dialog and pick "LLM response", which seeds a
+ * conversation and the default evaluator. Leaves the editor open for the
+ * scenario/criteria to be filled in.
  */
 async function openCreateTestEditor(
   baseName: string,
   deps: FirstEvalDeps,
 ): Promise<void> {
   await clickElement(A.testsCreate, { timeout: 10000 });
-  await clickByText("Next reply test", { timeout: 8000 });
+  await clickByText("LLM response test", { timeout: 8000 });
   await delay(300);
   // Avoid "A test with this name already exists" on re-runs.
   const name = await resolveFreeName(baseName, "/tests", deps.getAccessToken());
@@ -540,44 +540,26 @@ async function resolveFreeName(
 // Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
 // that type and silently drops "Full conversation" / "LLM output" ones. So the
-// second pick MUST be an LLM-reply evaluator, otherwise the card's claim that
-// both checks grade the test would be false — one would be ignored at run time.
-const LLM_REPLY_TYPE_LABEL = /LLM\s*reply/i;
-
-/** True if a picker row is an LLM-reply evaluator (grades a next-reply test). */
-export function isLlmReplyRow(row: HTMLLabelElement): boolean {
-  return LLM_REPLY_TYPE_LABEL.test(row.textContent ?? "");
-}
-
-/** True if a picker row's checkbox is currently unticked. */
-function isRowUnchecked(row: HTMLLabelElement): boolean {
-  const cb = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
-  return !!cb && !cb.checked;
-}
-
 /**
- * Choose the evaluator row to tick by its EXACT name (the name resolved into the
- * plan), restricted to unticked LLM-reply rows so it actually grades the
- * next-reply test. The match is on the row's name element being exactly `name` —
- * NOT merely containing it — so "Conciseness" never ticks a "Conciseness2" row,
- * and so the tour never ticks an unrelated evaluator whose criteria it cannot
- * control. Pure; returns the row or undefined.
+ * Find the evaluator's checkbox by its EXACT name. The picker renders each row
+ * as a checkbox whose aria-label is `Select <name>` (the row body opens a
+ * preview instead of ticking), so the aria-label is the one stable, exact-name
+ * hook — "Conciseness" never matches a "Conciseness2" row. Only unticked boxes
+ * count. Pure; returns the checkbox or undefined.
  */
-export function chooseRowByName(
-  rows: HTMLLabelElement[],
+export function chooseEvaluatorCheckbox(
+  dialog: HTMLElement,
   name: string,
-): HTMLLabelElement | undefined {
-  const target = name.trim().toLowerCase();
-  if (!target) return undefined;
-  // A row's name lives in its own element; match that element's text exactly
-  // rather than the whole row (which also holds the type pill + description).
-  const hasExactName = (row: HTMLLabelElement): boolean =>
-    Array.from(row.querySelectorAll<HTMLElement>("*")).some(
-      (el) => (el.textContent ?? "").trim().toLowerCase() === target,
-    );
-  return rows
-    .filter((r) => isRowUnchecked(r) && isLlmReplyRow(r))
-    .find(hasExactName);
+): HTMLInputElement | undefined {
+  const target = `select ${name.trim().toLowerCase()}`;
+  if (!name.trim()) return undefined;
+  return Array.from(
+    dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+  ).find(
+    (cb) =>
+      !cb.checked &&
+      (cb.getAttribute("aria-label") ?? "").trim().toLowerCase() === target,
+  );
 }
 
 /**
@@ -585,28 +567,23 @@ export function chooseRowByName(
  * (green "selected" tint + ring) so it is obvious which evaluator was just
  * picked. The highlight goes away when the dialog closes, so no cleanup needed.
  */
-function tickRow(row: HTMLLabelElement | undefined): void {
+function tickCheckbox(cb: HTMLInputElement | undefined): void {
+  if (!cb) return;
+  const row = cb.parentElement as HTMLElement | null;
+  (row ?? cb).scrollIntoView({ block: "center" });
+  if (!cb.checked) cb.click();
   if (!row) return;
-  row.scrollIntoView({ block: "center" });
-  const checkbox = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
-  if (checkbox && !checkbox.checked) checkbox.click();
   row.style.borderRadius = "8px";
   row.style.transition = "background-color 0.15s ease";
   row.style.backgroundColor = "color-mix(in srgb, #22c55e 20%, transparent)";
   row.style.boxShadow = "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
 }
 
-/**
- * Tick the Correctness evaluator. Falls back to the first LLM-reply row (not just
- * any row) so the pick always grades the next-reply demo test — see
- * `LLM_REPLY_TYPE_LABEL`.
- */
 /** Tick an evaluator in the picker, matched by the exact name from the plan. */
 async function pickEvaluatorByName(name: string): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
-  const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  tickRow(chooseRowByName(rows, name));
+  tickCheckbox(chooseEvaluatorCheckbox(dialog as HTMLElement, name));
 }
 
 /**
@@ -817,6 +794,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           )}</strong>: does the answer get it right?`,
       side: "left",
       actionLabel: "Pick it",
+      // Let the reader scroll through the list of evaluators while this and
+      // the following picker cards are up.
+      allowInteraction: true,
       action: async () => {
         await pickEvaluatorByName(correctness.name);
       },
@@ -834,6 +814,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
             )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
             side: "left" as const,
             actionLabel: "Pick it",
+            allowInteraction: true,
             action: async () => {
               await pickEvaluatorByName(secondName);
             },
@@ -850,6 +831,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           )} is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.`,
       side: "left",
       actionLabel: secondName ? "Add them" : "Add it",
+      allowInteraction: true,
       action: async () => {
         await clickElement(A.evaluatorsAddConfirm);
       },

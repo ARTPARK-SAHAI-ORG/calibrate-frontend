@@ -158,6 +158,17 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// Pick a type on the intro picker and confirm it: tapping the option opens a
+// preview of what that test type looks like, and Next is what actually
+// enters the full editor.
+async function pickTestType(
+  user: ReturnType<typeof setupUser>,
+  title: string,
+) {
+  await user.click(screen.getByText(title));
+  await user.click(screen.getByRole("button", { name: "Next" }));
+}
+
 // Drive a controlled `testName` prop from a stateful wrapper so typing in the
 // name field is reflected back into the dialog, mirroring how the real
 // parent page manages this state.
@@ -188,17 +199,17 @@ describe("AddTestDialog", () => {
   it("offers next reply and tool call on the create-phase type intro picker", async () => {
     render(<AddTestDialog {...baseProps()} />);
     expect(screen.getByText("Create a test")).toBeInTheDocument();
-    expect(screen.getByText("Next reply test")).toBeInTheDocument();
-    expect(screen.getByText("Tool call test")).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent give the right reply?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent use the right tool?"),
+    ).toBeInTheDocument();
   });
 
   it("does not offer the conversation type when creating a test", async () => {
-    const user = setupUser();
     render(<AddTestDialog {...baseProps()} />);
     expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
-    // Nor on the compact switcher shown once a type has been picked.
-    await user.click(screen.getByText("Next reply test"));
-    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("closes from the intro picker via the X button without a discard prompt", async () => {
@@ -221,10 +232,15 @@ describe("AddTestDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("enters the full editor after picking Next reply test", async () => {
+  it("shows a preview, then enters the full editor once Create is confirmed", async () => {
     const user = setupUser();
     render(<AddTestDialog {...baseProps()} />);
-    await user.click(screen.getByText("Next reply test"));
+    await user.click(screen.getByText("Does the agent give the right reply?"));
+    // Preview shown, editor not entered yet.
+    expect(screen.getByText("Conversation history")).toBeInTheDocument();
+    expect(screen.queryByText("Test name")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Test name")).toBeInTheDocument();
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
   });
@@ -267,9 +283,10 @@ describe("AddTestDialog", () => {
         })}
       />,
     );
-    expect(screen.getByText("Next reply test")).toBeInTheDocument();
-    // Compact type-switcher boxes ("Tool call", "Conversation" buttons) are
-    // only rendered in create mode; editing shows a static header instead.
+    // Straight into the editor: no intro picker, and no way to switch the
+    // type (no type header or switcher exists in the editor at all).
+    expect(screen.queryByText("Create a test")).not.toBeInTheDocument();
+    expect(screen.getByText("Test name")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Tool call" }),
     ).not.toBeInTheDocument();
@@ -927,7 +944,7 @@ describe("AddTestDialog", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("Back button calls onClose directly (no discard guard)", async () => {
+    it("the top-right Close icon calls onClose directly (no discard guard)", async () => {
       const user = setupUser();
       const onClose = jest.fn();
       render(
@@ -936,7 +953,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
-      await user.click(screen.getByRole("button", { name: "Back" }));
+      await user.click(screen.getByLabelText("Close"));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
@@ -1334,57 +1351,28 @@ describe("AddTestDialog", () => {
   });
 
   describe("agentNature", () => {
-    it("still shows Next reply and Tool call when agentNature is omitted (conversation, unchanged)", () => {
+    it("still offers the reply and tool questions when agentNature is omitted (conversation, unchanged)", () => {
       render(<AddTestDialog {...baseProps()} />);
-      expect(screen.getByText("Next reply test")).toBeInTheDocument();
-      expect(screen.getByText("Tool call test")).toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent give the right reply?"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent use the right tool?"),
+      ).toBeInTheDocument();
       // Conversation is hidden for every agent, not just general ones.
       expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
     });
 
-    it("hides Conversation and relabels Next reply to Output for a general agent", () => {
+    it("does not seed the conversation-agent Correctness default for a general agent", async () => {
       render(
         <AddTestDialog
           {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
         />,
       );
-      // Compact type-switcher boxes render the short `label`, which is what
-      // gets relabeled ("Next reply" -> "Output"); "Conversation" is dropped
-      // entirely rather than merely hidden.
-      expect(screen.queryByRole("button", { name: "Next reply" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Output" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Tool call" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Conversation" })).not.toBeInTheDocument();
-    });
-
-    it("shows the Next reply label (not Output) for a conversation agent", () => {
-      render(
-        <AddTestDialog
-          {...baseProps({
-            initialTab: "next-reply",
-            agentNature: "conversation",
-          })}
-        />,
-      );
-      expect(screen.getByRole("button", { name: "Next reply" })).toBeInTheDocument();
-      // Conversation is hidden for every agent, not just general ones.
-      expect(
-        screen.queryByRole("button", { name: "Conversation" }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("describes a general agent's grading as output-based rather than conversation-based", async () => {
-      render(
-        <AddTestDialog
-          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
-        />,
-      );
+      // The editor renders (the info banner is gone outside labelling mode)
+      // and the llm-type Correctness default is not seeded.
       await waitFor(() =>
-        expect(
-          screen.getByText(
-            "The agent's output is graded using the evaluators added to the test",
-          ),
-        ).toBeInTheDocument(),
+        expect(screen.getByText("Test name")).toBeInTheDocument(),
       );
       expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
     });

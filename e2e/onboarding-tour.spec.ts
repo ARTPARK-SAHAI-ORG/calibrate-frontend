@@ -525,12 +525,14 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
         ).toHaveValue(/community health clinic/i, { timeout: 10000 });
       }
       if (step.title === "Add another check") {
-        // Correctness is ticked; the picker highlights the just-picked row.
+        // The previous card's action ticked Correctness in the picker.
         const dialog = page.locator('[data-tour="add-evaluators-dialog"]');
         await expect(dialog).toBeVisible();
-        // The flow is locked to the card: the spotlighted dialog is marked
-        // non-interactive, so the user can't close it and desync the tour.
-        await expect(dialog).toHaveClass(/driver-no-interaction/);
+        await expect(
+          dialog.getByRole("checkbox", { name: /^Select Correctness/ }),
+        ).toBeChecked();
+        // Picker steps stay interactive so the reader can scroll the list.
+        await expect(dialog).not.toHaveClass(/driver-no-interaction/);
       }
       if (step.title === "Review your failed test") {
         // The first (failed) result row is the phone-number test.

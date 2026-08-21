@@ -1,107 +1,76 @@
 /**
  * Unit tests for the flagship tour's evaluator-picking logic.
  *
- * The picker rows the tour ticks MUST be LLM-reply evaluators: a next-reply test
- * only seeds `evaluator_type === "llm"` evaluators and silently drops
- * "Full conversation" / "LLM output" ones, so ticking a non-LLM-reply evaluator
- * would leave the tour's "both checks grade this test" claim false. These tests
- * lock that rule for both picks.
+ * The picker renders each row as a checkbox whose aria-label is
+ * `Select <name>` (the row body opens a preview instead of ticking), so the
+ * tour finds the box to tick by that aria-label, matched exactly.
  */
 
 import {
   buildCorrectnessPayload,
-  chooseRowByName,
-  isLlmReplyRow,
+  chooseEvaluatorCheckbox,
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
   type EvaluatorPlan,
 } from "../firstEval";
 
-// The pill label EvaluatorTypePill renders for each evaluator_type.
-const TYPE_LABEL = {
-  llm: "LLM reply",
-  conversation: "Full conversation",
-  "llm-general": "LLM output",
-  stt: "Speech to Text",
-  tts: "Text to Speech",
-} as const;
-
 type RowSpec = {
   name: string;
-  type: keyof typeof TYPE_LABEL;
   checked?: boolean;
 };
 
-/** Build a picker <label> row like AddEvaluatorsDialog renders. */
-function makeRow({ name, type, checked = false }: RowSpec): HTMLLabelElement {
-  const label = document.createElement("label");
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = checked;
-  const nameSpan = document.createElement("span");
-  nameSpan.textContent = name;
-  const pill = document.createElement("span");
-  pill.textContent = TYPE_LABEL[type];
-  label.append(checkbox, nameSpan, pill);
-  return label;
+/** Build a picker dialog holding checkbox rows like EvaluatorPicker renders. */
+function makeDialog(rows: RowSpec[]): HTMLElement {
+  const dialog = document.createElement("div");
+  rows.forEach(({ name, checked = false }) => {
+    const row = document.createElement("div");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checked;
+    checkbox.setAttribute("aria-label", `Select ${name}`);
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = name;
+    row.append(checkbox, nameSpan);
+    dialog.append(row);
+  });
+  return dialog;
 }
 
-const rowChecked = (row: HTMLLabelElement | undefined): boolean | undefined =>
-  row?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked;
-
-describe("isLlmReplyRow", () => {
-  it("matches an LLM-reply row and rejects other types", () => {
-    expect(isLlmReplyRow(makeRow({ name: "Correctness", type: "llm" }))).toBe(
-      true,
-    );
-    expect(
-      isLlmReplyRow(makeRow({ name: "Coherence", type: "conversation" })),
-    ).toBe(false);
-    // "LLM output" (llm-general) must NOT count as an LLM-reply row.
-    expect(
-      isLlmReplyRow(makeRow({ name: "General judge", type: "llm-general" })),
-    ).toBe(false);
-  });
-});
-
-describe("chooseRowByName", () => {
-  it("ticks the unchecked LLM-reply row whose name matches", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Reply Conciseness", type: "llm" }),
-      makeRow({ name: "Coherence", type: "conversation" }),
-    ];
-    expect(chooseRowByName(rows, "Reply Conciseness")).toBe(rows[1]);
-  });
-
-  it("ignores a conversation-type row even when the name matches", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "conversation" })];
-    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
+describe("chooseEvaluatorCheckbox", () => {
+  it("finds the unchecked checkbox whose aria-label matches the name", () => {
+    const dialog = makeDialog([
+      { name: "Correctness", checked: true },
+      { name: "Reply Conciseness" },
+    ]);
+    const cb = chooseEvaluatorCheckbox(dialog, "Reply Conciseness");
+    expect(cb?.getAttribute("aria-label")).toBe("Select Reply Conciseness");
   });
 
   it("skips an already-checked row", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "llm", checked: true })];
-    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
+    const dialog = makeDialog([{ name: "Conciseness", checked: true }]);
+    expect(chooseEvaluatorCheckbox(dialog, "Conciseness")).toBeUndefined();
   });
 
   it("returns undefined for an empty name", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "llm" })];
-    expect(chooseRowByName(rows, "")).toBeUndefined();
+    const dialog = makeDialog([{ name: "Conciseness" }]);
+    expect(chooseEvaluatorCheckbox(dialog, "")).toBeUndefined();
   });
 
   it("matches the exact name, never a longer name that contains it", () => {
-    const rows = [
-      makeRow({ name: "Conciseness2", type: "llm" }),
-      makeRow({ name: "Conciseness", type: "llm" }),
-    ];
-    // "Conciseness2" comes first, but only the exact "Conciseness" row wins.
-    expect(chooseRowByName(rows, "Conciseness")).toBe(rows[1]);
+    const dialog = makeDialog([
+      { name: "Conciseness2" },
+      { name: "Conciseness" },
+    ]);
+    const cb = chooseEvaluatorCheckbox(dialog, "Conciseness");
+    expect(cb?.getAttribute("aria-label")).toBe("Select Conciseness");
   });
 
-  it("does not mutate the rows it inspects", () => {
-    const rows = [makeRow({ name: "Reply Conciseness", type: "llm" })];
-    chooseRowByName(rows, "Reply Conciseness");
-    expect(rowChecked(rows[0])).toBe(false);
+  it("does not tick anything while choosing", () => {
+    const dialog = makeDialog([{ name: "Reply Conciseness" }]);
+    chooseEvaluatorCheckbox(dialog, "Reply Conciseness");
+    expect(
+      dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+    ).toBe(false);
   });
 });
 

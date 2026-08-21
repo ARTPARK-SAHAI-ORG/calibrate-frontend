@@ -882,8 +882,8 @@ function NewAgentDialog({
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
                       Configure the LLM/STT/TTS models for your agent, set the
-                      instructions and define the tools your agent can use.
-                      All within Calibrate.
+                      instructions and define the tools your agent can use. All
+                      within Calibrate.
                     </div>
                   </div>
                 </div>
@@ -916,9 +916,8 @@ function NewAgentDialog({
                       Connect your existing agent
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Provide a URL for your deployed agent. Calibrate will
-                      call it directly to run evals, benchmarks and
-                      simulations.
+                      Provide a URL for your deployed agent. Calibrate will call
+                      it directly to run evals, benchmarks and simulations.
                     </div>
                   </div>
                 </div>
@@ -979,7 +978,7 @@ function NewAgentDialog({
                       Conversation
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Talks back and forth with a person or system.
+                      Your agent has a conversation with a user
                     </div>
                   </div>
                 </div>
@@ -1009,10 +1008,10 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      General
+                      General response
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Takes a single input and produces an output.
+                      The agent takes an input and generates an output
                     </div>
                   </div>
                 </div>
@@ -1075,4 +1074,3 @@ function NewAgentDialog({
     </div>
   );
 }
-
