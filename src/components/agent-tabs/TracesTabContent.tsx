@@ -26,6 +26,7 @@ import {
 import {
   useAccessToken,
   useDialogUrlParam,
+  useItemPager,
   usePageSize,
   useTraceDeletion,
   useTraces,
@@ -66,6 +67,8 @@ export function TracesTabContent({
     total,
     loadedQ,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     handleDeleted,
@@ -223,7 +226,17 @@ export function TracesTabContent({
     setOpenTraceUuid(uuid);
     setTraceParam(uuid);
   };
+  const itemPager = useItemPager({
+    items,
+    openUuid: openTraceUuid,
+    pageStart: loadedOffset,
+    pageSize,
+    total,
+    onOpen: openTrace,
+    onPageStartChange: setOffset,
+  });
   const closeTrace = () => {
+    itemPager.cancel();
     setOpenTraceUuid(null);
     setTraceParam(null);
   };
@@ -374,7 +387,7 @@ export function TracesTabContent({
                 allSelected={deletion.allSelected}
                 hasSelectableItems={deletion.hasSelectableItems}
                 onToggleSelectAll={deletion.toggleSelectAll}
-                onOpen={openTrace}
+                onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
               />
             </div>
@@ -393,6 +406,11 @@ export function TracesTabContent({
         onClose={closeTrace}
         accessToken={accessToken}
         traceUuid={openTraceUuid}
+        hasPrev={itemPager.hasPrev}
+        hasNext={itemPager.hasNext}
+        onPrev={itemPager.prev}
+        onNext={itemPager.next}
+        position={itemPager.position}
       />
 
       <ConvertTracesToTestsDialog

@@ -22,6 +22,9 @@ jest.mock("../../../hooks", () => ({
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
     .useTraceDeletion,
   useDialogUrlParam: (args: unknown) => mockUseDialogUrlParam(args),
+  // Real, so the previous/next buttons on the detail dialog are exercised
+  // end to end rather than stubbed away.
+  useItemPager: jest.requireActual("../../../hooks/useItemPager").useItemPager,
   // The remembered page size is real, so choosing one is exercised end to end.
   usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
   PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
@@ -123,10 +126,44 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
   TraceDetailDialog: ({
     isOpen,
     traceUuid,
+    hasPrev,
+    hasNext,
+    onPrev,
+    onNext,
+    position,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
-  }) => (isOpen ? <div data-testid="trace-detail">{traceUuid}</div> : null),
+    hasPrev?: boolean;
+    hasNext?: boolean;
+    onPrev?: () => void;
+    onNext?: () => void;
+    position?: { index: number; total: number };
+  }) =>
+    isOpen ? (
+      <div data-testid="trace-detail">
+        {traceUuid}
+        <span data-testid="trace-detail-position">
+          {position ? `${position.index + 1} of ${position.total}` : ""}
+        </span>
+        <button
+          type="button"
+          disabled={!hasPrev}
+          onClick={onPrev}
+          data-testid="trace-detail-prev"
+        >
+          prev
+        </button>
+        <button
+          type="button"
+          disabled={!hasNext}
+          onClick={onNext}
+          data-testid="trace-detail-next"
+        >
+          next
+        </button>
+      </div>
+    ) : null,
 }));
 // The stub also exposes onConverted, so the "created N tests" message the tab
 // builds from the response is exercised rather than assumed.
@@ -184,6 +221,8 @@ function tracesResult(
     total: items.length,
     loadedQ: "",
     offset: 0,
+    setOffset: jest.fn(),
+    loadedOffset: 0,
     isLoading: false,
     error: null,
     handleDeleted,
@@ -248,8 +287,7 @@ describe("TracesTabContent", () => {
     expect(
       screen.getAllByText("When is the next vaccination?").length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("trace")).toBeInTheDocument();
+    expect(screen.getByText("1 trace")).toBeInTheDocument();
     expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
     expect(mockUseTraces).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: "agent-1" }),
@@ -936,5 +974,103 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByText("Second")[0]);
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("steps to the next and previous trace within the loaded page", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace(),
+        trace({
+          uuid: "trace-2",
+          message_id: "msg-002",
+          input_preview: "Second",
+        }),
+      ]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByText("Second")[0]);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "2 of 2",
+    );
+    expect(screen.getByTestId("trace-detail-next")).toBeDisabled();
+
+    await user.click(screen.getByTestId("trace-detail-prev"));
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-1");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "1 of 2",
+    );
+    expect(screen.getByTestId("trace-detail-prev")).toBeDisabled();
+
+    await user.click(screen.getByTestId("trace-detail-next"));
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("waits for the next page to actually load before opening its first trace", async () => {
+    const user = setupUser();
+    const setOffset = jest.fn();
+    const page1 = [
+      trace(),
+      trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+    ];
+    mockUseTraces.mockReturnValue(
+      tracesResult(page1, {
+        total: 4,
+        offset: 0,
+        loadedOffset: 0,
+        hasNext: true,
+        setOffset,
+      }),
+    );
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByText("Second")[0]);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+    expect(screen.getByTestId("trace-detail-position")).toHaveTextContent(
+      "2 of 4",
+    );
+
+    // Step past the last trace of the loaded page. The request for page two
+    // has gone out (`setOffset` was called) but hasn't come back yet, so the
+    // rows on screen are still page one's.
+    await user.click(screen.getByTestId("trace-detail-next"));
+    expect(setOffset).toHaveBeenCalledWith(50);
+
+    // Simulate the state a moment after that click: the requested offset has
+    // moved, but the trace rows have not arrived yet — same shape `useTraces`
+    // is in mid-fetch. The dialog must not jump to a trace off page one
+    // (the bug this guards: opening an old-page trace while page two loads).
+    mockUseTraces.mockReturnValue(
+      tracesResult(page1, {
+        total: 4,
+        offset: 50,
+        loadedOffset: 0,
+        hasNext: true,
+        setOffset,
+      }),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+
+    // Page two lands: `loadedOffset` catches up to match the new rows. Only
+    // now should the dialog step onto the new page, opening its first trace.
+    const page2 = [
+      trace({ uuid: "trace-3", message_id: "msg-003", input_preview: "Third" }),
+      trace({ uuid: "trace-4", message_id: "msg-004", input_preview: "Fourth" }),
+    ];
+    mockUseTraces.mockReturnValue(
+      tracesResult(page2, {
+        total: 4,
+        offset: 50,
+        loadedOffset: 50,
+        hasPrev: true,
+        hasNext: false,
+        setOffset,
+      }),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-3");
   });
 });

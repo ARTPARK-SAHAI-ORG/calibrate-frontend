@@ -26,3 +26,4 @@ export {
   seedOrgsCache,
 } from "./useOrganizations";
 export { useItemPager } from "./useItemPager";
+export { useDialogNavKeys } from "./useDialogNavKeys";

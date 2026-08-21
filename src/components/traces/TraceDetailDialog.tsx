@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { LoadingState } from "@/components/ui";
+import { DialogNavHeader, LoadingState } from "@/components/ui";
+import { useDialogNavKeys } from "@/hooks";
 import {
   TestDetailView,
   normalizeToolCall,
@@ -24,6 +25,11 @@ type TraceDetailDialogProps = {
   onClose: () => void;
   accessToken: string | null;
   traceUuid: string | null;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  position?: { index: number; total: number };
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -180,6 +186,11 @@ export function TraceDetailDialog({
   onClose,
   accessToken,
   traceUuid,
+  onPrev,
+  onNext,
+  hasPrev = false,
+  hasNext = false,
+  position,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -217,6 +228,8 @@ export function TraceDetailDialog({
     };
   }, [isOpen, traceUuid, accessToken]);
 
+  useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
+
   const history = useMemo(
     () => (trace ? turnsToHistory(trace.input) : []),
     [trace],
@@ -230,11 +243,22 @@ export function TraceDetailDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-6xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div className="flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
-          <h2 className="text-base md:text-lg font-semibold text-foreground truncate min-w-0">
-            {trace ? humanTraceName(trace) : "Trace"}
+      <div className="bg-background rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+        <div className="relative flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
+          <h2
+            className="text-base md:text-lg font-semibold text-foreground truncate min-w-0"
+            title={traceUuid ?? undefined}
+          >
+            {traceUuid ?? "Trace"}
           </h2>
+          <DialogNavHeader
+            noun="trace"
+            onPrev={onPrev}
+            onNext={onNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
           <button
             type="button"
             onClick={onClose}

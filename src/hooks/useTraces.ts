@@ -29,6 +29,11 @@ export function useTraces({
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
+  // The offset `items` actually came from. `offset` itself changes the
+  // instant a page turn is requested, before the fetch for it resolves, so a
+  // caller stepping through items page by page (useItemPager) needs this one
+  // instead: it only moves once the page it describes has actually loaded.
+  const [loadedOffset, setLoadedOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The search text the rows on screen came from. It lags `q` while a new
@@ -61,6 +66,7 @@ export function useTraces({
         setItems(page.items ?? []);
         setTotal(nextTotal);
         setLoadedQ(q);
+        setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
         if (requestId !== requestIdRef.current) return 0;
@@ -121,6 +127,8 @@ export function useTraces({
     total,
     loadedQ,
     offset,
+    setOffset,
+    loadedOffset,
     pageSize,
     isLoading,
     error,
