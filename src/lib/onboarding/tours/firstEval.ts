@@ -132,6 +132,8 @@ export const A = {
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
+  testTypeNextReply: '[data-test-type="next-reply"]',
+  testTypeNext: '[data-tour="test-type-next"]',
   testConversation: '[data-tour="test-conversation"]',
   testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
   testEditorClose: '[data-tour="test-editor-close"]',
@@ -292,7 +294,11 @@ async function openCreateTestEditor(
   deps: FirstEvalDeps,
 ): Promise<void> {
   await clickElement(A.testsCreate, { timeout: 10000 });
-  await clickByText("LLM response test", { timeout: 8000 });
+  // The type picker is a two-step pick: choose the reply/answer type (it also
+  // opens preselected), then confirm with Next to enter the editor. Driven by
+  // anchors so the picker's wording can change without breaking the tour.
+  await clickElement(A.testTypeNextReply, { timeout: 8000 });
+  await clickElement(A.testTypeNext, { timeout: 8000 });
   await delay(300);
   // Avoid "A test with this name already exists" on re-runs.
   const name = await resolveFreeName(baseName, "/tests", deps.getAccessToken());

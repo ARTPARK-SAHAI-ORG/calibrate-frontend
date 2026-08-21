@@ -143,6 +143,20 @@ describe("first-eval tour step actions", () => {
     jest.useRealTimers();
   });
 
+  it("drives the test-type picker's two steps by anchor, not by copy", async () => {
+    const tour = buildTour("tok");
+    await stepByTitle(tour, "Create your first test").action?.();
+    // Pick the reply/answer type, then confirm with Next: clicking the option
+    // alone only previews it, so both are needed to reach the editor. Anchored
+    // so the picker's wording can change without stalling the tour.
+    expect(mockClickElement).toHaveBeenCalledWith(A.testTypeNextReply, {
+      timeout: 8000,
+    });
+    expect(mockClickElement).toHaveBeenCalledWith(A.testTypeNext, {
+      timeout: 8000,
+    });
+  });
+
   it("no-ops the pick when the picker dialog is absent", async () => {
     const tour = buildTour();
     await expect(

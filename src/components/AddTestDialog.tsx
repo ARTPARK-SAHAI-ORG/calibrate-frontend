@@ -3340,6 +3340,8 @@ export function AddTestDialog({
                     <button
                       key={opt.tab}
                       type="button"
+                      data-tour="test-type-option"
+                      data-test-type={opt.tab}
                       onClick={() => setPreviewTab(opt.tab)}
                       className={`relative w-full text-left px-5 py-5 rounded-lg border transition-colors cursor-pointer flex items-center gap-3 ${
                         isSelected
@@ -3601,6 +3603,7 @@ export function AddTestDialog({
           <div className="px-6 py-4 border-t border-border flex justify-end">
             <button
               type="button"
+              data-tour="test-type-next"
               onClick={() => previewTab && chooseTestType(previewTab)}
               disabled={!previewTab}
               className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
