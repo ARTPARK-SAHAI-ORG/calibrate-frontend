@@ -965,6 +965,23 @@ describe("BulkUploadTestsModal", () => {
       await user.click(screen.getByText("download the sample CSV"));
       expect((global as any).URL.createObjectURL).toHaveBeenCalled();
     });
+
+    it("downloads the guidelines PDF for Next Reply, with a conversation_history column", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps()} />);
+      await selectTestType(user, "Next Reply");
+      await pickEvaluator(user, "Helpfulness");
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Download CSV format guidelines"));
+      const call = (generateGuidelinesPdf as jest.Mock).mock.calls[0][0];
+      expect(call.title).toBe("Bulk upload — Next reply tests");
+      expect(
+        call.columns.some((c: any) => c.name === "conversation_history"),
+      ).toBe(true);
+      expect(call.columns.some((c: any) => c.name === "input")).toBe(false);
+    });
   });
 
   describe("agentNature: general", () => {
@@ -1076,6 +1093,18 @@ describe("BulkUploadTestsModal", () => {
         input: "Summarize this",
         evaluators: [{ evaluator_uuid: "eval-4" }],
       });
+    });
+
+    it("downloads a sample CSV for a general agent (input column, not conversation JSON)", async () => {
+      const user = setupUser();
+      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
+      await selectTestType(user, "Output");
+      await pickGeneralEvaluator(user);
+      await waitFor(() =>
+        expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("download the sample CSV"));
+      expect((global as any).URL.createObjectURL).toHaveBeenCalled();
     });
 
     it("shows a per-row error for missing input, the same way a missing conversation history fails", async () => {

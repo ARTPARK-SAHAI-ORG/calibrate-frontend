@@ -934,6 +934,7 @@ function NewAgentDialog({
                 Cancel
               </button>
               <button
+                data-tour="agent-next-submit"
                 onClick={handleNext}
                 disabled={!agentName.trim()}
                 className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -953,6 +954,7 @@ function NewAgentDialog({
               {/* Conversation option */}
               <button
                 type="button"
+                data-tour="agent-nature-conversation"
                 onClick={() => setAgentNature("conversation")}
                 className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentNature === "conversation"

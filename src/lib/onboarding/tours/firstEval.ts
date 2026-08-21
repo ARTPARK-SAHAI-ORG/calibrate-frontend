@@ -135,6 +135,8 @@ function escapeHtml(s: string): string {
 export const A = {
   newAgent: '[data-tour="new-agent"]',
   agentNameInput: '[data-tour="agent-name-input"]',
+  agentNextSubmit: '[data-tour="agent-next-submit"]',
+  agentNatureConversation: '[data-tour="agent-nature-conversation"]',
   agentCreateSubmit: '[data-tour="agent-create-submit"]',
   systemPrompt: '[data-tour="agent-system-prompt"]',
   save: '[data-tour="agent-save"]',
@@ -748,6 +750,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Create",
       timeout: 10000,
       action: async () => {
+        await clickElement(A.agentNextSubmit);
+        // The dialog's second step asks what the agent does; the demo agent
+        // is conversational (a phone helpline), so pick that before creating.
+        await clickElement(A.agentNatureConversation);
         await clickElement(A.agentCreateSubmit);
         // The app navigates to /agents/[uuid]; later steps wait for that page.
       },
