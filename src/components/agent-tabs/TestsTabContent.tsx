@@ -144,6 +144,10 @@ type TestsTabContentProps = {
   // Called when the run window is closed here. The parent takes the reader to
   // the Evaluations tab, where the run they just watched is listed.
   onRunWindowClosed?: () => void;
+  // Called after the agent defaults prompt attaches an evaluator here. The
+  // Evaluators tab loads its list once, so the parent uses this to have that
+  // tab pick the newly attached evaluator up rather than showing a stale list.
+  onAgentDefaultsAttached?: () => void;
 };
 
 // Attaching a test that already exists is hidden for now: new tests come from
@@ -164,6 +168,7 @@ export function TestsTabContent({
   onGoToConnectionSettings,
   onRunStarted,
   onRunWindowClosed,
+  onAgentDefaultsAttached,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -881,15 +886,14 @@ export function TestsTabContent({
         backendAccessToken,
       );
       await loadAgentEvaluators();
+      onAgentDefaultsAttached?.();
       setAgentDefaultsPrompt(null);
       setAgentDefaultsError(null);
       closeTestDialogAfterSave();
     } catch (err) {
       reportError("Error adding evaluators to agent defaults:", err);
       setAgentDefaultsError(
-        err instanceof Error
-          ? err.message
-          : "Failed to update default evaluators",
+        err instanceof Error ? err.message : "Failed to attach the evaluator",
       );
     } finally {
       setIsAttachingDefaults(false);

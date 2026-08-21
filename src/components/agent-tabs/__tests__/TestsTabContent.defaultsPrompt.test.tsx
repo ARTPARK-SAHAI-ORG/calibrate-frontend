@@ -250,6 +250,25 @@ describe("TestsTabContent agent defaults prompt", () => {
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
 
+  it("tells the parent an evaluator was attached, so the Evaluators tab can refresh", async () => {
+    const onAgentDefaultsAttached = jest.fn();
+    const user = setupUser();
+    render(
+      <TestsTabContent
+        agentUuid={AGENT_UUID}
+        onAgentDefaultsAttached={onAgentDefaultsAttached}
+      />,
+    );
+
+    await createTestWithPrompt(user);
+    expect(onAgentDefaultsAttached).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Attach" }));
+
+    await waitFor(() => {
+      expect(onAgentDefaultsAttached).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("closes the test dialog without a prompt when all evaluators are already on the agent", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([
       attachedEvaluator(),

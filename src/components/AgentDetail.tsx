@@ -184,6 +184,11 @@ export function AgentDetail({
   // when it was already open earlier in this visit.
   const [runsReloadKey, setRunsReloadKey] = useState(0);
 
+  // Bumped when the Tests tab attaches an evaluator to the agent (via the
+  // agent defaults prompt), so the Evaluators tab shows it even when it was
+  // already open earlier in this visit.
+  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
+
   // Name editing dialog state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -1318,6 +1323,9 @@ export function AgentDetail({
                 setRunsReloadKey((k) => k + 1);
                 performTabSwitch("runs");
               }}
+              onAgentDefaultsAttached={() =>
+                setEvaluatorsReloadKey((k) => k + 1)
+              }
             />
           </div>
         )}
@@ -1348,6 +1356,7 @@ export function AgentDetail({
         {shouldRenderTab("evaluators") && (
           <div className={activeTab === "evaluators" ? undefined : "hidden"}>
             <EvaluatorsTabContent
+              key={evaluatorsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
             />
