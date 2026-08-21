@@ -1131,6 +1131,19 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
   });
 
+  it("leaves ?runId= alone: that belongs to the Evaluations tab", async () => {
+    state.agentTests = [responseTest];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await screen.findByTestId("test-runner-dialog");
+    // Both tabs stay mounted, so writing the run into the address here would
+    // open a second copy of this window in the Evaluations tab.
+    expect(new URLSearchParams(window.location.search).get("runId")).toBeNull();
+  });
+
   it("tells the parent when the run window is closed", async () => {
     state.agentTests = [responseTest];
     const onRunWindowClosed = jest.fn();

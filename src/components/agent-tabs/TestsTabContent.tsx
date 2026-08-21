@@ -291,23 +291,15 @@ export function TestsTabContent({
 
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
+  //
+  // The address is deliberately left alone. `?runId=` belongs to the
+  // Evaluations tab, which is where runs are listed; both tabs stay mounted
+  // once visited, so if this tab watched that param too, a run opened there
+  // would open a second, hidden copy of this window here.
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
-  // Deep-link the open test run to `?runId=<uuid>` so a reload re-opens the
-  // same run dialog and the URL can be shared. Only test runs use this;
-  // benchmark results keep their own dialog state.
-  const { setParam: setRunIdParam } = useDialogUrlParam({
-    param: "runId",
-    onOpen: (uuid) => setOpenTestRunId(uuid),
-    onClose: () => setOpenTestRunId(null),
-  });
-  // Open/close the run dialog and keep `?runId=` in step.
-  const openTestRun = (uuid: string) => {
-    setOpenTestRunId(uuid);
-    setRunIdParam(uuid);
-  };
+  const openTestRun = (uuid: string) => setOpenTestRunId(uuid);
   const closeTestRun = () => {
     setOpenTestRunId(null);
-    setRunIdParam(null);
     onRunWindowClosed?.();
   };
   // Key of the run control whose "create run" call is in flight ("all",
