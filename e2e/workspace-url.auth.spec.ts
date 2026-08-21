@@ -54,7 +54,9 @@ test.describe("Workspace in the address (authenticated, real backend)", () => {
     const workspace = activeWorkspace(page.url());
 
     // The sidebar nav items are Next.js <Link>s labelled with the section name.
-    for (const section of ["Tools", "Evaluators", "Personas"]) {
+    // Tools and Evaluators are reachable by address only, so they are not in
+    // the sidebar to click.
+    for (const section of ["Personas", "Scenarios", "Simulations"]) {
       await page.getByRole("link", { name: section, exact: true }).click();
       await expect(page).toHaveURL(workspacePath(`/${section.toLowerCase()}`), {
         timeout: 20000,

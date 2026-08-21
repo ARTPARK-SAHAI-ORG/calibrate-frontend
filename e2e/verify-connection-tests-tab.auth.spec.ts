@@ -81,6 +81,10 @@ async function createConnectionAgent(page: Page, name: string): Promise<void> {
 // leave the tab / trigger a run that reads the saved agent_url + unverified
 // flag. Mirrors agent-detail.auth.spec.ts.
 async function setConnectionUrl(page: Page, url: string): Promise<void> {
+  // A connection agent opens on Evaluators now, so reach the Connection tab,
+  // which sits just before Settings.
+  await page.getByRole("button", { name: "Connection", exact: true }).click();
+
   const urlInput = page.getByPlaceholder("https://your-agent.example.com/chat");
   await expect(urlInput).toBeVisible({ timeout: 15000 });
   await urlInput.fill(url);
