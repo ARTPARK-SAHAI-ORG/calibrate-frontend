@@ -23,9 +23,12 @@ export function AgentDefaultsPromptDialog({
   onConfirm,
 }: AgentDefaultsPromptDialogProps) {
   const isOne = evaluators.length === 1;
-  const subject = isOne ? "evaluator" : "evaluators";
-  const verb = isOne ? "is not" : "are not";
+  const subject = isOne ? "an evaluator" : "evaluators";
+  const verb = isOne ? "is not yet" : "are not yet";
   const pronoun = isOne ? "it" : "them";
+  const title = isOne
+    ? "Attach this evaluator to the agent?"
+    : "Attach these evaluators to the agent?";
 
   return (
     <div
@@ -38,7 +41,7 @@ export function AgentDefaultsPromptDialog({
       >
         <div className="flex items-start justify-between gap-3 mb-1">
           <h2 className="text-lg md:text-xl font-semibold tracking-tight">
-            Update default evaluators?
+            {title}
           </h2>
           <button
             type="button"
@@ -63,9 +66,10 @@ export function AgentDefaultsPromptDialog({
           </button>
         </div>
         <p className="text-sm md:text-[15px] text-muted-foreground mb-4">
-          The following {subject} {verb} in this agent&apos;s default list yet.
-          Update the list to include {pronoun} in new tests, otherwise you will
-          need to add {pronoun} manually every time you create a test.
+          This test used {subject} that {verb} attached to this agent. Attach{" "}
+          {pronoun} and new tests for this agent will include {pronoun}{" "}
+          automatically. If you skip this, you will need to add {pronoun} by
+          hand every time you create a test.
         </p>
         <ul className="mb-4 space-y-1.5 max-h-48 overflow-y-auto">
           {evaluators.map((ev) => (
@@ -84,7 +88,7 @@ export function AgentDefaultsPromptDialog({
             className="mb-4 rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2.5"
           >
             <p className="text-sm font-medium text-red-600 dark:text-red-400">
-              Could not update default evaluators
+              {isOne ? "Could not attach the evaluator" : "Could not attach the evaluators"}
             </p>
             <p className="text-sm text-red-600/90 dark:text-red-400/90 mt-1">
               {error}
@@ -107,7 +111,7 @@ export function AgentDefaultsPromptDialog({
             disabled={isSaving}
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isSaving ? "Updating..." : error ? "Try again" : "Update"}
+            {isSaving ? "Attaching..." : error ? "Try again" : "Attach"}
           </button>
         </div>
       </div>

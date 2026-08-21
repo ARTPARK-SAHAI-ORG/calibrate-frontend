@@ -491,9 +491,9 @@ async function openCreateTestEditor(
 /** Submit the open Create Test editor. */
 async function submitCreateTest(): Promise<void> {
   await clickByText("Create", { timeout: 8000 });
-  // No "Update default evaluators?" prompt to handle: the tour already attached
-  // Correctness to the agent (step 7) and the demo tests reference only that
-  // evaluator, so every evaluator the test uses is already a default.
+  // No "Attach this evaluator to the agent?" prompt to handle: the tour
+  // already attached Correctness to the agent (step 7) and the demo tests
+  // reference only that evaluator, so it is already attached.
   await delay(300);
 }
 
