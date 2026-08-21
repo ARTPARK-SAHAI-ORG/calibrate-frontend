@@ -65,15 +65,81 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
+// Create a standalone "LLM reply" evaluator via /evaluators, unattached to any
+// agent. Its default prompt has no `{{variables}}` (a literal
+// "<ENTER EVALUATION CRITERIA HERE>" placeholder instead), so — like the
+// "Speech to Text" case evaluators.auth.spec.ts picks for the same reason — no
+// per-variable descriptions are needed, only a name.
+async function createUnattachedLlmEvaluator(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await page.goto("/evaluators");
+  await waitForOrgReady(page);
+  await page.getByRole("button", { name: "Add evaluator" }).first().click();
+  const picker = page.locator(".fixed.inset-0.z-50");
+  await expect(
+    picker.getByRole("heading", {
+      name: "What is this evaluator for?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await picker.getByText("LLM reply", { exact: true }).click();
+  await picker.getByRole("button", { name: "Continue" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Add evaluator", exact: true }),
+  ).toBeVisible();
+  // Wait for the async default-prompt prefill (it clobbers the Name field, so
+  // set our unique name only after it lands).
+  await expect(page.getByText("Select judge model")).toHaveCount(0, {
+    timeout: 20000,
+  });
+
+  await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
+  await page.getByRole("button", { name: "Create evaluator" }).click();
+
+  await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({
+    timeout: 20000,
+  });
+}
+
+// Delete `name` from the "My evaluators" list. Mirrors
+// evaluators.auth.spec.ts's deleteEvaluator.
+async function deleteEvaluatorFromLibrary(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await page.goto("/evaluators");
+  await waitForOrgReady(page);
+  const card = page.getByRole("link", { name: `Open ${name}` });
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await page
+    .locator(`[aria-label="Open ${name}"]`)
+    .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
+    .getByRole("button", { name: "Delete evaluator" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Delete evaluator", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(card).toHaveCount(0, { timeout: 15000 });
+}
+
 // From an agent's detail page, open the Tests tab and create a minimal
 // next-reply test attached to this agent. Mirrors the proven create flow in
 // tests.auth.spec.ts ("creates a next-reply test through the editor"): the
 // editor opens pre-seeded with a user/agent/user conversation + the default
 // Correctness evaluator, so a valid create only needs every seeded message
-// filled and the evaluator criteria set.
+// filled and the evaluator criteria set. `extraEvaluatorName` is added on top
+// via the dialog's own "Add evaluator" picker — every agent now gets
+// Correctness auto-attached on creation (calibrate-backend #193), so a second,
+// genuinely unattached evaluator is what makes the "Attach this evaluator to
+// the agent?" prompt below have something real to fire on.
 async function createNextReplyTestOnAgent(
   page: Page,
   testName: string,
+  extraEvaluatorName: string,
 ): Promise<void> {
   await page.getByRole("button", { name: "Tests", exact: true }).click();
   await expect(page).toHaveURL(/tab=tests/);
@@ -98,13 +164,20 @@ async function createNextReplyTestOnAgent(
     .getByPlaceholder("Criteria that the agent's response should satisfy")
     .fill("The agent answers the user's question clearly and politely.");
 
+  // Add the second evaluator (no variables to fill in — see
+  // createUnattachedLlmEvaluator).
+  await page.getByRole("button", { name: "Add evaluator" }).click();
+  await page.getByPlaceholder("Search evaluators").fill(extraEvaluatorName);
+  await page.getByText(extraEvaluatorName, { exact: true }).first().click();
+  await page.getByRole("button", { name: "Add (1)" }).click();
+
   await page.getByRole("button", { name: "Create", exact: true }).click();
 
-  // The new test seeds the default Correctness evaluator, which isn't on the
-  // agent yet, so TestsTabContent reliably pops an "Attach this evaluator to
-  // the agent?" prompt. Wait for it and dismiss ("Not now") — it otherwise
-  // overlays the Run/Compare buttons. (isVisible() doesn't wait, so
-  // assert-then-click.)
+  // Correctness is auto-attached to every agent on creation, but the second
+  // evaluator isn't, so TestsTabContent reliably pops an "Attach this
+  // evaluator to the agent?" prompt for it. Wait for it and dismiss
+  // ("Not now") — it otherwise overlays the Run/Compare buttons. (isVisible()
+  // doesn't wait, so assert-then-click.)
   const evalPrompt = page.getByRole("heading", {
     name: "Attach this evaluator to the agent?",
     exact: true,
@@ -132,9 +205,11 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
   }) => {
     const agentName = `E2E Run Agent ${Date.now()}`;
     const testName = `E2E Run Test ${Date.now()}`;
+    const evaluatorName = `E2E Run Evaluator ${Date.now()}`;
 
+    await createUnattachedLlmEvaluator(page, evaluatorName);
     await createBuildAgent(page, agentName);
-    await createNextReplyTestOnAgent(page, testName);
+    await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // Trigger the run from the Tests tab. "Run all tests" opens TestRunnerDialog
     // and starts the run (POST /agent-tests/agent/{uuid}/run), then polls
@@ -166,6 +241,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // Close the dialog and clean up.
     await page.keyboard.press("Escape");
     await deleteAgent(page, agentName);
+    await deleteEvaluatorFromLibrary(page, evaluatorName);
   });
 
   // Regression: rerun from the /tests Runs tab must swap the URL to the NEW
@@ -175,9 +251,11 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
   test("rerun from the /tests Runs tab opens the new run", async ({ page }) => {
     const agentName = `E2E Rerun Agent ${Date.now()}`;
     const testName = `E2E Rerun Test ${Date.now()}`;
+    const evaluatorName = `E2E Rerun Evaluator ${Date.now()}`;
 
+    await createUnattachedLlmEvaluator(page, evaluatorName);
     await createBuildAgent(page, agentName);
-    await createNextReplyTestOnAgent(page, testName);
+    await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // Seed one completed run from the Tests tab, then close the dialog.
     await page.getByRole("button", { name: /Run all/ }).click();
@@ -212,6 +290,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
 
     await page.keyboard.press("Escape");
     await deleteAgent(page, agentName);
+    await deleteEvaluatorFromLibrary(page, evaluatorName);
   });
 
   test("benchmarks an agent across models and shows a leaderboard", async ({
@@ -219,9 +298,11 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
   }) => {
     const agentName = `E2E Bench Agent ${Date.now()}`;
     const testName = `E2E Bench Test ${Date.now()}`;
+    const evaluatorName = `E2E Bench Evaluator ${Date.now()}`;
 
+    await createUnattachedLlmEvaluator(page, evaluatorName);
     await createBuildAgent(page, agentName);
-    await createNextReplyTestOnAgent(page, testName);
+    await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // "Compare models" opens BenchmarkDialog. It starts with one empty model
     // slot (selectedModels=[null]) and "Run comparison" is disabled until a
@@ -266,5 +347,6 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
 
     await page.keyboard.press("Escape");
     await deleteAgent(page, agentName);
+    await deleteEvaluatorFromLibrary(page, evaluatorName);
   });
 });
