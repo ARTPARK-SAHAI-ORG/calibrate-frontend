@@ -66,7 +66,7 @@ export function EvaluatorPromptPreview({
     return (
       <Frame>
         <p className="text-sm text-muted-foreground">
-          Pick an evaluator to see how it judges.
+          Select an evaluator to see its details
         </p>
       </Frame>
     );

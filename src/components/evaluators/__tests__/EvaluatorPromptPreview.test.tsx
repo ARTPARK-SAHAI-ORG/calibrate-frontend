@@ -69,7 +69,7 @@ describe("EvaluatorPromptPreview", () => {
   it("asks the reader to pick one before anything is chosen", () => {
     render(<EvaluatorPromptPreview evaluatorUuid={null} />);
     expect(
-      screen.getByText("Pick an evaluator to see how it judges."),
+      screen.getByText("Select an evaluator to see its details"),
     ).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
