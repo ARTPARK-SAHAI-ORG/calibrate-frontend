@@ -10,7 +10,11 @@ function baseRows(): RatingScaleRow[] {
 }
 
 describe("RatingScaleEditor", () => {
-  function setup(overrides?: Partial<React.ComponentProps<typeof RatingScaleEditor<RatingScaleRow>>>) {
+  function setup(
+    overrides?: Partial<
+      React.ComponentProps<typeof RatingScaleEditor<RatingScaleRow>>
+    >,
+  ) {
     const onChange = jest.fn();
     const props = {
       rows: baseRows(),
@@ -111,7 +115,9 @@ describe("RatingScaleEditor", () => {
       { value: 2, name: "", description: "" },
     ];
     setup({ rows });
-    const removeButtons = screen.getAllByTitle("At least two rows are required");
+    const removeButtons = screen.getAllByTitle(
+      "At least two rows are required",
+    );
     expect(removeButtons).toHaveLength(2);
     removeButtons.forEach((btn) => expect(btn).toBeDisabled());
   });
@@ -123,7 +129,9 @@ describe("RatingScaleEditor", () => {
       { value: 2, name: "", description: "" },
     ];
     const { onChange } = setup({ rows });
-    const removeButtons = screen.getAllByTitle("At least two rows are required");
+    const removeButtons = screen.getAllByTitle(
+      "At least two rows are required",
+    );
     await user.click(removeButtons[0]);
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -181,7 +189,9 @@ describe("RatingScaleEditor", () => {
 
   it("treats non-numeric string value as 0 when computing max", async () => {
     const user = setupUser();
-    const rows: RatingScaleRow[] = [{ value: "abc", name: "", description: "" }];
+    const rows: RatingScaleRow[] = [
+      { value: "abc", name: "", description: "" },
+    ];
     const onChange = jest.fn();
     render(
       <RatingScaleEditor

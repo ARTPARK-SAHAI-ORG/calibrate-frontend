@@ -43,18 +43,16 @@ const chosen = () => screen.getByTestId("chosen").textContent;
 describe("EvaluatorTypeQuestions", () => {
   it("asks nothing below a question until it is answered", () => {
     render(<Harness />);
-    expect(screen.getByText("What are you labelling?")).toBeInTheDocument();
-    expect(screen.queryByText("Which one?")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Is there a conversation?"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("What do you want to label?")).toBeInTheDocument();
+    expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("reaches a single reply in a conversation", async () => {
     const user = setupUser();
     render(<Harness />);
     await user.click(screen.getByText("Text"));
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     expect(chosen()).toBe("none");
     await user.click(screen.getByText("A single reply"));
     expect(chosen()).toBe("llm");
@@ -64,7 +62,7 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness />);
     await user.click(screen.getByText("Text"));
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     await user.click(screen.getByText("The whole conversation"));
     expect(chosen()).toBe("conversation");
   });
@@ -75,9 +73,7 @@ describe("EvaluatorTypeQuestions", () => {
     await user.click(screen.getByText("Text"));
     await user.click(screen.getByText("Single LLM response"));
     expect(chosen()).toBe("llm-general");
-    expect(
-      screen.queryByText("What do you want judged?"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
   });
 
   it("reaches both audio kinds", async () => {
@@ -94,14 +90,14 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness />);
     await user.click(screen.getByText("Text"));
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     await user.click(screen.getByText("A single reply"));
     expect(chosen()).toBe("llm");
 
     await user.click(screen.getByText("Voice"));
     expect(chosen()).toBe("none");
     expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
-    expect(screen.queryByText("A conversation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("clears the kind when the branch inside text changes", async () => {
@@ -111,7 +107,7 @@ describe("EvaluatorTypeQuestions", () => {
     await user.click(screen.getByText("Single LLM response"));
     expect(chosen()).toBe("llm-general");
 
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     expect(chosen()).toBe("none");
   });
 
@@ -129,23 +125,23 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness allowed={["llm", "llm-general"]} />);
     expect(screen.queryByText("Voice")).not.toBeInTheDocument();
-    expect(screen.getByText("Is there a conversation?")).toBeInTheDocument();
+    expect(screen.getByText("Conversation")).toBeInTheDocument();
+    expect(screen.getByText("Single LLM response")).toBeInTheDocument();
 
     // Only one conversation kind is left, so choosing a conversation is the
     // whole answer and no further question is asked.
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     expect(chosen()).toBe("llm");
-    expect(
-      screen.queryByText("What do you want judged?"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
   });
 
   it("skips text or voice, and the kind question, when only audio is on offer", async () => {
     render(<Harness allowed={["stt", "tts"]} />);
     expect(
-      screen.queryByText("What are you labelling?"),
+      screen.queryByText("What do you want to label?"),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Which one?")).toBeInTheDocument();
+    expect(screen.getByText("Speech to Text")).toBeInTheDocument();
+    expect(screen.getByText("Text to Speech")).toBeInTheDocument();
   });
 
   it("takes the only audio kind without asking which one", async () => {
@@ -153,27 +149,16 @@ describe("EvaluatorTypeQuestions", () => {
     render(<Harness allowed={["llm", "stt"]} />);
     await user.click(screen.getByText("Voice"));
     expect(chosen()).toBe("stt");
-    expect(screen.queryByText("Which one?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Text to Speech")).not.toBeInTheDocument();
   });
 
   it("asks only what is judged when both conversation kinds are on offer alone", () => {
     render(<Harness allowed={["llm", "conversation"]} />);
     expect(
-      screen.queryByText("What are you labelling?"),
+      screen.queryByText("What do you want to label?"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Is there a conversation?"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("What do you want judged?")).toBeInTheDocument();
-  });
-
-  it("shows the note under the first question actually asked", () => {
-    render(
-      <Harness
-        allowed={["llm", "llm-general"]}
-        firstQuestionNote="Cannot be changed later"
-      />,
-    );
-    expect(screen.getByText("Cannot be changed later")).toBeInTheDocument();
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.getByText("A single reply")).toBeInTheDocument();
+    expect(screen.getByText("The whole conversation")).toBeInTheDocument();
   });
 });

@@ -130,7 +130,6 @@ describe("CreateEvaluatorFlow", () => {
 
     // Both kinds on offer sit inside a conversation, so text or voice and the
     // conversation question both have one possible answer and are not asked.
-    expect(screen.getByText("What do you want judged?")).toBeInTheDocument();
     expect(screen.getByText("A single reply")).toBeInTheDocument();
     expect(screen.getByText("The whole conversation")).toBeInTheDocument();
     expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();

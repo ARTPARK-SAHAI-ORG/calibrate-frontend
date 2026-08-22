@@ -119,7 +119,9 @@ describe("Agents", () => {
     );
     render(<Agents />);
 
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("surfaces a thrown error message when BACKEND_URL is unset", async () => {
@@ -173,8 +175,18 @@ describe("Agents", () => {
   it("handles agents with missing/invalid dates by falling back to string comparison", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse([
-        { uuid: "b1", name: "Bad Date Agent", type: "agent", updated_at: "not-a-date" },
-        { uuid: "b2", name: "Another Agent", type: "agent", updated_at: "also-bad" },
+        {
+          uuid: "b1",
+          name: "Bad Date Agent",
+          type: "agent",
+          updated_at: "not-a-date",
+        },
+        {
+          uuid: "b2",
+          name: "Another Agent",
+          type: "agent",
+          updated_at: "also-bad",
+        },
       ]),
     );
     render(<Agents />);
@@ -207,7 +219,9 @@ describe("Agents", () => {
     );
 
     await user.click(screen.getAllByText("New agent")[0]);
-    expect(screen.getByText("Choose a name and how you want to set up your agent")).toBeInTheDocument();
+    expect(
+      screen.getByText("Choose a name and how you want to set up your agent"),
+    ).toBeInTheDocument();
 
     const nameInput = screen.getByPlaceholderText("Enter agent name");
     await user.type(nameInput, "My New Agent");
@@ -226,7 +240,9 @@ describe("Agents", () => {
 
     await user.click(screen.getByText("Create"));
 
-    await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("new-agent-uuid"));
+    await waitFor(() =>
+      expect(onNavigateToAgent).toHaveBeenCalledWith("new-agent-uuid"),
+    );
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
     expect(body.interaction_type).toBe("conversation");
   });
@@ -241,7 +257,10 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Conn Agent");
+    await user.type(
+      screen.getByPlaceholderText("Enter agent name"),
+      "Conn Agent",
+    );
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Single LLM response"));
@@ -251,13 +270,15 @@ describe("Agents", () => {
     );
     await user.click(screen.getByText("Create"));
 
-    await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("conn-uuid"));
+    await waitFor(() =>
+      expect(onNavigateToAgent).toHaveBeenCalledWith("conn-uuid"),
+    );
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
     expect(body.type).toBe("connection");
     expect(body.interaction_type).toBe("general");
   });
 
-  it("keeps the second step's Create button disabled until a nature is chosen", async () => {
+  it("opens on Conversation, marked as the most popular, ready to create", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
     const user = setupUser();
     render(<Agents />);
@@ -265,12 +286,28 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Gated Agent");
+    await user.type(
+      screen.getByPlaceholderText("Enter agent name"),
+      "Gated Agent",
+    );
     await user.click(screen.getByText("Next"));
 
-    expect(screen.getByText("Create")).toBeDisabled();
-    await user.click(screen.getByText("Conversation"));
+    // Nothing to click: the common answer is already chosen, so the agent can
+    // be created straight away.
+    expect(screen.getByText("Most popular")).toBeInTheDocument();
     expect(screen.getByText("Create")).not.toBeDisabled();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ uuid: "defaulted-agent" }),
+    );
+    await user.click(screen.getByText("Create"));
+
+    await waitFor(() =>
+      expect(
+        JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body)
+          .interaction_type,
+      ).toBe("conversation"),
+    );
   });
 
   it("goes back from the nature step to the setup step", async () => {
@@ -281,7 +318,10 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Back Agent");
+    await user.type(
+      screen.getByPlaceholderText("Enter agent name"),
+      "Back Agent",
+    );
     await user.click(screen.getByText("Next"));
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
 
@@ -310,7 +350,10 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Dup Agent");
+    await user.type(
+      screen.getByPlaceholderText("Enter agent name"),
+      "Dup Agent",
+    );
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Conversation"));
 
@@ -355,7 +398,9 @@ describe("Agents", () => {
     );
     await user.click(screen.getByText("Create"));
 
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("shows a generic create failure error for a non-409/401 failure", async () => {
@@ -406,7 +451,9 @@ describe("Agents", () => {
     );
     await user.click(screen.getByText("Create"));
 
-    await waitFor(() => expect(onNavigateToAgent).toHaveBeenCalledWith("enter-uuid"));
+    await waitFor(() =>
+      expect(onNavigateToAgent).toHaveBeenCalledWith("enter-uuid"),
+    );
   });
 
   it("closes the new agent dialog via Cancel and via the overlay", async () => {
@@ -418,7 +465,9 @@ describe("Agents", () => {
     );
 
     await user.click(screen.getAllByText("New agent")[0]);
-    expect(screen.getByText("Choose a name and how you want to set up your agent")).toBeInTheDocument();
+    expect(
+      screen.getByText("Choose a name and how you want to set up your agent"),
+    ).toBeInTheDocument();
     await user.click(screen.getByText("Cancel"));
     expect(
       screen.queryByText("Choose a name and how you want to set up your agent"),
@@ -443,7 +492,9 @@ describe("Agents", () => {
     ).toBeInTheDocument();
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse({}));
-    const deleteConfirmButtons = screen.getAllByRole("button", { name: "Delete" });
+    const deleteConfirmButtons = screen.getAllByRole("button", {
+      name: "Delete",
+    });
     await user.click(deleteConfirmButtons[deleteConfirmButtons.length - 1]);
 
     await waitFor(() =>
@@ -568,10 +619,14 @@ describe("Agents", () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse(null, { ok: false, status: 401 }),
     );
-    const deleteConfirmButtons = screen.getAllByRole("button", { name: "Delete" });
+    const deleteConfirmButtons = screen.getAllByRole("button", {
+      name: "Delete",
+    });
     await user.click(deleteConfirmButtons[deleteConfirmButtons.length - 1]);
 
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("cannot close the delete dialog while a delete is in-flight", async () => {
@@ -593,7 +648,9 @@ describe("Agents", () => {
         resolveDelete = resolve;
       }),
     );
-    const deleteConfirmButtons = screen.getAllByRole("button", { name: "Delete" });
+    const deleteConfirmButtons = screen.getAllByRole("button", {
+      name: "Delete",
+    });
     await user.click(deleteConfirmButtons[deleteConfirmButtons.length - 1]);
 
     // Cancel button should be disabled while deleting is in-flight.
@@ -627,8 +684,12 @@ describe("Agents", () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "dup-uuid" }),
     );
-    const duplicateConfirmButtons = screen.getAllByRole("button", { name: "Duplicate" });
-    await user.click(duplicateConfirmButtons[duplicateConfirmButtons.length - 1]);
+    const duplicateConfirmButtons = screen.getAllByRole("button", {
+      name: "Duplicate",
+    });
+    await user.click(
+      duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
+    );
 
     await waitFor(() =>
       expect(onNavigateToAgent).toHaveBeenCalledWith("dup-uuid"),
@@ -657,8 +718,12 @@ describe("Agents", () => {
       },
       json: async () => ({ detail: "Agent name already exists" }),
     });
-    const duplicateConfirmButtons = screen.getAllByRole("button", { name: "Duplicate" });
-    await user.click(duplicateConfirmButtons[duplicateConfirmButtons.length - 1]);
+    const duplicateConfirmButtons = screen.getAllByRole("button", {
+      name: "Duplicate",
+    });
+    await user.click(
+      duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
+    );
 
     await waitFor(() =>
       expect(screen.getByText("Agent name already exists")).toBeInTheDocument(),
@@ -680,9 +745,15 @@ describe("Agents", () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse(null, { ok: false, status: 401 }),
     );
-    const duplicateConfirmButtons = screen.getAllByRole("button", { name: "Duplicate" });
-    await user.click(duplicateConfirmButtons[duplicateConfirmButtons.length - 1]);
-    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }));
+    const duplicateConfirmButtons = screen.getAllByRole("button", {
+      name: "Duplicate",
+    });
+    await user.click(
+      duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
+    );
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
   });
 
   it("shows a generic duplicate-failure message on a non-409/401 failure", async () => {
@@ -705,8 +776,12 @@ describe("Agents", () => {
       },
       json: async () => ({}),
     });
-    const duplicateConfirmButtons = screen.getAllByRole("button", { name: "Duplicate" });
-    await user.click(duplicateConfirmButtons[duplicateConfirmButtons.length - 1]);
+    const duplicateConfirmButtons = screen.getAllByRole("button", {
+      name: "Duplicate",
+    });
+    await user.click(
+      duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
+    );
     await waitFor(() =>
       expect(screen.getByText("Failed to duplicate agent")).toBeInTheDocument(),
     );

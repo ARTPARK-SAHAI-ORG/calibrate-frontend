@@ -51,11 +51,12 @@ describe("UseCasePickerDialog", () => {
       />,
     );
     expect(screen.queryByText("Voice")).not.toBeInTheDocument();
-    expect(screen.getByText("Is there a conversation?")).toBeInTheDocument();
+    expect(screen.getByText("Conversation")).toBeInTheDocument();
+    expect(screen.getByText("Single LLM response")).toBeInTheDocument();
 
     // And with one kind left under a conversation, that question is skipped
     // too: choosing a conversation is already the whole answer.
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
     expect(screen.getByText("Continue")).not.toBeDisabled();
   });

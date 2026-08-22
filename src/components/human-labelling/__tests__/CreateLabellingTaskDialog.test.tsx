@@ -51,7 +51,7 @@ function renderDialog(
 }
 
 async function goToStep2(user: ReturnType<typeof setupUser>) {
-  await user.type(screen.getByPlaceholderText(/Copilot review/i), "My task");
+  await user.type(screen.getByPlaceholderText(/Maternal health helpline/i), "My task");
   await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
@@ -61,8 +61,8 @@ async function goToStep2(user: ReturnType<typeof setupUser>) {
  * single card.
  */
 const ANSWER_PATH: Record<string, string[]> = {
-  "LLM reply": ["Text", "A conversation", "A single reply"],
-  "Full conversation": ["Text", "A conversation", "The whole conversation"],
+  "LLM reply": ["Text", "Conversation", "A single reply"],
+  "Full conversation": ["Text", "Conversation", "The whole conversation"],
   "Single LLM response": ["Text", "Single LLM response"],
   "Speech to Text": ["Voice", "Speech to Text"],
   "Text to Speech": ["Voice", "Text to Speech"],
@@ -96,7 +96,7 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog();
     expect(screen.getByText("Create labelling task")).toBeInTheDocument();
     expect(screen.getByText("Details")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Copilot review/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Maternal health helpline/i)).toBeInTheDocument();
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith(
         "/evaluators?include_defaults=true",
@@ -108,29 +108,42 @@ describe("CreateLabellingTaskDialog", () => {
   it("Next is disabled from proceeding via submit while step1 invalid, and name field updates state", async () => {
     const user = setupUser();
     renderDialog();
-    const nameInput = screen.getByPlaceholderText(/Copilot review/i);
+    const nameInput = screen.getByPlaceholderText(/Maternal health helpline/i);
     await user.type(nameInput, "Hello");
     expect(nameInput).toHaveValue("Hello");
   });
 
-  it("navigates forward and back via Next/Back, and jumps via stepper", async () => {
+  it("navigates forward and back, and refuses a step whose earlier ones are unanswered", async () => {
     const user = setupUser();
     renderDialog();
     await goToStep2(user);
-    expect(screen.getByText(/What are you labelling/)).toBeInTheDocument();
+    expect(screen.getByText(/What do you want to label/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByPlaceholderText(/Copilot review/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Maternal health helpline/i)).toBeInTheDocument();
 
     // Jump directly to step 2 via the stepper.
     await user.click(screen.getByText("Type"));
-    expect(screen.getByText(/What are you labelling/)).toBeInTheDocument();
+    expect(screen.getByText(/What do you want to label/)).toBeInTheDocument();
 
-    // Jump to step 3 without picking a type first.
+    // Evaluators cannot be opened while no kind is chosen, by the stepper or
+    // by Next, so the reader can never land on a stage that needs it.
+    expect(screen.getByRole("button", { name: /Evaluators/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     await user.click(screen.getByText("Evaluators"));
+    expect(screen.getByText(/What do you want to label/)).toBeInTheDocument();
+
+    // Answer it and both ways forward open up.
+    await answerTypeQuestions(user, "LLM reply");
     expect(
-      screen.getByText(/Pick a task type first \(step 2\)/),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: /Evaluators/ }),
+    ).not.toBeDisabled();
+    await user.click(screen.getByText("Evaluators"));
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText("Search evaluators"),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("asks text or voice first, and offers both audio kinds under voice", async () => {
@@ -152,10 +165,10 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog();
     await goToStep2(user);
     await user.click(screen.getByText("Text"));
-    expect(screen.getByText("A conversation")).toBeInTheDocument();
+    expect(screen.getByText("Conversation")).toBeInTheDocument();
     expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
 
-    await user.click(screen.getByText("A conversation"));
+    await user.click(screen.getByText("Conversation"));
     expect(screen.getByText("A single reply")).toBeInTheDocument();
     expect(screen.getByText("The whole conversation")).toBeInTheDocument();
   });
@@ -168,7 +181,7 @@ describe("CreateLabellingTaskDialog", () => {
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByRole("checkbox")[0]);
-    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
 
     // Back to the questions and change the first answer. That unpicks the kind
     // entirely, so the evaluators chosen for it must go too.
@@ -177,7 +190,11 @@ describe("CreateLabellingTaskDialog", () => {
     await user.click(screen.getByText("Speech to Text"));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
-    expect(screen.getByText("(0 selected)")).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole("checkbox")
+        .filter((box) => (box as HTMLInputElement).checked),
+    ).toHaveLength(0);
   });
 
   it("shows loading state for evaluators, then lists them filtered by type and supports search", async () => {
@@ -258,7 +275,7 @@ describe("CreateLabellingTaskDialog", () => {
     );
   });
 
-  it("toggles evaluator selection via checkbox and shows the selected count", async () => {
+  it("toggles evaluator selection via checkbox", async () => {
     const user = setupUser();
     renderDialog();
     await goToStep3(user, "LLM reply");
@@ -266,12 +283,20 @@ describe("CreateLabellingTaskDialog", () => {
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
 
-    expect(screen.getByText("(0 selected)")).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole("checkbox")
+        .filter((box) => (box as HTMLInputElement).checked),
+    ).toHaveLength(0);
     const checkboxes = screen.getAllByRole("checkbox");
     await user.click(checkboxes[0]);
-    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
     await user.click(checkboxes[0]);
-    expect(screen.getByText("(0 selected)")).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole("checkbox")
+        .filter((box) => (box as HTMLInputElement).checked),
+    ).toHaveLength(0);
   });
 
   it("drops selections that don't belong to the new type when the type changes", async () => {
@@ -282,14 +307,18 @@ describe("CreateLabellingTaskDialog", () => {
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByRole("checkbox")[0]);
-    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
 
     // Go back to step 2 and switch the type to stt.
     await user.click(screen.getByRole("button", { name: "Back" }));
     await answerTypeQuestions(user, "Speech to Text");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
-    expect(screen.getByText("(0 selected)")).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole("checkbox")
+        .filter((box) => (box as HTMLInputElement).checked),
+    ).toHaveLength(0);
   });
 
   it("disables Create task until name + type + at least one evaluator are set", async () => {
@@ -314,7 +343,7 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog({ onCreated });
 
     await user.type(
-      screen.getByPlaceholderText(/Copilot review/i),
+      screen.getByPlaceholderText(/Maternal health helpline/i),
       "  My Task  ",
     );
     await user.type(
@@ -355,7 +384,7 @@ describe("CreateLabellingTaskDialog", () => {
       .mockResolvedValueOnce({ items: EVALUATORS })
       .mockResolvedValueOnce({ uuid: "task-1", message: "ok" });
     renderDialog();
-    await user.type(screen.getByPlaceholderText(/Copilot review/i), "Task");
+    await user.type(screen.getByPlaceholderText(/Maternal health helpline/i), "Task");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await answerTypeQuestions(user, "LLM reply");
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -428,10 +457,10 @@ describe("CreateLabellingTaskDialog", () => {
       expect(screen.getByText("Task name already exists")).toBeInTheDocument(),
     );
     // Routed back to step 1.
-    expect(screen.getByPlaceholderText(/Copilot review/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Maternal health helpline/i)).toBeInTheDocument();
 
     // Typing clears the inline conflict error.
-    await user.type(screen.getByPlaceholderText(/Copilot review/i), "x");
+    await user.type(screen.getByPlaceholderText(/Maternal health helpline/i), "x");
     expect(
       screen.queryByText("Task name already exists"),
     ).not.toBeInTheDocument();
@@ -504,7 +533,7 @@ describe("CreateLabellingTaskDialog", () => {
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByRole("checkbox")[0]);
-    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
 
     // Changing accessToken re-triggers the evaluators fetch effect, giving a
     // new `evaluators` array reference while taskType/selection stay put —
@@ -535,7 +564,7 @@ describe("CreateLabellingTaskDialog", () => {
     await user.type(screen.getByPlaceholderText("Search evaluators"), "corr");
     // The previously-selected llm evaluator is re-added because its type
     // still matches after the re-fetch.
-    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
   });
 
   it("cancels the in-flight evaluators fetch on unmount without state updates", async () => {

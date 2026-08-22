@@ -15,18 +15,18 @@ describe("EVALUATOR_USE_CASE_OPTIONS", () => {
       "stt",
       "tts",
     ]);
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group).toBe(
-      "conversation",
-    );
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group,
+    ).toBe("conversation");
     expect(
       EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm-general")?.group,
     ).toBe("text");
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "stt")?.group).toBe(
-      "audio",
-    );
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tts")?.group).toBe(
-      "audio",
-    );
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "stt")?.group,
+    ).toBe("audio");
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tts")?.group,
+    ).toBe("audio");
   });
 });
 
@@ -45,9 +45,15 @@ describe("EvaluatorUseCaseCards", () => {
   });
 
   it("omits a section header when no options belong to that group", () => {
-    const options = EVALUATOR_USE_CASE_OPTIONS.filter((o) => o.group !== "text");
+    const options = EVALUATOR_USE_CASE_OPTIONS.filter(
+      (o) => o.group !== "text",
+    );
     render(
-      <EvaluatorUseCaseCards options={options} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={options}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(screen.queryByText("Text")).not.toBeInTheDocument();
     expect(screen.getByText("Conversation")).toBeInTheDocument();
@@ -122,7 +128,11 @@ describe("EvaluatorUseCaseCards", () => {
       },
     ];
     render(
-      <EvaluatorUseCaseCards options={options} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={options}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(screen.getByText("Most common")).toBeInTheDocument();
     const badges = screen.getAllByText("Most common");
@@ -131,7 +141,11 @@ describe("EvaluatorUseCaseCards", () => {
 
   it("renders nothing (no groups) when options is empty", () => {
     const { container } = render(
-      <EvaluatorUseCaseCards options={[]} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={[]}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(container.querySelectorAll("button")).toHaveLength(0);
     expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
@@ -180,7 +194,12 @@ describe("ChoiceCard", () => {
     const user = setupUser();
     const onSelect = jest.fn();
     render(
-      <ChoiceCard title="Yes" selected={false} onSelect={onSelect} tone="neutral" />,
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={onSelect}
+        tone="neutral"
+      />,
     );
     await user.click(screen.getByRole("button", { name: "Yes" }));
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -188,7 +207,12 @@ describe("ChoiceCard", () => {
 
   it("uses plain tokens and no colour classes for a neutral card", () => {
     const { rerender } = render(
-      <ChoiceCard title="Yes" selected={false} onSelect={jest.fn()} tone="neutral" />,
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
     );
     const inactive = screen.getByRole("button", { name: "Yes" });
     expect(inactive.className).not.toMatch(
@@ -208,7 +232,9 @@ describe("ChoiceCard", () => {
   });
 
   it("paints an evaluator-type card in that type's colour", () => {
-    render(<ChoiceCard title="Yes" selected onSelect={jest.fn()} tone="stt" />);
+    render(
+      <ChoiceCard title="Yes" selected onSelect={jest.fn()} tone="blue" />,
+    );
     expect(screen.getByRole("button", { name: "Yes" }).className).toContain(
       "ring-blue-500/40",
     );
@@ -226,7 +252,12 @@ describe("ChoiceCard", () => {
     );
     expect(screen.getByText("Most common")).toBeInTheDocument();
     rerender(
-      <ChoiceCard title="Yes" selected={false} onSelect={jest.fn()} tone="neutral" />,
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
     );
     expect(screen.queryByText("Most common")).not.toBeInTheDocument();
   });

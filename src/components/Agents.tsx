@@ -690,9 +690,12 @@ function NewAgentDialog({
 }) {
   const [agentName, setAgentName] = useState("");
   const [agentKind, setAgentKind] = useState<"agent" | "connection">("agent");
-  const [agentNature, setAgentNature] = useState<
-    "conversation" | "general" | null
-  >(null);
+  // Most agents have a conversation, so that answer starts chosen rather than
+  // leaving the step cold. Same as the new-test screen, which opens on its
+  // most popular type.
+  const [agentNature, setAgentNature] = useState<"conversation" | "general">(
+    "conversation",
+  );
   const [step, setStep] = useState<1 | 2>(1);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -707,7 +710,7 @@ function NewAgentDialog({
   };
 
   const handleCreate = async () => {
-    if (!agentName.trim() || !agentNature) return;
+    if (!agentName.trim()) return;
 
     // Keep the dialog open (spinner up) through navigation so the agents list
     // never flashes between "Create" and the new agent's page loading.
@@ -957,7 +960,7 @@ function NewAgentDialog({
                 type="button"
                 data-tour="agent-nature-conversation"
                 onClick={() => setAgentNature("conversation")}
-                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+                className={`relative w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentNature === "conversation"
                     ? "border-foreground bg-muted/30"
                     : "border-border hover:border-muted-foreground"
@@ -983,6 +986,12 @@ function NewAgentDialog({
                       Your agent has a conversation with a user
                     </div>
                   </div>
+                  {/* Most agents are this kind, so it is marked and starts
+                      chosen. The pill straddles the card's top-right corner,
+                      the same as on the new-test screen. */}
+                  <span className="absolute -top-2.5 -right-1 rounded-full bg-amber-500/15 backdrop-blur border border-amber-500/40 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    Most popular
+                  </span>
                 </div>
               </button>
 
@@ -1040,7 +1049,7 @@ function NewAgentDialog({
               <button
                 data-tour="agent-create-submit"
                 onClick={handleCreate}
-                disabled={!agentNature || isCreating}
+                disabled={isCreating}
                 className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isCreating ? (

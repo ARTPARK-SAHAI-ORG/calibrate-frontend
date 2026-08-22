@@ -28,6 +28,9 @@ async function createEvaluator(page: Page, name: string) {
       exact: true,
     }),
   ).toBeVisible();
+  // The picker asks one question at a time now, so the kind is reached by
+  // answering rather than by one click.
+  await picker.getByText("Voice", { exact: true }).click();
   await picker.getByText("Speech to Text", { exact: true }).click();
   await picker.getByRole("button", { name: "Continue" }).click();
 
@@ -87,7 +90,10 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
         exact: true,
       }),
     ).toBeVisible();
-    await picker.getByText("Speech to Text", { exact: true }).click();
+    // The picker asks one question at a time now, so the kind is reached by
+  // answering rather than by one click.
+  await picker.getByText("Voice", { exact: true }).click();
+  await picker.getByText("Speech to Text", { exact: true }).click();
     await picker.getByRole("button", { name: "Continue" }).click();
 
     // Step 2: create sidebar. The async default-prompt call prefills the judge

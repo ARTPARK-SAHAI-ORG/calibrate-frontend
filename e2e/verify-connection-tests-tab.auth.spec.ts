@@ -96,7 +96,11 @@ async function createUnattachedLlmEvaluator(
       exact: true,
     }),
   ).toBeVisible();
-  await picker.getByText("LLM reply", { exact: true }).click();
+  // The picker asks one question at a time now, so a reply in a
+  // conversation is reached by answering rather than by one click.
+  await picker.getByText("Text", { exact: true }).click();
+  await picker.getByText("Conversation", { exact: true }).click();
+  await picker.getByText("A single reply", { exact: true }).click();
   await picker.getByRole("button", { name: "Continue" }).click();
 
   await expect(

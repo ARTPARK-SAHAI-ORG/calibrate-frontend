@@ -144,7 +144,7 @@ describe("CreateEvaluatorSidebar", () => {
     const { setEvaluatorName, setCreateNameError } = renderComponent({
       createNameError: "taken",
     });
-    const nameInput = screen.getByPlaceholderText("e.g. Follows Refund Policy");
+    const nameInput = screen.getByPlaceholderText("e.g. Gives the correct vaccination schedule");
     await user.type(nameInput, "X");
     expect(setEvaluatorName).toHaveBeenCalledWith("X");
     expect(setCreateNameError).toHaveBeenCalledWith(null);

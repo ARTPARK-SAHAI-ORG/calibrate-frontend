@@ -767,7 +767,7 @@ export function AddRunToLabellingTaskDialog({
             setNewName(e.target.value);
             if (nameInvalid) setNameInvalid(false);
           }}
-          placeholder="e.g. Copilot review — May batch"
+          placeholder="e.g. Maternal health helpline, May calls"
           disabled={submitting}
           className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
             nameInvalid ? "border-red-500" : "border-border"

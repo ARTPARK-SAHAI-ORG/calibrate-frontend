@@ -37,24 +37,22 @@ function answersFor(value: EvaluatorType | null): {
   return { medium: null, textKind: null };
 }
 
+/**
+ * One question. Only the first carries a heading: the ones under it are read
+ * as the answer to the card just chosen, and giving each its own heading made
+ * three near-identical questions on one screen.
+ */
 function Question({
   title,
-  note,
   children,
 }: {
-  title: string;
-  note?: string;
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">
-        {title} <span className="text-red-500">*</span>
-      </label>
-      {note ? (
-        <p className="text-xs text-muted-foreground mb-3">{note}</p>
-      ) : (
-        <div className="mb-3" />
+      {title && (
+        <label className="block text-sm font-medium mb-3">{title}</label>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
     </div>
@@ -67,6 +65,10 @@ function Question({
  * screen so it can be changed. Changing an earlier answer drops the ones under
  * it, so nothing half answered can be saved.
  *
+ * Every answer has a colour of its own, so no two cards a reader can see at
+ * once are the same. Once a question is answered the option not taken fades
+ * back, leaving the chosen path the thing the eye follows down the screen.
+ *
  * `allowed` is the kinds the screen may offer. A question with only one
  * possible answer is never asked: that answer is taken as given. So a screen
  * offering all five asks three questions, and one offering a reply in a
@@ -76,13 +78,10 @@ export function EvaluatorTypeQuestions({
   allowed,
   value,
   onChange,
-  firstQuestionNote,
 }: {
   allowed: EvaluatorType[];
   value: EvaluatorType | null;
   onChange: (value: EvaluatorType | null) => void;
-  /** Shown under the first question, e.g. that the choice cannot be changed. */
-  firstQuestionNote?: string;
 }) {
   const permitted = new Set(allowed);
   const voiceKinds = VOICE_KINDS.filter((k) => permitted.has(k));
@@ -131,82 +130,86 @@ export function EvaluatorTypeQuestions({
   return (
     <div className="space-y-5">
       {!forcedMedium && (
-        <Question title="What are you labelling?" note={firstQuestionNote}>
+        <Question title="What do you want to label?">
           <ChoiceCard
             title="Text"
-            description="The agent reads and writes words"
-            tone="neutral"
+            description="Label conversations or single LLM responses"
+            tone="amber"
             selected={medium === "text"}
+            dimmed={medium === "voice"}
             onSelect={() => chooseMedium("text")}
           />
           <ChoiceCard
             title="Voice"
-            description="The agent listens or speaks"
-            tone="neutral"
+            description="Label audio transcripts or generated audio files"
+            tone="rose"
             selected={medium === "voice"}
+            dimmed={medium === "text"}
             onSelect={() => chooseMedium("voice")}
           />
         </Question>
       )}
 
       {medium === "voice" && voiceKinds.length > 1 && (
-        <Question
-          title="Which one?"
-          note={forcedMedium ? firstQuestionNote : undefined}
-        >
+        <Question>
           <ChoiceCard
             title="Speech to Text"
             description="Judge transcription accuracy against a reference transcript"
-            tone="stt"
+            tone="blue"
             selected={value === "stt"}
+            dimmed={value === "tts"}
             onSelect={() => onChange("stt")}
           />
           <ChoiceCard
             title="Text to Speech"
             description="Judge the quality of generated audio"
-            tone="tts"
+            tone="purple"
             selected={value === "tts"}
+            dimmed={value === "stt"}
             onSelect={() => onChange("tts")}
           />
         </Question>
       )}
 
       {medium === "text" && !forcedTextKind && (
-        <Question
-          title="Is there a conversation?"
-          note={forcedMedium ? firstQuestionNote : undefined}
-        >
+        /* The same question, the same two answers and the same words as the
+           new agent screen, so one idea is not named two ways. */
+        <Question>
           <ChoiceCard
-            title="A conversation"
-            description="Someone talks with the agent, back and forth"
-            tone="neutral"
+            title="Conversation"
+            description="Your agent has a conversation with a user"
+            tone="indigo"
             selected={textKind === "conversation"}
+            dimmed={textKind === "single"}
             onSelect={() => chooseTextKind("conversation")}
           />
           <ChoiceCard
             title="Single LLM response"
-            description="Judge the output of an LLM given a text input"
-            tone="llm-general"
+            description="The agent takes an input and generates an output"
+            tone="teal"
             selected={textKind === "single"}
+            dimmed={textKind === "conversation"}
             onSelect={() => chooseTextKind("single")}
           />
         </Question>
       )}
 
       {textKind === "conversation" && conversationKinds.length > 1 && (
-        <Question title="What do you want judged?">
+        <Question>
           <ChoiceCard
             title="A single reply"
             description="Judge an agent's next reply in a conversation"
-            tone="llm"
+            tone="orange"
             selected={value === "llm"}
+            dimmed={value === "conversation"}
             onSelect={() => onChange("llm")}
           />
           <ChoiceCard
             title="The whole conversation"
             description="Judge the agent's performance in a whole conversation"
-            tone="conversation"
+            tone="pink"
             selected={value === "conversation"}
+            dimmed={value === "llm"}
             onSelect={() => onChange("conversation")}
           />
         </Question>

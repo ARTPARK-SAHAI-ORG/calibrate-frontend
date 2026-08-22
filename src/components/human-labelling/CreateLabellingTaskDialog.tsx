@@ -6,6 +6,7 @@ import {
   EVALUATOR_TYPE_LABELS,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
+import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
 import { apiClient, unwrapList } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
@@ -77,6 +78,7 @@ export function CreateLabellingTaskDialog({
     new Set(),
   );
   const [evaluatorSearch, setEvaluatorSearch] = useState("");
+  const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
   const [evaluators, setEvaluators] = useState<EvaluatorListItem[]>([]);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
@@ -157,11 +159,19 @@ export function CreateLabellingTaskDialog({
   const step2Valid = !!taskType;
   const step3Valid = selectedEvaluatorIds.size >= 1;
   const canSubmit = step1Valid && step2Valid && step3Valid && !submitting;
+  // A step can only be opened once every step before it is answered, so the
+  // reader cannot land on a stage that depends on something not chosen yet.
+  // Once a step is answered, moving back and forth over it is free.
   const stepValid: Record<Step, boolean> = {
     1: step1Valid,
     2: step2Valid,
     3: step3Valid,
   };
+  // A step can only be opened once every step before it is answered, so the
+  // reader cannot land on a stage that depends on something not chosen yet.
+  // Once a step is answered, moving back and forth over it is free.
+  const canOpenStep = (n: Step) =>
+    STEPS.every((s) => s.n >= n || stepValid[s.n]);
 
   const handleSubmit = async () => {
     if (!canSubmit || !taskType) return;
@@ -228,7 +238,7 @@ export function CreateLabellingTaskDialog({
             </button>
           </div>
 
-          {/* Stepper — each step is clickable to jump freely between stages. */}
+          {/* Stepper — a step opens only once the ones before it are answered. */}
           <div className="mt-3 flex items-center gap-2">
             {STEPS.map((s, i) => {
               const active = step === s.n;
@@ -238,7 +248,8 @@ export function CreateLabellingTaskDialog({
                   <button
                     type="button"
                     onClick={() => setStep(s.n)}
-                    className="flex items-center gap-2 cursor-pointer group"
+                    disabled={!canOpenStep(s.n)}
+                    className="flex items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span
                       className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors ${
@@ -275,9 +286,7 @@ export function CreateLabellingTaskDialog({
           {step === 1 && (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Name <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium mb-2">Name</label>
                 <input
                   autoFocus
                   value={name}
@@ -285,7 +294,7 @@ export function CreateLabellingTaskDialog({
                     setName(e.target.value);
                     if (nameConflictError) setNameConflictError(null);
                   }}
-                  placeholder="e.g. Copilot review — Q2 batch"
+                  placeholder="e.g. Maternal health helpline, June calls"
                   className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
                     nameConflictError ? "border-red-500" : "border-border"
                   }`}
@@ -316,51 +325,54 @@ export function CreateLabellingTaskDialog({
               allowed={TASK_TYPE_CHOICES}
               value={taskType}
               onChange={(v) => setTaskType(v as TaskType | null)}
-              firstQuestionNote="Select carefully as it cannot be changed after the task is created"
             />
           )}
 
           {step === 3 && (
             <div className="flex flex-col min-h-0">
-              <label className="block text-sm font-medium mb-2">
-                Evaluators <span className="text-red-500">*</span>
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({selectedEvaluatorIds.size} selected)
-                </span>
-              </label>
               {!taskType ? (
                 <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   Pick a task type first (step 2) to see matching evaluators.
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Pick at least one evaluator that annotators will grade
-                    against.
+                  <p className="text-sm font-medium text-foreground mb-3">
+                    Select the labels for your dataset
                   </p>
-                  <div className="relative mb-2">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                        />
-                      </svg>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="relative flex-1">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                          />
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        value={evaluatorSearch}
+                        onChange={(e) => setEvaluatorSearch(e.target.value)}
+                        placeholder="Search evaluators"
+                        className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={evaluatorSearch}
-                      onChange={(e) => setEvaluatorSearch(e.target.value)}
-                      placeholder="Search evaluators"
-                      className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                    />
+                    {/* Nothing to judge with yet, or nothing that fits: make
+                        one here rather than leaving and losing this task. */}
+                    <button
+                      type="button"
+                      onClick={() => setCreateFlowOpen(true)}
+                      className="h-9 px-3 shrink-0 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      New evaluator
+                    </button>
                   </div>
 
                   <div className="border border-border rounded-md max-h-80 overflow-y-auto divide-y divide-border">
@@ -453,7 +465,8 @@ export function CreateLabellingTaskDialog({
             {step < 3 ? (
               <button
                 onClick={() => setStep((s) => (s + 1) as Step)}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                disabled={!stepValid[step]}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
@@ -469,6 +482,26 @@ export function CreateLabellingTaskDialog({
           </div>
         </div>
       </div>
+
+      {/* One kind is already chosen, so this opens straight on the form for
+          that kind rather than asking again. */}
+      {taskType && (
+        <CreateEvaluatorFlow
+          open={createFlowOpen}
+          onClose={() => setCreateFlowOpen(false)}
+          existingEvaluators={evaluators}
+          useCaseTypes={[taskType]}
+          onCreated={(created) => {
+            setCreateFlowOpen(false);
+            setEvaluators((prev) => [
+              { ...created, evaluator_type: taskType },
+              ...prev,
+            ]);
+            // Made for this task, so it starts ticked.
+            setSelectedEvaluatorIds((prev) => new Set(prev).add(created.uuid));
+          }}
+        />
+      )}
     </div>
   );
 }
