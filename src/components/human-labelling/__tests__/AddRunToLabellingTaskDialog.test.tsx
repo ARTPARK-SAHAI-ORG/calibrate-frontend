@@ -6,6 +6,7 @@ import {
   itemNounForSource,
   labellingTaskTypeForRaw,
   targetTaskTypeForSource,
+  traceLabellingType,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
 
@@ -377,7 +378,9 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.skippedCount).toBe(2);
   });
 
-  it("appends a trace's output tool calls to chat_history as the final turns", () => {
+  it("appends output tool calls to chat_history for a trace that also replied", () => {
+    // A trace WITH a text reply is a response item; the tool call rides along
+    // in the conversation history (the reply is what gets labelled).
     const source: AddRunToLabellingTaskSource = {
       type: "traces",
       agentUuid: "agent-uuid-1",
@@ -386,7 +389,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           name: "Books an appointment",
           input: [{ role: "user", content: "book me in" }],
           output: {
-            response: "",
+            response: "Booked!",
             tool_calls: [
               {
                 tool: "book_appointment",
@@ -398,28 +401,77 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
         },
       ],
     };
+    expect(targetTaskTypeForSource(source)).toBe("llm");
     const result = buildItemsFromSource(source);
     const history = result.items[0].payload.chat_history as Array<
       Record<string, unknown>
     >;
+    // user turn + assistant tool-call turn + tool result turn
     expect(history).toHaveLength(3);
-    expect(history[0]).toEqual({ role: "user", content: "book me in" });
     expect(history[1]).toMatchObject({
       role: "assistant",
-      tool_calls: [
+      tool_calls: [{ function: { name: "book_appointment" } }],
+    });
+    expect(result.items[0].payload.agent_response).toBe("Booked!");
+  });
+
+  it("routes a tool-call-only trace to an llm-tool-call item with no evaluators", () => {
+    // A trace that only made tool calls (no reply) becomes a tool-call item:
+    // the call is the `actual_tool_calls`, expected is empty (a trace has no
+    // spec — the human supplies it on a fail).
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
         {
-          type: "function",
-          function: {
-            name: "book_appointment",
-            arguments: JSON.stringify({ day: "Monday" }),
+          name: "Books an appointment",
+          input: [{ role: "user", content: "book me in" }],
+          output: {
+            response: "",
+            tool_calls: [{ tool: "book_appointment", arguments: { day: "Monday" } }],
           },
         },
       ],
-    });
-    expect(history[2]).toMatchObject({
-      role: "tool",
-      content: JSON.stringify({ ok: true }),
-    });
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    expect(traceLabellingType(source.traces[0])).toBe("llm-tool-call");
+    expect(targetTaskTypeForSource(source)).toBe("llm-tool-call");
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(0);
+    expect(result.evaluatorUuids.size).toBe(0); // tool-call tasks have no evaluators
+    const p = result.items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Books an appointment");
+    expect(p.chat_history).toEqual([{ role: "user", content: "book me in" }]);
+    expect(p.expected_tool_calls).toEqual([]);
+    expect(p.actual_tool_calls).toEqual([
+      { tool: "book_appointment", arguments: { day: "Monday" } },
+    ]);
+  });
+
+  it("keeps a response trace on llm when the selection is mixed, skipping tool-call traces", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Replied",
+          input: [{ role: "user", content: "hi" }],
+          output: { response: "hello!" },
+        },
+        {
+          name: "Only tool call",
+          input: [{ role: "user", content: "book" }],
+          output: { response: "", tool_calls: [{ tool: "book", arguments: {} }] },
+        },
+      ],
+    };
+    // Response preferred; the tool-call trace is skipped.
+    expect(targetTaskTypeForSource(source)).toBe("llm");
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(1);
+    expect(result.items[0].payload.name).toBe("Replied");
   });
 });
 

@@ -149,6 +149,23 @@ function forEachRawTest(
 }
 
 /** The task type a source targets. */
+// Which labelling task type a trace goes to: a trace with a text reply is an
+// `llm` (response) item; a trace that only made tool calls is an
+// `llm-tool-call` item (no expected calls — the human judges the actual call
+// and, on a fail, supplies what it should have been). A trace with neither
+// can't be labelled.
+export function traceLabellingType(
+  t: TraceLabellingItem,
+): SupportedTaskType | null {
+  const hasResponse =
+    typeof t.output?.response === "string" && t.output.response.trim().length > 0;
+  if (hasResponse) return "llm";
+  if (Array.isArray(t.output?.tool_calls) && t.output.tool_calls.length > 0) {
+    return "llm-tool-call";
+  }
+  return null;
+}
+
 export function targetTaskTypeForSource(
   source: AddRunToLabellingTaskSource,
 ): SupportedTaskType {
@@ -174,8 +191,20 @@ export function targetTaskTypeForSource(
       });
       return !sawResponse && sawToolCall ? "llm-tool-call" : "llm";
     }
-    case "traces":
-      return source.agentNature === "general" ? "llm-general" : "llm";
+    case "traces": {
+      // A general agent's traces are labelled as input + output text.
+      if (source.agentNature === "general") return "llm-general";
+      // Conversational: same rule as runs — response preferred, a
+      // tool-call-only selection targets `llm-tool-call`.
+      let sawResponse = false;
+      let sawToolCall = false;
+      for (const t of source.traces) {
+        const tt = traceLabellingType(t);
+        if (tt === "llm") sawResponse = true;
+        else if (tt === "llm-tool-call") sawToolCall = true;
+      }
+      return !sawResponse && sawToolCall ? "llm-tool-call" : "llm";
+    }
     default:
       return "llm";
   }
@@ -545,13 +574,35 @@ export function buildItemsFromSource(
         }
         return { items, skippedCount, evaluatorUuids };
       }
+      // Conversational traces: response traces go to an `llm` task,
+      // tool-call-only traces to an `llm-tool-call` task. A single task is one
+      // type, so a mixed selection targets `llm` (response preferred) and the
+      // tool-call traces are skipped.
+      const targetType = targetTaskTypeForSource(source);
       for (const t of source.traces) {
+        if (traceLabellingType(t) !== targetType) {
+          skippedCount += 1;
+          continue;
+        }
+        if (targetType === "llm-tool-call") {
+          // A trace has no expected tool calls — the human supplies them on a
+          // fail. Only the actual calls are known.
+          items.push(
+            buildToolCallItem({
+              test_case: {
+                name: t.name,
+                history: t.input as TestCaseHistory[],
+                evaluation: { type: "tool_call", tool_calls: [] },
+              },
+              output: t.output as { tool_calls?: ToolCallOutput[] },
+            }),
+          );
+          continue;
+        }
         const built = buildOneItem({
           test_case: {
             name: t.name,
             history: t.input as TestCaseHistory[],
-            // Required: buildOneItem drops anything whose evaluation type is
-            // not "response", so without this every trace is silently skipped.
             evaluation: { type: "response" },
           },
           output: t.output as {
@@ -565,11 +616,13 @@ export function buildItemsFromSource(
         }
         items.push(built.item);
       }
-      // A trace has no run and therefore no judge results, so its items carry
-      // no evaluator variables. The evaluators come wholesale from the source
-      // (the caller asks the user to pick them).
-      for (const ev of source.evaluators ?? []) {
-        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+      // Tool-call tasks have no evaluators. For `llm`, a trace has no run and
+      // therefore no judge results, so evaluators come wholesale from the
+      // source (the caller asks the user to pick them).
+      if (targetType === "llm") {
+        for (const ev of source.evaluators ?? []) {
+          if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+        }
       }
       return { items, skippedCount, evaluatorUuids };
     }

@@ -158,17 +158,19 @@ export function TracesTabContent({
         ? "general"
         : "response";
 
-  // Annotators score what the agent said, and a tool call is not that, so a
-  // trace carrying one cannot go for labelling. One in the selection stops the
-  // whole submission rather than being dropped without saying so.
-  const hasToolCallTrace = selectedTraces.some(
-    (trace) => trace.tool_call_count > 0,
-  );
-  const labellableUuids = hasToolCallTrace
-    ? []
-    : selectedTraces
-        .filter((trace) => !!trace.response_preview?.trim())
-        .map((trace) => trace.uuid);
+  // A selection where every trace only made tool calls goes to an
+  // `llm-tool-call` task (no evaluators, so the evaluator-picker step is
+  // skipped). Any trace with a reply forces the response flow, where
+  // tool-call-only traces are left out.
+  const labellingIsToolCallOnly =
+    selectedTraces.length > 0 &&
+    selectedTraces.every(
+      (trace) => !trace.response_preview?.trim() && trace.tool_call_count > 0,
+    );
+  const labellableTraces = labellingIsToolCallOnly
+    ? selectedTraces
+    : selectedTraces.filter((trace) => !!trace.response_preview?.trim());
+  const labellableUuids = labellableTraces.map((trace) => trace.uuid);
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -554,17 +556,13 @@ export function TracesTabContent({
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={everyTraceMatching ? 0 : labellableUuids.length}
-                      emptyMessage={
-                        everyTraceMatching
-                          ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
-                          : selected.size === 0
-                          ? "Select at least one trace to submit for labelling."
-                          : hasToolCallTrace
-                            ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
-                            : "Labelling traces that only made tool calls is not supported yet."
+                      count={labellableUuids.length}
+                      emptyMessage="Select at least one trace to submit for labelling."
+                      onOpen={() =>
+                        labellingIsToolCallOnly
+                          ? prepareLabelling([])
+                          : setEvaluatorStepOpen(true)
                       }
-                      onOpen={() => setEvaluatorStepOpen(true)}
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                     />
                   )}
