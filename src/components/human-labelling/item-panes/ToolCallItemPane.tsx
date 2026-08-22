@@ -1,7 +1,6 @@
 import {
   TestDetailView,
   type TestCaseHistory,
-  type TestCaseOutput,
 } from "@/components/test-results/shared";
 
 /**
@@ -11,6 +10,13 @@ import {
  * the "what happened" pane — the "what was expected" spec is the item's
  * evaluator-equivalent and renders on the other side of the screen, in
  * `ExpectedToolCallsPanel`, the same place a response item's evaluators show.
+ *
+ * Follows the exact same pattern as `LlmItemPane`: the agent's actual output
+ * is appended to `history` as its own trailing turn and highlighted with
+ * `highlightEvalTarget`, instead of being passed through `TestDetailView`'s
+ * separate `output` prop — that prop draws test-run pass/fail chrome (a
+ * colored bar, a check or cross) that a labelling item, which nobody has
+ * judged yet, should never show.
  */
 export function ToolCallItemPane({
   payload,
@@ -26,23 +32,22 @@ export function ToolCallItemPane({
   }
 
   const actualToolCalls = Array.isArray(payload.actual_tool_calls)
-    ? (payload.actual_tool_calls as NonNullable<TestCaseOutput["tool_calls"]>)
-    : [];
-  // A failed tool-call test: the agent replied with text instead of calling a
-  // tool. Show that reply so the annotator sees what the agent actually did.
-  const agentResponse =
-    typeof payload.agent_response === "string" ? payload.agent_response : "";
+    ? (payload.actual_tool_calls as TestCaseHistory["tool_calls"])
+    : undefined;
+  if (actualToolCalls && actualToolCalls.length > 0) {
+    history.push({ role: "assistant", tool_calls: actualToolCalls });
+  } else {
+    // A failed tool-call test: the agent replied with text instead of
+    // calling a tool. Show that reply so the annotator sees what the agent
+    // actually did.
+    const agentResponse =
+      typeof payload.agent_response === "string" ? payload.agent_response : "";
+    if (agentResponse.length > 0) {
+      history.push({ role: "assistant", content: agentResponse });
+    }
+  }
 
-  const output: TestCaseOutput | undefined =
-    actualToolCalls.length > 0 || agentResponse
-      ? {
-          ...(actualToolCalls.length > 0 ? { tool_calls: actualToolCalls } : {}),
-          ...(agentResponse ? { response: agentResponse } : {}),
-        }
-      : undefined;
-
-  const hasAnything = history.length > 0 || !!output;
-  if (!hasAnything) {
+  if (history.length === 0) {
     return (
       <div className="border border-border rounded-xl p-4">
         <p className="text-sm text-muted-foreground">—</p>
@@ -50,7 +55,9 @@ export function ToolCallItemPane({
     );
   }
 
-  return <TestDetailView history={history} output={output} passed={true} />;
+  return (
+    <TestDetailView history={history} passed={true} highlightEvalTarget />
+  );
 }
 
 function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {

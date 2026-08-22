@@ -201,6 +201,23 @@ describe("ToolCallCard", () => {
       expect(screen.getByText("destination")).toBeInTheDocument();
     });
 
+    it("keeps a gap between the tool name and the 'parameters hidden' line when collapsed", async () => {
+      const user = setupUser();
+      render(
+        <ToolCallCard
+          toolName="book_flight"
+          args={{ destination: { match_type: "exact", value: "NYC" } }}
+          expected
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Collapse parameters" }),
+      );
+      const hiddenLine = screen.getByText(/1 parameter hidden/);
+      const headerRow = hiddenLine.previousElementSibling;
+      expect(headerRow).toHaveClass("mb-2");
+    });
+
     it("renders the wildcard 'Is any' chip with no value box", () => {
       render(
         <ToolCallCard

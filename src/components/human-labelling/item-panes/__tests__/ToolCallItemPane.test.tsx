@@ -76,4 +76,19 @@ describe("ToolCallItemPane", () => {
     expect(screen.queryByText("Expected Tool Calls")).not.toBeInTheDocument();
     expect(screen.queryByText("book_flight")).not.toBeInTheDocument();
   });
+
+  it("never shows a pass/fail badge — a person is the one judging this item", () => {
+    const { container } = render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: "calling a tool with param success true",
+        }}
+      />,
+    );
+    expect(container.querySelector(".bg-green-500\\/20")).toBeNull();
+    expect(container.querySelector(".bg-red-500\\/20")).toBeNull();
+    expect(container.querySelector(".border-l-green-500")).toBeNull();
+    expect(container.querySelector(".border-l-red-500")).toBeNull();
+  });
 });

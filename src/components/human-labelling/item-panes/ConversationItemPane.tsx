@@ -27,7 +27,9 @@ export function ConversationItemPane({
     );
   }
 
-  return <TestDetailView history={history} passed={true} />;
+  return (
+    <TestDetailView history={history} passed={true} highlightEvalTarget />
+  );
 }
 
 function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
