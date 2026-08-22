@@ -814,7 +814,7 @@ function ModelSection({
                             title={
                               labellingEligible
                                 ? "Select for labelling"
-                                : "Tool-call tests will be skipped when submitting for labelling"
+                                : "This test can't be submitted for labelling"
                             }
                             className="cursor-pointer shrink-0"
                           >

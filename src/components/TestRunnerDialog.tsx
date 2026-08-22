@@ -437,7 +437,7 @@ export function TestRunnerDialog({
                       );
                       if (!hasEligibleSelected) {
                         toast.error(
-                          "Tool-call tests can't be submitted for labelling",
+                          "None of the selected tests can be submitted for labelling",
                         );
                         return;
                       }

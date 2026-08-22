@@ -53,6 +53,7 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
+import { isToolCallOutputItem } from "@/components/human-labelling/itemOutputType";
 import {
   AgreementStatCard,
   agreementColor,
@@ -860,6 +861,7 @@ function ItemRowActions({
   onLabel,
   onEdit,
   onEvaluate,
+  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -867,6 +869,8 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
+  /** Tool-call outputs can't be AI-judged — the button is shown but disabled. */
+  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -888,8 +892,14 @@ function ItemRowActions({
         <button
           type="button"
           onClick={() => onEvaluate(itemUuid)}
+          disabled={evaluateDisabled}
           aria-label="Evaluate"
-          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+          title={
+            evaluateDisabled
+              ? "AI judges do not run on tool calls — label this item by hand."
+              : undefined
+          }
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Evaluate
         </button>
@@ -1992,6 +2002,10 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
+  // How many of the items chosen for this run are tool-call outputs that an AI
+  // judge will skip (shown as a warning in the run dialog before confirming).
+  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] =
+    useState<number>(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
@@ -2010,8 +2024,31 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
+      // Can't classify items across pages here; the backend skips tool-call
+      // outputs, so no upfront count for the select-all path.
+      setRunDialogToolCallSkipCount(0);
     } else {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
+      // AI judges don't run on tool-call outputs. Count how many of the chosen
+      // items are tool calls: if they all are, there's nothing to evaluate;
+      // otherwise warn that those will be skipped (the backend runs the rest).
+      // `isToolCallOutputItem` is false for non-llm payloads, so this is a
+      // no-op for other task types.
+      if (ids) {
+        const toolCallCount = ids.filter((id) => {
+          const it = items.find((i) => i.uuid === id);
+          return !!it && isToolCallOutputItem(it.payload);
+        }).length;
+        if (toolCallCount === ids.length) {
+          toast.error(
+            "AI judges do not run on tool calls. Label these items by hand.",
+          );
+          return;
+        }
+        setRunDialogToolCallSkipCount(toolCallCount);
+      } else {
+        setRunDialogToolCallSkipCount(0);
+      }
       setRunDialogItemUuids(ids);
       setRunDialogSelectAll(null);
     }
@@ -3449,6 +3486,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={isToolCallOutputItem(item.payload)}
                           />
                         </div>
                       </Fragment>
@@ -3622,6 +3660,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={isToolCallOutputItem(item.payload)}
                           />
                         </div>
                       </Fragment>
@@ -3742,6 +3781,7 @@ function LabellingTaskPageInner() {
           }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
+          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);
