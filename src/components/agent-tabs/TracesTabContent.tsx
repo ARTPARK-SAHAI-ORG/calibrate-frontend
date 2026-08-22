@@ -331,15 +331,17 @@ export function TracesTabContent({
     !everyTraceMatching &&
     total > items.length;
 
-  // The choice was made against one list, so a new search, filter or empty
-  // selection drops it rather than acting on rows the reader never saw.
+  // The choice was made against one list, so a new search or filter drops it
+  // rather than acting on rows the reader never saw.
   useEffect(() => {
     setEveryTraceMatching(false);
     setWholeListKind(null);
   }, [search, outputFilter]);
+  // Unticking a row is the reader narrowing what they want, so the whole list
+  // is no longer what they asked for.
   useEffect(() => {
-    if (selected.size === 0) setEveryTraceMatching(false);
-  }, [selected.size]);
+    if (!deletion.allSelected) setEveryTraceMatching(false);
+  }, [deletion.allSelected]);
 
   /** Untick only the traces that were actually submitted. */
   const clearSubmitted = () => {
@@ -357,6 +359,9 @@ export function TracesTabContent({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
+    // A refresh can bring in traces of the other kind, which the counts read
+    // before it would not know about.
+    setWholeListKind(null);
     setIsRefreshing(true);
     try {
       await refetch();
@@ -744,7 +749,7 @@ export function TracesTabContent({
         onConfirm={deletion.deleteItems}
         title={
           deletion.itemsToDeleteBulk.length > 0
-            ? `Delete ${deletion.itemsToDeleteBulk.length} trace${deletion.itemsToDeleteBulk.length === 1 ? "" : "s"}?`
+            ? `Delete ${selectionCount} trace${selectionCount === 1 ? "" : "s"}?`
             : "Delete this trace?"
         }
         message={

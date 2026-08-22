@@ -550,6 +550,41 @@ describe("TracesTabContent", () => {
     expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
   });
 
+  it("says how many will really go when the whole list is asked for", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Delete selected (4)"));
+
+    expect(screen.getByText("Delete 4 traces?")).toBeInTheDocument();
+  });
+
+  it("drops the whole-list choice when a row is unticked", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" }), trace({ uuid: "trace-2" })], {
+        total: 6,
+        hasNext: true,
+      }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 6 traces"));
+    expect(screen.getByText("6")).toBeInTheDocument();
+
+    // Taking one row out is the reader narrowing what they want.
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
+  });
+
   it("does not offer to tick every trace when they all fit on one page", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
