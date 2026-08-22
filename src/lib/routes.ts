@@ -49,6 +49,7 @@ export const SECTION_LIST_PAGES = new Set([
   "human-alignment",
   "personas",
   "scenarios",
+  "simulation-evaluators",
   "simulations",
   "stt",
   "tests",

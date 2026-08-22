@@ -216,7 +216,7 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        id: "evaluators",
+        id: "simulation-evaluators",
         label: "Evaluators",
         icon: (
           <svg

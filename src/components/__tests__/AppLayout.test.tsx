@@ -131,10 +131,10 @@ describe("AppLayout", () => {
     expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
-  it("links Evaluators to the evaluators page", () => {
+  it("links Evaluators to the simulation evaluators page", () => {
     renderLayout();
     const evaluatorsLink = screen.getByText("Evaluators").closest("a");
-    expect(evaluatorsLink).toHaveAttribute("href", "/evaluators");
+    expect(evaluatorsLink).toHaveAttribute("href", "/simulation-evaluators");
   });
 
   it("opens the learning resources page from Tutorials", () => {
