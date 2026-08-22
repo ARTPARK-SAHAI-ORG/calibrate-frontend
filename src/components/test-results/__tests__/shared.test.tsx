@@ -744,6 +744,25 @@ describe("TestDetailView", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("never shows a reasoning toggle for a single agent response either", () => {
+    render(
+      <TestDetailView
+        history={[{ role: "user", content: "What is 2+2?" }]}
+        passed={false}
+        output={{ response: "5" }}
+        reasoning="The answer should have been 4"
+        evaluation={{ type: "general" }}
+      />,
+    );
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /reasoning/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("The answer should have been 4"),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders output tool calls with a pass/fail border", () => {
     render(
       <TestDetailView

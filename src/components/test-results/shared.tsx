@@ -1023,25 +1023,7 @@ export function TestDetailView({
             </p>
           </div>
           <div className="border border-border rounded-xl p-4 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Output
-              </h3>
-              {showLegacyReasoningToggle && (
-                <ReasoningToggleButton
-                  open={legacyReasoningOpen}
-                  onToggle={() => setLegacyReasoningOpen((o) => !o)}
-                />
-              )}
-            </div>
-            {showLegacyReasoningToggle && legacyReasoningOpen && (
-              <ReasoningExpandedContent
-                text={reasoning!}
-                showReasoningLabel={false}
-                mutedBody
-                italic
-              />
-            )}
+            <h3 className="text-sm font-semibold text-foreground">Output</h3>
             {output?.response && (
               <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                 {output.response}
