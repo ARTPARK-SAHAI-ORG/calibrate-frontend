@@ -9,7 +9,7 @@ import {
  * (its tool call, or the text it replied with when it made no call). This is
  * the "what happened" pane — the "what was expected" spec is the item's
  * evaluator-equivalent and renders on the other side of the screen, in
- * `ExpectedToolCallsPanel`, the same place a response item's evaluators show.
+ * `ExpectedToolCalls`, the same place a response item's evaluators show.
  *
  * Follows the exact same pattern as `LlmItemPane`: the agent's actual output
  * is appended to `history` as its own trailing turn and highlighted with

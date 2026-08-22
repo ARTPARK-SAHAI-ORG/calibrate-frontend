@@ -14,7 +14,6 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
-import { ExpectedToolCallsPanel } from "./item-panes/ExpectedToolCallsPanel";
 import { isToolCallOutputItem } from "./itemOutputType";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
@@ -1392,7 +1391,7 @@ function EvaluatorsPane({
     return (
       <div className="space-y-4">
         {descriptionBlock}
-        <ExpectedToolCallsPanel payload={itemPayload} />
+        <ExpectedToolCalls payload={itemPayload} />
         <div className="border border-border rounded-xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">
             Is the tool call correct?
