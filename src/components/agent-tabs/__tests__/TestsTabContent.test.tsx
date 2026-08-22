@@ -117,6 +117,19 @@ jest.mock("../../AddTestDialog", () => ({
         >
           SubmitToolCall
         </button>
+        <button
+          onClick={() =>
+            props.onSubmit(
+              {
+                input: "What is the capital of France?",
+                evaluation: { type: "general" },
+              },
+              [{ evaluator_uuid: "e1" }],
+            )
+          }
+        >
+          SubmitGeneral
+        </button>
         <button onClick={props.onClose}>CloseAddTest</button>
       </div>
     ) : null;
@@ -230,6 +243,15 @@ const toolCallTest = {
   created_at: "2026-01-01 09:00:00",
   updated_at: "2026-01-01 09:00:00",
 };
+const generalTest = {
+  uuid: "t4",
+  name: "Capital question test",
+  description: "",
+  type: "general" as const,
+  config: { input: "What is the capital of France?" },
+  created_at: "2026-01-01 09:00:00",
+  updated_at: "2026-01-01 09:00:00",
+};
 const libraryTest = {
   uuid: "t3",
   name: "Library only test",
@@ -276,7 +298,10 @@ function installFetch() {
       return jsonResponse(state.pollBench, state.pollInit);
     }
     if (url.endsWith("/agent-tests")) {
-      return jsonResponse({}, state.agentTestsMutInit);
+      return jsonResponse(
+        state.agentTestsMutBody ?? {},
+        state.agentTestsMutInit,
+      );
     }
     if (url.endsWith("/tests/bulk")) {
       return jsonResponse(state.createResult ?? {}, state.createInit);
@@ -483,7 +508,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
     expect(screen.getByText("2 tests")).toBeInTheDocument();
-    expect(screen.getAllByText("Next Reply").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("LLM response").length).toBeGreaterThan(0);
   });
 
   it("filters the list via the search input", async () => {
@@ -511,6 +536,41 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByRole("button", { name: "Tool Call" }));
     expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
+  });
+
+  it("keeps a general agent's tests under the LLM response filter", async () => {
+    state.agentTests = [responseTest, toolCallTest, generalTest];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Capital question test");
+
+    // "LLM response" is also a type label in the table, so scope to the chip.
+    await user.click(screen.getByRole("button", { name: "LLM response" }));
+    expect(screen.getAllByText("Capital question test")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test")[0]).toBeInTheDocument();
+    expect(screen.queryAllByText("Weather tool test")).toHaveLength(0);
+  });
+
+  it("sends the evaluators when a general test is edited", async () => {
+    state.agentTests = [generalTest];
+    state.testDetail = { ...generalTest, evaluators: [] };
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findAllByText("Capital question test");
+
+    await user.click(screen.getAllByText("Capital question test")[0]);
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SubmitGeneral"));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find(
+        (c: any[]) => c[1]?.method === "PUT",
+      );
+      expect(putCall).toBeTruthy();
+      expect(JSON.parse(putCall![1].body).evaluators).toEqual([
+        { evaluator_uuid: "e1" },
+      ]);
+    });
   });
 
   it("selects all rows and shows the bulk-action toolbar, then clears", async () => {
@@ -1061,6 +1121,30 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     });
   });
 
+  it("creates a general test with its input and its evaluators", async () => {
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitGeneral"));
+
+    await waitFor(() => {
+      const bulkCall = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/tests/bulk"),
+      );
+      expect(bulkCall).toBeTruthy();
+      const item = JSON.parse(bulkCall![1].body).tests[0];
+      // Exactly one of the two content fields, and the evaluators must ride
+      // along or the test is created with nothing judging it.
+      expect(item.input).toBe("What is the capital of France?");
+      expect(item).not.toHaveProperty("conversation_history");
+      expect(item.evaluators).toEqual([{ evaluator_uuid: "e1" }]);
+    });
+  });
+
   it("shows a name-conflict error when create hits a conflict", async () => {
     (readBulkNameConflictMessage as jest.Mock).mockResolvedValue("conflict");
     state.createInit = { ok: false, status: 400 };
@@ -1074,6 +1158,51 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("SubmitResponse"));
 
     await screen.findByTestId("add-test-name-error");
+  });
+
+  it("does not blame the test type when the failure body cannot be read", async () => {
+    // A 502 that returns an HTML error page says nothing about types.
+    // Guessing "your types don't match" sends the reader off to change
+    // test types over what is really an outage.
+    state.createInit = { ok: false, status: 502 };
+    state.createResult = "<html>Bad Gateway</html>";
+    const user = setupUser();
+    renderComponent();
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-error")).toHaveTextContent(
+        "Failed to create test",
+      ),
+    );
+    expect(screen.getByTestId("add-test-error")).not.toHaveTextContent(
+      /type doesn't match/,
+    );
+  });
+
+  it("shows a plain-language error when create-and-link fails because the type doesn't match", async () => {
+    state.createInit = { ok: false, status: 400 };
+    state.createResult = { detail: "interaction_type mismatch" };
+    const user = setupUser();
+    renderComponent();
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-error")).toHaveTextContent(
+        "These tests can't be linked to this agent because their type doesn't match the agent's kind.",
+      ),
+    );
+    expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows a warning on partial attach failure", async () => {
@@ -1102,6 +1231,21 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await user.click(screen.getByText("BulkUploadSuccess"));
     await user.click(screen.getByText("CloseBulkUpload"));
     expect(screen.queryByTestId("bulk-upload-modal")).not.toBeInTheDocument();
+  });
+
+  it("passes agentNature through to the create dialog and bulk-upload modal", async () => {
+    const user = setupUser();
+    renderComponent({ agentNature: "general" });
+    await screen.findByText("No tests attached");
+
+    await user.click(screen.getByText("Bulk upload"));
+    await screen.findByTestId("bulk-upload-modal");
+    expect(bulkUploadProps.agentNature).toBe("general");
+    await user.click(screen.getByText("CloseBulkUpload"));
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    expect(addTestDialogProps.agentNature).toBe("general");
   });
 });
 

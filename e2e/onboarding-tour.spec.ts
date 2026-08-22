@@ -256,7 +256,10 @@ async function installFakeBackend(
   appOrigin: string,
 ): Promise<void> {
   const state: FakeState = {
-    attachedEvaluators: [],
+    // A new agent comes with the built-in Correctness already attached (the
+    // real app does this on creation), which is what the tour points at
+    // before it adds a second check.
+    attachedEvaluators: [LIBRARY_EVALUATORS[0]],
     tests: [],
     runsCreated: 0,
   };
@@ -421,14 +424,17 @@ const STEPS: { title: string; auto?: boolean }[] = [
   { title: "Build or connect" },
   { title: "Give it instructions" },
   { title: "Save your work" },
-  { title: "Add an evaluator" },
-  { title: "Choose what to check" },
+  { title: "Meet the evaluators" },
+  { title: "Already added for you" },
   { title: "Add another check" },
-  { title: "Add them to your agent" },
+  { title: "Pick it in the list" },
+  { title: "Add it to your agent" },
   { title: "Create your first test" },
+  { title: "Pick what to test" },
   { title: "The scenario" },
   { title: "How your test is graded" },
   { title: "Add a test it should fail" },
+  { title: "The same choice again" },
   { title: "A scenario it cannot answer" },
   { title: "Require what it cannot give" },
   { title: "Run your tests" },
@@ -524,13 +530,19 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
           page.locator('[data-tour="agent-system-prompt"]'),
         ).toHaveValue(/community health clinic/i, { timeout: 10000 });
       }
-      if (step.title === "Add another check") {
-        // Correctness is ticked; the picker highlights the just-picked row.
+      if (step.title === "Already added for you") {
+        // Correctness is on the agent already — the tour points at its card
+        // in the tab rather than creating or ticking anything.
+        await expect(
+          page.locator('[data-evaluator-name="Correctness"]'),
+        ).toBeVisible({ timeout: 15000 });
+      }
+      if (step.title === "Add it to your agent") {
+        // The previous card's action ticked the second evaluator.
         const dialog = page.locator('[data-tour="add-evaluators-dialog"]');
         await expect(dialog).toBeVisible();
-        // The flow is locked to the card: the spotlighted dialog is marked
-        // non-interactive, so the user can't close it and desync the tour.
-        await expect(dialog).toHaveClass(/driver-no-interaction/);
+        // Picker steps stay interactive so the reader can scroll the list.
+        await expect(dialog).not.toHaveClass(/driver-no-interaction/);
       }
       if (step.title === "Review your failed test") {
         // The first (failed) result row is the phone-number test.

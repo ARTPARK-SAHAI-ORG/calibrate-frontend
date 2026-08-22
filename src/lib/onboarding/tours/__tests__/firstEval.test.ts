@@ -1,144 +1,86 @@
 /**
  * Unit tests for the flagship tour's evaluator-picking logic.
  *
- * The picker rows the tour ticks MUST be LLM-reply evaluators: a next-reply test
- * only seeds `evaluator_type === "llm"` evaluators and silently drops
- * "Full conversation" / "LLM output" ones, so ticking a non-LLM-reply evaluator
- * would leave the tour's "both checks grade this test" claim false. These tests
- * lock that rule for both picks.
+ * The picker renders each row as a checkbox whose aria-label is
+ * `Select <name>` (the row body opens a preview instead of ticking), so the
+ * tour finds the box to tick by that aria-label, matched exactly.
  */
 
+const mockFetchAgentEvaluators = jest.fn();
+
+jest.mock("../../../evaluatorApi", () => ({
+  ...jest.requireActual("../../../evaluatorApi"),
+  fetchAgentEvaluators: (...args: unknown[]) =>
+    mockFetchAgentEvaluators(...args),
+}));
+
 import {
-  buildCorrectnessPayload,
-  chooseRowByName,
-  isLlmReplyRow,
+  chooseEvaluatorCheckbox,
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
   type EvaluatorPlan,
 } from "../firstEval";
 
-// The pill label EvaluatorTypePill renders for each evaluator_type.
-const TYPE_LABEL = {
-  llm: "LLM reply",
-  conversation: "Full conversation",
-  "llm-general": "LLM output",
-  stt: "Speech to Text",
-  tts: "Text to Speech",
-} as const;
-
 type RowSpec = {
   name: string;
-  type: keyof typeof TYPE_LABEL;
   checked?: boolean;
 };
 
-/** Build a picker <label> row like AddEvaluatorsDialog renders. */
-function makeRow({ name, type, checked = false }: RowSpec): HTMLLabelElement {
-  const label = document.createElement("label");
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = checked;
-  const nameSpan = document.createElement("span");
-  nameSpan.textContent = name;
-  const pill = document.createElement("span");
-  pill.textContent = TYPE_LABEL[type];
-  label.append(checkbox, nameSpan, pill);
-  return label;
+/** Build a picker dialog holding checkbox rows like EvaluatorPicker renders. */
+function makeDialog(rows: RowSpec[]): HTMLElement {
+  const dialog = document.createElement("div");
+  rows.forEach(({ name, checked = false }) => {
+    const row = document.createElement("div");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checked;
+    checkbox.setAttribute("aria-label", `Select ${name}`);
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = name;
+    row.append(checkbox, nameSpan);
+    dialog.append(row);
+  });
+  return dialog;
 }
 
-const rowChecked = (row: HTMLLabelElement | undefined): boolean | undefined =>
-  row?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked;
-
-describe("isLlmReplyRow", () => {
-  it("matches an LLM-reply row and rejects other types", () => {
-    expect(isLlmReplyRow(makeRow({ name: "Correctness", type: "llm" }))).toBe(
-      true,
-    );
-    expect(
-      isLlmReplyRow(makeRow({ name: "Coherence", type: "conversation" })),
-    ).toBe(false);
-    // "LLM output" (llm-general) must NOT count as an LLM-reply row.
-    expect(
-      isLlmReplyRow(makeRow({ name: "General judge", type: "llm-general" })),
-    ).toBe(false);
-  });
-});
-
-describe("chooseRowByName", () => {
-  it("ticks the unchecked LLM-reply row whose name matches", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Reply Conciseness", type: "llm" }),
-      makeRow({ name: "Coherence", type: "conversation" }),
-    ];
-    expect(chooseRowByName(rows, "Reply Conciseness")).toBe(rows[1]);
-  });
-
-  it("ignores a conversation-type row even when the name matches", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "conversation" })];
-    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
+describe("chooseEvaluatorCheckbox", () => {
+  it("finds the unchecked checkbox whose aria-label matches the name", () => {
+    const dialog = makeDialog([
+      { name: "Correctness", checked: true },
+      { name: "Reply Conciseness" },
+    ]);
+    const cb = chooseEvaluatorCheckbox(dialog, "Reply Conciseness");
+    expect(cb?.getAttribute("aria-label")).toBe("Select Reply Conciseness");
   });
 
   it("skips an already-checked row", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "llm", checked: true })];
-    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
+    const dialog = makeDialog([{ name: "Conciseness", checked: true }]);
+    expect(chooseEvaluatorCheckbox(dialog, "Conciseness")).toBeUndefined();
   });
 
   it("returns undefined for an empty name", () => {
-    const rows = [makeRow({ name: "Conciseness", type: "llm" })];
-    expect(chooseRowByName(rows, "")).toBeUndefined();
+    const dialog = makeDialog([{ name: "Conciseness" }]);
+    expect(chooseEvaluatorCheckbox(dialog, "")).toBeUndefined();
   });
 
   it("matches the exact name, never a longer name that contains it", () => {
-    const rows = [
-      makeRow({ name: "Conciseness2", type: "llm" }),
-      makeRow({ name: "Conciseness", type: "llm" }),
-    ];
-    // "Conciseness2" comes first, but only the exact "Conciseness" row wins.
-    expect(chooseRowByName(rows, "Conciseness")).toBe(rows[1]);
-  });
-
-  it("does not mutate the rows it inspects", () => {
-    const rows = [makeRow({ name: "Reply Conciseness", type: "llm" })];
-    chooseRowByName(rows, "Reply Conciseness");
-    expect(rowChecked(rows[0])).toBe(false);
-  });
-});
-
-describe("buildCorrectnessPayload", () => {
-  it("always uses the hard-coded canonical prompt, ignoring the backend prompt", () => {
-    // Even if the backend hands back a different prompt, we create with the
-    // canonical one so a created evaluator matches what the reuse check expects.
-    const payload = buildCorrectnessPayload({
-      system_prompt: "Some other backend prompt without a variable",
-      judge_model: "openai/gpt-5.4-mini",
-      output_type: "binary",
-    });
-    expect(payload.name).toBe("Correctness");
-    expect(payload.evaluator_type).toBe("llm");
-    expect(payload.data_type).toBe("text");
-    expect(payload.version.judge_model).toBe("openai/gpt-5.4-mini");
-    expect(payload.version.system_prompt).toContain("{{criteria}}");
-    expect(payload.version.system_prompt).toContain("highly accurate evaluator");
-    expect(payload.version.system_prompt).not.toContain("Some other backend");
-    expect(payload.version.variables).toEqual([
-      { name: "criteria", description: expect.any(String) },
+    const dialog = makeDialog([
+      { name: "Conciseness2" },
+      { name: "Conciseness" },
     ]);
+    const cb = chooseEvaluatorCheckbox(dialog, "Conciseness");
+    expect(cb?.getAttribute("aria-label")).toBe("Select Conciseness");
   });
 
-  it("uses the canonical prompt and no judge model when none is given", () => {
-    const payload = buildCorrectnessPayload(null);
-    expect(payload.version.system_prompt).toContain("{{criteria}}");
-    expect(payload.version.judge_model).toBeUndefined();
-    expect(payload.output_type).toBe("binary");
-  });
-
-  it("creates under the given (free) name", () => {
-    expect(buildCorrectnessPayload(null, "Correctness (2)").name).toBe(
-      "Correctness (2)",
-    );
+  it("does not tick anything while choosing", () => {
+    const dialog = makeDialog([{ name: "Reply Conciseness" }]);
+    chooseEvaluatorCheckbox(dialog, "Reply Conciseness");
+    expect(
+      dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+    ).toBe(false);
   });
 });
+
 
 describe("buildFirstEvalTour", () => {
   const TWO: EvaluatorPlan = {
@@ -166,19 +108,23 @@ describe("buildFirstEvalTour", () => {
     expect(tour.steps[0].description).toContain("catch issues before deploy");
   });
 
-  it("includes the second-evaluator step (named) only when one is available", () => {
+  it("includes the add-a-second-evaluator steps (named) only when one is available", () => {
     const two = titles(TWO);
     expect(two).toContain("Add another check");
-    expect(two).toContain("Add them to your agent");
+    expect(two).toContain("Pick it in the list");
+    expect(two).toContain("Add it to your agent");
     // The second evaluator is named in the step copy.
     const addAnother = build(TWO).steps.find(
       (s) => s.title === "Add another check",
     );
     expect(addAnother?.description).toContain("Reply Conciseness");
 
+    // With no second evaluator available, the tour shows the agent's own
+    // evaluators tab and adds nothing.
     const one = titles(ONE);
     expect(one).not.toContain("Add another check");
-    expect(one).toContain("Add it to your agent");
+    expect(one).not.toContain("Pick it in the list");
+    expect(one).not.toContain("Add it to your agent");
   });
 
   it("never claims multiple dimensions in the grading step", () => {
@@ -191,21 +137,76 @@ describe("buildFirstEvalTour", () => {
     }
   });
 
-  it("names Correctness by its resolved name in the pick step (rename-safe)", () => {
-    const renamed = build({
-      correctnessName: "Answer Accuracy",
-      secondEvaluatorName: null,
-    });
-    const pick = renamed.steps.find((s) => s.title === "Choose what to check");
-    expect(pick?.description).toContain("Answer Accuracy");
-  });
+  // The card that points at what the agent already has resolves itself when the
+  // step is reached: only then does the agent exist. `stepAtIndex` finds it by
+  // position, since its title changes with what it finds.
+  describe("the card for what the agent already has", () => {
+    const evaluatorStepIndex = (tour: ReturnType<typeof build>) =>
+      tour.steps.findIndex((s) => s.title === "Meet the evaluators") + 1;
 
-  it("still builds when Correctness was deleted (recreated silently)", () => {
-    const deleted = build({ correctnessName: null, secondEvaluatorName: null });
-    const titles = deleted.steps.map((s) => s.title);
-    expect(titles).toContain("Choose what to check");
-    // Falls back to the default Correctness name in the copy.
-    const pick = deleted.steps.find((s) => s.title === "Choose what to check");
-    expect(pick?.description).toContain("Correctness");
+    beforeEach(() => {
+      mockFetchAgentEvaluators.mockReset();
+      window.history.replaceState({}, "", "/acme/agents/agent-1");
+      localStorage.setItem("access_token", "tok");
+    });
+
+    it("names the attached evaluator and anchors its card (rename-safe)", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([
+        { uuid: "e1", name: "Answer Accuracy" },
+      ]);
+      const tour = build({
+        correctnessName: "Answer Accuracy",
+        secondEvaluatorName: null,
+      });
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(mockFetchAgentEvaluators).toHaveBeenCalledWith("agent-1", "token");
+      expect(step.title).toBe("Already added for you");
+      expect(step.description).toContain("Answer Accuracy");
+      expect(step.anchor).toBe('[data-evaluator-name="Answer Accuracy"]');
+    });
+
+    it("points at what the agent really has, not the name from the library", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([
+        { uuid: "e2", name: "Politeness" },
+      ]);
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.description).toContain("Politeness");
+      expect(step.anchor).toBe('[data-evaluator-name="Politeness"]');
+    });
+
+    // The bug this guards: the card used to say "Correctness is already here"
+    // over an empty tab, anchored to a card that never appears.
+    it("says the tab is empty when the agent has no evaluators", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([]);
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.anchor).toBeUndefined();
+      expect(step.description).not.toContain("already here");
+      expect(step.description).toContain("empty");
+      expect(step.title).not.toMatch(/already added/i);
+    });
+
+    it("says the tab is empty when the lookup fails", async () => {
+      mockFetchAgentEvaluators.mockRejectedValue(new Error("network"));
+      const tour = build(ONE);
+      const step = tour.steps[evaluatorStepIndex(tour)];
+      await step.prepare?.();
+      expect(step.anchor).toBeUndefined();
+      expect(step.description).toContain("empty");
+    });
+
+    it("stops calling the next card 'another check' when nothing is attached", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([]);
+      const tour = build(TWO);
+      const i = evaluatorStepIndex(tour);
+      await tour.steps[i].prepare?.();
+      expect(tour.steps[i].description).toContain("Reply Conciseness");
+      expect(tour.steps[i + 1].title).toBe("Add your first check");
+      expect(tour.steps[i + 1].description).not.toContain("second");
+    });
   });
 });

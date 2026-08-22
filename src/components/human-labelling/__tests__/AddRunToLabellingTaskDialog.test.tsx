@@ -333,6 +333,49 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(itemNounForSource(source)).toEqual({ one: "trace", many: "traces" });
   });
 
+  it("builds an input and output item per trace for a general agent", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        {
+          name: "Vaccination question",
+          input: "When is the next vaccination?",
+          output: { response: "At 14 weeks, for OPV and DPT." },
+        },
+      ],
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    const result = buildItemsFromSource(source);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].payload).toEqual({
+      name: "Vaccination question",
+      input: "When is the next vaccination?",
+      output: "At 14 weeks, for OPV and DPT.",
+      evaluator_variables: {},
+    });
+    expect(result.items[0].payload.chat_history).toBeUndefined();
+    expect(Array.from(result.evaluatorUuids)).toEqual(["trace-ev-1"]);
+    expect(targetTaskTypeForSource(source)).toBe("llm-general");
+  });
+
+  it("skips a general trace with no input or no output", () => {
+    const result = buildItemsFromSource({
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        { name: "No output", input: "hello", output: { response: "" } },
+        { name: "No input", input: "   ", output: { response: "hi" } },
+      ],
+    });
+
+    expect(result.items).toHaveLength(0);
+    expect(result.skippedCount).toBe(2);
+  });
+
   it("appends a trace's output tool calls to chat_history as the final turns", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "traces",

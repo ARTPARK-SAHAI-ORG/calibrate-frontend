@@ -61,6 +61,7 @@ export function SimulationConfigTab({
         placeholder="Choose an agent for this simulation"
         disabled={isConfigured}
         disableCustomFieldConnections
+        disableGeneralAgents
       />
 
       {/* The two notices sit closer to each other than to the rest of the

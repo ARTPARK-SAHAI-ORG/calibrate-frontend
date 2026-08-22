@@ -39,11 +39,16 @@ async function createBuildAgent(page: Page, name: string): Promise<void> {
   // create can race auth readiness and 401 (which closes the dialog). Retry the
   // whole open → fill → create each iteration so a failed attempt re-opens the
   // dialog and tries again once the token has hydrated.
+  const conversationOption = page.getByText("Conversation", { exact: true });
   await expect(async () => {
     if (!(await dialogHeading.isVisible().catch(() => false))) {
       await page.getByRole("button", { name: "New agent" }).first().click();
       await expect(dialogHeading).toBeVisible({ timeout: 5000 });
       await page.getByPlaceholder("Enter agent name").fill(name);
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      // Second step: what the agent does. Pick Conversation — these tests
+      // run its tests/evaluations flows, which are conversation-shaped.
+      await conversationOption.click();
     }
     await createBtn.click();
     await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {

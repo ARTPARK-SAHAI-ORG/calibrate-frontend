@@ -144,7 +144,7 @@ export function EvaluatorPicker({
           fillHeight ? "md:h-full md:min-h-0" : "min-h-[12rem]"
         }`}
       >
-        <p className="text-sm md:text-base text-muted-foreground">
+        <p className="text-sm md:text-base text-muted-foreground max-w-md text-balance">
           {emptyMessage}
         </p>
         {emptyAction}

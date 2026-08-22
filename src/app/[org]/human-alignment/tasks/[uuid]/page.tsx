@@ -2269,7 +2269,7 @@ function LabellingTaskPageInner() {
     payload: Record<string, unknown> | null,
   ): TestConfig | undefined => {
     if (!payload) return undefined;
-    type HistoryItem = TestConfig["history"][number];
+    type HistoryItem = NonNullable<TestConfig["history"]>[number];
     const parseHistory = (raw: unknown): HistoryItem[] => {
       if (!Array.isArray(raw)) return [];
       const out: HistoryItem[] = [];

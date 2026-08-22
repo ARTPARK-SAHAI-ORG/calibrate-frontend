@@ -25,7 +25,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call" | "conversation";
+  type: "response" | "tool_call" | "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -41,6 +41,8 @@ type BenchmarkDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   agentUuid: string;
+  /** A general agent is probed with one input, not a conversation. */
+  agentNature?: "conversation" | "general";
   agentName: string;
   tests: TestData[];
   onBenchmarkCreated?: (taskId: string) => void;
@@ -56,6 +58,7 @@ export function BenchmarkDialog({
   isOpen,
   onClose,
   agentUuid,
+  agentNature = "conversation",
   agentName,
   tests,
   onBenchmarkCreated,
@@ -605,6 +608,7 @@ export function BenchmarkDialog({
       />
 
       <VerifyRequestPreviewDialog
+        agentNature={agentNature}
         open={verifyDialogOpen}
         onClose={() => {
           setVerifyDialogOpen(false);

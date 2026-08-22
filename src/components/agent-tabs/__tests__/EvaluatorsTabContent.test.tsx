@@ -13,12 +13,17 @@ jest.mock("../AddEvaluatorsDialog", () => ({
   AddEvaluatorsDialog: ({
     isOpen,
     onAdd,
+    availableEvaluators,
   }: {
     isOpen: boolean;
     onAdd: (ids: string[]) => Promise<void> | void;
+    availableEvaluators: EvaluatorData[];
   }) =>
     isOpen ? (
       <div data-testid="add-dialog">
+        <span data-testid="available-evaluator-types">
+          {availableEvaluators.map((e) => e.evaluator_type).join(",")}
+        </span>
         <button type="button" onClick={() => onAdd(["ev-2"])}>
           Confirm add
         </button>
@@ -26,8 +31,18 @@ jest.mock("../AddEvaluatorsDialog", () => ({
     ) : null,
 }));
 jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
-  CreateEvaluatorFlow: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="create-flow" /> : null,
+  CreateEvaluatorFlow: ({
+    open,
+    useCaseTypes,
+  }: {
+    open: boolean;
+    useCaseTypes: string[];
+  }) =>
+    open ? (
+      <div data-testid="create-flow">
+        <span data-testid="use-case-types">{useCaseTypes.join(",")}</span>
+      </div>
+    ) : null,
 }));
 
 const mockFetchAgentEvaluators = jest.fn();
@@ -253,5 +268,69 @@ describe("EvaluatorsTabContent", () => {
         "test-token",
       ),
     );
+  });
+
+  it("swaps 'responses' for 'output' in copy for a general agent", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+
+    render(
+      <EvaluatorsTabContent agentUuid="agent-1" agentNature="general" />,
+    );
+
+    await screen.findByText("Follows Refund Policy");
+    expect(
+      screen.getByText("LLM judges for evaluating the agent’s output"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/evaluating the agent.s responses/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses the llm-general use-case type for a general agent", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([
+      evaluator({ uuid: "ev-1" }),
+      evaluator({
+        uuid: "ev-2",
+        name: "Output check",
+        evaluator_type: "llm-general",
+      }),
+    ]);
+    const user = setupUser();
+
+    render(
+      <EvaluatorsTabContent agentUuid="agent-1" agentNature="general" />,
+    );
+
+    await screen.findByText("Follows Refund Policy");
+
+    await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+    expect(screen.getByTestId("use-case-types")).toHaveTextContent(
+      "llm-general",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+    // ev-1 is already attached (filtered out); ev-2 is llm-general so it's
+    // the only one offered.
+    expect(screen.getByTestId("available-evaluator-types")).toHaveTextContent(
+      "llm-general",
+    );
+  });
+
+  it("keeps the default (llm) use-case type when agentNature is omitted", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator({ uuid: "ev-1" })]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    expect(
+      screen.getByText("LLM judges for evaluating the agent’s responses"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+    expect(screen.getByTestId("use-case-types")).toHaveTextContent("llm");
   });
 });

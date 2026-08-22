@@ -40,6 +40,10 @@ async function createAgent(
     // agent kind to "connection" (Agents.tsx: onClick setAgentKind("connection")).
     await page.getByText("Connect your existing agent").click();
   }
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  // Second step: what the agent does. Pick Conversation — every test here
+  // exercises the conversation-shaped tabs and flows.
+  await page.getByText("Conversation", { exact: true }).click();
 
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
   await expect(async () => {

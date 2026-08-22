@@ -19,6 +19,25 @@ const TEST_TYPE_FILTER_OPTIONS: {
   { value: "conversation", label: testTypeLabel("conversation") },
 ];
 
+/**
+ * Does a test's type belong under the chosen filter chip?
+ *
+ * The "response" chip also matches "general" tests. To the reader they are one
+ * thing, "LLM response": a general agent's test and a conversation agent's test
+ * are both a reply being judged, and both show that same name. The split lives
+ * only in how the test stores its content, so a single chip has to select both
+ * or a general agent's tests would have no chip that finds them.
+ */
+export function matchesTestTypeFilter(
+  testType: string | null | undefined,
+  filter: TestTypeFilterValue,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "response")
+    return testType === "response" || testType === "general";
+  return testType === filter;
+}
+
 interface TestTypeFilterProps {
   value: TestTypeFilterValue;
   onChange: (value: TestTypeFilterValue) => void;

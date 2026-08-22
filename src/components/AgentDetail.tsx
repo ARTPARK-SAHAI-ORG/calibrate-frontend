@@ -69,6 +69,7 @@ type AgentData = {
   uuid: string;
   name: string;
   type?: "agent" | "connection";
+  interaction_type?: "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -1205,6 +1206,7 @@ export function AgentDetail({
           <div className={activeTab === "connection" ? undefined : "hidden"}>
             <AgentConnectionTabContent
               agentUuid={agentUuid}
+              agentNature={agent.interaction_type ?? "conversation"}
               agentUrl={connectionUrl}
               onAgentUrlChange={setConnectionUrl}
               agentHeaders={connectionHeaders}
@@ -1277,6 +1279,7 @@ export function AgentDetail({
               agentUuid={agentUuid}
               agentName={agent.name}
               agentType={agent.type}
+              agentNature={agent.interaction_type ?? "conversation"}
               connectionVerified={
                 agent.type === "connection"
                   ? connectionConfig.connection_verified === true
@@ -1346,6 +1349,7 @@ export function AgentDetail({
           <div className={activeTab === "traces" ? undefined : "hidden"}>
             <TracesTabContent
               agentUuid={agentUuid}
+              agentNature={agent.interaction_type ?? "conversation"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
             />
@@ -1359,6 +1363,7 @@ export function AgentDetail({
               key={evaluatorsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
+              agentNature={agent.interaction_type ?? "conversation"}
             />
           </div>
         )}
@@ -1593,6 +1598,7 @@ export function AgentDetail({
       )}
 
       <VerifyRequestPreviewDialog
+        agentNature={agent.interaction_type ?? "conversation"}
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}

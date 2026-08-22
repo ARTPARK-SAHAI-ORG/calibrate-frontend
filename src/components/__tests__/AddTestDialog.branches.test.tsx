@@ -710,21 +710,6 @@ describe("AddTestDialog — additional branch coverage", () => {
   });
 
   describe("evaluator initialization branches", () => {
-    it("switching from next-reply to tool call drops the llm Correctness evaluator", async () => {
-      const user = setupUser();
-      render(<AddTestDialog {...baseProps()} />);
-      await user.click(screen.getByText("Next reply test"));
-      await waitFor(() =>
-        expect(screen.getByText("Correctness")).toBeInTheDocument(),
-      );
-      // Compact switcher box for the tool call type. Conversation is hidden
-      // from creation, so tool call is the only other type to switch to.
-      await user.click(screen.getByRole("button", { name: "Tool call" }));
-      await waitFor(() =>
-        expect(screen.queryByText("Correctness")).not.toBeInTheDocument(),
-      );
-    });
-
     it("hydrates attached evaluators from initialEvaluators (edit)", async () => {
       render(
         <AddTestDialog

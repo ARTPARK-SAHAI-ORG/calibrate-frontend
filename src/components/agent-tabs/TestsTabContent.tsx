@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
@@ -32,6 +33,7 @@ import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel } from "@/lib/testTypes";
 import {
   TestTypeFilter,
+  matchesTestTypeFilter,
   type TestTypeFilterValue,
 } from "@/components/TestTypeFilter";
 import {
@@ -54,7 +56,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call" | "conversation";
+  type: "response" | "tool_call" | "conversation" | "general";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -148,11 +150,22 @@ type TestsTabContentProps = {
   // Evaluators tab loads its list once, so the parent uses this to have that
   // tab pick the newly attached evaluator up rather than showing a stale list.
   onAgentDefaultsAttached?: () => void;
+  // Whether the agent under test is a conversation agent or a general one.
+  // Forwarded to AddTestDialog / BulkUploadTestsModal to shape their evaluator
+  // options; both default to "conversation" when unset.
+  agentNature?: "conversation" | "general";
 };
 
 // Attaching a test that already exists is hidden for now: new tests come from
 // Create test and Bulk upload. Flip this to true to bring the control back.
 const SHOW_ADD_EXISTING_TEST = false;
+
+// Which test types carry their own evaluators. "response" and "conversation"
+// are a conversation agent's; "general" is a general agent's single
+// input/output test. Only "tool_call" is judged by its tool calls instead.
+// One place, so the create and update paths cannot drift apart.
+const carriesEvaluators = (type: string) =>
+  type === "response" || type === "conversation" || type === "general";
 
 export function TestsTabContent({
   agentUuid,
@@ -169,6 +182,7 @@ export function TestsTabContent({
   onRunStarted,
   onRunWindowClosed,
   onAgentDefaultsAttached,
+  agentNature,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -229,7 +243,7 @@ export function TestsTabContent({
   const [testsSearchMode, setTestsSearchMode] =
     useState<SearchMode>("contains");
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
-  // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
+  // is LLM response, "tool_call" is Tool Call. The "select all" checkbox keys
   // off `filteredAgentTests`, so this filter also narrows what gets selected.
   const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -549,8 +563,7 @@ export function TestsTabContent({
   // so the select-all checkbox — which keys off `filteredAvailableTests` — only
   // picks rows matching the active type filter and query.
   const filteredAvailableTests = availableTests.filter((test) => {
-    if (dropdownTypeFilter !== "all" && test.type !== dropdownTypeFilter)
-      return false;
+    if (!matchesTestTypeFilter(test.type, dropdownTypeFilter)) return false;
     const q = searchQuery.toLowerCase();
     if (!q) return true;
     return test.name.toLowerCase().includes(q);
@@ -568,7 +581,7 @@ export function TestsTabContent({
   // together (AND). The type filter also constrains the select-all checkbox
   // since it operates on `filteredAgentTests`.
   const filteredAgentTests = agentTests.filter((test) => {
-    if (typeFilter !== "all" && test.type !== typeFilter) return false;
+    if (!matchesTestTypeFilter(test.type, typeFilter)) return false;
     const q = testsSearchQuery.trim();
     if (!q) return true;
     return matchesSearchMode(test.name, q, testsSearchMode);
@@ -605,6 +618,34 @@ export function TestsTabContent({
     });
   };
 
+  // Reads a plain-language message out of a failed link-tests-to-agent
+  // response (POST /agent-tests, or /tests/bulk when it best-effort links
+  // to this agent). The backend rejects the whole batch with a 400 when a
+  // test's type doesn't match the agent's kind (e.g. a general test on a
+  // conversation agent), so we try to recognise that case and word it for a
+  // non-technical reader. Anything else, including a body we cannot read,
+  // uses `fallback` rather than guessing at a mismatch.
+  const readLinkTestsErrorMessage = async (
+    response: Response,
+    fallback: string,
+  ): Promise<string> => {
+    const typeMismatchMessage =
+      "These tests can't be linked to this agent because their type doesn't match the agent's kind.";
+    try {
+      const data = (await response.clone().json()) as { detail?: unknown };
+      const detail = typeof data?.detail === "string" ? data.detail : "";
+      // Only claim a type mismatch when the backend actually says so. An
+      // unreadable body (an HTML 502, a gateway timeout) tells us nothing
+      // about types, and guessing sends the reader off to change test types
+      // over what is really an outage.
+      return /type|interaction|kind|nature|mismatch/i.test(detail)
+        ? typeMismatchMessage
+        : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   // Attach all selected tests to the agent in a single request. The
   // /agent-tests endpoint accepts an array of test_uuids, so a multi-select
   // add is one POST rather than one per test.
@@ -636,7 +677,12 @@ export function TestsTabContent({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to add tests to agent");
+        throw new Error(
+          await readLinkTestsErrorMessage(
+            response,
+            "Failed to add tests to agent",
+          ),
+        );
       }
 
       // Refetch the agent's tests instead of locally splicing them in, so the
@@ -649,6 +695,9 @@ export function TestsTabContent({
       await fetchAgentTests();
     } catch (err) {
       reportError("Error adding tests to agent:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add tests to agent",
+      );
     } finally {
       setIsAddingTests(false);
     }
@@ -681,17 +730,22 @@ export function TestsTabContent({
       }
 
       const evalType = config.evaluation.type;
-      const usesEvaluators =
-        evalType === "response" || evalType === "conversation";
+      const usesEvaluators = carriesEvaluators(evalType);
       const testItem: {
         name: string;
-        conversation_history: TestConfig["history"];
+        input?: string;
+        conversation_history?: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
         tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
         inputs?: Record<string, unknown>;
       } = {
         name: newTestName.trim(),
-        conversation_history: config.history,
+        // Exactly one of the two: a general agent's test holds its single
+        // input, a conversation agent's holds the history. Sending both, or
+        // neither, is rejected by the backend.
+        ...(typeof config.input === "string"
+          ? { input: config.input }
+          : { conversation_history: config.history }),
         ...(config.inputs &&
           Object.keys(config.inputs).length > 0 && { inputs: config.inputs }),
       };
@@ -729,7 +783,9 @@ export function TestsTabContent({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to create test");
+        throw new Error(
+          await readLinkTestsErrorMessage(response, "Failed to create test"),
+        );
       }
 
       // Bulk endpoint creates the test atomically but links it best-effort.
@@ -1067,7 +1123,7 @@ export function TestsTabContent({
       // tool-invocation tests so existing links are left untouched.
       const body: {
         name: string;
-        type: "response" | "tool_call" | "conversation";
+        type: "response" | "tool_call" | "conversation" | "general";
         config: TestConfig;
         evaluators?: EvaluatorRefPayload[];
       } = {
@@ -1075,10 +1131,7 @@ export function TestsTabContent({
         type: config.evaluation.type,
         config: config,
       };
-      if (
-        config.evaluation.type === "response" ||
-        config.evaluation.type === "conversation"
-      ) {
+      if (carriesEvaluators(config.evaluation.type)) {
         body.evaluators = evaluators;
       }
 
@@ -1124,11 +1177,9 @@ export function TestsTabContent({
         );
         return;
       }
-      const prompted =
-        config.evaluation.type === "response" ||
-        config.evaluation.type === "conversation"
-          ? await maybePromptAgentDefaults(evaluators)
-          : false;
+      const prompted = carriesEvaluators(config.evaluation.type)
+        ? await maybePromptAgentDefaults(evaluators)
+        : false;
       if (!prompted) {
         closeTestDialogAfterSave();
       }
@@ -1737,7 +1788,7 @@ export function TestsTabContent({
                     const next = new Set<string>();
                     for (const t of agentTests) {
                       if (!prev.has(t.uuid)) continue;
-                      if (value !== "all" && t.type !== value) continue;
+                      if (!matchesTestTypeFilter(t.type, value)) continue;
                       next.add(t.uuid);
                     }
                     return next;
@@ -2229,6 +2280,7 @@ export function TestsTabContent({
           agentDefaultInputs={agentDefaultInputs}
           agentDefaultInputTypes={agentDefaultInputTypes}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
+          agentNature={agentNature}
           showRunAfterSave={!isConnectionUnverified}
           onRun={() => {
             // Run the already-saved version of the test being edited (the
@@ -2268,6 +2320,7 @@ export function TestsTabContent({
           fetchAgentTests();
         }}
         lockedAgentUuid={agentUuid}
+        agentNature={agentNature}
       />
 
       {/* Test Runner Dialog — one instance for both a just-started run and a
@@ -2313,6 +2366,7 @@ export function TestsTabContent({
         }}
         agentUuid={agentUuid}
         agentName={agentName}
+        agentNature={agentNature}
         tests={benchmarkTestSubset ?? agentTests}
         onBenchmarkCreated={() => onRunStarted?.()}
         agentType={agentType}

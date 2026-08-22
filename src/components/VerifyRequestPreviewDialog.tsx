@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
+import { CopyCodeButton } from "@/components/ui";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -24,6 +25,9 @@ type VerifyRequestPreviewDialogProps = {
   verifySampleResponse?: Record<string, unknown> | null;
   initialInputs?: Record<string, unknown>;
   initialInputTypes?: Record<string, InputFieldType>;
+  /** A general agent is sent one input, so the editor asks for one piece of
+   * text instead of a conversation. */
+  agentNature?: "conversation" | "general";
 };
 
 const DEFAULT_MESSAGES: MessageRow[] = [{ role: "user", content: "Hi" }];
@@ -37,7 +41,9 @@ export function VerifyRequestPreviewDialog({
   verifySampleResponse,
   initialInputs,
   initialInputTypes,
+  agentNature = "conversation",
 }: VerifyRequestPreviewDialogProps) {
+  const isGeneral = agentNature === "general";
   const [messages, setMessages] = useState<MessageRow[]>(DEFAULT_MESSAGES);
   const [emptyIndices, setEmptyIndices] = useState<Set<number>>(new Set());
   const [inputRows, setInputRows] = useState<InputRow[]>([]);
@@ -113,6 +119,17 @@ export function VerifyRequestPreviewDialog({
     onConfirm(messages);
   };
 
+  // What the agent will actually receive, built once so the box and the copy
+  // button can never show different things.
+  const previewBody = {
+    ...(isGeneral
+      ? { input: messages[0]?.content ?? "" }
+      : {
+          messages: messages.map(({ role, content }) => ({ role, content })),
+        }),
+    ...(showInputs ? parsedInputs : {}),
+  };
+
   if (!open) return null;
 
   return (
@@ -129,33 +146,35 @@ export function VerifyRequestPreviewDialog({
         </h2>
         <p className="text-xs md:text-sm text-muted-foreground mb-4">
           This is the sample request body that will be sent to your agent. Edit
-          the messages, add more rows, or change the custom fields before
-          verifying.
+          the {isGeneral ? "input" : "messages, add more rows,"} or change the
+          custom fields before verifying.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
           {/* Left column: message editor */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2">
-              Messages
+              {isGeneral ? "Input" : "Messages"}
             </p>
             <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
               {messages.map((msg, index) => (
                 <div key={index} className="flex items-start gap-2">
-                  <select
-                    value={msg.role}
-                    onChange={(e) =>
-                      handleRoleChange(
-                        index,
-                        e.target.value as MessageRow["role"],
-                      )
-                    }
-                    disabled={isVerifying}
-                    className="h-9 px-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer flex-shrink-0 w-[100px] appearance-none"
-                  >
-                    <option value="user">user</option>
-                    <option value="assistant">assistant</option>
-                  </select>
+                  {!isGeneral && (
+                    <select
+                      value={msg.role}
+                      onChange={(e) =>
+                        handleRoleChange(
+                          index,
+                          e.target.value as MessageRow["role"],
+                        )
+                      }
+                      disabled={isVerifying}
+                      className="h-9 px-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer flex-shrink-0 w-[100px] appearance-none"
+                    >
+                      <option value="user">user</option>
+                      <option value="assistant">assistant</option>
+                    </select>
+                  )}
                   <div className="flex-1">
                     <input
                       type="text"
@@ -164,7 +183,7 @@ export function VerifyRequestPreviewDialog({
                         handleContentChange(index, e.target.value)
                       }
                       disabled={isVerifying}
-                      placeholder="Message content"
+                      placeholder={isGeneral ? "Input" : "Message content"}
                       className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ${
                         emptyIndices.has(index)
                           ? "border-red-500 focus:ring-red-500"
@@ -173,55 +192,59 @@ export function VerifyRequestPreviewDialog({
                     />
                     {emptyIndices.has(index) && (
                       <p className="text-[11px] text-red-500 mt-0.5">
-                        Message cannot be empty
+                        {isGeneral ? "Input" : "Message"} cannot be empty
                       </p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow(index)}
-                    disabled={messages.length <= 1 || isVerifying}
-                    className="w-8 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                  {!isGeneral && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(index)}
+                      disabled={messages.length <= 1 || isVerifying}
+                      className="w-8 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={handleAddRow}
-              disabled={isVerifying}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+            {!isGeneral && (
+              <button
+                type="button"
+                onClick={handleAddRow}
+                disabled={isVerifying}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-              Add message
-            </button>
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+                Add message
+              </button>
+            )}
 
             {showInputs && (
               <div className="mt-4">
@@ -241,19 +264,15 @@ export function VerifyRequestPreviewDialog({
             <p className="text-xs font-medium text-muted-foreground mb-2">
               Request body preview
             </p>
-            <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
-              {JSON.stringify(
-                {
-                  messages: messages.map(({ role, content }) => ({
-                    role,
-                    content,
-                  })),
-                  ...(showInputs ? parsedInputs : {}),
-                },
-                null,
-                2,
-              )}
-            </pre>
+            <div className="relative">
+              <CopyCodeButton
+                value={JSON.stringify(previewBody, null, 2)}
+                label="Copy the request body"
+              />
+              <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
+                {JSON.stringify(previewBody, null, 2)}
+              </pre>
+            </div>
           </div>
         </div>
 
@@ -265,9 +284,15 @@ export function VerifyRequestPreviewDialog({
                 <p className="text-xs font-medium text-muted-foreground">
                   Your agent responded with:
                 </p>
-                <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
-                  {JSON.stringify(verifySampleResponse, null, 2)}
-                </pre>
+                <div className="relative">
+                  <CopyCodeButton
+                    value={JSON.stringify(verifySampleResponse, null, 2)}
+                    label="Copy what your agent responded with"
+                  />
+                  <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
+                    {JSON.stringify(verifySampleResponse, null, 2)}
+                  </pre>
+                </div>
               </div>
             )}
           </div>

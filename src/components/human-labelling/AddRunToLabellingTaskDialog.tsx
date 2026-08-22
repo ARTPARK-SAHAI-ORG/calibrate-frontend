@@ -21,6 +21,7 @@ import { Select } from "@/components/ui/Select";
 // (`targetTaskTypeForSource`), never chosen by the user.
 export const SUPPORTED_TARGET_TASK_TYPES = [
   "llm",
+  "llm-general",
   "stt",
   "tts",
   "conversation",
@@ -72,7 +73,8 @@ export type ConversationLabellingResult = {
  */
 export type TraceLabellingItem = {
   name: string;
-  input: unknown[];
+  /** Turns for a conversational agent, plain text for a general one. */
+  input: unknown[] | string;
   output: { response?: string | null; tool_calls?: unknown[] | null };
 };
 
@@ -117,6 +119,10 @@ export type AddRunToLabellingTaskSource =
       agentUuid: string;
       traces: TraceLabellingItem[];
       evaluators?: SourceEvaluatorRef[];
+      /** A general agent answers one input at a time, so its traces are
+       * labelled as an input and the output it produced, not as a
+       * conversation. */
+      agentNature?: "conversation" | "general";
     };
 
 /** The single task type each source kind targets. */
@@ -130,7 +136,9 @@ export function targetTaskTypeForSource(
       return "tts";
     case "simulation_run":
       return "conversation";
-    // test_run / benchmark_run / traces all target "llm".
+    case "traces":
+      return source.agentNature === "general" ? "llm-general" : "llm";
+    // test_run / benchmark_run both target "llm".
     default:
       return "llm";
   }
@@ -428,6 +436,26 @@ export function buildItemsFromSource(
       return { items, skippedCount, evaluatorUuids };
     }
     case "traces": {
+      // A general agent's trace is one input and the output it produced, which
+      // is what an LLM output task holds. Nothing is judged yet, so there is
+      // no reasoning or score to carry over.
+      if (source.agentNature === "general") {
+        for (const t of source.traces) {
+          const input = typeof t.input === "string" ? t.input : "";
+          const output = t.output?.response ?? "";
+          if (!input.trim() || !output.trim()) {
+            skippedCount += 1;
+            continue;
+          }
+          items.push({
+            payload: { name: t.name, input, output, evaluator_variables: {} },
+          });
+        }
+        for (const ev of source.evaluators ?? []) {
+          if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+        }
+        return { items, skippedCount, evaluatorUuids };
+      }
       for (const t of source.traces) {
         const built = buildOneItem({
           test_case: {

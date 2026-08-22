@@ -11,6 +11,7 @@ export type Agent = {
   uuid: string;
   name: string;
   type?: "agent" | "connection";
+  interaction_type?: "conversation" | "general";
   verified?: boolean;
   // True for connection agents that have custom fields (backend `default_inputs`).
   hasDefaultInputs?: boolean;
@@ -42,6 +43,8 @@ function formatAgents(data: unknown): Agent[] {
         : true,
     hasDefaultInputs:
       agent.type === "connection" && agentHasDefaultInputs(agent),
+    interaction_type:
+      agent.interaction_type === "general" ? "general" : "conversation",
   }));
 }
 
@@ -55,6 +58,10 @@ type AgentPickerProps = {
   // When true, connection agents with custom fields are shown but not
   // selectable (text simulation does not support them).
   disableCustomFieldConnections?: boolean;
+  // When true, general agents are shown but not selectable. A general agent
+  // takes one input and produces one output, so there is no conversation to
+  // simulate.
+  disableGeneralAgents?: boolean;
 };
 
 function UnverifiedPill() {
@@ -118,6 +125,7 @@ export function AgentPicker({
   className = "",
   disabled = false,
   disableCustomFieldConnections = false,
+  disableGeneralAgents = false,
 }: AgentPickerProps) {
   const backendAccessToken = useAccessToken();
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -178,11 +186,16 @@ export function AgentPicker({
       loadingLabel="Loading agents"
       emptyLabel="No agents found"
       isItemDisabled={
-        disableCustomFieldConnections
-          ? (a) =>
-              a.hasDefaultInputs
-                ? "Text simulation is not supported for connections with custom fields"
-                : null
+        disableCustomFieldConnections || disableGeneralAgents
+          ? (a) => {
+              if (disableGeneralAgents && a.interaction_type === "general") {
+                return "This agent answers one input at a time, so there is no conversation to simulate";
+              }
+              if (disableCustomFieldConnections && a.hasDefaultInputs) {
+                return "Text simulation is not supported for connections with custom fields";
+              }
+              return null;
+            }
           : undefined
       }
       searchPlaceholder="Search agents"

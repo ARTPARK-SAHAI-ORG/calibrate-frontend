@@ -40,10 +40,14 @@ import { reportError } from "@/lib/reportError";
  */
 export function TracesTabContent({
   agentUuid,
+  agentNature = "conversation",
   onTestsCreated,
   onViewTests,
 }: {
   agentUuid: string;
+  /** A general agent answers one input at a time, so the sending code shows a
+   * single piece of text rather than a conversation history. */
+  agentNature?: "conversation" | "general";
   /** Called after traces are turned into tests, so the Tests tab reloads. */
   onTestsCreated: () => void;
   /** Opens the Tests tab, where the created tests are listed. */
@@ -90,25 +94,40 @@ export function TracesTabContent({
     accessToken,
   });
 
-  // Add selected traces as tests. A recorded response always becomes a response
-  // test; tool-call tests are used only when every selected trace has calls and
-  // no text response.
+  // Add selected traces as tests. A recorded response becomes a test that
+  // judges what the agent produced, of the kind this agent's traces carry;
+  // tool-call tests are used only when every selected trace has calls and no
+  // text response.
+  const isGeneral = agentNature === "general";
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
   const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
+  // A trace either replied or only called a tool, and the two become different
+  // kinds of test. One selection makes one kind, so a mix is refused rather
+  // than quietly turned into the wrong thing.
+  const toolCallOnlyCount = selectedTraces.filter(
+    (trace) => !trace.response_preview && trace.tool_call_count > 0,
+  ).length;
+  const isMixedSelection =
+    toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
   const selectedTestType =
-    selectedTraces.length > 0 &&
-    selectedTraces.every(
-      (trace) => !trace.response_preview && trace.tool_call_count > 0,
-    )
+    selectedTraces.length > 0 && toolCallOnlyCount === selectedTraces.length
       ? "tool_call"
-      : "response";
+      : isGeneral
+        ? "general"
+        : "response";
 
-  // Annotators score the agent's reply, so a trace that only made tool calls
-  // has nothing to label and is left out of what is submitted.
-  const labellableUuids = selectedTraces
-    .filter((trace) => !!trace.response_preview?.trim())
-    .map((trace) => trace.uuid);
+  // Annotators score what the agent said, and a tool call is not that, so a
+  // trace carrying one cannot go for labelling. One in the selection stops the
+  // whole submission rather than being dropped without saying so.
+  const hasToolCallTrace = selectedTraces.some(
+    (trace) => trace.tool_call_count > 0,
+  );
+  const labellableUuids = hasToolCallTrace
+    ? []
+    : selectedTraces
+        .filter((trace) => !!trace.response_preview?.trim())
+        .map((trace) => trace.uuid);
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -183,7 +202,10 @@ export function TracesTabContent({
           name: trace.uuid,
           // The agent's own instructions are not part of the conversation the
           // annotators read, so they are never stored with the item.
-          input: (trace.input ?? []).filter((turn) => turn.role !== "system"),
+          input:
+            typeof trace.input === "string"
+              ? trace.input
+              : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
         })),
       );
@@ -298,7 +320,11 @@ export function TracesTabContent({
       {!hasLoaded ? (
         <LoadingState />
       ) : showEmptyState ? (
-        <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
+        <TracesEmptyState
+          agentUuid={agentUuid}
+          agentNature={agentNature}
+          onCheckForTraces={refetch}
+        />
       ) : (
         <div className="space-y-3">
           {/* Above the no-match message too: rows ticked before the search was
@@ -323,7 +349,15 @@ export function TracesTabContent({
                   <Button
                     size="sm"
                     variant="primary"
-                    onClick={() => setConvertOpen(true)}
+                    onClick={() => {
+                      if (isMixedSelection) {
+                        toast.error(
+                          "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+                        );
+                        return;
+                      }
+                      setConvertOpen(true);
+                    }}
                   >
                     Add to tests ({selected.size})
                   </Button>
@@ -331,9 +365,11 @@ export function TracesTabContent({
                     <SubmitForLabellingButton
                       count={labellableUuids.length}
                       emptyMessage={
-                        selected.size > 0
-                          ? "Labelling traces that only made tool calls is not supported yet."
-                          : "Select at least one trace to submit for labelling."
+                        selected.size === 0
+                          ? "Select at least one trace to submit for labelling."
+                          : hasToolCallTrace
+                            ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
+                            : "Labelling traces that only made tool calls is not supported yet."
                       }
                       onOpen={() => setEvaluatorStepOpen(true)}
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
@@ -399,6 +435,7 @@ export function TracesTabContent({
         isOpen={codeOpen}
         onClose={() => setCodeOpen(false)}
         agentUuid={agentUuid}
+        agentNature={agentNature}
       />
 
       <TraceDetailDialog
@@ -420,6 +457,7 @@ export function TracesTabContent({
         traceUuids={Array.from(selected)}
         testType={selectedTestType}
         agentUuid={agentUuid}
+        agentNature={agentNature}
         onConverted={(result) => {
           setConvertOpen(false);
           deletion.clearSelection();
@@ -443,6 +481,7 @@ export function TracesTabContent({
           isOpen
           onClose={() => setEvaluatorStepOpen(false)}
           agentUuid={agentUuid}
+          agentNature={agentNature}
           accessToken={accessToken}
           onChosen={prepareLabelling}
         />
@@ -457,6 +496,7 @@ export function TracesTabContent({
             agentUuid,
             traces: labellingTraces,
             evaluators: labellingEvaluators,
+            agentNature,
           }}
           // The dialog stays open on its own confirmation, which is where the
           // reader opens the task or closes it, same as every other submit for

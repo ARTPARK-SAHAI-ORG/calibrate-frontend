@@ -74,7 +74,7 @@ jest.mock("../agent-tabs", () => ({
   ),
   TestsTabContent: (props: any) => (
     <div data-testid="tests-tab-content">
-      TestsTabContent-{props.agentType}
+      TestsTabContent-{props.agentType}-{props.agentNature}
       <button onClick={() => props.onAgentDefaultsAttached?.()}>
         AttachDefaultEvaluator
       </button>
@@ -89,7 +89,7 @@ jest.mock("../agent-tabs", () => ({
     const mountId = React.useRef(Math.random()).current;
     return (
       <div data-testid="evaluators-tab-content" data-mount-id={mountId}>
-        EvaluatorsTabContent-{props.agentUuid}
+        EvaluatorsTabContent-{props.agentUuid}-{props.agentNature}
       </div>
     );
   },
@@ -302,7 +302,7 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
-      "TestsTabContent-agent",
+      "TestsTabContent-agent-conversation",
     );
     expectVisibleTab("tests-tab-content", "tools-tab-content");
 
@@ -323,6 +323,42 @@ describe("AgentDetail", () => {
     expectVisibleTab("agent-tab-content", "settings-tab-content");
   });
 
+  it("passes the agent's nature down to the Tests and Evaluators tabs", async () => {
+    const generalAgent = { ...buildAgent, uuid: "agent-3", interaction_type: "general" };
+    mockFetchSequenceForAgent(generalAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={generalAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("Tests"));
+    expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
+      "TestsTabContent-agent-general",
+    );
+
+    await user.click(screen.getByText("Evaluators"));
+    expect(screen.getByTestId("evaluators-tab-content")).toHaveTextContent(
+      "EvaluatorsTabContent-agent-3-general",
+    );
+  });
+
+  it("defaults the agent's nature to conversation when interaction_type is absent", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("Evaluators"));
+    expect(screen.getByTestId("evaluators-tab-content")).toHaveTextContent(
+      "EvaluatorsTabContent-agent-1-conversation",
+    );
+  });
+
   it("switches tabs on click for a connection agent", async () => {
     mockFetchSequenceForAgent(connectionAgent);
     const user = setupUser();
@@ -340,7 +376,7 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
-      "TestsTabContent-connection",
+      "TestsTabContent-connection-conversation",
     );
     expectVisibleTab("tests-tab-content", "traces-tab-content");
 

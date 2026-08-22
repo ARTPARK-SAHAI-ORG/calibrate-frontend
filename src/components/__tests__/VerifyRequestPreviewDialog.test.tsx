@@ -471,4 +471,33 @@ describe("VerifyRequestPreviewDialog", () => {
     expect(screen.getByDisplayValue("user")).toBeDisabled();
     expect(screen.getByText("Add message")).toBeDisabled();
   });
+
+  it("asks for one input and previews it for a general agent", async () => {
+    const user = setupUser();
+    const onConfirm = jest.fn();
+    render(
+      <VerifyRequestPreviewDialog
+        open
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        isVerifying={false}
+        agentNature="general"
+      />,
+    );
+
+    // One box for the input, and none of the conversation controls.
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.queryByText("Messages")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add message" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("user")).not.toBeInTheDocument();
+
+    // The preview shows what the agent will actually receive.
+    expect(screen.getByText(/"input": "Hi"/)).toBeInTheDocument();
+    expect(screen.queryByText(/"messages"/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Send & Verify"));
+    expect(onConfirm).toHaveBeenCalledWith([{ role: "user", content: "Hi" }]);
+  });
 });

@@ -18,7 +18,15 @@ export type SnippetValues = {
   apiKey: string;
   /** When false (default), optional ids and metadata are left out of the code. */
   includeOptional?: boolean;
+  /** A general agent answers one input at a time, so its input is a single
+   * piece of text rather than a conversation history. */
+  agentNature?: AgentNature;
 };
+
+export type AgentNature = "conversation" | "general";
+
+/** The one input every snippet uses, so all three read the same. */
+const EXAMPLE_INPUT = "When is the next vaccination?";
 
 const OPTIONAL_PYTHON = `        # Optional
         "message_id": "your-message-id",
@@ -35,7 +43,17 @@ function curl({
   agentUuid,
   apiKey,
   includeOptional = false,
+  agentNature = "conversation",
 }: SnippetValues): string {
+  const inputBlock =
+    agentNature === "general"
+      ? `"input": "${EXAMPLE_INPUT}"`
+      : `"input": [
+      {
+        "role": "user",
+        "content": "${EXAMPLE_INPUT}"
+      }
+    ]`;
   const optionalBlock = includeOptional
     ? `,
     "message_id": "your-message-id",
@@ -47,12 +65,7 @@ function curl({
   -H "Content-Type: application/json" \\
   -d '{
     "agent_id": "${agentUuid}",
-    "input": [
-      {
-        "role": "user",
-        "content": "When is the next vaccination?"
-      }
-    ],
+    ${inputBlock},
     "output": {
       "response": "At 14 weeks, for OPV and DPT.",
       "tool_calls": [
@@ -72,19 +85,24 @@ function python({
   agentUuid,
   apiKey,
   includeOptional = false,
+  agentNature = "conversation",
 }: SnippetValues): string {
+  const inputBlock =
+    agentNature === "general"
+      ? `"input": "${EXAMPLE_INPUT}"`
+      : `"input": [
+            {
+                "role": "user",
+                "content": "${EXAMPLE_INPUT}",
+            }
+        ]`;
   const optionalBlock = includeOptional ? `,\n${OPTIONAL_PYTHON}` : "";
   return `requests.post(
     "${backendUrl}/traces",
     headers={"X-API-Key": "${apiKey}"},
     json={
         "agent_id": "${agentUuid}",
-        "input": [
-            {
-                "role": "user",
-                "content": "When is the next vaccination?",
-            }
-        ],
+        ${inputBlock},
         "output": {
             "response": "At 14 weeks, for OPV and DPT.",
             "tool_calls": [
@@ -103,7 +121,17 @@ function javascript({
   agentUuid,
   apiKey,
   includeOptional = false,
+  agentNature = "conversation",
 }: SnippetValues): string {
+  const inputBlock =
+    agentNature === "general"
+      ? `input: "${EXAMPLE_INPUT}"`
+      : `input: [
+      {
+        role: "user",
+        content: "${EXAMPLE_INPUT}",
+      },
+    ]`;
   const optionalBlock = includeOptional ? `,\n${OPTIONAL_JAVASCRIPT}` : "";
   return `await fetch("${backendUrl}/traces", {
   method: "POST",
@@ -113,12 +141,7 @@ function javascript({
   },
   body: JSON.stringify({
     agent_id: "${agentUuid}",
-    input: [
-      {
-        role: "user",
-        content: "When is the next vaccination?",
-      },
-    ],
+    ${inputBlock},
     output: {
       response: "At 14 weeks, for OPV and DPT.",
       tool_calls: [
@@ -145,42 +168,49 @@ export function buildSnippet(
   return BUILDERS[language](values);
 }
 
-/** What each part of the request means, in the order it appears. */
-export const SNIPPET_FIELDS: {
+export type SnippetField = {
   name: string;
   meaning: string;
   optional?: boolean;
-}[] = [
-  {
-    name: "agent_id",
-    meaning: "Identifier for the agent to which this trace belongs",
-  },
-  {
-    name: "input",
-    meaning:
-      "The input given to the agent. If the input is a conversation with many turns, send the entire conversation history as input.",
-  },
-  {
-    name: "output",
-    meaning:
-      "What the agent produced: the text reply in \"response\", the tools it called in \"tool_calls\", or both. Send at least one of them and leave the other out.",
-  },
-  {
-    name: "message_id",
-    optional: true,
-    meaning:
-      "The unique input id that you can use to connect this trace to your internal ID tracking system.",
-  },
-  {
-    name: "conversation_id",
-    optional: true,
-    meaning:
-      "The unique id of the conversation that this trace belongs to. Use the same id for all turns in the same conversation.",
-  },
-  {
-    name: "metadata",
-    optional: true,
-    meaning:
-      "Additional metadata about the trace as key-value pairs",
-  },
-];
+};
+
+/** What each part of the request means, in the order it appears. */
+export function snippetFields(
+  agentNature: AgentNature = "conversation",
+): SnippetField[] {
+  return [
+    {
+      name: "agent_id",
+      meaning: "Identifier for the agent to which this trace belongs",
+    },
+    {
+      name: "input",
+      meaning:
+        agentNature === "general"
+          ? "The input given to the agent, as a single piece of text."
+          : "The input given to the agent. If the input is a conversation with many turns, send the entire conversation history as input.",
+    },
+    {
+      name: "output",
+      meaning:
+        'What the agent produced: the text reply in "response", the tools it called in "tool_calls", or both. Send at least one of them and leave the other out.',
+    },
+    {
+      name: "message_id",
+      optional: true,
+      meaning:
+        "The unique input id that you can use to connect this trace to your internal ID tracking system.",
+    },
+    {
+      name: "conversation_id",
+      optional: true,
+      meaning:
+        "The unique id of the conversation that this trace belongs to. Use the same id for all turns in the same conversation.",
+    },
+    {
+      name: "metadata",
+      optional: true,
+      meaning: "Additional metadata about the trace as key-value pairs",
+    },
+  ];
+}

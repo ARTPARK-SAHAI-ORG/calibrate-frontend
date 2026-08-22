@@ -29,7 +29,6 @@ jest.mock("../../../../lib/api", () => ({
 import {
   A,
   buildFirstEvalTour,
-  CANONICAL_CORRECTNESS_PROMPT,
   fillSystemPromptResilient,
   pickFreeName,
   resolveEvaluatorPlan,
@@ -144,160 +143,24 @@ describe("first-eval tour step actions", () => {
     jest.useRealTimers();
   });
 
-  it("recreates Correctness when the workspace deleted it", async () => {
-    const calls: { url: string; init?: RequestInit }[] = [];
-    (global.fetch as jest.Mock).mockImplementation(
-      async (url: string, init?: RequestInit) => {
-        calls.push({ url, init });
-        if (url.includes("/evaluators/default-prompt")) {
-          return {
-            ok: true,
-            json: async () => ({
-              system_prompt: "Judge against {{criteria}}",
-              judge_model: "openai/gpt-5.4-mini",
-              output_type: "binary",
-            }),
-          };
-        }
-        return { ok: true, json: async () => ({ uuid: "new-correct" }) };
-      },
-    );
-
-    const tour = buildTour("tok", {
-      correctnessName: null,
-      secondEvaluatorName: null,
+  it("drives the test-type picker's two steps by anchor, not by copy", async () => {
+    const tour = buildTour("tok");
+    await stepByTitle(tour, "Pick what to test").action?.();
+    // Pick the reply/answer type, then confirm with Next: clicking the option
+    // alone only previews it, so both are needed to reach the editor. Anchored
+    // so the picker's wording can change without stalling the tour.
+    expect(mockClickElement).toHaveBeenCalledWith(A.testTypeNextReply, {
+      timeout: 8000,
     });
-    await stepByTitle(tour, "Add an evaluator").prepare?.();
-
-    const post = calls.find(
-      (c) => c.init?.method === "POST" && c.url.endsWith("/evaluators"),
-    );
-    expect(post).toBeDefined();
-    const body = JSON.parse(post!.init!.body as string);
-    expect(body.name).toBe("Correctness");
-    expect(body.evaluator_type).toBe("llm");
-    expect(body.version.judge_model).toBe("openai/gpt-5.4-mini");
-    expect(body.version.variables[0].name).toBe("criteria");
-    // The prompt must reference the {{criteria}} variable, not a placeholder.
-    expect(body.version.system_prompt).toContain("{{criteria}}");
-  });
-
-  it("recreates Correctness under a FREE name when one already exists", async () => {
-    // A user replaced the default with their own "Correctness" (no default slug),
-    // so the plan reports none; we must create ours under a non-colliding name
-    // and pick THAT one — never the user's.
-    const calls: { url: string; init?: RequestInit }[] = [];
-    (global.fetch as jest.Mock).mockImplementation(
-      async (url: string, init?: RequestInit) => {
-        calls.push({ url, init });
-        if (url.includes("/evaluators/default-prompt")) {
-          return {
-            ok: true,
-            json: async () => ({
-              system_prompt: "Adhere to {{criteria}}",
-              judge_model: "m",
-            }),
-          };
-        }
-        if (init?.method === "POST") {
-          return { ok: true, json: async () => ({ uuid: "new" }) };
-        }
-        // GET /evaluators list: the workspace already has a "Correctness".
-        return { ok: true, json: async () => ({ items: [{ name: "Correctness" }] }) };
-      },
-    );
-
-    const tour = buildTour("tok", {
-      correctnessName: null,
-      secondEvaluatorName: null,
+    expect(mockClickElement).toHaveBeenCalledWith(A.testTypeNext, {
+      timeout: 8000,
     });
-    await stepByTitle(tour, "Add an evaluator").prepare?.();
-
-    // Picker holds the user's broken "Correctness" AND our created "Correctness (2)".
-    const dialog = document.createElement("div");
-    dialog.setAttribute("data-tour", "add-evaluators-dialog");
-    const labelRow = (name: string) => {
-      const el = document.createElement("label");
-      el.innerHTML = `<input type="checkbox" /><span>${name}</span><span>LLM reply</span>`;
-      return el;
-    };
-    const userRow = labelRow("Correctness");
-    const oursRow = labelRow("Correctness (2)");
-    dialog.append(userRow, oursRow);
-    document.body.appendChild(dialog);
-
-    await stepByTitle(tour, "Choose what to check").action?.();
-
-    const checked = (row: HTMLElement) =>
-      row.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked;
-    // We tick OUR created "Correctness (2)", never the user's "Correctness".
-    expect(checked(oursRow)).toBe(true);
-    expect(checked(userRow)).toBe(false);
-
-    const post = calls.find(
-      (c) => c.init?.method === "POST" && c.url.endsWith("/evaluators"),
-    );
-    expect(JSON.parse(post!.init!.body as string).name).toBe("Correctness (2)");
-  });
-
-  it("does not recreate Correctness when it already exists", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({}),
-    });
-    const tour = buildTour("tok"); // plan already has Correctness
-    await stepByTitle(tour, "Add an evaluator").prepare?.();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("skips the POST when the default-prompt gives no judge model", async () => {
-    const calls: { url: string; init?: RequestInit }[] = [];
-    (global.fetch as jest.Mock).mockImplementation(
-      async (url: string, init?: RequestInit) => {
-        calls.push({ url, init });
-        // default-prompt responds but without a judge_model.
-        return { ok: true, json: async () => ({ system_prompt: "x {{criteria}}" }) };
-      },
-    );
-    const tour = buildTour("tok", {
-      correctnessName: null,
-      secondEvaluatorName: null,
-    });
-    await stepByTitle(tour, "Add an evaluator").prepare?.();
-    // No create POST without a judge model (the backend would reject it).
-    expect(
-      calls.find((c) => c.init?.method === "POST"),
-    ).toBeUndefined();
-  });
-
-  it("does not recreate Correctness without an access token", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({}),
-    });
-    const tour = buildTour(null, {
-      correctnessName: null,
-      secondEvaluatorName: null,
-    });
-    await stepByTitle(tour, "Add an evaluator").prepare?.();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("swallows a failure while recreating Correctness", async () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new Error("boom"));
-    const tour = buildTour("tok", {
-      correctnessName: null,
-      secondEvaluatorName: null,
-    });
-    await expect(
-      stepByTitle(tour, "Add an evaluator").prepare?.(),
-    ).resolves.toBeUndefined();
   });
 
   it("no-ops the pick when the picker dialog is absent", async () => {
     const tour = buildTour();
     await expect(
-      stepByTitle(tour, "Choose what to check").action?.(),
+      stepByTitle(tour, "Pick it in the list").action?.(),
     ).resolves.toBeUndefined();
   });
 
@@ -308,29 +171,28 @@ describe("first-eval tour step actions", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("ticks correctness and a second evaluator in the picker", async () => {
+  it("ticks only the second evaluator, never the already-attached one", async () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("data-tour", "add-evaluators-dialog");
-    const correctness = document.createElement("label");
+    const correctness = document.createElement("div");
     correctness.innerHTML =
-      '<input type="checkbox" /><span>Correctness</span><span>LLM reply</span>';
-    const tone = document.createElement("label");
-    tone.innerHTML =
-      '<input type="checkbox" /><span>Politeness</span><span>LLM reply</span>';
-    dialog.append(correctness, tone);
+      '<input type="checkbox" aria-label="Select Correctness" /><span>Correctness</span>';
+    const second = document.createElement("div");
+    second.innerHTML =
+      '<input type="checkbox" aria-label="Select Politeness" /><span>Politeness</span>';
+    dialog.append(correctness, second);
     document.body.appendChild(dialog);
 
     const tour = buildTour();
-    await stepByTitle(tour, "Choose what to check").action?.();
+    await stepByTitle(tour, "Pick it in the list").action?.();
+    expect(
+      second.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+    ).toBe(true);
+    // Correctness is already on the agent, so the tour must not touch it.
     expect(
       correctness.querySelector<HTMLInputElement>('input[type="checkbox"]')
         ?.checked,
-    ).toBe(true);
-
-    await stepByTitle(tour, "Add another check").action?.();
-    expect(
-      tone.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("fills a demo test scenario and criteria", async () => {
@@ -432,45 +294,59 @@ describe("resolveEvaluatorPlan", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  // Reuse compares against the hard-coded canonical prompt.
-  const CANON = CANONICAL_CORRECTNESS_PROMPT;
+  // The plan takes the built-in Correctness (by slug) as the first check, and
+  // as the second an existing DEFAULT LLM-reply evaluator (Conciseness first)
+  // whose live judge prompt has the `{{criteria}}` slot the tour writes into.
+  // Nothing is ever created.
   const ITEMS = [
     {
       uuid: "ev-correct",
       name: "Correctness",
       evaluator_type: "llm",
       slug: "default-llm-next-reply",
-      live_version: { variables: [{ name: "criteria" }] },
+      is_default: true,
+    },
+    {
+      uuid: "ev-faith",
+      name: "Faithfulness",
+      evaluator_type: "llm",
+      is_default: true,
     },
     {
       uuid: "ev-conc",
-      name: "Reply Conciseness",
+      name: "Conciseness",
       evaluator_type: "llm",
-      slug: "reply-conciseness",
-      live_version: { variables: [{ name: "criteria" }] },
+      is_default: true,
+    },
+    {
+      uuid: "ev-mine",
+      name: "My custom judge",
+      evaluator_type: "llm",
+      is_default: false,
+      owner_user_id: "u1",
     },
   ];
 
-  // Per-URL mock: the list, the canonical default-prompt, and each evaluator's
-  // detail keyed by uuid (so Correctness and the second can be tested apart).
-  function mockEvaluatorFetches(
-    promptByUuid: Record<string, string>,
+  // Judge prompts by evaluator uuid. Anything not named here answers with a
+  // fixed rubric, i.e. no `{{criteria}}` slot for the tour to write into.
+  const CRITERIA_PROMPT = "Grade the reply against:\n\n{{criteria}}";
+  const FIXED_PROMPT = "Grade whether the reply is faithful to the source.";
+
+  function mockList(
     items: unknown[] = ITEMS,
+    prompts: Record<string, string> = {
+      "ev-conc": CRITERIA_PROMPT,
+      "ev-faith": FIXED_PROMPT,
+    },
   ) {
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-      if (url.includes("/evaluators/default-prompt")) {
-        return {
-          ok: true,
-          json: async () => ({ system_prompt: CANON, judge_model: "m" }),
-        };
-      }
-      const m = url.match(/\/evaluators\/([^/?]+)$/);
-      if (m) {
+      const detail = /\/evaluators\/([^/?]+)$/.exec(url)?.[1];
+      if (detail) {
         return {
           ok: true,
           json: async () => ({
-            versions: [{ uuid: "v1", system_prompt: promptByUuid[m[1]] ?? "" }],
             live_version_index: 0,
+            versions: [{ uuid: "v1", system_prompt: prompts[detail] ?? FIXED_PROMPT }],
           }),
         };
       }
@@ -478,48 +354,89 @@ describe("resolveEvaluatorPlan", () => {
     });
   }
 
-  it("reuses Correctness and the second when their live prompts qualify", async () => {
-    mockEvaluatorFetches({ "ev-correct": CANON, "ev-conc": CANON });
+  it("uses the existing Correctness and prefers Conciseness as the second", async () => {
+    mockList();
     expect(await resolveEvaluatorPlan("tok")).toEqual({
       correctnessName: "Correctness",
-      secondEvaluatorName: "Reply Conciseness",
+      secondEvaluatorName: "Conciseness",
     });
   });
 
-  it("reuses a tour-created Correctness (2) with no slug and no listed variables", async () => {
-    // A previous run created this: no default slug, and the LIST omits its
-    // variables — but its live prompt matches the canonical, so it must be reused
-    // (via the prompt check) rather than creating Correctness (3).
-    mockEvaluatorFetches({ "ev-c2": CANON }, [
-      { uuid: "ev-c2", name: "Correctness (2)", evaluator_type: "llm" },
-    ]);
-    expect((await resolveEvaluatorPlan("tok")).correctnessName).toBe(
-      "Correctness (2)",
+  it("uses a Correctness-named evaluator as-is when the default slug is gone", async () => {
+    mockList(
+      [
+        { uuid: "ev-c", name: "Correctness", evaluator_type: "llm", is_default: false, owner_user_id: "u1" },
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": CRITERIA_PROMPT },
+    );
+    expect(await resolveEvaluatorPlan("tok")).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: "Faithfulness",
+    });
+  });
+
+  it("takes another default evaluator when no Conciseness exists", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": CRITERIA_PROMPT },
+    );
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBe(
+      "Faithfulness",
     );
   });
 
-  it("recreates (correctnessName null) when the reused prompt differs", async () => {
-    // Slug + declared criteria variable, but the live prompt still has the
-    // placeholder — not the canonical prompt, so it must not be reused.
-    mockEvaluatorFetches({
-      "ev-correct": "You need to evaluate:\n\n<ENTER CRITERIA HERE>",
-      "ev-conc": CANON,
-    });
-    const plan = await resolveEvaluatorPlan("tok");
-    expect(plan.correctnessName).toBeNull();
-    expect(plan.secondEvaluatorName).toBe("Reply Conciseness");
+  // The tour overwrites the second check's criteria so every demo answer
+  // passes. An evaluator with a fixed rubric cannot be told what to grade, so
+  // it is skipped rather than left to fail an answer the tour calls a pass.
+  it("skips a second evaluator whose judge prompt has no criteria slot", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": FIXED_PROMPT },
+    );
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBeNull();
   });
 
-  it("drops the second check when its live prompt has no criteria variable", async () => {
-    // The LIST would say it has a variable, but the real prompt does not use
-    // {{criteria}} — so the tour cannot control it and must not attach it.
-    mockEvaluatorFetches({
-      "ev-correct": CANON,
-      "ev-conc": "Judge conciseness. No variable here.",
-    });
-    const plan = await resolveEvaluatorPlan("tok");
-    expect(plan.correctnessName).toBe("Correctness");
-    expect(plan.secondEvaluatorName).toBeNull();
+  it("falls through the fixed-rubric ones to a default it can control", async () => {
+    mockList(
+      [
+        ITEMS[0],
+        { uuid: "ev-faith", name: "Faithfulness", evaluator_type: "llm", is_default: true },
+        { uuid: "ev-polite", name: "Politeness", evaluator_type: "llm", is_default: true },
+      ],
+      { "ev-faith": FIXED_PROMPT, "ev-polite": CRITERIA_PROMPT },
+    );
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBe(
+      "Politeness",
+    );
+  });
+
+  it("checks at most a handful of candidates", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      uuid: `ev-${i}`,
+      name: `Judge ${i}`,
+      evaluator_type: "llm",
+      is_default: true,
+    }));
+    mockList([ITEMS[0], ...many], {});
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBeNull();
+    // One list request plus at most six detail requests.
+    expect((global.fetch as jest.Mock).mock.calls.length).toBeLessThanOrEqual(7);
+  });
+
+  it("never offers a user-owned evaluator or a non-llm default as the second", async () => {
+    mockList([
+      ITEMS[0],
+      { uuid: "ev-mine", name: "My custom judge", evaluator_type: "llm", is_default: false, owner_user_id: "u1" },
+      { uuid: "ev-conv", name: "Coherence", evaluator_type: "conversation", is_default: true },
+    ]);
+    expect((await resolveEvaluatorPlan("tok")).secondEvaluatorName).toBeNull();
   });
 
   it("falls back when the request is not ok", async () => {

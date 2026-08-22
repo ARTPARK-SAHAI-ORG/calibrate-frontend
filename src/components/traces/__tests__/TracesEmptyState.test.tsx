@@ -34,10 +34,11 @@ beforeEach(() => {
   jest.mocked(toast).mockReset();
 });
 
-function setup(agentUuid = "ag-1") {
+function setup(agentUuid = "ag-1", agentNature?: "conversation" | "general") {
   return render(
     <TracesEmptyState
       agentUuid={agentUuid}
+      agentNature={agentNature}
       onCheckForTraces={onCheckForTraces}
     />,
   );
@@ -100,15 +101,16 @@ it("lists all three steps, but only opens the one to do now", async () => {
   ).toBeInTheDocument();
 });
 
-it("will not open a step you have not reached", async () => {
+it("opens the last step straight away, without doing the first two", async () => {
   const user = setupUser();
   setup();
 
-  // Step three is greyed out until step two is done: clicking does nothing.
+  // Someone who already sends traces can come here just to look for them.
   await user.click(screen.getByText("Check that it arrived"));
+
   expect(
-    screen.queryByRole("button", { name: "Check for traces" }),
-  ).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Check for traces" }),
+  ).toBeInTheDocument();
 });
 
 it("shows an API key callout beside the snippet when no key is filled in", async () => {
@@ -118,9 +120,10 @@ it("shows an API key callout beside the snippet when no key is filled in", async
   await user.click(screen.getByText("Send your first trace"));
 
   expect(snippetText()).toContain("YOUR_API_KEY");
-  expect(
-    screen.getByRole("link", { name: "API keys" }),
-  ).toHaveAttribute("href", "/workspace-settings?tab=api-keys");
+  expect(screen.getByRole("link", { name: "API keys" })).toHaveAttribute(
+    "href",
+    "/workspace-settings?tab=api-keys",
+  );
 });
 
 it("hides the API key callout once a key is filled in", async () => {
@@ -128,7 +131,9 @@ it("hides the API key callout once a key is filled in", async () => {
   setup();
   await openStepTwo(user);
 
-  expect(screen.queryByRole("link", { name: "API keys" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "API keys" }),
+  ).not.toBeInTheDocument();
 });
 
 it("does not tick the key step when no key was made", async () => {
@@ -486,7 +491,9 @@ it("looks for traces when asked, and briefly says when none arrived", async () =
     "No traces yet. Send one from your app and check again.",
   );
   expect(
-    screen.queryByText("No traces yet. Send one from your app and check again."),
+    screen.queryByText(
+      "No traces yet. Send one from your app and check again.",
+    ),
   ).not.toBeInTheDocument();
 });
 
@@ -513,4 +520,18 @@ it("falls back to a placeholder host when the backend URL is unset", async () =>
   await openStepTwo(user);
   expect(snippetText()).toContain("https://<backend>/traces");
   api.getBackendUrl.mockImplementation(() => "https://api.example.com");
+});
+
+it("sends one piece of text as the input for a general agent", async () => {
+  const user = setupUser();
+  setup("ag-1", "general");
+  await openStepTwo(user);
+
+  expect(snippetText()).toContain('"input": "When is the next vaccination?"');
+  expect(snippetText()).not.toContain('"role"');
+  expect(
+    screen.getByText(
+      "The input given to the agent, as a single piece of text.",
+    ),
+  ).toBeInTheDocument();
 });

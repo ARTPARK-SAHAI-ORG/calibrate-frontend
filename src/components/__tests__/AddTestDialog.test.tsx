@@ -158,6 +158,17 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// Pick a type on the intro picker and confirm it: tapping the option opens a
+// preview of what that test type looks like, and Next is what actually
+// enters the full editor.
+async function pickTestType(
+  user: ReturnType<typeof setupUser>,
+  title: string,
+) {
+  await user.click(screen.getByText(title));
+  await user.click(screen.getByRole("button", { name: "Next" }));
+}
+
 // Drive a controlled `testName` prop from a stateful wrapper so typing in the
 // name field is reflected back into the dialog, mirroring how the real
 // parent page manages this state.
@@ -188,17 +199,17 @@ describe("AddTestDialog", () => {
   it("offers next reply and tool call on the create-phase type intro picker", async () => {
     render(<AddTestDialog {...baseProps()} />);
     expect(screen.getByText("Create a test")).toBeInTheDocument();
-    expect(screen.getByText("Next reply test")).toBeInTheDocument();
-    expect(screen.getByText("Tool call test")).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent give the right reply?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent use the right tool?"),
+    ).toBeInTheDocument();
   });
 
   it("does not offer the conversation type when creating a test", async () => {
-    const user = setupUser();
     render(<AddTestDialog {...baseProps()} />);
     expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
-    // Nor on the compact switcher shown once a type has been picked.
-    await user.click(screen.getByText("Next reply test"));
-    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
   });
 
   it("closes from the intro picker via the X button without a discard prompt", async () => {
@@ -221,10 +232,15 @@ describe("AddTestDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("enters the full editor after picking Next reply test", async () => {
+  it("shows a preview, then enters the full editor once Create is confirmed", async () => {
     const user = setupUser();
     render(<AddTestDialog {...baseProps()} />);
-    await user.click(screen.getByText("Next reply test"));
+    await user.click(screen.getByText("Does the agent give the right reply?"));
+    // Preview shown, editor not entered yet.
+    expect(screen.getByText("Conversation history")).toBeInTheDocument();
+    expect(screen.queryByText("Test name")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Test name")).toBeInTheDocument();
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
   });
@@ -267,9 +283,10 @@ describe("AddTestDialog", () => {
         })}
       />,
     );
-    expect(screen.getByText("Next reply test")).toBeInTheDocument();
-    // Compact type-switcher boxes ("Tool call", "Conversation" buttons) are
-    // only rendered in create mode; editing shows a static header instead.
+    // Straight into the editor: no intro picker, and no way to switch the
+    // type (no type header or switcher exists in the editor at all).
+    expect(screen.queryByText("Create a test")).not.toBeInTheDocument();
+    expect(screen.getByText("Test name")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Tool call" }),
     ).not.toBeInTheDocument();
@@ -927,7 +944,7 @@ describe("AddTestDialog", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("Back button calls onClose directly (no discard guard)", async () => {
+    it("the top-right Close icon calls onClose directly (no discard guard)", async () => {
       const user = setupUser();
       const onClose = jest.fn();
       render(
@@ -936,7 +953,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
-      await user.click(screen.getByRole("button", { name: "Back" }));
+      await user.click(screen.getByLabelText("Close"));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
@@ -1330,6 +1347,404 @@ describe("AddTestDialog", () => {
       await user.click(screen.getByRole("button", { name: "Discard and run" }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit.mock.calls[0][2]).toEqual({ runAfterSave: true });
+    });
+  });
+
+  describe("agentNature", () => {
+    it("still offers the reply and tool questions when agentNature is omitted (conversation, unchanged)", () => {
+      render(<AddTestDialog {...baseProps()} />);
+      expect(
+        screen.getByText("Does the agent give the right reply?"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent use the right tool?"),
+      ).toBeInTheDocument();
+      // Conversation is hidden for every agent, not just general ones.
+      expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
+    });
+
+    it("does not seed the conversation-agent Correctness default for a general agent", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
+        />,
+      );
+      // The editor renders (the info banner is gone outside labelling mode)
+      // and the llm-type Correctness default is not seeded.
+      await waitFor(() =>
+        expect(screen.getByText("Test name")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    });
+
+    it("seeds a general agent's next-reply evaluators from llm-general, not llm, and skips the default-correctness fallback", async () => {
+      // TONE_EVALUATOR is an "llm" evaluator linked to the agent. For a
+      // general agent the seeding looks for "llm-general" evaluators
+      // instead, so it should find nothing here, and — unlike the
+      // conversation-agent case — must not fall back to the seeded default
+      // correctness evaluator either.
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [TONE_EVALUATOR.uuid],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByText("Add at least one evaluator to grade the agent's next reply"),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tone check")).not.toBeInTheDocument();
+    });
+
+    it("still seeds the default-correctness evaluator for a conversation agent with no agent evaluators", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "conversation",
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    });
+
+    const GENERAL_EVALUATOR = {
+      uuid: "eval-general",
+      name: "Output check",
+      description: "Checks the output",
+      slug: null,
+      is_default: false,
+      evaluator_type: "llm-general",
+      live_version: { variables: [] },
+    };
+
+    it("shows a single input box instead of the conversation builder for a general agent's Output tab", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentNature: "general" })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("Enter the input given to the agent")).toBeInTheDocument(),
+      );
+      // The multi-turn chat-message builder is gone entirely for this case.
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+      expect(screen.queryByText("Add message")).not.toBeInTheDocument();
+    });
+
+    it("blocks submission when a general agent's input is empty", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [GENERAL_EVALUATOR.uuid],
+            onSubmit,
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
+      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText("Input cannot be empty")).toBeInTheDocument();
+    });
+
+    it("submits a general test with `input`, `evaluation.type: general`, and no history key", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            agentNature: "general",
+            agentEvaluatorUuids: [GENERAL_EVALUATOR.uuid],
+            onSubmit,
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
+      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+      await user.type(
+        screen.getByPlaceholderText("Enter the input given to the agent"),
+        "Summarize this article: ...",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config, evaluators] = onSubmit.mock.calls[0];
+      expect(config).toEqual({
+        input: "Summarize this article: ...",
+        evaluation: { type: "general" },
+      });
+      expect(config.history).toBeUndefined();
+      expect(evaluators).toEqual([{ evaluator_uuid: "eval-general" }]);
+    });
+
+    it("treats an existing general test as general even with no agentNature (the /tests page)", async () => {
+      // The standalone /tests page has no agent, so it cannot pass
+      // agentNature. Without recognising the test's own type, the dialog
+      // would show the conversation builder and save it back as a
+      // `response` test, losing the input.
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      const initialConfig: TestConfig = {
+        input: "Summarise this article",
+        evaluation: { type: "general" },
+      };
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            initialConfig,
+            initialEvaluators: [
+              {
+                evaluator_uuid: GENERAL_EVALUATOR.uuid,
+                name: "Output check",
+                slug: null,
+                variables: [],
+              },
+            ],
+            testName: "Existing general test",
+            onSubmit,
+          })}
+        />,
+      );
+
+      // The single input box is shown, holding the test's own input.
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("Summarise this article"),
+        ).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      // Saved back as a general test, not converted to a response one.
+      expect(config.evaluation.type).toBe("general");
+      expect(config.input).toBe("Summarise this article");
+      expect(config.history).toBeUndefined();
+    });
+
+    it("populates the input box from an existing general test's config.input on edit", async () => {
+      const initialConfig: TestConfig = {
+        input: "What is the capital of France?",
+        evaluation: { type: "general" },
+      };
+      global.fetch = mockFetchImpl([WEATHER_TOOL], [GENERAL_EVALUATOR]);
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            agentNature: "general",
+            initialConfig,
+            testName: "Existing general test",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("What is the capital of France?"),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("shows a single input box instead of the conversation builder on a general agent's Tool call tab", async () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByPlaceholderText("Enter the input given to the agent"),
+        ).toBeInTheDocument(),
+      );
+      // The multi-turn chat-message builder is gone; the tool picker stays.
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+      expect(screen.getByText("Tools to test")).toBeInTheDocument();
+    });
+
+    it("submits a general agent's tool call test with `input`, no history, and evaluation.type tool_call", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Enter the input given to the agent"),
+        "What is the weather in Bangalore?",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config).toEqual({
+        input: "What is the weather in Bangalore?",
+        evaluation: {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: "get_weather",
+              arguments: { city: { match_type: "exact", value: "Bangalore" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      });
+      expect(config.history).toBeUndefined();
+    });
+
+    it("blocks submission when a general agent's tool call test has an empty input", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "general",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText("Input cannot be empty")).toBeInTheDocument();
+    });
+
+    it("keeps a conversation agent's tool call test on history, with no input", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentNature: "conversation",
+            onSubmit,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Weather tool test",
+      );
+      await user.type(
+        screen.getByPlaceholderText("Expected value"),
+        "Bangalore",
+      );
+      expect(
+        screen.queryByPlaceholderText("Enter the input given to the agent"),
+      ).not.toBeInTheDocument();
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      for (const ta of Array.from(textareas)) {
+        await user.type(ta, "message");
+      }
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config.input).toBeUndefined();
+      expect(Array.isArray(config.history)).toBe(true);
+      expect(config.history.length).toBeGreaterThan(0);
+      expect(config.evaluation.type).toBe("tool_call");
+    });
+
+    it("opens a saved tool call test that carries `input` on the input box, with no agentNature", async () => {
+      const initialConfig: TestConfig = {
+        input: "What is the weather in Bangalore?",
+        evaluation: {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: "get_weather",
+              arguments: { city: { match_type: "exact", value: "Bangalore" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      };
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "tool-invocation",
+            initialConfig,
+            testName: "Saved general tool call test",
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("What is the weather in Bangalore?"),
+        ).toBeInTheDocument(),
+      );
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
     });
   });
 });

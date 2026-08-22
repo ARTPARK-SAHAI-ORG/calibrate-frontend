@@ -6,12 +6,15 @@ import { DialogNavHeader, LoadingState } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
 import {
   TestDetailView,
+  ToolCallCard,
   normalizeToolCall,
   type TestCaseHistory,
   type TestCaseOutput,
 } from "@/components/test-results/shared";
+import { Section } from "@/components/human-labelling/item-panes/shared";
 import {
   fetchTrace,
+  traceInputTurns,
   TraceDetail,
   TraceMetadataEntry,
   TraceOutput,
@@ -34,8 +37,9 @@ type TraceDetailDialogProps = {
 
 /** Last user turn, else a generic heading when the history has no user text. */
 export function humanTraceName(trace: Pick<TraceDetail, "input">): string {
-  for (let i = trace.input.length - 1; i >= 0; i--) {
-    const turn = trace.input[i];
+  const turns = traceInputTurns(trace.input);
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i];
     if (
       turn.role === "user" &&
       typeof turn.content === "string" &&
@@ -66,9 +70,9 @@ function historyToolCalls(turn: TraceTurn): TestCaseHistory["tool_calls"] {
 }
 
 /** Map stored OpenAI-ish turns into the shared conversation renderer. */
-export function turnsToHistory(turns: TraceTurn[]): TestCaseHistory[] {
+export function turnsToHistory(input: TraceTurn[] | string): TestCaseHistory[] {
   const history: TestCaseHistory[] = [];
-  for (const turn of turns) {
+  for (const turn of traceInputTurns(input)) {
     const content = typeof turn.content === "string" ? turn.content : undefined;
     const createdAt =
       typeof turn.created_at === "string" ? turn.created_at : undefined;
@@ -105,13 +109,18 @@ export function turnsToHistory(turns: TraceTurn[]): TestCaseHistory[] {
   return history;
 }
 
-export function toTestCaseOutput(output: TraceOutput): TestCaseOutput | undefined {
+export function toTestCaseOutput(
+  output: TraceOutput,
+): TestCaseOutput | undefined {
   const response = output.response?.trim() || undefined;
   const tool_calls = (output.tool_calls ?? [])
     .filter((call) => call.tool)
     .map((call) => ({
       tool: call.tool,
       arguments: call.arguments ?? {},
+      // Kept so a trace whose agent ran the tool shows the result the same
+      // way a test run does, instead of dropping it on the way through.
+      ...(call.output !== undefined ? { output: call.output } : {}),
     }));
   if (!response && tool_calls.length === 0) return undefined;
   return {
@@ -120,10 +129,59 @@ export function toTestCaseOutput(output: TraceOutput): TestCaseOutput | undefine
   };
 }
 
+/**
+ * A general agent answers one input at a time, so its trace reads as the input
+ * and what the agent produced, the same two boxes an LLM output labelling item
+ * uses. Tool calls sit under the output, or stand in for it when the agent
+ * called a tool instead of replying.
+ */
+function PlainTraceView({
+  input,
+  output,
+}: {
+  input: string;
+  output: TraceOutput;
+}) {
+  const response = output.response?.trim() ?? "";
+  const toolCalls = (output.tool_calls ?? []).filter((call) => call.tool);
+
+  return (
+    <div className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Section title="Input">
+        <p className="text-sm whitespace-pre-wrap break-words">
+          {input || "—"}
+        </p>
+      </Section>
+      <Section title="Output">
+        {response && (
+          <p className="text-sm whitespace-pre-wrap break-words">{response}</p>
+        )}
+        {toolCalls.length > 0 && (
+          <div className={`space-y-3 ${response ? "mt-3" : ""}`}>
+            {toolCalls.map((call, index) => (
+              <ToolCallCard
+                key={`${call.tool}-${index}`}
+                toolName={call.tool}
+                args={call.arguments ?? {}}
+                output={call.output}
+              />
+            ))}
+          </div>
+        )}
+        {!response && toolCalls.length === 0 && (
+          <p className="text-sm text-muted-foreground">—</p>
+        )}
+      </Section>
+    </div>
+  );
+}
+
 function MetaBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="block text-sm font-semibold text-foreground">{label}</span>
+      <span className="block text-sm font-semibold text-foreground">
+        {label}
+      </span>
       <span className="block text-xs text-foreground break-all">{value}</span>
     </div>
   );
@@ -217,7 +275,8 @@ export function TraceDetailDialog({
         if (!cancelled) setLoaded({ uuid: traceUuid, trace: data });
       } catch (err) {
         reportError("Error fetching trace:", err);
-        if (!cancelled) setError("Failed to load this trace. Please try again.");
+        if (!cancelled)
+          setError("Failed to load this trace. Please try again.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -243,7 +302,7 @@ export function TraceDetailDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-xl w-full max-w-[95vw] h-[92vh] flex flex-col shadow-2xl">
         <div className="relative flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
           <h2
             className="text-base md:text-lg font-semibold text-foreground truncate min-w-0"
@@ -293,14 +352,17 @@ export function TraceDetailDialog({
                 {error}
               </p>
             )}
-            {trace && (
-              <TestDetailView
-                history={history}
-                output={output}
-                passed={true}
-                showVerdict={false}
-              />
-            )}
+            {trace &&
+              (typeof trace.input === "string" ? (
+                <PlainTraceView input={trace.input} output={trace.output} />
+              ) : (
+                <TestDetailView
+                  history={history}
+                  output={output}
+                  passed={true}
+                  showVerdict={false}
+                />
+              ))}
           </div>
           {trace && (
             <div className="md:w-96 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">

@@ -5,8 +5,9 @@ import { Link } from "@/lib/nav";
 import { getBackendUrl } from "@/lib/api";
 import {
   buildSnippet,
-  SNIPPET_FIELDS,
+  snippetFields,
   SNIPPET_LANGUAGES,
+  type AgentNature,
   type SnippetLanguage,
 } from "./ingestSnippets";
 
@@ -59,19 +60,25 @@ function highlight(code: string): React.ReactNode[] {
   return out;
 }
 
-function FieldList({ optional }: { optional: boolean }) {
+function FieldList({
+  optional,
+  agentNature,
+}: {
+  optional: boolean;
+  agentNature: AgentNature;
+}) {
   return (
     <dl className="space-y-2">
-      {SNIPPET_FIELDS.filter((f) => Boolean(f.optional) === optional).map(
-        (field) => (
+      {snippetFields(agentNature)
+        .filter((f) => Boolean(f.optional) === optional)
+        .map((field) => (
           <div key={field.name}>
             <dt className="font-mono text-xs text-foreground">{field.name}</dt>
             <dd className="text-xs text-muted-foreground mt-0.5">
               {field.meaning}
             </dd>
           </div>
-        ),
-      )}
+        ))}
     </dl>
   );
 }
@@ -84,10 +91,12 @@ function FieldList({ optional }: { optional: boolean }) {
 export function TraceIngestSnippet({
   agentUuid,
   apiKey,
+  agentNature = "conversation",
 }: {
   agentUuid: string;
   /** The key created during setup, when there is one. */
   apiKey?: string | null;
+  agentNature?: AgentNature;
 }) {
   const [copied, setCopied] = useState(false);
   const [language, setLanguage] = useState<SnippetLanguage>("curl");
@@ -105,6 +114,7 @@ export function TraceIngestSnippet({
     agentUuid,
     apiKey: apiKey ?? KEY_PLACEHOLDER,
     includeOptional,
+    agentNature,
   });
 
   const handleCopy = async () => {
@@ -209,10 +219,10 @@ export function TraceIngestSnippet({
             </p>
           </div>
         )}
-        <FieldList optional={false} />
+        <FieldList optional={false} agentNature={agentNature} />
         <div className="space-y-2">
           <p className="text-xs font-medium text-foreground">Optional</p>
-          <FieldList optional />
+          <FieldList optional agentNature={agentNature} />
         </div>
       </div>
     </div>

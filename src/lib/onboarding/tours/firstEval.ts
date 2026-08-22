@@ -15,6 +15,11 @@
 
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import {
+  fetchAgentEvaluators,
+  isDefaultEvaluator,
+  type EvaluatorData,
+} from "@/lib/evaluatorApi";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
   clickByText,
@@ -104,23 +109,6 @@ const DEMO_PROMPT_FIX = " Our clinic helpline number is 1800-123-4567.";
 // when the library lookup fails and as the name to recreate it under if a
 // workspace has deleted it.
 const CORRECTNESS_NAME = "Correctness";
-const CORRECTNESS_DESCRIPTION = "Does the answer get it right?";
-// Its single criteria variable (the tour sets its value per test).
-const CORRECTNESS_CRITERIA_VARIABLE = {
-  name: "criteria",
-  description: "Criteria that the agent's response should satisfy",
-};
-// The canonical Correctness judge prompt, HARD-CODED so reuse and creation never
-// depend on a backend endpoint. The tour both creates Correctness with this exact
-// text and reuses an existing one only if its prompt equals this — so the two
-// sides can never drift and re-trigger duplicate creation. This is the exact
-// seeded-default correctness prompt.
-export const CANONICAL_CORRECTNESS_PROMPT =
-  "You are a highly accurate evaluator evaluating the response of an agent to a " +
-  "user's message.\n\nYou will be given a conversation between a user and an " +
-  "agent along with the response of the agent to the final user message.\n\nYou " +
-  "need to evaluate if the response adheres to the evaluation criteria:\n\n" +
-  "{{criteria}}";
 
 // The evaluator name goes into a card's description HTML, so escape it (names are
 // user-authored). driver.js renders the description as raw HTML.
@@ -135,6 +123,8 @@ function escapeHtml(s: string): string {
 export const A = {
   newAgent: '[data-tour="new-agent"]',
   agentNameInput: '[data-tour="agent-name-input"]',
+  agentNextSubmit: '[data-tour="agent-next-submit"]',
+  agentNatureConversation: '[data-tour="agent-nature-conversation"]',
   agentCreateSubmit: '[data-tour="agent-create-submit"]',
   systemPrompt: '[data-tour="agent-system-prompt"]',
   save: '[data-tour="agent-save"]',
@@ -146,6 +136,11 @@ export const A = {
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
+  // The whole picker body (options + example), so the card's "compare these
+  // with the example" reads against a lit example rather than a dimmed one.
+  testTypePicker: '[data-tour="test-type-body"]',
+  testTypeNextReply: '[data-test-type="next-reply"]',
+  testTypeNext: '[data-tour="test-type-next"]',
   testConversation: '[data-tour="test-conversation"]',
   testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
   testEditorClose: '[data-tour="test-editor-close"]',
@@ -184,6 +179,8 @@ type EvaluatorLike = {
   evaluator_type?: string;
   slug?: string | null;
   source_default_slug?: string | null;
+  is_default?: boolean | null;
+  owner_user_id?: string | null;
 };
 
 // The second check must be a genuine "Conciseness" evaluator. Match the WHOLE
@@ -192,6 +189,10 @@ type EvaluatorLike = {
 // be ignored, otherwise the tour would grade against an evaluator the user did
 // not mean.
 const CONCISENESS_NAME = /\bconciseness\b/i;
+
+// Identifies the workspace's existing Correctness — the built-in default (by
+// slug) or any "Correctness"-named LLM-reply evaluator.
+const CORRECTNESS_NAME_HINT = /correctness/i;
 
 /** The live version's judge prompt for evaluator `uuid`, or null. */
 async function fetchLivePrompt(
@@ -220,71 +221,19 @@ async function fetchLivePrompt(
   }
 }
 
-// Cheap pre-filter for correctness candidates whose prompt we then verify. The
-// name hint also catches evaluators the tour created on a previous run
-// ("Correctness (2)", "(3)", …) — which carry no default slug — so re-running
-// reuses one instead of endlessly creating the next number.
-const CORRECTNESS_NAME_HINT = /correctness/i;
-
 /**
- * Find an existing evaluator the tour can REUSE as Correctness: an LLM-reply
- * evaluator whose live prompt EXACTLY matches the hard-coded canonical prompt.
- * Considers the built-in default (by slug) AND any "Correctness"-named evaluator
- * (e.g. one the tour created before, which has no slug), preferring the built-in.
- * Returns its name, or null when none qualifies (so a proper one is created).
- * Bounds the number of detail fetches.
+ * The first candidate the tour can actually control: its live judge prompt must
+ * carry the `{{criteria}}` slot, because the tour overwrites that criteria with
+ * a mild one every demo answer passes. An evaluator with a fixed rubric of its
+ * own (Faithfulness, Instruction Following) could fail a demo answer while the
+ * tour's card says the run passes, so it is skipped. Bounded to a few detail
+ * fetches so the lookup never holds the tour up.
  */
-async function findUsableCorrectness(
-  list: EvaluatorLike[],
+async function findControllableSecond(
+  candidates: EvaluatorLike[],
   accessToken: string,
 ): Promise<string | null> {
-  const candidates = list
-    // Do NOT gate candidates on the list's `variables` — the list may omit them
-    // for custom (tour-created) evaluators, which would wrongly exclude a good
-    // copy. The prompt check below is authoritative.
-    .filter(
-      (e) =>
-        e.evaluator_type === "llm" &&
-        (isDefaultLLMNextReplyEvaluator(e) ||
-          CORRECTNESS_NAME_HINT.test(e.name ?? "")),
-    )
-    // Prefer the built-in default (by slug) first.
-    .sort(
-      (a, b) =>
-        Number(isDefaultLLMNextReplyEvaluator(b)) -
-        Number(isDefaultLLMNextReplyEvaluator(a)),
-    )
-    .slice(0, 6);
-  const target = CANONICAL_CORRECTNESS_PROMPT.trim();
-  for (const c of candidates) {
-    if (!c.uuid) continue;
-    const live = await fetchLivePrompt(c.uuid, accessToken);
-    if (live && live.trim() === target) return c.name ?? null;
-  }
-  return null;
-}
-
-/**
- * Find a usable second "Conciseness" check. Like the Correctness reuse, this does
- * NOT trust the list's `variables` (the list omits them for custom evaluators,
- * which would wrongly drop a valid one). Instead it verifies each Conciseness-
- * named LLM-reply evaluator's live prompt actually references the `{{criteria}}`
- * variable the tour fills — otherwise the tour cannot control what it grades.
- * Returns its name, or null when none qualifies (the flow then uses one check).
- */
-async function findUsableSecond(
-  list: EvaluatorLike[],
-  accessToken: string,
-): Promise<string | null> {
-  const candidates = list
-    .filter(
-      (e) =>
-        e.evaluator_type === "llm" &&
-        CONCISENESS_NAME.test(e.name ?? "") &&
-        !isDefaultLLMNextReplyEvaluator(e),
-    )
-    .slice(0, 6);
-  for (const c of candidates) {
+  for (const c of candidates.slice(0, 6)) {
     if (!c.uuid) continue;
     const live = await fetchLivePrompt(c.uuid, accessToken);
     if (live && live.includes("{{criteria}}")) return c.name ?? null;
@@ -293,11 +242,16 @@ async function findUsableSecond(
 }
 
 /**
- * Fetch the workspace evaluators and resolve the plan. Reuses an existing
- * Correctness ONLY if its live prompt exactly matches the canonical one (else it
- * is recreated). Falls back to the built-in "Correctness" default, second-check-
- * free (the safe path — one reliable, tour-controlled check) if the token is
- * missing or the request fails, so the tour never blocks on the lookup.
+ * Resolve the plan from the evaluators that ALREADY exist in the workspace.
+ * The tour never creates an evaluator:
+ *  - Correctness: the built-in next-reply default (by slug), else any
+ *    "Correctness"-named LLM-reply evaluator, taken as-is.
+ *  - Second check: an existing DEFAULT LLM-reply evaluator that is not
+ *    Correctness (Conciseness first) AND whose live judge prompt has the
+ *    `{{criteria}}` slot the tour writes into — or none, in which case the
+ *    flow uses Correctness alone.
+ * Falls back to Correctness-only if the token is missing or the request
+ * fails, so the tour never blocks on the lookup.
  */
 export async function resolveEvaluatorPlan(
   accessToken: string | null,
@@ -314,112 +268,29 @@ export async function resolveEvaluatorPlan(
     );
     if (!res.ok) return fallback;
     const list = unwrapList<EvaluatorLike>(await res.json());
-    // Resolve BOTH checks by prompt identity (verified against the actual live
-    // prompt, not the list's possibly-omitted variables): reuse a Correctness
-    // whose prompt equals the hard-coded canonical — including one the tour
-    // created on a previous run (no default slug), so re-running does not keep
-    // creating Correctness (2), (3), … — and add a Conciseness second only if its
-    // prompt genuinely uses {{criteria}} the tour can control.
+    const llm = list.filter((e) => e.evaluator_type === "llm");
+    const correctness =
+      llm.find(isDefaultLLMNextReplyEvaluator) ??
+      llm.find((e) => CORRECTNESS_NAME_HINT.test(e.name ?? ""));
+    const secondCandidates = llm.filter(
+      (e) =>
+        isDefaultEvaluator(e as EvaluatorData) &&
+        !isDefaultLLMNextReplyEvaluator(e) &&
+        e.name &&
+        e.name !== correctness?.name,
+    );
+    // Conciseness first, then the rest, so the intended second check is tried
+    // before any other default.
+    const ordered = [
+      ...secondCandidates.filter((e) => CONCISENESS_NAME.test(e.name ?? "")),
+      ...secondCandidates.filter((e) => !CONCISENESS_NAME.test(e.name ?? "")),
+    ];
     return {
-      correctnessName: await findUsableCorrectness(list, accessToken),
-      secondEvaluatorName: await findUsableSecond(list, accessToken),
+      correctnessName: correctness?.name ?? CORRECTNESS_NAME,
+      secondEvaluatorName: await findControllableSecond(ordered, accessToken),
     };
   } catch {
     return fallback;
-  }
-}
-
-/** What the backend's default-prompt endpoint returns for a purpose. */
-type DefaultPrompt = {
-  system_prompt?: string;
-  judge_model?: string;
-  output_type?: "binary" | "rating";
-};
-
-/**
- * Build the `POST /evaluators` body for recreating the Correctness default,
- * mirroring what the Create Evaluator flow sends. Pure, so it is unit-testable.
- * The prompt is the HARD-CODED canonical one (so a created evaluator matches what
- * the reuse check looks for, and nothing depends on a backend prompt endpoint);
- * only the judge model comes from the backend default (which model to use). `name`
- * lets the caller avoid colliding with an existing evaluator.
- */
-export function buildCorrectnessPayload(
-  dp: DefaultPrompt | null,
-  name: string = CORRECTNESS_NAME,
-): {
-  name: string;
-  description: string;
-  evaluator_type: "llm";
-  data_type: "text";
-  kind: "single";
-  output_type: "binary" | "rating";
-  version: {
-    judge_model?: string;
-    system_prompt: string;
-    variables: { name: string; description: string }[];
-  };
-} {
-  return {
-    name,
-    description: CORRECTNESS_DESCRIPTION,
-    evaluator_type: "llm",
-    data_type: "text",
-    kind: "single",
-    output_type: dp?.output_type ?? "binary",
-    version: {
-      ...(dp?.judge_model ? { judge_model: dp.judge_model } : {}),
-      system_prompt: CANONICAL_CORRECTNESS_PROMPT,
-      variables: [CORRECTNESS_CRITERIA_VARIABLE],
-    },
-  };
-}
-
-/**
- * Recreate a proper Correctness evaluator when the workspace has no built-in one
- * — either it was deleted, OR the user replaced it with a custom evaluator that
- * does not carry the default slug (so the plan cannot find it). In both cases the
- * tour needs a check whose `{{criteria}}` it controls, so it creates its own.
- *
- * Crucially it picks a FREE name (the backend rejects duplicate names, and a
- * user's own "Correctness" would otherwise both collide and, if we reused the
- * name, get picked instead of ours). Returns the name actually created so the
- * tour picks THAT exact evaluator — or null on any failure (best-effort; the
- * tour then degrades gracefully).
- */
-async function createCorrectnessEvaluator(
-  accessToken: string | null,
-): Promise<string | null> {
-  if (!accessToken) return null;
-  try {
-    let dp: DefaultPrompt | null = null;
-    const dpRes = await fetch(
-      `${getBackendUrl()}/evaluators/default-prompt?purpose=llm`,
-      { method: "GET", headers: getDefaultHeaders(accessToken) },
-    );
-    if (dpRes.ok) dp = (await dpRes.json()) as DefaultPrompt;
-    // Without a judge model the backend rejects the create, so only proceed when
-    // the default-prompt lookup gave us one.
-    if (!dp?.judge_model) return null;
-    // Avoid colliding with an existing evaluator named "Correctness" (e.g. the
-    // user's own custom one). Pick a free name and create under it.
-    const name = await resolveFreeName(
-      CORRECTNESS_NAME,
-      "/evaluators",
-      accessToken,
-    );
-    const res = await fetch(`${getBackendUrl()}/evaluators`, {
-      method: "POST",
-      headers: {
-        ...getDefaultHeaders(accessToken),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(buildCorrectnessPayload(dp, name)),
-    });
-    return res.ok ? name : null;
-  } catch {
-    /* best-effort: the tour proceeds without it */
-    return null;
   }
 }
 
@@ -472,16 +343,18 @@ export async function fillSystemPromptResilient(
 }
 
 /**
- * Open the Create Test dialog and pick "Next reply", which seeds a conversation
- * and the default evaluator. Leaves the editor open for the scenario/criteria
- * to be filled in.
+ * Confirm the test type in the picker and name the test. Leaves the editor
+ * open for the scenario/criteria to be filled in.
  */
-async function openCreateTestEditor(
+async function confirmTestTypeAndName(
   baseName: string,
   deps: FirstEvalDeps,
 ): Promise<void> {
-  await clickElement(A.testsCreate, { timeout: 10000 });
-  await clickByText("Next reply test", { timeout: 8000 });
+  // The type picker is a two-step pick: choose the reply/answer type (it also
+  // opens preselected), then confirm with Next to enter the editor. Driven by
+  // anchors so the picker's wording can change without breaking the tour.
+  await clickElement(A.testTypeNextReply, { timeout: 8000 });
+  await clickElement(A.testTypeNext, { timeout: 8000 });
   await delay(300);
   // Avoid "A test with this name already exists" on re-runs.
   const name = await resolveFreeName(baseName, "/tests", deps.getAccessToken());
@@ -538,44 +411,26 @@ async function resolveFreeName(
 // Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
 // that type and silently drops "Full conversation" / "LLM output" ones. So the
-// second pick MUST be an LLM-reply evaluator, otherwise the card's claim that
-// both checks grade the test would be false — one would be ignored at run time.
-const LLM_REPLY_TYPE_LABEL = /LLM\s*reply/i;
-
-/** True if a picker row is an LLM-reply evaluator (grades a next-reply test). */
-export function isLlmReplyRow(row: HTMLLabelElement): boolean {
-  return LLM_REPLY_TYPE_LABEL.test(row.textContent ?? "");
-}
-
-/** True if a picker row's checkbox is currently unticked. */
-function isRowUnchecked(row: HTMLLabelElement): boolean {
-  const cb = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
-  return !!cb && !cb.checked;
-}
-
 /**
- * Choose the evaluator row to tick by its EXACT name (the name resolved into the
- * plan), restricted to unticked LLM-reply rows so it actually grades the
- * next-reply test. The match is on the row's name element being exactly `name` —
- * NOT merely containing it — so "Conciseness" never ticks a "Conciseness2" row,
- * and so the tour never ticks an unrelated evaluator whose criteria it cannot
- * control. Pure; returns the row or undefined.
+ * Find the evaluator's checkbox by its EXACT name. The picker renders each row
+ * as a checkbox whose aria-label is `Select <name>` (the row body opens a
+ * preview instead of ticking), so the aria-label is the one stable, exact-name
+ * hook — "Conciseness" never matches a "Conciseness2" row. Only unticked boxes
+ * count. Pure; returns the checkbox or undefined.
  */
-export function chooseRowByName(
-  rows: HTMLLabelElement[],
+export function chooseEvaluatorCheckbox(
+  dialog: HTMLElement,
   name: string,
-): HTMLLabelElement | undefined {
-  const target = name.trim().toLowerCase();
-  if (!target) return undefined;
-  // A row's name lives in its own element; match that element's text exactly
-  // rather than the whole row (which also holds the type pill + description).
-  const hasExactName = (row: HTMLLabelElement): boolean =>
-    Array.from(row.querySelectorAll<HTMLElement>("*")).some(
-      (el) => (el.textContent ?? "").trim().toLowerCase() === target,
-    );
-  return rows
-    .filter((r) => isRowUnchecked(r) && isLlmReplyRow(r))
-    .find(hasExactName);
+): HTMLInputElement | undefined {
+  const target = `select ${name.trim().toLowerCase()}`;
+  if (!name.trim()) return undefined;
+  return Array.from(
+    dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+  ).find(
+    (cb) =>
+      !cb.checked &&
+      (cb.getAttribute("aria-label") ?? "").trim().toLowerCase() === target,
+  );
 }
 
 /**
@@ -583,28 +438,23 @@ export function chooseRowByName(
  * (green "selected" tint + ring) so it is obvious which evaluator was just
  * picked. The highlight goes away when the dialog closes, so no cleanup needed.
  */
-function tickRow(row: HTMLLabelElement | undefined): void {
+function tickCheckbox(cb: HTMLInputElement | undefined): void {
+  if (!cb) return;
+  const row = cb.parentElement as HTMLElement | null;
+  (row ?? cb).scrollIntoView({ block: "center" });
+  if (!cb.checked) cb.click();
   if (!row) return;
-  row.scrollIntoView({ block: "center" });
-  const checkbox = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
-  if (checkbox && !checkbox.checked) checkbox.click();
   row.style.borderRadius = "8px";
   row.style.transition = "background-color 0.15s ease";
   row.style.backgroundColor = "color-mix(in srgb, #22c55e 20%, transparent)";
   row.style.boxShadow = "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
 }
 
-/**
- * Tick the Correctness evaluator. Falls back to the first LLM-reply row (not just
- * any row) so the pick always grades the next-reply demo test — see
- * `LLM_REPLY_TYPE_LABEL`.
- */
 /** Tick an evaluator in the picker, matched by the exact name from the plan. */
 async function pickEvaluatorByName(name: string): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
-  const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  tickRow(chooseRowByName(rows, name));
+  tickCheckbox(chooseEvaluatorCheckbox(dialog as HTMLElement, name));
 }
 
 /**
@@ -703,18 +553,109 @@ async function appendPromptFix(): Promise<void> {
   window.setTimeout(selectNewLine, 300);
 }
 
+/** The uuid in an `/…/agents/<uuid>` address, or null when there is none. */
+export function agentUuidFromPath(pathname: string): string | null {
+  return /\/agents\/([^/?#]+)/.exec(pathname)?.[1] ?? null;
+}
+
+/**
+ * The name of an evaluator the agent on screen ACTUALLY has: `preferred` when it
+ * is one of them, else the first one. Null when the agent has none, or when the
+ * lookup cannot be made — the card then says the tab is empty rather than
+ * pointing at something that is not there.
+ */
+async function attachedEvaluatorName(
+  preferred: string,
+  accessToken: string | null,
+): Promise<string | null> {
+  const uuid = agentUuidFromPath(window.location.pathname);
+  if (!uuid || !accessToken) return null;
+  try {
+    const list = await fetchAgentEvaluators(uuid, accessToken);
+    const match = list.find((e) => e.name === preferred) ?? list[0];
+    return match?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// CSS attribute selector for an attached evaluator's card, by its name.
+function evaluatorCardAnchor(name: string): string {
+  return `[data-evaluator-name="${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
+}
+
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   // The flow adapts to the workspace: add a second check only when a suitable
   // (conciseness) evaluator exists; otherwise use Correctness alone.
   const secondName = deps.plan.secondEvaluatorName;
-  // Correctness is identified by its CURRENT name (rename-safe). If the workspace
-  // deleted it (null), recreate it under its default name before the picker opens.
-  const needsCorrectness = deps.plan.correctnessName === null;
   const correctnessName = deps.plan.correctnessName ?? CORRECTNESS_NAME;
-  // Mutable: when Correctness is recreated we may create it under a free,
-  // non-colliding name; the later pick + criteria steps must target whatever we
-  // actually created, not the placeholder name.
   const correctness = { name: correctnessName };
+
+  // The first card of the add-a-check trio. Held in a variable because the card
+  // before it rewrites its wording when the agent turns out to have no
+  // evaluators at all (there is no "another" check to add then).
+  const addCheckStep: TourStep | null = secondName
+    ? {
+        anchor: A.evaluatorsAdd,
+        title: "Add another check",
+        description: `One check rarely covers everything. Let us add <strong>${escapeHtml(
+          secondName,
+        )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
+        side: "bottom",
+        actionLabel: "Next",
+        action: async () => {
+          await clickElement(A.evaluatorsAdd, { timeout: 8000 });
+        },
+      }
+    : null;
+
+  // What this agent already has can only be known once the agent exists, which
+  // happens partway through the tour. So the card looks it up in its own
+  // prepare and rewrites its anchor and wording before the engine reads them.
+  // Without that it pointed at a card that may never exist and claimed an
+  // evaluator was there over an empty tab.
+  // Said when the agent has no evaluators. Also the card's starting state, so it
+  // never claims an evaluator is there before the lookup has answered.
+  const emptyTabDescription = secondName
+    ? `This tab holds every evaluator added to your agent, and it is empty. Let us add <strong>${escapeHtml(
+        secondName,
+      )}</strong> so your tests have something grading them.`
+    : "This tab holds every evaluator added to your agent, and it is empty. You can add a check here whenever you are ready.";
+
+  const attachedStep: TourStep = {
+    title: "No checks yet",
+    description: emptyTabDescription,
+    side: "bottom",
+    actionLabel: "Next",
+    timeout: 10000,
+    prepare: async () => {
+      const attached = await attachedEvaluatorName(
+        correctnessName,
+        deps.getAccessToken(),
+      );
+      if (attached) {
+        attachedStep.anchor = evaluatorCardAnchor(attached);
+        attachedStep.title = "Already added for you";
+        attachedStep.description =
+          `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
+            attached,
+          )}</strong> is already here: does the answer get it right?`;
+        return;
+      }
+      // Nothing is attached. Drop the anchor so the card sits in the middle
+      // instead of waiting on an element that will never appear.
+      attachedStep.anchor = undefined;
+      attachedStep.title = "No checks yet";
+      attachedStep.description = emptyTabDescription;
+      if (addCheckStep && secondName) {
+        addCheckStep.title = "Add your first check";
+        addCheckStep.description = `Let us add <strong>${escapeHtml(
+          secondName,
+        )}</strong>, so every test grades the reply on it.`;
+      }
+    },
+  };
+
   const steps: TourStep[] = [
     {
       title: "Welcome to Calibrate 👋",
@@ -748,6 +689,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Create",
       timeout: 10000,
       action: async () => {
+        await clickElement(A.agentNextSubmit);
+        // The dialog's second step asks what the agent does; the demo agent
+        // is conversational (a phone helpline), so pick that before creating.
+        await clickElement(A.agentNatureConversation);
         await clickElement(A.agentCreateSubmit);
         // The app navigates to /agents/[uuid]; later steps wait for that page.
       },
@@ -779,75 +724,51 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.tabEvaluators,
-      title: "Add an evaluator",
+      title: "Meet the evaluators",
       description:
-        "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
+        "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite.",
       side: "bottom",
       actionLabel: "Next",
-      prepare: async () => {
-        // If the workspace has no built-in Correctness (deleted, or replaced by a
-        // custom evaluator without the default slug), silently recreate a proper
-        // one now — under a free name — so it is in the picker the next click
-        // opens, and remember that name so the pick + criteria target it.
-        if (needsCorrectness) {
-          const created = await createCorrectnessEvaluator(deps.getAccessToken());
-          if (created) correctness.name = created;
-        }
-      },
       action: async () => {
         await clickElement(A.tabEvaluators);
-        await clickElement(A.evaluatorsAdd, { timeout: 8000 });
       },
     },
-    {
-      anchor: A.addEvaluatorsDialog,
-      title: "Choose what to check",
-      description: secondName
-        ? `These are the checks you can grade your agent with. First, <strong>${escapeHtml(
-            correctnessName,
-          )}</strong>: does the answer get it right?`
-        : `These are the checks you can grade your agent with. We will use <strong>${escapeHtml(
-            correctnessName,
-          )}</strong>: does the answer get it right?`,
-      side: "left",
-      actionLabel: "Pick it",
-      action: async () => {
-        await pickEvaluatorByName(correctness.name);
-      },
-    },
-    // Only add a second check when the workspace actually has one to add.
-    ...(secondName
+    attachedStep,
+    // Add a second, independent check — only when the workspace has an
+    // existing default evaluator (other than Correctness) to add.
+    ...(secondName && addCheckStep
       ? [
+          addCheckStep,
           {
             anchor: A.addEvaluatorsDialog,
-            title: "Add another check",
-            description: `${escapeHtml(
-              correctnessName,
-            )} is ticked. Now add <strong>${escapeHtml(
+            title: "Pick it in the list",
+            description: `These are the evaluators you can add. We will tick <strong>${escapeHtml(
               secondName,
-            )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
+            )}</strong>.`,
             side: "left" as const,
             actionLabel: "Pick it",
+            // Let the reader scroll through the list of evaluators while the
+            // picker cards are up.
+            allowInteraction: true,
             action: async () => {
               await pickEvaluatorByName(secondName);
             },
           },
+          {
+            anchor: A.addEvaluatorsDialog,
+            title: "Add it to your agent",
+            description: `${escapeHtml(
+              secondName,
+            )} is ticked. Let us <strong>add it</strong> so every test grades the reply on both checks. You can <strong>add more checks</strong> anytime.`,
+            side: "left" as const,
+            actionLabel: "Add it",
+            allowInteraction: true,
+            action: async () => {
+              await clickElement(A.evaluatorsAddConfirm);
+            },
+          },
         ]
       : []),
-    {
-      anchor: A.addEvaluatorsDialog,
-      title: secondName ? "Add them to your agent" : "Add it to your agent",
-      description: secondName
-        ? "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both."
-        : `${escapeHtml(
-            correctnessName,
-          )} is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.`,
-      side: "left",
-      actionLabel: secondName ? "Add them" : "Add it",
-      action: async () => {
-        await clickElement(A.evaluatorsAddConfirm);
-      },
-    },
     {
       anchor: A.tabTests,
       title: "Create your first test",
@@ -859,7 +780,21 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         await clickElement(A.tabTests);
       },
       action: async () => {
-        await openCreateTestEditor(DEMO_TESTS[0].name, deps);
+        await clickElement(A.testsCreate, { timeout: 10000 });
+      },
+    },
+    {
+      anchor: A.testTypePicker,
+      title: "Pick what to test",
+      description:
+        "First, choose <strong>what you want to check</strong>: the reply your agent gives, or the tool it reaches for. The example on the right shows what that kind of test looks like once it runs. We will check the <strong>reply</strong>.",
+      side: "bottom",
+      align: "start",
+      actionLabel: "Next",
+      timeout: 12000,
+      allowInteraction: true,
+      action: async () => {
+        await confirmTestTypeAndName(DEMO_TESTS[0].name, deps);
       },
     },
     {
@@ -907,7 +842,21 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Add it",
       timeout: 12000,
       action: async () => {
-        await openCreateTestEditor(DEMO_TESTS[1].name, deps);
+        await clickElement(A.testsCreate, { timeout: 10000 });
+      },
+    },
+    {
+      anchor: A.testTypePicker,
+      title: "The same choice again",
+      description:
+        "Same picker as before: we are checking the <strong>reply</strong> again, this time with a question the agent cannot answer.",
+      side: "bottom",
+      align: "start",
+      actionLabel: "Next",
+      timeout: 12000,
+      allowInteraction: true,
+      action: async () => {
+        await confirmTestTypeAndName(DEMO_TESTS[1].name, deps);
       },
     },
     {
@@ -1119,7 +1068,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       timeout: 10000,
       prepare: async () => {
+        // Closing the run window sends the app to the Evaluations tab, so come
+        // back to Tests before pointing at its Create test button.
         await clickElement(A.runClose, { timeout: 8000 });
+        await clickElement(A.tabTests, { timeout: 8000 });
         await waitForElement(A.testsCreate, { timeout: 8000 });
       },
     },

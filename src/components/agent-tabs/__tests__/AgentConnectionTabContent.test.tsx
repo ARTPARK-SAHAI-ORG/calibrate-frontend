@@ -46,7 +46,9 @@ jest.mock("../../VerifyRequestPreviewDialog", () => ({
     ) : null,
 }));
 
-function makeConfig(overrides: Partial<ConnectionConfig> = {}): ConnectionConfig {
+function makeConfig(
+  overrides: Partial<ConnectionConfig> = {},
+): ConnectionConfig {
   return {
     agent_url: "",
     agent_headers: {},
@@ -60,7 +62,9 @@ function makeConfig(overrides: Partial<ConnectionConfig> = {}): ConnectionConfig
 }
 
 function renderComponent(
-  overrides: Partial<React.ComponentProps<typeof AgentConnectionTabContent>> = {}
+  overrides: Partial<
+    React.ComponentProps<typeof AgentConnectionTabContent>
+  > = {},
 ) {
   const onAgentUrlChange = jest.fn();
   const onAgentHeadersChange = jest.fn();
@@ -172,10 +176,12 @@ describe("AgentConnectionTabContent", () => {
   it("runs a successful verification and reports success", async () => {
     const user = setupUser();
     verifyAdHoc.mockResolvedValue(true);
-    const { onConnectionConfigChange, onVerificationSuccess } = renderComponent({
-      agentUrl: "https://example.com",
-      agentHeaders: [{ key: "Authorization", value: "Bearer x" }],
-    });
+    const { onConnectionConfigChange, onVerificationSuccess } = renderComponent(
+      {
+        agentUrl: "https://example.com",
+        agentHeaders: [{ key: "Authorization", value: "Bearer x" }],
+      },
+    );
 
     await user.click(screen.getByText("Verify"));
     await user.click(screen.getByText("Confirm verify"));
@@ -185,14 +191,15 @@ describe("AgentConnectionTabContent", () => {
         "https://example.com",
         { Authorization: "Bearer x" },
         [{ role: "user", content: "Hi" }],
-        undefined
-      )
+        undefined,
+        "conversation",
+      ),
     );
 
     await waitFor(() =>
       expect(onConnectionConfigChange).toHaveBeenCalledWith(
-        expect.objectContaining({ connection_verified: true })
-      )
+        expect.objectContaining({ connection_verified: true }),
+      ),
     );
     expect(onVerificationSuccess).toHaveBeenCalled();
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
@@ -203,9 +210,11 @@ describe("AgentConnectionTabContent", () => {
     const user = setupUser();
     verifyAdHoc.mockResolvedValue(false);
     hookState.verifyError = "Connection refused";
-    const { onConnectionConfigChange, onVerificationSuccess } = renderComponent({
-      agentUrl: "https://example.com",
-    });
+    const { onConnectionConfigChange, onVerificationSuccess } = renderComponent(
+      {
+        agentUrl: "https://example.com",
+      },
+    );
 
     await user.click(screen.getByText("Verify"));
     await user.click(screen.getByText("Confirm verify"));
@@ -215,8 +224,8 @@ describe("AgentConnectionTabContent", () => {
         expect.objectContaining({
           connection_verified: false,
           connection_verified_error: "Connection refused",
-        })
-      )
+        }),
+      ),
     );
     expect(onVerificationSuccess).not.toHaveBeenCalled();
     expect(screen.getByTestId("verify-dialog")).toBeInTheDocument();
@@ -241,8 +250,9 @@ describe("AgentConnectionTabContent", () => {
         "https://example.com",
         { "X-Test": "keep" },
         expect.anything(),
-        undefined
-      )
+        undefined,
+        "conversation",
+      ),
     );
   });
 
@@ -270,12 +280,12 @@ describe("AgentConnectionTabContent", () => {
         onConnectionConfigChange={onConnectionConfigChange}
         onSave={jest.fn()}
         isSaving={false}
-      />
+      />,
     );
 
     expect(dismiss).toHaveBeenCalled();
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
-      expect.objectContaining({ connection_verified: false })
+      expect.objectContaining({ connection_verified: false }),
     );
     expect(screen.getByText("Not verified")).toBeInTheDocument();
   });
@@ -306,7 +316,7 @@ describe("AgentConnectionTabContent", () => {
         onConnectionConfigChange={onConnectionConfigChange}
         onSave={jest.fn()}
         isSaving={false}
-      />
+      />,
     );
     expect(screen.getByText("Not verified")).toBeInTheDocument();
 
@@ -326,7 +336,7 @@ describe("AgentConnectionTabContent", () => {
         onConnectionConfigChange={onConnectionConfigChange}
         onSave={jest.fn()}
         isSaving={false}
-      />
+      />,
     );
     expect(screen.getByText("Verified")).toBeInTheDocument();
   });
@@ -363,7 +373,7 @@ describe("AgentConnectionTabContent", () => {
         onConnectionConfigChange={onConnectionConfigChange}
         onSave={jest.fn()}
         isSaving={false}
-      />
+      />,
     );
 
     expect(screen.getByText("Verified")).toBeInTheDocument();
@@ -387,7 +397,7 @@ describe("AgentConnectionTabContent", () => {
         onConnectionConfigChange={jest.fn()}
         onSave={jest.fn()}
         isSaving={false}
-      />
+      />,
     );
 
     // Both the mobile card layout and the desktop inline row render their own
@@ -416,7 +426,7 @@ describe("AgentConnectionTabContent", () => {
       .getAllByRole("button")
       .filter(
         (b) =>
-          b.querySelector("path")?.getAttribute("d") === "M6 18L18 6M6 6l12 12"
+          b.querySelector("path")?.getAttribute("d") === "M6 18L18 6M6 6l12 12",
       );
     await user.click(removeButtons[0]);
     expect(onAgentHeadersChange).toHaveBeenCalledWith([]);
@@ -426,7 +436,7 @@ describe("AgentConnectionTabContent", () => {
     const user = setupUser();
     const { onAgentUrlChange } = renderComponent();
     const urlInput = screen.getByPlaceholderText(
-      "https://your-agent.example.com/chat"
+      "https://your-agent.example.com/chat",
     );
     await user.type(urlInput, "h");
     expect(onAgentUrlChange).toHaveBeenCalledWith("h");
@@ -436,19 +446,18 @@ describe("AgentConnectionTabContent", () => {
     const user = setupUser();
     const { onConnectionConfigChange } = renderComponent();
 
-    expect(
-      screen.queryByText("Model provider")
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Model provider")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByText("Support benchmarking different models").parentElement!
-        .querySelector("button") as HTMLButtonElement
+      screen
+        .getByText("Support benchmarking different models")
+        .parentElement!.querySelector("button") as HTMLButtonElement,
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
         supports_benchmark: true,
         benchmark_provider: "openrouter",
-      })
+      }),
     );
   });
 
@@ -480,7 +489,7 @@ describe("AgentConnectionTabContent", () => {
     const select = screen.getByDisplayValue("OpenRouter (all providers)");
     fireEvent.change(select, { target: { value: "anthropic" } });
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
-      expect.objectContaining({ benchmark_provider: "anthropic" })
+      expect.objectContaining({ benchmark_provider: "anthropic" }),
     );
   });
 
@@ -494,14 +503,15 @@ describe("AgentConnectionTabContent", () => {
     });
 
     await user.click(
-      screen.getByText("Support benchmarking different models").parentElement!
-        .querySelector("button") as HTMLButtonElement
+      screen
+        .getByText("Support benchmarking different models")
+        .parentElement!.querySelector("button") as HTMLButtonElement,
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
         supports_benchmark: false,
         benchmark_provider: "google",
-      })
+      }),
     );
   });
 
@@ -509,28 +519,26 @@ describe("AgentConnectionTabContent", () => {
     const user = setupUser();
     renderComponent();
 
-    expect(
-      screen.getByText(/"response": "Aapki beti/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/"response": "Aapki beti/)).toBeInTheDocument();
     expect(screen.queryByText(/tool_calls/)).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByText("Does your agent return tool calls?")
-    );
+    await user.click(screen.getByText("Does your agent return tool calls?"));
     expect(screen.getByText(/tool_calls/)).toBeInTheDocument();
     expect(
-      screen.getByText(/is optional\. Include the tool/)
+      screen.getByText(/is optional\. Include the tool/),
     ).toBeInTheDocument();
   });
 
   it("documents the optional metrics object for latency, cost, and tokens", () => {
     renderComponent();
     expect(
-      screen.getByText(/You can also include an optional/)
+      screen.getByText(/You can also include an optional/),
     ).toBeInTheDocument();
     expect(screen.getByText(/"cost": 0.0021/)).toBeInTheDocument();
     expect(
-      screen.getByText(/compare models on\s+the tradeoff between quality, cost, and speed/)
+      screen.getByText(
+        /compare models on\s+the tradeoff between quality, cost, and speed/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -588,7 +596,6 @@ describe("AgentConnectionTabContent", () => {
     expect(lastDefaultInputs(onConnectionConfigChange)).toEqual({ n: 42 });
   });
 
-
   it("flags a reserved custom field name and excludes it", () => {
     const { onConnectionConfigChange } = renderComponent();
 
@@ -633,5 +640,54 @@ describe("AgentConnectionTabContent", () => {
     // verification, which only depends on the URL and headers.
     expect(screen.getByText("Verified")).toBeInTheDocument();
     expect(screen.queryByText("Not verified")).not.toBeInTheDocument();
+  });
+});
+
+describe("AgentConnectionTabContent request example", () => {
+  it("shows a conversation history for a conversation agent", () => {
+    renderComponent();
+    expect(
+      screen.getByText(/"messages": \[/, { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Calibrate will create a POST request to this URL/),
+    ).toHaveTextContent("conversation messages");
+  });
+
+  it("shows one piece of text for a general agent", () => {
+    renderComponent({ agentNature: "general" });
+    expect(
+      screen.getByText(
+        /"input": "Meri beti ka vaccination schedule kya hai\?"/,
+        { exact: false },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/"messages":/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Calibrate will create a POST request to this URL/),
+    ).toHaveTextContent("with the input");
+  });
+});
+
+describe("AgentConnectionTabContent code examples", () => {
+  it("puts a copy button on every code example", () => {
+    renderComponent({
+      connectionConfig: makeConfig({ supports_benchmark: true }),
+    });
+
+    // Request body, the same body with the model field, the response format,
+    // and the metrics example.
+    expect(
+      screen.getAllByRole("button", { name: /^Copy/ }).length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      screen.getByRole("button", { name: "Copy the request body" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy the response format" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy the metrics example" }),
+    ).toBeInTheDocument();
   });
 });
