@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser, within } from "@/test-utils";
+import { render, screen, setupUser, within, fireEvent } from "@/test-utils";
 import {
   StatusIcon,
   LabellingRowCheckbox,
@@ -11,6 +11,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResizeHandle,
   scrollRowByPage,
   isTypingTarget,
   ResultPager,
@@ -449,6 +450,17 @@ describe("formatTurnTimestamp", () => {
   });
   it("stringifies a non-string, non-nullish value", () => {
     expect(formatTurnTimestamp(1700000000000)).not.toBeNull();
+  });
+});
+
+describe("ResizeHandle", () => {
+  it("labels itself as a vertical separator and fires the drag handler", async () => {
+    const onMouseDown = jest.fn();
+    render(<ResizeHandle onMouseDown={onMouseDown} label="Resize test list" />);
+    const handle = screen.getByRole("separator", { name: "Resize test list" });
+    expect(handle).toHaveAttribute("aria-orientation", "vertical");
+    fireEvent.mouseDown(handle);
+    expect(onMouseDown).toHaveBeenCalledTimes(1);
   });
 });
 

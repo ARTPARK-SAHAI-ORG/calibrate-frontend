@@ -9,6 +9,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResizeHandle,
   isTypingTarget,
   scrollRowByPage,
   type PagerNav,
@@ -18,6 +19,7 @@ import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -225,6 +227,7 @@ export function BenchmarkOutputsPanel({
   // Size the model-list column to fit the longest model name so it never
   // truncates. Budget extra room for the chevron, gaps, padding, and the
   // per-model pass/fail counts; clamp so it stays reasonable on both ends.
+  // Also user-resizable from there, same as the evaluators panel.
   const longestModelNameChars = useMemo(
     () =>
       modelResults.reduce(
@@ -233,7 +236,15 @@ export function BenchmarkOutputsPanel({
       ),
     [modelResults, formatModelName],
   );
-  const listColumnWidth = `clamp(18rem, calc(${longestModelNameChars} * 0.5rem + 11rem), 32rem)`;
+  // ponytail: the auto-fit default is only computed once, at mount — it
+  // won't re-fit if a longer model name streams in later. Upgrade to a
+  // "hasn't been manually resized yet" flag if that turns out to matter.
+  const defaultListWidth = Math.min(
+    512,
+    Math.max(288, longestModelNameChars * 8 + 176),
+  );
+  const listPanel = useResizableWidth(defaultListWidth, 288, 512, "grow-right");
+  const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   // If the active filter's status disappears (live runs change counts) or the
   // pills are hidden entirely, fall back to showing all tests.
@@ -379,10 +390,12 @@ export function BenchmarkOutputsPanel({
 
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
-      {/* Left Panel - Model list with tests */}
+      {/* Left Panel - Model list with tests. The border between this and
+          the middle panel comes from the resize handle below, not this
+          div, so the hover state covers the whole divider. */}
       <div
-        style={{ "--list-w": listColumnWidth } as React.CSSProperties}
-        className={`w-full md:w-[var(--list-w)] shrink-0 border-r border-border flex flex-col overflow-hidden ${
+        style={{ "--list-w": `${listPanel.width}px` } as React.CSSProperties}
+        className={`w-full md:w-[var(--list-w)] shrink-0 flex flex-col overflow-hidden ${
           selectedTest ? "hidden md:flex" : "flex"
         }`}
       >
@@ -520,9 +533,11 @@ export function BenchmarkOutputsPanel({
         </div>
       </div>
 
+      <ResizeHandle onMouseDown={listPanel.startDrag} label="Resize model list" />
+
       {/* Middle Panel - Test Details */}
       <div
-        className={`flex-1 ${selectedTest ? "flex" : "hidden md:flex"} flex-col overflow-hidden`}
+        className={`flex-1 min-w-0 ${selectedTest ? "flex" : "hidden md:flex"} flex-col overflow-hidden`}
       >
         {/* Mobile Back Button */}
         {selectedTest && onClearSelection && (
@@ -587,22 +602,33 @@ export function BenchmarkOutputsPanel({
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedTestResult && !selectedTestResult.error && selectedTestResult.passed !== null && (
-        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <EvaluationCriteriaPanel
-              testName={selectedTestName}
-              evaluation={selectedTestResult.test_case?.evaluation}
-              inputs={selectedTestResult.inputs}
-              testCaseEvaluators={selectedTestResult.test_case?.evaluators}
-              passed={selectedTestResult.passed}
-              judgeResults={selectedTestResult.judge_results}
-              reasoning={selectedTestResult.reasoning}
-              evaluatorsByUuid={evaluatorsByUuid}
-              enableEvaluatorLinks={enableEvaluatorLinks}
-              legacyDefaultEvaluator={legacyDefaultEvaluator}
-            />
+        <>
+          <ResizeHandle
+            onMouseDown={verdictPanel.startDrag}
+            label="Resize evaluators panel"
+          />
+          <div
+            style={
+              { "--verdict-w": `${verdictPanel.width}px` } as React.CSSProperties
+            }
+            className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
+          >
+            <div className="flex-1 overflow-y-auto">
+              <EvaluationCriteriaPanel
+                testName={selectedTestName}
+                evaluation={selectedTestResult.test_case?.evaluation}
+                inputs={selectedTestResult.inputs}
+                testCaseEvaluators={selectedTestResult.test_case?.evaluators}
+                passed={selectedTestResult.passed}
+                judgeResults={selectedTestResult.judge_results}
+                reasoning={selectedTestResult.reasoning}
+                evaluatorsByUuid={evaluatorsByUuid}
+                enableEvaluatorLinks={enableEvaluatorLinks}
+                legacyDefaultEvaluator={legacyDefaultEvaluator}
+              />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

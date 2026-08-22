@@ -1324,6 +1324,27 @@ export function TestDetailView({
   );
 }
 
+// A draggable divider between two columns, wired to a useResizableWidth
+// hook's startDrag. Desktop-only — the side columns it sits between are
+// full-width and stacked on mobile, so there's nothing to resize there.
+export function ResizeHandle({
+  onMouseDown,
+  label,
+}: {
+  onMouseDown: (e: React.MouseEvent) => void;
+  label: string;
+}) {
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      onMouseDown={onMouseDown}
+      className="hidden md:block w-1 shrink-0 cursor-col-resize bg-border hover:bg-accent active:bg-accent transition-colors"
+    />
+  );
+}
+
 // Shared Empty State Component
 export function EmptyStateView({ message }: { message: string }) {
   return (
