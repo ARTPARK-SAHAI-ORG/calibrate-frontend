@@ -6,6 +6,9 @@ import { convertTracesToTests } from "@/lib/tracesApi";
 
 jest.mock("../../../lib/evaluatorApi", () => ({
   __esModule: true,
+  // Keep the real helpers: the create flow this dialog opens uses several of
+  // them, and listing each one by hand breaks whenever a new one is added.
+  ...jest.requireActual("../../../lib/evaluatorApi"),
   fetchAllEvaluators: jest.fn(),
   fetchAgentEvaluators: jest.fn(),
   hasEvaluatorVariables: (e: {
