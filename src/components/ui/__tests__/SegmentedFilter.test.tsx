@@ -88,6 +88,10 @@ describe("SegmentedFilter", () => {
       />,
     );
     expect(container.firstChild).toHaveClass("mt-2");
-    expect(container.firstChild).toHaveAttribute("aria-label", "Filter items");
+    // Asked for by role, not by attribute: the label only reaches a screen
+    // reader because the row of pills is marked as a group.
+    expect(
+      screen.getByRole("group", { name: "Filter items" }),
+    ).toBeInTheDocument();
   });
 });

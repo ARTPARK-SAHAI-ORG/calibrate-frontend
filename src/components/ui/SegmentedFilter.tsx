@@ -41,6 +41,7 @@ export function SegmentedFilter<T extends string>({
 
   return (
     <div
+      role="group"
       aria-label={ariaLabel}
       className={`flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5 ${className}`}
     >
