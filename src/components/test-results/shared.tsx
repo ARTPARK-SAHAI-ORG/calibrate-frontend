@@ -1027,12 +1027,9 @@ export function TestDetailView({
           </div>
           <div className="border border-border rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-foreground">
-                  Output
-                </h3>
-                {showVerdict && <SmallStatusBadge passed={passed} />}
-              </div>
+              <h3 className="text-sm font-semibold text-foreground">
+                Output
+              </h3>
               {showLegacyReasoningToggle && (
                 <ReasoningToggleButton
                   open={legacyReasoningOpen}

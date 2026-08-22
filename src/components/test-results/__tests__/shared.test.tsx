@@ -790,11 +790,11 @@ describe("TestDetailView", () => {
 
   describe("a Single Agent Response test (evaluation.type === \"general\")", () => {
     it("renders the input and output as a box pair instead of chat bubbles", () => {
-      render(
+      const { container } = render(
         <TestDetailView
           history={[{ role: "user", content: "What is 2+2?" }]}
           output={{ response: "4" }}
-          passed={true}
+          passed={false}
           evaluation={{ type: "general" }}
         />,
       );
@@ -802,8 +802,11 @@ describe("TestDetailView", () => {
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
       expect(screen.getByText("Output")).toBeInTheDocument();
       expect(screen.getByText("4")).toBeInTheDocument();
-      // No chat-bubble chrome for either turn.
+      // No chat-bubble chrome for either turn, and no pass/fail badge on the
+      // Output box — the verdict already shows once, per evaluator, in the
+      // criteria panel next to it.
       expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+      expect(container.querySelector(".bg-red-500\\/20")).toBeNull();
     });
 
     it("renders output tool calls in the Output box", () => {
