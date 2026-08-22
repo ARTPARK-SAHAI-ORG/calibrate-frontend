@@ -36,6 +36,107 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(isLabellingEligibleRaw({})).toBe(false);
   });
 
+  it("treats a single agent response test as eligible, but not its tool-call test", () => {
+    expect(
+      isLabellingEligibleRaw({ test_case: { evaluation: { type: "general" } } }),
+    ).toBe(true);
+    expect(
+      isLabellingEligibleRaw({
+        test_case: { evaluation: { type: "tool_call" }, input: "hi" },
+      }),
+    ).toBe(false);
+  });
+
+  it("builds a single agent response run as input and output, skipping its tool-call tests", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-general01",
+      results: [
+        {
+          test_case: {
+            name: "Summarise",
+            evaluation: { type: "general" },
+            input: "Summarise this report",
+            evaluators: [
+              { evaluator_uuid: "ev-9", variable_values: { tone: "brief" } },
+            ],
+          },
+          output: { response: "Here is the summary." },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        {
+          test_case: {
+            name: "Calls the tool",
+            evaluation: { type: "tool_call" },
+            input: "book it",
+          },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+
+    expect(targetTaskTypeForSource(source)).toBe("llm-general");
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(1);
+    expect(result.items[0].payload).toEqual({
+      name: "Summarise — run-uuid",
+      input: "Summarise this report",
+      output: "Here is the summary.",
+      evaluator_variables: { "ev-9": { tone: "brief" } },
+    });
+    expect(result.evaluatorUuids.has("ev-9")).toBe(true);
+  });
+
+  it("reads a single agent response test's input from its one-turn history when the run does not echo input", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-general02",
+      results: [
+        {
+          test_case: {
+            name: "No echoed input",
+            evaluation: { type: "general" },
+            history: [{ role: "user", content: "widened input" }],
+          },
+          output: { response: "reply" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+
+    const result = buildItemsFromSource(source);
+    expect(result.items[0].payload.input).toBe("widened input");
+    expect(result.items[0].payload.chat_history).toBeUndefined();
+  });
+
+  it("targets an Agent Response task for a single agent response benchmark", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-general1",
+      modelResults: [
+        {
+          model: "m-1",
+          test_results: [
+            {
+              test_case: {
+                name: "Summarise",
+                evaluation: { type: "general" },
+                input: "in",
+              },
+              output: { response: "out" },
+            },
+          ],
+        } as unknown as import("@/components/eval-details").BenchmarkModelResult,
+      ],
+    };
+
+    expect(targetTaskTypeForSource(source)).toBe("llm-general");
+    const result = buildItemsFromSource(source);
+    expect(result.items[0].payload).toMatchObject({
+      name: "Summarise — bench-uu — m-1",
+      input: "in",
+      output: "out",
+    });
+  });
+
   it("builds items from a test_run source, skipping ineligible tests", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
