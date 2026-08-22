@@ -75,7 +75,7 @@ async function createUnattachedLlmEvaluator(
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
+  await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({

@@ -43,7 +43,7 @@ async function createEvaluator(page: Page, name: string) {
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
+  await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   const card = page.getByRole("link", { name: `Open ${name}` });
@@ -109,7 +109,7 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     });
 
     // Name it and create.
-    await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
+    await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
     await page.getByRole("button", { name: "Create evaluator" }).click();
 
     // The new evaluator card appears on the "My evaluators" tab.
