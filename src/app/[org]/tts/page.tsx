@@ -842,7 +842,7 @@ function TTSPageInner() {
         {activeTab === "evaluators" && (
           <EvaluatorLibraryPanel
             evaluatorType="tts"
-            description="These evaluators score the audio each model produces"
+            description="These evaluators score the speech each model produces"
           />
         )}
       </div>

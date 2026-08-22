@@ -143,8 +143,7 @@ export function EvaluatorLibraryPanel({
             No evaluators yet
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
-            {description}. Create one here and it is ready to pick the next time
-            you start an evaluation.
+            {description}. Create one to use it in your next evaluation.
           </p>
           {createButton}
         </div>
