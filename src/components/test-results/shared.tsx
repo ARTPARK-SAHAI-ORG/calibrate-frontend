@@ -573,7 +573,9 @@ export function ToolCallCard({
   return (
     <div className="bg-muted border border-border rounded-2xl p-4">
       <div
-        className={`flex items-center gap-2 ${showParams || hasOutput ? "mb-2" : ""}`}
+        className={`flex items-center gap-2 ${
+          showParams || hasOutput || (collapsible && !open) ? "mb-2" : ""
+        }`}
       >
         <ToolIcon className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">{toolName}</span>
@@ -982,9 +984,6 @@ export function TestDetailView({
         });
   const hasJudgeResults =
     Array.isArray(effectiveJudgeResults) && effectiveJudgeResults.length > 0;
-  const [legacyReasoningOpen, setLegacyReasoningOpen] = useState(false);
-  const showLegacyReasoningToggle =
-    !hasJudgeResults && !!reasoning?.trim();
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
   const outputAccent = showVerdict
     ? passed
@@ -1154,23 +1153,7 @@ export function TestDetailView({
                   </span>
                   {showVerdict && <SmallStatusBadge passed={passed} />}
                 </div>
-                {showLegacyReasoningToggle && (
-                  <ReasoningToggleButton
-                    open={legacyReasoningOpen}
-                    onToggle={() => setLegacyReasoningOpen((o) => !o)}
-                  />
-                )}
               </div>
-              {showLegacyReasoningToggle && legacyReasoningOpen && (
-                <div className="mb-2">
-                  <ReasoningExpandedContent
-                    text={reasoning!}
-                    showReasoningLabel={false}
-                    mutedBody
-                    italic
-                  />
-                </div>
-              )}
               <div className="max-w-[88%] md:max-w-3/4 w-fit">
                 <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                   <p className="text-sm text-foreground whitespace-pre-wrap">

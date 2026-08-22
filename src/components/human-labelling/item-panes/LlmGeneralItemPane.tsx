@@ -1,4 +1,4 @@
-import { Section } from "./shared";
+import { LabelledValue, Section } from "./shared";
 
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.
@@ -31,16 +31,8 @@ export function LlmGeneralItemPane({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Section title="Input">
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {input || "—"}
-        </p>
-      </Section>
-      <Section title="Output">
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {output || "—"}
-        </p>
-      </Section>
+      <LabelledValue label="Input">{input || "—"}</LabelledValue>
+      <LabelledValue label="Output">{output || "—"}</LabelledValue>
     </div>
   );
 }

@@ -1157,7 +1157,7 @@ describe("TestRunnerDialog", () => {
         screen.getByRole("button", { name: "Submit for labelling" }),
       );
       expect(toast.error).toHaveBeenCalledWith(
-        "Tool-call tests can't be submitted for labelling",
+        "None of the selected tests can be submitted for labelling",
       );
       expect(screen.queryByTestId("labelling-dialog")).not.toBeInTheDocument();
     });

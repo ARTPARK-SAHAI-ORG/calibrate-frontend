@@ -1512,7 +1512,7 @@ export function AddToolDialog({
                     {/* Name */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Name <span className="text-red-500">*</span>
+                        Name
                       </label>
                       <input
                         type="text"
@@ -1546,10 +1546,7 @@ export function AddToolDialog({
                     {/* Description (required only for webhook tools) */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Description{" "}
-                        {toolType === "webhook" && (
-                          <span className="text-red-500">*</span>
-                        )}
+                        Description
                       </label>
                       <textarea
                         value={toolDescription}
@@ -1622,7 +1619,7 @@ export function AddToolDialog({
                           </div>
                           <div className="flex-1">
                             <label className="block text-sm font-medium mb-2">
-                              URL <span className="text-red-500">*</span>
+                              URL
                             </label>
                             <input
                               type="text"
@@ -1752,7 +1749,7 @@ export function AddToolDialog({
                           {/* Name */}
                           <div>
                             <label className="block text-sm font-medium mb-2">
-                              Name <span className="text-red-500">*</span>
+                              Name
                             </label>
                             <input
                               type="text"
@@ -1783,7 +1780,7 @@ export function AddToolDialog({
                           {/* Value */}
                           <div>
                             <label className="block text-sm font-medium mb-2">
-                              Value <span className="text-red-500">*</span>
+                              Value
                             </label>
                             <input
                               type="text"
@@ -1941,8 +1938,7 @@ export function AddToolDialog({
                           {/* Body Description */}
                           <div>
                             <label className="block text-sm font-medium mb-2">
-                              Description{" "}
-                              <span className="text-red-500">*</span>
+                              Description
                             </label>
                             <textarea
                               value={bodyDescription}

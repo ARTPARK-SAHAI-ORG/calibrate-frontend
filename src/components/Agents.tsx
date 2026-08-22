@@ -813,7 +813,7 @@ function NewAgentDialog({
             {/* Agent Name Input */}
             <div className="mb-5">
               <label className="block text-[13px] font-medium text-foreground mb-2">
-                Agent name <span className="text-red-500">*</span>
+                Agent name
               </label>
               <div className="relative">
                 <input

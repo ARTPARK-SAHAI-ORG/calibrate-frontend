@@ -42,7 +42,7 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
   return (
     <div>
       <label className="block text-xs md:text-sm font-medium mb-1">
-        Rating scale <span className="text-red-500">*</span>
+        Rating scale
       </label>
       <p className="text-xs md:text-sm text-muted-foreground mb-2">
         {description}

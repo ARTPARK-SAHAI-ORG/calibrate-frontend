@@ -102,7 +102,7 @@ export const ParameterCard = ({
         {!isArrayItem && (
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">
-              Name <span className="text-red-500">*</span>
+              Name
             </label>
             <input
               type="text"
@@ -164,8 +164,7 @@ export const ParameterCard = ({
       {/* Description */}
       <div>
         <label className="block text-sm font-medium mb-2">
-          Description{" "}
-          {requireDescription && <span className="text-red-500">*</span>}
+          Description
         </label>
         <textarea
           value={param.description}
@@ -201,7 +200,7 @@ export const ParameterCard = ({
       {param.dataType === "object" && (
         <div>
           <label className="block text-sm font-medium mb-2">
-            Properties <span className="text-red-500">*</span>
+            Properties
           </label>
           <NestedContainer
             onAddProperty={() =>

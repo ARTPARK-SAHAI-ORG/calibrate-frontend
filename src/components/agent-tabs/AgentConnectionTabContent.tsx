@@ -397,7 +397,7 @@ export function AgentConnectionTabContent({
           {/* Agent URL */}
           <div className="space-y-1.5">
             <label className="block text-sm md:text-base font-medium text-foreground">
-              Agent URL <span className="text-red-500">*</span>
+              Agent URL
             </label>
             <input
               type="url"

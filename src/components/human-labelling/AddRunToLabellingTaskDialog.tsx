@@ -9,16 +9,22 @@ import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
 import {
   outputToolCallsToHistory,
+  type TestCaseEvaluation,
   type TestCaseHistory,
   type TestRunEvaluator,
   type ToolCallOutput,
 } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
 
-// Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
-// STT runs → "stt", TTS runs → "tts", simulation runs → "conversation" (their
-// transcript is a conversation). The type is derived from the source
-// (`targetTaskTypeForSource`), never chosen by the user.
+// One expected tool call as declared on a tool-call test's evaluation config.
+export type ExpectedToolCall = NonNullable<
+  TestCaseEvaluation["tool_calls"]
+>[number];
+
+// Each source kind maps to a task type: llm tests/benchmarks → "llm" (tool-call
+// tests are labelled inside `llm` tasks too), STT runs → "stt", TTS runs →
+// "tts", simulation runs → "conversation", general-agent traces → "llm-general".
+// The type is derived from the source (`targetTaskTypeForSource`), never chosen.
 export const SUPPORTED_TARGET_TASK_TYPES = [
   "llm",
   "llm-general",
@@ -125,7 +131,51 @@ export type AddRunToLabellingTaskSource =
       agentNature?: "conversation" | "general";
     };
 
-/** The single task type each source kind targets. */
+// Iterate the raw test cases of a test_run / benchmark_run source. No-op for
+// other source kinds.
+function forEachRawTest(
+  source: AddRunToLabellingTaskSource,
+  visit: (raw: RawTestCaseLike) => void,
+): void {
+  if (source.type === "test_run") {
+    for (const r of source.results) visit(r as RawTestCaseLike);
+  } else if (source.type === "benchmark_run") {
+    for (const mr of source.modelResults) {
+      for (const r of mr.test_results ?? []) visit(r as RawTestCaseLike);
+    }
+  }
+}
+
+/** The task type a source targets. */
+// Which labelling task type a trace goes to: a trace with a text reply is an
+// A trace is labellable if it either replied or made a tool call (both become
+// items in an `llm` task — a tool-call trace is labelled correct/wrong by a
+// human). A trace with neither can't be labelled.
+export function traceLabellingType(
+  t: TraceLabellingItem,
+): SupportedTaskType | null {
+  const hasResponse =
+    typeof t.output?.response === "string" && t.output.response.trim().length > 0;
+  if (hasResponse) return "llm";
+  if (Array.isArray(t.output?.tool_calls) && t.output.tool_calls.length > 0) {
+    return "llm";
+  }
+  return null;
+}
+
+// True when a trace's output is a tool call (no text reply). Such traces are
+// built as tool-call items (correct/wrong by a human) rather than response
+// items.
+export function isToolCallTrace(t: TraceLabellingItem): boolean {
+  const hasResponse =
+    typeof t.output?.response === "string" && t.output.response.trim().length > 0;
+  return (
+    !hasResponse &&
+    Array.isArray(t.output?.tool_calls) &&
+    t.output.tool_calls.length > 0
+  );
+}
+
 export function targetTaskTypeForSource(
   source: AddRunToLabellingTaskSource,
 ): SupportedTaskType {
@@ -136,9 +186,13 @@ export function targetTaskTypeForSource(
       return "tts";
     case "simulation_run":
       return "conversation";
+    // Response and tool-call tests both become items in an `llm` task.
+    case "test_run":
+    case "benchmark_run":
+      return "llm";
     case "traces":
+      // A general agent's traces are labelled as input + output text.
       return source.agentNature === "general" ? "llm-general" : "llm";
-    // test_run / benchmark_run both target "llm".
     default:
       return "llm";
   }
@@ -237,7 +291,7 @@ function parseApiError(err: unknown, fallback: string): string {
 type RawTestCaseLike = {
   test_case?: {
     name?: string;
-    evaluation?: { type?: string } | null;
+    evaluation?: { type?: string; tool_calls?: ExpectedToolCall[] | null } | null;
     history?: TestCaseHistory[] | null;
     evaluators?: Array<{
       evaluator_uuid?: string | null;
@@ -255,9 +309,54 @@ type RawTestCaseLike = {
   }> | null;
 };
 
-/** Response (next-reply) tests can be added to LLM labelling tasks; tool-call tests cannot. */
+/**
+ * Which labelling task type a test can be submitted to. Response and tool-call
+ * tests both go to an `llm` task (a tool-call test becomes a tool-call item a
+ * human marks correct/wrong). Returns null for tests that can't be labelled.
+ */
+export function labellingTaskTypeForRaw(
+  raw: RawTestCaseLike,
+): SupportedTaskType | null {
+  const type = raw.test_case?.evaluation?.type;
+  // Response and tool-call tests both go to an `llm` task — a tool-call test
+  // becomes a tool-call item a human marks correct/wrong (no criteria needed).
+  if (type === "response" || type === "tool_call") return "llm";
+  return null;
+}
+
+/** True for a tool-call test (built as a tool-call item, not a response item). */
+export function isToolCallTest(raw: RawTestCaseLike): boolean {
+  return raw.test_case?.evaluation?.type === "tool_call";
+}
+
+/** Response and tool-call tests can both be submitted for labelling. */
 export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
-  return raw.test_case?.evaluation?.type === "response";
+  return labellingTaskTypeForRaw(raw) !== null;
+}
+
+// Build a tool-call item — a normal item inside an `llm` task, carrying the
+// expected match spec and the agent's actual tool calls. A human marks it
+// correct/wrong; AI judges skip it. `actual_tool_calls` marks it as a
+// tool-call item (see `isToolCallOutputItem`).
+function buildToolCallItem(raw: RawTestCaseLike, nameOverride?: string): BuiltItem {
+  const name =
+    nameOverride ??
+    raw.test_case?.name ??
+    raw.test_name ??
+    raw.name ??
+    "Untitled test";
+  return {
+    payload: {
+      name,
+      chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
+      expected_tool_calls: raw.test_case?.evaluation?.tool_calls ?? [],
+      actual_tool_calls: raw.output?.tool_calls ?? [],
+      // When the agent replied with text instead of calling a tool (a failed
+      // tool-call test), keep the reply so the annotator sees what the agent
+      // actually did rather than an empty tool-call panel.
+      agent_response: raw.output?.response ?? "",
+    },
+  };
 }
 
 function buildOneItem(
@@ -337,48 +436,51 @@ export function buildItemsFromSource(
         source.type === "test_run"
           ? source.runUuid.slice(0, 8)
           : source.benchmarkUuid.slice(0, 8);
+      // Response and tool-call tests both become items in the `llm` task: a
+      // response test → a response item, a tool-call test → a tool-call item
+      // (correct/wrong by a human).
+      const handleRaw = (raw: RawTestCaseLike, fullName: string) => {
+        if (!isLabellingEligibleRaw(raw)) {
+          skippedCount += 1;
+          return;
+        }
+        if (isToolCallTest(raw)) {
+          items.push(buildToolCallItem(raw, fullName));
+          return;
+        }
+        const built = buildOneItem(raw, fullName);
+        if (!built) {
+          skippedCount += 1;
+          return;
+        }
+        items.push(built.item);
+        for (const id of built.evaluatorUuids) evaluatorUuids.add(id);
+      };
       if (source.type === "test_run") {
         for (const r of source.results) {
           const raw = r as RawTestCaseLike;
           const baseName =
             raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-          const built = buildOneItem(raw, `${baseName} — ${runSuffix}`);
-          if (!built) {
-            skippedCount += 1;
-            continue;
-          }
-          items.push(built.item);
-          for (const id of built.evaluatorUuids) evaluatorUuids.add(id);
+          handleRaw(raw, `${baseName} — ${runSuffix}`);
         }
       } else {
         for (const mr of source.modelResults) {
-          const testResults = mr.test_results ?? [];
-          for (const r of testResults) {
+          for (const r of mr.test_results ?? []) {
             const raw = r as RawTestCaseLike;
             const baseName =
               raw.test_case?.name ??
               raw.test_name ??
               raw.name ??
               "Untitled test";
-            const built = buildOneItem(
-              raw,
-              `${baseName} — ${runSuffix} — ${mr.model}`,
-            );
-            if (!built) {
-              skippedCount += 1;
-              continue;
-            }
-            items.push(built.item);
-            for (const id of built.evaluatorUuids) evaluatorUuids.add(id);
+            handleRaw(raw, `${baseName} — ${runSuffix} — ${mr.model}`);
           }
         }
       }
       // `evaluatorUuids` is built from the SELECTED tests' per-test echoes
-      // (judge_results / test_case.evaluators), so the evaluator set — and
-      // therefore the task filter and new-task evaluator_ids — reflects only
-      // the tests being submitted. Fall back to the run-level evaluators[]
-      // only when those echoes are entirely absent (sparse run payloads), so
-      // we never produce an item set with zero evaluators.
+      // (judge_results / test_case.evaluators). Fall back to the run-level
+      // evaluators[] only when those echoes are entirely absent (sparse run
+      // payloads). Tool-call items carry no evaluators, but response items in
+      // the same task do.
       if (evaluatorUuids.size === 0) {
         for (const ev of source.evaluators ?? []) {
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
@@ -456,13 +558,31 @@ export function buildItemsFromSource(
         }
         return { items, skippedCount, evaluatorUuids };
       }
+      // Conversational traces all go to an `llm` task: a reply trace → a
+      // response item, a tool-call-only trace → a tool-call item (a human marks
+      // it correct/wrong; a trace has no expected calls, so those stay empty).
       for (const t of source.traces) {
+        if (traceLabellingType(t) === null) {
+          skippedCount += 1;
+          continue;
+        }
+        if (isToolCallTrace(t)) {
+          items.push(
+            buildToolCallItem({
+              test_case: {
+                name: t.name,
+                history: t.input as TestCaseHistory[],
+                evaluation: { type: "tool_call", tool_calls: [] },
+              },
+              output: t.output as { tool_calls?: ToolCallOutput[] },
+            }),
+          );
+          continue;
+        }
         const built = buildOneItem({
           test_case: {
             name: t.name,
             history: t.input as TestCaseHistory[],
-            // Required: buildOneItem drops anything whose evaluation type is
-            // not "response", so without this every trace is silently skipped.
             evaluation: { type: "response" },
           },
           output: t.output as {
@@ -476,9 +596,8 @@ export function buildItemsFromSource(
         }
         items.push(built.item);
       }
-      // A trace has no run and therefore no judge results, so its items carry
-      // no evaluator variables. The evaluators come wholesale from the source
-      // (the caller asks the user to pick them).
+      // A trace has no run and therefore no judge results, so evaluators come
+      // wholesale from the source (the caller asks the user to pick them).
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
@@ -758,7 +877,7 @@ export function AddRunToLabellingTaskDialog({
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-2">
-          Name <span className="text-red-500">*</span>
+          Name
         </label>
         <input
           autoFocus
@@ -871,7 +990,10 @@ export function AddRunToLabellingTaskDialog({
                     d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
                   />
                 </svg>
-                <span>Tool call tests are not added to labelling tasks</span>
+                <span>
+                  {skippedCount} {skippedCount === 1 ? "item" : "items"} could
+                  not be added for labelling.
+                </span>
               </div>
             )}
             {showExistingTaskPicker && (

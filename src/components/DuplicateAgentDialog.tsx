@@ -123,7 +123,7 @@ export function DuplicateAgentDialog({
         {/* Agent Name Input */}
         <div className="mb-6">
           <label className="block text-[13px] font-medium text-foreground mb-2">
-            Agent Name <span className="text-red-500">*</span>
+            Agent Name
           </label>
           <div className="relative">
             <input

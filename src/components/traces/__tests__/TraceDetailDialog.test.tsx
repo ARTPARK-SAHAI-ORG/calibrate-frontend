@@ -3,7 +3,7 @@ import { act, render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   TraceDetailDialog,
   humanTraceName,
-  toTestCaseOutput,
+  traceOutputToHistoryTurns,
   turnsToHistory,
 } from "../TraceDetailDialog";
 import { fetchTrace, TraceDetail } from "@/lib/tracesApi";
@@ -66,7 +66,7 @@ describe("humanTraceName", () => {
   });
 });
 
-describe("turnsToHistory / toTestCaseOutput", () => {
+describe("turnsToHistory / traceOutputToHistoryTurns", () => {
   it("drops the agent's instructions and keeps user, assistant tool calls, and tool results", () => {
     const history = turnsToHistory([
       { role: "system", content: "sys" },
@@ -106,13 +106,49 @@ describe("turnsToHistory / toTestCaseOutput", () => {
       { role: "tool", content: "42" },
     ]);
   });
-  it("returns a reply-only output", () => {
-    expect(toTestCaseOutput({ response: "hi", tool_calls: null })).toEqual({
-      response: "hi",
-    });
+  it("folds a reply-only output into one trailing assistant turn", () => {
+    expect(
+      traceOutputToHistoryTurns({ response: "hi", tool_calls: null }),
+    ).toEqual([{ role: "assistant", content: "hi" }]);
   });
-  it("returns undefined output when there is no reply and no tool calls", () => {
-    expect(toTestCaseOutput({ response: "  ", tool_calls: [] })).toBeUndefined();
+  it("returns no turns when there is no reply and no tool calls", () => {
+    expect(
+      traceOutputToHistoryTurns({ response: "  ", tool_calls: [] }),
+    ).toEqual([]);
+  });
+  it("folds a tool call into an assistant turn plus a matching tool-result turn", () => {
+    const turns = traceOutputToHistoryTurns({
+      tool_calls: [
+        { tool: "get_schedule", arguments: { child_age_weeks: 14 }, output: { ok: true } },
+      ],
+    });
+    expect(turns).toEqual([
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            id: "output-tool-0",
+            type: "function",
+            function: {
+              name: "get_schedule",
+              arguments: JSON.stringify({ child_age_weeks: 14 }),
+            },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        tool_call_id: "output-tool-0",
+        content: JSON.stringify({ ok: true }, null, 2),
+      },
+    ]);
+  });
+  it("folds a tool call with no recorded result into just the assistant turn", () => {
+    const turns = traceOutputToHistoryTurns({
+      tool_calls: [{ tool: "get_schedule", arguments: {} }],
+    });
+    expect(turns).toHaveLength(1);
+    expect(turns[0].role).toBe("assistant");
   });
 });
 
@@ -286,10 +322,12 @@ it("leaves no empty block where the agent's instructions were", async () => {
   );
 
   const question = await screen.findByText("When is the next vaccination?");
-  // The trace has three turns: instructions, the question, the tool call.
-  // Only the last two are drawn, so the conversation has two blocks.
+  // The trace has three input turns (instructions, the question, a tool
+  // call) plus its own output (a reply and a tool call), all drawn as one
+  // conversation. The instructions are dropped, so only 4 blocks show: the
+  // question, the input's tool call, the reply, and the output's tool call.
   const conversation = question.closest("div.space-y-4");
-  expect(conversation?.children).toHaveLength(2);
+  expect(conversation?.children).toHaveLength(4);
 });
 
 it("never shows the previous trace under the next one's heading", async () => {

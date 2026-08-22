@@ -9,9 +9,7 @@ import {
   ToolCallCard,
   normalizeToolCall,
   type TestCaseHistory,
-  type TestCaseOutput,
 } from "@/components/test-results/shared";
-import { Section } from "@/components/human-labelling/item-panes/shared";
 import {
   fetchTrace,
   traceInputTurns,
@@ -20,6 +18,10 @@ import {
   TraceOutput,
   TraceTurn,
 } from "@/lib/tracesApi";
+import {
+  LabelledValue,
+  ValueBox,
+} from "@/components/human-labelling/item-panes/shared";
 import { reportError } from "@/lib/reportError";
 import { formatTraceDate } from "./TracesTable";
 
@@ -109,24 +111,54 @@ export function turnsToHistory(input: TraceTurn[] | string): TestCaseHistory[] {
   return history;
 }
 
-export function toTestCaseOutput(
+/**
+ * Fold the trace's own output into trailing history turn(s) — the same
+ * "append the final answer as the last turn" shape `LlmItemPane` uses for a
+ * labelling item's agent response, so `highlightEvalTarget` can mark it the
+ * same "Evaluation target" way. A trace stores its output separately from
+ * the conversation it followed (unlike a labelling item's transcript, which
+ * already ends with the final turn), so this is what stitches the two back
+ * into one array to draw.
+ */
+export function traceOutputToHistoryTurns(
   output: TraceOutput,
-): TestCaseOutput | undefined {
+): TestCaseHistory[] {
   const response = output.response?.trim() || undefined;
-  const tool_calls = (output.tool_calls ?? [])
-    .filter((call) => call.tool)
-    .map((call) => ({
-      tool: call.tool,
-      arguments: call.arguments ?? {},
-      // Kept so a trace whose agent ran the tool shows the result the same
-      // way a test run does, instead of dropping it on the way through.
-      ...(call.output !== undefined ? { output: call.output } : {}),
-    }));
-  if (!response && tool_calls.length === 0) return undefined;
-  return {
-    ...(response ? { response } : {}),
-    ...(tool_calls.length > 0 ? { tool_calls } : {}),
-  };
+  const toolCalls = (output.tool_calls ?? []).filter((call) => call.tool);
+  const turns: TestCaseHistory[] = [];
+  // A turn that carries both text and a tool call renders as the tool call
+  // only (the same rule `TestDetailView` applies everywhere else), so a
+  // response alongside a tool call needs its own separate turn to actually
+  // show — otherwise the reply text silently disappears behind the call.
+  if (response) turns.push({ role: "assistant", content: response });
+  if (toolCalls.length > 0) {
+    turns.push({
+      role: "assistant",
+      tool_calls: toolCalls.map((call, index) => {
+        const { toolName, args } = normalizeToolCall(call);
+        return {
+          id: `output-tool-${index}`,
+          type: "function",
+          function: { name: toolName, arguments: JSON.stringify(args) },
+        };
+      }),
+    });
+    // A trace's own tool result (not part of the input conversation) is
+    // attached to the call itself, not as a separate turn — synthesise the
+    // matching tool turn so the inline "Tool Response" rendering picks it up.
+    toolCalls.forEach((call, index) => {
+      if (call.output === undefined) return;
+      turns.push({
+        role: "tool",
+        tool_call_id: `output-tool-${index}`,
+        content:
+          typeof call.output === "string"
+            ? call.output
+            : JSON.stringify(call.output, null, 2),
+      });
+    });
+  }
+  return turns;
 }
 
 /**
@@ -147,15 +179,10 @@ function PlainTraceView({
 
   return (
     <div className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Section title="Input">
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {input || "—"}
-        </p>
-      </Section>
-      <Section title="Output">
-        {response && (
-          <p className="text-sm whitespace-pre-wrap break-words">{response}</p>
-        )}
+      <LabelledValue label="Input">{input || "—"}</LabelledValue>
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold">Output</h3>
+        {response && <ValueBox>{response}</ValueBox>}
         {toolCalls.length > 0 && (
           <div className={`space-y-3 ${response ? "mt-3" : ""}`}>
             {toolCalls.map((call, index) => (
@@ -171,7 +198,7 @@ function PlainTraceView({
         {!response && toolCalls.length === 0 && (
           <p className="text-sm text-muted-foreground">—</p>
         )}
-      </Section>
+      </div>
     </div>
   );
 }
@@ -289,12 +316,11 @@ export function TraceDetailDialog({
 
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
 
-  const history = useMemo(
-    () => (trace ? turnsToHistory(trace.input) : []),
-    [trace],
-  );
-  const output = useMemo(
-    () => (trace ? toTestCaseOutput(trace.output) : undefined),
+  const historyWithOutput = useMemo(
+    () =>
+      trace
+        ? [...turnsToHistory(trace.input), ...traceOutputToHistoryTurns(trace.output)]
+        : [],
     [trace],
   );
 
@@ -357,10 +383,9 @@ export function TraceDetailDialog({
                 <PlainTraceView input={trace.input} output={trace.output} />
               ) : (
                 <TestDetailView
-                  history={history}
-                  output={output}
+                  history={historyWithOutput}
                   passed={true}
-                  showVerdict={false}
+                  highlightEvalTarget
                 />
               ))}
           </div>

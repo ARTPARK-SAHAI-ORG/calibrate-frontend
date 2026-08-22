@@ -57,6 +57,9 @@ type RunEvaluatorsDialogProps = {
   evaluators: LinkedEvaluator[];
   submitting: boolean;
   submitError: string | null;
+  /** How many chosen items are tool-call outputs that an AI judge will skip.
+   * When > 0, a warning is shown before running. */
+  toolCallSkipCount?: number;
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
@@ -88,6 +91,7 @@ export function RunEvaluatorsDialog({
   evaluators,
   submitting,
   submitError,
+  toolCallSkipCount = 0,
   onClose,
   onConfirm,
 }: RunEvaluatorsDialogProps) {
@@ -398,6 +402,16 @@ export function RunEvaluatorsDialog({
               );
             })}
             </>
+          )}
+          {toolCallSkipCount > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
+              {toolCallSkipCount} of the chosen{" "}
+              {toolCallSkipCount === 1 ? "item is a tool call" : "items are tool calls"}
+              . AI judges do not run on tool calls, so{" "}
+              {toolCallSkipCount === 1 ? "it is" : "they are"} skipped — a person
+              can label {toolCallSkipCount === 1 ? "it" : "them"} by hand. The
+              rest will be evaluated.
+            </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>

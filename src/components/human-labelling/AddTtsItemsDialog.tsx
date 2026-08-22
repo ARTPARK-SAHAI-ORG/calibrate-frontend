@@ -453,7 +453,7 @@ export function AddTtsItemsDialog({
                 {/* Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Name <span className="text-red-500">*</span>
+                    Name
                   </label>
                   <input
                     type="text"
@@ -472,7 +472,7 @@ export function AddTtsItemsDialog({
                 {/* Reference text */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Reference text <span className="text-red-500">*</span>
+                    Reference text
                   </label>
                   <textarea
                     value={row.text}
@@ -490,7 +490,7 @@ export function AddTtsItemsDialog({
                 {/* Audio */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Audio <span className="text-red-500">*</span>
+                    Audio
                   </label>
                   <input
                     ref={(el) => {

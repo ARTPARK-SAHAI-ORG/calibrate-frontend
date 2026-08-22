@@ -110,7 +110,7 @@ export function NewSimulationDialog({
         {/* Simulation Name Input */}
         <div className="mb-5 md:mb-6">
           <label className="block text-xs md:text-[13px] font-medium text-foreground mb-2">
-            Simulation Name <span className="text-red-500">*</span>
+            Simulation Name
           </label>
           <div className="relative">
             <input

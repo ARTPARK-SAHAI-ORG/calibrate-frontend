@@ -689,7 +689,7 @@ export default function ScenariosPage() {
                     {/* Label */}
                     <div>
                       <label className="block text-xs md:text-sm font-medium mb-2">
-                        Label <span className="text-red-500">*</span>
+                        Label
                       </label>
                       <input
                         type="text"
@@ -716,7 +716,7 @@ export default function ScenariosPage() {
                     {/* Description */}
                     <div>
                       <label className="block text-xs md:text-sm font-medium mb-1">
-                        Description <span className="text-red-500">*</span>
+                        Description
                       </label>
                       <p className="text-xs md:text-sm text-muted-foreground mb-2">
                         Define WHAT the persona should do (e.g. &quot;Call to

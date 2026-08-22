@@ -28,10 +28,9 @@ describe("RatingScaleEditor", () => {
     return { onChange, props };
   }
 
-  it("renders the description text and required marker", () => {
+  it("renders the description text", () => {
     setup();
     expect(screen.getByText("Rating scale")).toBeInTheDocument();
-    expect(screen.getByText("*")).toBeInTheDocument();
     expect(screen.getByText("Describe the scale")).toBeInTheDocument();
   });
 

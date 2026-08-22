@@ -53,6 +53,8 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
+import { isToolCallOutputItem } from "@/components/human-labelling/itemOutputType";
+import { taskItemsPage } from "@/components/human-labelling/taskItemsView";
 import {
   AgreementStatCard,
   agreementColor,
@@ -860,6 +862,7 @@ function ItemRowActions({
   onLabel,
   onEdit,
   onEvaluate,
+  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -867,6 +870,8 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
+  /** Tool-call outputs can't be AI-judged — the button is shown but disabled. */
+  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -888,8 +893,14 @@ function ItemRowActions({
         <button
           type="button"
           onClick={() => onEvaluate(itemUuid)}
+          disabled={evaluateDisabled}
           aria-label="Evaluate"
-          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+          title={
+            evaluateDisabled
+              ? "AI judges do not run on tool calls — label this item by hand."
+              : undefined
+          }
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Evaluate
         </button>
@@ -1727,7 +1738,27 @@ function LabellingTaskPageInner() {
     for (const it of task?.items ?? []) map.set(it.uuid, it);
     return map;
   }, [task?.items]);
+  // A task with no linked evaluators produces zero rows from /summary
+  // (rows are keyed by item × evaluator), so the count would read "1 item"
+  // while the table shows "No items on this page." This is the tool-call
+  // "correct or wrong" task shape, which attaches no evaluators. Drive the
+  // items tab straight from the task's own item list, searched / sorted /
+  // paged in the browser. Mixed tasks (some response items, some tool-call)
+  // still have evaluators, so /summary emits a row per item there and this
+  // branch is skipped.
+  const noEvaluators = (task?.evaluators?.length ?? 0) === 0;
+  const clientItemsPage = useMemo(
+    () =>
+      taskItemsPage(task?.items ?? [], {
+        search: itemsSearch,
+        sort: itemsSort,
+        offset: itemsOffset,
+        limit: itemsLimit,
+      }),
+    [task?.items, itemsSearch, itemsSort, itemsOffset, itemsLimit],
+  );
   const items = useMemo<LabellingItem[]>(() => {
+    if (noEvaluators) return clientItemsPage.items;
     if (!taskSummary) return [];
     const seen = new Set<string>();
     const out: LabellingItem[] = [];
@@ -1750,20 +1781,25 @@ function LabellingTaskPageInner() {
       );
     }
     return out;
-  }, [taskSummary, itemMetaByUuid]);
+  }, [noEvaluators, clientItemsPage, taskSummary, itemMetaByUuid]);
   const jobs = task?.jobs ?? [];
   // First-load spinner only — paginated refetches keep the table
   // visible and surface their loading state via the refresh button.
   const itemsLoading = !taskFetchCompleted || !summaryFetchCompleted;
   const itemsError = error;
-  const itemsTotal =
-    taskSummary?.pagination?.total ?? task?.item_count ?? items.length;
+  const itemsTotal = noEvaluators
+    ? clientItemsPage.total
+    : taskSummary?.pagination?.total ?? task?.item_count ?? items.length;
   const itemsPageCount =
     itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
   // Where the items on screen actually start. `itemsOffset` is the page
   // that was asked for, which runs ahead of the items until they arrive,
   // so every number describing the rows on screen counts from this one.
-  const loadedItemsOffset = taskSummary?.pagination?.offset ?? itemsOffset;
+  // The no-evaluator branch pages in the browser, so it starts at the
+  // requested offset directly.
+  const loadedItemsOffset = noEvaluators
+    ? itemsOffset
+    : taskSummary?.pagination?.offset ?? itemsOffset;
   const itemsCurrentPage =
     itemsLimit > 0 ? Math.floor(loadedItemsOffset / itemsLimit) + 1 : 1;
   /** True when the task itself has any items (regardless of the
@@ -1992,6 +2028,10 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
+  // How many of the items chosen for this run are tool-call outputs that an AI
+  // judge will skip (shown as a warning in the run dialog before confirming).
+  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] =
+    useState<number>(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
@@ -2010,8 +2050,31 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
+      // Can't classify items across pages here; the backend skips tool-call
+      // outputs, so no upfront count for the select-all path.
+      setRunDialogToolCallSkipCount(0);
     } else {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
+      // AI judges don't run on tool-call outputs. Count how many of the chosen
+      // items are tool calls: if they all are, there's nothing to evaluate;
+      // otherwise warn that those will be skipped (the backend runs the rest).
+      // `isToolCallOutputItem` is false for non-llm payloads, so this is a
+      // no-op for other task types.
+      if (ids) {
+        const toolCallCount = ids.filter((id) => {
+          const it = items.find((i) => i.uuid === id);
+          return !!it && isToolCallOutputItem(it.payload);
+        }).length;
+        if (toolCallCount === ids.length) {
+          toast.error(
+            "AI judges do not run on tool calls. Label these items by hand.",
+          );
+          return;
+        }
+        setRunDialogToolCallSkipCount(toolCallCount);
+      } else {
+        setRunDialogToolCallSkipCount(0);
+      }
       setRunDialogItemUuids(ids);
       setRunDialogSelectAll(null);
     }
@@ -3449,6 +3512,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={isToolCallOutputItem(item.payload)}
                           />
                         </div>
                       </Fragment>
@@ -3622,6 +3686,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={isToolCallOutputItem(item.payload)}
                           />
                         </div>
                       </Fragment>
@@ -3742,6 +3807,7 @@ function LabellingTaskPageInner() {
           }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
+          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);

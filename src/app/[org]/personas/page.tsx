@@ -792,7 +792,7 @@ export default function PersonasPage() {
                     {/* Label */}
                     <div>
                       <label className="block text-xs md:text-sm font-medium mb-2">
-                        Label <span className="text-red-500">*</span>
+                        Label
                       </label>
                       <input
                         type="text"
@@ -819,7 +819,7 @@ export default function PersonasPage() {
                     {/* Characteristics */}
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        Characteristics <span className="text-red-500">*</span>
+                        Characteristics
                       </label>
                       <p className="text-sm text-muted-foreground mb-2">
                         Define WHO the persona is emulating (e.g. specific
