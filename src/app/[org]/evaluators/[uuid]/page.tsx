@@ -1619,7 +1619,7 @@ function EvaluatorDetailPageInner() {
         }}
         onConfirm={confirmDeleteVersion}
         title="Delete version"
-        message={`Are you sure you want to delete v${versionToDelete?.version_number}? Finished runs judged by this version keep showing it.`}
+        message={`Are you sure you want to delete v${versionToDelete?.version_number}?`}
         confirmText="Delete"
         isDeleting={deletingVersion}
       />
