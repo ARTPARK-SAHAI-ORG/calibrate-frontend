@@ -636,7 +636,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("convert-type")).toHaveTextContent("tool_call");
   });
 
-  it("uses response type for a mixed response and tool-call-only selection", async () => {
+  it("refuses a selection mixing replies and tool calls", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
       tracesResult([
@@ -654,6 +654,23 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Add to tests (2)"));
 
+    expect(toast.error).toHaveBeenCalledWith(
+      "Some of these traces replied and some only called a tool. Those make different kinds of test, so pick one kind at a time.",
+    );
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+  });
+
+  it("adds a selection that is all replies", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace(), trace({ uuid: "trace-2", message_id: "msg-002" })]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Add to tests (2)"));
+
+    expect(screen.getByTestId("convert-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("convert-type")).toHaveTextContent("response");
   });
 

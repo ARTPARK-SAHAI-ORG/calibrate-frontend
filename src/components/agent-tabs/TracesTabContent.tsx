@@ -102,11 +102,16 @@ export function TracesTabContent({
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
   const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
+  // A trace either replied or only called a tool, and the two become different
+  // kinds of test. One selection makes one kind, so a mix is refused rather
+  // than quietly turned into the wrong thing.
+  const toolCallOnlyCount = selectedTraces.filter(
+    (trace) => !trace.response_preview && trace.tool_call_count > 0,
+  ).length;
+  const isMixedSelection =
+    toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
   const selectedTestType =
-    selectedTraces.length > 0 &&
-    selectedTraces.every(
-      (trace) => !trace.response_preview && trace.tool_call_count > 0,
-    )
+    selectedTraces.length > 0 && toolCallOnlyCount === selectedTraces.length
       ? "tool_call"
       : isGeneral
         ? "general"
@@ -344,7 +349,15 @@ export function TracesTabContent({
                   <Button
                     size="sm"
                     variant="primary"
-                    onClick={() => setConvertOpen(true)}
+                    onClick={() => {
+                      if (isMixedSelection) {
+                        toast.error(
+                          "The selected traces contains a mix of responses and tool calls. Those make different kinds of test, so pick one kind at a time.",
+                        );
+                        return;
+                      }
+                      setConvertOpen(true);
+                    }}
                   >
                     Add to tests ({selected.size})
                   </Button>
