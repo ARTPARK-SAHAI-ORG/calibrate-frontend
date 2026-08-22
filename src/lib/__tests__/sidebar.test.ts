@@ -12,6 +12,10 @@ function setInnerWidth(width: number) {
 describe("useSidebarState", () => {
   const originalWidth = window.innerWidth;
 
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   afterEach(() => {
     setInnerWidth(originalWidth);
   });
@@ -48,5 +52,51 @@ describe("useSidebarState", () => {
     });
     rerender();
     expect(result.current[0]).toBe(false);
+  });
+
+  it("remembers a closed sidebar for the next page", () => {
+    setInnerWidth(1024);
+    const first = renderHook(() => useSidebarState());
+    act(() => {
+      first.result.current[1](false);
+    });
+    expect(localStorage.getItem("sidebarOpen")).toBe("false");
+
+    const second = renderHook(() => useSidebarState());
+    expect(second.result.current[0]).toBe(false);
+  });
+
+  it("remembers a reopened sidebar on a page that starts closed", () => {
+    setInnerWidth(1024);
+    const first = renderHook(() => useSidebarState(false));
+    expect(first.result.current[0]).toBe(false);
+    act(() => {
+      first.result.current[1]((prev) => !prev);
+    });
+    expect(first.result.current[0]).toBe(true);
+
+    const second = renderHook(() => useSidebarState(false));
+    expect(second.result.current[0]).toBe(true);
+  });
+
+  it("does not save a page's own closed default", () => {
+    setInnerWidth(1024);
+    renderHook(() => useSidebarState(false));
+    expect(localStorage.getItem("sidebarOpen")).toBeNull();
+    const other = renderHook(() => useSidebarState());
+    expect(other.result.current[0]).toBe(true);
+  });
+
+  it("ignores the saved choice on mobile and does not save toggles there", () => {
+    localStorage.setItem("sidebarOpen", "true");
+    setInnerWidth(375);
+    const { result } = renderHook(() => useSidebarState());
+    expect(result.current[0]).toBe(false);
+
+    act(() => {
+      result.current[1](true);
+    });
+    expect(result.current[0]).toBe(true);
+    expect(localStorage.getItem("sidebarOpen")).toBe("true");
   });
 });
