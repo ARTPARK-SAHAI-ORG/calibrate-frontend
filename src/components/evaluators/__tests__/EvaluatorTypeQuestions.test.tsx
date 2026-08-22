@@ -15,11 +15,9 @@ const ALL: EvaluatorType[] = [
 function Harness({
   allowed = ALL,
   onChange,
-  firstQuestionNote,
 }: {
   allowed?: EvaluatorType[];
   onChange?: (value: EvaluatorType | null) => void;
-  firstQuestionNote?: string;
 }) {
   const [value, setValue] = useState<EvaluatorType | null>(null);
   return (
@@ -27,7 +25,6 @@ function Harness({
       <EvaluatorTypeQuestions
         allowed={allowed}
         value={value}
-        firstQuestionNote={firstQuestionNote}
         onChange={(next) => {
           setValue(next);
           onChange?.(next);
