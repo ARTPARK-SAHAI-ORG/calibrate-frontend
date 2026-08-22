@@ -1595,9 +1595,11 @@ describe("AnnotationJobView", () => {
     );
   });
 
+  // A tool-call item inside a normal `llm` task (identified by
+  // `actual_tool_calls`). It gets a correct/wrong verdict, not the evaluators.
   const toolCallJob = () =>
     jobResponse({
-      task: { uuid: "task-1", name: "Tool Task", type: "llm-tool-call" },
+      task: { uuid: "task-1", name: "Tool Task", type: "llm" },
       evaluators: [],
       items: [
         {
@@ -1642,10 +1644,10 @@ describe("AnnotationJobView", () => {
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
       expect(
-        screen.getByText("Did the tool call match the expected?"),
+        screen.getByText("Is the tool call correct?"),
       ).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Fail" }));
+    await user.click(screen.getByRole("button", { name: "Wrong" }));
     // No "correct the expected call" editor — the human only marks correct/wrong.
     expect(
       screen.queryByText("What should the expected tool call have been?"),
@@ -1687,7 +1689,7 @@ describe("AnnotationJobView", () => {
         screen.getByRole("button", { name: "Update" }),
       ).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Pass" }));
+    await user.click(screen.getByRole("button", { name: "Correct" }));
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: [], count: 1, status: "completed" }),

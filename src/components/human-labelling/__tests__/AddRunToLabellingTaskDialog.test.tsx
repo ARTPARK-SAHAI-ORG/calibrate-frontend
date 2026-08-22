@@ -38,7 +38,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(isLabellingEligibleRaw({})).toBe(false);
   });
 
-  it("builds items from a test_run source, skipping ineligible tests", () => {
+  it("builds both response and tool-call items into an llm task", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
@@ -58,23 +58,29 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           ],
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
         {
-          test_case: { name: "Tool call test", evaluation: { type: "tool_call" } },
+          test_case: {
+            name: "Tool call test",
+            evaluation: { type: "tool_call" },
+          },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
       ],
     };
 
     const result = buildItemsFromSource(source);
-    expect(result.items).toHaveLength(1);
-    expect(result.skippedCount).toBe(1);
+    // Both go into the `llm` task: a response item and a tool-call item.
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
     expect(result.items[0].payload.name).toBe("Greeting — run-uuid");
-    expect(result.items[0].payload.chat_history).toEqual([
-      { role: "user", content: "hi" },
-    ]);
     expect(result.items[0].payload.agent_response).toBe("hello!");
-    // judge_results is preferred over test_case.evaluators for variable values
     expect(result.items[0].payload.evaluator_variables).toEqual({
       "ev-1": { tone: "polite2" },
     });
+    // The tool-call item carries the actual calls (no evaluator variables).
+    expect(result.items[1].payload.name).toBe("Tool call test — run-uuid");
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: { x: 1 } },
+    ]);
     expect(result.evaluatorUuids.has("ev-1")).toBe(true);
   });
 
@@ -415,10 +421,10 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items[0].payload.agent_response).toBe("Booked!");
   });
 
-  it("routes a tool-call-only trace to an llm-tool-call item with no evaluators", () => {
-    // A trace that only made tool calls (no reply) becomes a tool-call item:
-    // the call is the `actual_tool_calls`, expected is empty (a trace has no
-    // spec — the human supplies it on a fail).
+  it("builds a tool-call-only trace as a tool-call item in an llm task", () => {
+    // A trace that only made tool calls (no reply) becomes a tool-call item in
+    // an `llm` task: the call is `actual_tool_calls`, expected is empty (a
+    // trace has no spec — a human marks it correct/wrong).
     const source: AddRunToLabellingTaskSource = {
       type: "traces",
       agentUuid: "agent-uuid-1",
@@ -434,12 +440,11 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       ],
       evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
     };
-    expect(traceLabellingType(source.traces[0])).toBe("llm-tool-call");
-    expect(targetTaskTypeForSource(source)).toBe("llm-tool-call");
+    expect(traceLabellingType(source.traces[0])).toBe("llm");
+    expect(targetTaskTypeForSource(source)).toBe("llm");
     const result = buildItemsFromSource(source);
     expect(result.items).toHaveLength(1);
     expect(result.skippedCount).toBe(0);
-    expect(result.evaluatorUuids.size).toBe(0); // tool-call tasks have no evaluators
     const p = result.items[0].payload as Record<string, unknown>;
     expect(p.name).toBe("Books an appointment");
     expect(p.chat_history).toEqual([{ role: "user", content: "book me in" }]);
@@ -449,7 +454,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     ]);
   });
 
-  it("keeps a response trace on llm when the selection is mixed, skipping tool-call traces", () => {
+  it("builds both response and tool-call traces into an llm task", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "traces",
       agentUuid: "agent-uuid-1",
@@ -466,12 +471,17 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
         },
       ],
     };
-    // Response preferred; the tool-call trace is skipped.
     expect(targetTaskTypeForSource(source)).toBe("llm");
     const result = buildItemsFromSource(source);
-    expect(result.items).toHaveLength(1);
-    expect(result.skippedCount).toBe(1);
+    // Both become items — the reply a response item, the tool call a
+    // tool-call item.
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
     expect(result.items[0].payload.name).toBe("Replied");
+    expect(result.items[1].payload.name).toBe("Only tool call");
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: {} },
+    ]);
   });
 });
 
@@ -967,8 +977,8 @@ describe("AddRunToLabellingTaskDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("shows the skipped-tests banner when a mixed selection skips tool-call tests", async () => {
-    // Response preferred → target is `llm`, so the tool-call test is skipped.
+  it("shows the skipped-items banner for a genuinely ineligible test", async () => {
+    // A test with an unknown evaluation type can't be labelled → skipped.
     const sourceWithSkip: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
@@ -978,7 +988,7 @@ describe("AddRunToLabellingTaskDialog", () => {
           output: { response: "hi" },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
         {
-          test_case: { name: "Tool", evaluation: { type: "tool_call" } },
+          test_case: { name: "Odd", evaluation: { type: "mystery" } },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
       ],
     };
@@ -992,9 +1002,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     expect(
-      screen.getByText(
-        "Tool call tests are not added here — submit them to a tool-call task separately",
-      ),
+      screen.getByText("1 item could not be added for labelling."),
     ).toBeInTheDocument();
   });
 
@@ -1043,26 +1051,26 @@ describe("llm-tool-call labelling", () => {
     },
   } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
 
-  it("maps evaluation type to the task type — any tool call is labellable", () => {
+  it("maps response and tool-call tests to an llm task — any tool call is labellable", () => {
     expect(
       labellingTaskTypeForRaw({ test_case: { evaluation: { type: "response" } } }),
     ).toBe("llm");
-    expect(labellingTaskTypeForRaw(toolCallWithCriteria)).toBe("llm-tool-call");
-    // Any tool-call test is labellable (a human marks it correct/wrong) — no
-    // criteria required.
-    expect(labellingTaskTypeForRaw(toolCallNoCriteria)).toBe("llm-tool-call");
+    // Any tool-call test is labellable (a human marks it correct/wrong), and it
+    // goes into an `llm` task.
+    expect(labellingTaskTypeForRaw(toolCallWithCriteria)).toBe("llm");
+    expect(labellingTaskTypeForRaw(toolCallNoCriteria)).toBe("llm");
     expect(labellingTaskTypeForRaw({})).toBeNull();
     expect(isLabellingEligibleRaw(toolCallWithCriteria)).toBe(true);
     expect(isLabellingEligibleRaw(toolCallNoCriteria)).toBe(true);
   });
 
-  it("targets llm-tool-call for a tool-call-only selection, llm when mixed", () => {
+  it("targets an llm task whether the selection is tool-call, response, or mixed", () => {
     const toolOnly: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
       results: [toolCallWithCriteria],
     };
-    expect(targetTaskTypeForSource(toolOnly)).toBe("llm-tool-call");
+    expect(targetTaskTypeForSource(toolOnly)).toBe("llm");
 
     const mixed: AddRunToLabellingTaskSource = {
       type: "test_run",

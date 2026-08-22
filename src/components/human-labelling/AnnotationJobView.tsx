@@ -14,6 +14,7 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
+import { isToolCallOutputItem } from "./itemOutputType";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
@@ -68,13 +69,7 @@ type Annotator = { uuid: string; name: string };
 export type Task = {
   uuid: string;
   name: string;
-  type:
-    | "llm"
-    | "llm-general"
-    | "llm-tool-call"
-    | "stt"
-    | "tts"
-    | "conversation";
+  type: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description: string | null;
 };
 
@@ -302,14 +297,13 @@ export function AnnotationJobView({
       const next: Record<FieldKey, FieldValue> = {};
       const saved = new Set<FieldKey>();
       const comments: Record<string, string> = {};
-      const isToolCall = data.task.type === "llm-tool-call";
       for (const a of data.annotations) {
         if (!a.evaluator_id) {
           const c = readSavedComment(a.value);
           if (c) comments[a.item_id] = c;
-          // Tool-call verdict (correct/wrong) rides the item-level (null) slot
-          // as `value.value`.
-          if (isToolCall && a.value && typeof a.value === "object") {
+          // A tool-call item's verdict (correct/wrong) rides this item-level
+          // (null) slot as `value.value` — seed it whenever it's a boolean.
+          if (a.value && typeof a.value === "object") {
             const v = (a.value as Record<string, unknown>).value;
             if (typeof v === "boolean") {
               const vk = toolCallVerdictKey(a.item_id);
@@ -341,7 +335,7 @@ export function AnnotationJobView({
       }
       const required = requiredOnly(data.evaluators);
       const firstIncomplete = data.items.findIndex((it) =>
-        isToolCall
+        isToolCallOutputItem(it.payload)
           ? !saved.has(toolCallVerdictKey(it.uuid))
           : required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
       );
@@ -606,9 +600,18 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
-  // llm-tool-call tasks have no evaluators; the annotator records one pass/fail
-  // verdict per item (and, on a fail, corrects the expected tool call).
-  const isToolCall = data.task.type === "llm-tool-call";
+  // Tool-call items are per-item, not per-task: an `llm` / `llm-general` task
+  // can hold both response items (scored by evaluators) and tool-call items
+  // (one correct/wrong verdict, AI judges skipped).
+  const itemPayloadByUuid = useMemo(() => {
+    const m = new Map<string, unknown>();
+    for (const it of data.items) m.set(it.uuid, it.payload);
+    return m;
+  }, [data.items]);
+  const isToolCallItemId = useCallback(
+    (itemId: string) => isToolCallOutputItem(itemPayloadByUuid.get(itemId)),
+    [itemPayloadByUuid],
+  );
   // Both settings are frozen on the job. Absent keeps today's behaviour:
   // the comments box is offered and reasoning is optional.
   const commentsEnabled = data.job.comments_enabled !== false;
@@ -660,8 +663,9 @@ function AnnotateView({
   // when the annotator moves on.
   const itemCompleted = useCallback(
     (itemId: string) => {
-      // Tool-call items are done once their single pass/fail verdict is saved.
-      if (isToolCall) return savedKeys.has(toolCallVerdictKey(itemId));
+      // A tool-call item is done once its single correct/wrong verdict is saved.
+      if (isToolCallItemId(itemId))
+        return savedKeys.has(toolCallVerdictKey(itemId));
       const savedFor = (ev: Evaluator) =>
         savedKeys.has(fieldKey(itemId, ev.uuid));
       if (!requiredEvaluators.every(savedFor)) return false;
@@ -671,7 +675,7 @@ function AnnotateView({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isToolCall, requiredEvaluators, evaluators, savedKeys, fields],
+    [isToolCallItemId, requiredEvaluators, evaluators, savedKeys, fields],
   );
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !==
@@ -743,48 +747,21 @@ function AnnotateView({
     if (!currentItem || submitting) return false;
     setTopError(null);
 
-    // Nothing is sent until every label answered in this sitting has its
-    // reasoning. The boxes go red and the first one is scrolled to, so the
-    // annotator is told where to write rather than only that something is
-    // wrong.
-    const missing = reasoningMissingFor(currentItem.uuid);
-    if (missing.length > 0) {
-      setMissingReasoningKeys(new Set(missing));
-      return false;
-    }
-    setMissingReasoningKeys(new Set());
+    const itemIsToolCall = isToolCallItemId(currentItem.uuid);
+    // Item-level free-text comment lives on the `evaluator_id IS NULL` slot.
+    const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
+    const commentChanged = commentChangedFor(currentItem.uuid);
 
     const annotationsBody: {
       evaluator_id: string | null;
       value: Record<string, unknown>;
     }[] = [];
-    for (const ev of evaluators) {
-      const k = fieldKey(currentItem.uuid, ev.uuid);
-      const f = fields[k];
-      if (!hasFieldValue(f)) {
-        // A blank optional evaluator is simply not sent; a blank required
-        // one means there is nothing valid to save yet.
-        if (ev.is_optional === true) continue;
-        return false;
-      }
-      annotationsBody.push({
-        evaluator_id: ev.uuid,
-        value: {
-          value: f.value,
-          ...(f.comment ? { reasoning: f.comment } : {}),
-        },
-      });
-    }
-
-    // Item-level free-text comment lives on the `evaluator_id IS NULL` slot.
-    const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
-    const commentChanged = commentChangedFor(currentItem.uuid);
-
-    // A tool-call item's verdict (correct/wrong) rides that same null slot as
-    // `value.value`, with the comment alongside. The backend overwrites the
-    // value, so we send it whenever a verdict is chosen.
     let toolCallVerdict: boolean | null = null;
-    if (isToolCall) {
+
+    if (itemIsToolCall) {
+      // A tool-call item is labelled with a single correct/wrong verdict — the
+      // task's evaluators (AI judges) don't apply. It rides the null slot as
+      // `value.value`, with the comment alongside.
       const v = fields[toolCallVerdictKey(currentItem.uuid)]?.value;
       if (typeof v !== "boolean") return false; // verdict is required
       toolCallVerdict = v;
@@ -795,13 +772,44 @@ function AnnotateView({
           ...(currentComment ? { comment: currentComment } : {}),
         },
       });
-    } else if (commentChanged) {
-      // Only send when it actually changed — an unchanged value is wasted
-      // work, and an empty string would erase a saved comment.
-      annotationsBody.push({
-        evaluator_id: null,
-        value: { comment: currentComment },
-      });
+    } else {
+      // Nothing is sent until every label answered in this sitting has its
+      // reasoning. The boxes go red and the first one is scrolled to, so the
+      // annotator is told where to write rather than only that something is
+      // wrong.
+      const missing = reasoningMissingFor(currentItem.uuid);
+      if (missing.length > 0) {
+        setMissingReasoningKeys(new Set(missing));
+        return false;
+      }
+      setMissingReasoningKeys(new Set());
+
+      for (const ev of evaluators) {
+        const k = fieldKey(currentItem.uuid, ev.uuid);
+        const f = fields[k];
+        if (!hasFieldValue(f)) {
+          // A blank optional evaluator is simply not sent; a blank required
+          // one means there is nothing valid to save yet.
+          if (ev.is_optional === true) continue;
+          return false;
+        }
+        annotationsBody.push({
+          evaluator_id: ev.uuid,
+          value: {
+            value: f.value,
+            ...(f.comment ? { reasoning: f.comment } : {}),
+          },
+        });
+      }
+
+      // Only send the comment when it actually changed — an unchanged value is
+      // wasted work, and an empty string would erase a saved comment.
+      if (commentChanged) {
+        annotationsBody.push({
+          evaluator_id: null,
+          value: { comment: currentComment },
+        });
+      }
     }
 
     setSubmitting(true);
@@ -831,7 +839,7 @@ function AnnotateView({
         if (a.evaluator_id)
           justSaved.add(fieldKey(currentItem.uuid, a.evaluator_id));
       }
-      if (isToolCall && toolCallVerdict !== null) {
+      if (toolCallVerdict !== null) {
         justSaved.add(toolCallVerdictKey(currentItem.uuid));
       }
       setSavedKeys((prev) => {
@@ -1020,9 +1028,11 @@ function AnnotateView({
                 );
                 const isLastUnsaved =
                   !!currentItem && !currentItemSaved && unsavedCount === 1;
+                const currentIsToolCall =
+                  !!currentItem && isToolCallItemId(currentItem.uuid);
                 const allEvaluatorsAnswered =
                   !!currentItem &&
-                  (isToolCall
+                  (currentIsToolCall
                     ? typeof fields[toolCallVerdictKey(currentItem.uuid)]
                         ?.value === "boolean"
                     : evaluators.length > 0 &&
@@ -1039,7 +1049,7 @@ function AnnotateView({
                       ? "Mark as complete"
                       : "Submit & Next";
                 const tooltip = !allEvaluatorsAnswered
-                  ? isToolCall
+                  ? currentIsToolCall
                     ? "Choose pass or fail before submitting"
                     : "Judgements should be given for all required evaluators before submitting"
                   : undefined;
@@ -1198,7 +1208,6 @@ function AnnotateView({
                         [currentItem.uuid]: s,
                       }))
                     }
-                    taskType={data.task.type}
                   />
                 </div>
               </>
@@ -1257,11 +1266,13 @@ export function ItemPane({
   taskType: Task["type"];
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
+  // A tool-call item (in any llm/llm-general task) shows the tool call + the
+  // expected spec, regardless of the task's normal pane.
+  if (isToolCallOutputItem(payload))
+    return <ToolCallItemPane payload={payload} />;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
-  if (taskType === "llm-tool-call")
-    return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
   if (taskType === "conversation")
@@ -1288,7 +1299,6 @@ function EvaluatorsPane({
   missingReasoningKeys,
   itemComment,
   onItemCommentChange,
-  taskType,
 }: {
   evaluators: Evaluator[];
   item: Item;
@@ -1305,8 +1315,6 @@ function EvaluatorsPane({
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
   onItemCommentChange: (s: string) => void;
-  /** Task type — drives the tool-call verdict (correct/wrong) UI. */
-  taskType?: Task["type"];
 }) {
   // Per-item, per-evaluator variable values live on
   // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
@@ -1353,47 +1361,49 @@ function EvaluatorsPane({
     </div>
   ) : null;
 
-  if (evaluators.length === 0) {
-    // Tool-call tasks have no evaluators — the annotator gives one pass/fail
-    // verdict and, on a fail, corrects the expected tool call.
-    if (taskType === "llm-tool-call") {
-      const vkey = fieldKey(item.uuid, TOOL_CALL_VERDICT_KEY);
-      const verdict = fields[vkey]?.value;
-      const setVerdict = (v: boolean) => setField(vkey, { value: v });
-      const btn = (v: boolean, label: string, on: string) =>
-        `h-9 px-4 rounded-md text-sm font-medium border transition-colors ${
-          readOnly ? "" : "cursor-pointer"
-        } ${verdict === v ? on : "border-border bg-background text-foreground hover:bg-muted/50"}`;
-      return (
-        <div className="space-y-4">
-          {descriptionBlock}
-          <div className="border border-border rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">
-              Did the tool call match the expected?
-            </h3>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={() => setVerdict(true)}
-                className={btn(true, "Pass", "border-green-600 bg-green-600 text-white")}
-              >
-                Pass
-              </button>
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={() => setVerdict(false)}
-                className={btn(false, "Fail", "border-red-600 bg-red-600 text-white")}
-              >
-                Fail
-              </button>
-            </div>
+  // A tool-call item is labelled with a single correct/wrong verdict — the
+  // task's evaluators (AI judges) don't apply to it. This is per-item: the same
+  // llm/llm-general task can hold response items scored by evaluators too.
+  if (isToolCallOutputItem(itemPayload)) {
+    const vkey = fieldKey(item.uuid, TOOL_CALL_VERDICT_KEY);
+    const verdict = fields[vkey]?.value;
+    const setVerdict = (v: boolean) => setField(vkey, { value: v });
+    const btn = (v: boolean, on: string) =>
+      `h-9 px-4 rounded-md text-sm font-medium border transition-colors ${
+        readOnly ? "" : "cursor-pointer"
+      } ${verdict === v ? on : "border-border bg-background text-foreground hover:bg-muted/50"}`;
+    return (
+      <div className="space-y-4">
+        {descriptionBlock}
+        <div className="border border-border rounded-xl p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Is the tool call correct?
+          </h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => setVerdict(true)}
+              className={btn(true, "border-green-600 bg-green-600 text-white")}
+            >
+              Correct
+            </button>
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => setVerdict(false)}
+              className={btn(false, "border-red-600 bg-red-600 text-white")}
+            >
+              Wrong
+            </button>
           </div>
-          {commentBlock}
         </div>
-      );
-    }
+        {commentBlock}
+      </div>
+    );
+  }
+
+  if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
         {descriptionBlock}

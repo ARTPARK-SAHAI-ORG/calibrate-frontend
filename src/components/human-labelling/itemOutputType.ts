@@ -1,19 +1,23 @@
-// An `llm` labelling-task item's output is either a text reply or a tool call.
-// AI (LLM) judges only score text replies; a tool-call output has nothing for
-// an AI judge to read, so those items are labelled by humans only.
+// A labelling-task item whose output is a tool call, not a text reply. These
+// live inside a normal `llm` / `llm-general` task but are labelled by a human
+// with a single correct/wrong verdict — AI judges have nothing to read and are
+// skipped.
 //
-// There is no explicit marker on the payload: `agent_response` holds the text
-// reply, and when the output was a tool call `agent_response` is empty and the
-// call sits as the final assistant `tool_calls` turn in `chat_history`.
+// Two shapes count as a tool-call item:
+//  1. A tool-call item carries `actual_tool_calls` (what the agent called),
+//     built when a tool-call test/trace is submitted for labelling.
+//  2. A plain `llm` item whose reply was a tool call: `agent_response` is empty
+//     and the final assistant turn in `chat_history` carries `tool_calls`.
 export function isToolCallOutputItem(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
+  if (Array.isArray(p.actual_tool_calls) && p.actual_tool_calls.length > 0) {
+    return true;
+  }
   const response =
     typeof p.agent_response === "string" ? p.agent_response.trim() : "";
   if (response.length > 0) return false;
   const history = Array.isArray(p.chat_history) ? p.chat_history : [];
-  // The output tool call is appended as the final turn(s); find the last
-  // assistant turn and check whether it carries tool calls.
   for (let i = history.length - 1; i >= 0; i--) {
     const turn = history[i];
     if (!turn || typeof turn !== "object") continue;
