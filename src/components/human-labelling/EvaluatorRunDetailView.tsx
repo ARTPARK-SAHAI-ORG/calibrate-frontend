@@ -23,7 +23,11 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
-import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import {
+  ItemPane,
+  itemPaneHasOwnPadding,
+  type Item,
+} from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemValueFilter,
   matchesAllValueFilters,
@@ -1452,7 +1456,7 @@ export function ItemDetailPane({
   // padding and a `sticky top-0` UI/JSON toggle. Adding top padding here would
   // leave a band above the toggle that content scrolls through, so the left
   // pane drops it for those types (same as the annotation job view).
-  const paneHasOwnPadding = taskType === "llm" || taskType === "conversation";
+  const paneHasOwnPadding = itemPaneHasOwnPadding(taskType);
 
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">

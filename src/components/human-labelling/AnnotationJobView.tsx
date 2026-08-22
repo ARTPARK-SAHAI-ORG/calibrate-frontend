@@ -1116,7 +1116,11 @@ function AnnotateView({
                 <div
                   className={`${
                     isAdmin ? "md:flex-[6]" : "md:flex-[7]"
-                  } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 pb-4 md:px-6 md:pb-6`}
+                  } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 md:px-6 ${
+                    itemPaneHasOwnPadding(data.task.type)
+                      ? "pb-4 md:pb-6"
+                      : "py-4 md:py-6"
+                  }`}
                 >
                   <ItemPane item={currentItem} taskType={data.task.type} />
                 </div>
@@ -1190,6 +1194,17 @@ function AnnotateView({
       )}
     </div>
   );
+}
+
+/**
+ * Whether an item pane draws its own padding. The conversation renderer
+ * (`TestDetailView`, behind the llm and conversation panes) already pads
+ * itself, so its container adds only the bottom. Every other pane starts
+ * flush against its container and needs padding above and below, or its
+ * first card sits against the top edge.
+ */
+export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
+  return taskType === "llm" || taskType === "conversation";
 }
 
 export function ItemPane({

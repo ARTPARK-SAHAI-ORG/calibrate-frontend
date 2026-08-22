@@ -382,7 +382,7 @@ describe("TestRunOutputsPanel", () => {
       expect(onToggleLabellingSelection).not.toHaveBeenCalled();
     });
 
-    it("shows 'Tool-call tests will be skipped...' title when isLabellingEligibleRaw returns false for a selectable row", () => {
+    it("gives a tool-call row no checkbox at all, since it could never be submitted", () => {
       mockIsLabellingEligibleRaw.mockReturnValue(false);
       render(
         <TestRunOutputsPanel
@@ -392,12 +392,7 @@ describe("TestRunOutputsPanel", () => {
           onToggleLabellingSelection={jest.fn()}
         />,
       );
-      const rowContainer = screen.getByText("Passed Test One").closest("div")!;
-      const checkboxButton = within(rowContainer).getAllByRole("button")[0];
-      expect(checkboxButton).toHaveAttribute(
-        "title",
-        "Tool-call tests will be skipped when submitting for labelling",
-      );
+      expect(screen.queryAllByTestId("labelling-checkbox")).toHaveLength(0);
     });
   });
 

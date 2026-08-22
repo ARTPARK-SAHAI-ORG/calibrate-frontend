@@ -661,7 +661,7 @@ describe("BenchmarkOutputsPanel", () => {
       expect(onToggleLabellingSelection).toHaveBeenCalledWith("model-a:0");
     });
 
-    it("title reflects isLabellingEligibleRaw: 'Select for labelling' vs skip message", () => {
+    it("gives a tool-call row no checkbox at all, since it could never be submitted", () => {
       mockIsLabellingEligibleRaw.mockReturnValue(false);
       render(
         <BenchmarkOutputsPanel
@@ -673,12 +673,7 @@ describe("BenchmarkOutputsPanel", () => {
           onToggleLabellingSelection={jest.fn()}
         />,
       );
-      const row = screen.getByText("Alpha Passed").closest("div")!.parentElement!;
-      const checkboxButton = within(row).getAllByRole("button")[0];
-      expect(checkboxButton).toHaveAttribute(
-        "title",
-        "Tool-call tests will be skipped when submitting for labelling",
-      );
+      expect(screen.queryAllByTestId("labelling-checkbox")).toHaveLength(0);
     });
 
     it("shows 'Select for labelling' title when eligible", () => {

@@ -1146,20 +1146,50 @@ describe("TestRunnerDialog", () => {
       expect(screen.queryByTestId("labelling-dialog")).not.toBeInTheDocument();
     });
 
-    it("shows an error toast when only tool-call tests are selected", async () => {
-      await renderDoneRun();
-      const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
-      await user.click(
-        screen.getByRole("button", { name: "toggle-labelling-test-2" }),
+    it("hides the button and the row checkboxes when nothing in the run can be labelled", async () => {
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes("/evaluators?include_defaults=true")) {
+          return Promise.resolve(jsonResponse([]));
+        }
+        if (url.endsWith("/agent-tests/run/task-toolonly")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-toolonly",
+              status: "completed",
+              name: "Tool Only Run",
+              results: [
+                {
+                  test_uuid: "test-2",
+                  name: "Tool Test",
+                  status: "passed",
+                  passed: true,
+                  test_case: { evaluation: { type: "tool_call" } },
+                },
+              ],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+      render(
+        <TestRunnerDialog
+          isOpen
+          onClose={jest.fn()}
+          agentUuid="agent-1"
+          agentName="My Agent"
+          taskId="task-toolonly"
+        />,
       );
-      await user.click(
-        screen.getByRole("button", { name: "Submit for labelling" }),
+      await waitFor(() =>
+        expect(screen.getByText("Tool Only Run")).toBeInTheDocument(),
       );
-      expect(toast.error).toHaveBeenCalledWith(
-        "Tool-call tests can't be submitted for labelling",
-      );
-      expect(screen.queryByTestId("labelling-dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Submit for labelling" }),
+      ).not.toBeInTheDocument();
+      await setupUser().click(screen.getByRole("button", { name: "Results" }));
+      expect(
+        screen.queryByRole("button", { name: "toggle-labelling-test-2" }),
+      ).not.toBeInTheDocument();
     });
 
     it("opens the labelling dialog when an eligible test is selected, and closes it again", async () => {

@@ -10,6 +10,8 @@ jest.mock("../AnnotationJobView", () => ({
   ItemPane: ({ item }: { item: { uuid: string } }) => (
     <div data-testid="item-pane">{item.uuid}</div>
   ),
+  itemPaneHasOwnPadding: (taskType: string) =>
+    taskType === "llm" || taskType === "conversation",
 }));
 
 import {

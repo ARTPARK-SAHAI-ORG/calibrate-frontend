@@ -15,10 +15,11 @@ import {
 } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
 
-// Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
-// STT runs → "stt", TTS runs → "tts", simulation runs → "conversation" (their
-// transcript is a conversation). The type is derived from the source
-// (`targetTaskTypeForSource`), never chosen by the user.
+// Each source kind maps to exactly one task type: test runs and benchmarks →
+// "llm", or "llm-general" when their tests were written for a single agent
+// response agent; STT runs → "stt", TTS runs → "tts", simulation runs →
+// "conversation" (their transcript is a conversation). The type is derived
+// from the source (`targetTaskTypeForSource`), never chosen by the user.
 export const SUPPORTED_TARGET_TASK_TYPES = [
   "llm",
   "llm-general",
@@ -138,7 +139,22 @@ export function targetTaskTypeForSource(
       return "conversation";
     case "traces":
       return source.agentNature === "general" ? "llm-general" : "llm";
-    // test_run / benchmark_run both target "llm".
+    // A test run / benchmark says which kind of agent it ran through its own
+    // test cases, so nothing has to be passed in: a single agent response
+    // agent's tests target an Agent Response task, a conversation agent's
+    // target a Next Reply one.
+    case "test_run":
+      return source.results.some((r) => isGeneralTestCase(r as RawTestCaseLike))
+        ? "llm-general"
+        : "llm";
+    case "benchmark_run":
+      return source.modelResults.some((mr) =>
+        (mr.test_results ?? []).some((r) =>
+          isGeneralTestCase(r as RawTestCaseLike),
+        ),
+      )
+        ? "llm-general"
+        : "llm";
     default:
       return "llm";
   }
@@ -239,6 +255,9 @@ type RawTestCaseLike = {
     name?: string;
     evaluation?: { type?: string } | null;
     history?: TestCaseHistory[] | null;
+    /** The lone input a test written for a single agent response agent
+     * carries instead of a conversation. */
+    input?: string | null;
     evaluators?: Array<{
       evaluator_uuid?: string | null;
       uuid?: string | null;
@@ -255,9 +274,19 @@ type RawTestCaseLike = {
   }> | null;
 };
 
-/** Response (next-reply) tests can be added to LLM labelling tasks; tool-call tests cannot. */
+/** True for a test written for a single agent response agent — one input and
+ * one output, no conversation. */
+function isGeneralTestCase(raw: RawTestCaseLike): boolean {
+  return raw.test_case?.evaluation?.type === "general";
+}
+
+/** Tests that judge what the agent said can be added to LLM labelling tasks:
+ * a conversation agent's next-reply test (`response`) and a single agent
+ * response agent's test (`general`). Tool-call tests cannot, for either kind
+ * of agent, since there is no text reply to label. */
 export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
-  return raw.test_case?.evaluation?.type === "response";
+  const type = raw.test_case?.evaluation?.type;
+  return type === "response" || type === "general";
 }
 
 function buildOneItem(
@@ -310,17 +339,25 @@ function buildOneItem(
     }
   }
 
-  return {
-    item: {
-      payload: {
+  // A single agent response test is labelled as the one input it was given
+  // and the output it produced, which is what an Agent Response
+  // ("llm-general") task holds. A conversation agent's test carries the
+  // conversation so far plus the reply being judged.
+  const payload = isGeneralTestCase(raw)
+    ? {
         name,
-        chat_history,
-        agent_response,
+        input:
+          raw.test_case?.input ??
+          (raw.test_case?.history ?? raw.chat_history ?? []).find(
+            (h) => h.role === "user",
+          )?.content ??
+          "",
+        output: agent_response,
         evaluator_variables,
-      },
-    },
-    evaluatorUuids,
-  };
+      }
+    : { name, chat_history, agent_response, evaluator_variables };
+
+  return { item: { payload }, evaluatorUuids };
 }
 
 export function buildItemsFromSource(

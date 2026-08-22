@@ -965,20 +965,16 @@ describe("BenchmarkResultsDialog", () => {
       );
     });
 
-    it("submit-for-labelling: shows a toast when selected tests are not eligible", async () => {
-      await renderDoneRun();
-      const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
-      await user.click(screen.getByText("togglelabel0"));
-
+    it("hides the button and the row checkboxes when nothing in the benchmark can be labelled", async () => {
       isLabellingEligibleRawMock.mockReturnValue(false);
-      await user.click(
-        screen.getByRole("button", { name: "Submit for labelling" }),
-      );
-      expect(toast.error).toHaveBeenCalledWith(
-        "Tool-call tests can't be submitted for labelling",
-      );
-      expect(screen.queryByTestId("add-to-task-dialog")).not.toBeInTheDocument();
+      await renderDoneRun();
+      expect(
+        screen.queryByRole("button", { name: "Submit for labelling" }),
+      ).not.toBeInTheDocument();
+      await setupUser().click(screen.getByRole("button", { name: "Results" }));
+      expect(
+        screen.getByTestId("outputs-panel-labelling-selection"),
+      ).toHaveTextContent("undefined");
     });
 
     it("submit-for-labelling: opens the AddRunToLabellingTaskDialog when eligible tests are selected", async () => {
