@@ -1,5 +1,6 @@
 ## August 2026
 
+- Remember whether the sidebar is open or closed ([#410](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/410))
 - Ask what an evaluator is for one question at a time, and rename LLM output ([#408](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/408))
 - Refuse a push whose changed lines are untested ([#407](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/407))
 - Let users manage evaluators outside a run ([#405](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/405))
