@@ -10,7 +10,7 @@ import { validateApiKeyForAgent } from "@/lib/tracesApi";
 import { TraceIngestSnippet } from "./TraceIngestSnippet";
 import type { AgentNature } from "./ingestSnippets";
 
-type StepState = "done" | "current" | "upcoming";
+type StepState = "done" | "current";
 
 /**
  * One step, open or collapsed. Header and body share the same padding so the
@@ -34,19 +34,14 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={`border border-border rounded-xl ${
-        state === "upcoming" ? "opacity-50" : ""
-      }`}
-    >
-      {/* A step you have not reached cannot be opened. A finished one can, to
-          look at what you did. */}
+    <div className="border border-border rounded-xl">
+      {/* Every step opens, in any order: the reader may already have a key, or
+          may want to check for traces before doing anything here. */}
       <button
         type="button"
         onClick={onToggle}
-        disabled={state === "upcoming"}
         aria-expanded={isOpen}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer disabled:cursor-not-allowed"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer"
       >
         {/* The counter becomes a tick once the step is done. */}
         {state === "done" ? (
@@ -59,13 +54,11 @@ function Step({
         <span className="flex-1 min-w-0 text-sm md:text-base font-medium text-foreground">
           {title}
         </span>
-        {state !== "upcoming" && (
-          <ChevronDownIcon
-            className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
-              isOpen ? "" : "-rotate-90"
-            }`}
-          />
-        )}
+        <ChevronDownIcon
+          className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
+            isOpen ? "" : "-rotate-90"
+          }`}
+        />
       </button>
       {isOpen && (
         <div className="px-4 pb-4 pl-13 space-y-3">
@@ -111,9 +104,6 @@ export function TracesEmptyState({
   const toggleStep = (step: number) => {
     setOpenStep((open) => (open === step ? 0 : step));
   };
-  // Step two is always open to the reader, whether or not step one worked out:
-  // the key can be typed into the code by hand, so nothing about a failed key
-  // check should hide the code that does the sending.
   // Step one is done when there is a key, not when the reader has walked past
   // it: skipping it leaves the code below with a placeholder in place of a key,
   // so a tick there would say a key was made when none was.
@@ -124,9 +114,7 @@ export function TracesEmptyState({
         : "current"
       : step < reached
         ? "done"
-        : step === reached || step === 2
-          ? "current"
-          : "upcoming";
+        : "current";
 
   // The backend returns the key itself only when it is created, so this is the
   // one moment it can be filled into the request. Held in memory only, and gone

@@ -101,15 +101,16 @@ it("lists all three steps, but only opens the one to do now", async () => {
   ).toBeInTheDocument();
 });
 
-it("will not open a step you have not reached", async () => {
+it("opens the last step straight away, without doing the first two", async () => {
   const user = setupUser();
   setup();
 
-  // Step three is greyed out until step two is done: clicking does nothing.
+  // Someone who already sends traces can come here just to look for them.
   await user.click(screen.getByText("Check that it arrived"));
+
   expect(
-    screen.queryByRole("button", { name: "Check for traces" }),
-  ).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Check for traces" }),
+  ).toBeInTheDocument();
 });
 
 it("shows an API key callout beside the snippet when no key is filled in", async () => {
