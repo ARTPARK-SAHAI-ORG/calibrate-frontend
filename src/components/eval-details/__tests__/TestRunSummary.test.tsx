@@ -21,19 +21,25 @@ describe("TestRunSummary", () => {
     expect(screen.getByText("3/4")).toBeInTheDocument();
   });
 
-  it("shows the tool-call card only when toolCall.total > 0, using a 5-col grid", () => {
-    const { container, rerender } = render(
+  it("shows the tool-call card under Evaluators only when toolCall.total > 0", () => {
+    const { rerender } = render(
       <TestRunSummary passed={3} total={4} toolCall={{ passed: 1, total: 2 }} />,
     );
-    expect(screen.getByText("Tool calls")).toBeInTheDocument();
+    const toolCalls = screen.getByText("Tool calls");
+    expect(toolCalls).toBeInTheDocument();
+    expect(screen.getByText("Evaluators")).toBeInTheDocument();
+    // The card sits in the Evaluators section, not in the top summary row.
+    const section = screen.getByText("Evaluators").closest("div");
+    expect(section).not.toBeNull();
+    expect(section!.contains(toolCalls)).toBe(true);
+    expect(section!.contains(screen.getByText("Pass rate"))).toBe(false);
     expect(screen.getByText("75%")).toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("1/2")).toBeInTheDocument();
-    expect(container.querySelector(".md\\:grid-cols-5")).not.toBeNull();
 
     rerender(<TestRunSummary passed={2} total={4} toolCall={{ passed: 0, total: 0 }} />);
     expect(screen.queryByText("Tool calls")).not.toBeInTheDocument();
-    expect(container.querySelector(".md\\:grid-cols-4")).not.toBeNull();
+    expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   });
 
   it("formats latency using p50 with a p95/p99 caption", () => {

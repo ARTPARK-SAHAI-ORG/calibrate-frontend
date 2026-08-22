@@ -895,6 +895,42 @@ describe("TestDetailView", () => {
         screen.queryByText("No conversation history available for this test"),
       ).not.toBeInTheDocument();
     });
+
+    it("uses the same box pair for its Tool Call test, which is marked by `input` alone", () => {
+      render(
+        <TestDetailView
+          history={[{ role: "user", content: "Hi" }]}
+          input="Hi"
+          output={{
+            tool_calls: [
+              { tool: "dummy", arguments: { success: true }, output: "ok" },
+            ],
+          }}
+          passed={false}
+          evaluation={{ type: "tool_call" }}
+        />,
+      );
+      expect(screen.getByText("Input")).toBeInTheDocument();
+      expect(screen.getByText("Hi")).toBeInTheDocument();
+      // The tool call and what the tool answered both sit under Output.
+      expect(screen.getByText("Output")).toBeInTheDocument();
+      expect(screen.getByText("dummy")).toBeInTheDocument();
+      expect(screen.getByText(/ok/)).toBeInTheDocument();
+      expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    });
+
+    it("keeps chat bubbles for a conversation agent's tool call test, which carries no `input`", () => {
+      render(
+        <TestDetailView
+          history={[{ role: "user", content: "Hi" }]}
+          output={{ tool_calls: [{ tool: "dummy", arguments: {} }] }}
+          passed={false}
+          evaluation={{ type: "tool_call" }}
+        />,
+      );
+      expect(screen.queryByText("Input")).not.toBeInTheDocument();
+      expect(screen.getByText("Agent Tool Call")).toBeInTheDocument();
+    });
   });
 });
 
