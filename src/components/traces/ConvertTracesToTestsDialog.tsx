@@ -12,6 +12,7 @@ import {
   convertTracesErrorMessage,
   ConvertTestType,
   ConvertTracesToTestsResult,
+  type TraceFilters,
 } from "@/lib/tracesApi";
 
 type ConvertTracesToTestsDialogProps = {
@@ -20,6 +21,12 @@ type ConvertTracesToTestsDialogProps = {
   accessToken: string | null;
   /** The selected trace uuids to convert. */
   traceUuids: string[];
+  /** Set when the reader asked for every trace the list matches: the backend
+   *  re-reads them from these filters instead of the ticked ids. */
+  selectAll?: TraceFilters | null;
+  /** How many traces this will convert. The ticked count, or the whole list
+   *  when every matching trace was asked for. */
+  traceCount?: number;
   /** The test type derived from the selected traces. */
   testType: ConvertTestType;
   /** The agent whose traces these are, for the evaluators offered here. */
@@ -55,6 +62,8 @@ export function ConvertTracesToTestsDialog({
   onClose,
   accessToken,
   traceUuids,
+  selectAll = null,
+  traceCount,
   testType,
   agentUuid,
   agentNature = "conversation",
@@ -102,7 +111,7 @@ export function ConvertTracesToTestsDialog({
   const canSubmit =
     !submitting &&
     (!needsEvaluator || !loading) &&
-    traceUuids.length > 0 &&
+    (selectAll !== null || traceUuids.length > 0) &&
     (!needsEvaluator || selectedEvaluators.size > 0);
 
   const submit = async () => {
@@ -112,6 +121,7 @@ export function ConvertTracesToTestsDialog({
     try {
       const result = await convertTracesToTests(accessToken, {
         traceIds: traceUuids,
+        selectAll,
         type: testType,
         evaluatorUuids: needsEvaluator
           ? Array.from(selectedEvaluators)
@@ -141,7 +151,7 @@ export function ConvertTracesToTestsDialog({
     }
   };
 
-  const count = traceUuids.length;
+  const count = traceCount ?? traceUuids.length;
   // Says what is needed, why nothing is on offer, and what to do about it.
   const emptyEvaluatorMessage =
     agentNature === "general"

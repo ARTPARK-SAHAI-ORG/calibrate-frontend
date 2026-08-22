@@ -36,8 +36,6 @@ import {
 } from "@/hooks";
 import {
   fetchTrace,
-  fetchTraces,
-  MAX_TRACES_PAGE_SIZE,
   type TraceDetail,
   type TraceOutputFilter,
 } from "@/lib/tracesApi";
@@ -118,10 +116,22 @@ export function TracesTabContent({
     outputType: outputFilter,
   });
 
+  // Every trace the list matches, not only the ticked ones. The two bulk
+  // endpoints re-read the same rows from these filters, so the pages the
+  // reader never loaded are included and a stale tick cannot slip through.
+  const [everyTraceMatching, setEveryTraceMatching] = useState(false);
+  const traceFilters = {
+    agentId: agentUuid,
+    q: search,
+    outputType: outputFilter,
+  };
+
   const deletion = useTraceDeletion({
     traces: items,
-    onDeleted: (uuids) => handleDeleted(uuids.length),
+    onDeleted: (uuids) =>
+      handleDeleted(everyTraceMatching ? total : uuids.length),
     accessToken,
+    selectAll: everyTraceMatching ? traceFilters : null,
   });
 
   // Add selected traces as tests. A recorded response becomes a test that
@@ -269,40 +279,23 @@ export function TracesTabContent({
     );
   };
 
-  // Ticking every trace the search matches, not just the page on show. The
-  // trace actions all take a list of ids, so the ids for the other pages are
-  // read here (the backend caps a page at MAX_TRACES_PAGE_SIZE) before the
-  // reader can act on them.
-  const [isSelectingAll, setIsSelectingAll] = useState(false);
-  const pageFullySelected = deletion.allSelected && items.length > 0;
+  const selectionCount = everyTraceMatching ? total : selected.size;
+  // Offered once everything on show is ticked and there are more pages behind
+  // it. Deleting and adding to tests then work on the whole matching list.
   const canSelectEveryTrace =
-    pageFullySelected && !isSelectingAll && selected.size < total;
-  const selectEveryTrace = async () => {
-    if (!accessToken) return;
-    setIsSelectingAll(true);
-    try {
-      const uuids: string[] = [];
-      for (let from = 0; from < total; from += MAX_TRACES_PAGE_SIZE) {
-        const page = await fetchTraces(accessToken, {
-          limit: MAX_TRACES_PAGE_SIZE,
-          offset: from,
-          agentId: agentUuid,
-          q: search,
-          outputType: outputFilter,
-        });
-        uuids.push(...page.items.map((item) => item.uuid));
-        // The list shrank while it was being read (a delete elsewhere), so
-        // there is nothing more to ask for.
-        if (page.items.length === 0) break;
-      }
-      deletion.selectMany(uuids);
-    } catch (err) {
-      reportError("Error selecting every trace:", err);
-      toast.error("Could not select every trace. Please try again.");
-    } finally {
-      setIsSelectingAll(false);
-    }
-  };
+    deletion.allSelected &&
+    items.length > 0 &&
+    !everyTraceMatching &&
+    total > items.length;
+
+  // The choice was made against one list, so a new search, filter or empty
+  // selection drops it rather than acting on rows the reader never saw.
+  useEffect(() => {
+    setEveryTraceMatching(false);
+  }, [search, outputFilter]);
+  useEffect(() => {
+    if (selected.size === 0) setEveryTraceMatching(false);
+  }, [selected.size]);
 
   /** Untick only the traces that were actually submitted. */
   const clearSubmitted = () => {
@@ -449,26 +442,27 @@ export function TracesTabContent({
                 ) : (
                   <>
                     <span className="font-medium text-foreground">
-                      {selected.size}
+                      {selectionCount}
                     </span>{" "}
-                    {selected.size === 1 ? "trace" : "traces"} selected
+                    {selectionCount === 1 ? "trace" : "traces"} selected
+                    {everyTraceMatching && search.trim() ? (
+                      <span className="opacity-80">
+                        {" "}
+                        matching &ldquo;{search.trim()}&rdquo;
+                      </span>
+                    ) : null}
                   </>
                 )}
               </span>
               {canSelectEveryTrace && (
                 <button
                   type="button"
-                  onClick={selectEveryTrace}
+                  onClick={() => setEveryTraceMatching(true)}
                   className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   Select all {total} trace{total === 1 ? "" : "s"}
                   {search.trim() ? ` matching "${search.trim()}"` : ""}
                 </button>
-              )}
-              {isSelectingAll && (
-                <span className="text-sm text-muted-foreground">
-                  Selecting every trace...
-                </span>
               )}
               {selected.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -476,7 +470,15 @@ export function TracesTabContent({
                     size="sm"
                     variant="primary"
                     onClick={() => {
-                      if (isMixedSelection) {
+                      if (everyTraceMatching && outputFilter === "all") {
+                        // Nothing says the pages behind this one hold one kind
+                        // of output, and the two kinds make different tests.
+                        toast.error(
+                          "Filter the list to responses or to tool calls before adding every trace as tests.",
+                        );
+                        return;
+                      }
+                      if (!everyTraceMatching && isMixedSelection) {
                         toast.error(
                           "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                         );
@@ -485,13 +487,15 @@ export function TracesTabContent({
                       setConvertOpen(true);
                     }}
                   >
-                    Add to tests ({selected.size})
+                    Add to tests ({selectionCount})
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={labellableUuids.length}
+                      count={everyTraceMatching ? 0 : labellableUuids.length}
                       emptyMessage={
-                        selected.size === 0
+                        everyTraceMatching
+                          ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
+                          : selected.size === 0
                           ? "Select at least one trace to submit for labelling."
                           : hasToolCallTrace
                             ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
@@ -507,7 +511,7 @@ export function TracesTabContent({
                     onClick={deletion.openBulkDeleteDialog}
                     className="text-red-600 dark:text-red-400"
                   >
-                    Delete selected ({selected.size})
+                    Delete selected ({selectionCount})
                   </Button>
                 </div>
               )}
@@ -581,7 +585,17 @@ export function TracesTabContent({
         onClose={() => setConvertOpen(false)}
         accessToken={accessToken}
         traceUuids={Array.from(selected)}
-        testType={selectedTestType}
+        selectAll={everyTraceMatching ? traceFilters : null}
+        traceCount={selectionCount}
+        testType={
+          everyTraceMatching
+            ? outputFilter === "tool_call"
+              ? "tool_call"
+              : isGeneral
+                ? "general"
+                : "response"
+            : selectedTestType
+        }
         agentUuid={agentUuid}
         agentNature={agentNature}
         onConverted={(result, evaluatorsUsed = []) => {

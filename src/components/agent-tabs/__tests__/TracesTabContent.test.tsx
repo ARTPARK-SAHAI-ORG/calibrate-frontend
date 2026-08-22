@@ -188,6 +188,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid,
     traceUuids,
     testType,
+    selectAll,
     agentNature,
     onConverted,
   }: {
@@ -195,6 +196,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
+    selectAll?: { agentId: string; outputType?: string } | null;
     agentNature?: string;
     onConverted: (
       result: { created: number; test_uuids: string[] },
@@ -206,6 +208,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-select-all">
+          {selectAll ? `${selectAll.agentId}|${selectAll.outputType}` : "none"}
+        </span>
         <span data-testid="convert-nature">{agentNature}</span>
         <button
           type="button"
@@ -438,7 +443,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByText("trace selected")).toBeInTheDocument();
   });
 
-  it("ticks every trace across the pages, not just the one on show", async () => {
+  it("counts every trace the list matches once the whole list is asked for", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
       tracesResult([trace({ uuid: "trace-1" }), trace({ uuid: "trace-2" })], {
@@ -446,14 +451,6 @@ describe("TracesTabContent", () => {
         hasNext: true,
       }),
     );
-    fetchTraces.mockResolvedValue({
-      items: ["trace-1", "trace-2", "trace-3", "trace-4", "trace-5"].map(
-        (uuid) => ({ uuid }),
-      ),
-      total: 5,
-      limit: 200,
-      offset: 0,
-    });
     render(<TracesTabContent {...tabProps} />);
 
     await user.click(screen.getByLabelText("Select all traces"));
@@ -461,36 +458,54 @@ describe("TracesTabContent", () => {
 
     await user.click(screen.getByText("Select all 5 traces"));
 
-    await waitFor(() => expect(screen.getByText("5")).toBeInTheDocument());
-    expect(fetchTraces).toHaveBeenCalledWith("test-token", {
-      limit: 200,
-      offset: 0,
-      agentId: "agent-1",
-      q: "",
-      outputType: "all",
-    });
-    // Everything is ticked, so there is nothing left to offer.
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Delete selected (5)")).toBeInTheDocument();
+    // The whole list is spoken for, so there is nothing left to offer.
     expect(screen.queryByText("Select all 5 traces")).not.toBeInTheDocument();
   });
 
-  it("says so and keeps the ticks when the other pages cannot be read", async () => {
+  it("hands the whole-list choice to the add-to-tests window as filters", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
       tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
     );
-    fetchTraces.mockRejectedValue(new Error("offline"));
     render(<TracesTabContent {...tabProps} />);
 
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
-
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        "Could not select every trace. Please try again.",
-      ),
+    // The two kinds of output make different tests, so the list has to say
+    // which kind it is showing before every trace can be added.
+    await user.click(screen.getByText("Add to tests (4)"));
+    expect(toast.error).toHaveBeenCalledWith(
+      "Filter the list to responses or to tool calls before adding every trace as tests.",
     );
-    expect(reportError).toHaveBeenCalled();
-    expect(screen.getByText("1")).toBeInTheDocument();
+
+    // Saying which kind the list shows resets the choice; the ticks on the
+    // page stay, so the whole list can be asked for again.
+    await user.click(screen.getByRole("button", { name: "Response" }));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    expect(screen.getByTestId("convert-select-all")).toHaveTextContent(
+      "agent-1|response",
+    );
+  });
+
+  it("keeps labelling to the ticked traces when the whole list is asked for", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Submit for labelling"));
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Labelling works on the traces you tick. Untick the whole list and pick the ones to send.",
+    );
+    expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
   });
 
   it("does not offer to tick every trace when they all fit on one page", async () => {

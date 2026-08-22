@@ -132,11 +132,6 @@ export function useBulkDeletion<T extends { uuid: string }>({
     });
   };
 
-  /** Tick a list of items outright, for "select every one of them" on a list
-   *  whose other pages are not loaded. */
-  const selectMany = (uuids: string[]) =>
-    setSelectedUuids((prev) => new Set([...prev, ...uuids]));
-
   /** Clear the selection without deleting — for a non-delete bulk action (e.g.
    *  convert-to-tests) that consumed the selection successfully. */
   const clearSelection = () => setSelectedUuids(new Set());
@@ -237,7 +232,6 @@ export function useBulkDeletion<T extends { uuid: string }>({
     hasSelectableItems,
     checkboxProps,
     toggleSelectAll,
-    selectMany,
     clearSelection,
     deleteDialogOpen,
     itemToDelete,

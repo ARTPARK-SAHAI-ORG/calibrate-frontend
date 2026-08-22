@@ -283,25 +283,36 @@ export function ManageEvaluatorsDialog({
               Choose evaluators to align with humans
             </p>
           </div>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Nothing that fits yet: make one here rather than leaving and
+                losing the changes on this task. */}
+            <button
+              type="button"
+              onClick={() => setCreateFlowOpen(true)}
+              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              New evaluator
+            </button>
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
@@ -327,8 +338,7 @@ export function ManageEvaluatorsDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
             {/* Left column: catalogue with checkboxes */}
             <div className="flex flex-col gap-2 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 min-w-0">
+              <div className="relative">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <svg
                       className="w-4 h-4 text-muted-foreground"
@@ -352,16 +362,6 @@ export function ManageEvaluatorsDialog({
                     className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
-                {/* Nothing that fits yet: make one here rather than leaving and
-                    losing the changes on this task. */}
-                <button
-                  type="button"
-                  onClick={() => setCreateFlowOpen(true)}
-                  className="h-9 px-3 shrink-0 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                >
-                  New evaluator
-                </button>
-              </div>
 
               <div className="border border-border rounded-md max-h-80 overflow-y-auto divide-y divide-border">
                 {loading ? (

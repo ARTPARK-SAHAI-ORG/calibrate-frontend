@@ -222,6 +222,7 @@ it("submits a response test with the selected evaluator", async () => {
 
   await waitFor(() => expect(mockConvert).toHaveBeenCalled());
   expect(mockConvert).toHaveBeenCalledWith("tok", {
+    selectAll: null,
     traceIds: ["tr-1", "tr-2"],
     type: "response",
     evaluatorUuids: ["ev-default"],
@@ -273,6 +274,7 @@ it("asks only for confirmation for tool-call traces", async () => {
 
   await waitFor(() => expect(mockConvert).toHaveBeenCalled());
   expect(mockConvert).toHaveBeenCalledWith("tok", {
+    selectAll: null,
     traceIds: ["tr-1", "tr-2"],
     type: "tool_call",
     evaluatorUuids: undefined,
@@ -367,6 +369,7 @@ it("offers the output evaluators and sends a general conversion", async () => {
 
   await waitFor(() =>
     expect(mockConvert).toHaveBeenCalledWith("tok", {
+      selectAll: null,
       traceIds: ["tr-1", "tr-2"],
       type: "general",
       evaluatorUuids: ["ev-general-default"],

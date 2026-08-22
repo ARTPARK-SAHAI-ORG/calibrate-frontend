@@ -1,7 +1,11 @@
 "use client";
 
 import { useBulkDeletion } from "./useBulkDeletion";
-import type { TraceSummary } from "@/lib/tracesApi";
+import {
+  selectAllBody,
+  type TraceFilters,
+  type TraceSummary,
+} from "@/lib/tracesApi";
 
 type UseTraceDeletionArgs = {
   /** The currently visible page of traces — drives the "select all" toggle. */
@@ -10,6 +14,9 @@ type UseTraceDeletionArgs = {
   onDeleted: (uuids: string[]) => void;
   /** Backend JWT used for the delete requests. */
   accessToken: string | null;
+  /** Set when the reader asked for every trace the list matches, not only the
+   *  ticked ones: the delete is then sent as those filters. */
+  selectAll?: TraceFilters | null;
 };
 
 // Single and bulk deletes both go through `POST /traces/bulk-delete` — there
@@ -31,13 +38,21 @@ export function useTraceDeletion({
   traces,
   onDeleted,
   accessToken,
+  selectAll = null,
 }: UseTraceDeletionArgs) {
   return useBulkDeletion<TraceSummary>({
     items: traces,
     onDeleted,
     accessToken,
     selectLabel: "Select trace",
-    buildBulkRequest: buildRequest,
+    buildBulkRequest: (backendUrl, uuids) =>
+      selectAll
+        ? {
+            url: `${backendUrl}/traces/bulk-delete`,
+            method: "POST",
+            body: JSON.stringify(selectAllBody(selectAll)),
+          }
+        : buildRequest(backendUrl, uuids),
     buildSingleRequest: (backendUrl, uuid) => buildRequest(backendUrl, [uuid]),
   });
 }
