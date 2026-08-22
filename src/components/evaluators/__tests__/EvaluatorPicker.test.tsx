@@ -64,6 +64,25 @@ describe("EvaluatorPicker", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(2);
   });
 
+  it("puts the box level with the name when the row has no description", () => {
+    setup({
+      evaluators: [
+        evaluator({
+          uuid: "ev-a",
+          name: "Tone check",
+          description: "Some text",
+        }),
+        evaluator({ uuid: "ev-b", name: "Policy fit", description: null }),
+      ],
+    });
+
+    const [withText, withoutText] = screen.getAllByRole("checkbox");
+    expect(withText.parentElement).toHaveClass("items-start");
+    expect(withText).toHaveClass("mt-0.5");
+    expect(withoutText.parentElement).toHaveClass("items-center");
+    expect(withoutText).not.toHaveClass("mt-0.5");
+  });
+
   it("narrows the list as the user searches", async () => {
     const user = setupUser();
     setup({

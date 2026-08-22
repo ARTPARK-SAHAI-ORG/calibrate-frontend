@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Select } from "@/components/ui/Select";
@@ -563,12 +562,9 @@ function HumanLabellingPageInner() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[minmax(0,1fr)_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(2)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Type
                   </div>
                   <div className="text-sm font-medium text-muted-foreground">
                     Items
@@ -588,20 +584,11 @@ function HumanLabellingPageInner() {
                       onClick={() =>
                         router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
-                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(2)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       <p className="text-sm font-medium text-foreground truncate">
                         {task.name}
                       </p>
-                      <div>
-                        {evaluatorType ? (
-                          <EvaluatorTypePill evaluatorType={evaluatorType} />
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            —
-                          </span>
-                        )}
-                      </div>
                       <p className="text-sm text-muted-foreground tabular-nums">
                         {task.item_count ?? 0}
                       </p>
@@ -667,14 +654,9 @@ function HumanLabellingPageInner() {
                       className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {task.name}
-                          </p>
-                          {evaluatorType && (
-                            <EvaluatorTypePill evaluatorType={evaluatorType} />
-                          )}
-                        </div>
+                        <p className="text-sm font-medium text-foreground truncate mb-1">
+                          {task.name}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {task.item_count ?? 0} item
                           {(task.item_count ?? 0) === 1 ? "" : "s"}
@@ -1440,16 +1422,13 @@ function AgreementOverview({
         <>
           {/* Desktop table */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <SortHeader
                 label="Name"
                 active={sortKey === "name"}
                 dir={sortDir}
                 onClick={() => handleSort("name")}
               />
-              <div className="text-sm font-medium text-muted-foreground">
-                Type
-              </div>
               <SortHeader
                 label="Current agreement"
                 active={sortKey === "current"}
@@ -1471,7 +1450,7 @@ function AgreementOverview({
                 >
                   <div
                     onClick={() => toggleRow(row.key)}
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {row.key === "human_human" ? (
@@ -1492,15 +1471,6 @@ function AgreementOverview({
                             alignment
                           </span>
                         </>
-                      )}
-                    </div>
-                    <div>
-                      {row.key === "human_human" ? (
-                        <HumanTypePill />
-                      ) : row.evaluatorType ? (
-                        <EvaluatorTypePill evaluatorType={row.evaluatorType} />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </div>
                     <div
@@ -1580,15 +1550,6 @@ function AgreementOverview({
                           </span>
                         </>
                       )}
-                      {row.key === "human_human" ? (
-                        <HumanTypePill />
-                      ) : (
-                        row.evaluatorType && (
-                          <EvaluatorTypePill
-                            evaluatorType={row.evaluatorType}
-                          />
-                        )
-                      )}
                       <svg
                         className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
                         fill="none"
@@ -1632,14 +1593,6 @@ function AgreementOverview({
         </>
       )}
     </div>
-  );
-}
-
-function HumanTypePill() {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide bg-green-500/10 text-green-600 dark:text-green-400">
-      Human
-    </span>
   );
 }
 

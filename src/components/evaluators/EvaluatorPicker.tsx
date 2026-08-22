@@ -73,7 +73,11 @@ export function EvaluatorPicker({
     return (
       <div
         key={ev.uuid}
-        className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
+        className={`flex gap-3 px-3 py-2.5 transition-colors ${
+          // With no description the row is one line, so the box sits level
+          // with the name instead of at the top of a two-line block.
+          ev.description ? "items-start" : "items-center"
+        } ${
           previewUuid === ev.uuid
             ? "bg-muted/60 border-l-2 border-foreground/40 pl-[calc(0.75rem-2px)]"
             : "hover:bg-muted/30"
@@ -84,7 +88,9 @@ export function EvaluatorPicker({
           aria-label={`Select ${ev.name}`}
           checked={checked}
           onChange={() => onToggle(ev.uuid)}
-          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+          className={`w-4 h-4 cursor-pointer accent-foreground ${
+            ev.description ? "mt-0.5" : ""
+          }`}
         />
         {/* The body opens the prompt on the right rather than ticking the box,
             so an evaluator can be read before it is added. */}

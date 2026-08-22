@@ -3958,7 +3958,11 @@ export function AddTestDialog({
                                   return (
                                     <label
                                       key={o.uuid}
-                                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                                      className={`flex gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer ${
+                                        o.description
+                                          ? "items-start"
+                                          : "items-center"
+                                      }`}
                                     >
                                       <input
                                         type="checkbox"
@@ -3966,7 +3970,9 @@ export function AddTestDialog({
                                         onChange={() =>
                                           toggleEvaluatorPickerSelection(o.uuid)
                                         }
-                                        className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                                        className={`w-4 h-4 cursor-pointer accent-foreground ${
+                                          o.description ? "mt-0.5" : ""
+                                        }`}
                                       />
                                       <div className="min-w-0 flex-1">
                                         <div className="text-sm font-medium text-foreground">
@@ -4077,7 +4083,14 @@ export function AddTestDialog({
                             key={ev.evaluator_uuid}
                             className="border border-border rounded-lg p-4 bg-background"
                           >
-                            <div className="flex items-start justify-between gap-2 mb-3">
+                            {/* The gap below only separates the name from the
+                                variable fields, so a card with no variables
+                                does not carry it. */}
+                            <div
+                              className={`flex items-start justify-between gap-2 ${
+                                ev.variables.length > 0 ? "mb-3" : ""
+                              }`}
+                            >
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm font-semibold text-foreground">
                                   {ev.name}

@@ -85,11 +85,13 @@ describe("ManageEvaluatorsDialog", () => {
     );
   });
 
-  it("renders the task-type pill in the subtitle when taskType is given", async () => {
+  it("shows the same subtitle whatever the task type is", async () => {
     renderDialog({ taskType: "llm" });
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
-    const subtitle = screen.getByText("LLM reply").closest("div.inline-flex")!;
-    expect(subtitle.textContent).toBe("ChooseLLM replyevaluators to align with humans");
+    expect(
+      screen.getByText("Choose evaluators to align with humans"),
+    ).toBeInTheDocument();
+    // The kind of evaluator is no longer named anywhere in the header.
+    expect(screen.queryByText("LLM reply")).not.toBeInTheDocument();
   });
 
   it("initializes selection/order from currentEvaluatorIds and shows the count", async () => {
