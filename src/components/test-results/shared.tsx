@@ -6,7 +6,6 @@ import {
   ReasoningExpandedContent,
   ReasoningToggleButton,
 } from "@/components/EvaluatorVerdictCard";
-import { Link } from "@/lib/nav";
 import {
   CheckIcon,
   XIcon,
@@ -14,7 +13,6 @@ import {
   ToolIcon,
   DocumentIcon,
   CloseIcon,
-  ChevronDownIcon,
   WarningTriangleIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -25,34 +23,6 @@ import {
   toRatingScale,
 } from "@/lib/binaryLabels";
 import { copyToClipboard } from "@/lib/clipboard";
-
-// Renders the evaluator name. Authenticated result pages can link to the
-// evaluator detail page; public share pages must render plain text because
-// `/evaluators/{uuid}` is an authenticated route.
-function EvaluatorNameLink({
-  uuid,
-  name,
-  className,
-  enableLink,
-}: {
-  uuid?: string | null;
-  name: string;
-  className: string;
-  enableLink: boolean;
-}) {
-  if (uuid && enableLink) {
-    return (
-      <Link
-        href={`/evaluators/${uuid}`}
-        className={`${className} hover:underline cursor-pointer`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {name}
-      </Link>
-    );
-  }
-  return <span className={className}>{name}</span>;
-}
 
 // Re-export icons for backwards compatibility
 export { CheckIcon, XIcon, SpinnerIcon, ToolIcon, CloseIcon, DocumentIcon };
@@ -158,6 +128,13 @@ export type TestCaseEvaluatorRef = {
 export type TestCaseData = {
   name?: string;
   history?: TestCaseHistory[];
+  /** The single input a test written for a single agent response agent
+   * carries instead of a conversation. Present on both its Agent Response
+   * (`evaluation.type: "general"`) and its Tool Call tests — for the latter
+   * the backend also widens it into a one-turn `history` for the run, so
+   * this field is the only thing that says the test was written as one
+   * input. Absent on tests written as a conversation. */
+  input?: string | null;
   evaluation?: TestCaseEvaluation;
   /** Evaluators attached to this test (with their per-test variable
    * values). Optional — only present when the run-result API echoes the
@@ -901,6 +878,7 @@ function CopyJsonButton({ value }: { value: string }) {
 
 export function TestDetailView({
   history,
+  input,
   output,
   passed,
   reasoning,
@@ -913,6 +891,9 @@ export function TestDetailView({
   showVerdict = true,
 }: {
   history: TestCaseHistory[];
+  /** `test_case.input` — set only for a test written as one input rather
+   * than a conversation. Switches this view to the Input/Output boxes. */
+  input?: string | null;
   output?: TestCaseOutput;
   passed: boolean;
   reasoning?: string;
@@ -993,9 +974,12 @@ export function TestDetailView({
   // chat-bubble view below it reads as a two-message conversation, so it
   // gets the same plain Input/Output box layout used for these agents
   // everywhere else (the labelling item pane, a trace's detail view).
-  const isGeneralType = evaluation?.type === "general";
+  // Both of its test types qualify: an Agent Response test says so with
+  // `evaluation.type`, a Tool Call test only by carrying `input`.
+  const isGeneralType =
+    evaluation?.type === "general" || typeof input === "string";
   const generalInput = isGeneralType
-    ? (history.find((h) => h.role === "user")?.content ?? "")
+    ? (input ?? history.find((h) => h.role === "user")?.content ?? "")
     : "";
   const historyJson = useMemo(() => {
     // Mirror what the UI shows: the prior turns (`history`) followed by the

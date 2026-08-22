@@ -211,26 +211,13 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        <div
-          className={`grid grid-cols-2 gap-4 ${
-            toolCallRate !== null ? "md:grid-cols-5" : "md:grid-cols-4"
-          }`}
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Pass rate"
             value={formatPercent(rate)}
             subtitle={`${passed}/${total}`}
             progress={rate ?? undefined}
           />
-          {toolCallRate !== null && toolCall && (
-            <MetricCard
-              label="Tool calls"
-              value={formatPercent(toolCallRate)}
-              subtitle={`${toolCall.passed}/${toolCall.total}`}
-              progress={toolCallRate}
-              info="Pass rate across tool-call tests only"
-            />
-          )}
           <MetricCard
             label={METRIC_LABELS.latency}
             value={formatLatencyMs(latencyP50(latency))}
@@ -252,12 +239,24 @@ export function TestRunSummary({
         </div>
       </div>
 
-      {evaluators.length > 0 && (
+      {(evaluators.length > 0 || toolCallRate !== null) && (
         <div>
           <h2 className="text-base md:text-lg font-semibold mb-3">
             Evaluators
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Tool-call tests are judged by the expected tool calls on the
+                test itself, not by an evaluator, so their pass rate sits
+                beside the evaluator cards rather than in the run totals. */}
+            {toolCallRate !== null && toolCall && (
+              <MetricCard
+                label="Tool calls"
+                value={formatPercent(toolCallRate)}
+                subtitle={`${toolCall.passed}/${toolCall.total}`}
+                progress={toolCallRate}
+                info="Pass rate across tool-call tests only"
+              />
+            )}
             {evaluators.map((entry) => {
               const { label, value, subtitle, progress } =
                 evaluatorCardContent(entry);
