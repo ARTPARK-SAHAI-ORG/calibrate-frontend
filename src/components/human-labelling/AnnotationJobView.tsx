@@ -13,6 +13,9 @@ import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
+import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
+import { ExpectedToolCallsPanel } from "./item-panes/ExpectedToolCallsPanel";
+import { isToolCallOutputItem } from "./itemOutputType";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
@@ -141,6 +144,15 @@ type FieldValue = { value: unknown; comment: string };
 
 function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
+}
+
+// A tool-call item has no evaluators — the verdict is a single correct/wrong
+// per item. We store it in the same `fields` map (and `savedKeys`) under a
+// made-up evaluator id so the completion / save machinery works unchanged;
+// on save it rides the `evaluator_id: null` annotation as `value.value`.
+const TOOL_CALL_VERDICT_KEY = "__tool_call_verdict__";
+function toolCallVerdictKey(itemId: string): FieldKey {
+  return fieldKey(itemId, TOOL_CALL_VERDICT_KEY);
 }
 
 /** The evaluators an annotator must answer before an item counts as done.
@@ -290,6 +302,16 @@ export function AnnotationJobView({
         if (!a.evaluator_id) {
           const c = readSavedComment(a.value);
           if (c) comments[a.item_id] = c;
+          // A tool-call item's verdict (correct/wrong) rides this item-level
+          // (null) slot as `value.value` — seed it whenever it's a boolean.
+          if (a.value && typeof a.value === "object") {
+            const v = (a.value as Record<string, unknown>).value;
+            if (typeof v === "boolean") {
+              const vk = toolCallVerdictKey(a.item_id);
+              next[vk] = { value: v, comment: "" };
+              saved.add(vk);
+            }
+          }
           continue;
         }
         const k = fieldKey(a.item_id, a.evaluator_id);
@@ -314,7 +336,9 @@ export function AnnotationJobView({
       }
       const required = requiredOnly(data.evaluators);
       const firstIncomplete = data.items.findIndex((it) =>
-        required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+        isToolCallOutputItem(it.payload)
+          ? !saved.has(toolCallVerdictKey(it.uuid))
+          : required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
@@ -577,6 +601,18 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // Tool-call items are per-item, not per-task: an `llm` / `llm-general` task
+  // can hold both response items (scored by evaluators) and tool-call items
+  // (one correct/wrong verdict, AI judges skipped).
+  const itemPayloadByUuid = useMemo(() => {
+    const m = new Map<string, unknown>();
+    for (const it of data.items) m.set(it.uuid, it.payload);
+    return m;
+  }, [data.items]);
+  const isToolCallItemId = useCallback(
+    (itemId: string) => isToolCallOutputItem(itemPayloadByUuid.get(itemId)),
+    [itemPayloadByUuid],
+  );
   // Both settings are frozen on the job. Absent keeps today's behaviour:
   // the comments box is offered and reasoning is optional.
   const commentsEnabled = data.job.comments_enabled !== false;
@@ -628,6 +664,9 @@ function AnnotateView({
   // when the annotator moves on.
   const itemCompleted = useCallback(
     (itemId: string) => {
+      // A tool-call item is done once its single correct/wrong verdict is saved.
+      if (isToolCallItemId(itemId))
+        return savedKeys.has(toolCallVerdictKey(itemId));
       const savedFor = (ev: Evaluator) =>
         savedKeys.has(fieldKey(itemId, ev.uuid));
       if (!requiredEvaluators.every(savedFor)) return false;
@@ -637,7 +676,7 @@ function AnnotateView({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requiredEvaluators, evaluators, savedKeys, fields],
+    [isToolCallItemId, requiredEvaluators, evaluators, savedKeys, fields],
   );
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !==
@@ -709,51 +748,69 @@ function AnnotateView({
     if (!currentItem || submitting) return false;
     setTopError(null);
 
-    // Nothing is sent until every label answered in this sitting has its
-    // reasoning. The boxes go red and the first one is scrolled to, so the
-    // annotator is told where to write rather than only that something is
-    // wrong.
-    const missing = reasoningMissingFor(currentItem.uuid);
-    if (missing.length > 0) {
-      setMissingReasoningKeys(new Set(missing));
-      return false;
-    }
-    setMissingReasoningKeys(new Set());
+    const itemIsToolCall = isToolCallItemId(currentItem.uuid);
+    // Item-level free-text comment lives on the `evaluator_id IS NULL` slot.
+    const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
+    const commentChanged = commentChangedFor(currentItem.uuid);
 
     const annotationsBody: {
       evaluator_id: string | null;
       value: Record<string, unknown>;
     }[] = [];
-    for (const ev of evaluators) {
-      const k = fieldKey(currentItem.uuid, ev.uuid);
-      const f = fields[k];
-      if (!hasFieldValue(f)) {
-        // A blank optional evaluator is simply not sent; a blank required
-        // one means there is nothing valid to save yet.
-        if (ev.is_optional === true) continue;
-        return false;
-      }
-      annotationsBody.push({
-        evaluator_id: ev.uuid,
-        value: {
-          value: f.value,
-          ...(f.comment ? { reasoning: f.comment } : {}),
-        },
-      });
-    }
+    let toolCallVerdict: boolean | null = null;
 
-    // Item-level free-text comment lives on the `evaluator_id IS NULL`
-    // slot. Only send when it actually changed since the last save — the
-    // backend overwrites whatever's there, so an unchanged value is wasted
-    // work, and we'd erase a saved comment if we sent an empty string for
-    // an item that never had one edited.
-    const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
-    const commentChanged = commentChangedFor(currentItem.uuid);
-    if (commentChanged) {
+    if (itemIsToolCall) {
+      // A tool-call item is labelled with a single correct/wrong verdict — the
+      // task's evaluators (AI judges) don't apply. It rides the null slot as
+      // `value.value`, with the comment alongside.
+      const v = fields[toolCallVerdictKey(currentItem.uuid)]?.value;
+      if (typeof v !== "boolean") return false; // verdict is required
+      toolCallVerdict = v;
       annotationsBody.push({
         evaluator_id: null,
-        value: { comment: currentComment },
+        value: {
+          value: v,
+          ...(currentComment ? { comment: currentComment } : {}),
+        },
       });
+    } else {
+      // Nothing is sent until every label answered in this sitting has its
+      // reasoning. The boxes go red and the first one is scrolled to, so the
+      // annotator is told where to write rather than only that something is
+      // wrong.
+      const missing = reasoningMissingFor(currentItem.uuid);
+      if (missing.length > 0) {
+        setMissingReasoningKeys(new Set(missing));
+        return false;
+      }
+      setMissingReasoningKeys(new Set());
+
+      for (const ev of evaluators) {
+        const k = fieldKey(currentItem.uuid, ev.uuid);
+        const f = fields[k];
+        if (!hasFieldValue(f)) {
+          // A blank optional evaluator is simply not sent; a blank required
+          // one means there is nothing valid to save yet.
+          if (ev.is_optional === true) continue;
+          return false;
+        }
+        annotationsBody.push({
+          evaluator_id: ev.uuid,
+          value: {
+            value: f.value,
+            ...(f.comment ? { reasoning: f.comment } : {}),
+          },
+        });
+      }
+
+      // Only send the comment when it actually changed — an unchanged value is
+      // wasted work, and an empty string would erase a saved comment.
+      if (commentChanged) {
+        annotationsBody.push({
+          evaluator_id: null,
+          value: { comment: currentComment },
+        });
+      }
     }
 
     setSubmitting(true);
@@ -782,6 +839,9 @@ function AnnotateView({
       for (const a of annotationsBody) {
         if (a.evaluator_id)
           justSaved.add(fieldKey(currentItem.uuid, a.evaluator_id));
+      }
+      if (toolCallVerdict !== null) {
+        justSaved.add(toolCallVerdictKey(currentItem.uuid));
       }
       setSavedKeys((prev) => {
         const next = new Set(prev);
@@ -969,12 +1029,17 @@ function AnnotateView({
                 );
                 const isLastUnsaved =
                   !!currentItem && !currentItemSaved && unsavedCount === 1;
+                const currentIsToolCall =
+                  !!currentItem && isToolCallItemId(currentItem.uuid);
                 const allEvaluatorsAnswered =
                   !!currentItem &&
-                  evaluators.length > 0 &&
-                  requiredEvaluators.every((ev) =>
-                    evaluatorAnswered(currentItem.uuid, ev),
-                  );
+                  (currentIsToolCall
+                    ? typeof fields[toolCallVerdictKey(currentItem.uuid)]
+                        ?.value === "boolean"
+                    : evaluators.length > 0 &&
+                      requiredEvaluators.every((ev) =>
+                        evaluatorAnswered(currentItem.uuid, ev),
+                      ));
                 const disabled =
                   submitting || total === 0 || !allEvaluatorsAnswered;
                 const label = submitting
@@ -985,7 +1050,9 @@ function AnnotateView({
                       ? "Mark as complete"
                       : "Submit & Next";
                 const tooltip = !allEvaluatorsAnswered
-                  ? "Judgements should be given for all required evaluators before submitting"
+                  ? currentIsToolCall
+                    ? "Choose pass or fail before submitting"
+                    : "Judgements should be given for all required evaluators before submitting"
                   : undefined;
                 return (
                   <button
@@ -1200,6 +1267,10 @@ export function ItemPane({
   taskType: Task["type"];
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
+  // A tool-call item (in any llm/llm-general task) shows the tool call + the
+  // expected spec, regardless of the task's normal pane.
+  if (isToolCallOutputItem(payload))
+    return <ToolCallItemPane payload={payload} />;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
@@ -1290,6 +1361,49 @@ function EvaluatorsPane({
       )}
     </div>
   ) : null;
+
+  // A tool-call item is labelled with a single correct/wrong verdict — the
+  // task's evaluators (AI judges) don't apply to it. This is per-item: the same
+  // llm/llm-general task can hold response items scored by evaluators too.
+  if (isToolCallOutputItem(itemPayload)) {
+    const vkey = fieldKey(item.uuid, TOOL_CALL_VERDICT_KEY);
+    const verdict = fields[vkey]?.value;
+    const setVerdict = (v: boolean) => setField(vkey, { value: v });
+    const btn = (v: boolean, on: string) =>
+      `h-9 px-4 rounded-md text-sm font-medium border transition-colors ${
+        readOnly ? "" : "cursor-pointer"
+      } ${verdict === v ? on : "border-border bg-background text-foreground hover:bg-muted/50"}`;
+    return (
+      <div className="space-y-4">
+        {descriptionBlock}
+        <ExpectedToolCallsPanel payload={itemPayload} />
+        <div className="border border-border rounded-xl p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Is the tool call correct?
+          </h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => setVerdict(true)}
+              className={btn(true, "border-green-600 bg-green-600 text-white")}
+            >
+              Correct
+            </button>
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => setVerdict(false)}
+              className={btn(false, "border-red-600 bg-red-600 text-white")}
+            >
+              Wrong
+            </button>
+          </div>
+        </div>
+        {commentBlock}
+      </div>
+    );
+  }
 
   if (evaluators.length === 0) {
     return (
