@@ -49,10 +49,12 @@ function historyToString(history: TestCaseHistory[] | undefined): string {
   return JSON.stringify(history);
 }
 
-// Serialize the agent's actual output for CSV. Response tests populate
-// `output.response`; tool-call tests populate `output.tool_calls` (often
-// with no text reply). When both are present, export the full object.
-function outputToAgentResponse(output: TestCaseOutput | null | undefined): string {
+// Serialize the agent's actual output as one piece of text. Response tests
+// populate `output.response`; tool-call tests populate `output.tool_calls`
+// (often with no text reply). When both are present, export the full object.
+// Shared with the labelling flow, where an Agent Response item can hold only
+// text and would otherwise drop a tool-call answer entirely.
+export function outputToAgentResponse(output: TestCaseOutput | null | undefined): string {
   if (!output) return "";
   const { response, tool_calls } = output;
   const hasResponse = typeof response === "string" && response.length > 0;

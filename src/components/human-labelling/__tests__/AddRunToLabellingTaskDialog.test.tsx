@@ -86,6 +86,31 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.evaluatorUuids.has("ev-9")).toBe(true);
   });
 
+  it("writes a single agent response test's tool-call answer into the output instead of leaving it blank", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-general03",
+      results: [
+        {
+          test_case: {
+            name: "Books the slot",
+            evaluation: { type: "general" },
+            input: "book me in",
+          },
+          output: {
+            response: "",
+            tool_calls: [{ tool: "book_slot", arguments: { day: "monday" } }],
+          },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+
+    const output = buildItemsFromSource(source).items[0].payload
+      .output as string;
+    expect(output).toContain("book_slot");
+    expect(output).toContain("monday");
+  });
+
   it("reads a single agent response test's input from its one-turn history when the run does not echo input", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",

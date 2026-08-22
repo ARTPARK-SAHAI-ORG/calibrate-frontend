@@ -14,6 +14,7 @@ import {
   type ToolCallOutput,
 } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
+import { outputToAgentResponse } from "@/lib/exportTestResults";
 
 // Each source kind maps to exactly one task type: test runs and benchmarks →
 // "llm", or "llm-general" when their tests were written for a single agent
@@ -352,7 +353,10 @@ function buildOneItem(
             (h) => h.role === "user",
           )?.content ??
           "",
-        output: agent_response,
+        // The answer may be a tool call rather than text. An Agent Response
+        // item holds only text, so write the tool call out the same way the
+        // run export does instead of handing the annotator a blank answer.
+        output: outputToAgentResponse(raw.output ?? null),
         evaluator_variables,
       }
     : { name, chat_history, agent_response, evaluator_variables };
