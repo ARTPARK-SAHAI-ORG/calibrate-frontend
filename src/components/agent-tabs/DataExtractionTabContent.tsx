@@ -1067,7 +1067,7 @@ export function DataExtractionTabContent({
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">
-                    Name <span className="text-red-500">*</span>
+                    Name
                   </label>
                   <input
                     type="text"
@@ -1130,7 +1130,7 @@ export function DataExtractionTabContent({
                 }`}
               >
                 <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">
-                  Description <span className="text-red-500">*</span>
+                  Description
                 </label>
                 <textarea
                   value={dataFieldDescription}
@@ -1153,7 +1153,7 @@ export function DataExtractionTabContent({
               {dataFieldDataType === "object" && (
                 <div>
                   <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">
-                    Properties <span className="text-red-500">*</span>
+                    Properties
                   </label>
                   <NestedContainer
                     onAddProperty={addDataFieldProperty}

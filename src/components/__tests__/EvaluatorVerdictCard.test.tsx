@@ -828,7 +828,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
     expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
   });
 
-  it("marks reasoning with a red star when it is required", () => {
+  it("drops the optional wording when reasoning is required", () => {
     const { container } = render(
       <EvaluatorVerdictCard
         mode="write"
@@ -838,7 +838,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
       />,
     );
     expect(screen.queryByText("Reasoning (optional)")).not.toBeInTheDocument();
-    expect(container.querySelector(".text-red-500")?.textContent).toBe("*");
+    expect(container.querySelector(".text-red-500")).toBeNull();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 

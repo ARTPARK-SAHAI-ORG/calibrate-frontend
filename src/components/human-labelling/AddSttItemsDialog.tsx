@@ -348,7 +348,7 @@ export function AddSttItemsDialog({
                 )}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Name <span className="text-red-500">*</span>
+                    Name
                   </label>
                   <input
                     type="text"
@@ -365,8 +365,7 @@ export function AddSttItemsDialog({
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Reference transcript{" "}
-                    <span className="text-red-500">*</span>
+                    Reference transcript
                   </label>
                   <textarea
                     value={row.actual}
@@ -384,8 +383,7 @@ export function AddSttItemsDialog({
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Predicted transcript{" "}
-                    <span className="text-red-500">*</span>
+                    Predicted transcript
                   </label>
                   <textarea
                     value={row.predicted}

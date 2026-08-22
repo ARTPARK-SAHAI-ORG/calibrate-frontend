@@ -144,7 +144,7 @@ export function DuplicateEvaluatorDialog({
         {/* Evaluator Name Input */}
         <div className="mb-6">
           <label className="block text-[13px] font-medium text-foreground mb-2">
-            Evaluator Name <span className="text-red-500">*</span>
+            Evaluator Name
           </label>
           <div className="relative">
             <input

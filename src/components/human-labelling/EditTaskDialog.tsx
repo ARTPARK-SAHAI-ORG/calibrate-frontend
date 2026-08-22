@@ -129,7 +129,7 @@ export function EditTaskDialog({
         <div className="flex-1 overflow-y-auto px-5 md:px-6 py-4 md:py-5 space-y-4">
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Name <span className="text-red-500">*</span>
+              Name
             </label>
             <input
               type="text"

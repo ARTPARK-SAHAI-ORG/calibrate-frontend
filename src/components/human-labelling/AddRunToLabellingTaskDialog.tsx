@@ -873,7 +873,7 @@ export function AddRunToLabellingTaskDialog({
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-2">
-          Name <span className="text-red-500">*</span>
+          Name
         </label>
         <input
           autoFocus

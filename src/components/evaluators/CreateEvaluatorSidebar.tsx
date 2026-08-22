@@ -134,7 +134,7 @@ export function CreateEvaluatorSidebar({
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 md:gap-6">
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Name <span className="text-red-500">*</span>
+              Name
             </label>
             <input
               type="text"
@@ -182,7 +182,7 @@ export function CreateEvaluatorSidebar({
 
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Review type <span className="text-red-500">*</span>
+              Review type
             </label>
             <div className="inline-flex rounded-md border border-border p-1">
               {(["binary", "rating"] as const).map((type) => {
@@ -229,7 +229,7 @@ export function CreateEvaluatorSidebar({
 
           <div>
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Judge model <span className="text-red-500">*</span>
+              Judge model
             </label>
             <button
               type="button"
@@ -265,7 +265,7 @@ export function CreateEvaluatorSidebar({
 
           <div className="flex flex-col">
             <label className="block text-xs md:text-sm font-medium mb-2">
-              Judge prompt <span className="text-red-500">*</span>
+              Judge prompt
             </label>
             {variablesSupported && (
               <p className="text-xs md:text-sm text-muted-foreground mb-2 leading-relaxed">

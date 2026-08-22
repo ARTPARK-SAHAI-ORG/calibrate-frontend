@@ -327,7 +327,7 @@ export function EvaluationTabContent({
               {/* Criteria name */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Criteria name <span className="text-red-500">*</span>
+                  Criteria name
                 </label>
                 <input
                   type="text"

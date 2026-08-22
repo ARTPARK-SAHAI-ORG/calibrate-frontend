@@ -644,13 +644,7 @@ function WriteReasoning({
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
         Reasoning{" "}
-        {disabled ? (
-          ""
-        ) : required ? (
-          <span className="text-red-500">*</span>
-        ) : (
-          "(optional)"
-        )}
+        {disabled || required ? "" : "(optional)"}
       </div>
       <textarea
         value={value}
