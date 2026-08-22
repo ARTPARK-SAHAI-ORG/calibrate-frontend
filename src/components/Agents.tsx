@@ -98,6 +98,8 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
               uuid: agent.uuid,
               name: agent.name || agent.agent_name || String(agent),
               type: agent.type === "connection" ? "connection" : "agent",
+              interaction_type:
+                agent.interaction_type === "general" ? "general" : "conversation",
               updatedAt: formatDate(rawDate),
               updatedAtRaw: rawDate,
             };
@@ -179,6 +181,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
       uuid: newAgentUuid,
       name,
       type: agentToDuplicate.type,
+      interaction_type: agentToDuplicate.interaction_type,
       updatedAt: formatDate(new Date().toISOString()),
       updatedAtRaw: new Date().toISOString(),
     };
@@ -341,7 +344,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           {/* Desktop Table View */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[40px_1fr_160px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <div className="flex items-center">
                 <SelectCheckbox
                   checked={allSelected}
@@ -355,6 +358,9 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
               </div>
               <div className="text-sm font-medium text-muted-foreground">
                 Type
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">
+                What it does
               </div>
               <div className="text-sm font-medium text-muted-foreground">
                 <button
@@ -386,7 +392,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             {sortedAgents.map((agent) => (
               <div
                 key={agent.uuid}
-                className="grid grid-cols-[40px_1fr_160px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+                className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
               >
                 {/* Selection checkbox */}
                 <div className="flex items-center pl-4">
@@ -426,6 +432,23 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                     }`}
                   >
                     {agent.type === "connection" ? "Connection" : "Agent"}
+                  </span>
+                </Link>
+                {/* What It Does Column */}
+                <Link
+                  href={`/agents/${agent.uuid}`}
+                  onClick={(e) => {
+                    if (onNavigateToAgent) {
+                      e.preventDefault();
+                      onNavigateToAgent(agent.uuid);
+                    }
+                  }}
+                  className="flex items-center px-4 py-2"
+                >
+                  <span className="text-xs px-2 py-1 rounded-md font-medium bg-muted text-muted-foreground">
+                    {agent.interaction_type === "general"
+                      ? "Single LLM response"
+                      : "Conversation"}
                   </span>
                 </Link>
                 {/* Last Updated At Column */}
@@ -540,7 +563,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   }}
                   className="block px-4 pb-4 pt-2"
                 >
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center flex-wrap gap-2 mb-1">
                     <div className="font-medium text-sm text-foreground">
                       {agent.name}
                     </div>
@@ -552,6 +575,11 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       }`}
                     >
                       {agent.type === "connection" ? "Connection" : "Agent"}
+                    </span>
+                    <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
+                      {agent.interaction_type === "general"
+                        ? "Single LLM response"
+                        : "Conversation"}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground">

@@ -70,6 +70,49 @@ describe("Agents", () => {
     expect(screen.getByText("2 agents")).toBeInTheDocument();
   });
 
+  it("shows what each agent does based on interaction_type", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "a1",
+          name: "Support Bot",
+          type: "agent",
+          interaction_type: "conversation",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+        {
+          uuid: "a2",
+          name: "Classifier Bot",
+          type: "agent",
+          interaction_type: "general",
+          updated_at: "2024-02-01T10:00:00.000Z",
+        },
+      ]),
+    );
+    render(<Agents />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Single LLM response").length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("defaults to Conversation when interaction_type is missing", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(agentsPayload),
+    );
+    render(<Agents />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Single LLM response")).not.toBeInTheDocument();
+  });
+
   it("does not fetch when there is no access token", () => {
     useAccessTokenMock.mockReturnValue(null);
     render(<Agents />);
