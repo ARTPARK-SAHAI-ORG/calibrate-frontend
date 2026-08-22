@@ -1595,3 +1595,54 @@ describe("AnnotationJobView", () => {
     );
   });
 });
+
+describe("AnnotationJobView expected tool calls", () => {
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it("shows the expected tool call's name and arguments", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          items: [
+            {
+              ...items[0],
+              payload: {
+                ...items[0].payload,
+                expected_tool_calls: [
+                  {
+                    tool: "book_appointment",
+                    arguments: {
+                      city: { match_type: "exact", value: "Bengaluru" },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Expected tool calls")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("book_appointment")).toBeInTheDocument();
+    expect(screen.getByText("city")).toBeInTheDocument();
+    expect(screen.getByText("Bengaluru")).toBeInTheDocument();
+  });
+
+  it("shows no heading for an item without expected tool calls", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+  });
+});

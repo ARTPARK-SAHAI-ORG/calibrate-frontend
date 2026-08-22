@@ -3,6 +3,7 @@ import {
   AddRunToLabellingTaskDialog,
   buildItemsFromSource,
   isLabellingEligibleRaw,
+  isToolCallTest,
   itemNounForSource,
   targetTaskTypeForSource,
   type AddRunToLabellingTaskSource,
@@ -26,17 +27,23 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 }));
 
 describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
-  it("treats only response-type test cases as eligible", () => {
+  it("treats response and tool-call test cases as eligible", () => {
     expect(
       isLabellingEligibleRaw({ test_case: { evaluation: { type: "response" } } }),
     ).toBe(true);
     expect(
       isLabellingEligibleRaw({ test_case: { evaluation: { type: "tool_call" } } }),
-    ).toBe(false);
+    ).toBe(true);
     expect(isLabellingEligibleRaw({})).toBe(false);
+    expect(
+      isToolCallTest({ test_case: { evaluation: { type: "tool_call" } } }),
+    ).toBe(true);
+    expect(
+      isToolCallTest({ test_case: { evaluation: { type: "response" } } }),
+    ).toBe(false);
   });
 
-  it("treats a single agent response test as eligible, but not its tool-call test", () => {
+  it("treats a single agent response test and its tool-call test as eligible", () => {
     expect(
       isLabellingEligibleRaw({ test_case: { evaluation: { type: "general" } } }),
     ).toBe(true);
@@ -44,10 +51,10 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       isLabellingEligibleRaw({
         test_case: { evaluation: { type: "tool_call" }, input: "hi" },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("builds a single agent response run as input and output, skipping its tool-call tests", () => {
+  it("builds a single agent response run as input and output, with its tool-call test as a tool-call item", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-general01",
@@ -75,13 +82,23 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
 
     expect(targetTaskTypeForSource(source)).toBe("llm-general");
     const result = buildItemsFromSource(source);
-    expect(result.items).toHaveLength(1);
-    expect(result.skippedCount).toBe(1);
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
     expect(result.items[0].payload).toEqual({
       name: "Summarise — run-uuid",
       input: "Summarise this report",
       output: "Here is the summary.",
       evaluator_variables: { "ev-9": { tone: "brief" } },
+    });
+    // The tool-call test belongs to the same single agent response agent, so
+    // it keeps the input it was given instead of being written as a
+    // conversation.
+    expect(result.items[1].payload).toEqual({
+      name: "Calls the tool — run-uuid",
+      input: "book it",
+      output: "",
+      actual_tool_calls: [],
+      expected_tool_calls: [],
     });
     expect(result.evaluatorUuids.has("ev-9")).toBe(true);
   });
@@ -137,7 +154,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     });
   });
 
-  it("builds items from a test_run source, skipping ineligible tests", () => {
+  it("builds both response and tool-call items into an llm task", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
@@ -157,14 +174,19 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           ],
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
         {
-          test_case: { name: "Tool call test", evaluation: { type: "tool_call" } },
+          test_case: {
+            name: "Tool call test",
+            evaluation: { type: "tool_call" },
+          },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
       ],
     };
 
     const result = buildItemsFromSource(source);
-    expect(result.items).toHaveLength(1);
-    expect(result.skippedCount).toBe(1);
+    // Both go into the `llm` task: a response item and a tool-call item.
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
     expect(result.items[0].payload.name).toBe("Greeting — run-uuid");
     expect(result.items[0].payload.chat_history).toEqual([
       { role: "user", content: "hi" },
@@ -174,6 +196,12 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items[0].payload.evaluator_variables).toEqual({
       "ev-1": { tone: "polite2" },
     });
+    // The tool-call item carries the actual calls, and no evaluator variables.
+    expect(result.items[1].payload.name).toBe("Tool call test — run-uuid");
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: { x: 1 } },
+    ]);
+    expect(result.items[1].payload.evaluator_variables).toBeUndefined();
     expect(result.evaluatorUuids.has("ev-1")).toBe(true);
   });
 
@@ -1015,13 +1043,19 @@ describe("AddRunToLabellingTaskDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("shows the skipped-tests banner when tool-call tests were skipped", async () => {
+  it("shows the skipped-items banner for a genuinely ineligible test", async () => {
+    // A test with an unknown evaluation type cannot be labelled, so it is
+    // skipped and counted. A tool-call test no longer is.
     const sourceWithSkip: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
       results: [
         {
-          test_case: { name: "Tool", evaluation: { type: "tool_call" } },
+          test_case: { name: "Reply", evaluation: { type: "response" } },
+          output: { response: "hi" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        {
+          test_case: { name: "Odd", evaluation: { type: "mystery" } },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
       ],
     };
@@ -1035,7 +1069,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     expect(
-      screen.getByText("Tool call tests are not added to labelling tasks"),
+      screen.getByText("1 item could not be added for labelling."),
     ).toBeInTheDocument();
   });
 
@@ -1049,5 +1083,214 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     expect(apiClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("tool-call tests submitted for labelling", () => {
+  const toolCallTest = {
+    test_case: {
+      name: "Book flight",
+      evaluation: {
+        type: "tool_call",
+        tool_calls: [
+          {
+            tool: "book_flight",
+            arguments: {
+              city: { match_type: "llm_judge", criteria: "a valid city" },
+            },
+          },
+        ],
+      },
+      history: [{ role: "user", content: "book it" }],
+    },
+    output: {
+      tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+    },
+  } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
+
+  it("targets an llm task whether the selection is tool-call, response, or mixed", () => {
+    const toolOnly: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallTest],
+    };
+    expect(targetTaskTypeForSource(toolOnly)).toBe("llm");
+
+    const mixed: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: { name: "R", evaluation: { type: "response" } },
+          output: { response: "hi" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        toolCallTest,
+      ],
+    };
+    expect(targetTaskTypeForSource(mixed)).toBe("llm");
+  });
+
+  it("builds a tool-call item with the expected and the actual calls, and no evaluators", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallTest],
+    };
+    const { items, skippedCount, evaluatorUuids } = buildItemsFromSource(source);
+    expect(items).toHaveLength(1);
+    expect(skippedCount).toBe(0);
+    expect(evaluatorUuids.size).toBe(0);
+    const p = items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Book flight — run-uuid");
+    expect(p.chat_history).toEqual([{ role: "user", content: "book it" }]);
+    expect(p.expected_tool_calls).toEqual([
+      {
+        tool: "book_flight",
+        arguments: {
+          city: { match_type: "llm_judge", criteria: "a valid city" },
+        },
+      },
+    ]);
+    expect(p.actual_tool_calls).toEqual([
+      { tool: "book_flight", arguments: { city: "NYC" } },
+    ]);
+  });
+
+  it("keeps the agent's text reply when it answered instead of calling a tool", () => {
+    // A failed tool-call test: no call was made, so the reply is what the
+    // annotator needs to see.
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Book flight",
+            evaluation: { type: "tool_call", tool_calls: [] },
+          },
+          output: { response: "I cannot do that." },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+    const { items } = buildItemsFromSource(source);
+    const p = items[0].payload as Record<string, unknown>;
+    expect(p.actual_tool_calls).toEqual([]);
+    expect(p.agent_response).toBe("I cannot do that.");
+  });
+
+  it("builds tool-call items from a benchmark run too, named per model", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-1234",
+      modelResults: [
+        { model: "gpt-4", test_results: [toolCallTest] },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+    };
+    const { items, skippedCount } = buildItemsFromSource(source);
+    expect(items).toHaveLength(1);
+    expect(skippedCount).toBe(0);
+    expect(items[0].payload.name).toBe("Book flight — bench-uu — gpt-4");
+    expect(items[0].payload.actual_tool_calls).toEqual([
+      { tool: "book_flight", arguments: { city: "NYC" } },
+    ]);
+  });
+
+  // A tool-call test written for a single agent response agent. Its evaluation
+  // type is "tool_call" like any other, so the only thing marking it as that
+  // agent's is the `input` it carries.
+  const generalToolCallTest = {
+    test_case: {
+      name: "Book flight",
+      evaluation: {
+        type: "tool_call",
+        tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+      },
+      input: "book me a flight to NYC",
+    },
+    output: {
+      tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+    },
+  } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
+
+  it("targets an Agent Response task for a general agent's tool-call run, as a test run and as a benchmark", () => {
+    const run: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-generaltc",
+      results: [generalToolCallTest],
+    };
+    expect(targetTaskTypeForSource(run)).toBe("llm-general");
+
+    const bench: AddRunToLabellingTaskSource = {
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-gtc1",
+      modelResults: [
+        { model: "gpt-4", test_results: [generalToolCallTest] },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+    };
+    expect(targetTaskTypeForSource(bench)).toBe("llm-general");
+  });
+
+  it("builds a general agent's tool-call item as input and output, keeping the input", () => {
+    const { items } = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-generaltc",
+      results: [generalToolCallTest],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].payload).toEqual({
+      name: "Book flight — run-uuid",
+      input: "book me a flight to NYC",
+      // The agent called a tool instead of replying with text.
+      output: "",
+      actual_tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+      expected_tool_calls: [
+        { tool: "book_flight", arguments: { city: "NYC" } },
+      ],
+    });
+    expect(items[0].payload.chat_history).toBeUndefined();
+    expect(items[0].payload.agent_response).toBeUndefined();
+  });
+
+  it("keeps the general agent's text reply as the output when it answered instead of calling a tool", () => {
+    const { items } = buildItemsFromSource({
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-gtc2",
+      modelResults: [
+        {
+          model: "gpt-4",
+          test_results: [
+            {
+              test_case: {
+                name: "Book flight",
+                evaluation: { type: "tool_call", tool_calls: [] },
+                input: "book me a flight",
+              },
+              output: { response: "I cannot do that." },
+            },
+          ],
+        },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+    });
+    expect(items[0].payload).toEqual({
+      name: "Book flight — bench-uu — gpt-4",
+      input: "book me a flight",
+      output: "I cannot do that.",
+      actual_tool_calls: [],
+      expected_tool_calls: [],
+    });
+  });
+
+  it("still builds a conversation agent's tool-call item as a chat history", () => {
+    const { items } = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallTest],
+    });
+    expect(items[0].payload.chat_history).toEqual([
+      { role: "user", content: "book it" },
+    ]);
+    expect(items[0].payload.agent_response).toBe("");
+    expect(items[0].payload.input).toBeUndefined();
+    expect(items[0].payload.output).toBeUndefined();
   });
 });

@@ -2305,3 +2305,41 @@ describe("ItemDetailPane", () => {
     expect(pane.className).toContain("md:py-6");
   });
 });
+
+describe("ItemDetailPane expected tool calls", () => {
+  const renderPane = (payload: Record<string, unknown>) =>
+    render(
+      <ItemDetailPane
+        item={{ id: 0, uuid: "item-1", task_id: "task-1", payload, created_at: "", deleted_at: null }}
+        taskType="llm"
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
+        getJobEvaluator={() => evaluatorBinary}
+        runs={[makeRun()]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+
+  it("shows the expected tool call's name and arguments", () => {
+    renderPane({
+      expected_tool_calls: [
+        {
+          tool: "book_appointment",
+          arguments: { city: { match_type: "exact", value: "Bengaluru" } },
+        },
+      ],
+    });
+    expect(screen.getByText("Expected tool calls")).toBeInTheDocument();
+    expect(screen.getByText("book_appointment")).toBeInTheDocument();
+    expect(screen.getByText("city")).toBeInTheDocument();
+    expect(screen.getByText("Bengaluru")).toBeInTheDocument();
+  });
+
+  it("shows no heading for an item without expected tool calls", () => {
+    renderPane({ description: "Desc here" });
+    expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+  });
+});

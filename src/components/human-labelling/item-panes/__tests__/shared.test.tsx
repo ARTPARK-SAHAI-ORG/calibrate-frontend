@@ -7,7 +7,7 @@ describe("Section", () => {
     render(
       <Section title="My Title" subtitle="My subtitle">
         <p>child content</p>
-      </Section>
+      </Section>,
     );
     expect(screen.getByText("My Title")).toBeInTheDocument();
     expect(screen.getByText("My subtitle")).toBeInTheDocument();
@@ -18,7 +18,7 @@ describe("Section", () => {
     render(
       <Section title="Just a title">
         <span>content</span>
-      </Section>
+      </Section>,
     );
     expect(screen.getByText("Just a title")).toBeInTheDocument();
     expect(screen.queryByText("My subtitle")).not.toBeInTheDocument();

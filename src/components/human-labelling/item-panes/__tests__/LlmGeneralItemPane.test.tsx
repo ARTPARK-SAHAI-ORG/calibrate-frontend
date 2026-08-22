@@ -7,7 +7,7 @@ describe("LlmGeneralItemPane", () => {
     render(
       <LlmGeneralItemPane
         payload={{ input: "Summarise this", output: "A short summary" }}
-      />
+      />,
     );
     expect(screen.getByText("Input")).toBeInTheDocument();
     expect(screen.getByText("Summarise this")).toBeInTheDocument();
@@ -40,6 +40,51 @@ describe("LlmGeneralItemPane", () => {
 
   it("treats empty-string input/output as falsy and falls back to JSON dump", () => {
     render(<LlmGeneralItemPane payload={{ input: "", output: "" }} />);
+    expect(screen.getByText("Item payload")).toBeInTheDocument();
+  });
+
+  it("shows the tool calls the agent made when the output is empty", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{
+          input: "Book me a flight to Delhi",
+          output: "",
+          actual_tool_calls: [
+            { tool: "book_flight", arguments: { destination: "Delhi" } },
+          ],
+          expected_tool_calls: [{ tool: "should_not_render", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("Book me a flight to Delhi")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(screen.getByText("destination")).toBeInTheDocument();
+    expect(screen.getByText("Delhi")).toBeInTheDocument();
+    expect(screen.queryByText("Item payload")).not.toBeInTheDocument();
+    expect(screen.queryByText("should_not_render")).not.toBeInTheDocument();
+  });
+
+  it("shows the text reply above the tool calls when there is both", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{
+          input: "Book a flight",
+          output: "Let me look that up",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("Let me look that up")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("ignores an empty actual_tool_calls list", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ input: "", output: "", actual_tool_calls: [] }}
+      />,
+    );
     expect(screen.getByText("Item payload")).toBeInTheDocument();
   });
 });

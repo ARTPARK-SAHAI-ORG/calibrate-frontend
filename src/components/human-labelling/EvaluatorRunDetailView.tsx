@@ -40,6 +40,7 @@ import {
   useUrlValueFilters,
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
+import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/ExpectedToolCalls";
 import type { ReviewItem } from "./SendForReviewFlow";
 
 // ---------------------------------------------------------------------------
@@ -1468,7 +1469,8 @@ export function ItemDetailPane({
       >
         <ItemPane item={item} taskType={taskType} />
       </div>
-      <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+      <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6 space-y-3">
+        {itemPayload && <ExpectedToolCalls payload={itemPayload} />}
         <EvaluatorResultsPane
           evaluators={evaluators}
           evaluatorNamesById={evaluatorNamesById}
