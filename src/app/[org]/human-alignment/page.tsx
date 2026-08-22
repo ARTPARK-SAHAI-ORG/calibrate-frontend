@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Select } from "@/components/ui/Select";
@@ -562,9 +563,12 @@ function HumanLabellingPageInner() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[minmax(0,1fr)_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(2)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Type
                   </div>
                   <div className="text-sm font-medium text-muted-foreground">
                     Items
@@ -576,17 +580,28 @@ function HumanLabellingPageInner() {
                 </div>
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
+                  const evaluatorType =
+                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
                       onClick={() =>
                         router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
-                      className="grid grid-cols-[minmax(0,1fr)_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(2)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       <p className="text-sm font-medium text-foreground truncate">
                         {task.name}
                       </p>
+                      <div>
+                        {evaluatorType ? (
+                          <EvaluatorTypePill evaluatorType={evaluatorType} />
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground tabular-nums">
                         {task.item_count ?? 0}
                       </p>
@@ -641,6 +656,8 @@ function HumanLabellingPageInner() {
               <div className="md:hidden space-y-2">
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
+                  const evaluatorType =
+                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -650,9 +667,14 @@ function HumanLabellingPageInner() {
                       className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate mb-1">
-                          {task.name}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {task.name}
+                          </p>
+                          {evaluatorType && (
+                            <EvaluatorTypePill evaluatorType={evaluatorType} />
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {task.item_count ?? 0} item
                           {(task.item_count ?? 0) === 1 ? "" : "s"}
