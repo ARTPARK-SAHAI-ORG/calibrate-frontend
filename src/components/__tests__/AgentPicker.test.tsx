@@ -207,6 +207,70 @@ describe("AgentPicker", () => {
     expect(screen.getAllByText("Unverified")).toHaveLength(1);
   });
 
+  it("disables general agents when disableGeneralAgents is set", async () => {
+    // A general agent answers one input at a time, so a simulation has no
+    // conversation to run against it.
+    const payload = [
+      { uuid: "a1", name: "Chatty Bot", type: "agent" },
+      {
+        uuid: "a2",
+        name: "Summariser",
+        type: "agent",
+        interaction_type: "general",
+      },
+    ];
+    mockFetchOnce({ json: async () => payload });
+    const user = setupUser();
+    const onSelectAgent = jest.fn();
+    render(
+      <AgentPicker
+        disableGeneralAgents
+        selectedAgentUuid=""
+        onSelectAgent={onSelectAgent}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select an agent" }));
+    await screen.findByText("Chatty Bot");
+
+    const disabledOption = screen.getByRole("option", { name: /Summariser/ });
+    expect(disabledOption).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByText(
+        "This agent answers one input at a time, so there is no conversation to simulate",
+      ),
+    ).toBeInTheDocument();
+
+    // Clicking it does nothing.
+    await user.click(disabledOption);
+    expect(onSelectAgent).not.toHaveBeenCalled();
+
+    // The conversation agent is still selectable.
+    await user.click(screen.getByRole("option", { name: /Chatty Bot/ }));
+    expect(onSelectAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves general agents selectable when disableGeneralAgents is not set", async () => {
+    const payload = [
+      {
+        uuid: "a2",
+        name: "Summariser",
+        type: "agent",
+        interaction_type: "general",
+      },
+    ];
+    mockFetchOnce({ json: async () => payload });
+    const user = setupUser();
+    const onSelectAgent = jest.fn();
+    render(
+      <AgentPicker selectedAgentUuid="" onSelectAgent={onSelectAgent} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select an agent" }));
+    await user.click(await screen.findByRole("option", { name: /Summariser/ }));
+    expect(onSelectAgent).toHaveBeenCalledTimes(1);
+  });
+
   it("disables connection agents with custom fields when disableCustomFieldConnections is set", async () => {
     const payload = [
       { uuid: "a1", name: "Support Bot", type: "agent" },
