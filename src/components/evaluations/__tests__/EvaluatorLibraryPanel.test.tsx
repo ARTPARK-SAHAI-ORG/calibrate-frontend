@@ -67,7 +67,10 @@ test("lists only the evaluators of this kind", async () => {
   ]);
 
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   expect(await screen.findByText("Word accuracy")).toBeInTheDocument();
@@ -83,10 +86,15 @@ test("shows the empty state with a create action when there are none", async () 
 
   const user = setupUser();
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   expect(await screen.findByText("No evaluators yet")).toBeInTheDocument();
+  // The create action lives in the header row, which is on screen whether or
+  // not there are any evaluators.
   await user.click(screen.getByRole("button", { name: "Create evaluator" }));
   expect(screen.getByTestId("create-flow")).toBeInTheDocument();
 });
@@ -95,7 +103,10 @@ test("re-reads the list after an evaluator is created", async () => {
   mockFetch.mockResolvedValue([]);
   const user = setupUser();
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   await screen.findByText("No evaluators yet");
@@ -111,7 +122,10 @@ test("deletes an evaluator after confirmation", async () => {
 
   const user = setupUser();
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   await user.click(await screen.findByRole("button", { name: "Delete" }));
@@ -134,7 +148,10 @@ test("keeps the dialog open and says what failed when a delete fails", async () 
 
   const user = setupUser();
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   await user.click(await screen.findByRole("button", { name: "Delete" }));
@@ -153,10 +170,90 @@ test("offers a retry when the list cannot be loaded", async () => {
 
   const user = setupUser();
   render(
-    <EvaluatorLibraryPanel evaluatorType="stt" description="Score transcripts" />,
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
   );
 
   expect(await screen.findByText("Network down")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Word accuracy")).toBeInTheDocument();
+});
+
+test("lists every kind it is given", async () => {
+  mockFetch.mockResolvedValue([
+    evaluator("ev-1", "Reply correctness", "llm"),
+    evaluator("ev-2", "Output correctness", "llm-general"),
+    evaluator("ev-3", "Voice warmth", "tts"),
+  ]);
+
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["llm", "llm-general"]}
+      description="Judge replies"
+    />,
+  );
+
+  expect(await screen.findByText("Reply correctness")).toBeInTheDocument();
+  expect(screen.getByText("Output correctness")).toBeInTheDocument();
+  expect(screen.queryByText("Voice warmth")).not.toBeInTheDocument();
+});
+
+test("narrows the list by the search box", async () => {
+  mockFetch.mockResolvedValue([
+    evaluator("ev-1", "Word accuracy", "stt"),
+    evaluator("ev-2", "Number reading", "stt"),
+  ]);
+
+  const user = setupUser();
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
+  );
+
+  await screen.findByText("Word accuracy");
+  await user.type(screen.getByPlaceholderText("Search evaluators"), "number");
+
+  expect(screen.queryByText("Word accuracy")).not.toBeInTheDocument();
+  expect(screen.getByText("Number reading")).toBeInTheDocument();
+
+  await user.clear(screen.getByPlaceholderText("Search evaluators"));
+  await user.type(screen.getByPlaceholderText("Search evaluators"), "zzz");
+  expect(
+    screen.getByText("No evaluators match your search."),
+  ).toBeInTheDocument();
+});
+
+test("draws the page header when it is the whole page", async () => {
+  mockFetch.mockResolvedValue([evaluator("ev-1", "Word accuracy", "stt")]);
+
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      title="Evaluators"
+      description="Score transcripts"
+    />,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Evaluators", level: 1 }),
+  ).toBeInTheDocument();
+});
+
+test("opens the evaluator from anywhere on its card", async () => {
+  mockFetch.mockResolvedValue([evaluator("ev-1", "Word accuracy", "stt")]);
+
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
+  );
+
+  expect(
+    await screen.findByRole("link", { name: "Open Word accuracy" }),
+  ).toHaveAttribute("href", "/evaluators/ev-1");
 });

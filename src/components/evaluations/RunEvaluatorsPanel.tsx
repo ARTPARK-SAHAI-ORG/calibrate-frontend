@@ -144,9 +144,18 @@ export function RunEvaluatorsPanel({
           {selected.map((evaluator) => (
             <div
               key={evaluator.uuid}
-              className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors"
+              className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
             >
-              <div className="flex items-start justify-between gap-3">
+              {/* Covers the whole card so it behaves like a link: clicking anywhere
+                  opens the evaluator, and the buttons still sit above it. */}
+              <Link
+                href={`/evaluators/${evaluator.uuid}`}
+                aria-label={`Open ${evaluator.name}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute inset-0 rounded-xl z-0"
+              />
+              <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-semibold text-foreground">
@@ -160,7 +169,7 @@ export function RunEvaluatorsPanel({
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
                   {/* Same buttons as the agent's Evaluators tab. A new tab
                       keeps the run being set up on screen. */}
                   <Link

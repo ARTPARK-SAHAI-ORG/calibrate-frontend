@@ -1,8 +1,7 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import SimulationEvaluatorsPage from "../page";
+import AgentEvaluatorsPage from "../page";
 
-// The page chrome is not under test — render children straight through.
 jest.mock("../../../../components/AppLayout", () => ({
   AppLayout: ({
     children,
@@ -19,7 +18,6 @@ jest.mock("../../../../components/AppLayout", () => ({
   useHideFloatingButton: () => {},
 }));
 
-// The list itself has its own tests; here we only check what the page asks for.
 jest.mock("../../../../components/evaluations/EvaluatorLibraryPanel", () => ({
   EvaluatorLibraryPanel: ({
     evaluatorTypes,
@@ -36,8 +34,8 @@ jest.mock("../../../../components/evaluations/EvaluatorLibraryPanel", () => ({
   ),
 }));
 
-it("shows the conversation evaluators and marks the sidebar entry", () => {
-  render(<SimulationEvaluatorsPage />);
+it("shows only the evaluators that can be added to an agent", () => {
+  render(<AgentEvaluatorsPage />);
 
   expect(screen.getByTestId("evaluator-library")).toHaveAttribute(
     "data-title",
@@ -45,9 +43,9 @@ it("shows the conversation evaluators and marks the sidebar entry", () => {
   );
   expect(screen.getByTestId("evaluator-library")).toHaveAttribute(
     "data-kinds",
-    "conversation",
+    "llm,llm-general",
   );
   expect(screen.getByTestId("active-item")).toHaveTextContent(
-    "simulation-evaluators",
+    "agent-evaluators",
   );
 });

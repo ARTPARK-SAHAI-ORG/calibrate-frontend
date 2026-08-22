@@ -7,22 +7,21 @@ import { EvaluatorLibraryPanel } from "@/components/evaluations/EvaluatorLibrary
 import { useSidebarState } from "@/lib/sidebar";
 
 /**
- * The conversation evaluators, shown the same way the Speech-to-Text and
- * Text-to-Speech pages show theirs and the same way they appear when setting
- * up a simulation, so they can be looked at, created and deleted without
- * starting one.
+ * The evaluators that can be added to an agent: the next-reply ones a
+ * conversation agent uses (`llm`) and the output ones a general agent uses
+ * (`llm-general`), shown the same way the other evaluator pages show theirs.
  */
-export default function SimulationEvaluatorsPage() {
+export default function AgentEvaluatorsPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
 
   useEffect(() => {
-    document.title = "Simulation evaluators | Calibrate";
+    document.title = "Agent evaluators | Calibrate";
   }, []);
 
   return (
     <AppLayout
-      activeItem="simulation-evaluators"
+      activeItem="agent-evaluators"
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -30,8 +29,8 @@ export default function SimulationEvaluatorsPage() {
       <div className="py-4 md:py-6">
         <EvaluatorLibraryPanel
           title="Evaluators"
-          evaluatorTypes={["conversation"]}
-          description="These evaluators evaluate the agent's performance in each simulated conversation"
+          evaluatorTypes={["llm", "llm-general"]}
+          description="LLM judges for evaluating an agent's responses or output"
         />
       </div>
     </AppLayout>

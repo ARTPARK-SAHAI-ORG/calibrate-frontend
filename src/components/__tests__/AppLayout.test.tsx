@@ -131,10 +131,14 @@ describe("AppLayout", () => {
     expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
-  it("links Evaluators to the simulation evaluators page", () => {
+  it("links both Evaluators entries to their own page", () => {
     renderLayout();
-    const evaluatorsLink = screen.getByText("Evaluators").closest("a");
-    expect(evaluatorsLink).toHaveAttribute("href", "/simulation-evaluators");
+    // One under Agents (judges for an agent's replies), one under Scenarios
+    // (judges for simulated conversations), in sidebar order.
+    const hrefs = screen
+      .getAllByText("Evaluators")
+      .map((label) => label.closest("a")?.getAttribute("href"));
+    expect(hrefs).toEqual(["/agent-evaluators", "/simulation-evaluators"]);
   });
 
   it("opens the learning resources page from Tutorials", () => {

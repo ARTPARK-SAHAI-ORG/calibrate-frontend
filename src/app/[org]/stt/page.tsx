@@ -841,7 +841,7 @@ function STTPageInner() {
         {/* Evaluators Tab */}
         {activeTab === "evaluators" && (
           <EvaluatorLibraryPanel
-            evaluatorType="stt"
+            evaluatorTypes={["stt"]}
             description="These evaluators score the transcripts each model produces"
           />
         )}

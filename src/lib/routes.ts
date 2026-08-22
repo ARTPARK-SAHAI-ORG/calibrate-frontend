@@ -44,6 +44,7 @@ const PUBLIC_PREFIXES = [
  * Anything else falls back to /agents, which every workspace has.
  */
 export const SECTION_LIST_PAGES = new Set([
+  "agent-evaluators",
   "agents",
   "evaluators",
   "human-alignment",

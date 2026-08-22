@@ -44,8 +44,8 @@ jest.mock("../../../../hooks", () => ({
 
 // The evaluators list has its own tests; here we only check the tab shows it.
 jest.mock("../../../../components/evaluations/EvaluatorLibraryPanel", () => ({
-  EvaluatorLibraryPanel: ({ evaluatorType }: { evaluatorType: string }) => (
-    <div data-testid="evaluator-library">{evaluatorType}</div>
+  EvaluatorLibraryPanel: ({ evaluatorTypes }: { evaluatorTypes: string[] }) => (
+    <div data-testid="evaluator-library">{evaluatorTypes.join(",")}</div>
   ),
 }));
 
