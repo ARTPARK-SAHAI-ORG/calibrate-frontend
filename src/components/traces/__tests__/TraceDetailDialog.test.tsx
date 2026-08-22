@@ -473,3 +473,57 @@ it("surfaces an error when the fetch fails", async () => {
     expect(screen.getByText(/Failed to load this trace/)).toBeInTheDocument(),
   );
 });
+
+describe("a general agent's trace", () => {
+  it("reads as an input and an output, not as a conversation", async () => {
+    mockFetchTrace.mockResolvedValue({
+      ...detail,
+      input: "Practice: Compound\nAdoption type: non_adopter",
+      output: { response: "Keeping your compound clean helps.", tool_calls: null },
+    });
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+      />,
+    );
+
+    expect(await screen.findByText("Input")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Practice: Compound/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Keeping your compound clean helps."),
+    ).toBeInTheDocument();
+    // The conversation renderer labels the agent's turn; this view does not.
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+  });
+
+  it("shows the tools it called in place of a reply", async () => {
+    mockFetchTrace.mockResolvedValue({
+      ...detail,
+      input: "Book a slot for next week",
+      output: {
+        response: null,
+        tool_calls: [{ tool: "book_appointment", arguments: { date: "2026-03-14" } }],
+      },
+    });
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+      />,
+    );
+
+    expect(await screen.findByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("book_appointment")).toBeInTheDocument();
+    expect(screen.getByText("2026-03-14")).toBeInTheDocument();
+  });
+});
