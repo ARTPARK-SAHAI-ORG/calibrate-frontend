@@ -309,7 +309,7 @@ export function TestRunOutputsPanel({
                             isLabellingSelectable(result)
                               ? isLabellingEligible(result)
                                 ? "Select for labelling"
-                                : "Tool-call tests will be skipped when submitting for labelling"
+                                : "This test can't be submitted for labelling"
                               : "Available once the test completes"
                           }
                           className="cursor-pointer disabled:cursor-not-allowed shrink-0"
