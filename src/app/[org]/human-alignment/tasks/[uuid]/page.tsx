@@ -26,7 +26,6 @@ import {
   type TestConfig,
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
-import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -2486,7 +2485,6 @@ function LabellingTaskPageInner() {
                   (task?.name ?? "—")
                 )}
               </h1>
-              {taskType && <EvaluatorTypePill evaluatorType={taskType} />}
             </div>
             {task?.description && (
               <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1 max-w-3xl">
@@ -3253,7 +3251,7 @@ function LabellingTaskPageInner() {
                 </div>
               )}
 
-              <div className="space-y-1 pt-4">
+              <div className="space-y-1 pt-1">
               <ServerPaginatedListBar
                 total={itemsTotal}
                 offset={loadedItemsOffset}

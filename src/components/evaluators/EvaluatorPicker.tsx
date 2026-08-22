@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
@@ -23,6 +23,11 @@ type EvaluatorPickerProps = {
    */
   allowConversationType?: boolean;
   /**
+   * Show this evaluator's prompt on the right, as if its row had been clicked.
+   * Set it after creating one, so the reader sees what they just made.
+   */
+  previewUuid?: string | null;
+  /**
    * Stretch both columns to the height the parent gives them, instead of the
    * built-in one. For a dialog that holds nothing but this picker, so the
    * prompt reaches the footer instead of stopping short. The parent must be a
@@ -42,12 +47,18 @@ export function EvaluatorPicker({
   onToggle,
   emptyMessage = "No evaluators can judge a reply yet. Create one on the Evaluators page.",
   emptyAction,
+  previewUuid: previewUuidProp,
   fillHeight = false,
   allowConversationType = false,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
   // The evaluator whose prompt is on show. Null until one is clicked.
   const [previewUuid, setPreviewUuid] = useState<string | null>(null);
+  // A parent that names an evaluator (one just created) opens it on the right.
+  // Clicking another row afterwards still wins, until the parent names a new one.
+  useEffect(() => {
+    if (previewUuidProp) setPreviewUuid(previewUuidProp);
+  }, [previewUuidProp]);
 
   const q = search.trim().toLowerCase();
   // Everything this picker could offer, before the reader's own search.
@@ -79,13 +90,17 @@ export function EvaluatorPicker({
             : "hover:bg-muted/30"
         }`}
       >
-        <input
-          type="checkbox"
-          aria-label={`Select ${ev.name}`}
-          checked={checked}
-          onChange={() => onToggle(ev.uuid)}
-          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
-        />
+        {/* The box is centred against the name's own line, so it sits the
+            same way whether or not a description follows underneath. */}
+        <span className="flex h-5 items-center flex-shrink-0">
+          <input
+            type="checkbox"
+            aria-label={`Select ${ev.name}`}
+            checked={checked}
+            onChange={() => onToggle(ev.uuid)}
+            className="w-4 h-4 cursor-pointer accent-foreground"
+          />
+        </span>
         {/* The body opens the prompt on the right rather than ticking the box,
             so an evaluator can be read before it is added. */}
         <button

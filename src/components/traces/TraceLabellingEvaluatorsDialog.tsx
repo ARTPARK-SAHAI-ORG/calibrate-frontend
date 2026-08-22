@@ -52,6 +52,9 @@ export function TraceLabellingEvaluatorsDialog({
   // evaluators are what is selected.
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  // The evaluator made from inside this dialog, so its prompt opens on the
+  // right as well as its box being ticked.
+  const [createdUuid, setCreatedUuid] = useState<string | null>(null);
   const selected = picked ?? preselectedUuids;
 
   if (!isOpen) return null;
@@ -78,8 +81,19 @@ export function TraceLabellingEvaluatorsDialog({
             ) : (
               <>
                 {evaluators.length > 0 && (
-                  <div className="text-sm font-semibold text-foreground">
-                    Evaluators
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-foreground">
+                      Evaluators
+                    </div>
+                    {/* The same offer the empty picker makes, kept in reach
+                        once there is a list to read. */}
+                    <button
+                    type="button"
+                    onClick={() => setCreateFlowOpen(true)}
+                    className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                    >
+                    Create evaluator
+                  </button>
                   </div>
                 )}
                 <div className="flex-1 min-h-0">
@@ -105,6 +119,7 @@ export function TraceLabellingEvaluatorsDialog({
                         Create evaluator
                       </button>
                     }
+                    previewUuid={createdUuid}
                     fillHeight
                   />
                 </div>
@@ -150,6 +165,7 @@ export function TraceLabellingEvaluatorsDialog({
         existingEvaluators={evaluators}
         onCreated={(created) => {
           addEvaluator(created);
+          setCreatedUuid(created.uuid);
           // Ticking already started, so the new one has to join that set
           // rather than the untouched default.
           setPicked((prev) => (prev ? new Set(prev).add(created.uuid) : prev));

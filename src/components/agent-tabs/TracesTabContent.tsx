@@ -14,6 +14,7 @@ import {
   type SourceEvaluatorRef,
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -24,6 +25,7 @@ import {
   SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
+import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
 import {
   useAccessToken,
   useDialogUrlParam,
@@ -34,6 +36,7 @@ import {
 } from "@/hooks";
 import {
   fetchTrace,
+  fetchTraces,
   type TraceDetail,
   type TraceOutputFilter,
 } from "@/lib/tracesApi";
@@ -58,6 +61,7 @@ export function TracesTabContent({
   agentNature = "conversation",
   onTestsCreated,
   onViewTests,
+  onAgentDefaultsAttached,
 }: {
   agentUuid: string;
   /** A general agent answers one input at a time, so the sending code shows a
@@ -67,6 +71,8 @@ export function TracesTabContent({
   onTestsCreated: () => void;
   /** Opens the Tests tab, where the created tests are listed. */
   onViewTests: () => void;
+  /** Called after evaluators are attached here, so the Evaluators tab reloads. */
+  onAgentDefaultsAttached?: () => void;
 }) {
   const accessToken = useAccessToken();
 
@@ -111,10 +117,22 @@ export function TracesTabContent({
     outputType: outputFilter,
   });
 
+  // Every trace the list matches, not only the ticked ones. The two bulk
+  // endpoints re-read the same rows from these filters, so the pages the
+  // reader never loaded are included and a stale tick cannot slip through.
+  const [everyTraceMatching, setEveryTraceMatching] = useState(false);
+  const traceFilters = {
+    agentId: agentUuid,
+    q: search,
+    outputType: outputFilter,
+  };
+
   const deletion = useTraceDeletion({
     traces: items,
-    onDeleted: (uuids) => handleDeleted(uuids.length),
+    onDeleted: (uuids) =>
+      handleDeleted(everyTraceMatching ? total : uuids.length),
     accessToken,
+    selectAll: everyTraceMatching ? traceFilters : null,
   });
 
   // Add selected traces as tests. A recorded response becomes a test that
@@ -237,6 +255,94 @@ export function TracesTabContent({
     }
   };
 
+  // Evaluators picked in either flow that the agent does not have yet: the
+  // same offer the Tests tab makes after a test is saved, so the next dialog
+  // starts with them already ticked.
+  const [defaultsLead, setDefaultsLead] = useState<string>("");
+  const agentDefaults = useAgentDefaultsPrompt({
+    agentUuid,
+    accessToken,
+    onAttached: () => onAgentDefaultsAttached?.(),
+  });
+  const offerAgentDefaults = (
+    chosen: { uuid: string; name?: string }[],
+    lead: (isOne: boolean) => string,
+  ) => {
+    if (chosen.length === 0) return;
+    setDefaultsLead(lead(chosen.length === 1));
+    void agentDefaults.promptFor(
+      chosen.map((ev) => ev.uuid),
+      {
+        knownNames: new Map(
+          chosen.flatMap((ev) => (ev.name ? [[ev.uuid, ev.name] as const] : [])),
+        ),
+      },
+    );
+  };
+
+  const selectionCount = everyTraceMatching ? total : selected.size;
+  // Which kind the whole matching list is, once it is asked for with the
+  // filter on All. Null until the counts come back, "mixed" when both kinds
+  // are in there. The counts are two cheap reads: a page of one row each,
+  // whose total is what is wanted.
+  const [wholeListKind, setWholeListKind] = useState<
+    "response" | "tool_call" | "mixed" | null
+  >(null);
+  const [isCheckingKinds, setIsCheckingKinds] = useState(false);
+  const wholeListKindOf = async (): Promise<
+    "response" | "tool_call" | "mixed" | null
+  > => {
+    if (!accessToken) return null;
+    if (wholeListKind) return wholeListKind;
+    setIsCheckingKinds(true);
+    try {
+      const [replies, toolCalls] = await Promise.all(
+        (["response", "tool_call"] as const).map((outputType) =>
+          fetchTraces(accessToken, {
+            limit: 1,
+            offset: 0,
+            agentId: agentUuid,
+            q: search,
+            outputType,
+          }),
+        ),
+      );
+      const kind =
+        replies.total > 0 && toolCalls.total > 0
+          ? "mixed"
+          : toolCalls.total > 0
+            ? "tool_call"
+            : "response";
+      setWholeListKind(kind);
+      return kind;
+    } catch (err) {
+      reportError("Error counting the kinds of trace:", err);
+      toast.error("Could not read the traces. Please try again.");
+      return null;
+    } finally {
+      setIsCheckingKinds(false);
+    }
+  };
+  // Offered once everything on show is ticked and there are more pages behind
+  // it. Deleting and adding to tests then work on the whole matching list.
+  const canSelectEveryTrace =
+    deletion.allSelected &&
+    items.length > 0 &&
+    !everyTraceMatching &&
+    total > items.length;
+
+  // The choice was made against one list, so a new search or filter drops it
+  // rather than acting on rows the reader never saw.
+  useEffect(() => {
+    setEveryTraceMatching(false);
+    setWholeListKind(null);
+  }, [search, outputFilter]);
+  // Unticking a row is the reader narrowing what they want, so the whole list
+  // is no longer what they asked for.
+  useEffect(() => {
+    if (!deletion.allSelected) setEveryTraceMatching(false);
+  }, [deletion.allSelected]);
+
   /** Untick only the traces that were actually submitted. */
   const clearSubmitted = () => {
     const submitted = new Set(submittedUuids);
@@ -253,6 +359,9 @@ export function TracesTabContent({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
+    // A refresh can bring in traces of the other kind, which the counts read
+    // before it would not know about.
+    setWholeListKind(null);
     setIsRefreshing(true);
     try {
       await refetch();
@@ -376,25 +485,63 @@ export function TracesTabContent({
               labelling must not disappear either. */}
           {(selected.size > 0 || isPreparingLabelling) && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
-              <span className="text-sm text-muted-foreground">
-                {isPreparingLabelling ? (
-                  "Loading traces..."
-                ) : (
-                  <>
-                    <span className="font-medium text-foreground">
-                      {selected.size}
-                    </span>{" "}
-                    {selected.size === 1 ? "trace" : "traces"} selected
-                  </>
+              {/* The count and the offer to take the whole list belong
+                  together on the left; only the actions go to the right. */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {isPreparingLabelling ? (
+                    "Loading traces..."
+                  ) : (
+                    <>
+                      <span className="font-medium text-foreground">
+                        {selectionCount}
+                      </span>{" "}
+                      {selectionCount === 1 ? "trace" : "traces"} selected
+                      {everyTraceMatching && search.trim() ? (
+                        <span className="opacity-80">
+                          {" "}
+                          matching &ldquo;{search.trim()}&rdquo;
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </span>
+                {canSelectEveryTrace && (
+                  <button
+                    type="button"
+                    onClick={() => setEveryTraceMatching(true)}
+                    className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Select all {total} trace{total === 1 ? "" : "s"}
+                    {search.trim() ? ` matching "${search.trim()}"` : ""}
+                  </button>
                 )}
-              </span>
+              </div>
               {selected.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
                     variant="primary"
-                    onClick={() => {
-                      if (isMixedSelection) {
+                    disabled={isCheckingKinds}
+                    onClick={async () => {
+                      if (!everyTraceMatching) {
+                        if (isMixedSelection) {
+                          toast.error(
+                            "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+                          );
+                          return;
+                        }
+                        setConvertOpen(true);
+                        return;
+                      }
+                      // The pages behind this one are unread, so the backend
+                      // says what kinds they hold before anything is made.
+                      const kind =
+                        outputFilter === "all"
+                          ? await wholeListKindOf()
+                          : outputFilter;
+                      if (!kind) return;
+                      if (kind === "mixed") {
                         toast.error(
                           "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                         );
@@ -403,13 +550,15 @@ export function TracesTabContent({
                       setConvertOpen(true);
                     }}
                   >
-                    Add to tests ({selected.size})
+                    Add to tests ({selectionCount})
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={labellableUuids.length}
+                      count={everyTraceMatching ? 0 : labellableUuids.length}
                       emptyMessage={
-                        selected.size === 0
+                        everyTraceMatching
+                          ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
+                          : selected.size === 0
                           ? "Select at least one trace to submit for labelling."
                           : hasToolCallTrace
                             ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
@@ -425,7 +574,7 @@ export function TracesTabContent({
                     onClick={deletion.openBulkDeleteDialog}
                     className="text-red-600 dark:text-red-400"
                   >
-                    Delete selected ({selected.size})
+                    Delete selected ({selectionCount})
                   </Button>
                 </div>
               )}
@@ -445,7 +594,7 @@ export function TracesTabContent({
               </p>
             </div>
           ) : (
-            <div className="space-y-1 pt-4">
+            <div className="space-y-1 pt-1">
               <ServerPaginatedListBar
                 total={total}
                 offset={offset}
@@ -499,10 +648,33 @@ export function TracesTabContent({
         onClose={() => setConvertOpen(false)}
         accessToken={accessToken}
         traceUuids={Array.from(selected)}
-        testType={selectedTestType}
+        selectAll={
+          everyTraceMatching
+            ? {
+                ...traceFilters,
+                // Only one kind of test is made per call, so an unfiltered
+                // list is pinned to the kind the counts found.
+                outputType:
+                  outputFilter === "all" && wholeListKind !== "mixed"
+                    ? (wholeListKind ?? "all")
+                    : outputFilter,
+              }
+            : null
+        }
+        traceCount={selectionCount}
+        testType={
+          everyTraceMatching
+            ? (outputFilter === "all" ? wholeListKind : outputFilter) ===
+              "tool_call"
+              ? "tool_call"
+              : isGeneral
+                ? "general"
+                : "response"
+            : selectedTestType
+        }
         agentUuid={agentUuid}
         agentNature={agentNature}
-        onConverted={(result) => {
+        onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           deletion.clearSelection();
           const created = result.created;
@@ -515,6 +687,11 @@ export function TracesTabContent({
               onClick: onViewTests,
             },
           });
+          offerAgentDefaults(evaluatorsUsed, (isOne) =>
+            created === 1
+              ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`
+              : `The tests you just added use ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+          );
         }}
       />
 
@@ -545,7 +722,24 @@ export function TracesTabContent({
           // The dialog stays open on its own confirmation, which is where the
           // reader opens the task or closes it, same as every other submit for
           // labelling flow. Only the ticks the submit used are cleared here.
-          onAdded={clearSubmitted}
+          onAdded={() => {
+            clearSubmitted();
+            offerAgentDefaults(labellingEvaluators, (isOne) =>
+              `The traces you just sent for labelling are scored against ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+            );
+          }}
+        />
+      )}
+
+      {agentDefaults.prompt && agentDefaults.prompt.length > 0 && (
+        <AgentDefaultsPromptDialog
+          evaluators={agentDefaults.prompt}
+          lead={defaultsLead}
+          savedNote="The work itself went through. Try again below, or choose Not now to skip."
+          isSaving={agentDefaults.isSaving}
+          error={agentDefaults.error}
+          onDismiss={agentDefaults.dismiss}
+          onConfirm={agentDefaults.confirm}
         />
       )}
 
@@ -555,7 +749,7 @@ export function TracesTabContent({
         onConfirm={deletion.deleteItems}
         title={
           deletion.itemsToDeleteBulk.length > 0
-            ? `Delete ${deletion.itemsToDeleteBulk.length} trace${deletion.itemsToDeleteBulk.length === 1 ? "" : "s"}?`
+            ? `Delete ${selectionCount} trace${selectionCount === 1 ? "" : "s"}?`
             : "Delete this trace?"
         }
         message={

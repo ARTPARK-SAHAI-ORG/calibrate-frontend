@@ -162,8 +162,32 @@ export async function validateApiKeyForAgent(
 
 export type ConvertTestType = "response" | "tool_call" | "general";
 
+/** The list the reader is looking at, when they asked for every trace in it
+ *  rather than the ones they ticked. The backend re-reads the same rows, so a
+ *  page they never loaded is included and a stale tick cannot slip through. */
+export type TraceFilters = {
+  agentId: string;
+  q?: string;
+  outputType?: TraceOutputFilter;
+};
+
+/** Turn the filters into the fields both bulk endpoints read. */
+export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    select_all: true,
+    agent_id: filters.agentId,
+  };
+  if (filters.q?.trim()) body.q = filters.q.trim();
+  if (filters.outputType && filters.outputType !== "all") {
+    body.output_type = filters.outputType;
+  }
+  return body;
+}
+
 export type ConvertTracesToTestsBody = {
   traceIds: string[];
+  /** Convert every trace the filters match, ignoring `traceIds`. */
+  selectAll?: TraceFilters | null;
   type: ConvertTestType;
   /** Evaluators to link to each created test. Required for `response` and
    * `general`, rejected for `tool_call`. */
@@ -191,12 +215,15 @@ export async function convertTracesToTests(
   accessToken: string,
   {
     traceIds,
+    selectAll,
     type,
     evaluatorUuids,
     acceptAnyArguments,
   }: ConvertTracesToTestsBody,
 ): Promise<ConvertTracesToTestsResult> {
-  const body: Record<string, unknown> = { trace_ids: traceIds, type };
+  const body: Record<string, unknown> = selectAll
+    ? { ...selectAllBody(selectAll), type }
+    : { trace_ids: traceIds, type };
   if (evaluatorUuids && evaluatorUuids.length) {
     body.evaluators = evaluatorUuids;
   }

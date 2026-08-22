@@ -2,6 +2,33 @@ import { fireEvent } from "@testing-library/react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { ManageEvaluatorsDialog } from "../ManageEvaluatorsDialog";
 
+// Making an evaluator is its own journey with its own tests; here only the
+// handing back of the created one matters.
+jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
+  CreateEvaluatorFlow: ({
+    open,
+    onCreated,
+    useCaseTypes,
+  }: {
+    open: boolean;
+    onCreated: (evaluator: unknown) => void;
+    useCaseTypes?: string[];
+  }) =>
+    open ? (
+      <div data-testid="create-evaluator-flow">
+        <span data-testid="create-evaluator-types">
+          {(useCaseTypes ?? []).join(",")}
+        </span>
+        <button
+          type="button"
+          onClick={() => onCreated({ uuid: "ev-made", name: "Made just now" })}
+        >
+          finish creating
+        </button>
+      </div>
+    ) : null,
+}));
+
 const mockApiClient = jest.fn();
 jest.mock("../../../lib/api", () => ({
   apiClient: (...args: unknown[]) => mockApiClient(...args),
@@ -85,11 +112,32 @@ describe("ManageEvaluatorsDialog", () => {
     );
   });
 
-  it("renders the task-type pill in the subtitle when taskType is given", async () => {
+  it("shows the same subtitle whatever the task type is", async () => {
     renderDialog({ taskType: "llm" });
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
-    const subtitle = screen.getByText("LLM reply").closest("div.inline-flex")!;
-    expect(subtitle.textContent).toBe("ChooseLLM replyevaluators to align with humans");
+    expect(
+      screen.getByText("Choose evaluators to align with humans"),
+    ).toBeInTheDocument();
+    // The kind of evaluator is no longer named anywhere in the header.
+    expect(screen.queryByText("LLM reply")).not.toBeInTheDocument();
+  });
+
+  it("makes an evaluator without leaving, and starts it ticked", async () => {
+    const user = setupUser();
+    renderDialog({ taskType: "llm" });
+    await waitForCatalogueLoaded();
+
+    await user.click(screen.getByRole("button", { name: "New evaluator" }));
+    // The task judges one kind of thing, so the flow is told which.
+    expect(screen.getByTestId("create-evaluator-types")).toHaveTextContent(
+      "llm",
+    );
+
+    await user.click(screen.getByRole("button", { name: "finish creating" }));
+
+    expect(screen.queryByTestId("create-evaluator-flow")).not.toBeInTheDocument();
+    // Two were already chosen, and the new one joins them.
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+    expect(screen.getAllByText("Made just now").length).toBeGreaterThan(0);
   });
 
   it("initializes selection/order from currentEvaluatorIds and shows the count", async () => {
@@ -285,8 +333,10 @@ describe("ManageEvaluatorsDialog", () => {
 
     expect(screen.queryByText("Order Changed")).not.toBeInTheDocument();
 
-    // Right-column cards: find the draggable rows via their "N." index badge.
-    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
+    // Right-column cards: the chosen evaluators are the draggable rows.
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('div[draggable="true"]'),
+    );
     expect(cards.length).toBe(2);
 
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
@@ -317,7 +367,9 @@ describe("ManageEvaluatorsDialog", () => {
   it("ignores dragOver before any drag has started, clears the drag-over highlight on dragLeave, and resets on dragEnd", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
     await waitForCatalogueLoaded();
-    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('div[draggable="true"]'),
+    );
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
 
     // dragOver with no active drag source is a no-op (dragSourceIdx === null).
@@ -333,7 +385,9 @@ describe("ManageEvaluatorsDialog", () => {
   it("ignores a drop onto the same source index (no reorder)", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
     await waitForCatalogueLoaded();
-    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('div[draggable="true"]'),
+    );
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
     fireEvent.dragStart(cards[0], { dataTransfer });
     fireEvent.dragOver(cards[0], { dataTransfer });

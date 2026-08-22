@@ -417,12 +417,14 @@ export function CreateLabellingTaskDialog({
                             key={ev.uuid}
                             className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
                           >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleEvaluator(ev.uuid)}
-                              className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
-                            />
+                            <span className="flex h-5 items-center flex-shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleEvaluator(ev.uuid)}
+                                className="w-4 h-4 cursor-pointer accent-foreground"
+                              />
+                            </span>
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium truncate">
                                 {ev.name}

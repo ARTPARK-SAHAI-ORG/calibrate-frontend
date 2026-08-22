@@ -29,6 +29,7 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
+import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
 import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel } from "@/lib/testTypes";
 import {
@@ -48,8 +49,6 @@ import {
 import {
   type EvaluatorData,
   fetchAgentEvaluators,
-  addEvaluatorsToAgent,
-  fetchAllEvaluators,
 } from "@/lib/evaluatorApi";
 
 type TestData = {
@@ -196,13 +195,18 @@ export function TestsTabContent({
   // Post-save prompt: evaluators referenced by the just-saved test that aren't
   // yet attached to the agent. Shown on top of the still-open AddTestDialog
   // so the user can dismiss the prompt and continue reviewing the test.
-  const [agentDefaultsPrompt, setAgentDefaultsPrompt] = useState<
-    { uuid: string; name: string }[] | null
-  >(null);
-  const [agentDefaultsError, setAgentDefaultsError] = useState<string | null>(
-    null,
-  );
-  const [isAttachingDefaults, setIsAttachingDefaults] = useState(false);
+  const agentDefaults = useAgentDefaultsPrompt({
+    agentUuid,
+    accessToken: backendAccessToken,
+    onEvaluatorsRefreshed: setAgentEvaluators,
+    onAttached: async () => {
+      await loadAgentEvaluators();
+      onAgentDefaultsAttached?.();
+    },
+    // The test is already saved when the prompt shows, so answering it either
+    // way is the point at which the test dialog behind it can close.
+    onSettled: () => closeTestDialogAfterSave(),
+  });
   // Agent tests state (tests attached to the agent)
   const [agentTests, setAgentTests] = useState<TestData[]>([]);
   const [agentTestsLoading, setAgentTestsLoading] = useState(true);
@@ -423,40 +427,14 @@ export function TestsTabContent({
   // aren't yet attached to the agent, so the user can add them to the agent's
   // defaults. Never removes evaluators (deletions on a test are ignored here).
   // Returns true when the prompt is shown (caller should keep AddTestDialog open).
-  const maybePromptAgentDefaults = async (
+  const maybePromptAgentDefaults = (
     evaluators: EvaluatorRefPayload[],
-  ): Promise<boolean> => {
-    if (!backendAccessToken || evaluators.length === 0) return false;
-    let attached = new Set(agentEvaluators.map((e) => e.uuid));
-    try {
-      const fresh = await fetchAgentEvaluators(agentUuid, backendAccessToken);
-      attached = new Set(fresh.map((e) => e.uuid));
-      setAgentEvaluators(fresh);
-    } catch {
-      // Fall back to the cached list when the refresh fails.
-    }
-    const newUuids = Array.from(
-      new Set(evaluators.map((e) => e.evaluator_uuid)),
-    ).filter((uuid) => !attached.has(uuid));
-    if (newUuids.length === 0) return false;
-    // Resolve names from a fresh library fetch so inline-created evaluators
-    // (not in our cached agent list) still show a friendly label.
-    let library: EvaluatorData[] = [];
-    try {
-      library = await fetchAllEvaluators(backendAccessToken);
-    } catch {
-      // Names are best-effort; fall back to a generic label below.
-    }
-    const nameByUuid = new Map(library.map((e) => [e.uuid, e.name]));
-    setAgentDefaultsPrompt(
-      newUuids.map((uuid) => ({
-        uuid,
-        name: nameByUuid.get(uuid) ?? "Evaluator",
-      })),
+  ): Promise<boolean> =>
+    agentDefaults.promptFor(
+      evaluators.map((e) => e.evaluator_uuid),
+      // The cached list keeps the offer alive when the fresh read fails.
+      { fallbackAttached: new Set(agentEvaluators.map((e) => e.uuid)) },
     );
-    setAgentDefaultsError(null);
-    return true;
-  };
 
   // Fetch the user's full /tests library. Triggered from two places: when
   // the attach-existing dropdown opens, and when the agent's tests list
@@ -922,44 +900,6 @@ export function TestsTabContent({
 
   // Test is already saved when this prompt is shown. Declining (Not now / X)
   // keeps the test but skips updating the agent's default evaluators.
-  const dismissAgentDefaultsPrompt = () => {
-    if (isAttachingDefaults) return;
-    setAgentDefaultsPrompt(null);
-    setAgentDefaultsError(null);
-    closeTestDialogAfterSave();
-  };
-
-  const confirmAddAgentDefaults = async () => {
-    if (!agentDefaultsPrompt || !backendAccessToken) return;
-    try {
-      setIsAttachingDefaults(true);
-      setAgentDefaultsError(null);
-      // Add-only, single call: the prompt already holds just the evaluators
-      // not yet on the agent; existing links are left intact.
-      await addEvaluatorsToAgent(
-        agentUuid,
-        agentDefaultsPrompt.map((ev) => ev.uuid),
-        backendAccessToken,
-      );
-      await loadAgentEvaluators();
-      onAgentDefaultsAttached?.();
-      setAgentDefaultsPrompt(null);
-      setAgentDefaultsError(null);
-      closeTestDialogAfterSave();
-    } catch (err) {
-      reportError("Error adding evaluators to agent defaults:", err);
-      setAgentDefaultsError(
-        err instanceof Error
-          ? err.message
-          : agentDefaultsPrompt.length === 1
-            ? "Failed to attach the evaluator"
-            : "Failed to attach the evaluators",
-      );
-    } finally {
-      setIsAttachingDefaults(false);
-    }
-  };
-
   // Fetch a test's details by UUID and open the dialog in edit mode.
   // Hydrates the same shape the standalone /tests page uses, so the dialog
   // can be reused as-is.
@@ -2301,13 +2241,13 @@ export function TestsTabContent({
 
       {/* Shown on top of the still-open AddTestDialog after a successful save.
           The test is already persisted; this only asks about agent defaults. */}
-      {agentDefaultsPrompt && agentDefaultsPrompt.length > 0 && (
+      {agentDefaults.prompt && agentDefaults.prompt.length > 0 && (
         <AgentDefaultsPromptDialog
-          evaluators={agentDefaultsPrompt}
-          isSaving={isAttachingDefaults}
-          error={agentDefaultsError}
-          onDismiss={dismissAgentDefaultsPrompt}
-          onConfirm={confirmAddAgentDefaults}
+          evaluators={agentDefaults.prompt}
+          isSaving={agentDefaults.isSaving}
+          error={agentDefaults.error}
+          onDismiss={agentDefaults.dismiss}
+          onConfirm={agentDefaults.confirm}
         />
       )}
 

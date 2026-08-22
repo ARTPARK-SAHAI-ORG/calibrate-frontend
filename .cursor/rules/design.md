@@ -658,7 +658,7 @@ className =
 
 Use `ServerPaginatedListBar` from `@/components/ui` — do not duplicate markup. Full rules in `CLAUDE.md`.
 
-**Placement:** directly **above** the table. Wrap bar + table in `space-y-1 pt-4`; toolbar and bulk actions sit above that group in a parent with `space-y-3`. Not below the table.
+**Placement:** directly **above** the table. Wrap bar + table in `space-y-1 pt-1`; toolbar and bulk actions sit above that group in a parent with `space-y-3`. Not below the table.
 
 ### Tabs Navigation
 

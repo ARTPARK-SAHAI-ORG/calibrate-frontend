@@ -32,8 +32,21 @@ jest.mock("../../../hooks", () => ({
 }));
 
 const fetchTrace = jest.fn();
+const fetchTraces = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
+  fetchTraces: (...args: unknown[]) => fetchTraces(...args),
+  MAX_TRACES_PAGE_SIZE: 200,
+}));
+
+// The agent's own evaluators decide whether the attach prompt has anything to
+// ask about, so they are driven from the test rather than the network.
+const fetchAgentEvaluators = jest.fn(async () => [] as { uuid: string }[]);
+const addEvaluatorsToAgent = jest.fn(async () => ({}));
+jest.mock("../../../lib/evaluatorApi", () => ({
+  fetchAgentEvaluators: () => fetchAgentEvaluators(),
+  fetchAllEvaluators: async () => [],
+  addEvaluatorsToAgent: (...args: unknown[]) => addEvaluatorsToAgent(...args),
 }));
 
 const reportError = jest.fn();
@@ -175,6 +188,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid,
     traceUuids,
     testType,
+    selectAll,
     agentNature,
     onConverted,
   }: {
@@ -182,20 +196,37 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
+    selectAll?: { agentId: string; outputType?: string } | null;
     agentNature?: string;
-    onConverted: (result: { created: number; test_uuids: string[] }) => void;
+    onConverted: (
+      result: { created: number; test_uuids: string[] },
+      evaluatorsUsed?: { uuid: string; name: string }[],
+    ) => void;
   }) =>
     isOpen ? (
       <div data-testid="convert-dialog">
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-select-all">
+          {selectAll ? `${selectAll.agentId}|${selectAll.outputType}` : "none"}
+        </span>
         <span data-testid="convert-nature">{agentNature}</span>
         <button
           type="button"
           onClick={() => onConverted({ created: 2, test_uuids: ["t1", "t2"] })}
         >
           finish adding
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onConverted({ created: 1, test_uuids: ["t1"] }, [
+              { uuid: "ev-9", name: "Tone check" },
+            ])
+          }
+        >
+          finish adding with a new evaluator
         </button>
       </div>
     ) : null,
@@ -251,6 +282,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
+  fetchAgentEvaluators.mockResolvedValue([]);
 });
 
 /** The last arguments `useTraces` was called with, i.e. what is on screen now. */
@@ -409,6 +441,157 @@ describe("TracesTabContent", () => {
 
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("trace selected")).toBeInTheDocument();
+  });
+
+  it("counts every trace the list matches once the whole list is asked for", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" }), trace({ uuid: "trace-2" })], {
+        total: 5,
+        hasNext: true,
+      }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    expect(screen.getByText("2")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Select all 5 traces"));
+
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Delete selected (5)")).toBeInTheDocument();
+    // The whole list is spoken for, so there is nothing left to offer.
+    expect(screen.queryByText("Select all 5 traces")).not.toBeInTheDocument();
+  });
+
+  it("refuses a whole list holding both kinds, in the same words as a mixed tick", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // Both kinds are in the list the filters match.
+    fetchTraces.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 });
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+      ),
+    );
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+  });
+
+  it("adds a whole list of one kind without asking anything", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // Only tool-call traces match, so there is nothing to ask about.
+    fetchTraces.mockImplementation(
+      async (_token: string, params: { outputType?: string }) => ({
+        items: [],
+        total: params.outputType === "tool_call" ? 4 : 0,
+        limit: 1,
+        offset: 0,
+      }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("tool_call");
+    // The kind is pinned on the filters, so the backend reads only that kind.
+    expect(screen.getByTestId("convert-select-all")).toHaveTextContent(
+      "agent-1|tool_call",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("adds a general agent's whole list as general tests", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} agentNature="general" />);
+
+    // The list itself is filtered to replies, so no counting is needed.
+    await user.click(screen.getByRole("button", { name: "Response" }));
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    expect(await screen.findByTestId("convert-type")).toHaveTextContent(
+      "general",
+    );
+    expect(fetchTraces).not.toHaveBeenCalled();
+  });
+
+  it("keeps labelling to the ticked traces when the whole list is asked for", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Submit for labelling"));
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Labelling works on the traces you tick. Untick the whole list and pick the ones to send.",
+    );
+    expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
+  });
+
+  it("says how many will really go when the whole list is asked for", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Delete selected (4)"));
+
+    expect(screen.getByText("Delete 4 traces?")).toBeInTheDocument();
+  });
+
+  it("drops the whole-list choice when a row is unticked", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" }), trace({ uuid: "trace-2" })], {
+        total: 6,
+        hasNext: true,
+      }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 6 traces"));
+    expect(screen.getByText("6")).toBeInTheDocument();
+
+    // Taking one row out is the reader narrowing what they want.
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
+  });
+
+  it("does not offer to tick every trace when they all fit on one page", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+
+    expect(screen.queryByText(/^Select all \d+ trace/)).not.toBeInTheDocument();
   });
 
   it("says nothing matched the filter instead of showing the setup steps", async () => {
@@ -665,6 +848,60 @@ describe("TracesTabContent", () => {
       expect.anything(),
     );
     expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
+  it("offers to attach an evaluator the agent does not have after adding tests", async () => {
+    const user = setupUser();
+    const onAgentDefaultsAttached = jest.fn();
+    render(
+      <TracesTabContent
+        {...tabProps}
+        onAgentDefaultsAttached={onAgentDefaultsAttached}
+      />,
+    );
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    await user.click(screen.getByText("finish adding with a new evaluator"));
+
+    expect(
+      await screen.findByText("Attach this evaluator to the agent?"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Tone check")).toBeInTheDocument();
+    expect(
+      screen.getByText(/The test you just added uses an evaluator/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Attach" }));
+
+    await waitFor(() =>
+      expect(addEvaluatorsToAgent).toHaveBeenCalledWith(
+        "agent-1",
+        ["ev-9"],
+        "test-token",
+      ),
+    );
+    expect(onAgentDefaultsAttached).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Attach this evaluator to the agent?"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("does not offer to attach an evaluator the agent already has", async () => {
+    const user = setupUser();
+    fetchAgentEvaluators.mockResolvedValue([{ uuid: "ev-9" }]);
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    await user.click(screen.getByText("finish adding with a new evaluator"));
+
+    await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+    expect(
+      screen.queryByText("Attach this evaluator to the agent?"),
+    ).not.toBeInTheDocument();
   });
 
   it("reloads the Tests tab and sends View tests there", async () => {
@@ -966,6 +1203,33 @@ describe("TracesTabContent", () => {
 
       await user.click(screen.getByText("close labelling"));
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
+    });
+
+    it("offers to attach the labelling evaluators the agent does not have", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByText("finish labelling"));
+
+      expect(
+        await screen.findByText("Attach this evaluator to the agent?"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/The traces you just sent for labelling/),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Correctness")).toBeInTheDocument();
+
+      // Skipping leaves the agent alone and the task dialog on screen.
+      await user.click(screen.getByRole("button", { name: "Not now" }));
+      expect(addEvaluatorsToAgent).not.toHaveBeenCalled();
+      expect(screen.getByTestId("labelling-task")).toBeInTheDocument();
     });
 
     it("leaves the agent's own instructions out of what is stored", async () => {

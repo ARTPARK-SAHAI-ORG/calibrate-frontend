@@ -380,7 +380,7 @@ export function RunsTabContent({
           </p>
         </div>
       ) : (
-        <div className="space-y-1 pt-4">
+        <div className="space-y-1 pt-1">
           <ServerPaginatedListBar
             total={total}
             offset={offset}

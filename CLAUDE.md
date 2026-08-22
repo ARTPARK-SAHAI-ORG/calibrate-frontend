@@ -236,7 +236,7 @@ body. No page uses a back arrow for this any more; `BackHeader` is gone.
 
 Use this whenever a list is backed by server-side `limit`/`offset` paging (today: **Traces tab** and **human-alignment task items tab**). Copy the markup from `TracesTabContent` or `src/app/[org]/human-alignment/tasks/[uuid]/page.tsx` — do not invent a new layout.
 
-**Placement:** one row **directly above the table**, after any bulk-action strip and before the table. Never below the table. Wrap the bar and table in a `space-y-1 pt-4` group so they sit close together but with clear space above the bar; toolbar and bulk actions stay in the outer `space-y-3` stack above that group.
+**Placement:** one row **directly above the table**, after any bulk-action strip and before the table. Never below the table. Wrap the bar and table in a `space-y-1 pt-1` group so the bar sits close to both the table below it and whatever is above it; toolbar and bulk actions stay in the outer `space-y-3` stack above that group.
 
 **When controls appear:** `total > PAGE_SIZE_OPTIONS[0]` (i.e. more than 10 rows exist). Below that threshold the bar still shows a count on the left, but hides **Per page** and page navigation — everything already fits on one page at the smallest option.
 

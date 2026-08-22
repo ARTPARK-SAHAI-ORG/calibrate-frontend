@@ -12,6 +12,7 @@ import {
   convertTracesErrorMessage,
   ConvertTestType,
   ConvertTracesToTestsResult,
+  type TraceFilters,
 } from "@/lib/tracesApi";
 
 type ConvertTracesToTestsDialogProps = {
@@ -20,6 +21,12 @@ type ConvertTracesToTestsDialogProps = {
   accessToken: string | null;
   /** The selected trace uuids to convert. */
   traceUuids: string[];
+  /** Set when the reader asked for every trace the list matches: the backend
+   *  re-reads them from these filters instead of the ticked ids. */
+  selectAll?: TraceFilters | null;
+  /** How many traces this will convert. The ticked count, or the whole list
+   *  when every matching trace was asked for. */
+  traceCount?: number;
   /** The test type derived from the selected traces. */
   testType: ConvertTestType;
   /** The agent whose traces these are, for the evaluators offered here. */
@@ -27,7 +34,12 @@ type ConvertTracesToTestsDialogProps = {
   /** Decides which kind of evaluator can judge what this agent produced. */
   agentNature?: "conversation" | "general";
   /** Called with the backend result after a successful conversion. */
-  onConverted: (result: ConvertTracesToTestsResult) => void;
+  /** The second argument is the evaluators the created tests were given, so
+   *  the caller can offer to attach any the agent does not have yet. */
+  onConverted: (
+    result: ConvertTracesToTestsResult,
+    evaluatorsUsed: { uuid: string; name: string }[],
+  ) => void;
 };
 
 function toggle(set: Set<string>, uuid: string): Set<string> {
@@ -50,6 +62,8 @@ export function ConvertTracesToTestsDialog({
   onClose,
   accessToken,
   traceUuids,
+  selectAll = null,
+  traceCount,
   testType,
   agentUuid,
   agentNature = "conversation",
@@ -82,6 +96,9 @@ export function ConvertTracesToTestsDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  // The evaluator made from inside this dialog, so its prompt opens on the
+  // right as well as its box being ticked.
+  const [createdUuid, setCreatedUuid] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -94,7 +111,7 @@ export function ConvertTracesToTestsDialog({
   const canSubmit =
     !submitting &&
     (!needsEvaluator || !loading) &&
-    traceUuids.length > 0 &&
+    (selectAll !== null || traceUuids.length > 0) &&
     (!needsEvaluator || selectedEvaluators.size > 0);
 
   const submit = async () => {
@@ -104,6 +121,7 @@ export function ConvertTracesToTestsDialog({
     try {
       const result = await convertTracesToTests(accessToken, {
         traceIds: traceUuids,
+        selectAll,
         type: testType,
         evaluatorUuids: needsEvaluator
           ? Array.from(selectedEvaluators)
@@ -112,7 +130,14 @@ export function ConvertTracesToTestsDialog({
         // and the test can be edited afterwards.
         acceptAnyArguments: false,
       });
-      onConverted(result);
+      onConverted(
+        result,
+        needsEvaluator
+          ? evaluators
+              .filter((e) => selectedEvaluators.has(e.uuid))
+              .map((e) => ({ uuid: e.uuid, name: e.name }))
+          : [],
+      );
     } catch (err) {
       reportError("Error converting traces to tests:", err);
       // Nothing is created when a conversion fails, so the reader can fix what
@@ -126,7 +151,7 @@ export function ConvertTracesToTestsDialog({
     }
   };
 
-  const count = traceUuids.length;
+  const count = traceCount ?? traceUuids.length;
   // Says what is needed, why nothing is on offer, and what to do about it.
   const emptyEvaluatorMessage =
     agentNature === "general"
@@ -167,8 +192,19 @@ export function ConvertTracesToTestsDialog({
               {needsEvaluator ? (
                 <div className="flex-1 min-h-0 flex flex-col gap-2">
                   {evaluators.length > 0 && (
-                    <div className="text-sm font-semibold text-foreground">
-                      Evaluators
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-foreground">
+                        Evaluators
+                      </div>
+                      {/* The same offer the empty picker makes, kept in reach
+                          once there is a list to read. */}
+                      <button
+                      type="button"
+                      onClick={() => setCreateFlowOpen(true)}
+                      className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                    >
+                      Create evaluator
+                    </button>
                     </div>
                   )}
                   <div className="flex-1 min-h-0">
@@ -190,6 +226,7 @@ export function ConvertTracesToTestsDialog({
                           Create evaluator
                         </button>
                       }
+                      previewUuid={createdUuid}
                       fillHeight
                     />
                   </div>
@@ -237,6 +274,7 @@ export function ConvertTracesToTestsDialog({
         existingEvaluators={evaluators}
         onCreated={(created) => {
           addEvaluator(created);
+          setCreatedUuid(created.uuid);
           // Ticking already started, so the new one has to join that set
           // rather than the untouched default.
           setPickedEvaluators((prev) =>

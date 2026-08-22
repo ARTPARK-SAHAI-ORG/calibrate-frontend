@@ -1440,16 +1440,13 @@ function AgreementOverview({
         <>
           {/* Desktop table */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <SortHeader
                 label="Name"
                 active={sortKey === "name"}
                 dir={sortDir}
                 onClick={() => handleSort("name")}
               />
-              <div className="text-sm font-medium text-muted-foreground">
-                Type
-              </div>
               <SortHeader
                 label="Current agreement"
                 active={sortKey === "current"}
@@ -1471,7 +1468,7 @@ function AgreementOverview({
                 >
                   <div
                     onClick={() => toggleRow(row.key)}
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {row.key === "human_human" ? (
@@ -1492,15 +1489,6 @@ function AgreementOverview({
                             alignment
                           </span>
                         </>
-                      )}
-                    </div>
-                    <div>
-                      {row.key === "human_human" ? (
-                        <HumanTypePill />
-                      ) : row.evaluatorType ? (
-                        <EvaluatorTypePill evaluatorType={row.evaluatorType} />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </div>
                     <div
@@ -1580,15 +1568,6 @@ function AgreementOverview({
                           </span>
                         </>
                       )}
-                      {row.key === "human_human" ? (
-                        <HumanTypePill />
-                      ) : (
-                        row.evaluatorType && (
-                          <EvaluatorTypePill
-                            evaluatorType={row.evaluatorType}
-                          />
-                        )
-                      )}
                       <svg
                         className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
                         fill="none"
@@ -1632,14 +1611,6 @@ function AgreementOverview({
         </>
       )}
     </div>
-  );
-}
-
-function HumanTypePill() {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide bg-green-500/10 text-green-600 dark:text-green-400">
-      Human
-    </span>
   );
 }
 

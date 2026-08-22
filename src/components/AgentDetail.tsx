@@ -1352,6 +1352,9 @@ export function AgentDetail({
               agentNature={agent.interaction_type ?? "conversation"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
+              onAgentDefaultsAttached={() =>
+                setEvaluatorsReloadKey((k) => k + 1)
+              }
             />
           </div>
         )}
