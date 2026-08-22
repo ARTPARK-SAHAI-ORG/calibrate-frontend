@@ -576,8 +576,6 @@ function HumanLabellingPageInner() {
                 </div>
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
-                  const evaluatorType =
-                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -643,8 +641,6 @@ function HumanLabellingPageInner() {
               <div className="md:hidden space-y-2">
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
-                  const evaluatorType =
-                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
