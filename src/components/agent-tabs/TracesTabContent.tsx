@@ -352,7 +352,7 @@ export function TracesTabContent({
                     onClick={() => {
                       if (isMixedSelection) {
                         toast.error(
-                          "The selected traces contains a mix of responses and tool calls. Those make different kinds of test, so pick one kind at a time.",
+                          "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                         );
                         return;
                       }

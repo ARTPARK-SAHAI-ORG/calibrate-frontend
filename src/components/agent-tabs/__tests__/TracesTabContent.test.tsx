@@ -482,9 +482,7 @@ describe("TracesTabContent", () => {
       ...tracesResult([]),
       isLoading: loading,
     }));
-    const { container, rerender } = render(
-      <TracesTabContent {...tabProps} />,
-    );
+    const { container, rerender } = render(<TracesTabContent {...tabProps} />);
 
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
 
@@ -655,7 +653,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (2)"));
 
     expect(toast.error).toHaveBeenCalledWith(
-      "Some of these traces replied and some only called a tool. Those make different kinds of test, so pick one kind at a time.",
+      "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
     );
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
@@ -663,7 +661,10 @@ describe("TracesTabContent", () => {
   it("adds a selection that is all replies", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
-      tracesResult([trace(), trace({ uuid: "trace-2", message_id: "msg-002" })]),
+      tracesResult([
+        trace(),
+        trace({ uuid: "trace-2", message_id: "msg-002" }),
+      ]),
     );
     render(<TracesTabContent {...tabProps} />);
 
@@ -1093,7 +1094,11 @@ describe("TracesTabContent", () => {
     const setOffset = jest.fn();
     const page1 = [
       trace(),
-      trace({ uuid: "trace-2", message_id: "msg-002", input_preview: "Second" }),
+      trace({
+        uuid: "trace-2",
+        message_id: "msg-002",
+        input_preview: "Second",
+      }),
     ];
     mockUseTraces.mockReturnValue(
       tracesResult(page1, {
@@ -1138,7 +1143,11 @@ describe("TracesTabContent", () => {
     // now should the dialog step onto the new page, opening its first trace.
     const page2 = [
       trace({ uuid: "trace-3", message_id: "msg-003", input_preview: "Third" }),
-      trace({ uuid: "trace-4", message_id: "msg-004", input_preview: "Fourth" }),
+      trace({
+        uuid: "trace-4",
+        message_id: "msg-004",
+        input_preview: "Fourth",
+      }),
     ];
     mockUseTraces.mockReturnValue(
       tracesResult(page2, {
