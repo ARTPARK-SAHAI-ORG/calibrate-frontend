@@ -1,5 +1,6 @@
 ## August 2026
 
+- Let single agent response test results be submitted for labelling ([#416](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/416))
 - Show a single agent response tool call test as input and output ([#415](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/415))
 - Fix the crash on single agent response test results ([#414](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/414))
 - Stop repeating a test's failure explanation under its answer ([#412](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/412))
