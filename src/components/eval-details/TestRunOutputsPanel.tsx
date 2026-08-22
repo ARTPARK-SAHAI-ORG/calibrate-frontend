@@ -480,6 +480,7 @@ function TestResultDetail({
   return (
     <SharedTestDetailView
       history={result.testCase?.history || []}
+      input={result.testCase?.input}
       output={result.output}
       passed={result.evaluation?.passed ?? false}
       reasoning={result.reasoning}
