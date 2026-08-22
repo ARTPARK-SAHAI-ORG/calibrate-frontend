@@ -24,6 +24,7 @@ import {
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import { isToolCallOutputItem } from "@/components/human-labelling/itemOutputType";
 import {
   ItemValueFilter,
   matchesAllValueFilters,
@@ -690,7 +691,12 @@ export function EvaluatorResultsPane({
   annotatorFilterActive = false,
   singleAnnotatorFiltered = false,
   itemComments = [],
+  isToolCallOutput = false,
 }: {
+  /** True when this item's output is a tool call, not a text reply — AI
+   * judges don't score it, so a "humans only" note shows in place of a
+   * missing result. */
+  isToolCallOutput?: boolean;
   evaluators: {
     evaluator_id: string;
     evaluator_version_id?: string;
@@ -897,6 +903,30 @@ export function EvaluatorResultsPane({
         const evaluatorName = displayName;
 
         if (!r) {
+          // A tool-call output has nothing for an AI judge to read, so the run
+          // skips it. Say so plainly rather than showing a missing-result
+          // error — a human can still label it.
+          if (isToolCallOutput) {
+            return (
+              <div
+                key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+                className="border border-border bg-muted/30 rounded-xl p-4 space-y-1.5"
+              >
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <h3 className="text-sm font-semibold">{evaluatorName}</h3>
+                  {versionLabel && (
+                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                      {versionLabel}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  AI judges do not run on tool calls. A person can still label
+                  this item by hand.
+                </p>
+              </div>
+            );
+          }
           return (
             <div
               key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
@@ -1490,6 +1520,9 @@ export function ItemDetailPane({
           annotatorFilterActive={annotatorFilterActive}
           singleAnnotatorFiltered={singleAnnotatorFiltered}
           itemComments={itemComments}
+          isToolCallOutput={
+            taskType === "llm" && isToolCallOutputItem(item.payload)
+          }
         />
       </div>
     </div>

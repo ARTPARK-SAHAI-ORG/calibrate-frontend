@@ -1954,6 +1954,25 @@ describe("EvaluatorResultsPane", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a humans-only note instead of an error for a tool-call output item", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[]}
+        isToolCallOutput
+      />,
+    );
+    expect(
+      screen.getByText(
+        "AI judges do not run on tool calls. A person can still label this item by hand.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows disagreements-only empty state", () => {
     render(
       <EvaluatorResultsPane
