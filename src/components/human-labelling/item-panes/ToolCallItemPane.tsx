@@ -2,6 +2,7 @@ import {
   TestDetailView,
   type TestCaseHistory,
 } from "@/components/test-results/shared";
+import { normaliseHistoryItem } from "./shared";
 
 /**
  * Renders the conversation side of a tool-call labelling item (a tool-call
@@ -58,41 +59,4 @@ export function ToolCallItemPane({
   return (
     <TestDetailView history={history} passed={true} highlightEvalTarget />
   );
-}
-
-function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  const role = obj.role;
-  const content = typeof obj.content === "string" ? obj.content : undefined;
-  const toolCalls = obj.tool_calls;
-  const toolCallId =
-    typeof obj.tool_call_id === "string" ? obj.tool_call_id : undefined;
-  const createdAt =
-    typeof obj.created_at === "string" ? obj.created_at : undefined;
-  const tsField = createdAt ? { created_at: createdAt } : {};
-  if (role === "assistant") {
-    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-      return {
-        role: "assistant",
-        ...(content != null ? { content } : {}),
-        tool_calls: toolCalls as TestCaseHistory["tool_calls"],
-        ...tsField,
-      };
-    }
-    if (content != null) return { role: "assistant", content, ...tsField };
-    return null;
-  }
-  if (role === "user" && content != null) {
-    return { role: "user", content, ...tsField };
-  }
-  if (role === "tool" && content != null) {
-    return {
-      role: "tool",
-      content,
-      ...(toolCallId ? { tool_call_id: toolCallId } : {}),
-      ...tsField,
-    };
-  }
-  return null;
 }
