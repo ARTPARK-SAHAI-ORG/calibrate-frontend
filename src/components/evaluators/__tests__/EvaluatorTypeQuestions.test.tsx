@@ -68,7 +68,7 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness />);
     await user.click(screen.getByText("Text"));
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
     expect(chosen()).toBe("llm-general");
     expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness />);
     await user.click(screen.getByText("Text"));
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
     expect(chosen()).toBe("llm-general");
 
     await user.click(screen.getByText("Conversation"));
@@ -123,7 +123,7 @@ describe("EvaluatorTypeQuestions", () => {
     render(<Harness allowed={["llm", "llm-general"]} />);
     expect(screen.queryByText("Voice")).not.toBeInTheDocument();
     expect(screen.getByText("Conversation")).toBeInTheDocument();
-    expect(screen.getByText("Single LLM response")).toBeInTheDocument();
+    expect(screen.getByText("Single Agent Response")).toBeInTheDocument();
 
     // Only one conversation kind is left, so choosing a conversation is the
     // whole answer and no further question is asked.

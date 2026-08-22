@@ -4,7 +4,7 @@ import { TestTypeFilter, matchesTestTypeFilter } from "../TestTypeFilter";
 describe("TestTypeFilter", () => {
   it("renders all filter options with default md size", () => {
     render(<TestTypeFilter value="all" onChange={jest.fn()} />);
-    ["All", "LLM response", "Tool Call", "Conversation"].forEach((label) => {
+    ["All", "Agent Response", "Tool Call", "Conversation"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     });
   });

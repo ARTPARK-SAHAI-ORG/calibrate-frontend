@@ -107,11 +107,11 @@ describe("onboarding dom helpers", () => {
 
   it("matches clickByText on a starts-with label", async () => {
     const button = document.createElement("button");
-    button.textContent = "LLM response test Evaluate the next message";
+    button.textContent = "Agent Response test Evaluate the next message";
     makeLayoutVisible(button);
     document.body.appendChild(button);
 
-    expect(await clickByText("LLM response test")).toBe(true);
+    expect(await clickByText("Agent Response test")).toBe(true);
   });
 
   it("awaits delay", async () => {

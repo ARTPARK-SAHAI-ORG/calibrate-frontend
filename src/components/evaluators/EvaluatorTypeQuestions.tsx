@@ -133,7 +133,7 @@ export function EvaluatorTypeQuestions({
         <Question title="What do you want to label?">
           <ChoiceCard
             title="Text"
-            description="Label conversations or single LLM responses"
+            description="Label conversations or single Agent Responses"
             tone="amber"
             selected={medium === "text"}
             dimmed={medium === "voice"}
@@ -184,7 +184,7 @@ export function EvaluatorTypeQuestions({
             onSelect={() => chooseTextKind("conversation")}
           />
           <ChoiceCard
-            title="Single LLM response"
+            title="Single Agent Response"
             description="The agent takes an input and generates an output"
             tone="teal"
             selected={textKind === "single"}

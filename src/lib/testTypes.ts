@@ -11,16 +11,16 @@ export type TestType = "response" | "tool_call" | "conversation" | "general";
  * Human-readable label for a test type.
  *
  * "response" (a conversation agent's reply) and "general" (a general
- * agent's plain input/output) both show the same name, "LLM response" —
+ * agent's plain input/output) both show the same name, "Agent Response" —
  * the test type name doesn't distinguish the two, only the test's own
  * config shape does. Unknown / missing types fall back to `fallback`. The
  * agent Tests tab treats anything non-tool_call / non-conversation as
- * "LLM response" (the default fallback); the standalone /tests page passes
+ * "Agent Response" (the default fallback); the standalone /tests page passes
  * "—" so a truly unknown type renders as a dash.
  */
 export function testTypeLabel(
   type: string | null | undefined,
-  fallback = "LLM response",
+  fallback = "Agent Response",
 ): string {
   switch (type) {
     case "tool_call":
@@ -29,7 +29,7 @@ export function testTypeLabel(
       return "Conversation";
     case "response":
     case "general":
-      return "LLM response";
+      return "Agent Response";
     default:
       return fallback;
   }

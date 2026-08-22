@@ -95,7 +95,7 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Single LLM response").length).toBeGreaterThan(
+    expect(screen.getAllByText("Single Agent Response").length).toBeGreaterThan(
       0,
     );
   });
@@ -110,7 +110,7 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Single LLM response")).not.toBeInTheDocument();
+    expect(screen.queryByText("Single Agent Response")).not.toBeInTheDocument();
   });
 
   it("does not fetch when there is no access token", () => {
@@ -306,7 +306,7 @@ describe("Agents", () => {
     );
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "conn-uuid" }),
@@ -487,7 +487,7 @@ describe("Agents", () => {
     await user.type(input, "{Enter}");
 
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "enter-uuid" }),
@@ -879,10 +879,10 @@ describe("Agents", () => {
     const user = setupUser();
     render(<Agents onNavigateToAgent={onNavigateToAgent} />);
     await waitFor(() =>
-      expect(screen.getAllByText("Single LLM response")[0]).toBeInTheDocument(),
+      expect(screen.getAllByText("Single Agent Response")[0]).toBeInTheDocument(),
     );
 
-    await user.click(screen.getAllByText("Single LLM response")[0]);
+    await user.click(screen.getAllByText("Single Agent Response")[0]);
     expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
   });
 });

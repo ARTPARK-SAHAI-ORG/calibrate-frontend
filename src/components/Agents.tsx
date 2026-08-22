@@ -360,7 +360,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                 Type
               </div>
               <div className="text-sm font-medium text-muted-foreground">
-                What it does
+                Interaction type
               </div>
               <div className="text-sm font-medium text-muted-foreground">
                 <button
@@ -392,10 +392,10 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             {sortedAgents.map((agent) => (
               <div
                 key={agent.uuid}
-                className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+                className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 px-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
               >
                 {/* Selection checkbox */}
-                <div className="flex items-center pl-4">
+                <div className="flex items-center">
                   <SelectCheckbox {...agentCheckboxProps(agent)} />
                 </div>
                 {/* Name Column */}
@@ -407,7 +407,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       onNavigateToAgent(agent.uuid);
                     }
                   }}
-                  className="flex items-center px-4 py-2"
+                  className="flex items-center py-2"
                 >
                   <div className="text-sm font-medium text-foreground">
                     {agent.name}
@@ -422,7 +422,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       onNavigateToAgent(agent.uuid);
                     }
                   }}
-                  className="flex items-center px-4 py-2"
+                  className="flex items-center py-2"
                 >
                   <span
                     className={`text-xs px-2 py-1 rounded-md font-medium ${
@@ -443,7 +443,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       onNavigateToAgent(agent.uuid);
                     }
                   }}
-                  className="flex items-center px-4 py-2"
+                  className="flex items-center py-2"
                 >
                   <span
                     className={`text-xs px-2 py-1 rounded-md font-medium ${
@@ -453,7 +453,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                     }`}
                   >
                     {agent.interaction_type === "general"
-                      ? "Single LLM response"
+                      ? "Single Agent Response"
                       : "Conversation"}
                   </span>
                 </Link>
@@ -466,7 +466,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       onNavigateToAgent(agent.uuid);
                     }
                   }}
-                  className="flex items-center px-4 py-2"
+                  className="flex items-center py-2"
                 >
                   <span className="text-sm text-muted-foreground">
                     {agent.updatedAt}
@@ -590,7 +590,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       }`}
                     >
                       {agent.interaction_type === "general"
-                        ? "Single LLM response"
+                        ? "Single Agent Response"
                         : "Conversation"}
                     </span>
                   </div>
@@ -1060,7 +1060,7 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      Single LLM response
+                      Single Agent Response
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
                       The agent takes an input and generates an output

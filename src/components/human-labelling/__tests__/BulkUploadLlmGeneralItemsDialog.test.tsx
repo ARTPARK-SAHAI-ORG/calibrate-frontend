@@ -56,7 +56,7 @@ describe("BulkUploadLlmGeneralItemsDialog", () => {
     expect(capturedProps.onClose).toBe(onClose);
     expect(capturedProps.onSuccess).toBe(onSuccess);
     expect(capturedProps.guidelinesTitle).toBe(
-      "Bulk upload: LLM response labelling items"
+      "Bulk upload: Agent Response labelling items"
     );
     expect(capturedProps.guidelinesIntro).toMatch(/non-conversational/);
     expect(capturedProps.sampleFilenameBase).toBe("llm_response_items");

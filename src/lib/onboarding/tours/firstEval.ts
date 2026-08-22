@@ -408,9 +408,9 @@ async function resolveFreeName(
   }
 }
 
-// Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
+// Only "Agent reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
-// that type and silently drops "Full conversation" / "LLM response" ones. So the
+// that type and silently drops "Full conversation" / "Agent Response" ones. So the
 /**
  * Find the evaluator's checkbox by its EXACT name. The picker renders each row
  * as a checkbox whose aria-label is `Select <name>` (the row body opens a

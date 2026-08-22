@@ -61,9 +61,9 @@ async function goToStep2(user: ReturnType<typeof setupUser>) {
  * single card.
  */
 const ANSWER_PATH: Record<string, string[]> = {
-  "LLM reply": ["Text", "Conversation", "A single reply"],
+  "Agent reply": ["Text", "Conversation", "A single reply"],
   "Full conversation": ["Text", "Conversation", "The whole conversation"],
-  "Single LLM response": ["Text", "Single LLM response"],
+  "Single Agent Response": ["Text", "Single Agent Response"],
   "Speech to Text": ["Voice", "Speech to Text"],
   "Text to Speech": ["Voice", "Text to Speech"],
 };
@@ -79,7 +79,7 @@ async function answerTypeQuestions(
 
 async function goToStep3(
   user: ReturnType<typeof setupUser>,
-  typeTitle = "LLM reply",
+  typeTitle = "Agent reply",
 ) {
   await goToStep2(user);
   await answerTypeQuestions(user, typeTitle);
@@ -134,7 +134,7 @@ describe("CreateLabellingTaskDialog", () => {
     expect(screen.getByText(/What do you want to label/)).toBeInTheDocument();
 
     // Answer it and both ways forward open up.
-    await answerTypeQuestions(user, "LLM reply");
+    await answerTypeQuestions(user, "Agent reply");
     expect(
       screen.getByRole("button", { name: /Evaluators/ }),
     ).not.toBeDisabled();
@@ -176,7 +176,7 @@ describe("CreateLabellingTaskDialog", () => {
   it("drops every chosen evaluator when an earlier answer is changed", async () => {
     const user = setupUser();
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -207,7 +207,7 @@ describe("CreateLabellingTaskDialog", () => {
       }),
     );
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     expect(screen.getByText("Loading evaluators")).toBeInTheDocument();
 
     resolveFn({ items: EVALUATORS });
@@ -235,10 +235,10 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     mockApiClient.mockResolvedValue({ items: [] });
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(
-        screen.getByText("No LLM reply evaluators yet."),
+        screen.getByText("No Agent reply evaluators yet."),
       ).toBeInTheDocument(),
     );
   });
@@ -249,7 +249,7 @@ describe("CreateLabellingTaskDialog", () => {
       new Error('Request failed: 500 - {"detail":"boom"}'),
     );
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() => expect(screen.getByText("boom")).toBeInTheDocument());
   });
 
@@ -259,7 +259,7 @@ describe("CreateLabellingTaskDialog", () => {
       new Error("Request failed: 500 - not json"),
     );
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("not json")).toBeInTheDocument(),
     );
@@ -269,7 +269,7 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     mockApiClient.mockRejectedValue("oops");
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Failed to load evaluators")).toBeInTheDocument(),
     );
@@ -278,7 +278,7 @@ describe("CreateLabellingTaskDialog", () => {
   it("toggles evaluator selection via checkbox", async () => {
     const user = setupUser();
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -302,7 +302,7 @@ describe("CreateLabellingTaskDialog", () => {
   it("drops selections that don't belong to the new type when the type changes", async () => {
     const user = setupUser();
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -324,7 +324,7 @@ describe("CreateLabellingTaskDialog", () => {
   it("disables Create task until name + type + at least one evaluator are set", async () => {
     const user = setupUser();
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -351,7 +351,7 @@ describe("CreateLabellingTaskDialog", () => {
       "  desc here  ",
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await answerTypeQuestions(user, "LLM reply");
+    await answerTypeQuestions(user, "Agent reply");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
@@ -386,7 +386,7 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog();
     await user.type(screen.getByPlaceholderText(/Maternal health helpline/i), "Task");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await answerTypeQuestions(user, "LLM reply");
+    await answerTypeQuestions(user, "Agent reply");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
@@ -417,7 +417,7 @@ describe("CreateLabellingTaskDialog", () => {
         }),
       );
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -446,7 +446,7 @@ describe("CreateLabellingTaskDialog", () => {
       );
     mockReadNameConflictFromError.mockReturnValue("Task name already exists");
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -475,7 +475,7 @@ describe("CreateLabellingTaskDialog", () => {
       );
     mockReadNameConflictFromError.mockReturnValue(null);
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
@@ -501,7 +501,7 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     mockApiClient.mockRejectedValue(new Error("network down"));
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("network down")).toBeInTheDocument(),
     );
@@ -511,7 +511,7 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     mockApiClient.mockRejectedValue(new Error(""));
     renderDialog();
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Failed to load evaluators")).toBeInTheDocument(),
     );
@@ -528,7 +528,7 @@ describe("CreateLabellingTaskDialog", () => {
         onCreated={onCreated}
       />,
     );
-    await goToStep3(user, "LLM reply");
+    await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );

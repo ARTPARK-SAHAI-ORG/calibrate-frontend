@@ -247,7 +247,7 @@ export function TestsTabContent({
   const [testsSearchMode, setTestsSearchMode] =
     useState<SearchMode>("contains");
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
-  // is LLM response, "tool_call" is Tool Call. The "select all" checkbox keys
+  // is Agent Response, "tool_call" is Tool Call. The "select all" checkbox keys
   // off `filteredAgentTests`, so this filter also narrows what gets selected.
   const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
   const dropdownRef = useRef<HTMLDivElement>(null);

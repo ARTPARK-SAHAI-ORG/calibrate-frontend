@@ -693,7 +693,7 @@ const TEST_TYPE_OPTIONS: Array<{
 }> = [
   {
     tab: "next-reply",
-    label: "LLM response",
+    label: "Agent Response",
     title: "Does the agent give the right reply?",
     description: "Evaluate the agent's response given a conversation history",
   },
@@ -937,11 +937,11 @@ export function AddTestDialog({
   // shared evaluator-related UI and validation paths below.
   const isEvaluatorTab =
     activeTab === "next-reply" || activeTab === "conversation";
-  // A general agent's "LLM response" tab has no conversation history — it's
+  // A general agent's "Agent Response" tab has no conversation history — it's
   // a single plain-text input instead of the multi-turn message builder.
   const isGeneralOutputTab = isGeneralTest && activeTab === "next-reply";
   // A general agent has no conversation on EITHER authoring tab: both the
-  // "LLM response" and "Tool call" tests are written as one plain input.
+  // "Agent Response" and "Tool call" tests are written as one plain input.
   // The test type is unaffected — a tool call test stays `tool_call`, it
   // just stores `input` instead of `history`.
   const usesPlainInput =
@@ -1016,7 +1016,7 @@ export function AddTestDialog({
 
   // A short, static example of what one test of the given type actually
   // looks like — shown on the picker before the reader commits to it. A
-  // general agent has no conversation, so its "LLM response" example is a
+  // general agent has no conversation, so its "Agent Response" example is a
   // single input/output instead of a back-and-forth.
   function testTypePreview(tab: TestTab) {
     if (tab === "tool-invocation") {
