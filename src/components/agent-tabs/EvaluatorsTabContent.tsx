@@ -35,7 +35,9 @@ const CREATE_BUTTON_CLASS =
 // lists only the next-reply (`llm`) ones. A general (non-conversational,
 // one-input-one-output) agent only takes output-type evaluators instead.
 function agentEvaluatorTypes(agentNature: "conversation" | "general") {
-  return agentNature === "general" ? new Set(["llm-general"]) : new Set(["llm"]);
+  return agentNature === "general"
+    ? new Set(["llm-general"])
+    : new Set(["llm"]);
 }
 
 export function EvaluatorsTabContent({
@@ -338,9 +340,16 @@ export function EvaluatorsTabContent({
                 key={evaluator.uuid}
                 data-tour="evaluator-card"
                 data-evaluator-name={evaluator.name}
-                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors"
+                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
               >
-                <div className="flex items-start justify-between gap-3">
+                {/* Covers the whole card so it behaves like a link: clicking anywhere
+                    opens the evaluator, and the buttons still sit above it. */}
+                <Link
+                  href={`/evaluators/${evaluator.uuid}`}
+                  aria-label={`Open ${evaluator.name}`}
+                  className="absolute inset-0 rounded-xl z-0"
+                />
+                <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-semibold text-foreground">
@@ -356,7 +365,7 @@ export function EvaluatorsTabContent({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
                     <Link
                       href={`/evaluators/${evaluator.uuid}`}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
