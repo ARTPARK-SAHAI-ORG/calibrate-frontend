@@ -149,8 +149,8 @@ function collectModelLabellingKeys(
   for (let index = 0; index < expectedCount; index++) {
     const testResult = modelResult.test_results?.[index];
     if (!testResult) continue;
-    // A tool-call test would always be skipped on submission, so it is not
-    // tickable and must not be swept up by a select-all either.
+    // A test that would always be skipped on submission is not tickable and
+    // must not be swept up by a select-all either.
     if (!isLabellingEligibleRaw(testResult)) continue;
     const status = benchmarkTestStatus(testResult);
     const testName = benchmarkTestName(testResult, index, testNames);

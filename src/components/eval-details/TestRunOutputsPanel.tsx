@@ -107,9 +107,9 @@ export function TestRunOutputsPanel({
   const isErrored = (r: TestRunResult) => !!r.error;
   const isLabellingEligible = (r: TestRunResult) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null });
-  // Only a finished test that can actually be submitted is tickable. A
-  // tool-call test would always be skipped, so it gets no checkbox at all
-  // rather than one that leads nowhere.
+  // Only a finished test that can actually be submitted is tickable. A test
+  // of a kind that would always be skipped gets no checkbox at all rather
+  // than one that leads nowhere.
   const isLabellingSelectable = (r: TestRunResult) =>
     isLabellingEligible(r) &&
     (r.status === "passed" || r.status === "failed" || isErrored(r));
