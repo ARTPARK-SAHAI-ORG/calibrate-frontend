@@ -445,7 +445,13 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   }}
                   className="flex items-center px-4 py-2"
                 >
-                  <span className="text-xs px-2 py-1 rounded-md font-medium bg-muted text-muted-foreground">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-md font-medium ${
+                      agent.interaction_type === "general"
+                        ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                        : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
+                    }`}
+                  >
                     {agent.interaction_type === "general"
                       ? "Single LLM response"
                       : "Conversation"}
@@ -576,7 +582,13 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                     >
                       {agent.type === "connection" ? "Connection" : "Agent"}
                     </span>
-                    <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        agent.interaction_type === "general"
+                          ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                          : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
+                      }`}
+                    >
                       {agent.interaction_type === "general"
                         ? "Single LLM response"
                         : "Conversation"}
