@@ -464,31 +464,73 @@ describe("TracesTabContent", () => {
     expect(screen.queryByText("Select all 5 traces")).not.toBeInTheDocument();
   });
 
-  it("hands the whole-list choice to the add-to-tests window as filters", async () => {
+  it("refuses a whole list holding both kinds, in the same words as a mixed tick", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
       tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // Both kinds are in the list the filters match.
+    fetchTraces.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 });
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+      ),
+    );
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+  });
+
+  it("adds a whole list of one kind without asking anything", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // Only tool-call traces match, so there is nothing to ask about.
+    fetchTraces.mockImplementation(
+      async (_token: string, params: { outputType?: string }) => ({
+        items: [],
+        total: params.outputType === "tool_call" ? 4 : 0,
+        limit: 1,
+        offset: 0,
+      }),
     );
     render(<TracesTabContent {...tabProps} />);
 
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
-    // The two kinds of output make different tests, so the list has to say
-    // which kind it is showing before every trace can be added.
     await user.click(screen.getByText("Add to tests (4)"));
-    expect(toast.error).toHaveBeenCalledWith(
-      "Filter the list to responses or to tool calls before adding every trace as tests.",
-    );
 
-    // Saying which kind the list shows resets the choice; the ticks on the
-    // page stay, so the whole list can be asked for again.
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("tool_call");
+    // The kind is pinned on the filters, so the backend reads only that kind.
+    expect(screen.getByTestId("convert-select-all")).toHaveTextContent(
+      "agent-1|tool_call",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("adds a general agent's whole list as general tests", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    render(<TracesTabContent {...tabProps} agentNature="general" />);
+
+    // The list itself is filtered to replies, so no counting is needed.
     await user.click(screen.getByRole("button", { name: "Response" }));
+    await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
 
-    expect(screen.getByTestId("convert-select-all")).toHaveTextContent(
-      "agent-1|response",
+    expect(await screen.findByTestId("convert-type")).toHaveTextContent(
+      "general",
     );
+    expect(fetchTraces).not.toHaveBeenCalled();
   });
 
   it("keeps labelling to the ticked traces when the whole list is asked for", async () => {

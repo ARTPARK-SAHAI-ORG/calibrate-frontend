@@ -2,6 +2,7 @@ import {
   fetchTraces,
   fetchTrace,
   convertTracesToTests,
+  selectAllBody,
   convertTracesErrorMessage,
   validateApiKeyForAgent,
   traceInputTurns,
@@ -296,6 +297,55 @@ describe("convertTracesToTests", () => {
     expect(body).not.toHaveProperty("accept_any_arguments");
     // The backend links each created test to the trace's own agent.
     expect(body).not.toHaveProperty("agent_uuids");
+  });
+});
+
+describe("selectAllBody", () => {
+  it("carries the agent, the search text and the output type", () => {
+    expect(
+      selectAllBody({ agentId: "ag-1", q: "  refund  ", outputType: "tool_call" }),
+    ).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      q: "refund",
+      output_type: "tool_call",
+    });
+  });
+
+  it("leaves out a blank search and the all-outputs filter", () => {
+    expect(
+      selectAllBody({ agentId: "ag-1", q: "   ", outputType: "all" }),
+    ).toEqual({ select_all: true, agent_id: "ag-1" });
+    expect(selectAllBody({ agentId: "ag-1" })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+    });
+  });
+});
+
+describe("convertTracesToTests for every trace the list matches", () => {
+  it("sends the filters instead of the ticked ids", async () => {
+    mockApiPost.mockResolvedValue({ created: 3, test_uuids: ["t1", "t2", "t3"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["stale-1"],
+      selectAll: { agentId: "ag-1", q: "refund", outputType: "response" },
+      type: "response",
+      evaluatorUuids: ["ev1"],
+    });
+
+    const body = mockApiPost.mock.calls[0][2];
+    expect(body).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      q: "refund",
+      output_type: "response",
+      type: "response",
+      evaluators: ["ev1"],
+    });
+    // The ticks are left out on purpose: the backend re-reads the rows, so a
+    // tick from a page that has since changed cannot slip through.
+    expect(body).not.toHaveProperty("trace_ids");
   });
 });
 

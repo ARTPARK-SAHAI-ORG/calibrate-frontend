@@ -33,6 +33,45 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+it("deletes every trace the list matches by sending its filters", async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ deleted: 40 }),
+  }) as unknown as typeof fetch;
+  const onDeleted = jest.fn();
+
+  const { result } = renderHook(() =>
+    useTraceDeletion({
+      traces,
+      onDeleted,
+      accessToken: "tok",
+      selectAll: { agentId: "ag-1", q: "refund", outputType: "response" },
+    }),
+  );
+
+  act(() => result.current.toggleSelectAll());
+  act(() => result.current.openBulkDeleteDialog());
+  await act(async () => {
+    await result.current.deleteItems();
+  });
+
+  // The ticked ids are not sent: the backend re-reads the rows from the
+  // filters, so the pages that were never loaded are included too.
+  expect(global.fetch).toHaveBeenCalledWith(
+    "http://localhost:8000/traces/bulk-delete",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({
+        select_all: true,
+        agent_id: "ag-1",
+        q: "refund",
+        output_type: "response",
+      }),
+    }),
+  );
+});
+
 it("bulk-deletes selected traces via POST /traces/bulk-delete with trace_ids", async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,

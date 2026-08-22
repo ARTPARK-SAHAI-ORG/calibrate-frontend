@@ -25,6 +25,41 @@ jest.mock("../../../lib/tracesApi", () => ({
     .convertTracesErrorMessage,
   convertTracesToTests: jest.fn(),
 }));
+jest.mock("../../evaluators/EvaluatorPromptPreview", () => ({
+  __esModule: true,
+  EvaluatorPromptPreview: ({
+    evaluatorUuid,
+  }: {
+    evaluatorUuid: string | null;
+  }) => <div data-testid="prompt-for">{evaluatorUuid ?? "none"}</div>,
+}));
+jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
+  __esModule: true,
+  // The whole making-an-evaluator journey has its own tests; here only the
+  // handing back of the created one matters.
+  CreateEvaluatorFlow: ({
+    open,
+    onCreated,
+  }: {
+    open: boolean;
+    onCreated: (evaluator: unknown) => void;
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() =>
+          onCreated({
+            uuid: "ev-made",
+            name: "Made just now",
+            evaluator_type: "llm",
+            is_default: false,
+          })
+        }
+      >
+        finish creating
+      </button>
+    ) : null,
+}));
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
   reportError: jest.fn(),
@@ -412,8 +447,9 @@ it("offers making an evaluator when none can judge this agent", async () => {
   expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Create evaluator" }));
 
+  // The making-an-evaluator journey opens over this dialog.
   expect(
-    screen.getByRole("heading", { name: "Add evaluator" }),
+    screen.getByRole("button", { name: "finish creating" }),
   ).toBeInTheDocument();
 });
 
@@ -426,4 +462,20 @@ it("says a reply, not an output, for a conversational agent", async () => {
       /Your workspace has none that score a reply in a conversation/,
     ),
   ).toBeInTheDocument();
+});
+
+it("ticks an evaluator made here and opens its prompt on the right", async () => {
+  const user = setupUser();
+  setup();
+  await waitFor(() =>
+    expect(screen.getByText("Correctness")).toBeInTheDocument(),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+  await user.click(screen.getByRole("button", { name: "finish creating" }));
+
+  expect(
+    screen.getByRole("checkbox", { name: "Select Made just now" }),
+  ).toBeChecked();
+  expect(screen.getByTestId("prompt-for")).toHaveTextContent("ev-made");
 });

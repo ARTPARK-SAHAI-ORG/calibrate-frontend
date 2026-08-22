@@ -13,6 +13,39 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   isDefaultEvaluator: (e: { is_default?: boolean | null }) => !!e.is_default,
   isOwnedEvaluator: (e: { is_default?: boolean | null }) => !e.is_default,
 }));
+jest.mock("../../evaluators/EvaluatorPromptPreview", () => ({
+  __esModule: true,
+  EvaluatorPromptPreview: ({ evaluatorUuid }: { evaluatorUuid: string | null }) => (
+    <div data-testid="prompt-for">{evaluatorUuid ?? "none"}</div>
+  ),
+}));
+jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
+  __esModule: true,
+  // The whole making-an-evaluator journey has its own tests; here only the
+  // handing back of the created one matters.
+  CreateEvaluatorFlow: ({
+    open,
+    onCreated,
+  }: {
+    open: boolean;
+    onCreated: (evaluator: unknown) => void;
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() =>
+          onCreated({
+            uuid: "ev-made",
+            name: "Made just now",
+            evaluator_type: "llm",
+            is_default: false,
+          })
+        }
+      >
+        finish creating
+      </button>
+    ) : null,
+}));
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
   reportError: jest.fn(),
@@ -143,7 +176,24 @@ it("offers making an evaluator when none can judge this agent", async () => {
 
   await user.click(screen.getByRole("button", { name: "Create evaluator" }));
 
+  // The making-an-evaluator journey opens over this dialog.
   expect(
-    screen.getByRole("heading", { name: "Add evaluator" }),
+    screen.getByRole("button", { name: "finish creating" }),
   ).toBeInTheDocument();
+});
+
+it("ticks an evaluator made here and opens its prompt on the right", async () => {
+  const user = setupUser();
+  setup();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+  await user.click(screen.getByRole("button", { name: "finish creating" }));
+
+  const box = screen.getByRole("checkbox", { name: "Select Made just now" });
+  expect(box).toBeChecked();
+  // Its prompt is what the right-hand column is showing.
+  expect(screen.getByTestId("prompt-for")).toHaveTextContent("ev-made");
 });

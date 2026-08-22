@@ -167,3 +167,42 @@ it("asks nothing without a signed-in token or with an empty list", async () => {
   expect(shown).toBe(false);
   expect(fetchAgentEvaluators).not.toHaveBeenCalled();
 });
+
+it("falls back to a plain label when the library cannot be read", async () => {
+  fetchAllEvaluators.mockRejectedValue(new Error("offline"));
+  const { result } = setup();
+
+  await act(async () => {
+    await result.current.promptFor(["ev-new"]);
+  });
+
+  expect(result.current.prompt).toEqual([
+    { uuid: "ev-new", name: "Evaluator" },
+  ]);
+});
+
+it("says which evaluators failed when the failure carries no message", async () => {
+  addEvaluatorsToAgent.mockRejectedValue("no message here");
+  const { result } = setup();
+
+  await act(async () => {
+    await result.current.promptFor(["ev-new"]);
+  });
+  await act(async () => {
+    await result.current.confirm();
+  });
+  expect(result.current.error).toBe("Failed to attach the evaluator");
+
+  fetchAllEvaluators.mockResolvedValue([
+    { uuid: "ev-new", name: "Tone check" },
+    { uuid: "ev-two", name: "Another" },
+  ]);
+  const two = setup();
+  await act(async () => {
+    await two.result.current.promptFor(["ev-new", "ev-two"]);
+  });
+  await act(async () => {
+    await two.result.current.confirm();
+  });
+  expect(two.result.current.error).toBe("Failed to attach the evaluators");
+});

@@ -36,6 +36,7 @@ import {
 } from "@/hooks";
 import {
   fetchTrace,
+  fetchTraces,
   type TraceDetail,
   type TraceOutputFilter,
 } from "@/lib/tracesApi";
@@ -280,6 +281,48 @@ export function TracesTabContent({
   };
 
   const selectionCount = everyTraceMatching ? total : selected.size;
+  // Which kind the whole matching list is, once it is asked for with the
+  // filter on All. Null until the counts come back, "mixed" when both kinds
+  // are in there. The counts are two cheap reads: a page of one row each,
+  // whose total is what is wanted.
+  const [wholeListKind, setWholeListKind] = useState<
+    "response" | "tool_call" | "mixed" | null
+  >(null);
+  const [isCheckingKinds, setIsCheckingKinds] = useState(false);
+  const wholeListKindOf = async (): Promise<
+    "response" | "tool_call" | "mixed" | null
+  > => {
+    if (!accessToken) return null;
+    if (wholeListKind) return wholeListKind;
+    setIsCheckingKinds(true);
+    try {
+      const [replies, toolCalls] = await Promise.all(
+        (["response", "tool_call"] as const).map((outputType) =>
+          fetchTraces(accessToken, {
+            limit: 1,
+            offset: 0,
+            agentId: agentUuid,
+            q: search,
+            outputType,
+          }),
+        ),
+      );
+      const kind =
+        replies.total > 0 && toolCalls.total > 0
+          ? "mixed"
+          : toolCalls.total > 0
+            ? "tool_call"
+            : "response";
+      setWholeListKind(kind);
+      return kind;
+    } catch (err) {
+      reportError("Error counting the kinds of trace:", err);
+      toast.error("Could not read the traces. Please try again.");
+      return null;
+    } finally {
+      setIsCheckingKinds(false);
+    }
+  };
   // Offered once everything on show is ticked and there are more pages behind
   // it. Deleting and adding to tests then work on the whole matching list.
   const canSelectEveryTrace =
@@ -292,6 +335,7 @@ export function TracesTabContent({
   // selection drops it rather than acting on rows the reader never saw.
   useEffect(() => {
     setEveryTraceMatching(false);
+    setWholeListKind(null);
   }, [search, outputFilter]);
   useEffect(() => {
     if (selected.size === 0) setEveryTraceMatching(false);
@@ -469,16 +513,26 @@ export function TracesTabContent({
                   <Button
                     size="sm"
                     variant="primary"
-                    onClick={() => {
-                      if (everyTraceMatching && outputFilter === "all") {
-                        // Nothing says the pages behind this one hold one kind
-                        // of output, and the two kinds make different tests.
-                        toast.error(
-                          "Filter the list to responses or to tool calls before adding every trace as tests.",
-                        );
+                    disabled={isCheckingKinds}
+                    onClick={async () => {
+                      if (!everyTraceMatching) {
+                        if (isMixedSelection) {
+                          toast.error(
+                            "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+                          );
+                          return;
+                        }
+                        setConvertOpen(true);
                         return;
                       }
-                      if (!everyTraceMatching && isMixedSelection) {
+                      // The pages behind this one are unread, so the backend
+                      // says what kinds they hold before anything is made.
+                      const kind =
+                        outputFilter === "all"
+                          ? await wholeListKindOf()
+                          : outputFilter;
+                      if (!kind) return;
+                      if (kind === "mixed") {
                         toast.error(
                           "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                         );
@@ -585,11 +639,24 @@ export function TracesTabContent({
         onClose={() => setConvertOpen(false)}
         accessToken={accessToken}
         traceUuids={Array.from(selected)}
-        selectAll={everyTraceMatching ? traceFilters : null}
+        selectAll={
+          everyTraceMatching
+            ? {
+                ...traceFilters,
+                // Only one kind of test is made per call, so an unfiltered
+                // list is pinned to the kind the counts found.
+                outputType:
+                  outputFilter === "all" && wholeListKind !== "mixed"
+                    ? (wholeListKind ?? "all")
+                    : outputFilter,
+              }
+            : null
+        }
         traceCount={selectionCount}
         testType={
           everyTraceMatching
-            ? outputFilter === "tool_call"
+            ? (outputFilter === "all" ? wholeListKind : outputFilter) ===
+              "tool_call"
               ? "tool_call"
               : isGeneral
                 ? "general"
