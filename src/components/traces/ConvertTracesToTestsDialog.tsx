@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
@@ -65,6 +66,7 @@ export function ConvertTracesToTestsDialog({
     preselectedUuids,
     isLoading: loading,
     error: loadError,
+    addEvaluator,
   } = useAgentLlmEvaluators({
     agentUuid,
     accessToken,
@@ -79,6 +81,7 @@ export function ConvertTracesToTestsDialog({
   const selectedEvaluators = pickedEvaluators ?? preselectedUuids;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -124,10 +127,19 @@ export function ConvertTracesToTestsDialog({
   };
 
   const count = traceUuids.length;
+  // Says what is needed, why nothing is on offer, and what to do about it.
+  const emptyEvaluatorMessage =
+    agentNature === "general"
+      ? "Each test needs at least one evaluator to score the agent's output. Your workspace has none that score a single output, so create one to continue."
+      : "Each test needs at least one evaluator to score the agent's reply. Your workspace has none that score a reply in a conversation, so create one to continue.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-6xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div
+        className={`bg-background rounded-xl w-full max-w-6xl flex flex-col shadow-2xl ${
+          needsEvaluator ? "max-h-[90vh] md:h-[85vh]" : "max-h-[85vh]"
+        }`}
+      >
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             Add {count} trace{count === 1 ? "" : "s"} to your tests
@@ -142,25 +154,40 @@ export function ConvertTracesToTestsDialog({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-5 md:p-6 flex flex-col gap-2">
           {needsEvaluator && loading ? (
             <LoadingState />
           ) : (
             <>
               {needsEvaluator ? (
-                <div className="space-y-2">
-                  <div className="text-sm font-semibold text-foreground">
-                    Evaluators
+                <div className="flex-1 min-h-0 flex flex-col gap-2">
+                  {evaluators.length > 0 && (
+                    <div className="text-sm font-semibold text-foreground">
+                      Evaluators
+                    </div>
+                  )}
+                  <div className="flex-1 min-h-0">
+                    <EvaluatorPicker
+                      evaluators={evaluators}
+                      selectedIds={selectedEvaluators}
+                      onToggle={(uuid) =>
+                        setPickedEvaluators((prev) =>
+                          toggle(prev ?? preselectedUuids, uuid),
+                        )
+                      }
+                      emptyMessage={emptyEvaluatorMessage}
+                      emptyAction={
+                        <button
+                          type="button"
+                          onClick={() => setCreateFlowOpen(true)}
+                          className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                        >
+                          Create evaluator
+                        </button>
+                      }
+                      fillHeight
+                    />
                   </div>
-                  <EvaluatorPicker
-                    evaluators={evaluators}
-                    selectedIds={selectedEvaluators}
-                    onToggle={(uuid) =>
-                      setPickedEvaluators((prev) =>
-                        toggle(prev ?? preselectedUuids, uuid),
-                      )
-                    }
-                  />
                 </div>
               ) : (
                 <p className="text-sm text-foreground">
@@ -198,6 +225,23 @@ export function ConvertTracesToTestsDialog({
           </button>
         </div>
       </div>
+
+      <CreateEvaluatorFlow
+        open={createFlowOpen}
+        onClose={() => setCreateFlowOpen(false)}
+        existingEvaluators={evaluators}
+        onCreated={(created) => {
+          addEvaluator(created);
+          // Ticking already started, so the new one has to join that set
+          // rather than the untouched default.
+          setPickedEvaluators((prev) =>
+            prev ? new Set(prev).add(created.uuid) : prev,
+          );
+          setCreateFlowOpen(false);
+        }}
+        // Single type only, so the flow skips the "what is this for?" step.
+        useCaseTypes={agentNature === "general" ? ["llm-general"] : ["llm"]}
+      />
     </div>
   );
 }

@@ -341,7 +341,10 @@ it("shows what the backend says went wrong, when it says", async () => {
 it("offers the output evaluators and sends a general conversion", async () => {
   const user = setupUser();
   mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
-  const { onConverted } = setup({ testType: "general", agentNature: "general" });
+  const { onConverted } = setup({
+    testType: "general",
+    agentNature: "general",
+  });
 
   await waitFor(() =>
     expect(evaluatorCheckbox("Output correctness")).toBeChecked(),
@@ -377,4 +380,37 @@ it("will not add a general conversion with no evaluator ticked", async () => {
 
   expect(screen.getByRole("button", { name: "Add to tests" })).toBeDisabled();
   expect(mockConvert).not.toHaveBeenCalled();
+});
+
+it("offers making an evaluator when none can judge this agent", async () => {
+  const user = setupUser();
+  mockFetchEvals.mockResolvedValue([]);
+  setup({ testType: "general", agentNature: "general" });
+
+  expect(
+    await screen.findByText(
+      /Your workspace has none that score a single output/,
+    ),
+  ).toBeInTheDocument();
+
+  // The reader is not sent away to another page to make one.
+  expect(screen.queryByText(/Evaluators page/)).not.toBeInTheDocument();
+  // The list heading has nothing under it, so it stays away.
+  expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+
+  expect(
+    screen.getByRole("heading", { name: "Add evaluator" }),
+  ).toBeInTheDocument();
+});
+
+it("says a reply, not an output, for a conversational agent", async () => {
+  mockFetchEvals.mockResolvedValue([]);
+  setup();
+
+  expect(
+    await screen.findByText(
+      /Your workspace has none that score a reply in a conversation/,
+    ),
+  ).toBeInTheDocument();
 });

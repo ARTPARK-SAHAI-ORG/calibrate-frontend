@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_LLM_GENERAL_SLUG,
   DEFAULT_LLM_NEXT_REPLY_SLUG,
@@ -31,6 +31,9 @@ export type UseAgentLlmEvaluatorsResult = {
   preselectedUuids: Set<string>;
   isLoading: boolean;
   error: string | null;
+  /** Put a just-created evaluator on the list and tick it, so a reader who
+   * makes one from an empty picker does not have to reopen the dialog. */
+  addEvaluator: (evaluator: EvaluatorData) => void;
 };
 
 /**
@@ -114,5 +117,12 @@ export function useAgentLlmEvaluators({
     };
   }, [enabled, accessToken, agentUuid, agentNature]);
 
-  return { evaluators, preselectedUuids, isLoading, error };
+  const addEvaluator = useCallback((evaluator: EvaluatorData) => {
+    setEvaluators((prev) =>
+      prev.some((e) => e.uuid === evaluator.uuid) ? prev : [...prev, evaluator],
+    );
+    setPreselectedUuids((prev) => new Set(prev).add(evaluator.uuid));
+  }, []);
+
+  return { evaluators, preselectedUuids, isLoading, error, addEvaluator };
 }

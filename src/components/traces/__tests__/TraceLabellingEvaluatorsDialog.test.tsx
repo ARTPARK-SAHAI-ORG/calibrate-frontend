@@ -116,3 +116,24 @@ it("cannot continue until an evaluator is picked", async () => {
 
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 });
+
+it("offers making an evaluator when none can judge this agent", async () => {
+  const user = setupUser();
+  mockFetchEvals.mockResolvedValue([]);
+  setup({ agentNature: "general" });
+
+  expect(
+    await screen.findByText(
+      /Your workspace has none that score a single output/,
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/Evaluators page/)).not.toBeInTheDocument();
+  // The list heading has nothing under it, so it stays away.
+  expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+
+  expect(
+    screen.getByRole("heading", { name: "Add evaluator" }),
+  ).toBeInTheDocument();
+});
