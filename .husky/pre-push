@@ -1,0 +1,19 @@
+# Codecov's patch check is blocking on PRs: changed lines must be covered by
+# tests. Catch that here instead of after the PR is opened.
+if [ -n "$SKIP_COVERAGE" ]; then
+  echo "SKIP_COVERAGE set — skipping the patch coverage check."
+  exit 0
+fi
+
+base=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base main HEAD 2>/dev/null)
+if [ -z "$base" ]; then
+  exit 0
+fi
+
+if [ -z "$(git diff --name-only "$base"...HEAD -- src)" ]; then
+  echo "No src/ changes — skipping the patch coverage check."
+  exit 0
+fi
+
+npm run test:coverage -- --silent || exit 1
+node scripts/check-patch-coverage.mjs
