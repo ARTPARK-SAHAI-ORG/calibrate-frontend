@@ -92,6 +92,25 @@ describe("RunEvaluatorsDialog", () => {
     expect(mockedApiClient).not.toHaveBeenCalled();
   });
 
+  it("warns that tool-call items will be skipped when some are chosen", async () => {
+    mockedApiClient.mockResolvedValue([]);
+    renderDialog({ toolCallSkipCount: 2 });
+    expect(
+      await screen.findByText(/2 of the chosen items are tool calls/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/AI judges do not run on tool calls/)).toBeInTheDocument();
+  });
+
+  it("shows no tool-call warning when none are chosen", async () => {
+    mockedApiClient.mockResolvedValue([]);
+    renderDialog({ toolCallSkipCount: 0 });
+    // let the fetch settle
+    await screen.findByText("Run evaluators");
+    expect(
+      screen.queryByText(/tool calls/),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows a load error parsed from a structured detail", async () => {
     mockedApiClient.mockRejectedValue(
       new Error('Request failed: 500 - {"detail":"Server exploded"}'),
