@@ -565,6 +565,11 @@ export function BenchmarkResultsDialog({
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
+  // The row checkboxes exist only to feed the "Submit for labelling" button,
+  // so they appear exactly when it does — never on a benchmark with nothing
+  // that can be labelled.
+  const showLabelling =
+    isDone && !error && hasAnyResults && hasLabellingEligibleTests;
 
   // Config for a rerun. When viewing a past benchmark the props are empty, so
   // fall back to what the loaded results carry: models from the model rows, the
@@ -664,11 +669,7 @@ export function BenchmarkResultsDialog({
               </div>
             )}
             {/* Submit for labelling — only shown when benchmark is done */}
-            {isDone &&
-              !error &&
-              hasAnyResults &&
-              hasLabellingEligibleTests &&
-              currentTaskId && (
+            {showLabelling && currentTaskId && (
                 <button
                   onClick={() => {
                     if (activeTab !== "outputs") {
@@ -677,20 +678,6 @@ export function BenchmarkResultsDialog({
                     if (labellingSelectedKeys.size === 0) {
                       toast.error(
                         "Select one or more tests to submit for labelling",
-                      );
-                      return;
-                    }
-                    const hasEligibleSelected = modelResults.some((mr) =>
-                      (mr.test_results ?? []).some(
-                        (tr, index) =>
-                          labellingSelectedKeys.has(
-                            benchmarkLabellingKey(mr.model, index),
-                          ) && isLabellingEligibleRaw(tr),
-                      ),
-                    );
-                    if (!hasEligibleSelected) {
-                      toast.error(
-                        "Tool-call tests can't be submitted for labelling",
                       );
                       return;
                     }
@@ -885,11 +872,15 @@ export function BenchmarkResultsDialog({
                   runEvaluators.map((e) => [e.uuid, e]),
                 )}
                 legacyDefaultEvaluator={defaultNextReplyEvaluator}
-                labellingSelection={isDone ? labellingSelectedKeys : undefined}
-                onToggleLabellingSelection={
-                  isDone ? toggleLabellingSelection : undefined
+                labellingSelection={
+                  showLabelling ? labellingSelectedKeys : undefined
                 }
-                onLabellingBulkToggle={isDone ? toggleLabellingBulk : undefined}
+                onToggleLabellingSelection={
+                  showLabelling ? toggleLabellingSelection : undefined
+                }
+                onLabellingBulkToggle={
+                  showLabelling ? toggleLabellingBulk : undefined
+                }
               />
             )}
           </div>

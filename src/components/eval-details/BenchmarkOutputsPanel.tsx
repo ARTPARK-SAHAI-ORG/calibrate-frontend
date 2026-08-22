@@ -149,6 +149,9 @@ function collectModelLabellingKeys(
   for (let index = 0; index < expectedCount; index++) {
     const testResult = modelResult.test_results?.[index];
     if (!testResult) continue;
+    // A tool-call test would always be skipped on submission, so it is not
+    // tickable and must not be swept up by a select-all either.
+    if (!isLabellingEligibleRaw(testResult)) continue;
     const status = benchmarkTestStatus(testResult);
     const testName = benchmarkTestName(testResult, index, testNames);
     if (!matchesBenchmarkFilters(status, testName, statusFilter, query)) continue;
@@ -415,7 +418,7 @@ export function BenchmarkOutputsPanel({
               <button
                 type="button"
                 onClick={() => onLabellingBulkToggle!(visibleLabellingKeys)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border border-border bg-muted/60 text-foreground hover:bg-muted"
+                className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border border-border bg-muted/60 text-foreground hover:bg-muted"
               >
                 <LabellingRowCheckbox checked={allVisibleLabellingSelected} />
                 {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
@@ -754,7 +757,7 @@ function ModelSection({
                   ? `Deselect all ${formatModelName(modelResult.model)} tests`
                   : `Select all ${formatModelName(modelResult.model)} tests`
               }
-              className="px-3 py-3 shrink-0 cursor-pointer"
+              className="hidden md:block px-3 py-3 shrink-0 cursor-pointer"
             >
               <LabellingRowCheckbox checked={modelAllSelected} />
             </button>
@@ -807,22 +810,28 @@ function ModelSection({
                           isSelected ? "bg-muted" : "hover:bg-muted/50"
                         }`}
                       >
-                        {showLabellingCheckboxes && onToggleLabellingSelection && (
-                          <button
-                            type="button"
-                            onClick={() => onToggleLabellingSelection(labellingKey)}
-                            title={
-                              labellingEligible
-                                ? "Select for labelling"
-                                : "Tool-call tests will be skipped when submitting for labelling"
-                            }
-                            className="cursor-pointer shrink-0"
-                          >
-                            <LabellingRowCheckbox
-                              checked={labellingSelection?.has(labellingKey) ?? false}
-                            />
-                          </button>
-                        )}
+                        {showLabellingCheckboxes &&
+                          onToggleLabellingSelection &&
+                          (labellingEligible ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onToggleLabellingSelection(labellingKey)
+                              }
+                              title="Select for labelling"
+                              className="hidden md:block cursor-pointer shrink-0"
+                            >
+                              <LabellingRowCheckbox
+                                checked={
+                                  labellingSelection?.has(labellingKey) ?? false
+                                }
+                              />
+                            </button>
+                          ) : (
+                            // Keeps every row's name starting at the same place
+                            // when only some of the tests are tickable.
+                            <span className="hidden md:block w-5 shrink-0" />
+                          ))}
                         <button
                           type="button"
                           onClick={() => onTestSelect(index)}

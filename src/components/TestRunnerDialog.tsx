@@ -298,6 +298,11 @@ export function TestRunnerDialog({
   const hasLabellingEligibleTests = rows.some((r) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
   );
+  // The row checkboxes exist only to feed the "Submit for labelling" button,
+  // so they appear exactly when it does — never on a run with nothing that
+  // can be labelled.
+  const showLabelling =
+    runStatus === "done" && rows.length > 0 && hasLabellingEligibleTests;
 
   // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
   // backend `evaluator_summary` block (only benchmarks do), so aggregate it
@@ -412,9 +417,7 @@ export function TestRunnerDialog({
                 />
               </div>
             )}
-            {runStatus === "done" &&
-              rows.length > 0 &&
-              hasLabellingEligibleTests && (
+            {showLabelling && (
                 <div className="hidden md:block">
                   <button
                     type="button"
@@ -425,19 +428,6 @@ export function TestRunnerDialog({
                       if (labellingSelectedIds.size === 0) {
                         toast.error(
                           "Select one or more tests to submit for labelling",
-                        );
-                        return;
-                      }
-                      const hasEligibleSelected = rows.some(
-                        (r) =>
-                          labellingSelectedIds.has(r.id) &&
-                          isLabellingEligibleRaw({
-                            test_case: r.testCase ?? null,
-                          }),
-                      );
-                      if (!hasEligibleSelected) {
-                        toast.error(
-                          "Tool-call tests can't be submitted for labelling",
                         );
                         return;
                       }
@@ -593,13 +583,13 @@ export function TestRunnerDialog({
                   evaluatorsByUuid={evaluatorsByUuid}
                   legacyDefaultEvaluator={defaultNextReplyEvaluator}
                   labellingSelection={
-                    runStatus === "done" ? labellingSelectedIds : undefined
+                    showLabelling ? labellingSelectedIds : undefined
                   }
                   onToggleLabellingSelection={
-                    runStatus === "done" ? toggleLabellingSelection : undefined
+                    showLabelling ? toggleLabellingSelection : undefined
                   }
                   onLabellingBulkToggle={
-                    runStatus === "done" ? toggleLabellingBulk : undefined
+                    showLabelling ? toggleLabellingBulk : undefined
                   }
                 />
               </div>

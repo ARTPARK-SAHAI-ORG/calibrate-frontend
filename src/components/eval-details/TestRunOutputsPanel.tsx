@@ -107,8 +107,12 @@ export function TestRunOutputsPanel({
   const isErrored = (r: TestRunResult) => !!r.error;
   const isLabellingEligible = (r: TestRunResult) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null });
+  // Only a finished test that can actually be submitted is tickable. A
+  // tool-call test would always be skipped, so it gets no checkbox at all
+  // rather than one that leads nowhere.
   const isLabellingSelectable = (r: TestRunResult) =>
-    r.status === "passed" || r.status === "failed" || isErrored(r);
+    isLabellingEligible(r) &&
+    (r.status === "passed" || r.status === "failed" || isErrored(r));
   const showLabellingCheckboxes = !!onToggleLabellingSelection;
 
   const query = searchQuery.trim().toLowerCase();
@@ -229,7 +233,7 @@ export function TestRunOutputsPanel({
             <button
               type="button"
               onClick={() => onLabellingBulkToggle(visibleSelectableIds)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="hidden md:block text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
             </button>
@@ -280,7 +284,7 @@ export function TestRunOutputsPanel({
                     type="button"
                     onClick={() => onLabellingBulkToggle(groupSelectableIds)}
                     title={groupAllSelected ? `Deselect all ${group.label.toLowerCase()}` : `Select all ${group.label.toLowerCase()}`}
-                    className="px-3 py-3 shrink-0 cursor-pointer"
+                    className="hidden md:block px-3 py-3 shrink-0 cursor-pointer"
                   >
                     <LabellingRowCheckbox checked={groupAllSelected} />
                   </button>
@@ -296,30 +300,35 @@ export function TestRunOutputsPanel({
                         selectedId === result.id ? "bg-muted" : "hover:bg-muted/50"
                       }`}
                     >
-                      {showLabellingCheckboxes && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isLabellingSelectable(result)) {
-                              onToggleLabellingSelection(result.id);
-                            }
-                          }}
-                          disabled={!isLabellingSelectable(result)}
-                          title={
-                            isLabellingSelectable(result)
-                              ? isLabellingEligible(result)
-                                ? "Select for labelling"
-                                : "Tool-call tests will be skipped when submitting for labelling"
-                              : "Available once the test completes"
-                          }
-                          className="cursor-pointer disabled:cursor-not-allowed shrink-0"
-                        >
-                          <LabellingRowCheckbox
-                            checked={labellingSelection?.has(result.id) ?? false}
+                      {showLabellingCheckboxes &&
+                        (isLabellingEligible(result) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isLabellingSelectable(result)) {
+                                onToggleLabellingSelection(result.id);
+                              }
+                            }}
                             disabled={!isLabellingSelectable(result)}
-                          />
-                        </button>
-                      )}
+                            title={
+                              isLabellingSelectable(result)
+                                ? "Select for labelling"
+                                : "Available once the test completes"
+                            }
+                            className="hidden md:block cursor-pointer disabled:cursor-not-allowed shrink-0"
+                          >
+                            <LabellingRowCheckbox
+                              checked={
+                                labellingSelection?.has(result.id) ?? false
+                              }
+                              disabled={!isLabellingSelectable(result)}
+                            />
+                          </button>
+                        ) : (
+                          // Keeps every row's name starting at the same place
+                          // when only some of the run's tests are tickable.
+                          <span className="hidden md:block w-5 shrink-0" />
+                        ))}
                       <button
                         type="button"
                         data-tour="run-result-row"
