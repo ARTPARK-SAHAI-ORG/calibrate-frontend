@@ -113,16 +113,29 @@ export function useBulkDeletion<T extends { uuid: string }>({
     };
   };
 
+  // Everything on show is ticked. Counted item by item rather than by size,
+  // because a list that pages can hold ticks from pages that are not on show.
   const allSelected =
-    hasSelectableItems && selectedUuids.size === eligibleItems.length;
+    hasSelectableItems &&
+    eligibleItems.every((item) => selectedUuids.has(item.uuid));
 
   const toggleSelectAll = () => {
-    if (selectedUuids.size === eligibleItems.length) {
-      setSelectedUuids(new Set());
-    } else {
-      setSelectedUuids(new Set(eligibleItems.map((i) => i.uuid)));
-    }
+    setSelectedUuids((prev) => {
+      const next = new Set(prev);
+      const onShow = eligibleItems.map((i) => i.uuid);
+      if (onShow.every((uuid) => next.has(uuid))) {
+        onShow.forEach((uuid) => next.delete(uuid));
+      } else {
+        onShow.forEach((uuid) => next.add(uuid));
+      }
+      return next;
+    });
   };
+
+  /** Tick a list of items outright, for "select every one of them" on a list
+   *  whose other pages are not loaded. */
+  const selectMany = (uuids: string[]) =>
+    setSelectedUuids((prev) => new Set([...prev, ...uuids]));
 
   /** Clear the selection without deleting — for a non-delete bulk action (e.g.
    *  convert-to-tests) that consumed the selection successfully. */
@@ -224,6 +237,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
     hasSelectableItems,
     checkboxProps,
     toggleSelectAll,
+    selectMany,
     clearSelection,
     deleteDialogOpen,
     itemToDelete,

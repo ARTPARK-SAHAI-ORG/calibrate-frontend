@@ -200,9 +200,14 @@ it("does not offer an agent picker", async () => {
       (b) =>
         !b.getAttribute("aria-label")?.startsWith("Select ") &&
         // Each evaluator row carries the button that opens its prompt.
-        !b.className.includes("flex-1 text-left"),
+        !b.className.includes("flex-1 text-left") &&
+        // The body carries the button that makes a new evaluator.
+        b.textContent !== "Create evaluator",
     ),
   ).toHaveLength(2);
+  expect(
+    screen.getByRole("button", { name: "Create evaluator" }),
+  ).toBeInTheDocument();
 });
 
 it("submits a response test with the selected evaluator", async () => {

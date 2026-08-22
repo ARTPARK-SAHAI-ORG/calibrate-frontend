@@ -64,7 +64,7 @@ describe("EvaluatorPicker", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(2);
   });
 
-  it("puts the box level with the name when the row has no description", () => {
+  it("puts the box level with the name, description or not", () => {
     setup({
       evaluators: [
         evaluator({
@@ -76,11 +76,14 @@ describe("EvaluatorPicker", () => {
       ],
     });
 
+    // Both boxes sit centred in a box the height of one line of the name, so
+    // the description underneath one of them changes nothing.
     const [withText, withoutText] = screen.getAllByRole("checkbox");
-    expect(withText.parentElement).toHaveClass("items-start");
-    expect(withText).toHaveClass("mt-0.5");
-    expect(withoutText.parentElement).toHaveClass("items-center");
-    expect(withoutText).not.toHaveClass("mt-0.5");
+    for (const box of [withText, withoutText]) {
+      expect(box.parentElement).toHaveClass("h-5", "items-center");
+      expect(box).not.toHaveClass("mt-0.5");
+      expect(box.parentElement?.parentElement).toHaveClass("items-start");
+    }
   });
 
   it("narrows the list as the user searches", async () => {

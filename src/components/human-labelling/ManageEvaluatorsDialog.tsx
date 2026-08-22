@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
   EVALUATOR_TYPE_LABELS,
   type EvaluatorType,
@@ -65,6 +66,7 @@ export function ManageEvaluatorsDialog({
     new Set(currentOptionalIds),
   );
   const [search, setSearch] = useState("");
+  const [createFlowOpen, setCreateFlowOpen] = useState(false);
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -325,29 +327,40 @@ export function ManageEvaluatorsDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
             {/* Left column: catalogue with checkboxes */}
             <div className="flex flex-col gap-2 min-w-0">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                    />
-                  </svg>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg
+                      className="w-4 h-4 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search evaluators"
+                    className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search evaluators"
-                  className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                />
+                {/* Nothing that fits yet: make one here rather than leaving and
+                    losing the changes on this task. */}
+                <button
+                  type="button"
+                  onClick={() => setCreateFlowOpen(true)}
+                  className="h-9 px-3 shrink-0 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  New evaluator
+                </button>
               </div>
 
               <div className="border border-border rounded-md max-h-80 overflow-y-auto divide-y divide-border">
@@ -390,18 +403,16 @@ export function ManageEvaluatorsDialog({
                     return (
                       <label
                         key={ev.uuid}
-                        className={`flex gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer ${
-                          ev.description ? "items-start" : "items-center"
-                        }`}
+                        className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggle(ev.uuid)}
-                          className={`w-4 h-4 cursor-pointer accent-foreground ${
-                            ev.description ? "mt-0.5" : ""
-                          }`}
-                        />
+                        <span className="flex h-5 items-center flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggle(ev.uuid)}
+                            className="w-4 h-4 cursor-pointer accent-foreground"
+                          />
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
                             {ev.name}
@@ -476,9 +487,6 @@ export function ManageEvaluatorsDialog({
                             d="M4 6h16M4 12h16M4 18h16"
                           />
                         </svg>
-                        <span className="text-xs text-muted-foreground tabular-nums w-4 text-right flex-shrink-0">
-                          {idx + 1}
-                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
                             {ev?.name ?? uuid.slice(0, 8)}
@@ -575,6 +583,26 @@ export function ManageEvaluatorsDialog({
           </button>
         </div>
       </div>
+
+      <CreateEvaluatorFlow
+        open={createFlowOpen}
+        onClose={() => setCreateFlowOpen(false)}
+        existingEvaluators={evaluators}
+        // A task judges one kind of thing, so the flow skips asking what for.
+        useCaseTypes={taskType ? [taskType] : undefined}
+        onCreated={(created) => {
+          setCreateFlowOpen(false);
+          setEvaluators((prev) => [
+            { ...created, evaluator_type: taskType ?? created.evaluator_type },
+            ...prev,
+          ]);
+          // Made for this task, so it starts ticked and joins the order.
+          setSelectedIds((prev) => new Set(prev).add(created.uuid));
+          setOrderedSelected((prev) =>
+            prev.includes(created.uuid) ? prev : [...prev, created.uuid],
+          );
+        }}
+      />
     </div>
   );
 }

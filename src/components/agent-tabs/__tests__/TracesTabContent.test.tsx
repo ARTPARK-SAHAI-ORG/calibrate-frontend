@@ -32,8 +32,11 @@ jest.mock("../../../hooks", () => ({
 }));
 
 const fetchTrace = jest.fn();
+const fetchTraces = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
+  fetchTraces: (...args: unknown[]) => fetchTraces(...args),
+  MAX_TRACES_PAGE_SIZE: 200,
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -433,6 +436,70 @@ describe("TracesTabContent", () => {
 
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("trace selected")).toBeInTheDocument();
+  });
+
+  it("ticks every trace across the pages, not just the one on show", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" }), trace({ uuid: "trace-2" })], {
+        total: 5,
+        hasNext: true,
+      }),
+    );
+    fetchTraces.mockResolvedValue({
+      items: ["trace-1", "trace-2", "trace-3", "trace-4", "trace-5"].map(
+        (uuid) => ({ uuid }),
+      ),
+      total: 5,
+      limit: 200,
+      offset: 0,
+    });
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    expect(screen.getByText("2")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Select all 5 traces"));
+
+    await waitFor(() => expect(screen.getByText("5")).toBeInTheDocument());
+    expect(fetchTraces).toHaveBeenCalledWith("test-token", {
+      limit: 200,
+      offset: 0,
+      agentId: "agent-1",
+      q: "",
+      outputType: "all",
+    });
+    // Everything is ticked, so there is nothing left to offer.
+    expect(screen.queryByText("Select all 5 traces")).not.toBeInTheDocument();
+  });
+
+  it("says so and keeps the ticks when the other pages cannot be read", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    fetchTraces.mockRejectedValue(new Error("offline"));
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not select every trace. Please try again.",
+      ),
+    );
+    expect(reportError).toHaveBeenCalled();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("does not offer to tick every trace when they all fit on one page", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+
+    expect(screen.queryByText(/^Select all \d+ trace/)).not.toBeInTheDocument();
   });
 
   it("says nothing matched the filter instead of showing the setup steps", async () => {

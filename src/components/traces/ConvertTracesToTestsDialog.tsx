@@ -87,6 +87,9 @@ export function ConvertTracesToTestsDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  // The evaluator made from inside this dialog, so its prompt opens on the
+  // right as well as its box being ticked.
+  const [createdUuid, setCreatedUuid] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -179,8 +182,19 @@ export function ConvertTracesToTestsDialog({
               {needsEvaluator ? (
                 <div className="flex-1 min-h-0 flex flex-col gap-2">
                   {evaluators.length > 0 && (
-                    <div className="text-sm font-semibold text-foreground">
-                      Evaluators
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-foreground">
+                        Evaluators
+                      </div>
+                      {/* The same offer the empty picker makes, kept in reach
+                          once there is a list to read. */}
+                      <button
+                      type="button"
+                      onClick={() => setCreateFlowOpen(true)}
+                      className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                    >
+                      Create evaluator
+                    </button>
                     </div>
                   )}
                   <div className="flex-1 min-h-0">
@@ -202,6 +216,7 @@ export function ConvertTracesToTestsDialog({
                           Create evaluator
                         </button>
                       }
+                      previewUuid={createdUuid}
                       fillHeight
                     />
                   </div>
@@ -249,6 +264,7 @@ export function ConvertTracesToTestsDialog({
         existingEvaluators={evaluators}
         onCreated={(created) => {
           addEvaluator(created);
+          setCreatedUuid(created.uuid);
           // Ticking already started, so the new one has to join that set
           // rather than the untouched default.
           setPickedEvaluators((prev) =>

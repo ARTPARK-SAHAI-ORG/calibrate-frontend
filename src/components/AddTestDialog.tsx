@@ -30,6 +30,7 @@ import {
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
+import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -1419,6 +1420,9 @@ export function AddTestDialog({
     useState(false);
   // All available LLM evaluators (defaults + user-owned), used by the picker
   // and for resolving the default-correctness evaluator on init.
+  // Making an evaluator without leaving the test being written. What it is
+  // offered for follows the tab, so the flow skips the "what is this for?" step.
+  const [createEvaluatorOpen, setCreateEvaluatorOpen] = useState(false);
   const [availableLLMEvaluators, setAvailableLLMEvaluators] = useState<
     LLMEvaluatorOption[]
   >([]);
@@ -3844,19 +3848,6 @@ export function AddTestDialog({
                         </label>
                         {!isLabelItem &&
                           (() => {
-                            const remainingOptions =
-                              availableLLMEvaluators.filter(
-                                (o) =>
-                                  !attachedEvaluators.some(
-                                    (a) => a.evaluator_uuid === o.uuid,
-                                  ) &&
-                                  (activeTab === "conversation"
-                                    ? o.evaluator_type ===
-                                      CONVERSATION_EVALUATOR_TYPE
-                                    : o.evaluator_type ===
-                                      nextReplyEvaluatorType),
-                              );
-                            const noOptionsLeft = remainingOptions.length === 0;
                             return (
                               <button
                                 onClick={() => {
@@ -3958,22 +3949,20 @@ export function AddTestDialog({
                                   return (
                                     <label
                                       key={o.uuid}
-                                      className={`flex gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer ${
-                                        o.description
-                                          ? "items-start"
-                                          : "items-center"
-                                      }`}
+                                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() =>
-                                          toggleEvaluatorPickerSelection(o.uuid)
-                                        }
-                                        className={`w-4 h-4 cursor-pointer accent-foreground ${
-                                          o.description ? "mt-0.5" : ""
-                                        }`}
-                                      />
+                                      <span className="flex h-5 items-center flex-shrink-0">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() =>
+                                            toggleEvaluatorPickerSelection(
+                                              o.uuid,
+                                            )
+                                          }
+                                          className="w-4 h-4 cursor-pointer accent-foreground"
+                                        />
+                                      </span>
                                       <div className="min-w-0 flex-1">
                                         <div className="text-sm font-medium text-foreground">
                                           {o.name}
@@ -4010,7 +3999,17 @@ export function AddTestDialog({
                                 );
                               })()}
                             </div>
-                            <div className="flex items-center justify-end gap-2 border-t border-border p-2 bg-background">
+                            <div className="flex items-center justify-between gap-2 border-t border-border p-2 bg-background">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  closeEvaluatorPicker();
+                                  setCreateEvaluatorOpen(true);
+                                }}
+                                className="h-8 px-3 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                              >
+                                Create evaluator
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5685,6 +5684,33 @@ export function AddTestDialog({
           </div>
         </div>
       )}
+
+      {/* Making an evaluator from inside the test: the new one is attached to
+          the test straight away, so the reader is back where they were. */}
+      <CreateEvaluatorFlow
+        open={createEvaluatorOpen}
+        onClose={() => setCreateEvaluatorOpen(false)}
+        existingEvaluators={availableLLMEvaluators}
+        useCaseTypes={[
+          activeTab === "conversation"
+            ? CONVERSATION_EVALUATOR_TYPE
+            : nextReplyEvaluatorType,
+        ]}
+        onCreated={(created) => {
+          setCreateEvaluatorOpen(false);
+          const option: LLMEvaluatorOption = {
+            uuid: created.uuid,
+            name: created.name,
+            description: created.description ?? undefined,
+            slug: created.slug ?? null,
+            is_default: created.is_default ?? false,
+            variables: created.live_version?.variables ?? [],
+            evaluator_type: created.evaluator_type,
+          };
+          setAvailableLLMEvaluators((prev) => [...prev, option]);
+          attachEvaluatorsFromOptions([option]);
+        }}
+      />
     </div>
   );
 }

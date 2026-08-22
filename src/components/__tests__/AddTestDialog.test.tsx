@@ -21,6 +21,44 @@ beforeAll(() => {
 // preview). Stub it with a couple of buttons so tests can deterministically
 // drive "select an inbuilt tool" / "select a custom tool" without depending
 // on its internal search/filter logic.
+// Making an evaluator is its own multi-step journey with its own tests; here
+// only the handing back of the created one matters.
+jest.mock("../evaluators/CreateEvaluatorFlow", () => ({
+  __esModule: true,
+  CreateEvaluatorFlow: ({
+    open,
+    onCreated,
+    useCaseTypes,
+  }: {
+    open: boolean;
+    onCreated: (evaluator: unknown) => void;
+    useCaseTypes?: string[];
+  }) =>
+    open ? (
+      <div data-testid="create-evaluator-flow">
+        <span data-testid="create-evaluator-types">
+          {(useCaseTypes ?? []).join(",")}
+        </span>
+        <button
+          type="button"
+          onClick={() =>
+            onCreated({
+              uuid: "ev-made",
+              name: "Made just now",
+              description: null,
+              slug: null,
+              is_default: false,
+              evaluator_type: "llm",
+              live_version: { variables: [] },
+            })
+          }
+        >
+          finish creating
+        </button>
+      </div>
+    ) : null,
+}));
+
 jest.mock("../ToolPicker", () => ({
   __esModule: true,
   ToolPicker: ({
@@ -653,6 +691,36 @@ describe("AddTestDialog", () => {
       expect(
         screen.queryByPlaceholderText("Search evaluators"),
       ).not.toBeInTheDocument();
+    });
+
+    it("makes an evaluator from the picker and attaches it to the test", async () => {
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Add evaluator" }));
+      await user.click(
+        screen.getByRole("button", { name: "Create evaluator" }),
+      );
+
+      // The picker closes behind the flow, which is offered the kind this tab
+      // needs so it can skip asking what the evaluator is for.
+      expect(
+        screen.queryByPlaceholderText("Search evaluators"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("create-evaluator-types")).toHaveTextContent(
+        "llm",
+      );
+
+      await user.click(screen.getByRole("button", { name: "finish creating" }));
+
+      // The new evaluator is on the test straight away.
+      expect(screen.getByText("Made just now")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Remove Made just now" }),
+      ).toBeInTheDocument();
     });
 
     it("removes an attached evaluator", async () => {

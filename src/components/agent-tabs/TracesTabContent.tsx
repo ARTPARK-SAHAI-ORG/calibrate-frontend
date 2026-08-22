@@ -36,6 +36,8 @@ import {
 } from "@/hooks";
 import {
   fetchTrace,
+  fetchTraces,
+  MAX_TRACES_PAGE_SIZE,
   type TraceDetail,
   type TraceOutputFilter,
 } from "@/lib/tracesApi";
@@ -267,6 +269,41 @@ export function TracesTabContent({
     );
   };
 
+  // Ticking every trace the search matches, not just the page on show. The
+  // trace actions all take a list of ids, so the ids for the other pages are
+  // read here (the backend caps a page at MAX_TRACES_PAGE_SIZE) before the
+  // reader can act on them.
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const pageFullySelected = deletion.allSelected && items.length > 0;
+  const canSelectEveryTrace =
+    pageFullySelected && !isSelectingAll && selected.size < total;
+  const selectEveryTrace = async () => {
+    if (!accessToken) return;
+    setIsSelectingAll(true);
+    try {
+      const uuids: string[] = [];
+      for (let from = 0; from < total; from += MAX_TRACES_PAGE_SIZE) {
+        const page = await fetchTraces(accessToken, {
+          limit: MAX_TRACES_PAGE_SIZE,
+          offset: from,
+          agentId: agentUuid,
+          q: search,
+          outputType: outputFilter,
+        });
+        uuids.push(...page.items.map((item) => item.uuid));
+        // The list shrank while it was being read (a delete elsewhere), so
+        // there is nothing more to ask for.
+        if (page.items.length === 0) break;
+      }
+      deletion.selectMany(uuids);
+    } catch (err) {
+      reportError("Error selecting every trace:", err);
+      toast.error("Could not select every trace. Please try again.");
+    } finally {
+      setIsSelectingAll(false);
+    }
+  };
+
   /** Untick only the traces that were actually submitted. */
   const clearSubmitted = () => {
     const submitted = new Set(submittedUuids);
@@ -418,6 +455,21 @@ export function TracesTabContent({
                   </>
                 )}
               </span>
+              {canSelectEveryTrace && (
+                <button
+                  type="button"
+                  onClick={selectEveryTrace}
+                  className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Select all {total} trace{total === 1 ? "" : "s"}
+                  {search.trim() ? ` matching "${search.trim()}"` : ""}
+                </button>
+              )}
+              {isSelectingAll && (
+                <span className="text-sm text-muted-foreground">
+                  Selecting every trace...
+                </span>
+              )}
               {selected.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -475,7 +527,7 @@ export function TracesTabContent({
               </p>
             </div>
           ) : (
-            <div className="space-y-1 pt-4">
+            <div className="space-y-1 pt-1">
               <ServerPaginatedListBar
                 total={total}
                 offset={offset}

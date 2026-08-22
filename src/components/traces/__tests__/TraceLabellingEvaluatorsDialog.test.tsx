@@ -83,15 +83,22 @@ it("offers exactly two actions", async () => {
   await waitFor(() =>
     expect(screen.getByText("Correctness")).toBeInTheDocument(),
   );
-  // Footer keeps exactly the two actions. Each evaluator row also carries a
-  // button, the one that opens its prompt on the right.
+  // Footer keeps exactly the two actions. The body also carries the button
+  // that makes a new evaluator, and each row the one that opens its prompt.
   expect(
     screen
       .getAllByRole("button")
-      .filter((b) => !b.className.includes("flex-1 text-left")),
+      .filter(
+        (b) =>
+          !b.className.includes("flex-1 text-left") &&
+          b.textContent !== "Create evaluator",
+      ),
   ).toHaveLength(2);
   expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Create evaluator" }),
+  ).toBeInTheDocument();
 });
 
 it("hands back the picked evaluators", async () => {

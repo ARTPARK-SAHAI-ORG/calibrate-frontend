@@ -410,18 +410,16 @@ export function AssignAnnotatorsDialog({
                     return (
                       <label
                         key={ev.uuid}
-                        className={`flex gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer ${
-                          ev.description ? "items-start" : "items-center"
-                        }`}
+                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleEvaluator(ev.uuid)}
-                          className={`w-4 h-4 accent-foreground cursor-pointer ${
-                            ev.description ? "mt-0.5" : ""
-                          }`}
-                        />
+                        <span className="flex h-5 items-center flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleEvaluator(ev.uuid)}
+                            className="w-4 h-4 accent-foreground cursor-pointer"
+                          />
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
                             {ev.name}
