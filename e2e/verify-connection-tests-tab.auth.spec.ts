@@ -16,7 +16,7 @@
 //   npm run test:e2e:integration  (sets E2E_FAKE_AI=1)
 // otherwise every test here is SKIPPED.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady, workspacePath } from "./helpers";
+import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -180,7 +180,7 @@ async function createNextReplyTestOnAgent(
   await expect(
     page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 15000 });
-  await page.getByText("Next reply test", { exact: true }).first().click();
+  await chooseTestType(page);
 
   const nameInput = page.getByPlaceholder(/Your .* name/i).first();
   await expect(nameInput).toBeVisible({ timeout: 15000 });

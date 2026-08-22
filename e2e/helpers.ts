@@ -80,3 +80,21 @@ export async function openWorkspaceSettings(
     await page.getByRole("button", { name: tab, exact: true }).click();
   }
 }
+
+/**
+ * Pick a test type in the "Create a test" dialog and move on to the editor.
+ *
+ * Choosing a type is two steps: click the card on the left, then click "Next"
+ * in the footer. Both are found by the attributes on the markup rather than by
+ * the words on screen, so rewording the cards does not break every spec that
+ * creates a test.
+ */
+export async function chooseTestType(
+  page: Page,
+  type: "next-reply" | "tool-invocation" | "conversation" = "next-reply",
+): Promise<void> {
+  await page
+    .locator(`[data-tour="test-type-options-list"] [data-test-type="${type}"]`)
+    .click();
+  await page.locator('[data-tour="test-type-next"]').click();
+}

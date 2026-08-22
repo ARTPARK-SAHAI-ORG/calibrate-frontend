@@ -12,7 +12,7 @@
 // its Tools / Tests / Evaluators / Settings / Connection tab content), and
 // agent deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady, workspacePath } from "./helpers";
+import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Create an agent through the "New agent" dialog and land on its detail page.
@@ -156,8 +156,8 @@ test.describe("Agent detail (authenticated, real backend)", () => {
       page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 15000 });
     // Choose a type to run the seeding effect (agent evaluators seed the new
-    // test). The intro box title is "Next reply test".
-    await page.getByText("Next reply test", { exact: true }).first().click();
+    // test).
+    await chooseTestType(page);
     // Editor mounted: it shows a name input placeholder like "Your test name".
     await expect(page.getByPlaceholder(/Your .* name/i).first()).toBeVisible({
       timeout: 15000,

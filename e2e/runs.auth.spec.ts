@@ -17,7 +17,7 @@
 //   E2E_FAKE_AI=1 NEXT_PUBLIC_BACKEND_URL=http://localhost:8001 \
 //     npx playwright test --project=authenticated runs.auth
 import { test, expect } from "./fixtures";
-import { waitForOrgReady, workspacePath } from "./helpers";
+import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -153,7 +153,7 @@ async function createNextReplyTestOnAgent(
   await expect(
     page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 15000 });
-  await page.getByText("Next reply test", { exact: true }).first().click();
+  await chooseTestType(page);
 
   const nameInput = page.getByPlaceholder(/Your .* name/i).first();
   await expect(nameInput).toBeVisible({ timeout: 15000 });

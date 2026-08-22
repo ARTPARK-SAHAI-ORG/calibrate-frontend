@@ -12,7 +12,7 @@
 //
 // Run with `npm run test:e2e:integration` (needs a backend, see e2e/README.md).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { chooseTestType, waitForOrgReady } from "./helpers";
 
 test.describe("Tests page (authenticated, real backend)", () => {
   test("opens the Create test dialog through to the editor, then closes", async ({
@@ -32,16 +32,18 @@ test.describe("Tests page (authenticated, real backend)", () => {
     await page.getByRole("button", { name: "Create test" }).first().click();
 
     // Phase 1: the two-phase create flow opens on a centred type picker.
-    // Heading "Create a test" + label "Select the type of test" are from the
-    // intro block in AddTestDialog.tsx (~line 2935).
+    // Heading "Create a test" + the label above the type cards are from the
+    // type-picker block in AddTestDialog.tsx.
     await expect(
       page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText("Select the type of test")).toBeVisible();
+    await expect(
+      page.getByText("Select what you want to test about the agent"),
+    ).toBeVisible();
 
-    // Pick the "Next reply test" card (TEST_TYPE_OPTIONS[0].title) to animate
-    // into the full editor. This mounts the bulk of AddTestDialog.
-    await page.getByRole("button", { name: "Next reply test" }).click();
+    // Pick the next-reply card, then "Next", to animate into the full editor.
+    // This mounts the bulk of AddTestDialog.
+    await chooseTestType(page);
 
     // Phase 2: the editor. The next-reply/evaluator tab renders a "Test name"
     // label + input with placeholder "Your test name" (AddTestDialog.tsx
@@ -52,9 +54,9 @@ test.describe("Tests page (authenticated, real backend)", () => {
     await nameInput.fill(name);
     await expect(nameInput).toHaveValue(name);
 
-    // Close via the editor footer's "Back" button — it calls onClose directly
+    // Close via the editor's X in the top-right — it calls onClose directly
     // (no discard-changes guard), which unmounts the dialog.
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(nameInput).toHaveCount(0, { timeout: 15000 });
   });
 
@@ -191,8 +193,8 @@ test.describe("Tests page (authenticated, real backend)", () => {
       page.getByRole("heading", { name: "Create a test", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    // Into the full editor via the "Next reply test" card (TEST_TYPE_OPTIONS[0]).
-    await page.getByRole("button", { name: "Next reply test" }).click();
+    // Into the full editor via the next-reply card, then "Next".
+    await chooseTestType(page);
 
     const nameInput = page.getByPlaceholder("Your test name");
     await expect(nameInput).toBeVisible({ timeout: 20000 });

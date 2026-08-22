@@ -13,7 +13,7 @@
 // keys/cost); they SKIP unless E2E_FAKE_AI=1, which `npm run test:e2e:integration`
 // sets. Run with that command (see e2e/README.md / CLAUDE.md).
 import { test, expect } from "./fixtures";
-import { waitForOrgReady, workspacePath } from "./helpers";
+import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -134,7 +134,7 @@ async function createStandaloneTest(page: Page, name: string): Promise<void> {
   await expect(
     page.getByRole("heading", { name: "Create a test", exact: true }),
   ).toBeVisible({ timeout: 20000 });
-  await page.getByRole("button", { name: "Next reply test" }).click();
+  await chooseTestType(page);
 
   const nameInput = page.getByPlaceholder("Your test name");
   await expect(nameInput).toBeVisible({ timeout: 20000 });
