@@ -4,6 +4,24 @@ const STORAGE_KEY = "sidebarOpen";
 
 const isDesktop = () => window.innerWidth >= 768;
 
+/** The remembered choice, or null when there is none or storage is blocked. */
+const readSaved = (): boolean | null => {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    return saved === null ? null : saved === "true";
+  } catch {
+    return null;
+  }
+};
+
+const writeSaved = (open: boolean): void => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, String(open));
+  } catch {
+    // Storage is blocked, so the choice lasts for this page only.
+  }
+};
+
 /**
  * Hook to manage sidebar state based on screen size.
  * Desktop (>=768px): open by default, unless the reader has opened or closed
@@ -21,31 +39,27 @@ export const useSidebarState = (
 ): [boolean, React.Dispatch<React.SetStateAction<boolean>>] => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialized, setInitialized] = useState(false);
-  const openRef = useRef(false);
-
-  useEffect(() => {
-    openRef.current = sidebarOpen;
-  }, [sidebarOpen]);
+  const changedByReader = useRef(false);
 
   useEffect(() => {
     if (initialized) return;
     const desktop = isDesktop();
-    const saved = desktop ? localStorage.getItem(STORAGE_KEY) : null;
-    setSidebarOpen(
-      saved !== null ? saved === "true" : desktop && openOnDesktop,
-    );
+    const saved = desktop ? readSaved() : null;
+    setSidebarOpen(saved ?? (desktop && openOnDesktop));
     setInitialized(true);
   }, [initialized, openOnDesktop]);
+
+  // Remember only what the reader chose, so a page that starts closed does not
+  // save that as their choice.
+  useEffect(() => {
+    if (changedByReader.current && isDesktop()) writeSaved(sidebarOpen);
+  }, [sidebarOpen]);
 
   const setAndRemember = useCallback<
     React.Dispatch<React.SetStateAction<boolean>>
   >((value) => {
-    const next =
-      typeof value === "function"
-        ? (value as (prev: boolean) => boolean)(openRef.current)
-        : value;
-    if (isDesktop()) localStorage.setItem(STORAGE_KEY, String(next));
-    setSidebarOpen(next);
+    changedByReader.current = true;
+    setSidebarOpen(value);
   }, []);
 
   return [sidebarOpen, setAndRemember];

@@ -99,4 +99,40 @@ describe("useSidebarState", () => {
     expect(result.current[0]).toBe(true);
     expect(localStorage.getItem("sidebarOpen")).toBe("true");
   });
+
+  it("keeps both toggles when two arrive together", () => {
+    setInnerWidth(1024);
+    const { result } = renderHook(() => useSidebarState());
+    act(() => {
+      result.current[1]((prev) => !prev);
+      result.current[1]((prev) => !prev);
+    });
+    expect(result.current[0]).toBe(true);
+  });
+
+  it("still works when the browser blocks saving", () => {
+    setInnerWidth(1024);
+    const getItem = jest
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    const setItem = jest
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+
+    try {
+      const { result } = renderHook(() => useSidebarState());
+      expect(result.current[0]).toBe(true);
+      act(() => {
+        result.current[1](false);
+      });
+      expect(result.current[0]).toBe(false);
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
 });
