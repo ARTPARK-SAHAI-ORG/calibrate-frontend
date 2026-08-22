@@ -1598,6 +1598,7 @@ export function AgentDetail({
       )}
 
       <VerifyRequestPreviewDialog
+        agentNature={agent.interaction_type ?? "conversation"}
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}

@@ -4,6 +4,7 @@ import {
   convertTracesToTests,
   convertTracesErrorMessage,
   validateApiKeyForAgent,
+  traceInputTurns,
   MAX_TRACES_PAGE_SIZE,
 } from "../tracesApi";
 import { apiGet, apiPost } from "../api";
@@ -205,6 +206,22 @@ describe("convertTracesToTests", () => {
     expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
   });
 
+  it("shapes a general conversion the same way, with its own type", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "general",
+      evaluatorUuids: ["ev1"],
+    });
+
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/traces/convert-to-tests",
+      "tok",
+      { trace_ids: ["a"], type: "general", evaluators: ["ev1"] },
+    );
+  });
+
   it("sends accept_any_arguments only for tool_call and omits empty evaluators", async () => {
     mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
 
@@ -281,5 +298,24 @@ describe("convertTracesErrorMessage", () => {
       convertTracesErrorMessage(new Error("Request failed: 500 - {oops")),
     ).toBeNull();
     expect(convertTracesErrorMessage(failure({ other: 1 }))).toBeNull();
+  });
+});
+
+describe("traceInputTurns", () => {
+  it("keeps a stored conversation as it is", () => {
+    const turns = [{ role: "user", content: "Hi" }];
+    expect(traceInputTurns(turns)).toBe(turns);
+  });
+
+  it("reads plain text as the one user turn it stands for", () => {
+    expect(traceInputTurns("When is the next vaccination?")).toEqual([
+      { role: "user", content: "When is the next vaccination?" },
+    ]);
+  });
+
+  it("gives nothing back for empty text or a missing input", () => {
+    expect(traceInputTurns("   ")).toEqual([]);
+    expect(traceInputTurns(null)).toEqual([]);
+    expect(traceInputTurns(undefined)).toEqual([]);
   });
 });

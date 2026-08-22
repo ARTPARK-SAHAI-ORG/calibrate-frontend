@@ -31,6 +31,14 @@ const EVALUATORS = [
   { uuid: "ev-custom", name: "My Judge", evaluator_type: "llm" },
   { uuid: "ev-conv", name: "Conversation", evaluator_type: "conversation" },
   {
+    uuid: "ev-general-default",
+    name: "Correctness",
+    evaluator_type: "llm-general",
+    is_default: true,
+    source_default_slug: "default-llm-general",
+  },
+  { uuid: "ev-general", name: "Tone", evaluator_type: "llm-general" },
+  {
     uuid: "ev-vars",
     name: "Needs Variables",
     evaluator_type: "llm",
@@ -148,5 +156,26 @@ it("reads as still loading while there is no sign-in yet, then loads when it lan
   expect(result.current.evaluators.map((e) => e.uuid)).toEqual([
     "ev-default",
     "ev-custom",
+  ]);
+});
+
+it("offers the output evaluators for a general agent", async () => {
+  const { result } = setup({ agentNature: "general" });
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+  expect(result.current.evaluators.map((e) => e.uuid)).toEqual([
+    "ev-general-default",
+    "ev-general",
+  ]);
+});
+
+it("ticks the built-in output evaluator when a general agent has none", async () => {
+  const { result } = setup({ agentNature: "general" });
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+  expect(Array.from(result.current.preselectedUuids)).toEqual([
+    "ev-general-default",
   ]);
 });

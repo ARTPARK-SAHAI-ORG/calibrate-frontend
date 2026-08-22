@@ -94,9 +94,11 @@ export function TracesTabContent({
     accessToken,
   });
 
-  // Add selected traces as tests. A recorded response always becomes a response
-  // test; tool-call tests are used only when every selected trace has calls and
-  // no text response.
+  // Add selected traces as tests. A recorded response becomes a test that
+  // judges what the agent produced, of the kind this agent's traces carry;
+  // tool-call tests are used only when every selected trace has calls and no
+  // text response.
+  const isGeneral = agentNature === "general";
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
   const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
@@ -106,7 +108,9 @@ export function TracesTabContent({
       (trace) => !trace.response_preview && trace.tool_call_count > 0,
     )
       ? "tool_call"
-      : "response";
+      : isGeneral
+        ? "general"
+        : "response";
 
   // Annotators score the agent's reply, so a trace that only made tool calls
   // has nothing to label and is left out of what is submitted.
@@ -187,7 +191,10 @@ export function TracesTabContent({
           name: trace.uuid,
           // The agent's own instructions are not part of the conversation the
           // annotators read, so they are never stored with the item.
-          input: (trace.input ?? []).filter((turn) => turn.role !== "system"),
+          input:
+            typeof trace.input === "string"
+              ? trace.input
+              : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
         })),
       );
@@ -429,6 +436,7 @@ export function TracesTabContent({
         traceUuids={Array.from(selected)}
         testType={selectedTestType}
         agentUuid={agentUuid}
+        agentNature={agentNature}
         onConverted={(result) => {
           setConvertOpen(false);
           deletion.clearSelection();
@@ -452,6 +460,7 @@ export function TracesTabContent({
           isOpen
           onClose={() => setEvaluatorStepOpen(false)}
           agentUuid={agentUuid}
+          agentNature={agentNature}
           accessToken={accessToken}
           onChosen={prepareLabelling}
         />
@@ -466,6 +475,7 @@ export function TracesTabContent({
             agentUuid,
             traces: labellingTraces,
             evaluators: labellingEvaluators,
+            agentNature,
           }}
           // The dialog stays open on its own confirmation, which is where the
           // reader opens the task or closes it, same as every other submit for

@@ -23,6 +23,8 @@ type ConvertTracesToTestsDialogProps = {
   testType: ConvertTestType;
   /** The agent whose traces these are, for the evaluators offered here. */
   agentUuid: string;
+  /** Decides which kind of evaluator can judge what this agent produced. */
+  agentNature?: "conversation" | "general";
   /** Called with the backend result after a successful conversion. */
   onConverted: (result: ConvertTracesToTestsResult) => void;
 };
@@ -35,11 +37,12 @@ function toggle(set: Set<string>, uuid: string): Set<string> {
 }
 
 /**
- * Convert selected traces into regression tests. `response` re-runs the agent
- * and judges the reply (requires ≥1 evaluator, defaulted to the workspace's
- * LLM-reply evaluator); `tool_call` asserts the recorded tool calls. Created
- * tests are linked by the backend to the agent that produced each trace, so
- * they're runnable right away.
+ * Convert selected traces into regression tests. `response` and `general`
+ * re-run the agent and judge what it produced (each requires at least one
+ * evaluator, defaulted to the workspace's built-in one for that kind of
+ * agent); `tool_call` asserts the recorded tool calls. Created tests are
+ * linked by the backend to the agent that produced each trace, so they are
+ * runnable right away.
  */
 export function ConvertTracesToTestsDialog({
   isOpen,
@@ -48,9 +51,14 @@ export function ConvertTracesToTestsDialog({
   traceUuids,
   testType,
   agentUuid,
+  agentNature = "conversation",
   onConverted,
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
+
+  // A tool-call test asserts the recorded calls and takes no evaluators. Every
+  // other kind judges what the agent produced and needs at least one.
+  const needsEvaluator = testType !== "tool_call";
 
   const {
     evaluators,
@@ -60,7 +68,8 @@ export function ConvertTracesToTestsDialog({
   } = useAgentLlmEvaluators({
     agentUuid,
     accessToken,
-    enabled: isOpen && testType === "response",
+    enabled: isOpen && needsEvaluator,
+    agentNature,
   });
   // Null until the reader ticks something: until then the agent's own
   // evaluators are what is selected, and reopening starts from them again.
@@ -79,7 +88,6 @@ export function ConvertTracesToTestsDialog({
 
   if (!isOpen) return null;
 
-  const needsEvaluator = testType === "response";
   const canSubmit =
     !submitting &&
     (!needsEvaluator || !loading) &&
@@ -94,8 +102,9 @@ export function ConvertTracesToTestsDialog({
       const result = await convertTracesToTests(accessToken, {
         traceIds: traceUuids,
         type: testType,
-        evaluatorUuids:
-          testType === "response" ? Array.from(selectedEvaluators) : undefined,
+        evaluatorUuids: needsEvaluator
+          ? Array.from(selectedEvaluators)
+          : undefined,
         // The recorded calls become the expected output, arguments and all,
         // and the test can be edited afterwards.
         acceptAnyArguments: false,
@@ -125,7 +134,7 @@ export function ConvertTracesToTestsDialog({
           </h2>
           {/* Tool-call traces have nothing to choose, so the whole dialog is
               the one sentence below and a confirmation. */}
-          {testType === "response" && (
+          {needsEvaluator && (
             <p className="text-sm text-muted-foreground mt-1">
               Pick at least one evaluator for evaluating the agent&apos;s
               performance
@@ -138,7 +147,7 @@ export function ConvertTracesToTestsDialog({
             <LoadingState />
           ) : (
             <>
-              {testType === "response" ? (
+              {needsEvaluator ? (
                 <div className="space-y-2">
                   <div className="text-sm font-semibold text-foreground">
                     Evaluators

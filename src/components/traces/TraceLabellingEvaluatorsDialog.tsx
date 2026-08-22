@@ -11,6 +11,8 @@ type TraceLabellingEvaluatorsDialogProps = {
   onClose: () => void;
   /** The agent whose traces are being sent, used to seed the selection. */
   agentUuid: string;
+  /** Decides which kind of evaluator can judge these traces. */
+  agentNature?: "conversation" | "general";
   accessToken: string | null;
   /** Called with the chosen evaluators when the reader continues. */
   onChosen: (evaluators: { uuid: string; name?: string }[]) => void;
@@ -32,13 +34,19 @@ export function TraceLabellingEvaluatorsDialog({
   isOpen,
   onClose,
   agentUuid,
+  agentNature = "conversation",
   accessToken,
   onChosen,
 }: TraceLabellingEvaluatorsDialogProps) {
   useHideFloatingButton(isOpen);
 
   const { evaluators, preselectedUuids, isLoading, error } =
-    useAgentLlmEvaluators({ agentUuid, accessToken, enabled: isOpen });
+    useAgentLlmEvaluators({
+      agentUuid,
+      accessToken,
+      enabled: isOpen,
+      agentNature,
+    });
   // Null until the reader ticks something: until then the agent's own
   // evaluators are what is selected.
   const [picked, setPicked] = useState<Set<string> | null>(null);
@@ -56,8 +64,8 @@ export function TraceLabellingEvaluatorsDialog({
             Submit traces for labelling
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Pick at least one evaluator. Annotators score the reply against
-            these.
+            Pick at least one evaluator. Annotators score the agent&apos;s{" "}
+            {agentNature === "general" ? "output" : "reply"} against these.
           </p>
         </div>
 
@@ -80,7 +88,9 @@ export function TraceLabellingEvaluatorsDialog({
               </div>
 
               {error && (
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {error}
+                </p>
               )}
             </>
           )}

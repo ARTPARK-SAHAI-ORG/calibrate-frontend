@@ -52,12 +52,28 @@ export type TraceDetail = {
   agent_id: string;
   message_id: string | null;
   conversation_id: string | null;
-  input: TraceTurn[];
+  /** A conversational agent stores the history as turns. A general agent
+   * answers one input at a time, so it stores that input as plain text. */
+  input: TraceTurn[] | string;
   output: TraceOutput;
   metadata: TraceMetadataEntry[] | null;
   created_at: string;
   updated_at: string;
 };
+
+/**
+ * The stored input as turns, whichever shape it arrived in. A general agent's
+ * plain text becomes the one user turn it stands for, so everything reading a
+ * trace works the same either way.
+ */
+export function traceInputTurns(
+  input: TraceTurn[] | string | null | undefined,
+): TraceTurn[] {
+  if (typeof input === "string") {
+    return input.trim() ? [{ role: "user", content: input }] : [];
+  }
+  return input ?? [];
+}
 
 /** The backend caps a page at 200 rows. */
 export const MAX_TRACES_PAGE_SIZE = 200;
@@ -128,12 +144,13 @@ export async function validateApiKeyForAgent(
   throw new Error(`Request failed: ${response.status}`);
 }
 
-export type ConvertTestType = "response" | "tool_call";
+export type ConvertTestType = "response" | "tool_call" | "general";
 
 export type ConvertTracesToTestsBody = {
   traceIds: string[];
   type: ConvertTestType;
-  /** Evaluators to link to each created test. Required (and used) for `response`. */
+  /** Evaluators to link to each created test. Required for `response` and
+   * `general`, rejected for `tool_call`. */
   evaluatorUuids?: string[];
   /** For `tool_call`: match only the tool name, ignore the recorded arguments. */
   acceptAnyArguments?: boolean;
@@ -147,9 +164,10 @@ export type ConvertTracesToTestsResult = {
 };
 
 /**
- * Convert selected traces into regression tests. `response` tests re-run the
- * agent and judge the reply (needs ≥1 evaluator); `tool_call` tests assert the
- * recorded tool calls. Each created test is linked to the agent that produced
+ * Convert selected traces into regression tests. `response` and `general`
+ * tests re-run the agent and judge what it produced (each needs at least one
+ * evaluator, of a type matching the agent); `tool_call` tests assert the
+ * recorded tool calls and take no evaluators. Each created test is linked to the agent that produced
  * its trace, so nothing here names an agent. Backed by
  * `POST /traces/convert-to-tests`.
  */

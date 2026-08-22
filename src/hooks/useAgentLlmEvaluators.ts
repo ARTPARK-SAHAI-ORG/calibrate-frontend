@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  DEFAULT_LLM_GENERAL_SLUG,
   DEFAULT_LLM_NEXT_REPLY_SLUG,
   defaultOriginSlug,
 } from "@/lib/defaultEvaluators";
@@ -18,6 +19,9 @@ type UseAgentLlmEvaluatorsArgs = {
   accessToken: string | null;
   /** Skip the fetch entirely (e.g. the dialog using this is closed). */
   enabled?: boolean;
+  /** A general agent's output is judged on its own, so its evaluators are a
+   * different kind from the ones that judge a reply in a conversation. */
+  agentNature?: "conversation" | "general";
 };
 
 export type UseAgentLlmEvaluatorsResult = {
@@ -30,10 +34,10 @@ export type UseAgentLlmEvaluatorsResult = {
 };
 
 /**
- * The evaluators offered whenever a reply has to be judged outside a test run
- * (adding traces to tests, sending traces for labelling): the LLM evaluators in
- * the library, with the agent's own ones ticked and the built-in reply
- * evaluator as the fallback.
+ * The evaluators offered whenever what an agent produced has to be judged
+ * outside a test run (adding traces to tests, sending traces for labelling):
+ * the library evaluators of the kind this agent needs, with the agent's own
+ * ones ticked and the matching built-in evaluator as the fallback.
  *
  * Evaluators with variables need a value per variable, and these dialogs have
  * nowhere to ask for those, so they are left out.
@@ -42,6 +46,7 @@ export function useAgentLlmEvaluators({
   agentUuid,
   accessToken,
   enabled = true,
+  agentNature = "conversation",
 }: UseAgentLlmEvaluatorsArgs): UseAgentLlmEvaluatorsResult {
   const [evaluators, setEvaluators] = useState<EvaluatorData[]>([]);
   const [preselectedUuids, setPreselectedUuids] = useState<Set<string>>(
@@ -58,6 +63,11 @@ export function useAgentLlmEvaluators({
       setIsLoading(enabled && !accessToken);
       return;
     }
+    const evaluatorType = agentNature === "general" ? "llm-general" : "llm";
+    const defaultSlug =
+      agentNature === "general"
+        ? DEFAULT_LLM_GENERAL_SLUG
+        : DEFAULT_LLM_NEXT_REPLY_SLUG;
     let cancelled = false;
     const load = async () => {
       setIsLoading(true);
@@ -78,18 +88,16 @@ export function useAgentLlmEvaluators({
           // carries those values and neither dialog can ask for them, so such
           // an evaluator is left out rather than attached half-filled.
           (e) =>
-            e.evaluator_type === "llm" &&
+            e.evaluator_type === evaluatorType &&
             (e.live_version?.variables?.length ?? 0) === 0,
         );
         setEvaluators(llm);
         // Start from the agent's own evaluators, limited to the ones on offer.
         const attachedUuids = new Set(attached.map((e) => e.uuid));
         const preselect = llm.filter((e) => attachedUuids.has(e.uuid));
-        // Nothing attached: seed the default LLM-reply evaluator, matching how
-        // the tests UI seeds.
-        const fallback = llm.find(
-          (e) => defaultOriginSlug(e) === DEFAULT_LLM_NEXT_REPLY_SLUG,
-        );
+        // Nothing attached: seed the built-in evaluator for this kind of agent,
+        // matching how the tests UI seeds.
+        const fallback = llm.find((e) => defaultOriginSlug(e) === defaultSlug);
         const seed =
           preselect.length > 0 ? preselect : fallback ? [fallback] : [];
         setPreselectedUuids(new Set(seed.map((e) => e.uuid)));
@@ -104,7 +112,7 @@ export function useAgentLlmEvaluators({
     return () => {
       cancelled = true;
     };
-  }, [enabled, accessToken, agentUuid]);
+  }, [enabled, accessToken, agentUuid, agentNature]);
 
   return { evaluators, preselectedUuids, isLoading, error };
 }

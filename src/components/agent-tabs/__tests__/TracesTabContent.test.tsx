@@ -78,8 +78,9 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
     source: {
       type: string;
       agentUuid: string;
-      traces: { name: string; input: unknown[]; output: unknown }[];
+      traces: { name: string; input: unknown[] | string; output: unknown }[];
       evaluators?: { uuid: string }[];
+      agentNature?: string;
     };
     onAdded?: (taskUuid: string, itemsCreated: number) => void;
     onClose: () => void;
@@ -88,6 +89,7 @@ jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
       <div data-testid="labelling-task">
         <span data-testid="labelling-source">{source.type}</span>
         <span data-testid="labelling-agent">{source.agentUuid}</span>
+        <span data-testid="labelling-nature">{source.agentNature}</span>
         <span data-testid="labelling-payload">
           {JSON.stringify(source.traces)}
         </span>
@@ -173,12 +175,14 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid,
     traceUuids,
     testType,
+    agentNature,
     onConverted,
   }: {
     isOpen: boolean;
     agentUuid: string;
     traceUuids: string[];
-    testType: "response" | "tool_call";
+    testType: "response" | "tool_call" | "general";
+    agentNature?: string;
     onConverted: (result: { created: number; test_uuids: string[] }) => void;
   }) =>
     isOpen ? (
@@ -186,6 +190,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-nature">{agentNature}</span>
         <button
           type="button"
           onClick={() => onConverted({ created: 2, test_uuids: ["t1", "t2"] })}
@@ -602,6 +607,17 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("convert-type")).toHaveTextContent("response");
   });
 
+  it("adds a general agent's traces as general tests", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} agentNature="general" />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+
+    expect(screen.getByTestId("convert-type")).toHaveTextContent("general");
+    expect(screen.getByTestId("convert-nature")).toHaveTextContent("general");
+  });
+
   it("uses tool-call type only when every selected trace is tool-call-only", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(
@@ -667,6 +683,26 @@ describe("TracesTabContent", () => {
       await user.click(screen.getAllByLabelText("Select trace")[0]);
 
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
+    });
+
+    it("sends a general agent's trace as plain text, not as turns", async () => {
+      const user = setupUser();
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
+        detail({ uuid, input: "When is the next vaccination?" }),
+      );
+      render(<TracesTabContent {...tabProps} agentNature="general" />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
+
+      const payload = await screen.findByTestId("labelling-payload");
+      expect(JSON.parse(payload.textContent ?? "[]")[0].input).toBe(
+        "When is the next vaccination?",
+      );
+      expect(screen.getByTestId("labelling-nature")).toHaveTextContent(
+        "general",
+      );
     });
 
     it("refuses a selection that only made tool calls", async () => {

@@ -2,6 +2,10 @@ import { unwrapList } from "./api";
 
 export const DEFAULT_LLM_NEXT_REPLY_SLUG = "default-llm-next-reply";
 
+/** The general-agent counterpart: judges one output for one input, where
+ *  `default-llm-next-reply` judges a reply given the conversation before it. */
+export const DEFAULT_LLM_GENERAL_SLUG = "default-llm-general";
+
 /**
  * Anything carrying a default evaluator's origin identity. Forks null out
  * `slug` and put the seed slug in `source_default_slug`; legacy unforked seeds

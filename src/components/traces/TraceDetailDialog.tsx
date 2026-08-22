@@ -12,6 +12,7 @@ import {
 } from "@/components/test-results/shared";
 import {
   fetchTrace,
+  traceInputTurns,
   TraceDetail,
   TraceMetadataEntry,
   TraceOutput,
@@ -34,8 +35,9 @@ type TraceDetailDialogProps = {
 
 /** Last user turn, else a generic heading when the history has no user text. */
 export function humanTraceName(trace: Pick<TraceDetail, "input">): string {
-  for (let i = trace.input.length - 1; i >= 0; i--) {
-    const turn = trace.input[i];
+  const turns = traceInputTurns(trace.input);
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i];
     if (
       turn.role === "user" &&
       typeof turn.content === "string" &&
@@ -66,9 +68,11 @@ function historyToolCalls(turn: TraceTurn): TestCaseHistory["tool_calls"] {
 }
 
 /** Map stored OpenAI-ish turns into the shared conversation renderer. */
-export function turnsToHistory(turns: TraceTurn[]): TestCaseHistory[] {
+export function turnsToHistory(
+  input: TraceTurn[] | string,
+): TestCaseHistory[] {
   const history: TestCaseHistory[] = [];
-  for (const turn of turns) {
+  for (const turn of traceInputTurns(input)) {
     const content = typeof turn.content === "string" ? turn.content : undefined;
     const createdAt =
       typeof turn.created_at === "string" ? turn.created_at : undefined;

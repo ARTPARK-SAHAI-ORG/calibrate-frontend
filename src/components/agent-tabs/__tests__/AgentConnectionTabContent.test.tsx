@@ -192,6 +192,7 @@ describe("AgentConnectionTabContent", () => {
         { Authorization: "Bearer x" },
         [{ role: "user", content: "Hi" }],
         undefined,
+        "conversation",
       ),
     );
 
@@ -250,6 +251,7 @@ describe("AgentConnectionTabContent", () => {
         { "X-Test": "keep" },
         expect.anything(),
         undefined,
+        "conversation",
       ),
     );
   });

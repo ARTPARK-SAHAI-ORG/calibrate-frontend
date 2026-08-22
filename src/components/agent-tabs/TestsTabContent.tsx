@@ -2366,6 +2366,7 @@ export function TestsTabContent({
         }}
         agentUuid={agentUuid}
         agentName={agentName}
+        agentNature={agentNature}
         tests={benchmarkTestSubset ?? agentTests}
         onBenchmarkCreated={() => onRunStarted?.()}
         agentType={agentType}

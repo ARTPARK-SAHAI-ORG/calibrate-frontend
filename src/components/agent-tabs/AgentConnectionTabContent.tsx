@@ -234,6 +234,7 @@ export function AgentConnectionTabContent({
       currentHeadersObj,
       messages,
       inputs,
+      agentNature,
     );
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
@@ -829,6 +830,7 @@ export function AgentConnectionTabContent({
       </div>
 
       <VerifyRequestPreviewDialog
+        agentNature={agentNature}
         open={verifyDialogOpen}
         onClose={() => setVerifyDialogOpen(false)}
         onConfirm={handleVerifyConfirm}

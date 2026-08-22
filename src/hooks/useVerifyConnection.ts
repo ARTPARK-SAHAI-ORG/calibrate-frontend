@@ -18,12 +18,15 @@ export type VerifyConnectionResult = {
     messages?: VerifyMessage[],
     inputs?: Record<string, unknown>,
   ) => Promise<boolean>;
-  /** Verify an ad-hoc connection (unsaved URL/headers) */
+  /** Verify an ad-hoc connection (unsaved URL/headers). `interactionType`
+   * decides what the probe posts: a conversation agent is sent `messages`,
+   * a general one is sent the last message as a plain `input`. */
   verifyAdHoc: (
     agentUrl: string,
     agentHeaders?: Record<string, string>,
     messages?: VerifyMessage[],
     defaultInputs?: Record<string, unknown>,
+    interactionType?: "conversation" | "general",
   ) => Promise<boolean>;
   dismiss: () => void;
 };
@@ -89,8 +92,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
             },
             body: JSON.stringify({
               ...(messages && messages.length > 0 && { messages }),
-              ...(inputs &&
-                Object.keys(inputs).length > 0 && { inputs }),
+              ...(inputs && Object.keys(inputs).length > 0 && { inputs }),
             }),
           },
         );
@@ -115,6 +117,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
       agentHeaders?: Record<string, string>,
       messages?: VerifyMessage[],
       defaultInputs?: Record<string, unknown>,
+      interactionType?: "conversation" | "general",
     ): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
@@ -124,29 +127,29 @@ export function useVerifyConnection(): VerifyConnectionResult {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) throw new Error("BACKEND_URL not set");
 
-        const response = await fetch(
-          `${backendUrl}/agents/verify-connection`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
-            body: JSON.stringify({
-              agent_url: agentUrl.trim(),
-              ...(agentHeaders &&
-                Object.keys(agentHeaders).length > 0 && {
-                  agent_headers: agentHeaders,
-                }),
-              ...(messages && messages.length > 0 && { messages }),
-              ...(defaultInputs &&
-                Object.keys(defaultInputs).length > 0 && {
-                  default_inputs: defaultInputs,
-                }),
-            }),
+        const response = await fetch(`${backendUrl}/agents/verify-connection`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
-        );
+          body: JSON.stringify({
+            agent_url: agentUrl.trim(),
+            ...(agentHeaders &&
+              Object.keys(agentHeaders).length > 0 && {
+                agent_headers: agentHeaders,
+              }),
+            ...(messages && messages.length > 0 && { messages }),
+            ...(defaultInputs &&
+              Object.keys(defaultInputs).length > 0 && {
+                default_inputs: defaultInputs,
+              }),
+            // The agent is not saved yet, so the probe cannot read this off
+            // the stored agent the way the saved-agent call does.
+            ...(interactionType && { interaction_type: interactionType }),
+          }),
+        });
 
         return await handleResponse(response);
       } catch (err) {

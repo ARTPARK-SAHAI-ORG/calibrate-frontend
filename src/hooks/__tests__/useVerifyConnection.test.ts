@@ -353,6 +353,49 @@ describe("useVerifyConnection", () => {
       );
     });
 
+    it("names the agent's nature so the probe posts the right body", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      const messages = [{ role: "user", content: "hello" }];
+      await act(async () => {
+        await result.current.verifyAdHoc(
+          "https://agent.example.com",
+          undefined,
+          messages,
+          undefined,
+          "general",
+        );
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({
+            agent_url: "https://agent.example.com",
+            messages,
+            interaction_type: "general",
+          }),
+        }),
+      );
+    });
+
+    it("leaves the nature out when the caller does not name one", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+      const { result } = renderHook(() => useVerifyConnection());
+
+      await act(async () => {
+        await result.current.verifyAdHoc("https://agent.example.com");
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({ agent_url: "https://agent.example.com" }),
+        }),
+      );
+    });
+
     it("includes default_inputs when provided and non-empty", async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
       const { result } = renderHook(() => useVerifyConnection());

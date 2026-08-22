@@ -10,6 +10,7 @@ import { fetchTrace, TraceDetail } from "@/lib/tracesApi";
 
 jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
+  ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: jest.fn(),
 }));
 jest.mock("../../../lib/reportError", () => ({

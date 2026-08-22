@@ -48,6 +48,13 @@ const EVALUATORS = [
   },
   { uuid: "ev-conv", name: "Conversation", evaluator_type: "conversation" },
   {
+    uuid: "ev-general-default",
+    name: "Output correctness",
+    evaluator_type: "llm-general",
+    is_default: true,
+    source_default_slug: "default-llm-general",
+  },
+  {
     uuid: "ev-vars",
     name: "Needs Variables",
     evaluator_type: "llm",
@@ -329,4 +336,45 @@ it("shows what the backend says went wrong, when it says", async () => {
       screen.getByText("Tone needs values for its variables."),
     ).toBeInTheDocument(),
   );
+});
+
+it("offers the output evaluators and sends a general conversion", async () => {
+  const user = setupUser();
+  mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+  const { onConverted } = setup({ testType: "general", agentNature: "general" });
+
+  await waitFor(() =>
+    expect(evaluatorCheckbox("Output correctness")).toBeChecked(),
+  );
+  // The reply evaluators cannot judge a general agent's output, so they are
+  // not on offer at all.
+  expect(screen.queryByText("My Judge")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+  await waitFor(() =>
+    expect(mockConvert).toHaveBeenCalledWith("tok", {
+      traceIds: ["tr-1", "tr-2"],
+      type: "general",
+      evaluatorUuids: ["ev-general-default"],
+      acceptAnyArguments: false,
+    }),
+  );
+  expect(onConverted).toHaveBeenCalledWith({
+    created: 2,
+    test_uuids: ["t1", "t2"],
+  });
+});
+
+it("will not add a general conversion with no evaluator ticked", async () => {
+  const user = setupUser();
+  setup({ testType: "general", agentNature: "general" });
+
+  await waitFor(() =>
+    expect(evaluatorCheckbox("Output correctness")).toBeChecked(),
+  );
+  await user.click(evaluatorCheckbox("Output correctness"));
+
+  expect(screen.getByRole("button", { name: "Add to tests" })).toBeDisabled();
+  expect(mockConvert).not.toHaveBeenCalled();
 });
