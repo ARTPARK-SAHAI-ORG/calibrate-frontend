@@ -1,5 +1,6 @@
 ## August 2026
 
+- Show a single agent response tool call test as input and output ([#415](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/415))
 - Fix the crash on single agent response test results ([#414](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/414))
 - Stop repeating a test's failure explanation under its answer ([#412](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/412))
 - Add an interaction-type column to Agents, fix result-view layout issues ([#411](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/411))
