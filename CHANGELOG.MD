@@ -1,5 +1,6 @@
 ## August 2026
 
+- Point the create-test specs at the dialog's attributes, not its words ([#404](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/404))
 - Ask an agent's nature (conversation vs general) at creation ([#397](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/397))
 - Delete a saved evaluator version ([#402](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/402))
 - Add a delete button to the evaluator page and move editing to a pencil ([#400](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/400))
