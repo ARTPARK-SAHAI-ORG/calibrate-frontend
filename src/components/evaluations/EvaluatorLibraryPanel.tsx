@@ -101,7 +101,9 @@ export function EvaluatorLibraryPanel({
     <div className="flex flex-col">
       {evaluators.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm md:text-base font-medium text-foreground">
+            {description}
+          </p>
           {createButton}
         </div>
       )}
