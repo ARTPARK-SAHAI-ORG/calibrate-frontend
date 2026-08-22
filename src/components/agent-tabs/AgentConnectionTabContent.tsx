@@ -39,6 +39,9 @@ export type ConnectionConfig = {
 
 type AgentConnectionTabContentProps = {
   agentUuid: string;
+  /** A general agent answers one input at a time, so the example request shows
+   * a single piece of text rather than a conversation history. */
+  agentNature?: "conversation" | "general";
   agentUrl: string;
   onAgentUrlChange: (url: string) => void;
   agentHeaders: Array<{ key: string; value: string }>;
@@ -54,6 +57,7 @@ type AgentConnectionTabContentProps = {
 
 export function AgentConnectionTabContent({
   agentUuid,
+  agentNature = "conversation",
   agentUrl,
   onAgentUrlChange,
   agentHeaders,
@@ -283,6 +287,17 @@ export function AgentConnectionTabContent({
     : "";
   const customFieldsInline = customFieldEntries.map((e) => `, ${e}`).join("");
 
+  // A general agent is sent one piece of text; a conversation agent is sent the
+  // history so far.
+  const isGeneral = agentNature === "general";
+  const requestInputBlock = isGeneral
+    ? `"input": "Meri beti ka vaccination schedule kya hai?"`
+    : `"messages": [
+    { "role": "assistant", "content": "Namaste! Main aapki kaise madad kar sakti hoon?" },
+    { "role": "user",      "content": "Meri beti ka vaccination schedule kya hai?"      }
+  ]`;
+  const requestInputInline = isGeneral ? `"input": "..."` : `"messages": [...]`;
+
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
   const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";
 
@@ -357,8 +372,8 @@ export function AgentConnectionTabContent({
               className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
             <p className="text-xs text-muted-foreground">
-              Calibrate will create a POST request to this URL with the
-              conversation messages
+              Calibrate will create a POST request to this URL with the{" "}
+              {isGeneral ? "input" : "conversation messages"}
             </p>
           </div>
 
@@ -654,10 +669,7 @@ export function AgentConnectionTabContent({
               </p>
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
                 {`{
-  "messages": [
-    { "role": "assistant", "content": "Namaste! Main aapki kaise madad kar sakti hoon?" },
-    { "role": "user",      "content": "Meri beti ka vaccination schedule kya hai?"      }
-  ]${customFieldsBlock}
+  ${requestInputBlock}${customFieldsBlock}
 }`}
               </pre>
 
@@ -672,7 +684,7 @@ export function AgentConnectionTabContent({
                     LLM:
                   </p>
                   <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                    {`{ "messages": [...]${customFieldsInline}, "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
+                    {`{ ${requestInputInline}${customFieldsInline}, "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
                   </pre>
                   <div className="flex gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                     <svg

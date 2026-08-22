@@ -1206,6 +1206,7 @@ export function AgentDetail({
           <div className={activeTab === "connection" ? undefined : "hidden"}>
             <AgentConnectionTabContent
               agentUuid={agentUuid}
+              agentNature={agent.interaction_type ?? "conversation"}
               agentUrl={connectionUrl}
               onAgentUrlChange={setConnectionUrl}
               agentHeaders={connectionHeaders}
@@ -1348,6 +1349,7 @@ export function AgentDetail({
           <div className={activeTab === "traces" ? undefined : "hidden"}>
             <TracesTabContent
               agentUuid={agentUuid}
+              agentNature={agent.interaction_type ?? "conversation"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
             />

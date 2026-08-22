@@ -3,6 +3,7 @@
 import React from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { TraceIngestSnippet } from "./TraceIngestSnippet";
+import type { AgentNature } from "./ingestSnippets";
 
 /**
  * The sending code, on demand. The setup steps disappear once the first trace
@@ -13,10 +14,12 @@ export function TraceIngestCodeDialog({
   isOpen,
   onClose,
   agentUuid,
+  agentNature,
 }: {
   isOpen: boolean;
   onClose: () => void;
   agentUuid: string;
+  agentNature?: AgentNature;
 }) {
   useHideFloatingButton(isOpen);
 
@@ -38,7 +41,7 @@ export function TraceIngestCodeDialog({
         <div className="flex-1 overflow-y-auto p-5 md:p-6">
           {/* No key here: the one made during setup is shown once and never
               stored, so the snippet keeps its placeholder. */}
-          <TraceIngestSnippet agentUuid={agentUuid} />
+          <TraceIngestSnippet agentUuid={agentUuid} agentNature={agentNature} />
         </div>
 
         <div className="flex items-center justify-end p-5 md:p-6 border-t border-border">

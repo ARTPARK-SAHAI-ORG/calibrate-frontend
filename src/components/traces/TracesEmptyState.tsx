@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { useAccessToken, useActiveOrgUuid, useWorkspaceApiKeys } from "@/hooks";
 import { validateApiKeyForAgent } from "@/lib/tracesApi";
 import { TraceIngestSnippet } from "./TraceIngestSnippet";
+import type { AgentNature } from "./ingestSnippets";
 
 type StepState = "done" | "current" | "upcoming";
 
@@ -78,6 +79,7 @@ function Step({
 
 type TracesEmptyStateProps = {
   agentUuid: string;
+  agentNature?: AgentNature;
   /** Ask the backend for this agent's traces again. Returns true if still empty. */
   onCheckForTraces: () => Promise<boolean>;
 };
@@ -89,6 +91,7 @@ type TracesEmptyStateProps = {
  */
 export function TracesEmptyState({
   agentUuid,
+  agentNature,
   onCheckForTraces,
 }: TracesEmptyStateProps) {
   const [isCreateKeyOpen, setIsCreateKeyOpen] = useState(false);
@@ -280,7 +283,11 @@ export function TracesEmptyState({
         isOpen={openStep === 2}
         onToggle={() => toggleStep(2)}
       >
-        <TraceIngestSnippet agentUuid={agentUuid} apiKey={createdKey} />
+        <TraceIngestSnippet
+          agentUuid={agentUuid}
+          apiKey={createdKey}
+          agentNature={agentNature}
+        />
 
         <Button size="sm" onClick={() => goToStep(3)}>
           I have added this

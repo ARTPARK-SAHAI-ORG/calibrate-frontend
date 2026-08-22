@@ -40,10 +40,14 @@ import { reportError } from "@/lib/reportError";
  */
 export function TracesTabContent({
   agentUuid,
+  agentNature = "conversation",
   onTestsCreated,
   onViewTests,
 }: {
   agentUuid: string;
+  /** A general agent answers one input at a time, so the sending code shows a
+   * single piece of text rather than a conversation history. */
+  agentNature?: "conversation" | "general";
   /** Called after traces are turned into tests, so the Tests tab reloads. */
   onTestsCreated: () => void;
   /** Opens the Tests tab, where the created tests are listed. */
@@ -298,7 +302,11 @@ export function TracesTabContent({
       {!hasLoaded ? (
         <LoadingState />
       ) : showEmptyState ? (
-        <TracesEmptyState agentUuid={agentUuid} onCheckForTraces={refetch} />
+        <TracesEmptyState
+          agentUuid={agentUuid}
+          agentNature={agentNature}
+          onCheckForTraces={refetch}
+        />
       ) : (
         <div className="space-y-3">
           {/* Above the no-match message too: rows ticked before the search was
@@ -399,6 +407,7 @@ export function TracesTabContent({
         isOpen={codeOpen}
         onClose={() => setCodeOpen(false)}
         agentUuid={agentUuid}
+        agentNature={agentNature}
       />
 
       <TraceDetailDialog

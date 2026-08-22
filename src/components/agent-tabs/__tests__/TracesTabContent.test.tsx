@@ -280,6 +280,17 @@ describe("TracesTabContent", () => {
     );
   });
 
+  it("shows the input as one piece of text for a general agent", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} agentNature="general" />);
+
+    await user.click(screen.getByRole("button", { name: "View code" }));
+
+    const snippet = document.querySelector("pre")?.textContent ?? "";
+    expect(snippet).toContain('"input": "When is the next vaccination?"');
+    expect(snippet).not.toContain('"role"');
+  });
+
   it("lists the loaded traces for this agent", () => {
     render(<TracesTabContent {...tabProps} />);
 
