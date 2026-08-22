@@ -1011,7 +1011,7 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      General response
+                      Single LLM response
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
                       The agent takes an input and generates an output
