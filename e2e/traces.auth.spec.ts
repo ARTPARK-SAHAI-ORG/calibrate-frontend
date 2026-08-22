@@ -15,43 +15,10 @@
 // workspace-wide cap, so leftovers pile up across runs).
 // Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady, workspacePath } from "./helpers";
+import { createAgent, waitForOrgReady, workspacePath } from "./helpers";
 import type { Page } from "@playwright/test";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-
-// Create a Build agent through the "New agent" dialog, land on its detail page
-// and return its uuid (traces are seeded against it). Same create-retry as
-// agent-detail.auth.spec.ts: the dialog's token comes from a hook effect, so
-// the very first create can race auth readiness and 401 (a no-op that leaves
-// the dialog open) — retry the click until we navigate to the detail URL.
-async function createAgent(page: Page, name: string): Promise<string> {
-  await page.goto("/agents");
-  await waitForOrgReady(page);
-  await page.getByRole("button", { name: "New agent" }).first().click();
-  await expect(
-    page.getByRole("heading", { name: "New agent", exact: true }),
-  ).toBeVisible();
-  await page.getByPlaceholder("Enter agent name").fill(name);
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  // Second step: what the agent does. Pick Conversation — traces are
-  // conversation-shaped either way.
-  await page.getByText("Conversation", { exact: true }).click();
-
-  const createBtn = page.getByRole("button", { name: "Create", exact: true });
-  await expect(async () => {
-    if (await createBtn.isVisible().catch(() => false)) {
-      await createBtn.click();
-    }
-    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
-      timeout: 6000,
-    });
-  }).toPass({ timeout: 30000 });
-
-  const uuid = page.url().match(/\/agents\/([0-9a-f-]{36})/)?.[1];
-  expect(uuid).toBeTruthy();
-  return uuid as string;
-}
 
 // Delete an agent from the /agents list via its titled delete button.
 async function deleteAgent(page: Page, name: string): Promise<void> {

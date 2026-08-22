@@ -31,7 +31,14 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // One retry, not two: a genuinely flaky test still gets a second chance,
+  // but a broken selector costs one extra run instead of two.
+  retries: process.env.CI ? 1 : 0,
+  // Stop the whole run after five failures. When a shared control is renamed
+  // every spec that uses it fails the same way, and each one waits out the
+  // full timeout; without this the run keeps going for another half hour to
+  // report the same cause over and over.
+  maxFailures: process.env.CI ? 5 : 0,
   // CI runs against `npm run dev`, so the first hit to each route pays a cold
   // Turbopack compile — give assertions and whole tests more headroom there.
   timeout: process.env.CI ? 60_000 : 30_000,
