@@ -1,5 +1,6 @@
 ## August 2026
 
+- Add an interaction-type column to Agents, fix result-view layout issues ([#411](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/411))
 - Drop the evaluator type pill from human alignment ([#406](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/406))
 - Remember whether the sidebar is open or closed ([#410](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/410))
 - Ask what an evaluator is for one question at a time, and rename LLM output ([#408](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/408))
