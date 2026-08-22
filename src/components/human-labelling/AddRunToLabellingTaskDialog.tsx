@@ -168,6 +168,31 @@ export function targetTaskTypeForSource(
   }
 }
 
+// True when a trace's output is a tool call and nothing else. Such a trace is
+// built as a tool-call item (a person marks it correct or wrong) rather than a
+// response item. A trace that also replied is a response item, and its call
+// rides along in the conversation.
+export function isToolCallTrace(t: TraceLabellingItem): boolean {
+  const hasResponse =
+    typeof t.output?.response === "string" &&
+    t.output.response.trim().length > 0;
+  return (
+    !hasResponse &&
+    Array.isArray(t.output?.tool_calls) &&
+    t.output.tool_calls.length > 0
+  );
+}
+
+/** Whether a conversational trace can be labelled at all. It can if it either
+ * replied or called a tool; both become items in an `llm` task. A trace that
+ * did neither has nothing to show an annotator. */
+export function isLabellableTrace(t: TraceLabellingItem): boolean {
+  const hasResponse =
+    typeof t.output?.response === "string" &&
+    t.output.response.trim().length > 0;
+  return hasResponse || isToolCallTrace(t);
+}
+
 /** Singular / plural noun for the items being submitted, per source kind. */
 export function itemNounForSource(source: AddRunToLabellingTaskSource): {
   one: string;
@@ -705,7 +730,28 @@ export function buildItemsFromSource(
           toolCallEvaluatorUuids,
         };
       }
+      // Conversational traces all go to an `llm` task: a trace that replied
+      // becomes a response item, a trace that only called a tool becomes a
+      // tool-call item. A trace has no expected calls, so that side stays
+      // empty and a person judges the call on its own.
       for (const t of source.traces) {
+        if (!isLabellableTrace(t)) {
+          skippedCount += 1;
+          continue;
+        }
+        if (isToolCallTrace(t)) {
+          items.push(
+            buildToolCallItem({
+              test_case: {
+                name: t.name,
+                history: t.input as TestCaseHistory[],
+                evaluation: { type: "tool_call", tool_calls: [] },
+              },
+              output: t.output as { tool_calls?: ToolCallOutput[] },
+            }),
+          );
+          continue;
+        }
         const built = buildOneItem({
           test_case: {
             name: t.name,
