@@ -437,7 +437,7 @@ export function buildItemsFromSource(
     }
     case "traces": {
       // A general agent's trace is one input and the output it produced, which
-      // is what an LLM output task holds. Nothing is judged yet, so there is
+      // is what an LLM response task holds. Nothing is judged yet, so there is
       // no reasoning or score to carry over.
       if (source.agentNature === "general") {
         for (const t of source.traces) {

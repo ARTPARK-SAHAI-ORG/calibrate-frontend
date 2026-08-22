@@ -45,7 +45,7 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     await dialog.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 2 — Type. Pick "LLM reply" (llm); its accessible name won't collide
-    // with "LLM output". Then advance.
+    // with "LLM response". Then advance.
     await dialog.getByRole("button", { name: "LLM reply" }).click();
     await dialog.getByRole("button", { name: "Next", exact: true }).click();
 

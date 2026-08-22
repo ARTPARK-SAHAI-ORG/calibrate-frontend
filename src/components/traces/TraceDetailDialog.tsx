@@ -131,7 +131,7 @@ export function toTestCaseOutput(
 
 /**
  * A general agent answers one input at a time, so its trace reads as the input
- * and what the agent produced, the same two boxes an LLM output labelling item
+ * and what the agent produced, the same two boxes an LLM response labelling item
  * uses. Tool calls sit under the output, or stand in for it when the agent
  * called a tool instead of replying.
  */
