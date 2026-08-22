@@ -265,9 +265,10 @@ export async function deleteEvaluator(
 
 /**
  * Permanently delete one saved version of an evaluator. The backend refuses to
- * delete the current version (400) — make another version current first — so
- * the page hides the control on that row and shows the backend's own wording
- * if it comes back anyway. Finished runs keep naming the version they used.
+ * delete the current version (400): another version has to be made current
+ * first, so the page hides the control on that row and shows the backend's own
+ * wording if it comes back anyway. Finished runs keep naming the version they
+ * used.
  */
 export async function deleteEvaluatorVersion(
   evaluatorId: string,
