@@ -583,6 +583,7 @@ export function BenchmarkOutputsPanel({
             ) : (
               <TestDetailView
                 history={selectedTestResult.test_case?.history || []}
+                input={selectedTestResult.test_case?.input}
                 output={selectedTestResult.output}
                 passed={selectedTestResult.passed ?? false}
                 reasoning={selectedTestResult.reasoning}
