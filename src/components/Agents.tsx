@@ -857,6 +857,7 @@ function NewAgentDialog({
               {/* Build option */}
               <button
                 type="button"
+                data-agent-kind="agent"
                 onClick={() => setAgentKind("agent")}
                 className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentKind === "agent"
@@ -892,6 +893,7 @@ function NewAgentDialog({
               {/* Connect option */}
               <button
                 type="button"
+                data-agent-kind="connection"
                 onClick={() => setAgentKind("connection")}
                 className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentKind === "connection"
@@ -987,6 +989,7 @@ function NewAgentDialog({
               {/* General option */}
               <button
                 type="button"
+                data-tour="agent-nature-general"
                 onClick={() => setAgentNature("general")}
                 className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
                   agentNature === "general"

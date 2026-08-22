@@ -13,7 +13,12 @@
 // keys/cost); they SKIP unless E2E_FAKE_AI=1, which `npm run test:e2e:integration`
 // sets. Run with that command (see e2e/README.md / CLAUDE.md).
 import { test, expect } from "./fixtures";
-import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
+import {
+  chooseTestType,
+  createAgent,
+  waitForOrgReady,
+  workspacePath,
+} from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
@@ -40,43 +45,6 @@ const COMPLETED_RUN = {
   ],
   evaluators: [],
 };
-
-// Create an agent through the "New agent" dialog and land on its detail page.
-// Copied from e2e/agent-detail.auth.spec.ts (helpers are kept local per repo
-// convention so specs stay independent). The dialog's token comes from a hook
-// effect, so the very first create can race auth readiness and 401 (a no-op
-// that leaves the dialog open) — retry the click until we navigate to detail.
-async function createAgent(
-  page: Page,
-  name: string,
-  kind: "build" | "connection" = "build",
-): Promise<void> {
-  await page.goto("/agents");
-  await waitForOrgReady(page);
-
-  const heading = page.getByRole("heading", { name: "New agent", exact: true });
-  const createBtn = page.getByRole("button", { name: "Create", exact: true });
-  // Cold-start / auth race: on the first authenticated test the /agents route
-  // compiles on demand and the create can 401 (a no-op) or leave the dialog
-  // closed without navigating. Re-open and refill the dialog each retry so the
-  // block self-heals instead of spinning on a dialog that is no longer there.
-  await expect(async () => {
-    if (!(await heading.isVisible().catch(() => false))) {
-      await page.getByRole("button", { name: "New agent" }).first().click();
-      await expect(heading).toBeVisible();
-      await page.getByPlaceholder("Enter agent name").fill(name);
-      if (kind === "connection") {
-        await page.getByText("Connect your existing agent").click();
-      }
-    }
-    if (await createBtn.isVisible().catch(() => false)) {
-      await createBtn.click();
-    }
-    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
-      timeout: 6000,
-    });
-  }).toPass({ timeout: 45000 });
-}
 
 // Delete an agent from the /agents list via its titled delete button.
 // Copied from e2e/runs.auth.spec.ts / agent-detail.auth.spec.ts.

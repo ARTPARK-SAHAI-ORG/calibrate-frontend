@@ -98,3 +98,53 @@ export async function chooseTestType(
     .click();
   await page.locator('[data-tour="test-type-next"]').click();
 }
+
+/**
+ * Create an agent through the "New agent" dialog and land on its detail page.
+ *
+ * Creating an agent is two steps: name it (and say whether it is built here or
+ * connected from outside), then say what it does. Both steps are found by the
+ * attributes on the markup rather than by the words on screen.
+ *
+ * The dialog's access token comes from a hook effect, so the very first create
+ * in a run can race auth readiness and quietly do nothing. The whole open, fill
+ * and create is retried until the address changes to the agent's own page, so a
+ * failed attempt re-opens the dialog and tries again once the token has landed.
+ *
+ * Returns the new agent's id.
+ */
+export async function createAgent(
+  page: Page,
+  name: string,
+  kind: "build" | "connection" = "build",
+): Promise<string> {
+  await page.goto("/agents");
+  await waitForOrgReady(page);
+
+  const heading = page.getByRole("heading", { name: "New agent", exact: true });
+  const createBtn = page.getByRole("button", { name: "Create", exact: true });
+
+  await expect(async () => {
+    if (!(await heading.isVisible().catch(() => false))) {
+      await page.getByRole("button", { name: "New agent" }).first().click();
+      await expect(heading).toBeVisible({ timeout: 5000 });
+      await page.getByPlaceholder("Enter agent name").fill(name);
+      if (kind === "connection") {
+        await page.locator('[data-agent-kind="connection"]').click();
+      }
+      await page.locator('[data-tour="agent-next-submit"]').click();
+      // Every spec here exercises conversation-shaped flows.
+      await page.locator('[data-tour="agent-nature-conversation"]').click();
+    }
+    if (await createBtn.isVisible().catch(() => false)) {
+      await createBtn.click();
+    }
+    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
+      timeout: 6000,
+    });
+  }).toPass({ timeout: 45000 });
+
+  const uuid = page.url().match(/\/agents\/([0-9a-f-]{36})/)?.[1];
+  expect(uuid).toBeTruthy();
+  return uuid as string;
+}

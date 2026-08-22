@@ -12,49 +12,13 @@
 // its Tools / Tests / Evaluators / Settings / Connection tab content), and
 // agent deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
+import {
+  chooseTestType,
+  createAgent,
+  waitForOrgReady,
+  workspacePath,
+} from "./helpers";
 import type { Page } from "@playwright/test";
-
-// Create an agent through the "New agent" dialog and land on its detail page.
-// `kind` selects the setup radio: "build" (default, name-only) or "connection"
-// (the Connect option, whose config seeds an empty agent_url server-side).
-// Mirrors the create-retry pattern the original test used: the dialog's token
-// comes from a hook effect, so the very first create can race auth readiness
-// and 401 (a no-op that leaves the dialog open) — retry the click until we
-// navigate to the detail URL.
-async function createAgent(
-  page: Page,
-  name: string,
-  kind: "build" | "connection" = "build",
-): Promise<void> {
-  await page.goto("/agents");
-  await waitForOrgReady(page);
-  await page.getByRole("button", { name: "New agent" }).first().click();
-  await expect(
-    page.getByRole("heading", { name: "New agent", exact: true }),
-  ).toBeVisible();
-
-  await page.getByPlaceholder("Enter agent name").fill(name);
-  if (kind === "connection") {
-    // Setup picker: the "Connect your existing agent" option box switches the
-    // agent kind to "connection" (Agents.tsx: onClick setAgentKind("connection")).
-    await page.getByText("Connect your existing agent").click();
-  }
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  // Second step: what the agent does. Pick Conversation — every test here
-  // exercises the conversation-shaped tabs and flows.
-  await page.getByText("Conversation", { exact: true }).click();
-
-  const createBtn = page.getByRole("button", { name: "Create", exact: true });
-  await expect(async () => {
-    if (await createBtn.isVisible().catch(() => false)) {
-      await createBtn.click();
-    }
-    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
-      timeout: 6000,
-    });
-  }).toPass({ timeout: 30000 });
-}
 
 // Delete an agent from the /agents list via its titled delete button.
 async function deleteAgent(page: Page, name: string): Promise<void> {

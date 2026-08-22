@@ -17,45 +17,15 @@
 //   E2E_FAKE_AI=1 NEXT_PUBLIC_BACKEND_URL=http://localhost:8001 \
 //     npx playwright test --project=authenticated runs.auth
 import { test, expect } from "./fixtures";
-import { chooseTestType, waitForOrgReady, workspacePath } from "./helpers";
+import {
+  chooseTestType,
+  createAgent,
+  waitForOrgReady,
+  workspacePath,
+} from "./helpers";
 import type { Page } from "@playwright/test";
 
 const FAKE_AI = process.env.E2E_FAKE_AI === "1";
-
-// Create a Build agent through the "New agent" dialog and land on its detail
-// page. Mirrors e2e/agent-detail.auth.spec.ts createAgent (kept local so the
-// two specs stay independent).
-async function createBuildAgent(page: Page, name: string): Promise<void> {
-  await page.goto("/agents");
-  await waitForOrgReady(page);
-
-  const dialogHeading = page.getByRole("heading", {
-    name: "New agent",
-    exact: true,
-  });
-  const createBtn = page.getByRole("button", { name: "Create", exact: true });
-
-  // The dialog's access token comes from a hook effect, so the very first
-  // create can race auth readiness and 401 (which closes the dialog). Retry the
-  // whole open → fill → create each iteration so a failed attempt re-opens the
-  // dialog and tries again once the token has hydrated.
-  const conversationOption = page.getByText("Conversation", { exact: true });
-  await expect(async () => {
-    if (!(await dialogHeading.isVisible().catch(() => false))) {
-      await page.getByRole("button", { name: "New agent" }).first().click();
-      await expect(dialogHeading).toBeVisible({ timeout: 5000 });
-      await page.getByPlaceholder("Enter agent name").fill(name);
-      await page.getByRole("button", { name: "Next", exact: true }).click();
-      // Second step: what the agent does. Pick Conversation — these tests
-      // run its tests/evaluations flows, which are conversation-shaped.
-      await conversationOption.click();
-    }
-    await createBtn.click();
-    await expect(page).toHaveURL(workspacePath(/\/agents\/[0-9a-f-]{36}/), {
-      timeout: 5000,
-    });
-  }).toPass({ timeout: 30000 });
-}
 
 async function deleteAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
@@ -213,7 +183,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     const evaluatorName = `E2E Run Evaluator ${Date.now()}`;
 
     await createUnattachedLlmEvaluator(page, evaluatorName);
-    await createBuildAgent(page, agentName);
+    await createAgent(page, agentName);
     await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // Trigger the run from the Tests tab. "Run all tests" opens TestRunnerDialog
@@ -259,7 +229,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     const evaluatorName = `E2E Rerun Evaluator ${Date.now()}`;
 
     await createUnattachedLlmEvaluator(page, evaluatorName);
-    await createBuildAgent(page, agentName);
+    await createAgent(page, agentName);
     await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // Seed one completed run from the Tests tab, then close the dialog.
@@ -306,7 +276,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     const evaluatorName = `E2E Bench Evaluator ${Date.now()}`;
 
     await createUnattachedLlmEvaluator(page, evaluatorName);
-    await createBuildAgent(page, agentName);
+    await createAgent(page, agentName);
     await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     // "Compare models" opens BenchmarkDialog. It starts with one empty model
