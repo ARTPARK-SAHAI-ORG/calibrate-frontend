@@ -23,8 +23,9 @@ export type ExpectedToolCall = NonNullable<
 
 // Each source kind maps to exactly one task type: test runs and benchmarks →
 // "llm", or "llm-general" when their tests were written for a single agent
-// response agent (tool-call tests are labelled inside "llm" tasks too); STT
-// runs → "stt", TTS runs → "tts", simulation runs → "conversation" (their
+// response agent (a tool-call test goes into whichever of the two its own
+// agent uses); STT runs → "stt", TTS runs → "tts", simulation runs →
+// "conversation" (their
 // transcript is a conversation). The type is derived from the source
 // (`targetTaskTypeForSource`), never chosen by the user.
 export const SUPPORTED_TARGET_TASK_TYPES = [
@@ -285,9 +286,28 @@ type RawTestCaseLike = {
 };
 
 /** True for a test written for a single agent response agent — one input and
- * one output, no conversation. */
+ * one output, no conversation. An Agent Response test says so with
+ * `evaluation.type`; a Tool Call test written for the same agent only by
+ * carrying `input` (its type is always "tool_call"). Same rule as the test
+ * result view in `components/test-results/shared.tsx`. */
 function isGeneralTestCase(raw: RawTestCaseLike): boolean {
-  return raw.test_case?.evaluation?.type === "general";
+  return (
+    raw.test_case?.evaluation?.type === "general" ||
+    typeof raw.test_case?.input === "string"
+  );
+}
+
+/** The lone input a single agent response test was given. The run echoes it as
+ * `test_case.input`; when it does not, the run widened it into a one-turn
+ * history, so read it back from that user turn. */
+function generalInputOf(raw: RawTestCaseLike): string {
+  return (
+    raw.test_case?.input ??
+    (raw.test_case?.history ?? raw.chat_history ?? []).find(
+      (h) => h.role === "user",
+    )?.content ??
+    ""
+  );
 }
 
 /** True for a tool-call test — built as a tool-call item, not a response item. */
@@ -304,10 +324,10 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
   return type === "response" || type === "general" || type === "tool_call";
 }
 
-// Build a tool-call item — a normal item inside an `llm` task, carrying the
-// expected match spec and the tool calls the agent actually made. A person
-// marks it correct or wrong; AI judges skip it. `actual_tool_calls` is what
-// marks the item as a tool-call one.
+// Build a tool-call item — a normal item inside an `llm` or `llm-general`
+// task, carrying the expected match spec and the tool calls the agent actually
+// made. A person marks it correct or wrong; AI judges skip it.
+// `actual_tool_calls` is what marks the item as a tool-call one.
 function buildToolCallItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
@@ -318,16 +338,35 @@ function buildToolCallItem(
     raw.test_name ??
     raw.name ??
     "Untitled test";
+  const expected_tool_calls = raw.test_case?.evaluation?.tool_calls ?? [];
+  const actual_tool_calls = raw.output?.tool_calls ?? [];
+  // When the agent replied with text instead of calling a tool (a failed
+  // tool-call test), keep the reply so the annotator sees what the agent
+  // actually did rather than an empty tool-call panel.
+  const response = raw.output?.response ?? "";
+
+  // A single agent response agent has no conversation, so its tool-call test
+  // is labelled as the one input it was given and the output it produced —
+  // the same shape its response tests use in an Agent Response task.
+  if (isGeneralTestCase(raw)) {
+    return {
+      payload: {
+        name,
+        input: generalInputOf(raw),
+        output: response,
+        actual_tool_calls,
+        expected_tool_calls,
+      },
+    };
+  }
+
   return {
     payload: {
       name,
       chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
-      expected_tool_calls: raw.test_case?.evaluation?.tool_calls ?? [],
-      actual_tool_calls: raw.output?.tool_calls ?? [],
-      // When the agent replied with text instead of calling a tool (a failed
-      // tool-call test), keep the reply so the annotator sees what the agent
-      // actually did rather than an empty tool-call panel.
-      agent_response: raw.output?.response ?? "",
+      expected_tool_calls,
+      actual_tool_calls,
+      agent_response: response,
     },
   };
 }
@@ -392,12 +431,7 @@ function buildOneItem(
   const payload = isGeneralTestCase(raw)
     ? {
         name,
-        input:
-          raw.test_case?.input ??
-          (raw.test_case?.history ?? raw.chat_history ?? []).find(
-            (h) => h.role === "user",
-          )?.content ??
-          "",
+        input: generalInputOf(raw),
         output: agent_response,
         evaluator_variables,
       }
@@ -420,7 +454,7 @@ export function buildItemsFromSource(
         source.type === "test_run"
           ? source.runUuid.slice(0, 8)
           : source.benchmarkUuid.slice(0, 8);
-      // Response and tool-call tests both become items in the `llm` task: a
+      // Response and tool-call tests both become items in the task: a
       // response test → a response item scored by the evaluators, a tool-call
       // test → a tool-call item a person marks correct or wrong.
       const handleRaw = (raw: RawTestCaseLike, fullName: string) => {
@@ -638,10 +672,7 @@ export function AddRunToLabellingTaskDialog({
       setTasksLoading(true);
       setTasksError(null);
       try {
-        const data = await apiClient<unknown>(
-          "/annotation-tasks",
-          accessToken,
-        );
+        const data = await apiClient<unknown>("/annotation-tasks", accessToken);
         if (cancelled || !mountedRef.current) return;
         setTasks(unwrapList<LabellingTask>(data));
       } catch (err) {
@@ -661,10 +692,7 @@ export function AddRunToLabellingTaskDialog({
     };
   }, [isOpen, accessToken]);
 
-  const transform = useMemo(
-    () => buildItemsFromSource(source),
-    [source],
-  );
+  const transform = useMemo(() => buildItemsFromSource(source), [source]);
   const { items, skippedCount, evaluatorUuids } = transform;
 
   // First relevance gate: the task must be of the type this source targets.

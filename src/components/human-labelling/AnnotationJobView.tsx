@@ -14,6 +14,7 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
+import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
   ItemValueFilter,
@@ -1309,6 +1310,7 @@ function EvaluatorsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
+        <ExpectedToolCalls payload={itemPayload} />
         {descriptionBlock}
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -1337,6 +1339,7 @@ function EvaluatorsPane({
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
+      <ExpectedToolCalls payload={itemPayload} />
       {descriptionBlock}
       {commentBlock}
       {evaluators.map((ev) => {

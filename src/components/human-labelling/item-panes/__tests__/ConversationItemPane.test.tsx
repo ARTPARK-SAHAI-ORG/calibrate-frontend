@@ -33,7 +33,7 @@ describe("ConversationItemPane", () => {
             { role: "unknown-role", content: "x" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("—")).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe("ConversationItemPane", () => {
             { role: "assistant", content: "Hello!" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hi")).toBeInTheDocument();
     expect(screen.getByText("Hello!")).toBeInTheDocument();
@@ -75,7 +75,7 @@ describe("ConversationItemPane", () => {
             },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("lookup")).toBeInTheDocument();
   });
@@ -97,7 +97,7 @@ describe("ConversationItemPane", () => {
             },
           ],
         }}
-      />
+      />,
     );
     // TestDetailView should render something for the tool call turn rather
     // than falling back to the empty placeholder.
@@ -122,7 +122,7 @@ describe("ConversationItemPane", () => {
             },
           ],
         }}
-      />
+      />,
     );
     // The tool-call rendering path takes precedence over the plain-text
     // assistant message when both content and tool_calls are present.
@@ -139,7 +139,7 @@ describe("ConversationItemPane", () => {
             { role: "user", content: "Hello" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
   });
@@ -153,7 +153,7 @@ describe("ConversationItemPane", () => {
             { role: "user", content: "Hello" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
   });

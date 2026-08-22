@@ -16,7 +16,7 @@ describe("LlmItemPane", () => {
 
   it("shows an em-dash placeholder when chat_history is not an array and agent_response is empty", () => {
     render(
-      <LlmItemPane payload={{ chat_history: "nope", agent_response: "" }} />
+      <LlmItemPane payload={{ chat_history: "nope", agent_response: "" }} />,
     );
     expect(screen.getByText("—")).toBeInTheDocument();
   });
@@ -28,7 +28,7 @@ describe("LlmItemPane", () => {
           chat_history: [{ role: "user", content: "Hi" }],
           agent_response: "Hello, how can I help?",
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hi")).toBeInTheDocument();
     expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
@@ -42,8 +42,11 @@ describe("LlmItemPane", () => {
   it("ignores a non-string agent_response", () => {
     render(
       <LlmItemPane
-        payload={{ chat_history: [{ role: "user", content: "Hi" }], agent_response: 42 }}
-      />
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: 42,
+        }}
+      />,
     );
     expect(screen.getByText("Hi")).toBeInTheDocument();
   });
@@ -77,7 +80,7 @@ describe("LlmItemPane", () => {
             { role: "bogus", content: "x" }, // unknown role -> dropped
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Book a flight")).toBeInTheDocument();
     expect(screen.getByText("Booked!")).toBeInTheDocument();
@@ -101,7 +104,7 @@ describe("LlmItemPane", () => {
             },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("lookup")).toBeInTheDocument();
   });
@@ -115,7 +118,7 @@ describe("LlmItemPane", () => {
             { role: "assistant", content: "Hello from history!" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hello from history!")).toBeInTheDocument();
   });
@@ -129,7 +132,7 @@ describe("LlmItemPane", () => {
             { role: "user", content: "Hello" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
   });
@@ -143,8 +146,49 @@ describe("LlmItemPane", () => {
             { role: "user", content: "Hello" },
           ],
         }}
-      />
+      />,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
+  });
+
+  it("shows the tool call the agent made as the trailing turn", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Book me a flight" }],
+          agent_response: "",
+          actual_tool_calls: [
+            {
+              tool: "book_flight",
+              arguments: { destination: "Delhi" },
+              output: "Booked",
+            },
+          ],
+          expected_tool_calls: [{ tool: "should_not_render", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("Book me a flight")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(screen.queryByText("should_not_render")).not.toBeInTheDocument();
+  });
+
+  it("keeps the text reply before the tool calls", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Book me a flight" }],
+          agent_response: "One moment",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("One moment")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+  });
+
+  it("still shows the em-dash placeholder when actual_tool_calls is empty", () => {
+    render(<LlmItemPane payload={{ actual_tool_calls: [] }} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });

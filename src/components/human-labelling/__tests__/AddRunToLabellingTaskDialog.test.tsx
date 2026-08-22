@@ -90,8 +90,16 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       output: "Here is the summary.",
       evaluator_variables: { "ev-9": { tone: "brief" } },
     });
-    expect(result.items[1].payload.name).toBe("Calls the tool — run-uuid");
-    expect(result.items[1].payload.actual_tool_calls).toEqual([]);
+    // The tool-call test belongs to the same single agent response agent, so
+    // it keeps the input it was given instead of being written as a
+    // conversation.
+    expect(result.items[1].payload).toEqual({
+      name: "Calls the tool — run-uuid",
+      input: "book it",
+      output: "",
+      actual_tool_calls: [],
+      expected_tool_calls: [],
+    });
     expect(result.evaluatorUuids.has("ev-9")).toBe(true);
   });
 
@@ -1185,5 +1193,104 @@ describe("tool-call tests submitted for labelling", () => {
     expect(items[0].payload.actual_tool_calls).toEqual([
       { tool: "book_flight", arguments: { city: "NYC" } },
     ]);
+  });
+
+  // A tool-call test written for a single agent response agent. Its evaluation
+  // type is "tool_call" like any other, so the only thing marking it as that
+  // agent's is the `input` it carries.
+  const generalToolCallTest = {
+    test_case: {
+      name: "Book flight",
+      evaluation: {
+        type: "tool_call",
+        tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+      },
+      input: "book me a flight to NYC",
+    },
+    output: {
+      tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+    },
+  } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
+
+  it("targets an Agent Response task for a general agent's tool-call run, as a test run and as a benchmark", () => {
+    const run: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-generaltc",
+      results: [generalToolCallTest],
+    };
+    expect(targetTaskTypeForSource(run)).toBe("llm-general");
+
+    const bench: AddRunToLabellingTaskSource = {
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-gtc1",
+      modelResults: [
+        { model: "gpt-4", test_results: [generalToolCallTest] },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+    };
+    expect(targetTaskTypeForSource(bench)).toBe("llm-general");
+  });
+
+  it("builds a general agent's tool-call item as input and output, keeping the input", () => {
+    const { items } = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-generaltc",
+      results: [generalToolCallTest],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].payload).toEqual({
+      name: "Book flight — run-uuid",
+      input: "book me a flight to NYC",
+      // The agent called a tool instead of replying with text.
+      output: "",
+      actual_tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+      expected_tool_calls: [
+        { tool: "book_flight", arguments: { city: "NYC" } },
+      ],
+    });
+    expect(items[0].payload.chat_history).toBeUndefined();
+    expect(items[0].payload.agent_response).toBeUndefined();
+  });
+
+  it("keeps the general agent's text reply as the output when it answered instead of calling a tool", () => {
+    const { items } = buildItemsFromSource({
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-gtc2",
+      modelResults: [
+        {
+          model: "gpt-4",
+          test_results: [
+            {
+              test_case: {
+                name: "Book flight",
+                evaluation: { type: "tool_call", tool_calls: [] },
+                input: "book me a flight",
+              },
+              output: { response: "I cannot do that." },
+            },
+          ],
+        },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+    });
+    expect(items[0].payload).toEqual({
+      name: "Book flight — bench-uu — gpt-4",
+      input: "book me a flight",
+      output: "I cannot do that.",
+      actual_tool_calls: [],
+      expected_tool_calls: [],
+    });
+  });
+
+  it("still builds a conversation agent's tool-call item as a chat history", () => {
+    const { items } = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [toolCallTest],
+    });
+    expect(items[0].payload.chat_history).toEqual([
+      { role: "user", content: "book it" },
+    ]);
+    expect(items[0].payload.agent_response).toBe("");
+    expect(items[0].payload.input).toBeUndefined();
+    expect(items[0].payload.output).toBeUndefined();
   });
 });
