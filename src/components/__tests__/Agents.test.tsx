@@ -862,4 +862,27 @@ describe("Agents", () => {
     await user.click(screen.getAllByText("Support Bot")[0]);
     expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
   });
+
+  it("navigates via onNavigateToAgent when clicking the What it does pill", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "a1",
+          name: "Support Bot",
+          type: "agent",
+          interaction_type: "general",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+      ]),
+    );
+    const onNavigateToAgent = jest.fn();
+    const user = setupUser();
+    render(<Agents onNavigateToAgent={onNavigateToAgent} />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Single LLM response")[0]).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getAllByText("Single LLM response")[0]);
+    expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
+  });
 });
