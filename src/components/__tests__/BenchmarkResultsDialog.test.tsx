@@ -410,7 +410,7 @@ describe("BenchmarkResultsDialog", () => {
     // The run is now done, which auto-switches to the leaderboard tab; flip
     // back to outputs to read the evaluators prop passed to the panel.
     await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-    await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+    await setupUser().click(screen.getByRole("button", { name: "Results" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("outputs-panel-evaluators").textContent).toBe(
@@ -681,7 +681,7 @@ describe("BenchmarkResultsDialog", () => {
       // Done runs auto-switch to the leaderboard tab; flip back to outputs
       // to read the modelResults passed to the panel.
       await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-      await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+      await setupUser().click(screen.getByRole("button", { name: "Results" }));
 
       await waitFor(() =>
         expect(
@@ -877,7 +877,7 @@ describe("BenchmarkResultsDialog", () => {
         expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Leaderboard" }));
@@ -915,7 +915,7 @@ describe("BenchmarkResultsDialog", () => {
     it("shows the nav pager only on the outputs tab once nav + selectedTest are set", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
 
       expect(screen.queryByTestId("result-pager")).not.toBeInTheDocument();
       await user.click(screen.getByText("setnav"));
@@ -968,7 +968,7 @@ describe("BenchmarkResultsDialog", () => {
     it("submit-for-labelling: shows a toast when selected tests are not eligible", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(screen.getByText("togglelabel0"));
 
       isLabellingEligibleRawMock.mockReturnValue(false);
@@ -984,7 +984,7 @@ describe("BenchmarkResultsDialog", () => {
     it("submit-for-labelling: opens the AddRunToLabellingTaskDialog when eligible tests are selected", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(screen.getByText("togglelabel0"));
 
       await user.click(
@@ -999,7 +999,7 @@ describe("BenchmarkResultsDialog", () => {
     it("bulk-toggle labelling selection also drives eligibility", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(screen.getByText("bulktogglelabel0"));
 
       await user.click(
@@ -1195,7 +1195,7 @@ describe("BenchmarkResultsDialog", () => {
     // fake-timer flakiness.
     await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
     await act(async () => {
-      await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+      await setupUser().click(screen.getByRole("button", { name: "Results" }));
     });
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
   });

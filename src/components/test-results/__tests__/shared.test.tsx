@@ -787,6 +787,54 @@ describe("TestDetailView", () => {
     await user.click(screen.getByRole("button", { name: "UI" }));
     expect(screen.getByText("final")).toBeInTheDocument();
   });
+
+  describe("a Single Agent Response test (evaluation.type === \"general\")", () => {
+    it("renders the input and output as a box pair instead of chat bubbles", () => {
+      render(
+        <TestDetailView
+          history={[{ role: "user", content: "What is 2+2?" }]}
+          output={{ response: "4" }}
+          passed={true}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getByText("Input")).toBeInTheDocument();
+      expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+      expect(screen.getByText("Output")).toBeInTheDocument();
+      expect(screen.getByText("4")).toBeInTheDocument();
+      // No chat-bubble chrome for either turn.
+      expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    });
+
+    it("renders output tool calls in the Output box", () => {
+      render(
+        <TestDetailView
+          history={[{ role: "user", content: "Book it" }]}
+          output={{
+            tool_calls: [{ tool: "book", arguments: { id: 1 }, output: "done" }],
+          }}
+          passed={true}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getByText("book")).toBeInTheDocument();
+    });
+
+    it("shows an em dash placeholder in each box when there is no input or output", () => {
+      render(
+        <TestDetailView
+          history={[]}
+          passed={true}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getAllByText("—")).toHaveLength(2);
+      // The chat-history empty state does not also show up.
+      expect(
+        screen.queryByText("No conversation history available for this test"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("EvaluationCriteriaPanel", () => {

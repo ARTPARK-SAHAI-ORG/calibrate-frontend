@@ -344,7 +344,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           {/* Desktop Table View */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[40px_1fr_160px_190px_200px_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <div className="flex items-center">
                 <SelectCheckbox
                   checked={allSelected}
@@ -392,7 +392,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             {sortedAgents.map((agent) => (
               <div
                 key={agent.uuid}
-                className="grid grid-cols-[40px_1fr_160px_190px_1fr_auto_auto] gap-4 px-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+                className="grid grid-cols-[40px_1fr_160px_190px_200px_auto_auto] gap-4 px-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
               >
                 {/* Selection checkbox */}
                 <div className="flex items-center">

@@ -991,6 +991,15 @@ export function TestDetailView({
       ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
       : "border-l-4 border-l-red-500 pl-2 md:pl-3"
     : "border-l-4 border-l-foreground pl-2 md:pl-3";
+  // A Single Agent Response test has no conversation — its "history" is
+  // just one user turn standing in for the input. Rendered through the
+  // chat-bubble view below it reads as a two-message conversation, so it
+  // gets the same plain Input/Output box layout used for these agents
+  // everywhere else (the labelling item pane, a trace's detail view).
+  const isGeneralType = evaluation?.type === "general";
+  const generalInput = isGeneralType
+    ? (history.find((h) => h.role === "user")?.content ?? "")
+    : "";
   const historyJson = useMemo(() => {
     // Mirror what the UI shows: the prior turns (`history`) followed by the
     // agent's evaluated response (`output`) appended as the final turn(s),
@@ -1006,8 +1015,75 @@ export function TestDetailView({
   }, [history, output]);
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      {/* Single Agent Response tests: one Input/Output box pair, no chat
+          bubbles — this agent never had a conversation to show. */}
+      {isGeneralType && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-border rounded-xl p-4 space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">Input</h3>
+            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+              {generalInput || "—"}
+            </p>
+          </div>
+          <div className="border border-border rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Output
+                </h3>
+                {showVerdict && <SmallStatusBadge passed={passed} />}
+              </div>
+              {showLegacyReasoningToggle && (
+                <ReasoningToggleButton
+                  open={legacyReasoningOpen}
+                  onToggle={() => setLegacyReasoningOpen((o) => !o)}
+                />
+              )}
+            </div>
+            {showLegacyReasoningToggle && legacyReasoningOpen && (
+              <ReasoningExpandedContent
+                text={reasoning!}
+                showReasoningLabel={false}
+                mutedBody
+                italic
+              />
+            )}
+            {output?.response && (
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                {output.response}
+              </p>
+            )}
+            {output?.tool_calls && output.tool_calls.length > 0 && (
+              <div
+                className={`space-y-3 ${output.response ? "mt-3" : ""}`}
+              >
+                {output.tool_calls.map((toolCall, index) => {
+                  const {
+                    toolName,
+                    args,
+                    output: toolOutput,
+                  } = normalizeToolCall(toolCall);
+                  return (
+                    <ToolCallCard
+                      key={index}
+                      toolName={toolName}
+                      args={args}
+                      output={toolOutput}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {!output?.response &&
+              !(output?.tool_calls && output.tool_calls.length > 0) && (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
+          </div>
+        </div>
+      )}
+
       {/* Chat History from test_case.history */}
-      {history.length > 0 && (
+      {!isGeneralType && history.length > 0 && (
         <div className="space-y-4">
           <div className="sticky top-0 z-20 -mx-8 md:-mx-12 -mt-4 md:-mt-6 px-8 md:px-12 py-2 flex items-center justify-end bg-background">
             <ConversationViewToggle
@@ -1141,8 +1217,9 @@ export function TestDetailView({
 
       {/* Output Section - Agent's Response/Tool Call. Hidden in JSON mode
           since the JSON view already includes the evaluated agent response
-          as the final turn. */}
-      {output && historyView !== "json" && (
+          as the final turn. Hidden for a general test too — its output
+          already rendered in the Input/Output box pair above. */}
+      {!isGeneralType && output && historyView !== "json" && (
         <div className="space-y-4">
           {/* Text Response */}
           {output.response && (
@@ -1238,7 +1315,7 @@ export function TestDetailView({
       )}
 
       {/* Show empty state if no history and no output */}
-      {history.length === 0 && !output && !hasJudgeResults && (
+      {!isGeneralType && history.length === 0 && !output && !hasJudgeResults && (
         <div className="text-center py-8">
           <p className="text-sm text-muted-foreground">
             No conversation history available for this test

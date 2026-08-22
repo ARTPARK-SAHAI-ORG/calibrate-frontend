@@ -805,7 +805,7 @@ export function BenchmarkResultsDialog({
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Outputs
+                Results
               </button>
               <button
                 onClick={() => setActiveTab("about")}
