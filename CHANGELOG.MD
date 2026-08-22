@@ -1,5 +1,6 @@
 ## August 2026
 
+- Stop repeating a test's failure explanation under its answer ([#412](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/412))
 - Add an interaction-type column to Agents, fix result-view layout issues ([#411](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/411))
 - Drop the evaluator type pill from human alignment ([#406](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/406))
 - Remember whether the sidebar is open or closed ([#410](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/410))
