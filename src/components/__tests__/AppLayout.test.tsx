@@ -131,6 +131,12 @@ describe("AppLayout", () => {
     expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
+  it("links Evaluators to the evaluators page", () => {
+    renderLayout();
+    const evaluatorsLink = screen.getByText("Evaluators").closest("a");
+    expect(evaluatorsLink).toHaveAttribute("href", "/evaluators");
+  });
+
   it("opens the learning resources page from Tutorials", () => {
     renderLayout();
     const tutorials = screen.getByText("Tutorials").closest("a");
@@ -193,7 +199,7 @@ describe("AppLayout", () => {
     );
   });
 
-  it.each(["LLM Tests", "Tools", "Evaluators"])(
+  it.each(["LLM Tests", "Tools"])(
     "does not offer %s in the sidebar",
     (label) => {
       renderLayout();
