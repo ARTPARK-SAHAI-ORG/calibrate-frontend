@@ -35,3 +35,4 @@ export {
 } from "./useOrganizations";
 export { useItemPager } from "./useItemPager";
 export { useDialogNavKeys } from "./useDialogNavKeys";
+export { useResizableWidth } from "./useResizableWidth";

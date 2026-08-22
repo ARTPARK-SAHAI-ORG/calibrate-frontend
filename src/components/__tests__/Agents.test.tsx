@@ -70,6 +70,49 @@ describe("Agents", () => {
     expect(screen.getByText("2 agents")).toBeInTheDocument();
   });
 
+  it("shows what each agent does based on interaction_type", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "a1",
+          name: "Support Bot",
+          type: "agent",
+          interaction_type: "conversation",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+        {
+          uuid: "a2",
+          name: "Classifier Bot",
+          type: "agent",
+          interaction_type: "general",
+          updated_at: "2024-02-01T10:00:00.000Z",
+        },
+      ]),
+    );
+    render(<Agents />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Single Agent Response").length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("defaults to Conversation when interaction_type is missing", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(agentsPayload),
+    );
+    render(<Agents />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Single Agent Response")).not.toBeInTheDocument();
+  });
+
   it("does not fetch when there is no access token", () => {
     useAccessTokenMock.mockReturnValue(null);
     render(<Agents />);
@@ -263,7 +306,7 @@ describe("Agents", () => {
     );
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "conn-uuid" }),
@@ -444,7 +487,7 @@ describe("Agents", () => {
     await user.type(input, "{Enter}");
 
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
-    await user.click(screen.getByText("Single LLM response"));
+    await user.click(screen.getByText("Single Agent Response"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "enter-uuid" }),
@@ -817,6 +860,29 @@ describe("Agents", () => {
     );
 
     await user.click(screen.getAllByText("Support Bot")[0]);
+    expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
+  });
+
+  it("navigates via onNavigateToAgent when clicking the What it does pill", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "a1",
+          name: "Support Bot",
+          type: "agent",
+          interaction_type: "general",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+      ]),
+    );
+    const onNavigateToAgent = jest.fn();
+    const user = setupUser();
+    render(<Agents onNavigateToAgent={onNavigateToAgent} />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Single Agent Response")[0]).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getAllByText("Single Agent Response")[0]);
     expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
   });
 });

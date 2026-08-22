@@ -23,8 +23,8 @@ export function PreBuiltPill() {
 export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
-  llm: "LLM reply",
-  "llm-general": "LLM response",
+  llm: "Agent reply",
+  "llm-general": "Agent response",
   conversation: "Full conversation",
 };
 

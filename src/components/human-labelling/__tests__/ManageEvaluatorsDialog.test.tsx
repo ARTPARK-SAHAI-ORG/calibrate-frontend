@@ -118,7 +118,7 @@ describe("ManageEvaluatorsDialog", () => {
       screen.getByText("Choose evaluators to align with humans"),
     ).toBeInTheDocument();
     // The kind of evaluator is no longer named anywhere in the header.
-    expect(screen.queryByText("LLM reply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent reply")).not.toBeInTheDocument();
   });
 
   it("makes an evaluator without leaving, and starts it ticked", async () => {
@@ -201,7 +201,7 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockResolvedValue({ items: [] });
     const { rerender } = renderDialog({ taskType: "llm" });
     await waitFor(() =>
-      expect(screen.getByText("No LLM reply evaluators yet.")).toBeInTheDocument(),
+      expect(screen.getByText("No Agent reply evaluators yet.")).toBeInTheDocument(),
     );
     rerender(
       <ManageEvaluatorsDialog

@@ -508,7 +508,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
     expect(screen.getByText("2 tests")).toBeInTheDocument();
-    expect(screen.getAllByText("LLM response").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Agent Response").length).toBeGreaterThan(0);
   });
 
   it("filters the list via the search input", async () => {
@@ -538,14 +538,14 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
   });
 
-  it("keeps a general agent's tests under the LLM response filter", async () => {
+  it("keeps a general agent's tests under the Agent Response filter", async () => {
     state.agentTests = [responseTest, toolCallTest, generalTest];
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Capital question test");
 
-    // "LLM response" is also a type label in the table, so scope to the chip.
-    await user.click(screen.getByRole("button", { name: "LLM response" }));
+    // "Agent Response" is also a type label in the table, so scope to the chip.
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
     expect(screen.getAllByText("Capital question test")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Greeting test")[0]).toBeInTheDocument();
     expect(screen.queryAllByText("Weather tool test")).toHaveLength(0);

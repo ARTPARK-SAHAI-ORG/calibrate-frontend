@@ -408,9 +408,9 @@ async function resolveFreeName(
   }
 }
 
-// Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
+// Only "Agent reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
-// that type and silently drops "Full conversation" / "LLM response" ones. So the
+// that type and silently drops "Full conversation" / "Agent Response" ones. So the
 /**
  * Find the evaluator's checkbox by its EXACT name. The picker renders each row
  * as a checkbox whose aria-label is `Select <name>` (the row body opens a
@@ -930,12 +930,12 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runTabOutputs,
       title: "See every answer",
       description:
-        "That was the overview. The <strong>Outputs</strong> tab shows <strong>each test</strong> your agent ran, one by one.",
+        "That was the overview. The <strong>Results</strong> tab shows <strong>each test</strong> your agent ran, one by one.",
       side: "bottom",
       align: "start",
       actionLabel: "Next",
       prepare: async () => {
-        // Open the Outputs tab now so it is the active tab while this card
+        // Open the Results tab now so it is the active tab while this card
         // describes it (rather than only switching on the next click).
         await clickElement(A.runTabOutputs);
       },
@@ -1043,7 +1043,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       timeout: 90000,
       prepare: async () => {
-        // Open the Outputs tab and the previously-failing test so the pass is
+        // Open the Results tab and the previously-failing test so the pass is
         // shown on the exact case, not just the summary.
         await clickElement(A.runTabOutputs, { timeout: 10000 });
         await waitForElement(A.runResultRow, { timeout: 8000 });

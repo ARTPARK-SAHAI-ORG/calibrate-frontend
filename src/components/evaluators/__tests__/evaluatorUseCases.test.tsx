@@ -83,7 +83,7 @@ describe("EvaluatorUseCaseCards", () => {
         onSelect={onSelect}
       />,
     );
-    await user.click(screen.getByText("LLM reply"));
+    await user.click(screen.getByText("Agent reply"));
     expect(onSelect).toHaveBeenCalledWith("llm");
   });
 
@@ -107,7 +107,7 @@ describe("EvaluatorUseCaseCards", () => {
         onSelect={jest.fn()}
       />,
     );
-    const card = screen.getByText("LLM reply").closest("button");
+    const card = screen.getByText("Agent reply").closest("button");
     expect(card?.className).toContain("hover:border-orange-500/40");
   });
 

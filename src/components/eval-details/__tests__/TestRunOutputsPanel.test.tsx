@@ -38,6 +38,9 @@ jest.mock("../../test-results/shared", () => ({
       {props.testName}
     </div>
   ),
+  ResizeHandle: ({ label }: { label: string }) => (
+    <div data-testid="resize-handle" aria-label={label} />
+  ),
   isTypingTarget: jest.fn(() => false),
   scrollRowByPage: jest.fn(),
 }));

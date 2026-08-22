@@ -9,6 +9,7 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResizeHandle,
   isTypingTarget,
   scrollRowByPage,
   type PagerNav,
@@ -16,6 +17,7 @@ import {
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 export type TestRunResult = {
   id: string;
@@ -87,6 +89,10 @@ export function TestRunOutputsPanel({
   // navigation keeps the selection in view (a page at a time).
   const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLDivElement>(null);
+  // Both side columns start at their old fixed widths but are user-resizable,
+  // so a long input/output pair in the middle can be given more room.
+  const listPanel = useResizableWidth(320, 240, 560, "grow-right");
+  const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -203,9 +209,12 @@ export function TestRunOutputsPanel({
 
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
-      {/* Left Panel - Test List */}
+      {/* Left Panel - Test List. The border between this and the middle
+          panel comes from the resize handle below, not this div, so the
+          hover state covers the whole divider. */}
       <div
-        className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden ${
+        style={{ "--list-w": `${listPanel.width}px` } as React.CSSProperties}
+        className={`w-full md:w-[var(--list-w)] flex flex-col overflow-hidden ${
           selectedId ? "hidden md:flex" : "flex"
         }`}
       >
@@ -330,10 +339,12 @@ export function TestRunOutputsPanel({
         </div>
       </div>
 
+      <ResizeHandle onMouseDown={listPanel.startDrag} label="Resize test list" />
+
       {/* Middle Panel - Test Details */}
       <div
         data-tour="run-result-detail"
-        className={`flex-1 ${selectedId ? "flex" : "hidden md:flex"} flex-col overflow-hidden`}
+        className={`flex-1 min-w-0 ${selectedId ? "flex" : "hidden md:flex"} flex-col overflow-hidden`}
       >
         {selectedResult ? (
           <>
@@ -368,10 +379,18 @@ export function TestRunOutputsPanel({
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedResult && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
-        <div
-          data-tour="run-result-verdict"
-          className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden"
-        >
+        <>
+          <ResizeHandle
+            onMouseDown={verdictPanel.startDrag}
+            label="Resize evaluators panel"
+          />
+          <div
+            data-tour="run-result-verdict"
+            style={
+              { "--verdict-w": `${verdictPanel.width}px` } as React.CSSProperties
+            }
+            className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
+          >
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
               testName={selectedResult.name}
@@ -392,7 +411,8 @@ export function TestRunOutputsPanel({
               legacyDefaultEvaluator={legacyDefaultEvaluator}
             />
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

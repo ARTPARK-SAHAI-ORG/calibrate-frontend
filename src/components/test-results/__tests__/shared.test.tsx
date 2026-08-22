@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser, within } from "@/test-utils";
+import { render, screen, setupUser, within, fireEvent } from "@/test-utils";
 import {
   StatusIcon,
   LabellingRowCheckbox,
@@ -11,6 +11,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResizeHandle,
   scrollRowByPage,
   isTypingTarget,
   ResultPager,
@@ -452,6 +453,17 @@ describe("formatTurnTimestamp", () => {
   });
 });
 
+describe("ResizeHandle", () => {
+  it("labels itself as a vertical separator and fires the drag handler", async () => {
+    const onMouseDown = jest.fn();
+    render(<ResizeHandle onMouseDown={onMouseDown} label="Resize test list" />);
+    const handle = screen.getByRole("separator", { name: "Resize test list" });
+    expect(handle).toHaveAttribute("aria-orientation", "vertical");
+    fireEvent.mouseDown(handle);
+    expect(onMouseDown).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("EmptyStateView", () => {
   it("renders the given message", () => {
     render(<EmptyStateView message="Nothing here" />);
@@ -786,6 +798,57 @@ describe("TestDetailView", () => {
 
     await user.click(screen.getByRole("button", { name: "UI" }));
     expect(screen.getByText("final")).toBeInTheDocument();
+  });
+
+  describe("a Single Agent Response test (evaluation.type === \"general\")", () => {
+    it("renders the input and output as a box pair instead of chat bubbles", () => {
+      const { container } = render(
+        <TestDetailView
+          history={[{ role: "user", content: "What is 2+2?" }]}
+          output={{ response: "4" }}
+          passed={false}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getByText("Input")).toBeInTheDocument();
+      expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+      expect(screen.getByText("Output")).toBeInTheDocument();
+      expect(screen.getByText("4")).toBeInTheDocument();
+      // No chat-bubble chrome for either turn, and no pass/fail badge on the
+      // Output box — the verdict already shows once, per evaluator, in the
+      // criteria panel next to it.
+      expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+      expect(container.querySelector(".bg-red-500\\/20")).toBeNull();
+    });
+
+    it("renders output tool calls in the Output box", () => {
+      render(
+        <TestDetailView
+          history={[{ role: "user", content: "Book it" }]}
+          output={{
+            tool_calls: [{ tool: "book", arguments: { id: 1 }, output: "done" }],
+          }}
+          passed={true}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getByText("book")).toBeInTheDocument();
+    });
+
+    it("shows an em dash placeholder in each box when there is no input or output", () => {
+      render(
+        <TestDetailView
+          history={[]}
+          passed={true}
+          evaluation={{ type: "general" }}
+        />,
+      );
+      expect(screen.getAllByText("—")).toHaveLength(2);
+      // The chat-history empty state does not also show up.
+      expect(
+        screen.queryByText("No conversation history available for this test"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
 

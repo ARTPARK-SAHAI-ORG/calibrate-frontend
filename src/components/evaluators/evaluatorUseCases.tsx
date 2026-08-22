@@ -21,7 +21,7 @@ export type EvaluatorUseCaseOption = {
 export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
   {
     value: "llm",
-    title: "LLM reply",
+    title: "Agent reply",
     description: "Judge an agent's next reply in a conversation",
     group: "conversation",
   },
@@ -33,7 +33,7 @@ export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
   },
   {
     value: "llm-general",
-    title: "LLM response",
+    title: "Agent response",
     description: "Judge the output of an LLM given a text input",
     group: "text",
   },

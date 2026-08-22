@@ -274,7 +274,7 @@ describe("EvaluatorPicker hidden types", () => {
         onToggle={jest.fn()}
       />,
     );
-    expect(screen.queryByText("LLM reply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent reply")).not.toBeInTheDocument();
     expect(screen.queryByText("Binary")).not.toBeInTheDocument();
   });
 });

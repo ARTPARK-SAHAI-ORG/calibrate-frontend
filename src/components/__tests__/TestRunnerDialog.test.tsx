@@ -193,7 +193,7 @@ describe("TestRunnerDialog", () => {
       expect(screen.getByText("Slow Run")).toBeInTheDocument(),
     );
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
-    await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+    await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
   });
 
@@ -328,9 +328,9 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Outputs" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Outputs" }));
+    await user.click(screen.getByRole("button", { name: "Results" }));
 
     expect(screen.getByTestId("results-count")).toHaveTextContent("2");
     // Selectable despite having no test_uuid (stable index id is used).
@@ -795,7 +795,7 @@ describe("TestRunnerDialog", () => {
 
     // Tab nav is visible once done; switch back to outputs.
     const user = setupUser();
-    await user.click(screen.getByRole("button", { name: "Outputs" }));
+    await user.click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
 
     // The About tab explains the metrics (always documents pass rate).
@@ -1149,7 +1149,7 @@ describe("TestRunnerDialog", () => {
     it("shows an error toast when only tool-call tests are selected", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(
         screen.getByRole("button", { name: "toggle-labelling-test-2" }),
       );
@@ -1165,7 +1165,7 @@ describe("TestRunnerDialog", () => {
     it("opens the labelling dialog when an eligible test is selected, and closes it again", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(
         screen.getByRole("button", { name: "toggle-labelling-test-1" }),
       );
