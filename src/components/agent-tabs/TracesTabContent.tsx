@@ -21,6 +21,7 @@ import {
   Button,
   LoadingState,
   SearchInput,
+  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import {
@@ -31,8 +32,22 @@ import {
   useTraceDeletion,
   useTraces,
 } from "@/hooks";
-import { fetchTrace, type TraceDetail } from "@/lib/tracesApi";
+import {
+  fetchTrace,
+  type TraceDetail,
+  type TraceOutputFilter,
+} from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
+
+/** What a trace's output can be filtered down to. A trace that both replied
+ *  and called tools counts as a reply, which is also how "Add to tests"
+ *  decides: one selected trace with a reply makes the whole batch judge
+ *  replies. */
+const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "response", label: "Response" },
+  { value: "tool_call", label: "Tool call" },
+];
 
 /**
  * The Traces tab on the agent detail page: the production conversations sent
@@ -66,10 +81,17 @@ export function TracesTabContent({
     return () => window.clearTimeout(handle);
   }, [searchInput]);
 
+  // Which kind of output to list. "response" is a trace whose agent replied,
+  // "tool_call" one that only called tools. Like the search, the backend does
+  // the filtering, so the count and the pages cover every matching trace and
+  // not just the ones on screen.
+  const [outputFilter, setOutputFilter] = useState<TraceOutputFilter>("all");
+
   const {
     items,
     total,
     loadedQ,
+    loadedOutputType,
     offset,
     setOffset,
     loadedOffset,
@@ -86,6 +108,7 @@ export function TracesTabContent({
     agentId: agentUuid,
     pageSize,
     q: search,
+    outputType: outputFilter,
   });
 
   const deletion = useTraceDeletion({
@@ -279,8 +302,22 @@ export function TracesTabContent({
   // screen are still the old search until the full list has loaded back.
   const isSearching =
     searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
+  // A chosen output kind counts the same way: once one is on, an empty list can
+  // no longer mean "this agent never sent a trace". Both the chosen value and
+  // the one the rows came from count, because after the filter is set back to
+  // All the rows on screen are still the filtered ones until the full list has
+  // loaded back.
+  const isFilteringOutput =
+    outputFilter !== "all" || loadedOutputType !== "all";
+  const isNarrowed = isSearching || isFilteringOutput;
+  const noMatchMessage =
+    isSearching && isFilteringOutput
+      ? "No traces match your search and filter"
+      : isSearching
+        ? "No traces match your search"
+        : "No traces match your filter";
   const isEmptyRef = useRef(false);
-  if (!isLoading && !error && !isSearching) isEmptyRef.current = total === 0;
+  if (!isLoading && !error && !isNarrowed) isEmptyRef.current = total === 0;
   const showEmptyState = hasLoaded && isEmptyRef.current;
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
@@ -301,7 +338,14 @@ export function TracesTabContent({
             value={searchInput}
             onChange={setSearchInput}
             placeholder="Search traces"
-            className="w-full sm:w-3/5 sm:mr-auto"
+            className="w-full sm:w-2/5"
+          />
+          <SegmentedFilter
+            value={outputFilter}
+            onChange={setOutputFilter}
+            options={OUTPUT_FILTER_OPTIONS}
+            className="sm:mr-auto"
+            ariaLabel="Filter traces by output"
           />
           <RefreshButton
             loading={isRefreshing}
@@ -388,7 +432,7 @@ export function TracesTabContent({
             </div>
           )}
 
-          {total === 0 && isSearching ? (
+          {total === 0 && isNarrowed ? (
             <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
                 <SearchIcon className="w-6 h-6 md:w-7 md:h-7 text-muted-foreground" />
@@ -397,7 +441,7 @@ export function TracesTabContent({
                 No traces found
               </h3>
               <p className="text-sm md:text-base text-muted-foreground text-center">
-                No traces match your search
+                {noMatchMessage}
               </p>
             </div>
           ) : (

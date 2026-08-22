@@ -81,6 +81,12 @@ export function traceInputTurns(
 /** The backend caps a page at 200 rows. */
 export const MAX_TRACES_PAGE_SIZE = 200;
 
+/** What the agent did on the turn: replied, or called tools instead. */
+export type TraceOutputType = "response" | "tool_call";
+
+/** The output filter, where "all" means no filter at all. */
+export type TraceOutputFilter = "all" | TraceOutputType;
+
 export type TraceListParams = {
   limit: number;
   offset: number;
@@ -90,6 +96,10 @@ export type TraceListParams = {
    *  conversation id, conversation history, reply, and metadata. Blank is
    *  ignored by the backend, and left off here. */
   q?: string;
+  /** Keep only the traces whose output has a reply ("response") or whose
+   *  output has tool calls and no reply ("tool_call"). "all" keeps everything
+   *  and is left off here. */
+  outputType?: TraceOutputFilter;
 };
 
 /**
@@ -100,13 +110,16 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q }: TraceListParams,
+  { limit, offset, agentId, q, outputType }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
   if (q?.trim()) params.set("q", q.trim());
+  if (outputType && outputType !== "all") {
+    params.set("output_type", outputType);
+  }
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTraces, TraceSummary } from "@/lib/tracesApi";
+import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 type UseTracesArgs = {
@@ -12,6 +12,8 @@ type UseTracesArgs = {
   pageSize?: number;
   /** Search text, already debounced by the caller. Blank searches everything. */
   q?: string;
+  /** Keep only replies or only tool calls. "all" keeps everything. */
+  outputType?: TraceOutputFilter;
 };
 
 /**
@@ -25,6 +27,7 @@ export function useTraces({
   agentId,
   pageSize = 50,
   q = "",
+  outputType = "all",
 }: UseTracesArgs) {
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -40,13 +43,18 @@ export function useTraces({
   // search loads, and callers need it to tell "this agent has no traces" from
   // "this search found none".
   const [loadedQ, setLoadedQ] = useState("");
+  // The output filter the rows on screen came from. Like `loadedQ`, it lags
+  // `outputType` while a new filter loads, because the value in state changes
+  // before the fetch for it resolves.
+  const [loadedOutputType, setLoadedOutputType] =
+    useState<TraceOutputFilter>("all");
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize, q]);
+  }, [agentId, pageSize, q, outputType]);
 
   const load = useCallback(
     async (targetOffset: number): Promise<number> => {
@@ -60,12 +68,14 @@ export function useTraces({
           offset: targetOffset,
           agentId,
           q,
+          outputType,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
         setTotal(nextTotal);
         setLoadedQ(q);
+        setLoadedOutputType(outputType);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -81,7 +91,7 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId, q],
+    [accessToken, pageSize, agentId, q, outputType],
   );
 
   useEffect(() => {
@@ -126,6 +136,7 @@ export function useTraces({
     items,
     total,
     loadedQ,
+    loadedOutputType,
     offset,
     setOffset,
     loadedOffset,

@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTraces } from "@/hooks/useTraces";
 import { fetchTraces } from "@/lib/tracesApi";
+import type { TraceOutputFilter } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
@@ -40,7 +41,62 @@ describe("useTraces", () => {
       offset: 0,
       agentId: "ag-1",
       q: "",
+      outputType: "all",
     });
+  });
+
+  it("sends the output filter and returns to the first page when it changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "a" }, { uuid: "b" }], 9));
+
+    const { result, rerender } = renderHook(
+      ({ outputType }: { outputType: TraceOutputFilter }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId: "ag-1",
+          pageSize: 2,
+          outputType,
+        }),
+      { initialProps: { outputType: "all" as TraceOutputFilter } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(2));
+
+    rerender({ outputType: "tool_call" });
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ outputType: "tool_call", offset: 0 }),
+      ),
+    );
+    expect(result.current.offset).toBe(0);
+  });
+
+  it("reports the output filter the rows on screen came from", async () => {
+    let resolvePage: (value: unknown) => void = () => {};
+    mockFetchTraces.mockResolvedValueOnce(page([{ uuid: "a" }], 1));
+
+    const { result, rerender } = renderHook(
+      ({ outputType }: { outputType: TraceOutputFilter }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", outputType }),
+      { initialProps: { outputType: "all" as TraceOutputFilter } },
+    );
+    await waitFor(() => expect(result.current.loadedOutputType).toBe("all"));
+
+    mockFetchTraces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePage = resolve;
+      }),
+    );
+    rerender({ outputType: "tool_call" });
+    // The new filter is in flight, so the rows are still the old ones.
+    expect(result.current.loadedOutputType).toBe("all");
+
+    await act(async () => {
+      resolvePage(page([], 0));
+    });
+    expect(result.current.loadedOutputType).toBe("tool_call");
   });
 
   it("sends the search text and returns to the first page when it changes", async () => {

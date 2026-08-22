@@ -38,6 +38,47 @@ describe("fetchTraces", () => {
     expect(query.get("agent_id")).toBe("ag-1");
     expect(query.has("q")).toBe(false);
     expect(query.has("conversation_id")).toBe(false);
+    expect(query.has("output_type")).toBe(false);
+  });
+
+  it("sends the output filter, and leaves it off when everything is wanted", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      outputType: "tool_call",
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get(
+        "output_type",
+      ),
+    ).toBe("tool_call");
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      outputType: "response",
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).get(
+        "output_type",
+      ),
+    ).toBe("response");
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      outputType: "all",
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[2][0].split("?")[1]).has(
+        "output_type",
+      ),
+    ).toBe(false);
   });
 
   it("sends the trimmed search term, and leaves a blank one off", async () => {

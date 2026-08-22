@@ -1,5 +1,6 @@
 "use client";
 
+import { SegmentedFilter } from "@/components/ui";
 import { testTypeLabel, type TestType } from "@/lib/testTypes";
 
 /** The filter value: a concrete test type, or "all" for no filtering. */
@@ -52,9 +53,9 @@ interface TestTypeFilterProps {
 }
 
 /**
- * iOS-style segmented control to filter a tests list by type. Presentational
- * only — the caller owns the filter state and any side-effects (e.g. pruning
- * bulk selections that no longer match) in its `onChange` handler.
+ * Filters a tests list by type. Presentational only — the caller owns the
+ * filter state and any side-effects (e.g. pruning bulk selections that no
+ * longer match) in its `onChange` handler.
  */
 export function TestTypeFilter({
   value,
@@ -62,29 +63,14 @@ export function TestTypeFilter({
   size = "md",
   className = "",
 }: TestTypeFilterProps) {
-  const buttonClasses =
-    size === "sm"
-      ? "flex-1 h-6 px-1.5 text-[11px] whitespace-nowrap"
-      : "h-7 px-3 text-xs";
-
   return (
-    <div
-      className={`flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5 ${className}`}
-    >
-      {TEST_TYPE_FILTER_OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`${buttonClasses} rounded-full font-medium cursor-pointer transition-colors ${
-            value === opt.value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedFilter
+      value={value}
+      onChange={onChange}
+      options={TEST_TYPE_FILTER_OPTIONS}
+      size={size}
+      className={className}
+      ariaLabel="Filter tests by type"
+    />
   );
 }

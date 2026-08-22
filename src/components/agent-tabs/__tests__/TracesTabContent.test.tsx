@@ -225,6 +225,7 @@ function tracesResult(
     items,
     total: items.length,
     loadedQ: "",
+    loadedOutputType: "all",
     offset: 0,
     setOffset: jest.fn(),
     loadedOffset: 0,
@@ -374,6 +375,95 @@ describe("TracesTabContent", () => {
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() => expect(lastTracesArgs().q).toBe("polio"));
+  });
+
+  it("asks the backend for one kind of output when a filter is chosen", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(lastTracesArgs().outputType).toBe("all");
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
+
+    await waitFor(() => expect(lastTracesArgs().outputType).toBe("tool_call"));
+  });
+
+  it("select all ticks the filtered traces and nothing else", async () => {
+    const user = setupUser();
+    // Filtering happens on the backend, so the page holds only the traces that
+    // matched: ticking select all can never reach the ones it hid.
+    mockUseTraces.mockReturnValue(
+      tracesResult(
+        [
+          trace({
+            uuid: "trace-tool",
+            response_preview: null,
+            tool_call_count: 1,
+          }),
+        ],
+        { loadedOutputType: "tool_call", total: 1 },
+      ),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("trace selected")).toBeInTheDocument();
+  });
+
+  it("says nothing matched the filter instead of showing the setup steps", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { loadedOutputType: "tool_call" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your filter"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
+  });
+
+  it("names both when a search and a filter are on together", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { loadedQ: "polio", loadedOutputType: "tool_call" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your search and filter"),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the setup steps away while a cleared filter loads the full list back", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { loadedOutputType: "tool_call" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("No traces match your filter"),
+      ).toBeInTheDocument(),
+    );
+
+    // Back to All. The rows on screen are still the filtered ones until the
+    // full list has loaded, so the setup steps must not appear in between.
+    await user.click(screen.getByRole("button", { name: "All" }));
+
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
   });
 
   it("says nothing matched instead of showing the setup steps", async () => {
