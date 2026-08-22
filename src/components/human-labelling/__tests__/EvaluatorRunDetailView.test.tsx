@@ -1954,6 +1954,69 @@ describe("EvaluatorResultsPane", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a humans-only note instead of an error for a tool-call output item", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[]}
+        isToolCallOutput
+      />,
+    );
+    expect(
+      screen.getByText(
+        "AI judges do not run on tool calls. A person can still label this item by hand.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the expected tool calls in place of 'No evaluators in this run' for a tool-call item with no evaluators", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[]}
+        runs={[]}
+        isToolCallOutput
+        toolCallPayload={{
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No evaluators in this run."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the expected tool calls alongside the humans-only note when the task also has evaluators", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[]}
+        isToolCallOutput
+        toolCallPayload={{
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "AI judges do not run on tool calls. A person can still label this item by hand.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows disagreements-only empty state", () => {
     render(
       <EvaluatorResultsPane
@@ -2249,6 +2312,48 @@ describe("EvaluatorResultsPane", () => {
 // ---------------------------------------------------------------------------
 
 describe("ItemDetailPane", () => {
+  it("recognises a tool-call item from its payload and passes it through", () => {
+    // Guards the wiring, not just the pane: ItemDetailPane must spot a
+    // tool-call payload itself and hand it on, in a task of any kind.
+    render(
+      <ItemDetailPane
+        item={{
+          id: 0,
+          uuid: "item-tc",
+          task_id: "task-1",
+          payload: {
+            chat_history: [{ role: "user", content: "book it" }],
+            expected_tool_calls: [
+              { function: { name: "book_flight", arguments: "{}" } },
+            ],
+            actual_tool_calls: [],
+          },
+          created_at: "",
+          deleted_at: null,
+        }}
+        taskType="llm"
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
+        getJobEvaluator={() => evaluatorBinary}
+        runs={[]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "AI judges do not run on tool calls. A person can still label this item by hand.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders ItemPane and EvaluatorResultsPane side by side", () => {
     render(
       <ItemDetailPane

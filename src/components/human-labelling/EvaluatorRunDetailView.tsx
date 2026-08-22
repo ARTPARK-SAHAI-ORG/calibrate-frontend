@@ -24,6 +24,8 @@ import {
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import { isToolCallOutputItem } from "@/components/human-labelling/itemOutputType";
+import { ExpectedToolCallsPanel } from "@/components/human-labelling/item-panes/ExpectedToolCallsPanel";
 import {
   ItemValueFilter,
   matchesAllValueFilters,
@@ -684,7 +686,18 @@ export function EvaluatorResultsPane({
   annotatorFilterActive = false,
   singleAnnotatorFiltered = false,
   itemComments = [],
+  isToolCallOutput = false,
+  toolCallPayload,
 }: {
+  /** True when this item's output is a tool call, not a text reply — AI
+   * judges don't score it, so a "humans only" note shows in place of a
+   * missing result. */
+  isToolCallOutput?: boolean;
+  /** The item's payload, present when `isToolCallOutput` is true. Read for
+   * `expected_tool_calls` — the evaluator-equivalent for a tool-call item —
+   * shown via `ExpectedToolCallsPanel` in the same spot a response item's
+   * evaluators show. */
+  toolCallPayload?: Record<string, unknown>;
   evaluators: {
     evaluator_id: string;
     evaluator_version_id?: string;
@@ -758,14 +771,21 @@ export function EvaluatorResultsPane({
       />
     ) : null;
 
+  const toolCallPanel =
+    isToolCallOutput && toolCallPayload ? (
+      <ExpectedToolCallsPanel payload={toolCallPayload} />
+    ) : null;
+
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
         {descriptionBlock}
         {commentsBlock}
-        <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          No evaluators in this run.
-        </div>
+        {toolCallPanel ?? (
+          <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+            No evaluators in this run.
+          </div>
+        )}
       </div>
     );
   }
@@ -804,6 +824,7 @@ export function EvaluatorResultsPane({
       <div className="space-y-3">
         {descriptionBlock}
         {commentsBlock}
+        {toolCallPanel}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           {filterDisagreements
             ? "All evaluators agree with human annotations on this item."
@@ -891,6 +912,30 @@ export function EvaluatorResultsPane({
         const evaluatorName = displayName;
 
         if (!r) {
+          // A tool-call output has nothing for an AI judge to read, so the run
+          // skips it. Say so plainly rather than showing a missing-result
+          // error — a human can still label it.
+          if (isToolCallOutput) {
+            return (
+              <div
+                key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+                className="border border-border bg-muted/30 rounded-xl p-4 space-y-1.5"
+              >
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <h3 className="text-sm font-semibold">{evaluatorName}</h3>
+                  {versionLabel && (
+                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                      {versionLabel}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  AI judges do not run on tool calls. A person can still label
+                  this item by hand.
+                </p>
+              </div>
+            );
+          }
           return (
             <div
               key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
@@ -1085,6 +1130,7 @@ export function EvaluatorResultsPane({
     <div className="space-y-4">
       {descriptionBlock}
       {commentsBlock}
+      {toolCallPanel}
       {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
     </div>
   );
@@ -1484,6 +1530,8 @@ export function ItemDetailPane({
           annotatorFilterActive={annotatorFilterActive}
           singleAnnotatorFiltered={singleAnnotatorFiltered}
           itemComments={itemComments}
+          isToolCallOutput={isToolCallOutputItem(item.payload)}
+          toolCallPayload={itemPayload ?? undefined}
         />
       </div>
     </div>
