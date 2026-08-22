@@ -480,34 +480,38 @@ export function TracesTabContent({
               labelling must not disappear either. */}
           {(selected.size > 0 || isPreparingLabelling) && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
-              <span className="text-sm text-muted-foreground">
-                {isPreparingLabelling ? (
-                  "Loading traces..."
-                ) : (
-                  <>
-                    <span className="font-medium text-foreground">
-                      {selectionCount}
-                    </span>{" "}
-                    {selectionCount === 1 ? "trace" : "traces"} selected
-                    {everyTraceMatching && search.trim() ? (
-                      <span className="opacity-80">
-                        {" "}
-                        matching &ldquo;{search.trim()}&rdquo;
-                      </span>
-                    ) : null}
-                  </>
+              {/* The count and the offer to take the whole list belong
+                  together on the left; only the actions go to the right. */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {isPreparingLabelling ? (
+                    "Loading traces..."
+                  ) : (
+                    <>
+                      <span className="font-medium text-foreground">
+                        {selectionCount}
+                      </span>{" "}
+                      {selectionCount === 1 ? "trace" : "traces"} selected
+                      {everyTraceMatching && search.trim() ? (
+                        <span className="opacity-80">
+                          {" "}
+                          matching &ldquo;{search.trim()}&rdquo;
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </span>
+                {canSelectEveryTrace && (
+                  <button
+                    type="button"
+                    onClick={() => setEveryTraceMatching(true)}
+                    className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Select all {total} trace{total === 1 ? "" : "s"}
+                    {search.trim() ? ` matching "${search.trim()}"` : ""}
+                  </button>
                 )}
-              </span>
-              {canSelectEveryTrace && (
-                <button
-                  type="button"
-                  onClick={() => setEveryTraceMatching(true)}
-                  className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Select all {total} trace{total === 1 ? "" : "s"}
-                  {search.trim() ? ` matching "${search.trim()}"` : ""}
-                </button>
-              )}
+              </div>
               {selected.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
