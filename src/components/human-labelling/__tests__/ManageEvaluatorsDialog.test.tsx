@@ -286,7 +286,7 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.queryByText("Order Changed")).not.toBeInTheDocument();
 
     // Right-column cards: find the draggable rows via their "N." index badge.
-    const cards = screen.getAllByText(/^\d+\.$/).map((el) => el.closest("div[draggable]")!);
+    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
     expect(cards.length).toBe(2);
 
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
@@ -317,7 +317,7 @@ describe("ManageEvaluatorsDialog", () => {
   it("ignores dragOver before any drag has started, clears the drag-over highlight on dragLeave, and resets on dragEnd", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
     await waitForCatalogueLoaded();
-    const cards = screen.getAllByText(/^\d+\.$/).map((el) => el.closest("div[draggable]")!);
+    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
 
     // dragOver with no active drag source is a no-op (dragSourceIdx === null).
@@ -333,7 +333,7 @@ describe("ManageEvaluatorsDialog", () => {
   it("ignores a drop onto the same source index (no reorder)", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
     await waitForCatalogueLoaded();
-    const cards = screen.getAllByText(/^\d+\.$/).map((el) => el.closest("div[draggable]")!);
+    const cards = screen.getAllByText(/^\d+$/).map((el) => el.closest("div[draggable]")!);
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
     fireEvent.dragStart(cards[0], { dataTransfer });
     fireEvent.dragOver(cards[0], { dataTransfer });

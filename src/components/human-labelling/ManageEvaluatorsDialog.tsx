@@ -457,7 +457,7 @@ export function ManageEvaluatorsDialog({
                         }}
                         onDrop={(e) => handleCardDrop(idx, e)}
                         onDragEnd={handleCardDragEnd}
-                        className={`flex items-start gap-2 px-3 py-2.5 rounded-md border bg-background select-none transition-all ${
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-md border bg-background select-none transition-all ${
                           isDropTarget
                             ? "border-foreground/60 ring-2 ring-foreground/20"
                             : "border-border"
@@ -468,7 +468,7 @@ export function ManageEvaluatorsDialog({
                         }`}
                       >
                         <svg
-                          className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
+                          className="w-4 h-4 text-muted-foreground flex-shrink-0"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -481,8 +481,8 @@ export function ManageEvaluatorsDialog({
                             d="M4 6h16M4 12h16M4 18h16"
                           />
                         </svg>
-                        <span className="text-xs text-muted-foreground tabular-nums mt-0.5 w-5 flex-shrink-0">
-                          {idx + 1}.
+                        <span className="text-xs text-muted-foreground tabular-nums w-4 text-right flex-shrink-0">
+                          {idx + 1}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
@@ -493,7 +493,7 @@ export function ManageEvaluatorsDialog({
                           draggable={false}
                           onDragStart={(e) => e.preventDefault()}
                           onClick={(e) => e.stopPropagation()}
-                          className={`flex-shrink-0 flex items-center gap-1.5 text-xs mt-0.5 ${
+                          className={`flex-shrink-0 flex items-center gap-1.5 text-xs ${
                             saving
                               ? "text-muted-foreground cursor-not-allowed"
                               : "text-muted-foreground hover:text-foreground cursor-pointer"
