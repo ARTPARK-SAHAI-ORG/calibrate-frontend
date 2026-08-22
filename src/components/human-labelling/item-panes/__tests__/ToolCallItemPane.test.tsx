@@ -14,7 +14,7 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("always shows the expected tool-call section heading", () => {
+  it("renders the conversation history", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -26,11 +26,10 @@ describe("ToolCallItemPane", () => {
         }}
       />,
     );
-    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
-    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(screen.getByText("Book a flight")).toBeInTheDocument();
   });
 
-  it("says so when no expected tool calls are specified (a trace)", () => {
+  it("renders the agent's actual tool call", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -41,9 +40,7 @@ describe("ToolCallItemPane", () => {
         }}
       />,
     );
-    expect(
-      screen.getByText("No expected tool calls specified"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
   });
 
   it("shows the agent's text reply when it made no tool call (a failed test)", () => {
@@ -62,7 +59,21 @@ describe("ToolCallItemPane", () => {
     expect(
       screen.getByText("calling a tool with param success true"),
     ).toBeInTheDocument();
-    // The expected spec is still shown alongside the wrong text reply.
-    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+  });
+
+  it("does not render the expected tool calls (that's the other side's job now)", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+          actual_tool_calls: [],
+        }}
+      />,
+    );
+    expect(screen.queryByText("Expected Tool Calls")).not.toBeInTheDocument();
+    expect(screen.queryByText("book_flight")).not.toBeInTheDocument();
   });
 });

@@ -1973,6 +1973,50 @@ describe("EvaluatorResultsPane", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows the expected tool calls in place of 'No evaluators in this run' for a tool-call item with no evaluators", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[]}
+        runs={[]}
+        isToolCallOutput
+        toolCallPayload={{
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No evaluators in this run."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the expected tool calls alongside the humans-only note when the task also has evaluators", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[]}
+        isToolCallOutput
+        toolCallPayload={{
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "AI judges do not run on tool calls. A person can still label this item by hand.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows disagreements-only empty state", () => {
     render(
       <EvaluatorResultsPane

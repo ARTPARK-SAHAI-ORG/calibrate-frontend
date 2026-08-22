@@ -1,16 +1,16 @@
 import {
   TestDetailView,
-  ToolCallCard,
-  normalizeToolCall,
   type TestCaseHistory,
   type TestCaseOutput,
 } from "@/components/test-results/shared";
 
 /**
- * Renders a tool-call labelling item (a tool-call item inside an `llm` task):
- * the conversation and the agent's actual output on top (its tool call, or the
- * text it replied with when it made no call), then the expected tool-call spec
- * below, so an annotator can judge whether the agent did the right thing.
+ * Renders the conversation side of a tool-call labelling item (a tool-call
+ * item inside an `llm` task): the conversation and the agent's actual output
+ * (its tool call, or the text it replied with when it made no call). This is
+ * the "what happened" pane — the "what was expected" spec is the item's
+ * evaluator-equivalent and renders on the other side of the screen, in
+ * `ExpectedToolCallsPanel`, the same place a response item's evaluators show.
  */
 export function ToolCallItemPane({
   payload,
@@ -28,9 +28,6 @@ export function ToolCallItemPane({
   const actualToolCalls = Array.isArray(payload.actual_tool_calls)
     ? (payload.actual_tool_calls as NonNullable<TestCaseOutput["tool_calls"]>)
     : [];
-  const expectedToolCalls = Array.isArray(payload.expected_tool_calls)
-    ? (payload.expected_tool_calls as unknown[])
-    : [];
   // A failed tool-call test: the agent replied with text instead of calling a
   // tool. Show that reply so the annotator sees what the agent actually did.
   const agentResponse =
@@ -44,11 +41,7 @@ export function ToolCallItemPane({
         }
       : undefined;
 
-  const hasAnything =
-    history.length > 0 ||
-    actualToolCalls.length > 0 ||
-    expectedToolCalls.length > 0 ||
-    agentResponse.length > 0;
+  const hasAnything = history.length > 0 || !!output;
   if (!hasAnything) {
     return (
       <div className="border border-border rounded-xl p-4">
@@ -57,32 +50,7 @@ export function ToolCallItemPane({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {(history.length > 0 || output) && (
-        <TestDetailView history={history} output={output} passed={true} />
-      )}
-      <div className="px-4 md:px-6 space-y-2">
-        <h3 className="text-sm font-semibold text-foreground">
-          Expected Tool Calls
-        </h3>
-        {expectedToolCalls.length > 0 ? (
-          <div className="space-y-2">
-            {expectedToolCalls.map((tc, i) => {
-              const { toolName, args } = normalizeToolCall(tc);
-              return (
-                <ToolCallCard key={i} toolName={toolName} args={args} expected />
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No expected tool calls specified
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  return <TestDetailView history={history} output={output} passed={true} />;
 }
 
 function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
