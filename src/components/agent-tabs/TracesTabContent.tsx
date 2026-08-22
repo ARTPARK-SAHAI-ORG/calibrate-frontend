@@ -556,8 +556,12 @@ export function TracesTabContent({
                   </Button>
                   {!isPreparingLabelling && (
                     <SubmitForLabellingButton
-                      count={labellableUuids.length}
-                      emptyMessage="Select at least one trace to submit for labelling."
+                      count={everyTraceMatching ? 0 : labellableUuids.length}
+                      emptyMessage={
+                        everyTraceMatching
+                          ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
+                          : "Select at least one trace to submit for labelling."
+                      }
                       onOpen={() =>
                         labellingIsToolCallOnly
                           ? prepareLabelling([])
