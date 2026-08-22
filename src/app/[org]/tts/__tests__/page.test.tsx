@@ -7,7 +7,7 @@
  * dataset-management hook are stubbed so the test exercises only the list rows.
  */
 import React from "react";
-import { render, screen, waitFor } from "@/test-utils";
+import { render, screen, waitFor, setupUser } from "@/test-utils";
 import TTSPage from "../page";
 
 // The page chrome isn't under test — render children straight through.
@@ -40,6 +40,13 @@ jest.mock("../../../../hooks", () => ({
     handleDeleteDataset: jest.fn(),
     handleCreateDataset: jest.fn(),
   }),
+}));
+
+// The evaluators list has its own tests; here we only check the tab shows it.
+jest.mock("../../../../components/evaluations/EvaluatorLibraryPanel", () => ({
+  EvaluatorLibraryPanel: ({ evaluatorType }: { evaluatorType: string }) => (
+    <div data-testid="evaluator-library">{evaluatorType}</div>
+  ),
 }));
 
 const originalFetch = global.fetch;
@@ -188,5 +195,15 @@ describe("TTS evaluations list", () => {
     await waitFor(() =>
       expect(screen.getByText("Failed to fetch TTS jobs")).toBeInTheDocument(),
     );
+  });
+
+  it("shows the evaluators for this kind on the Evaluators tab", async () => {
+    const user = setupUser();
+    mockJobsResponse([]);
+
+    render(<TTSPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Evaluators" }));
+    expect(screen.getByTestId("evaluator-library")).toHaveTextContent("tts");
   });
 });

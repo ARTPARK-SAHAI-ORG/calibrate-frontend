@@ -20,6 +20,7 @@ import {
   JobDeleteDialog,
 } from "@/components/eval-jobs/JobDeleteControls";
 import { useDatasetManagement, useJobDeletion } from "@/hooks";
+import { EvaluatorLibraryPanel } from "@/components/evaluations/EvaluatorLibraryPanel";
 
 type TTSJob = {
   uuid: string;
@@ -47,9 +48,12 @@ function TTSPageInner() {
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
 
   // Tab state – initialise from ?tab= query param
-  const [activeTab, setActiveTab] = useState<"evaluations" | "datasets">(
-    searchParams.get("tab") === "datasets" ? "datasets" : "evaluations",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "evaluations" | "datasets" | "evaluators"
+  >(() => {
+    const tab = searchParams.get("tab");
+    return tab === "datasets" || tab === "evaluators" ? tab : "evaluations";
+  });
 
   // Evaluations state
   const [jobs, setJobs] = useState<TTSJob[]>([]);
@@ -237,14 +241,14 @@ function TTSPageInner() {
             >
               New evaluation
             </button>
-          ) : (
+          ) : activeTab === "datasets" ? (
             <button
               onClick={() => setShowCreateModal(true)}
               className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
             >
               New dataset
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Tab Bar */}
@@ -274,6 +278,19 @@ function TTSPageInner() {
             }`}
           >
             Datasets
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("evaluators");
+              router.replace("/tts?tab=evaluators", { scroll: false });
+            }}
+            className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
+              activeTab === "evaluators"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Evaluators
           </button>
         </div>
 
@@ -505,7 +522,9 @@ function TTSPageInner() {
                         {job.created_at ? formatDate(job.created_at) : "—"}
                       </p>
                       {/* Delete */}
-                      <JobRowDeleteCell onDelete={() => openDeleteDialog(job)} />
+                      <JobRowDeleteCell
+                        onDelete={() => openDeleteDialog(job)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -607,7 +626,9 @@ function TTSPageInner() {
                                 Language
                               </p>
                               <p className="text-sm font-medium text-foreground">
-                                {job.language ? formatLanguage(job.language) : "—"}
+                                {job.language
+                                  ? formatLanguage(job.language)
+                                  : "—"}
                               </p>
                             </div>
                           </div>
@@ -815,6 +836,14 @@ function TTSPageInner() {
               </>
             )}
           </>
+        )}
+
+        {/* Evaluators Tab */}
+        {activeTab === "evaluators" && (
+          <EvaluatorLibraryPanel
+            evaluatorType="tts"
+            description="These evaluators score the audio each model produces"
+          />
         )}
       </div>
 

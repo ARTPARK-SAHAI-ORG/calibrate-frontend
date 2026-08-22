@@ -46,6 +46,13 @@ jest.mock("../../../../hooks", () => ({
   }),
 }));
 
+// The evaluators list has its own tests; here we only check the tab shows it.
+jest.mock("../../../../components/evaluations/EvaluatorLibraryPanel", () => ({
+  EvaluatorLibraryPanel: ({ evaluatorType }: { evaluatorType: string }) => (
+    <div data-testid="evaluator-library">{evaluatorType}</div>
+  ),
+}));
+
 const originalFetch = global.fetch;
 
 beforeEach(() => {
@@ -223,5 +230,15 @@ describe("STT evaluations list", () => {
     await waitFor(() =>
       expect(screen.queryByText("OpenAI")).not.toBeInTheDocument(),
     );
+  });
+
+  it("shows the evaluators for this kind on the Evaluators tab", async () => {
+    const user = setupUser();
+    mockJobsResponse([]);
+
+    render(<STTPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Evaluators" }));
+    expect(screen.getByTestId("evaluator-library")).toHaveTextContent("stt");
   });
 });
