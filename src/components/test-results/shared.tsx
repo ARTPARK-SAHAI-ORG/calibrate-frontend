@@ -393,60 +393,6 @@ function isMatchSpec(
   );
 }
 
-// A tool-call parameter (at any nesting layer) that carries an `llm_judge`
-// match spec — the only mode the UI renders as "satisfies the criteria".
-// These subjective checks are what makes a tool-call test worth human
-// labelling; a test with none is fully deterministic.
-export type ToolCallCriteriaParam = {
-  toolName: string;
-  /** Dotted path within the tool's arguments, e.g. "passenger.name". */
-  path: string;
-  criteria: string;
-};
-
-// Walk one tool call's arguments, mirroring `ExpectedArgValue`'s recursion:
-// stop at match specs, recurse into plain (non-spec) objects as nested layers.
-function walkCriteriaArgs(
-  toolName: string,
-  args: Record<string, unknown>,
-  prefix: string,
-  out: ToolCallCriteriaParam[],
-): void {
-  for (const [key, value] of Object.entries(args ?? {})) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (isMatchSpec(value)) {
-      if (
-        value.match_type === "llm_judge" &&
-        typeof value.criteria === "string" &&
-        value.criteria.trim().length > 0
-      ) {
-        out.push({ toolName, path, criteria: value.criteria });
-      }
-      continue;
-    }
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      walkCriteriaArgs(toolName, value as Record<string, unknown>, path, out);
-    }
-  }
-}
-
-/**
- * Collect every parameter carrying an `llm_judge` criteria across a set of
- * expected tool calls. Used to decide whether a tool-call test is worth
- * labelling (needs at least one). Tolerates the various tool-call shapes via
- * `normalizeToolCall`.
- */
-export function collectToolCallCriteriaParams(
-  expectedToolCalls: unknown[] | null | undefined,
-): ToolCallCriteriaParam[] {
-  const out: ToolCallCriteriaParam[] = [];
-  for (const tc of expectedToolCalls ?? []) {
-    const { toolName, args } = normalizeToolCall(tc);
-    walkCriteriaArgs(toolName, args, "", out);
-  }
-  return out;
-}
-
 // Read-only render of an expected argument (name + value), mirroring the
 // add-test dialog's per-parameter controls: the parameter name sits on one line
 // with a match-mode chip ("Is exactly" / "satisfies the criteria" / "Is null" /

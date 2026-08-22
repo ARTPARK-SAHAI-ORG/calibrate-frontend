@@ -8,7 +8,6 @@ import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
 import {
-  collectToolCallCriteriaParams,
   outputToolCallsToHistory,
   type TestCaseEvaluation,
   type TestCaseHistory,
@@ -330,9 +329,7 @@ type RawTestCaseLike = {
 /**
  * Which labelling task type a test can be submitted to:
  *  - `response` tests → `llm`
- *  - `tool_call` tests → `llm-tool-call`, but only when at least one expected
- *    argument carries an `llm_judge` criteria. A fully deterministic tool-call
- *    test (exact / any / null args) has nothing for a human to judge.
+ *  - `tool_call` tests → `llm-tool-call` (a human marks it correct or wrong)
  * Returns null for tests that can't be labelled.
  */
 export function labellingTaskTypeForRaw(
@@ -340,12 +337,9 @@ export function labellingTaskTypeForRaw(
 ): SupportedTaskType | null {
   const type = raw.test_case?.evaluation?.type;
   if (type === "response") return "llm";
-  if (type === "tool_call") {
-    const hasCriteria =
-      collectToolCallCriteriaParams(raw.test_case?.evaluation?.tool_calls ?? [])
-        .length > 0;
-    return hasCriteria ? "llm-tool-call" : null;
-  }
+  // Any tool-call test can be labelled — a human just marks it correct or
+  // wrong (no criteria needed).
+  if (type === "tool_call") return "llm-tool-call";
   return null;
 }
 

@@ -1636,7 +1636,7 @@ describe("AnnotationJobView", () => {
     return JSON.parse((call![1] as RequestInit).body as string);
   }
 
-  it("records a fail verdict with the corrected expected tool call", async () => {
+  it("records a fail verdict (correct/wrong only, no correction editor)", async () => {
     const user = setupUser();
     fetchMock.mockResolvedValueOnce(jsonResponse(toolCallJob()));
     render(<AnnotationJobView token="tok" mode="public" />);
@@ -1645,14 +1645,11 @@ describe("AnnotationJobView", () => {
         screen.getByText("Did the tool call match the expected?"),
       ).toBeInTheDocument(),
     );
-    // Fail reveals the correction editor, seeded from the expected call.
     await user.click(screen.getByRole("button", { name: "Fail" }));
+    // No "correct the expected call" editor — the human only marks correct/wrong.
     expect(
-      screen.getByText("What should the expected tool call have been?"),
-    ).toBeInTheDocument();
-    const valueInput = screen.getByPlaceholderText("Value");
-    await user.clear(valueInput);
-    await user.type(valueInput, "Delhi");
+      screen.queryByText("What should the expected tool call have been?"),
+    ).not.toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: [], count: 1, status: "completed" }),
@@ -1665,14 +1662,11 @@ describe("AnnotationJobView", () => {
     expect(body.annotations).toHaveLength(1);
     expect(body.annotations[0].evaluator_id).toBeNull();
     expect(body.annotations[0].value.value).toBe(false);
-    expect(body.annotations[0].value.expected_tool_calls).toEqual([
-      { tool: "book_flight", arguments: { city: "Delhi" } },
-    ]);
+    expect(body.annotations[0].value.expected_tool_calls).toBeUndefined();
   });
 
-  it("records a pass verdict with no expected_tool_calls, and seeds a saved verdict", async () => {
+  it("seeds a saved verdict and records a pass on update", async () => {
     const user = setupUser();
-    // A saved fail verdict should seed the UI (verdict + correction).
     const job = toolCallJob();
     (job as { annotations: unknown[] }).annotations = [
       {
@@ -1680,12 +1674,7 @@ describe("AnnotationJobView", () => {
         job_id: "job-1",
         item_id: "item-1",
         evaluator_id: null,
-        value: {
-          value: false,
-          expected_tool_calls: [
-            { tool: "book_flight", arguments: { city: "Delhi" } },
-          ],
-        },
+        value: { value: false },
         created_at: "",
         updated_at: "",
       },
@@ -1698,11 +1687,7 @@ describe("AnnotationJobView", () => {
         screen.getByRole("button", { name: "Update" }),
       ).toBeInTheDocument(),
     );
-    // Switch to Pass — the correction editor disappears.
     await user.click(screen.getByRole("button", { name: "Pass" }));
-    expect(
-      screen.queryByText("What should the expected tool call have been?"),
-    ).not.toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: [], count: 1, status: "completed" }),

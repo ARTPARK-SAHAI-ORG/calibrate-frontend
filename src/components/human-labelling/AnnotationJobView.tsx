@@ -17,12 +17,6 @@ import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
-  CorrectedToolCallsEditor,
-  callsToEditable,
-  editableToStoredCalls,
-  type EditableToolCall,
-} from "./CorrectedToolCallsEditor";
-import {
   ItemValueFilter,
   matchesAllValueFilters,
   usableValueFilters,
@@ -289,15 +283,6 @@ export function AnnotationJobView({
   const [savedComments, setSavedComments] = useState<Record<string, string>>(
     {},
   );
-  // Per-item corrected expected tool calls (llm-tool-call tasks only), stored
-  // on the same `evaluator_id IS NULL` slot as `value.expected_tool_calls`
-  // when the verdict is a fail. `saved…` snapshots the server value.
-  const [correctedCalls, setCorrectedCalls] = useState<
-    Record<string, EditableToolCall[]>
-  >({});
-  const [savedCorrectedCalls, setSavedCorrectedCalls] = useState<
-    Record<string, EditableToolCall[]>
-  >({});
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
   // Admin-only "show items scored X" filter over the annotator's answers.
@@ -317,13 +302,13 @@ export function AnnotationJobView({
       const next: Record<FieldKey, FieldValue> = {};
       const saved = new Set<FieldKey>();
       const comments: Record<string, string> = {};
-      const corrected: Record<string, EditableToolCall[]> = {};
       const isToolCall = data.task.type === "llm-tool-call";
       for (const a of data.annotations) {
         if (!a.evaluator_id) {
           const c = readSavedComment(a.value);
           if (c) comments[a.item_id] = c;
-          // Tool-call verdict + correction ride the item-level (null) slot.
+          // Tool-call verdict (correct/wrong) rides the item-level (null) slot
+          // as `value.value`.
           if (isToolCall && a.value && typeof a.value === "object") {
             const v = (a.value as Record<string, unknown>).value;
             if (typeof v === "boolean") {
@@ -331,8 +316,6 @@ export function AnnotationJobView({
               next[vk] = { value: v, comment: "" };
               saved.add(vk);
             }
-            const ec = (a.value as Record<string, unknown>).expected_tool_calls;
-            if (Array.isArray(ec)) corrected[a.item_id] = callsToEditable(ec);
           }
           continue;
         }
@@ -347,8 +330,6 @@ export function AnnotationJobView({
       setSavedKeys(saved);
       setItemComments(comments);
       setSavedComments(comments);
-      setCorrectedCalls(corrected);
-      setSavedCorrectedCalls(corrected);
 
       // Read-only views (admin, public-readonly) always start on the first
       // item — they're reviewing what's been labelled, not picking up where
@@ -553,10 +534,6 @@ export function AnnotationJobView({
       setItemComments={setItemComments}
       savedComments={savedComments}
       setSavedComments={setSavedComments}
-      correctedCalls={correctedCalls}
-      setCorrectedCalls={setCorrectedCalls}
-      savedCorrectedCalls={savedCorrectedCalls}
-      setSavedCorrectedCalls={setSavedCorrectedCalls}
       submitting={submitting}
       setSubmitting={setSubmitting}
       topError={topError}
@@ -592,14 +569,6 @@ type ViewProps = {
   setSavedComments: React.Dispatch<
     React.SetStateAction<Record<string, string>>
   >;
-  correctedCalls: Record<string, EditableToolCall[]>;
-  setCorrectedCalls: React.Dispatch<
-    React.SetStateAction<Record<string, EditableToolCall[]>>
-  >;
-  savedCorrectedCalls: Record<string, EditableToolCall[]>;
-  setSavedCorrectedCalls: React.Dispatch<
-    React.SetStateAction<Record<string, EditableToolCall[]>>
-  >;
   submitting: boolean;
   setSubmitting: (b: boolean) => void;
   topError: string | null;
@@ -628,10 +597,6 @@ function AnnotateView({
   setItemComments,
   savedComments,
   setSavedComments,
-  correctedCalls,
-  setCorrectedCalls,
-  savedCorrectedCalls,
-  setSavedCorrectedCalls,
   submitting,
   setSubmitting,
   topError,
@@ -815,33 +780,19 @@ function AnnotateView({
     const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
     const commentChanged = commentChangedFor(currentItem.uuid);
 
-    // Tool-call tasks record their whole state on that same null slot: the
-    // pass/fail verdict (required), the comment, and — on a fail — the
-    // corrected expected tool calls. The backend overwrites the value, so we
-    // always send the full object once a verdict is chosen.
+    // A tool-call item's verdict (correct/wrong) rides that same null slot as
+    // `value.value`, with the comment alongside. The backend overwrites the
+    // value, so we send it whenever a verdict is chosen.
     let toolCallVerdict: boolean | null = null;
-    let currentCorrected: EditableToolCall[] | null = null;
     if (isToolCall) {
       const v = fields[toolCallVerdictKey(currentItem.uuid)]?.value;
       if (typeof v !== "boolean") return false; // verdict is required
       toolCallVerdict = v;
-      const expectedBaseline = callsToEditable(
-        ((currentItem.payload ?? {}) as Record<string, unknown>)
-          .expected_tool_calls as unknown[] | undefined,
-      );
-      currentCorrected =
-        correctedCalls[currentItem.uuid] ??
-        savedCorrectedCalls[currentItem.uuid] ??
-        expectedBaseline;
-      const storedCorrected = editableToStoredCalls(currentCorrected);
       annotationsBody.push({
         evaluator_id: null,
         value: {
           value: v,
           ...(currentComment ? { comment: currentComment } : {}),
-          ...(v === false && storedCorrected.length > 0
-            ? { expected_tool_calls: storedCorrected }
-            : {}),
         },
       });
     } else if (commentChanged) {
@@ -892,12 +843,6 @@ function AnnotateView({
         setSavedComments((prev) => ({
           ...prev,
           [currentItem.uuid]: currentComment,
-        }));
-      }
-      if (isToolCall && currentCorrected) {
-        setSavedCorrectedCalls((prev) => ({
-          ...prev,
-          [currentItem.uuid]: currentCorrected!,
         }));
       }
 
@@ -1254,21 +1199,6 @@ function AnnotateView({
                       }))
                     }
                     taskType={data.task.type}
-                    correctedCalls={
-                      correctedCalls[currentItem.uuid] ??
-                      savedCorrectedCalls[currentItem.uuid] ??
-                      callsToEditable(
-                        (
-                          (currentItem.payload ?? {}) as Record<string, unknown>
-                        ).expected_tool_calls as unknown[] | undefined,
-                      )
-                    }
-                    onCorrectedCallsChange={(v) =>
-                      setCorrectedCalls((prev) => ({
-                        ...prev,
-                        [currentItem.uuid]: v,
-                      }))
-                    }
                   />
                 </div>
               </>
@@ -1359,8 +1289,6 @@ function EvaluatorsPane({
   itemComment,
   onItemCommentChange,
   taskType,
-  correctedCalls,
-  onCorrectedCallsChange,
 }: {
   evaluators: Evaluator[];
   item: Item;
@@ -1377,11 +1305,8 @@ function EvaluatorsPane({
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
   onItemCommentChange: (s: string) => void;
-  /** Task type — drives the tool-call verdict + correction UI. */
+  /** Task type — drives the tool-call verdict (correct/wrong) UI. */
   taskType?: Task["type"];
-  /** Corrected expected tool calls for this item (llm-tool-call only). */
-  correctedCalls?: EditableToolCall[];
-  onCorrectedCallsChange?: (v: EditableToolCall[]) => void;
 }) {
   // Per-item, per-evaluator variable values live on
   // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
@@ -1465,21 +1390,6 @@ function EvaluatorsPane({
               </button>
             </div>
           </div>
-          {verdict === false && onCorrectedCallsChange && (
-            <div className="border border-border rounded-xl p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                What should the expected tool call have been?
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Correct the tool call below to what it should be.
-              </p>
-              <CorrectedToolCallsEditor
-                value={correctedCalls ?? []}
-                onChange={onCorrectedCallsChange}
-                disabled={readOnly}
-              />
-            </div>
-          )}
           {commentBlock}
         </div>
       );

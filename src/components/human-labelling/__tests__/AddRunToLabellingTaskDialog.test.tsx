@@ -28,13 +28,13 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 }));
 
 describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
-  it("treats only response-type test cases as eligible", () => {
+  it("treats response and tool-call test cases as eligible", () => {
     expect(
       isLabellingEligibleRaw({ test_case: { evaluation: { type: "response" } } }),
     ).toBe(true);
     expect(
       isLabellingEligibleRaw({ test_case: { evaluation: { type: "tool_call" } } }),
-    ).toBe(false);
+    ).toBe(true);
     expect(isLabellingEligibleRaw({})).toBe(false);
   });
 
@@ -967,11 +967,16 @@ describe("AddRunToLabellingTaskDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("shows the skipped-tests banner when tool-call tests were skipped", async () => {
+  it("shows the skipped-tests banner when a mixed selection skips tool-call tests", async () => {
+    // Response preferred → target is `llm`, so the tool-call test is skipped.
     const sourceWithSkip: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-12345678",
       results: [
+        {
+          test_case: { name: "Reply", evaluation: { type: "response" } },
+          output: { response: "hi" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
         {
           test_case: { name: "Tool", evaluation: { type: "tool_call" } },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
@@ -1038,16 +1043,17 @@ describe("llm-tool-call labelling", () => {
     },
   } as unknown as import("@/components/TestRunnerDialog").TestCaseResult;
 
-  it("maps evaluation type + criteria to the task type", () => {
+  it("maps evaluation type to the task type — any tool call is labellable", () => {
     expect(
       labellingTaskTypeForRaw({ test_case: { evaluation: { type: "response" } } }),
     ).toBe("llm");
     expect(labellingTaskTypeForRaw(toolCallWithCriteria)).toBe("llm-tool-call");
-    // A tool-call test with no llm_judge criteria is not labellable.
-    expect(labellingTaskTypeForRaw(toolCallNoCriteria)).toBeNull();
+    // Any tool-call test is labellable (a human marks it correct/wrong) — no
+    // criteria required.
+    expect(labellingTaskTypeForRaw(toolCallNoCriteria)).toBe("llm-tool-call");
     expect(labellingTaskTypeForRaw({})).toBeNull();
     expect(isLabellingEligibleRaw(toolCallWithCriteria)).toBe(true);
-    expect(isLabellingEligibleRaw(toolCallNoCriteria)).toBe(false);
+    expect(isLabellingEligibleRaw(toolCallNoCriteria)).toBe(true);
   });
 
   it("targets llm-tool-call for a tool-call-only selection, llm when mixed", () => {
