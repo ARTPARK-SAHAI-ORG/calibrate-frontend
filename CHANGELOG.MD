@@ -1,5 +1,6 @@
 ## August 2026
 
+- Refuse a push whose changed lines are untested ([#407](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/407))
 - Let users manage evaluators outside a run ([#405](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/405))
 - Filter traces by output type ([#403](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/403))
 - Point the create-test specs at the dialog's attributes, not its words ([#404](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/404))
