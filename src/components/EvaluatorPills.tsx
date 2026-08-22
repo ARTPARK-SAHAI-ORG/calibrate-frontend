@@ -24,7 +24,7 @@ export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
   llm: "Agent reply",
-  "llm-general": "Agent Response",
+  "llm-general": "Agent response",
   conversation: "Full conversation",
 };
 

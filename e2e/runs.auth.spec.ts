@@ -40,7 +40,7 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
-// Create a standalone "LLM reply" evaluator via /evaluators, unattached to any
+// Create a standalone "Agent reply" evaluator via /evaluators, unattached to any
 // agent. Its default prompt has no `{{variables}}` (a literal
 // "<ENTER EVALUATION CRITERIA HERE>" placeholder instead), so — like the
 // "Speech to Text" case evaluators.auth.spec.ts picks for the same reason — no
@@ -195,7 +195,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // GET /agent-tests/run/{taskId} every 3s until the status is terminal.
     await page.getByRole("button", { name: /Run all/ }).click();
 
-    // Results tabs (Summary / Outputs) render ONLY once runStatus === "done".
+    // Results tabs (Summary / Results) render ONLY once runStatus === "done".
     // Fake backend completes near-instantly; allow for the POST + first poll.
     await expect(
       page.getByRole("button", { name: "Summary", exact: true }),
@@ -210,9 +210,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
       timeout: 15000,
     });
 
-    // Outputs tab: the per-test results group the passing test under a
+    // Results tab: the per-test results group the passing test under a
     // "Passed (n)" heading (test-results/shared StatusIcon + grouping).
-    await page.getByRole("button", { name: "Outputs", exact: true }).click();
+    await page.getByRole("button", { name: "Results", exact: true }).click();
     await expect(page.getByText(/Passed \(\d+\)/).first()).toBeVisible({
       timeout: 15000,
     });
@@ -314,7 +314,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await page.getByRole("button", { name: "Run comparison" }).click();
 
     // BenchmarkResultsDialog polls GET /agent-tests/benchmark/{taskId}; the
-    // Leaderboard / Outputs tabs render only once the run is done.
+    // Leaderboard / Results tabs render only once the run is done.
     await expect(
       page.getByRole("button", { name: "Leaderboard", exact: true }),
     ).toBeVisible({ timeout: 30000 });

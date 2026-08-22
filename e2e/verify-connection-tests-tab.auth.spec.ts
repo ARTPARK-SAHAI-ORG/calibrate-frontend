@@ -79,7 +79,7 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
-// Create a standalone "LLM reply" evaluator via /evaluators, unattached to any
+// Create a standalone "Agent reply" evaluator via /evaluators, unattached to any
 // agent. Mirrors runs.auth.spec.ts / evaluators.auth.spec.ts — its default
 // prompt has no `{{variables}}`, so only a name is needed.
 async function createUnattachedLlmEvaluator(

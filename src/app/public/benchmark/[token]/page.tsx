@@ -123,7 +123,7 @@ export default function PublicBenchmarkPage() {
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               >
-                {{ leaderboard: "Leaderboard", "top-picks": "Model selection", outputs: "Outputs", about: "About" }[tab]}
+                {{ leaderboard: "Leaderboard", "top-picks": "Model selection", outputs: "Results", about: "About" }[tab]}
               </button>
             ))}
           </div>
@@ -195,7 +195,7 @@ export default function PublicBenchmarkPage() {
           />
         )}
 
-        {/* Outputs Tab */}
+        {/* Results Tab */}
         {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel

@@ -77,7 +77,7 @@ const CORRECTNESS_LIVE_PROMPT =
 
 // Two LLM-reply evaluators: one "Correctness" (the default next-reply slug the
 // dialog seeds), one "Reply Conciseness" (the second check the flow adds). Both are
-// evaluator_type "llm" so they render the "LLM reply" pill AND actually grade a
+// evaluator_type "llm" so they render the "Agent reply" pill AND actually grade a
 // next-reply test — the exact property the tour's picker now depends on.
 const LIBRARY_EVALUATORS: EvaluatorPayload[] = [
   {
