@@ -982,9 +982,17 @@ export function TestDetailView({
         });
   const hasJudgeResults =
     Array.isArray(effectiveJudgeResults) && effectiveJudgeResults.length > 0;
+  // A tool-call test already shows this same reasoning in the verdict card
+  // next to it (`EvaluationCriteriaPanel`'s "Tool call test" card / its
+  // "See reasoning" toggle), so showing it again here under the agent's
+  // answer would just repeat it. Legacy response tests with no evaluators
+  // captured have nowhere else to show it, so they keep this toggle.
+  const isToolCallTest =
+    (evaluation?.type ?? (evaluation?.tool_calls ? "tool_call" : "response")) ===
+    "tool_call";
   const [legacyReasoningOpen, setLegacyReasoningOpen] = useState(false);
   const showLegacyReasoningToggle =
-    !hasJudgeResults && !!reasoning?.trim();
+    !hasJudgeResults && !!reasoning?.trim() && !isToolCallTest;
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
   const outputAccent = showVerdict
     ? passed
