@@ -136,8 +136,13 @@ export function ConvertTracesToTestsDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
-        className={`bg-background rounded-xl w-full max-w-6xl flex flex-col shadow-2xl ${
-          needsEvaluator ? "max-h-[90vh] md:h-[85vh]" : "max-h-[85vh]"
+        className={`bg-background rounded-xl w-full flex flex-col shadow-2xl ${
+          needsEvaluator
+            ? // The evaluator list and the prompt beside it need the room.
+              "max-w-6xl max-h-[90vh] md:h-[85vh]"
+            : // A sentence and two buttons, so the same size as any other
+              // confirmation.
+              "max-w-md max-h-[85vh]"
         }`}
       >
         <div className="p-5 md:p-6 border-b border-border">
