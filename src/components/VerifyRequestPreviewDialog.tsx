@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
+import { CopyCodeButton } from "@/components/ui";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -116,6 +117,17 @@ export function VerifyRequestPreviewDialog({
       return;
     }
     onConfirm(messages);
+  };
+
+  // What the agent will actually receive, built once so the box and the copy
+  // button can never show different things.
+  const previewBody = {
+    ...(isGeneral
+      ? { input: messages[0]?.content ?? "" }
+      : {
+          messages: messages.map(({ role, content }) => ({ role, content })),
+        }),
+    ...(showInputs ? parsedInputs : {}),
   };
 
   if (!open) return null;
@@ -252,23 +264,15 @@ export function VerifyRequestPreviewDialog({
             <p className="text-xs font-medium text-muted-foreground mb-2">
               Request body preview
             </p>
-            <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
-              {JSON.stringify(
-                {
-                  ...(isGeneral
-                    ? { input: messages[0]?.content ?? "" }
-                    : {
-                        messages: messages.map(({ role, content }) => ({
-                          role,
-                          content,
-                        })),
-                      }),
-                  ...(showInputs ? parsedInputs : {}),
-                },
-                null,
-                2,
-              )}
-            </pre>
+            <div className="relative">
+              <CopyCodeButton
+                value={JSON.stringify(previewBody, null, 2)}
+                label="Copy the request body"
+              />
+              <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground max-h-72 overflow-y-auto">
+                {JSON.stringify(previewBody, null, 2)}
+              </pre>
+            </div>
           </div>
         </div>
 
@@ -280,9 +284,15 @@ export function VerifyRequestPreviewDialog({
                 <p className="text-xs font-medium text-muted-foreground">
                   Your agent responded with:
                 </p>
-                <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
-                  {JSON.stringify(verifySampleResponse, null, 2)}
-                </pre>
+                <div className="relative">
+                  <CopyCodeButton
+                    value={JSON.stringify(verifySampleResponse, null, 2)}
+                    label="Copy what your agent responded with"
+                  />
+                  <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
+                    {JSON.stringify(verifySampleResponse, null, 2)}
+                  </pre>
+                </div>
               </div>
             )}
           </div>

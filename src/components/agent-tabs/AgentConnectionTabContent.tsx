@@ -7,6 +7,7 @@ import {
   VerifyRequestPreviewDialog,
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
+import { CopyCodeButton } from "@/components/ui";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -299,6 +300,35 @@ export function AgentConnectionTabContent({
   ]`;
   const requestInputInline = isGeneral ? `"input": "..."` : `"messages": [...]`;
 
+  // Each example is built once so the block a reader sees and the text the
+  // copy button hands them can never drift apart.
+  const requestBodyExample = `{
+  ${requestInputBlock}${customFieldsBlock}
+}`;
+  const responseWithToolCallsExample = `{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai, OPV aur DPT ke liye.",
+  "tool_calls": [
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      // optional
+      "output": { "next_vaccines": ["OPV", "DPT"], "due_in_weeks": 14 }
+    }
+  ]
+}`;
+  const responseExample = `{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai, OPV aur DPT ke liye."
+}`;
+  const metricsExample = `{
+  "response": "...",
+  "metrics": {
+    "cost": 0.0021,
+    "prompt_tokens": 1200,
+    "completion_tokens": 340,
+    "latency_ms": 850
+  }
+}`;
+
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
   const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";
 
@@ -315,6 +345,10 @@ export function AgentConnectionTabContent({
     qwen: "qwen-max",
     ai21: "jamba-1.5-large",
   };
+
+  const benchmarkBodyExample = `{ ${requestInputInline}${customFieldsInline}, "model": "${
+    exampleModelByProvider[benchmarkProvider] || "model-name"
+  }" }`;
 
   const handleBenchmarkToggle = () => {
     onConnectionConfigChange({
@@ -632,9 +666,19 @@ export function AgentConnectionTabContent({
                     <p className="text-xs font-medium text-muted-foreground">
                       Your agent responded with:
                     </p>
-                    <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-48 overflow-y-auto">
-                      {JSON.stringify(verify.verifySampleResponse, null, 2)}
-                    </pre>
+                    <div className="relative">
+                      <CopyCodeButton
+                        value={JSON.stringify(
+                          verify.verifySampleResponse,
+                          null,
+                          2,
+                        )}
+                        label="Copy what your agent responded with"
+                      />
+                      <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground max-h-48 overflow-y-auto">
+                        {JSON.stringify(verify.verifySampleResponse, null, 2)}
+                      </pre>
+                    </div>
                   </div>
                 )}
               </div>
@@ -668,11 +712,15 @@ export function AgentConnectionTabContent({
                 </code>{" "}
                 to your agent URL with this body:
               </p>
-              <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {`{
-  ${requestInputBlock}${customFieldsBlock}
-}`}
-              </pre>
+              <div className="relative">
+                <CopyCodeButton
+                  value={requestBodyExample}
+                  label="Copy the request body"
+                />
+                <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground">
+                  {requestBodyExample}
+                </pre>
+              </div>
 
               {supportsBenchmark && (
                 <>
@@ -684,9 +732,15 @@ export function AgentConnectionTabContent({
                     field is also included so your agent can route to the right
                     LLM:
                   </p>
-                  <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                    {`{ ${requestInputInline}${customFieldsInline}, "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
-                  </pre>
+                  <div className="relative">
+                    <CopyCodeButton
+                      value={benchmarkBodyExample}
+                      label="Copy the request body with the model field"
+                    />
+                    <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground">
+                      {benchmarkBodyExample}
+                    </pre>
+                  </div>
                   <div className="flex gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                     <svg
                       className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5"
@@ -738,31 +792,29 @@ export function AgentConnectionTabContent({
               <p className="text-sm text-muted-foreground">
                 Your agent must respond with:
               </p>
-              <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {showToolCalls ? (
-                  <>
-                    {`{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
-  "tool_calls": [
-    {
-      "tool": "get_schedule",
-      "arguments": { "child_age_weeks": 14 },
-      `}
-                    <span className="italic text-muted-foreground">
-                      {`// optional`}
-                    </span>
-                    {`
-      "output": { "next_vaccines": ["OPV", "DPT"], "due_in_weeks": 14 }
-    }
-  ]
-}`}
-                  </>
-                ) : (
-                  `{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
-}`
-                )}
-              </pre>
+              <div className="relative">
+                <CopyCodeButton
+                  value={
+                    showToolCalls
+                      ? responseWithToolCallsExample
+                      : responseExample
+                  }
+                  label="Copy the response format"
+                />
+                <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground">
+                  {showToolCalls ? (
+                    <>
+                      {responseWithToolCallsExample.split("// optional")[0]}
+                      <span className="italic text-muted-foreground">
+                        {`// optional`}
+                      </span>
+                      {responseWithToolCallsExample.split("// optional")[1]}
+                    </>
+                  ) : (
+                    responseExample
+                  )}
+                </pre>
+              </div>
               {showToolCalls && (
                 <p className="text-xs text-muted-foreground">
                   <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
@@ -783,17 +835,15 @@ export function AgentConnectionTabContent({
                 object to report the cost, latency and tokens consumed for each
                 agent run:
               </p>
-              <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {`{
-  "response": "...",
-  "metrics": {
-    "cost": 0.0021,
-    "prompt_tokens": 1200,
-    "completion_tokens": 340,
-    "latency_ms": 850
-  }
-}`}
-              </pre>
+              <div className="relative">
+                <CopyCodeButton
+                  value={metricsExample}
+                  label="Copy the metrics example"
+                />
+                <pre className="text-xs bg-muted rounded-lg p-3 pr-9 overflow-x-auto text-foreground">
+                  {metricsExample}
+                </pre>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Every field inside{" "}
                 <code className="text-[11px] bg-muted px-1 py-0.5 rounded">

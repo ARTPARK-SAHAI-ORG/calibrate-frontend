@@ -668,3 +668,26 @@ describe("AgentConnectionTabContent request example", () => {
     ).toHaveTextContent("with the input");
   });
 });
+
+describe("AgentConnectionTabContent code examples", () => {
+  it("puts a copy button on every code example", () => {
+    renderComponent({
+      connectionConfig: makeConfig({ supports_benchmark: true }),
+    });
+
+    // Request body, the same body with the model field, the response format,
+    // and the metrics example.
+    expect(
+      screen.getAllByRole("button", { name: /^Copy/ }).length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      screen.getByRole("button", { name: "Copy the request body" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy the response format" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy the metrics example" }),
+    ).toBeInTheDocument();
+  });
+});
