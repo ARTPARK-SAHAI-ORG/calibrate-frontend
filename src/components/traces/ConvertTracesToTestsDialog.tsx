@@ -27,7 +27,12 @@ type ConvertTracesToTestsDialogProps = {
   /** Decides which kind of evaluator can judge what this agent produced. */
   agentNature?: "conversation" | "general";
   /** Called with the backend result after a successful conversion. */
-  onConverted: (result: ConvertTracesToTestsResult) => void;
+  /** The second argument is the evaluators the created tests were given, so
+   *  the caller can offer to attach any the agent does not have yet. */
+  onConverted: (
+    result: ConvertTracesToTestsResult,
+    evaluatorsUsed: { uuid: string; name: string }[],
+  ) => void;
 };
 
 function toggle(set: Set<string>, uuid: string): Set<string> {
@@ -112,7 +117,14 @@ export function ConvertTracesToTestsDialog({
         // and the test can be edited afterwards.
         acceptAnyArguments: false,
       });
-      onConverted(result);
+      onConverted(
+        result,
+        needsEvaluator
+          ? evaluators
+              .filter((e) => selectedEvaluators.has(e.uuid))
+              .map((e) => ({ uuid: e.uuid, name: e.name }))
+          : [],
+      );
     } catch (err) {
       reportError("Error converting traces to tests:", err);
       // Nothing is created when a conversion fails, so the reader can fix what

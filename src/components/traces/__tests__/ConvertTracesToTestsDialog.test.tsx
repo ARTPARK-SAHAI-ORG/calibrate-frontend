@@ -222,10 +222,12 @@ it("submits a response test with the selected evaluator", async () => {
     evaluatorUuids: ["ev-default"],
     acceptAnyArguments: false,
   });
-  expect(onConverted).toHaveBeenCalledWith({
-    created: 2,
-    test_uuids: ["t1", "t2"],
-  });
+  // The evaluators the tests were given come back too, so the tab can offer
+  // to attach any the agent does not have yet.
+  expect(onConverted).toHaveBeenCalledWith(
+    { created: 2, test_uuids: ["t1", "t2"] },
+    [{ uuid: "ev-default", name: "Correctness" }],
+  );
 });
 
 it("requires an evaluator for a response test", async () => {
@@ -366,10 +368,10 @@ it("offers the output evaluators and sends a general conversion", async () => {
       acceptAnyArguments: false,
     }),
   );
-  expect(onConverted).toHaveBeenCalledWith({
-    created: 2,
-    test_uuids: ["t1", "t2"],
-  });
+  expect(onConverted).toHaveBeenCalledWith(
+    { created: 2, test_uuids: ["t1", "t2"] },
+    [{ uuid: "ev-general-default", name: "Output correctness" }],
+  );
 });
 
 it("will not add a general conversion with no evaluator ticked", async () => {

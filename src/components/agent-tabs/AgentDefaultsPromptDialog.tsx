@@ -9,6 +9,14 @@ export type AgentDefaultsPromptEvaluator = {
 
 type AgentDefaultsPromptDialogProps = {
   evaluators: AgentDefaultsPromptEvaluator[];
+  /**
+   * The first sentence, naming what just used these evaluators. Defaults to a
+   * saved test; traces added to tests and traces sent for labelling say so in
+   * their own words.
+   */
+  lead?: string;
+  /** The line under an error saying the work itself did go through. */
+  savedNote?: string;
   isSaving: boolean;
   error: string | null;
   onDismiss: () => void;
@@ -17,6 +25,8 @@ type AgentDefaultsPromptDialogProps = {
 
 export function AgentDefaultsPromptDialog({
   evaluators,
+  lead,
+  savedNote = "Your test was saved. Try again below, or choose Not now to skip.",
   isSaving,
   error,
   onDismiss,
@@ -66,8 +76,8 @@ export function AgentDefaultsPromptDialog({
           </button>
         </div>
         <p className="text-sm md:text-[15px] text-muted-foreground mb-4">
-          This test used {subject} that {verb} attached to this agent. Attach{" "}
-          {pronoun} and new tests for this agent will include {pronoun}{" "}
+          {lead ?? `This test used ${subject} that ${verb} attached to this agent.`}{" "}
+          Attach {pronoun} and new tests for this agent will include {pronoun}{" "}
           automatically. If you skip this, you will need to add {pronoun} by
           hand every time you create a test.
         </p>
@@ -93,9 +103,7 @@ export function AgentDefaultsPromptDialog({
             <p className="text-sm text-red-600/90 dark:text-red-400/90 mt-1">
               {error}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Your test was saved. Try again below, or choose Not now to skip.
-            </p>
+            <p className="text-xs text-muted-foreground mt-2">{savedNote}</p>
           </div>
         )}
         <div className="flex items-center justify-end gap-3">

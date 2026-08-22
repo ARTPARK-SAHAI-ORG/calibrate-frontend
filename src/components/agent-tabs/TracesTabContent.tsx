@@ -14,6 +14,7 @@ import {
   type SourceEvaluatorRef,
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -24,6 +25,7 @@ import {
   SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
+import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
 import {
   useAccessToken,
   useDialogUrlParam,
@@ -58,6 +60,7 @@ export function TracesTabContent({
   agentNature = "conversation",
   onTestsCreated,
   onViewTests,
+  onAgentDefaultsAttached,
 }: {
   agentUuid: string;
   /** A general agent answers one input at a time, so the sending code shows a
@@ -67,6 +70,8 @@ export function TracesTabContent({
   onTestsCreated: () => void;
   /** Opens the Tests tab, where the created tests are listed. */
   onViewTests: () => void;
+  /** Called after evaluators are attached here, so the Evaluators tab reloads. */
+  onAgentDefaultsAttached?: () => void;
 }) {
   const accessToken = useAccessToken();
 
@@ -235,6 +240,31 @@ export function TracesTabContent({
     } finally {
       setIsPreparingLabelling(false);
     }
+  };
+
+  // Evaluators picked in either flow that the agent does not have yet: the
+  // same offer the Tests tab makes after a test is saved, so the next dialog
+  // starts with them already ticked.
+  const [defaultsLead, setDefaultsLead] = useState<string>("");
+  const agentDefaults = useAgentDefaultsPrompt({
+    agentUuid,
+    accessToken,
+    onAttached: () => onAgentDefaultsAttached?.(),
+  });
+  const offerAgentDefaults = (
+    chosen: { uuid: string; name?: string }[],
+    lead: (isOne: boolean) => string,
+  ) => {
+    if (chosen.length === 0) return;
+    setDefaultsLead(lead(chosen.length === 1));
+    void agentDefaults.promptFor(
+      chosen.map((ev) => ev.uuid),
+      {
+        knownNames: new Map(
+          chosen.flatMap((ev) => (ev.name ? [[ev.uuid, ev.name] as const] : [])),
+        ),
+      },
+    );
   };
 
   /** Untick only the traces that were actually submitted. */
@@ -502,7 +532,7 @@ export function TracesTabContent({
         testType={selectedTestType}
         agentUuid={agentUuid}
         agentNature={agentNature}
-        onConverted={(result) => {
+        onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           deletion.clearSelection();
           const created = result.created;
@@ -515,6 +545,11 @@ export function TracesTabContent({
               onClick: onViewTests,
             },
           });
+          offerAgentDefaults(evaluatorsUsed, (isOne) =>
+            created === 1
+              ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`
+              : `The tests you just added use ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+          );
         }}
       />
 
@@ -545,7 +580,24 @@ export function TracesTabContent({
           // The dialog stays open on its own confirmation, which is where the
           // reader opens the task or closes it, same as every other submit for
           // labelling flow. Only the ticks the submit used are cleared here.
-          onAdded={clearSubmitted}
+          onAdded={() => {
+            clearSubmitted();
+            offerAgentDefaults(labellingEvaluators, (isOne) =>
+              `The traces you just sent for labelling are scored against ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+            );
+          }}
+        />
+      )}
+
+      {agentDefaults.prompt && agentDefaults.prompt.length > 0 && (
+        <AgentDefaultsPromptDialog
+          evaluators={agentDefaults.prompt}
+          lead={defaultsLead}
+          savedNote="The work itself went through. Try again below, or choose Not now to skip."
+          isSaving={agentDefaults.isSaving}
+          error={agentDefaults.error}
+          onDismiss={agentDefaults.dismiss}
+          onConfirm={agentDefaults.confirm}
         />
       )}
 
