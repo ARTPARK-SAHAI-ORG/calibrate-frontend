@@ -527,3 +527,61 @@ describe("a general agent's trace", () => {
     expect(screen.getByText("2026-03-14")).toBeInTheDocument();
   });
 });
+
+it("shows what a tool returned, when the trace carries it", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    input: "Book a slot for next week",
+    output: {
+      response: null,
+      tool_calls: [
+        {
+          tool: "book_appointment",
+          arguments: { date: "2026-03-14" },
+          output: { confirmed: true, slot: "10:30" },
+        },
+      ],
+    },
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  expect(await screen.findByText("Tool Response")).toBeInTheDocument();
+  expect(screen.getByText(/"confirmed": true/)).toBeInTheDocument();
+});
+
+it("shows a tool result on a conversational agent's trace too", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    input: [{ role: "user", content: "Book a slot" }],
+    output: {
+      response: null,
+      tool_calls: [
+        {
+          tool: "book_appointment",
+          arguments: { date: "2026-03-14" },
+          output: { confirmed: true },
+        },
+      ],
+    },
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  expect(await screen.findByText("Tool Response")).toBeInTheDocument();
+  expect(screen.getByText(/"confirmed": true/)).toBeInTheDocument();
+});

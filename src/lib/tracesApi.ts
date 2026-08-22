@@ -14,6 +14,9 @@ export type TraceTurn = {
 export type TraceToolCall = {
   tool: string;
   arguments?: Record<string, unknown> | null;
+  /** What the tool returned, when the agent ran it and sent the result in.
+   * Any JSON value. Absent when the agent only reported the call. */
+  output?: unknown;
 };
 
 export type TraceOutput = {

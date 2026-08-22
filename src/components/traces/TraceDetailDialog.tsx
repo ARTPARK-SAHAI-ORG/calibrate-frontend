@@ -118,6 +118,9 @@ export function toTestCaseOutput(
     .map((call) => ({
       tool: call.tool,
       arguments: call.arguments ?? {},
+      // Kept so a trace whose agent ran the tool shows the result the same
+      // way a test run does, instead of dropping it on the way through.
+      ...(call.output !== undefined ? { output: call.output } : {}),
     }));
   if (!response && tool_calls.length === 0) return undefined;
   return {
@@ -160,6 +163,7 @@ function PlainTraceView({
                 key={`${call.tool}-${index}`}
                 toolName={call.tool}
                 args={call.arguments ?? {}}
+                output={call.output}
               />
             ))}
           </div>
