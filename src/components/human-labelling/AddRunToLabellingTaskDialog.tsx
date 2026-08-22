@@ -351,6 +351,10 @@ function buildToolCallItem(raw: RawTestCaseLike, nameOverride?: string): BuiltIt
       chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
       expected_tool_calls: raw.test_case?.evaluation?.tool_calls ?? [],
       actual_tool_calls: raw.output?.tool_calls ?? [],
+      // When the agent replied with text instead of calling a tool (a failed
+      // tool-call test), keep the reply so the annotator sees what the agent
+      // actually did rather than an empty tool-call panel.
+      agent_response: raw.output?.response ?? "",
     },
   };
 }

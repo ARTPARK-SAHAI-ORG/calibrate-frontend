@@ -7,10 +7,10 @@ import {
 } from "@/components/test-results/shared";
 
 /**
- * Renders an `llm-tool-call` labelling item: the conversation and the agent's
- * actual tool call(s) on top (shared test renderer), then the expected
- * tool-call spec below, so an annotator can judge whether the actual call
- * matched what was expected.
+ * Renders a tool-call labelling item (a tool-call item inside an `llm` task):
+ * the conversation and the agent's actual output on top (its tool call, or the
+ * text it replied with when it made no call), then the expected tool-call spec
+ * below, so an annotator can judge whether the agent did the right thing.
  */
 export function ToolCallItemPane({
   payload,
@@ -31,14 +31,24 @@ export function ToolCallItemPane({
   const expectedToolCalls = Array.isArray(payload.expected_tool_calls)
     ? (payload.expected_tool_calls as unknown[])
     : [];
+  // A failed tool-call test: the agent replied with text instead of calling a
+  // tool. Show that reply so the annotator sees what the agent actually did.
+  const agentResponse =
+    typeof payload.agent_response === "string" ? payload.agent_response : "";
 
   const output: TestCaseOutput | undefined =
-    actualToolCalls.length > 0 ? { tool_calls: actualToolCalls } : undefined;
+    actualToolCalls.length > 0 || agentResponse
+      ? {
+          ...(actualToolCalls.length > 0 ? { tool_calls: actualToolCalls } : {}),
+          ...(agentResponse ? { response: agentResponse } : {}),
+        }
+      : undefined;
 
   const hasAnything =
     history.length > 0 ||
     actualToolCalls.length > 0 ||
-    expectedToolCalls.length > 0;
+    expectedToolCalls.length > 0 ||
+    agentResponse.length > 0;
   if (!hasAnything) {
     return (
       <div className="border border-border rounded-xl p-4">

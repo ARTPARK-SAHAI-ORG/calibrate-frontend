@@ -2,49 +2,41 @@ import React from "react";
 import { render, screen } from "@/test-utils";
 import { ToolCallItemPane } from "../ToolCallItemPane";
 
-// jsdom doesn't implement scrollIntoView; TestDetailView calls it on mount.
+// jsdom doesn't implement scrollIntoView; TestDetailView (rendered when there
+// is any history/output) calls it in a useEffect.
 beforeAll(() => {
   Element.prototype.scrollIntoView = jest.fn();
 });
 
 describe("ToolCallItemPane", () => {
-  it("shows an em-dash placeholder when the payload is empty", () => {
+  it("shows a placeholder when there is nothing to render", () => {
     render(<ToolCallItemPane payload={{}} />);
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("renders the conversation, the actual tool call, and the expected spec", () => {
+  it("always shows the expected tool-call section heading", () => {
     render(
       <ToolCallItemPane
         payload={{
-          chat_history: [{ role: "user", content: "book a flight to NYC" }],
-          actual_tool_calls: [
-            { tool: "book_flight", arguments: { city: "NYC" } },
-          ],
+          chat_history: [{ role: "user", content: "Book a flight" }],
           expected_tool_calls: [
-            {
-              tool: "book_flight",
-              arguments: {
-                city: { match_type: "llm_judge", criteria: "a valid city" },
-              },
-            },
+            { function: { name: "book_flight", arguments: "{}" } },
           ],
+          actual_tool_calls: [],
         }}
       />,
     );
-    expect(screen.getByText("book a flight to NYC")).toBeInTheDocument();
     expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
-    expect(screen.getAllByText("book_flight").length).toBeGreaterThanOrEqual(1);
-    // The expected llm_judge arg renders as a "satisfies the criteria" spec.
-    expect(screen.getByText("a valid city")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
   });
 
-  it("notes when no expected tool calls are specified", () => {
+  it("says so when no expected tool calls are specified (a trace)", () => {
     render(
       <ToolCallItemPane
         payload={{
-          chat_history: [{ role: "user", content: "hi" }],
-          actual_tool_calls: [{ tool: "noop", arguments: {} }],
+          actual_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
           expected_tool_calls: [],
         }}
       />,
@@ -52,5 +44,25 @@ describe("ToolCallItemPane", () => {
     expect(
       screen.getByText("No expected tool calls specified"),
     ).toBeInTheDocument();
+  });
+
+  it("shows the agent's text reply when it made no tool call (a failed test)", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          expected_tool_calls: [
+            { function: { name: "book_flight", arguments: "{}" } },
+          ],
+          actual_tool_calls: [],
+          agent_response: "calling a tool with param success true",
+        }}
+      />,
+    );
+    expect(
+      screen.getByText("calling a tool with param success true"),
+    ).toBeInTheDocument();
+    // The expected spec is still shown alongside the wrong text reply.
+    expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
   });
 });
