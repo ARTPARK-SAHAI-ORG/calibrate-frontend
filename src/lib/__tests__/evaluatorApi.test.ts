@@ -9,6 +9,7 @@ import {
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
+  deleteEvaluatorVersion,
   supportsEvaluatorVariables,
   type EvaluatorData,
 } from "../evaluatorApi";
@@ -27,13 +28,7 @@ function mockResponse(
     textBody?: string;
   } = {},
 ): Response {
-  const {
-    ok = true,
-    status = 200,
-    headers = {},
-    jsonBody,
-    textBody,
-  } = init;
+  const { ok = true, status = 200, headers = {}, jsonBody, textBody } = init;
   return {
     ok,
     status,
@@ -73,9 +68,7 @@ describe("isDefaultEvaluator", () => {
 
 describe("isOwnedEvaluator", () => {
   it("returns false for built-in defaults via is_default", () => {
-    expect(isOwnedEvaluator({ is_default: true } as EvaluatorData)).toBe(
-      false,
-    );
+    expect(isOwnedEvaluator({ is_default: true } as EvaluatorData)).toBe(false);
   });
 
   it("returns true for non-default evaluators via is_default", () => {
@@ -148,10 +141,7 @@ describe("isEvaluatorNameConflict", () => {
 
   it("returns false for other statuses or messages", () => {
     expect(
-      isEvaluatorNameConflict(
-        mockResponse({ status: 409 }),
-        "Something else",
-      ),
+      isEvaluatorNameConflict(mockResponse({ status: 409 }), "Something else"),
     ).toBe(false);
     expect(
       isEvaluatorNameConflict(
@@ -266,6 +256,35 @@ describe("fetch helpers", () => {
     await expect(deleteEvaluator("ev-3", "token")).rejects.toThrow("nope");
   });
 
+  it("deleteEvaluatorVersion calls the version address", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(mockResponse({}));
+
+    await deleteEvaluatorVersion("ev-3", "ver-2", "token");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://test-backend/evaluators/ev-3/versions/ver-2",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("deleteEvaluatorVersion passes the backend's reason on", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockResponse({
+        ok: false,
+        status: 400,
+        headers: { "content-type": "application/json" },
+        jsonBody: {
+          detail:
+            "Cannot delete the live version. Set another version live first.",
+        },
+      }),
+    );
+
+    await expect(
+      deleteEvaluatorVersion("ev-3", "ver-1", "token"),
+    ).rejects.toThrow("Cannot delete the live version.");
+  });
+
   it("fetchAgentEvaluators signs out and returns [] on 401", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockResponse({ ok: false, status: 401 }),
@@ -289,9 +308,7 @@ describe("fetch helpers", () => {
     );
 
     const items = await fetchAgentEvaluators("agent-1", "token");
-    expect(items).toEqual([
-      { uuid: "ev-2", name: "Policy", is_default: true },
-    ]);
+    expect(items).toEqual([{ uuid: "ev-2", name: "Policy", is_default: true }]);
   });
 
   it("addEvaluatorsToAgent POSTs the evaluator_ids array", async () => {

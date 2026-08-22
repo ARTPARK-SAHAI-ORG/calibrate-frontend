@@ -46,10 +46,13 @@ jest.mock("sonner", () => ({
 }));
 
 const deleteEvaluator = jest.fn();
+const deleteEvaluatorVersion = jest.fn();
 
 jest.mock("../../../../../lib/evaluatorApi", () => ({
   ...jest.requireActual("../../../../../lib/evaluatorApi"),
   deleteEvaluator: (...args: unknown[]) => deleteEvaluator(...args),
+  deleteEvaluatorVersion: (...args: unknown[]) =>
+    deleteEvaluatorVersion(...args),
 }));
 
 import EvaluatorDetailPage from "../page";
@@ -258,6 +261,58 @@ describe("the versions and the one on screen", () => {
     expect(
       await screen.findByText("Grade the reply strictly"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("deleting a version", () => {
+  it("offers the bin only on versions that are not the current one", async () => {
+    render(<EvaluatorDetailPage />);
+
+    const bins = await screen.findAllByTitle(/^Delete v/);
+    expect(bins).toHaveLength(1);
+    expect(bins[0]).toHaveAttribute("title", "Delete v2");
+  });
+
+  it("deletes the version and takes it off the list", async () => {
+    const user = setupUser();
+    deleteEvaluatorVersion.mockResolvedValue(undefined);
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete v2"));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(deleteEvaluatorVersion).toHaveBeenCalledWith(
+        "eval-1",
+        "ver-2",
+        "test-token",
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByTitle("Delete v2")).not.toBeInTheDocument(),
+    );
+    // The details fall back to the current version.
+    expect(screen.getByText("Grade the reply")).toBeInTheDocument();
+  });
+
+  it("says why when the version cannot be deleted", async () => {
+    const user = setupUser();
+    deleteEvaluatorVersion.mockRejectedValue(
+      new Error(
+        "Cannot delete the live version. Set another version live first.",
+      ),
+    );
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByTitle("Delete v2"));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "Cannot delete the live version. Set another version live first.",
+      ),
+    );
+    expect(screen.getByTitle("Delete v2")).toBeInTheDocument();
   });
 });
 
