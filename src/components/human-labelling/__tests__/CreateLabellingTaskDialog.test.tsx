@@ -6,7 +6,11 @@ jest.mock("../../../lib/api", () => ({
   apiClient: (...args: unknown[]) => mockApiClient(...args),
   unwrapList: (data: unknown) => {
     if (Array.isArray(data)) return data;
-    if (data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items)) {
+    if (
+      data &&
+      typeof data === "object" &&
+      Array.isArray((data as { items?: unknown }).items)
+    ) {
       return (data as { items: unknown[] }).items;
     }
     return [];
@@ -20,12 +24,19 @@ jest.mock("../../../lib/parseBackendError", () => ({
 }));
 
 const EVALUATORS = [
-  { uuid: "ev-llm-1", name: "Correctness", description: "Checks facts", evaluator_type: "llm" },
+  {
+    uuid: "ev-llm-1",
+    name: "Correctness",
+    description: "Checks facts",
+    evaluator_type: "llm",
+  },
   { uuid: "ev-llm-2", name: "Helpfulness", evaluator_type: "llm" },
   { uuid: "ev-stt-1", name: "WER", evaluator_type: "stt" },
 ];
 
-function renderDialog(props: Partial<Parameters<typeof CreateLabellingTaskDialog>[0]> = {}) {
+function renderDialog(
+  props: Partial<Parameters<typeof CreateLabellingTaskDialog>[0]> = {},
+) {
   const onClose = props.onClose ?? jest.fn();
   const onCreated = props.onCreated ?? jest.fn();
   const utils = render(
@@ -44,9 +55,34 @@ async function goToStep2(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
-async function goToStep3(user: ReturnType<typeof setupUser>, typeTitle = "LLM reply") {
+/**
+ * Answer the questions on the Type step. The step asks what is being labelled
+ * one question at a time, so each kind is a path of answers rather than a
+ * single card.
+ */
+const ANSWER_PATH: Record<string, string[]> = {
+  "LLM reply": ["Text", "A conversation", "A single reply"],
+  "Full conversation": ["Text", "A conversation", "The whole conversation"],
+  "Single LLM response": ["Text", "Single LLM response"],
+  "Speech to Text": ["Voice", "Speech to Text"],
+  "Text to Speech": ["Voice", "Text to Speech"],
+};
+
+async function answerTypeQuestions(
+  user: ReturnType<typeof setupUser>,
+  typeTitle: string,
+) {
+  for (const answer of ANSWER_PATH[typeTitle]) {
+    await user.click(screen.getByText(answer));
+  }
+}
+
+async function goToStep3(
+  user: ReturnType<typeof setupUser>,
+  typeTitle = "LLM reply",
+) {
   await goToStep2(user);
-  await user.click(screen.getByText(typeTitle));
+  await answerTypeQuestions(user, typeTitle);
   await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
@@ -97,13 +133,51 @@ describe("CreateLabellingTaskDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers every task type option, including tts", async () => {
+  it("asks text or voice first, and offers both audio kinds under voice", async () => {
     const user = setupUser();
     renderDialog();
     await goToStep2(user);
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
+    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.getByText("Voice")).toBeInTheDocument();
+    // Nothing below the first question until it is answered.
+    expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Voice"));
     expect(screen.getByText("Speech to Text")).toBeInTheDocument();
-    expect(screen.getByText("Text to Speech (TTS)")).toBeInTheDocument();
+    expect(screen.getByText("Text to Speech")).toBeInTheDocument();
+  });
+
+  it("asks what is judged only once a conversation is chosen", async () => {
+    const user = setupUser();
+    renderDialog();
+    await goToStep2(user);
+    await user.click(screen.getByText("Text"));
+    expect(screen.getByText("A conversation")).toBeInTheDocument();
+    expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("A conversation"));
+    expect(screen.getByText("A single reply")).toBeInTheDocument();
+    expect(screen.getByText("The whole conversation")).toBeInTheDocument();
+  });
+
+  it("drops every chosen evaluator when an earlier answer is changed", async () => {
+    const user = setupUser();
+    renderDialog();
+    await goToStep3(user, "LLM reply");
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    expect(screen.getByText("(1 selected)")).toBeInTheDocument();
+
+    // Back to the questions and change the first answer. That unpicks the kind
+    // entirely, so the evaluators chosen for it must go too.
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByText("Voice"));
+    await user.click(screen.getByText("Speech to Text"));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
+    expect(screen.getByText("(0 selected)")).toBeInTheDocument();
   });
 
   it("shows loading state for evaluators, then lists them filtered by type and supports search", async () => {
@@ -146,7 +220,9 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog();
     await goToStep3(user, "LLM reply");
     await waitFor(() =>
-      expect(screen.getByText("No LLM reply evaluators yet.")).toBeInTheDocument(),
+      expect(
+        screen.getByText("No LLM reply evaluators yet."),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -162,10 +238,14 @@ describe("CreateLabellingTaskDialog", () => {
 
   it("falls back to a generic evaluators-load error for a non-JSON failure body", async () => {
     const user = setupUser();
-    mockApiClient.mockRejectedValue(new Error("Request failed: 500 - not json"));
+    mockApiClient.mockRejectedValue(
+      new Error("Request failed: 500 - not json"),
+    );
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("not json")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("not json")).toBeInTheDocument(),
+    );
   });
 
   it("falls back to the generic message for a non-Error rejection", async () => {
@@ -182,7 +262,9 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
 
     expect(screen.getByText("(0 selected)")).toBeInTheDocument();
     const checkboxes = screen.getAllByRole("checkbox");
@@ -196,13 +278,15 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     expect(screen.getByText("(1 selected)")).toBeInTheDocument();
 
     // Go back to step 2 and switch the type to stt.
     await user.click(screen.getByRole("button", { name: "Back" }));
-    await user.click(screen.getByText("Speech to Text"));
+    await answerTypeQuestions(user, "Speech to Text");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
     expect(screen.getByText("(0 selected)")).toBeInTheDocument();
@@ -212,7 +296,9 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     const createBtn = screen.getByRole("button", { name: "Create task" });
     expect(createBtn).toBeDisabled();
     await user.click(screen.getAllByRole("checkbox")[0]);
@@ -227,15 +313,20 @@ describe("CreateLabellingTaskDialog", () => {
     const onCreated = jest.fn();
     renderDialog({ onCreated });
 
-    await user.type(screen.getByPlaceholderText(/Copilot review/i), "  My Task  ");
+    await user.type(
+      screen.getByPlaceholderText(/Copilot review/i),
+      "  My Task  ",
+    );
     await user.type(
       screen.getByPlaceholderText(/Short description/i),
       "  desc here  ",
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByText("LLM reply"));
+    await answerTypeQuestions(user, "LLM reply");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
 
     await user.click(screen.getByRole("button", { name: "Create task" }));
@@ -266,17 +357,23 @@ describe("CreateLabellingTaskDialog", () => {
     renderDialog();
     await user.type(screen.getByPlaceholderText(/Copilot review/i), "Task");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByText("LLM reply"));
+    await answerTypeQuestions(user, "LLM reply");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
     await waitFor(() =>
-      expect(mockApiClient).toHaveBeenLastCalledWith("/annotation-tasks", "tok", {
-        method: "POST",
-        body: { name: "Task", type: "llm", evaluator_ids: ["ev-llm-1"] },
-      }),
+      expect(mockApiClient).toHaveBeenLastCalledWith(
+        "/annotation-tasks",
+        "tok",
+        {
+          method: "POST",
+          body: { name: "Task", type: "llm", evaluator_ids: ["ev-llm-1"] },
+        },
+      ),
     );
   });
 
@@ -292,14 +389,20 @@ describe("CreateLabellingTaskDialog", () => {
       );
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
-    expect(screen.getByRole("button", { name: "Creating..." })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Creating..." }),
+    ).toBeInTheDocument();
     resolveCreate({ uuid: "t1", message: "ok" });
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Creating..." })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("button", { name: "Creating..." }),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -307,11 +410,17 @@ describe("CreateLabellingTaskDialog", () => {
     const user = setupUser();
     mockApiClient
       .mockResolvedValueOnce({ items: EVALUATORS })
-      .mockRejectedValueOnce(new Error('Request failed: 409 - {"detail":"Task name already exists"}'));
+      .mockRejectedValueOnce(
+        new Error(
+          'Request failed: 409 - {"detail":"Task name already exists"}',
+        ),
+      );
     mockReadNameConflictFromError.mockReturnValue("Task name already exists");
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
@@ -323,22 +432,30 @@ describe("CreateLabellingTaskDialog", () => {
 
     // Typing clears the inline conflict error.
     await user.type(screen.getByPlaceholderText(/Copilot review/i), "x");
-    expect(screen.queryByText("Task name already exists")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Task name already exists"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a generic submit error banner for non-conflict failures", async () => {
     const user = setupUser();
     mockApiClient
       .mockResolvedValueOnce({ items: EVALUATORS })
-      .mockRejectedValueOnce(new Error('Request failed: 400 - {"detail":"Bad input"}'));
+      .mockRejectedValueOnce(
+        new Error('Request failed: 400 - {"detail":"Bad input"}'),
+      );
     mockReadNameConflictFromError.mockReturnValue(null);
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
-    await waitFor(() => expect(screen.getByText("Bad input")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Bad input")).toBeInTheDocument(),
+    );
   });
 
   it("calls onClose when the header close button is clicked and disables it while submitting", async () => {
@@ -356,7 +473,9 @@ describe("CreateLabellingTaskDialog", () => {
     mockApiClient.mockRejectedValue(new Error("network down"));
     renderDialog();
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("network down")).toBeInTheDocument(),
+    );
   });
 
   it("falls back to the generic evaluators-load error for an Error with an empty message", async () => {
@@ -374,10 +493,16 @@ describe("CreateLabellingTaskDialog", () => {
     const onClose = jest.fn();
     const onCreated = jest.fn();
     const { rerender } = render(
-      <CreateLabellingTaskDialog accessToken="tok" onClose={onClose} onCreated={onCreated} />,
+      <CreateLabellingTaskDialog
+        accessToken="tok"
+        onClose={onClose}
+        onCreated={onCreated}
+      />,
     );
     await goToStep3(user, "LLM reply");
-    await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
     await user.click(screen.getAllByRole("checkbox")[0]);
     expect(screen.getByText("(1 selected)")).toBeInTheDocument();
 
@@ -395,7 +520,11 @@ describe("CreateLabellingTaskDialog", () => {
       ],
     });
     rerender(
-      <CreateLabellingTaskDialog accessToken="tok2" onClose={onClose} onCreated={onCreated} />,
+      <CreateLabellingTaskDialog
+        accessToken="tok2"
+        onClose={onClose}
+        onCreated={onCreated}
+      />,
     );
     await waitFor(() =>
       expect(screen.getByText("Freshness")).toBeInTheDocument(),

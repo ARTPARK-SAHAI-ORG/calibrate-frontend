@@ -86,6 +86,68 @@ const TYPE_TITLE_CLASSES: Record<EvaluatorType, string> = {
   conversation: "text-pink-700 dark:text-pink-300",
 };
 
+// Plain-token version of the same card, for an answer that is not an
+// evaluator type of its own.
+const NEUTRAL_INACTIVE_CLASSES =
+  "border-border bg-muted/20 hover:bg-muted/40 hover:border-muted-foreground";
+const NEUTRAL_ACTIVE_CLASSES =
+  "border-foreground bg-muted/40 ring-1 ring-foreground/20";
+
+type ChoiceCardProps = {
+  title: string;
+  description?: string;
+  selected: boolean;
+  onSelect: () => void;
+  /** An evaluator type paints the card in that type's colour. "neutral" is for
+   *  an answer that is not a type of its own. */
+  tone: EvaluatorType | "neutral";
+  recommended?: boolean;
+};
+
+// One selectable answer card. Shared by the evaluator use-case grid below and
+// the labelling-task questions so both read identically.
+export function ChoiceCard({
+  title,
+  description,
+  selected,
+  onSelect,
+  tone,
+  recommended,
+}: ChoiceCardProps) {
+  const neutral = tone === "neutral";
+  const toneClasses = neutral
+    ? selected
+      ? NEUTRAL_ACTIVE_CLASSES
+      : NEUTRAL_INACTIVE_CLASSES
+    : selected
+      ? TYPE_ACTIVE_CLASSES[tone]
+      : TYPE_INACTIVE_CLASSES[tone];
+  const titleClasses = neutral ? "text-foreground" : TYPE_TITLE_CLASSES[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${toneClasses}`}
+    >
+      <div className="flex items-start justify-between gap-2 w-full">
+        <div className={`text-sm md:text-base font-medium ${titleClasses}`}>
+          {title}
+        </div>
+        {recommended && (
+          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+            Most common
+          </span>
+        )}
+      </div>
+      <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
+        {description}
+      </div>
+    </button>
+  );
+}
+
 type EvaluatorUseCaseCardsProps = {
   options: EvaluatorUseCaseOption[];
   selected: EvaluatorType | null;
@@ -118,37 +180,17 @@ export function EvaluatorUseCaseCards({
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {groupOptions.map((opt) => {
-                const active = selected === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => onSelect(opt.value)}
-                    className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${
-                      active
-                        ? TYPE_ACTIVE_CLASSES[opt.value]
-                        : TYPE_INACTIVE_CLASSES[opt.value]
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 w-full">
-                      <div
-                        className={`text-sm md:text-base font-medium ${TYPE_TITLE_CLASSES[opt.value]}`}
-                      >
-                        {opt.title}
-                      </div>
-                      {opt.recommended && (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
-                          Most common
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
-                      {opt.description}
-                    </div>
-                  </button>
-                );
-              })}
+              {groupOptions.map((opt) => (
+                <ChoiceCard
+                  key={opt.value}
+                  title={opt.title}
+                  description={opt.description}
+                  selected={selected === opt.value}
+                  onSelect={() => onSelect(opt.value)}
+                  tone={opt.value}
+                  recommended={opt.recommended}
+                />
+              ))}
             </div>
           </div>
         );

@@ -27,35 +27,49 @@ describe("UseCasePickerDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders all use case options", () => {
+  it("asks text or voice first when every kind is on offer", () => {
     setup();
-    for (const opt of EVALUATOR_USE_CASE_OPTIONS) {
-      expect(screen.getByText(opt.title)).toBeInTheDocument();
-    }
+    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.getByText("Voice")).toBeInTheDocument();
+    // The kinds themselves only appear once the first question is answered.
+    expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();
+    expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
   });
 
-  it("hides category headers when only one group is shown", () => {
-    const conversationOnly = EVALUATOR_USE_CASE_OPTIONS.filter(
-      (option) => option.group === "conversation",
-    );
+  it("skips a question that has only one possible answer", async () => {
+    const user = setupUser();
+    // A screen offering only a reply in a conversation and a single response
+    // cannot mean voice, so it never asks text or voice. One question is left.
     render(
       <UseCasePickerDialog
         initialValue={null}
-        options={conversationOnly}
+        options={EVALUATOR_USE_CASE_OPTIONS.filter(
+          (option) => option.value === "llm" || option.value === "llm-general",
+        )}
         onCancel={jest.fn()}
         onSelect={jest.fn()}
       />,
     );
-    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
-    expect(screen.getByText("Full conversation")).toBeInTheDocument();
+    expect(screen.queryByText("Voice")).not.toBeInTheDocument();
+    expect(screen.getByText("Is there a conversation?")).toBeInTheDocument();
+
+    // And with one kind left under a conversation, that question is skipped
+    // too: choosing a conversation is already the whole answer.
+    await user.click(screen.getByText("A conversation"));
+    expect(screen.queryByText("A single reply")).not.toBeInTheDocument();
+    expect(screen.getByText("Continue")).not.toBeDisabled();
   });
 
-  it("shows category headers when multiple groups are shown", () => {
+  it("drops the answers under one that changes", async () => {
+    const user = setupUser();
     setup();
-    expect(screen.getByText("Conversation")).toBeInTheDocument();
-    expect(screen.getByText("Text")).toBeInTheDocument();
-    expect(screen.getByText("Audio")).toBeInTheDocument();
+    await user.click(screen.getByText("Voice"));
+    await user.click(screen.getByText("Speech to Text"));
+    expect(screen.getByText("Continue")).not.toBeDisabled();
+
+    await user.click(screen.getByText("Text"));
+    expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();
+    expect(screen.getByText("Continue")).toBeDisabled();
   });
 
   it("Continue button is disabled when nothing is selected", () => {
@@ -71,6 +85,7 @@ describe("UseCasePickerDialog", () => {
   it("selecting a card enables Continue and calls onSelect with that value on click", async () => {
     const user = setupUser();
     const { onSelect } = setup();
+    await user.click(screen.getByText("Voice"));
     await user.click(screen.getByText("Speech to Text"));
     expect(screen.getByText("Continue")).not.toBeDisabled();
     await user.click(screen.getByText("Continue"));

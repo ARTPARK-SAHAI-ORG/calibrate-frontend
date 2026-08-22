@@ -6,10 +6,7 @@ import {
   EVALUATOR_TYPE_LABELS,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
-import {
-  EvaluatorUseCaseCards,
-  EVALUATOR_USE_CASE_OPTIONS,
-} from "@/components/evaluators/evaluatorUseCases";
+import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
 import { apiClient, unwrapList } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
@@ -19,9 +16,15 @@ type TaskType = Extract<
   "llm" | "llm-general" | "stt" | "tts" | "conversation"
 >;
 
-// Reuse the shared evaluator use-case cards. Same grouping/copy as the
-// new-evaluator picker.
-const TASK_TYPE_OPTIONS = EVALUATOR_USE_CASE_OPTIONS;
+// A labelling task can be any of the five kinds, so all three questions get
+// asked.
+const TASK_TYPE_CHOICES: TaskType[] = [
+  "llm",
+  "conversation",
+  "llm-general",
+  "stt",
+  "tts",
+];
 
 type EvaluatorListItem = {
   uuid: string;
@@ -112,8 +115,14 @@ export function CreateLabellingTaskDialog({
   }, [accessToken]);
 
   // When the type changes, drop selections that don't belong to the new type.
+  // Going back to no type at all drops every one of them: the questions let a
+  // reader undo an answer, and the evaluators picked under the old answer are
+  // not valid under whatever they choose next.
   useEffect(() => {
-    if (!taskType) return;
+    if (!taskType) {
+      setSelectedEvaluatorIds((prev) => (prev.size ? new Set<string>() : prev));
+      return;
+    }
     setSelectedEvaluatorIds((prev) => {
       const next = new Set<string>();
       for (const ev of evaluators) {
@@ -303,20 +312,12 @@ export function CreateLabellingTaskDialog({
           )}
 
           {step === 2 && (
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                What are you labelling? <span className="text-red-500">*</span>
-              </label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Select carefully as it cannot be changed after the task is
-                created
-              </p>
-              <EvaluatorUseCaseCards
-                options={TASK_TYPE_OPTIONS}
-                selected={taskType}
-                onSelect={(v) => setTaskType(v as TaskType)}
-              />
-            </div>
+            <EvaluatorTypeQuestions
+              allowed={TASK_TYPE_CHOICES}
+              value={taskType}
+              onChange={(v) => setTaskType(v as TaskType | null)}
+              firstQuestionNote="Select carefully as it cannot be changed after the task is created"
+            />
           )}
 
           {step === 3 && (
