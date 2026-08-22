@@ -982,17 +982,6 @@ export function TestDetailView({
         });
   const hasJudgeResults =
     Array.isArray(effectiveJudgeResults) && effectiveJudgeResults.length > 0;
-  // A tool-call test already shows this same reasoning in the verdict card
-  // next to it (`EvaluationCriteriaPanel`'s "Tool call test" card / its
-  // "See reasoning" toggle), so showing it again here under the agent's
-  // answer would just repeat it. Legacy response tests with no evaluators
-  // captured have nowhere else to show it, so they keep this toggle.
-  const isToolCallTest =
-    (evaluation?.type ?? (evaluation?.tool_calls ? "tool_call" : "response")) ===
-    "tool_call";
-  const [legacyReasoningOpen, setLegacyReasoningOpen] = useState(false);
-  const showLegacyReasoningToggle =
-    !hasJudgeResults && !!reasoning?.trim() && !isToolCallTest;
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
   const outputAccent = showVerdict
     ? passed
@@ -1162,23 +1151,7 @@ export function TestDetailView({
                   </span>
                   {showVerdict && <SmallStatusBadge passed={passed} />}
                 </div>
-                {showLegacyReasoningToggle && (
-                  <ReasoningToggleButton
-                    open={legacyReasoningOpen}
-                    onToggle={() => setLegacyReasoningOpen((o) => !o)}
-                  />
-                )}
               </div>
-              {showLegacyReasoningToggle && legacyReasoningOpen && (
-                <div className="mb-2">
-                  <ReasoningExpandedContent
-                    text={reasoning!}
-                    showReasoningLabel={false}
-                    mutedBody
-                    italic
-                  />
-                </div>
-              )}
               <div className="max-w-[88%] md:max-w-3/4 w-fit">
                 <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                   <p className="text-sm text-foreground whitespace-pre-wrap">
