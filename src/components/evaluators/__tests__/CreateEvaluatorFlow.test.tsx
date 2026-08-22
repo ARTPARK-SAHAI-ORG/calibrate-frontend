@@ -128,10 +128,12 @@ describe("CreateEvaluatorFlow", () => {
       />,
     );
 
-    expect(screen.getByText("LLM reply")).toBeInTheDocument();
-    expect(screen.getByText("Full conversation")).toBeInTheDocument();
+    // Both kinds on offer sit inside a conversation, so text or voice and the
+    // conversation question both have one possible answer and are not asked.
+    expect(screen.getByText("A single reply")).toBeInTheDocument();
+    expect(screen.getByText("The whole conversation")).toBeInTheDocument();
     expect(screen.queryByText("Speech to Text")).not.toBeInTheDocument();
-    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Voice")).not.toBeInTheDocument();
   });
 
   it("closes the flow when the picker is cancelled before the sidebar opens", async () => {

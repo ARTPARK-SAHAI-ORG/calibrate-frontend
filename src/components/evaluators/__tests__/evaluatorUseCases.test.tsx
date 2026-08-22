@@ -1,5 +1,6 @@
 import { render, screen, setupUser } from "@/test-utils";
 import {
+  ChoiceCard,
   EVALUATOR_USE_CASE_OPTIONS,
   EvaluatorUseCaseCards,
   type EvaluatorUseCaseOption,
@@ -14,18 +15,18 @@ describe("EVALUATOR_USE_CASE_OPTIONS", () => {
       "stt",
       "tts",
     ]);
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group).toBe(
-      "conversation",
-    );
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group,
+    ).toBe("conversation");
     expect(
       EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm-general")?.group,
     ).toBe("text");
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "stt")?.group).toBe(
-      "audio",
-    );
-    expect(EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tts")?.group).toBe(
-      "audio",
-    );
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "stt")?.group,
+    ).toBe("audio");
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tts")?.group,
+    ).toBe("audio");
   });
 });
 
@@ -44,9 +45,15 @@ describe("EvaluatorUseCaseCards", () => {
   });
 
   it("omits a section header when no options belong to that group", () => {
-    const options = EVALUATOR_USE_CASE_OPTIONS.filter((o) => o.group !== "text");
+    const options = EVALUATOR_USE_CASE_OPTIONS.filter(
+      (o) => o.group !== "text",
+    );
     render(
-      <EvaluatorUseCaseCards options={options} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={options}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(screen.queryByText("Text")).not.toBeInTheDocument();
     expect(screen.getByText("Conversation")).toBeInTheDocument();
@@ -121,7 +128,11 @@ describe("EvaluatorUseCaseCards", () => {
       },
     ];
     render(
-      <EvaluatorUseCaseCards options={options} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={options}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(screen.getByText("Most common")).toBeInTheDocument();
     const badges = screen.getAllByText("Most common");
@@ -130,9 +141,124 @@ describe("EvaluatorUseCaseCards", () => {
 
   it("renders nothing (no groups) when options is empty", () => {
     const { container } = render(
-      <EvaluatorUseCaseCards options={[]} selected={null} onSelect={jest.fn()} />,
+      <EvaluatorUseCaseCards
+        options={[]}
+        selected={null}
+        onSelect={jest.fn()}
+      />,
     );
     expect(container.querySelectorAll("button")).toHaveLength(0);
     expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+  });
+});
+
+describe("ChoiceCard", () => {
+  it("renders the title and description", () => {
+    render(
+      <ChoiceCard
+        title="Yes"
+        description="Every reply is judged"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
+    );
+    expect(screen.getByText("Yes")).toBeInTheDocument();
+    expect(screen.getByText("Every reply is judged")).toBeInTheDocument();
+  });
+
+  it("marks the selected card with aria-pressed", () => {
+    const { unmount } = render(
+      <ChoiceCard title="Yes" selected onSelect={jest.fn()} tone="neutral" />,
+    );
+    expect(screen.getByRole("button", { name: "Yes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    unmount();
+    render(
+      <ChoiceCard
+        title="No"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "No" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("calls onSelect when clicked", async () => {
+    const user = setupUser();
+    const onSelect = jest.fn();
+    render(
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={onSelect}
+        tone="neutral"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Yes" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses plain tokens and no colour classes for a neutral card", () => {
+    const { rerender } = render(
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
+    );
+    const inactive = screen.getByRole("button", { name: "Yes" });
+    expect(inactive.className).not.toMatch(
+      /purple|blue|orange|teal|pink|(^|\s)ring-/,
+    );
+    expect(inactive.className).toContain("border-border");
+    expect(inactive.className).toContain("bg-muted/20");
+    expect(screen.getByText("Yes").className).toContain("text-foreground");
+
+    rerender(
+      <ChoiceCard title="Yes" selected onSelect={jest.fn()} tone="neutral" />,
+    );
+    const active = screen.getByRole("button", { name: "Yes" });
+    expect(active.className).not.toMatch(/purple|blue|orange|teal|pink/);
+    expect(active.className).toContain("border-foreground");
+    expect(active.className).toContain("ring-1 ring-foreground/20");
+  });
+
+  it("paints an evaluator-type card in that type's colour", () => {
+    render(
+      <ChoiceCard title="Yes" selected onSelect={jest.fn()} tone="blue" />,
+    );
+    expect(screen.getByRole("button", { name: "Yes" }).className).toContain(
+      "ring-blue-500/40",
+    );
+  });
+
+  it("shows the 'Most common' badge only when recommended", () => {
+    const { rerender } = render(
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+        recommended
+      />,
+    );
+    expect(screen.getByText("Most common")).toBeInTheDocument();
+    rerender(
+      <ChoiceCard
+        title="Yes"
+        selected={false}
+        onSelect={jest.fn()}
+        tone="neutral"
+      />,
+    );
+    expect(screen.queryByText("Most common")).not.toBeInTheDocument();
   });
 });

@@ -41,12 +41,14 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
 
     // Step 1 — Details. Only Name is required (placeholder uses an em dash, so
     // match a substring). Then advance.
-    await dialog.getByPlaceholder("Copilot review").fill(name);
+    await dialog.getByPlaceholder("Maternal health helpline").fill(name);
     await dialog.getByRole("button", { name: "Next", exact: true }).click();
 
-    // Step 2 — Type. Pick "LLM reply" (llm); its accessible name won't collide
-    // with "LLM output". Then advance.
-    await dialog.getByRole("button", { name: "LLM reply" }).click();
+    // Step 2 — Type. The step asks one question at a time, so a reply in a
+    // conversation is three answers rather than one card.
+    await dialog.getByText("Text", { exact: true }).click();
+    await dialog.getByText("Conversation", { exact: true }).click();
+    await dialog.getByText("A single reply", { exact: true }).click();
     await dialog.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 3 — Evaluators. The dialog fetches /evaluators?include_defaults=true

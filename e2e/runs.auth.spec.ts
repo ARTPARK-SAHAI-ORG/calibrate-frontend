@@ -59,7 +59,11 @@ async function createUnattachedLlmEvaluator(
       exact: true,
     }),
   ).toBeVisible();
-  await picker.getByText("LLM reply", { exact: true }).click();
+  // The picker asks one question at a time now, so a reply in a
+  // conversation is reached by answering rather than by one click.
+  await picker.getByText("Text", { exact: true }).click();
+  await picker.getByText("Conversation", { exact: true }).click();
+  await picker.getByText("A single reply", { exact: true }).click();
   await picker.getByRole("button", { name: "Continue" }).click();
 
   await expect(
@@ -71,7 +75,7 @@ async function createUnattachedLlmEvaluator(
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g. Follows Refund Policy").fill(name);
+  await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({

@@ -42,15 +42,22 @@ describe("BinaryScaleEditor", () => {
 
   it("uses default true/false placeholders when name is empty", () => {
     setup();
-    const inputs = screen.getAllByRole("textbox").filter((el) => el.tagName === "INPUT");
+    const inputs = screen
+      .getAllByRole("textbox")
+      .filter((el) => el.tagName === "INPUT");
     expect(inputs[0]).toHaveAttribute("placeholder", DEFAULT_BINARY_TRUE_LABEL);
-    expect(inputs[1]).toHaveAttribute("placeholder", DEFAULT_BINARY_FALSE_LABEL);
+    expect(inputs[1]).toHaveAttribute(
+      "placeholder",
+      DEFAULT_BINARY_FALSE_LABEL,
+    );
   });
 
   it("calls onChange with updated name for the true row", async () => {
     const user = setupUser();
     const { onChange } = setup();
-    const inputs = screen.getAllByRole("textbox").filter((el) => el.tagName === "INPUT");
+    const inputs = screen
+      .getAllByRole("textbox")
+      .filter((el) => el.tagName === "INPUT");
     await user.type(inputs[0], "Y");
     expect(onChange).toHaveBeenCalledWith([
       { value: true, name: "Y", description: "" },
@@ -61,7 +68,9 @@ describe("BinaryScaleEditor", () => {
   it("calls onChange with updated name for the false row", async () => {
     const user = setupUser();
     const { onChange } = setup();
-    const inputs = screen.getAllByRole("textbox").filter((el) => el.tagName === "INPUT");
+    const inputs = screen
+      .getAllByRole("textbox")
+      .filter((el) => el.tagName === "INPUT");
     await user.type(inputs[1], "N");
     expect(onChange).toHaveBeenCalledWith([
       { value: true, name: "", description: "" },
@@ -72,7 +81,9 @@ describe("BinaryScaleEditor", () => {
   it("calls onChange with updated description", async () => {
     const user = setupUser();
     const { onChange } = setup();
-    const textareas = screen.getAllByPlaceholderText(/Criteria for the response/);
+    const textareas = screen.getAllByPlaceholderText(
+      /Criteria for the response/,
+    );
     await user.type(textareas[0], "D");
     expect(onChange).toHaveBeenCalledWith([
       { value: true, name: "", description: "D" },
@@ -87,7 +98,9 @@ describe("BinaryScaleEditor", () => {
     ];
     const onChange = jest.fn();
     render(<BinaryScaleEditor rows={rows} onChange={onChange} />);
-    const inputs = screen.getAllByRole("textbox").filter((el) => el.tagName === "INPUT");
+    const inputs = screen
+      .getAllByRole("textbox")
+      .filter((el) => el.tagName === "INPUT");
     expect(inputs[0]).toHaveValue("Yep");
     expect(inputs[1]).toHaveValue("Nope");
   });

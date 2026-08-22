@@ -437,7 +437,7 @@ export function buildItemsFromSource(
     }
     case "traces": {
       // A general agent's trace is one input and the output it produced, which
-      // is what an LLM output task holds. Nothing is judged yet, so there is
+      // is what an LLM response task holds. Nothing is judged yet, so there is
       // no reasoning or score to carry over.
       if (source.agentNature === "general") {
         for (const t of source.traces) {
@@ -767,7 +767,7 @@ export function AddRunToLabellingTaskDialog({
             setNewName(e.target.value);
             if (nameInvalid) setNameInvalid(false);
           }}
-          placeholder="e.g. Copilot review — May batch"
+          placeholder="e.g. Maternal health helpline, May calls"
           disabled={submitting}
           className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
             nameInvalid ? "border-red-500" : "border-border"

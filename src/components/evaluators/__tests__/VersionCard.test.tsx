@@ -13,11 +13,14 @@ class MockResizeObserver {
 }
 
 beforeAll(() => {
-  (global as unknown as { ResizeObserver: typeof MockResizeObserver }).ResizeObserver =
-    MockResizeObserver;
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
 });
 
-function makeVersion(overrides: Partial<Parameters<typeof VersionCard>[0]["version"]> = {}) {
+function makeVersion(
+  overrides: Partial<Parameters<typeof VersionCard>[0]["version"]> = {},
+) {
   return {
     uuid: "v-1",
     version_number: 1,
@@ -172,10 +175,9 @@ describe("VersionCard", () => {
 
     expect(await screen.findByText("Copied")).toBeInTheDocument();
 
-    await waitFor(
-      () => expect(screen.getByText("Copy")).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
+    await waitFor(() => expect(screen.getByText("Copy")).toBeInTheDocument(), {
+      timeout: 3000,
+    });
   }, 10000);
 
   it("renders variables section when variables are present", () => {

@@ -468,7 +468,7 @@ describe("AddRunToLabellingTaskDialog", () => {
     expect(
       screen.getByText(/No existing tasks were found that include the evaluator in the selected tests/),
     ).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument();
   });
 
   it("shows an error when loading tasks fails", async () => {
@@ -561,7 +561,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       expect(screen.getByText("Use existing task")).toBeInTheDocument(),
     );
     await user.click(screen.getByText("Create new task"));
-    expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument();
     await user.click(screen.getByText("Use existing task"));
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
@@ -578,7 +578,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
     );
     // canSubmit gates on newName.trim(), so the button is disabled — assert
     // that state directly rather than relying on click-through validation.
@@ -611,9 +611,9 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
     );
-    await user.type(screen.getByPlaceholderText(/e.g. Copilot review/), "New Task");
+    await user.type(screen.getByPlaceholderText(/e.g. Maternal health helpline/), "New Task");
     await user.type(
       screen.getByPlaceholderText("Short description of the labelling task"),
       "Some description",
@@ -686,7 +686,7 @@ describe("AddRunToLabellingTaskDialog", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText(/e.g. Copilot review/),
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       ).toBeInTheDocument(),
     );
     // Header uses the "result(s)" noun for tts sources.
@@ -694,7 +694,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       screen.getByText(/Submit 1 result for labelling/),
     ).toBeInTheDocument();
     await user.type(
-      screen.getByPlaceholderText(/e.g. Copilot review/),
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       "TTS batch",
     );
     await user.click(screen.getByRole("button", { name: /Create task & add/ }));
@@ -774,12 +774,12 @@ describe("AddRunToLabellingTaskDialog", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText(/e.g. Copilot review/),
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       ).toBeInTheDocument(),
     );
     expect(screen.getByText(/Submit 1 trace for labelling/)).toBeInTheDocument();
     await user.type(
-      screen.getByPlaceholderText(/e.g. Copilot review/),
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       "Trace batch",
     );
     await user.click(screen.getByRole("button", { name: /Create task & add/ }));
@@ -906,7 +906,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
     );
     await user.click(screen.getByLabelText("Close"));
     expect(onClose).toHaveBeenCalledTimes(1);
