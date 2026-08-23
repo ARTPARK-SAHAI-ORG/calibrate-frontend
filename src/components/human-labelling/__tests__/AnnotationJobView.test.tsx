@@ -1700,6 +1700,87 @@ describe("AnnotationJobView", () => {
     expect(body.annotations[0].value.value).toBe(true);
     expect(body.annotations[0].value.expected_tool_calls).toBeUndefined();
   });
+
+  const toolCallJobWith = (job: Record<string, unknown>) => {
+    const base = toolCallJob();
+    return { ...base, job: { ...base.job, ...job } };
+  };
+
+  it("hides the reasoning box when the job hides reasoning", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(toolCallJobWith({ reasoning_mode: "hidden" })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Is the tool call correct?")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByPlaceholderText("Add your reasoning"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("refuses to save a verdict with no reasoning when the job requires it", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(
+      jsonResponse(toolCallJobWith({ reasoning_mode: "required" })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Is the tool call correct?")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Add your reasoning for this score"),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, opts]) =>
+          typeof url === "string" &&
+          url.endsWith("/annotations") &&
+          (opts as RequestInit | undefined)?.method === "POST",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("sends the reasoning written against the verdict", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(toolCallJobWith({ reasoning_mode: "required" })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Is the tool call correct?")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    await user.type(
+      screen.getByPlaceholderText("Add your reasoning"),
+      "Right city",
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 1, status: "completed" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Mark as complete" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = lastAnnotationsPost();
+    expect(body.annotations[0].value.value).toBe(true);
+    expect(body.annotations[0].value.reasoning).toBe("Right city");
+  });
+
+  it("hides the comments box when the job has comments switched off", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(toolCallJobWith({ comments_enabled: false })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Is the tool call correct?")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByPlaceholderText("Add any notes about this item"),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("AnnotationJobView expected tool calls", () => {

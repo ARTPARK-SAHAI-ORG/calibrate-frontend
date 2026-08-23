@@ -627,7 +627,10 @@ function VariableValuesBlock({ values }: { values: Record<string, string> }) {
   );
 }
 
-function WriteReasoning({
+/** The reasoning box under an answer. Exported because a tool-call
+ * labelling item has one answer for the whole item rather than one per
+ * evaluator, and its box has to look and behave exactly like this one. */
+export function WriteReasoning({
   value,
   onChange,
   disabled,

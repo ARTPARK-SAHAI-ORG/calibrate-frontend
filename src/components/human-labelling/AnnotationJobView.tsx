@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
-import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import {
+  EvaluatorVerdictCard,
+  WriteReasoning,
+} from "@/components/EvaluatorVerdictCard";
 import {
   getBinaryDescription,
   getBinaryLabel,
@@ -719,14 +722,17 @@ function AnnotateView({
    * without reasoning, on a job that requires it. */
   const reasoningMissingFor = (itemId: string): FieldKey[] => {
     if (reasoningMode !== "required") return [];
-    return evaluators
-      .map((ev) => fieldKey(itemId, ev.uuid))
-      .filter(
-        (k) =>
-          touchedKeys.has(k) &&
-          hasFieldValue(fields[k]) &&
-          !(fields[k]?.comment ?? "").trim(),
-      );
+    // A tool-call item has one answer, not one per evaluator, so its
+    // reasoning hangs off the verdict key instead.
+    const keys = isToolCallItemId(itemId)
+      ? [toolCallVerdictKey(itemId)]
+      : evaluators.map((ev) => fieldKey(itemId, ev.uuid));
+    return keys.filter(
+      (k) =>
+        touchedKeys.has(k) &&
+        hasFieldValue(fields[k]) &&
+        !(fields[k]?.comment ?? "").trim(),
+    );
   };
 
   // Red borders are painted first, then the first one is scrolled into view,
@@ -763,13 +769,24 @@ function AnnotateView({
       // A tool-call item is labelled with a single correct/wrong verdict — the
       // task's evaluators (AI judges) don't apply. It rides the null slot as
       // `value.value`, with the comment alongside.
-      const v = fields[toolCallVerdictKey(currentItem.uuid)]?.value;
+      const vkey = toolCallVerdictKey(currentItem.uuid);
+      const v = fields[vkey]?.value;
       if (typeof v !== "boolean") return false; // verdict is required
+      // Same rule as an evaluator answer: on a job that asks for reasoning,
+      // nothing is sent until it is written.
+      const missing = reasoningMissingFor(currentItem.uuid);
+      if (missing.length > 0) {
+        setMissingReasoningKeys(new Set(missing));
+        return false;
+      }
+      setMissingReasoningKeys(new Set());
+      const verdictReasoning = (fields[vkey]?.comment ?? "").trim();
       toolCallVerdict = v;
       annotationsBody.push({
         evaluator_id: null,
         value: {
           value: v,
+          ...(verdictReasoning ? { reasoning: verdictReasoning } : {}),
           ...(currentComment ? { comment: currentComment } : {}),
         },
       });
@@ -1282,15 +1299,16 @@ export function ItemPane({
   taskType: Task["type"];
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
-  // A tool-call item (in any llm/llm-general task) shows the tool call + the
-  // expected spec, regardless of the task's normal pane.
-  if (isToolCallOutputItem(payload))
-    return <ToolCallItemPane payload={payload} />;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
-  if (taskType === "llm") return <LlmItemPane payload={payload} />;
+  // A single agent response item is input and output, never a conversation,
+  // so its own pane draws the tool call too. Only a next-reply item swaps to
+  // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
+  if (isToolCallOutputItem(payload))
+    return <ToolCallItemPane payload={payload} />;
+  if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
   return (
@@ -1414,6 +1432,15 @@ function EvaluatorsPane({
               Wrong
             </button>
           </div>
+          {reasoningMode !== "hidden" && (
+            <WriteReasoning
+              value={typeof fields[vkey]?.comment === "string" ? fields[vkey].comment : ""}
+              onChange={(text) => setField(vkey, { comment: text })}
+              disabled={readOnly}
+              required={reasoningMode === "required"}
+              missing={missingReasoningKeys.has(vkey)}
+            />
+          )}
         </div>
         {commentBlock}
       </div>
