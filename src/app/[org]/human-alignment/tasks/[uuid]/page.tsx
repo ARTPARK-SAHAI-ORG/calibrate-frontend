@@ -4273,6 +4273,9 @@ function LabellingTaskPageInner() {
                   ...(r.description ? { description: r.description } : {}),
                   input: r.input,
                   output: r.output,
+                  ...(r.toolCalls.length > 0
+                    ? { actual_tool_calls: r.toolCalls }
+                    : {}),
                   ...(Object.keys(r.evaluator_variables).length > 0
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
@@ -4339,6 +4342,7 @@ function LabellingTaskPageInner() {
                       description: r.description,
                       input: r.input,
                       output: r.output,
+                      actual_tool_calls: r.toolCalls,
                       evaluator_variables: r.evaluator_variables,
                     },
                   })),

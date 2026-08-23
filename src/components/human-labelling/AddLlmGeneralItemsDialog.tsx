@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
-import {
-  ToolCallCard,
-  normalizeToolCall,
-} from "@/components/test-results/shared";
+import { ToolPicker, getToolParams } from "@/components/ToolPicker";
+import type { AvailableTool } from "@/components/ToolPicker";
+import { getDefaultHeaders } from "@/lib/api";
+import { reportError } from "@/lib/reportError";
+import { normalizeToolCall } from "@/components/test-results/shared";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
@@ -30,8 +31,62 @@ export type LlmGeneralItemRowSubmission = {
   description: string;
   input: string;
   output: string;
+  /** The tool calls the agent made. Empty means the answer was text. */
+  toolCalls: { tool: string; arguments: Record<string, unknown> }[];
   evaluator_variables: VarValues;
 };
+
+/** One tool call while it is being edited: values are held as the text in
+ * the boxes and only turned back into real values on save. */
+type DraftToolCall = {
+  id: string;
+  tool: string;
+  params: { name: string; value: string }[];
+};
+
+/** A typed-in argument, back to a real value. "true" and "12" are meant as
+ * a yes/no and a number, which is how they were stored when the agent made
+ * the call; anything else stays the text it is. */
+function parseArgValue(text: string): unknown {
+  const t = text.trim();
+  if (t === "") return "";
+  try {
+    return JSON.parse(t);
+  } catch {
+    return text;
+  }
+}
+
+function argValueToText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return JSON.stringify(value);
+}
+
+let draftIdCounter = 0;
+function nextDraftId(): number {
+  draftIdCounter += 1;
+  return draftIdCounter;
+}
+
+function seedToolCalls(raw: unknown): DraftToolCall[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((tc, i) => {
+    const { toolName, args } = normalizeToolCall(tc);
+    const entries =
+      args && typeof args === "object" && !Array.isArray(args)
+        ? Object.entries(args as Record<string, unknown>)
+        : [];
+    return {
+      id: `seed-${i}`,
+      tool: toolName,
+      params: entries.map(([name, value]) => ({
+        name,
+        value: argValueToText(value),
+      })),
+    };
+  });
+}
 
 type AddLlmGeneralItemsDialogProps = {
   isOpen: boolean;
@@ -49,7 +104,7 @@ type AddLlmGeneralItemsDialogProps = {
     input: string;
     output: string;
     /** The tool calls the agent made, when its answer was a tool call rather
-     * than text. Shown under Output, read-only: there is no text to type. */
+     * than text. Editable under Output. */
     toolCalls?: unknown[];
     varValues?: VarValues;
   }[];
@@ -106,12 +161,17 @@ export function AddLlmGeneralItemsDialog({
   };
 
   const seed = initialRows?.[0];
-  const toolCalls = Array.isArray(seed?.toolCalls) ? seed.toolCalls : [];
   const [uuid, setUuid] = useState<string | undefined>(seed?.uuid);
   const [name, setName] = useState(seed?.name ?? "");
   const [description, setDescription] = useState(seed?.description ?? "");
   const [input, setInput] = useState(seed?.input ?? "");
   const [output, setOutput] = useState(seed?.output ?? "");
+  const [toolCalls, setToolCalls] = useState<DraftToolCall[]>(() =>
+    seedToolCalls(seed?.toolCalls),
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
+  const [toolsLoading, setToolsLoading] = useState(false);
   const [varValues, setVarValues] = useState<VarValues>(() =>
     seedVarValues(seed?.varValues),
   );
@@ -129,12 +189,37 @@ export function AddLlmGeneralItemsDialog({
       setDescription(s?.description ?? "");
       setInput(s?.input ?? "");
       setOutput(s?.output ?? "");
+      setToolCalls(seedToolCalls(s?.toolCalls));
+      setPickerOpen(false);
       setVarValues(seedVarValues(s?.varValues));
       setError(null);
       setNameError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialRows]);
+
+  // The workspace tool catalogue, same source the test dialog picks from.
+  // Fetched only once the dialog is open.
+  useEffect(() => {
+    if (!isOpen || availableTools.length > 0 || toolsLoading) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+    let cancelled = false;
+    setToolsLoading(true);
+    fetch(`${backendUrl}/tools`, { headers: getDefaultHeaders() })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: AvailableTool[]) => {
+        if (!cancelled && Array.isArray(data)) setAvailableTools(data);
+      })
+      .catch((err) => reportError("Error fetching tools", err))
+      .finally(() => {
+        if (!cancelled) setToolsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Unsaved-changes check: any field differs from what the dialog was seeded
   // with (blank for add, the item's values for edit).
@@ -144,6 +229,13 @@ export function AddLlmGeneralItemsDialog({
     description.trim() !== (seed?.description ?? "").trim() ||
     input.trim() !== (seed?.input ?? "").trim() ||
     output.trim() !== (seed?.output ?? "").trim() ||
+    JSON.stringify(toolCalls.map(({ tool, params }) => ({ tool, params }))) !==
+      JSON.stringify(
+        seedToolCalls(seed?.toolCalls).map(({ tool, params }) => ({
+          tool,
+          params,
+        })),
+      ) ||
     evaluatorsWithVariables.some((e) =>
       e.variables.some(
         (v) =>
@@ -172,6 +264,38 @@ export function AddLlmGeneralItemsDialog({
 
   if (!isOpen) return null;
 
+  const addToolCall = (
+    toolName: string,
+    params: { name: string; value: string }[],
+  ) => {
+    setToolCalls((prev) => [
+      ...prev,
+      {
+        id: `${toolName}-${prev.length}-${nextDraftId()}`,
+        tool: toolName,
+        params,
+      },
+    ]);
+    setPickerOpen(false);
+  };
+
+  const removeToolCall = (id: string) =>
+    setToolCalls((prev) => prev.filter((tc) => tc.id !== id));
+
+  const updateToolCallParam = (id: string, paramName: string, value: string) =>
+    setToolCalls((prev) =>
+      prev.map((tc) =>
+        tc.id === id
+          ? {
+              ...tc,
+              params: tc.params.map((prm) =>
+                prm.name === paramName ? { ...prm, value } : prm,
+              ),
+            }
+          : tc,
+      ),
+    );
+
   const updateVar = (evaluatorUuid: string, varName: string, value: string) => {
     setVarValues((prev) => ({
       ...prev,
@@ -183,8 +307,13 @@ export function AddLlmGeneralItemsDialog({
   const varsComplete = evaluatorsWithVariables.every((e) =>
     e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
   );
+  // An item's answer is either text or one or more tool calls, so either
+  // one satisfies Output.
   const valid =
-    !!name.trim() && !!input.trim() && !!output.trim() && varsComplete;
+    !!name.trim() &&
+    !!input.trim() &&
+    (!!output.trim() || toolCalls.length > 0) &&
+    varsComplete;
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
@@ -207,6 +336,12 @@ export function AddLlmGeneralItemsDialog({
           description: description.trim(),
           input: input.trim(),
           output: output.trim(),
+          toolCalls: toolCalls.map((tc) => ({
+            tool: tc.tool,
+            arguments: Object.fromEntries(
+              tc.params.map((prm) => [prm.name, parseArgValue(prm.value)]),
+            ),
+          })),
           evaluator_variables,
         },
       ]);
@@ -384,26 +519,91 @@ export function AddLlmGeneralItemsDialog({
               <label className="block text-base font-medium text-foreground mb-2">
                 Output
               </label>
-              {toolCalls.length > 0 ? (
-                // ponytail: read-only. Editing a tool call by hand needs a
-                // form of its own; add one if anybody asks for it.
-                <div className="flex-1 min-h-[10rem] space-y-2 overflow-y-auto">
-                  {toolCalls.map((tc, i) => {
-                    const { toolName, args } = normalizeToolCall(tc);
-                    return (
-                      <ToolCallCard key={i} toolName={toolName} args={args} />
-                    );
-                  })}
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+                {toolCalls.length === 0 && (
+                  <textarea
+                    value={output}
+                    onChange={(e) => setOutput(e.target.value)}
+                    placeholder="The output the LLM produced"
+                    disabled={submitting}
+                    className="min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                  />
+                )}
+                {toolCalls.map((tc) => (
+                  <div
+                    key={tc.id}
+                    className="rounded-lg border border-border p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground break-words">
+                        {tc.tool}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeToolCall(tc.id)}
+                        disabled={submitting}
+                        className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {tc.params.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        This tool takes no values.
+                      </p>
+                    ) : (
+                      tc.params.map((prm) => (
+                        <div key={prm.name} className="space-y-1">
+                          <label
+                            htmlFor={`${tc.id}-${prm.name}`}
+                            className="block text-xs font-medium text-muted-foreground"
+                          >
+                            {prm.name}
+                          </label>
+                          <input
+                            id={`${tc.id}-${prm.name}`}
+                            type="text"
+                            value={prm.value}
+                            onChange={(e) =>
+                              updateToolCallParam(
+                                tc.id,
+                                prm.name,
+                                e.target.value,
+                              )
+                            }
+                            disabled={submitting}
+                            className="w-full px-3 py-2 rounded-md text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ))}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((open) => !open)}
+                    disabled={submitting}
+                    className="text-sm font-medium text-foreground underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add tool call
+                  </button>
+                  {pickerOpen && (
+                    <div className="absolute left-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                      <ToolPicker
+                        availableTools={availableTools}
+                        isLoading={toolsLoading}
+                        onSelectInbuiltTool={(_toolId, toolName) =>
+                          addToolCall(toolName, [])
+                        }
+                        onSelectCustomTool={(tool) =>
+                          addToolCall(tool.name, getToolParams(tool))
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <textarea
-                  value={output}
-                  onChange={(e) => setOutput(e.target.value)}
-                  placeholder="The output the LLM produced"
-                  disabled={submitting}
-                  className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                />
-              )}
+              </div>
             </div>
           </div>
         </div>
