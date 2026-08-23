@@ -72,6 +72,9 @@ jest.mock("../EvaluatorRunDetailView", () => {
         <span data-testid="pane-item-comments">
           {JSON.stringify(props.itemComments)}
         </span>
+        <span data-testid="pane-tool-call-verdicts">
+          {JSON.stringify(props.toolCallVerdicts)}
+        </span>
       </div>
     ),
   };
@@ -134,6 +137,41 @@ function baseSummary(overrides: Record<string, unknown> = {}) {
 describe("ItemDetailDialog", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it("passes the people's correct/wrong answers through to the item pane", async () => {
+    apiClientMock.mockResolvedValue(
+      baseSummary({
+        item_tool_call_annotations: {
+          "item-1": {
+            "ann-1": { value: true, reasoning: "Right city" },
+            "ann-2": { value: null },
+          },
+        },
+      }),
+    );
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("pane-tool-call-verdicts")).toBeInTheDocument(),
+    );
+    expect(
+      JSON.parse(screen.getByTestId("pane-tool-call-verdicts").textContent!),
+    ).toEqual([
+      {
+        annotator_id: "ann-1",
+        annotator_name: "Alice",
+        value: true,
+        reasoning: "Right city",
+      },
+    ]);
   });
 
   it("renders nothing when closed", () => {
@@ -318,7 +356,12 @@ describe("ItemDetailDialog", () => {
     apiClientMock.mockResolvedValue(
       baseSummary({
         evaluators: [
-          { uuid: "ev-1", name: "Correctness", output_type: "binary", run_count: 0 },
+          {
+            uuid: "ev-1",
+            name: "Correctness",
+            output_type: "binary",
+            run_count: 0,
+          },
         ],
       }),
     );
@@ -354,19 +397,21 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
-      "false",
-    );
+    expect(
+      screen.getByTestId("pane-annotator-filter-active"),
+    ).toHaveTextContent("false");
     expect(screen.getByTestId("pane-item-comments")).toHaveTextContent(
       "Nice item",
     );
 
     await user.click(screen.getByRole("button", { name: "Alice" }));
-    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
-      "true",
-    );
+    expect(
+      screen.getByTestId("pane-annotator-filter-active"),
+    ).toHaveTextContent("true");
     // Bob left no signal on this item, so he shouldn't appear as filterable.
-    expect(screen.queryByRole("button", { name: "Bob" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Bob" }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show the annotator picker when nobody has left a signal", async () => {
@@ -513,7 +558,9 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: /Live versions only/ }));
+    await user.click(
+      screen.getByRole("button", { name: /Live versions only/ }),
+    );
     expect(
       screen.getByRole("button", { name: /Live versions only/ }),
     ).toHaveAttribute("aria-pressed", "false");

@@ -5,7 +5,10 @@ import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
 import { DialogNavHeader } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
-import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
+import {
+  MultiSelectPicker,
+  type PickerItem,
+} from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -14,6 +17,7 @@ import {
   type HumanAgreementItem,
   type HumanAnnotation,
   type JobEvaluator,
+  type ToolCallVerdictEntry,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
 
 type SummaryAnnotator = { uuid: string; name: string };
@@ -75,6 +79,17 @@ type TaskSummaryResponse = {
    * annotation slot. Sparse: only `(item, annotator)` pairs with a
    * non-empty comment appear. */
   item_comments?: { [item_id: string]: { [annotator_uuid: string]: string } };
+  /** The correct/wrong answer a person gave on a tool-call item, from the
+   * same no-evaluator slot the comments come from. Sparse: only the
+   * `(item, annotator)` pairs that were answered appear. */
+  item_tool_call_annotations?: {
+    [item_id: string]: {
+      [annotator_uuid: string]: {
+        value: boolean | null;
+        reasoning?: string | null;
+      } | null;
+    };
+  };
 };
 
 export type ItemCommentEntry = {
@@ -272,6 +287,27 @@ export function ItemDetailDialog({
     return entries;
   }, [summary, item, annotatorFilter]);
 
+  // The correct/wrong answers people gave on this item, in the same
+  // annotator order as the comments and under the same annotator filter.
+  const itemToolCallVerdicts = useMemo<ToolCallVerdictEntry[]>(() => {
+    if (!summary || !item) return [];
+    const byAnn = summary.item_tool_call_annotations?.[item.uuid];
+    if (!byAnn) return [];
+    const entries: ToolCallVerdictEntry[] = [];
+    for (const ann of summary.annotators ?? []) {
+      const raw = byAnn[ann.uuid];
+      if (!raw || typeof raw.value !== "boolean") continue;
+      if (annotatorFilter && !annotatorFilter.has(ann.uuid)) continue;
+      entries.push({
+        annotator_id: ann.uuid,
+        annotator_name: ann.name,
+        value: raw.value,
+        reasoning: raw.reasoning ?? null,
+      });
+    }
+    return entries;
+  }, [summary, item, annotatorFilter]);
+
   const hasAnyLabel = useMemo(() => {
     if (!summary) return false;
     for (const row of summary.rows) {
@@ -345,14 +381,10 @@ export function ItemDetailDialog({
       const evDescription =
         summaryEv?.description ?? taskEv?.description ?? null;
       const evOutputType =
-        summaryEv?.output_type ?? (taskEv?.output_type as
-          | "binary"
-          | "rating"
-          | undefined);
+        summaryEv?.output_type ??
+        (taskEv?.output_type as "binary" | "rating" | undefined);
       const evVersion = row.evaluator_version_id
-        ? summaryEv?.versions?.find(
-            (v) => v.uuid === row.evaluator_version_id,
-          )
+        ? summaryEv?.versions?.find((v) => v.uuid === row.evaluator_version_id)
         : undefined;
 
       const evKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}`;
@@ -589,63 +621,63 @@ export function ItemDetailDialog({
               </div>
             )}
             {hasAnyEvaluatorRun && (
-            <Tooltip
-              position="bottom"
-              content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
-            >
-              <button
-                type="button"
-                onClick={() => setLiveOnly((v) => !v)}
-                aria-pressed={liveOnly}
-                className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
-                  liveOnly
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
-                }`}
+              <Tooltip
+                position="bottom"
+                content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
               >
-                {liveOnly ? (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 12.75l6 6 9-13.5"
+                <button
+                  type="button"
+                  onClick={() => setLiveOnly((v) => !v)}
+                  aria-pressed={liveOnly}
+                  className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
+                    liveOnly
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {liveOnly ? (
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                  ) : (
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                      aria-hidden
                     />
-                  </svg>
-                ) : (
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                    aria-hidden
-                  />
-                )}
-                Live versions only
-              </button>
-            </Tooltip>
+                  )}
+                  Live versions only
+                </button>
+              </Tooltip>
             )}
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -698,6 +730,7 @@ export function ItemDetailDialog({
               annotatorFilterActive={annotatorFilter !== null}
               singleAnnotatorFiltered={effectiveSelectedAnnotators.length === 1}
               itemComments={itemCommentEntries}
+              toolCallVerdicts={itemToolCallVerdicts}
             />
           )}
         </div>
