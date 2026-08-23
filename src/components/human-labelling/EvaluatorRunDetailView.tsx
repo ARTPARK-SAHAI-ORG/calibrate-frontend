@@ -91,13 +91,11 @@ export type JobEvaluator = {
       color?: string | null;
     }[];
   } | null;
-  variables?:
-    | {
-        name: string;
-        description?: string | null;
-        default?: string | null;
-      }[]
-    | null;
+  variables?: {
+    name: string;
+    description?: string | null;
+    default?: string | null;
+  }[] | null;
 };
 
 export type EvaluatorRunItemSnapshot = {
@@ -327,7 +325,8 @@ export function computeInterAnnotatorAgreement(
     .map((x) => x.value?.value)
     .filter(
       (v) =>
-        typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)),
+        typeof v === "boolean" ||
+        (typeof v === "number" && Number.isFinite(v)),
     );
   if (vals.length < 2) return null;
   let agree = 0;
@@ -415,7 +414,9 @@ export function extractEvaluatorVariables(
   return out;
 }
 
-export function exportInputCols(taskType: LabellingTaskFull["type"]): string[] {
+export function exportInputCols(
+  taskType: LabellingTaskFull["type"],
+): string[] {
   if (taskType === "stt")
     return ["reference_transcript", "predicted_transcript"];
   if (taskType === "tts") return ["text", "audio_path"];
@@ -457,8 +458,12 @@ export function extractPayloadInputValues(
       : {};
   if (taskType === "stt") {
     return [
-      typeof p.reference_transcript === "string" ? p.reference_transcript : "",
-      typeof p.predicted_transcript === "string" ? p.predicted_transcript : "",
+      typeof p.reference_transcript === "string"
+        ? p.reference_transcript
+        : "",
+      typeof p.predicted_transcript === "string"
+        ? p.predicted_transcript
+        : "",
     ];
   }
   if (taskType === "tts") {
@@ -837,232 +842,238 @@ export function EvaluatorResultsPane({
     );
   }
 
-  const renderEvaluatorCard = (ev: {
-    evaluator_id: string;
-    evaluator_version_id?: string;
-    name?: string;
-  }) => {
-    const versionLabel = ev.evaluator_version_id
-      ? versionLabels[ev.evaluator_version_id]
-      : null;
-    const r = runs.find(
-      (x) =>
-        x.evaluator_id === ev.evaluator_id &&
-        (!ev.evaluator_version_id ||
-          x.evaluator_version_id === ev.evaluator_version_id),
-    );
-    const jobEvaluator = getJobEvaluator(ev);
-    const displayName = evaluatorDisplayName(ev, evaluatorNamesById);
-    // Prefer the evaluator's declared output type so annotations still
-    // render with the right pill when the evaluator itself produced no
-    // value yet (e.g. items labelled by humans before a run).
-    let outputType: "binary" | "rating" =
-      jobEvaluator?.output_type === "rating" ? "rating" : "binary";
-    if (r) {
-      const v = r.value?.value;
-      if (typeof v === "boolean") outputType = "binary";
-      else if (typeof v === "number") outputType = "rating";
-    }
-    // outputType above can flip to binary on a boolean-valued row, so
-    // gate the binary lookups on the evaluator's declared type instead.
-    const binaryScale = binaryScaleFor(
-      jobEvaluator?.output_type,
-      jobEvaluator?.output_config?.scale,
-    );
+  const renderEvaluatorCard = (
+    ev: { evaluator_id: string; evaluator_version_id?: string; name?: string },
+  ) => {
+        const versionLabel = ev.evaluator_version_id
+          ? versionLabels[ev.evaluator_version_id]
+          : null;
+        const r = runs.find(
+          (x) =>
+            x.evaluator_id === ev.evaluator_id &&
+            (!ev.evaluator_version_id ||
+              x.evaluator_version_id === ev.evaluator_version_id),
+        );
+        const jobEvaluator = getJobEvaluator(ev);
+        const displayName = evaluatorDisplayName(ev, evaluatorNamesById);
+        // Prefer the evaluator's declared output type so annotations still
+        // render with the right pill when the evaluator itself produced no
+        // value yet (e.g. items labelled by humans before a run).
+        let outputType: "binary" | "rating" =
+          jobEvaluator?.output_type === "rating" ? "rating" : "binary";
+        if (r) {
+          const v = r.value?.value;
+          if (typeof v === "boolean") outputType = "binary";
+          else if (typeof v === "number") outputType = "rating";
+        }
+        // outputType above can flip to binary on a boolean-valued row, so
+        // gate the binary lookups on the evaluator's declared type instead.
+        const binaryScale = binaryScaleFor(
+          jobEvaluator?.output_type,
+          jobEvaluator?.output_config?.scale,
+        );
 
-    const stillRunning =
-      !r && (jobStatus === "in_progress" || jobStatus === "queued");
-    if (stillRunning) {
-      return (
-        <div
-          key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-          className="border border-border rounded-xl p-4 space-y-2"
-        >
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <h3 className="text-sm font-semibold">{displayName}</h3>
-            {versionLabel && (
-              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
-                {versionLabel}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 py-1">
-            <svg
-              className="w-5 h-5 animate-spin text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
+        const stillRunning =
+          !r && (jobStatus === "in_progress" || jobStatus === "queued");
+        if (stillRunning) {
+          return (
+            <div
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              className="border border-border rounded-xl p-4 space-y-2"
             >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <p className="text-sm text-muted-foreground">Running evaluator</p>
-          </div>
-        </div>
-      );
-    }
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="text-sm font-semibold">{displayName}</h3>
+                {versionLabel && (
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
+                    {versionLabel}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <svg
+                  className="w-5 h-5 animate-spin text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <p className="text-sm text-muted-foreground">
+                  Running evaluator
+                </p>
+              </div>
+            </div>
+          );
+        }
 
-    const evaluatorName = displayName;
+        const evaluatorName = displayName;
 
-    if (!r) {
-      return (
-        <div
-          key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-          className="border border-red-500/30 bg-red-500/5 rounded-xl p-4 space-y-1.5"
-        >
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <h3 className="text-sm font-semibold">{evaluatorName}</h3>
-            {versionLabel && (
-              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
-                {versionLabel}
-              </span>
+        if (!r) {
+          return (
+            <div
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              className="border border-red-500/30 bg-red-500/5 rounded-xl p-4 space-y-1.5"
+            >
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="text-sm font-semibold">{evaluatorName}</h3>
+                {versionLabel && (
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                    {versionLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                No result recorded for this item.
+              </p>
+            </div>
+          );
+        }
+
+        const humansForEvaluator =
+          humanAgreementForItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          ) ?? null;
+        const annotations =
+          jobStatus === "completed"
+            ? (humansForEvaluator?.human_annotations ?? [])
+            : [];
+        const annotationPills = filterDisagreements
+          ? annotations.filter(
+              (a) =>
+                !isAnnotationAligned(
+                  a.value?.value,
+                  r.value?.value,
+                  outputType,
+                ),
+            )
+          : annotations;
+        const hasHumans = annotationPills.length > 0;
+        const evaluatorValue = r.value?.value;
+        const hasEvaluatorLabel =
+          evaluatorValue !== null && evaluatorValue !== undefined;
+
+        // If the row only has human annotations (evaluator hasn't produced a
+        // value), drop the "Evaluator" pill and default the selection to the
+        // first annotator so the card has something meaningful to show.
+        const defaultSelection =
+          !hasEvaluatorLabel && hasHumans
+            ? annotationPills[0].annotator_id
+            : "evaluator";
+        const rawSelection =
+          selectionByEvaluator[ev.evaluator_id] ?? defaultSelection;
+        const selectedAnnotation =
+          rawSelection !== "evaluator"
+            ? annotationPills.find((a) => a.annotator_id === rawSelection)
+            : undefined;
+        const showHuman = !!selectedAnnotation;
+        const selection: string =
+          rawSelection === "evaluator" || selectedAnnotation
+            ? rawSelection
+            : defaultSelection;
+
+        const setSelection = (sel: string) =>
+          setSelectionByEvaluator((prev) => ({
+            ...prev,
+            [ev.evaluator_id]: sel,
+          }));
+
+        const scaleMin =
+          typeof jobEvaluator?.scale_min === "number"
+            ? jobEvaluator.scale_min
+            : undefined;
+        const scaleMax =
+          typeof jobEvaluator?.scale_max === "number"
+            ? jobEvaluator.scale_max
+            : undefined;
+
+        const {
+          match: displayMatch,
+          score: displayScore,
+          reasoning: displayReasoning,
+        } = resolveCardDisplay(
+          showHuman && selectedAnnotation
+            ? annotationToSource(selectedAnnotation)
+            : runToSource(r),
+          outputType,
+        );
+
+        return (
+          <div
+            key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+            className="space-y-2"
+          >
+            {(hasHumans || alwaysShowSourcePills) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {!hideAgreementGlyph && hasHumans && (
+                  <AgreementGlyph
+                    perfect={humansForEvaluator?.agreement === 1}
+                    agreement={humansForEvaluator?.agreement ?? null}
+                    pairCount={humansForEvaluator?.pair_count ?? 0}
+                  />
+                )}
+                {hasEvaluatorLabel && (
+                  <SourcePill
+                    selected={selection === "evaluator"}
+                    onClick={() => setSelection("evaluator")}
+                    primaryLabel="Evaluator"
+                    monoSuffix={showVersionInSourcePill ? versionLabel : null}
+                  />
+                )}
+                {annotationPills.map((a) => {
+                  const aligned = isAnnotationAligned(
+                    a.value?.value,
+                    r.value?.value,
+                    outputType,
+                  );
+                  return (
+                    <SourcePill
+                      key={a.annotation_id}
+                      primaryLabel={annotatorDisplayName(a)}
+                      selected={selection === a.annotator_id}
+                      onClick={() => setSelection(a.annotator_id)}
+                      tone={aligned ? "aligned" : "misaligned"}
+                    />
+                  );
+                })}
+              </div>
             )}
+            <EvaluatorVerdictCard
+              mode="read"
+              name={evaluatorName}
+              description={jobEvaluator?.description ?? null}
+              versionLabel={showVersionInSourcePill ? null : versionLabel}
+              outputType={outputType}
+              evaluatorUuid={ev.evaluator_id}
+              enableLink={linkEvaluators}
+              variableValues={
+                evaluatorVariablesByEvaluatorId[ev.evaluator_id] ?? null
+              }
+              match={displayMatch}
+              score={displayScore}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              trueLabel={getBinaryLabel(binaryScale, true)}
+              falseLabel={getBinaryLabel(binaryScale, false)}
+              trueDescription={getBinaryDescription(binaryScale, true)}
+              falseDescription={getBinaryDescription(binaryScale, false)}
+              ratingScale={toRatingScale(
+                jobEvaluator?.output_config?.scale,
+              )}
+              reasoning={displayReasoning}
+            />
           </div>
-          <p className="text-xs text-red-600 dark:text-red-400">
-            No result recorded for this item.
-          </p>
-        </div>
-      );
-    }
-
-    const humansForEvaluator =
-      humanAgreementForItem?.evaluators.find(
-        (e) => e.evaluator_id === ev.evaluator_id,
-      ) ?? null;
-    const annotations =
-      jobStatus === "completed"
-        ? (humansForEvaluator?.human_annotations ?? [])
-        : [];
-    const annotationPills = filterDisagreements
-      ? annotations.filter(
-          (a) =>
-            !isAnnotationAligned(a.value?.value, r.value?.value, outputType),
-        )
-      : annotations;
-    const hasHumans = annotationPills.length > 0;
-    const evaluatorValue = r.value?.value;
-    const hasEvaluatorLabel =
-      evaluatorValue !== null && evaluatorValue !== undefined;
-
-    // If the row only has human annotations (evaluator hasn't produced a
-    // value), drop the "Evaluator" pill and default the selection to the
-    // first annotator so the card has something meaningful to show.
-    const defaultSelection =
-      !hasEvaluatorLabel && hasHumans
-        ? annotationPills[0].annotator_id
-        : "evaluator";
-    const rawSelection =
-      selectionByEvaluator[ev.evaluator_id] ?? defaultSelection;
-    const selectedAnnotation =
-      rawSelection !== "evaluator"
-        ? annotationPills.find((a) => a.annotator_id === rawSelection)
-        : undefined;
-    const showHuman = !!selectedAnnotation;
-    const selection: string =
-      rawSelection === "evaluator" || selectedAnnotation
-        ? rawSelection
-        : defaultSelection;
-
-    const setSelection = (sel: string) =>
-      setSelectionByEvaluator((prev) => ({
-        ...prev,
-        [ev.evaluator_id]: sel,
-      }));
-
-    const scaleMin =
-      typeof jobEvaluator?.scale_min === "number"
-        ? jobEvaluator.scale_min
-        : undefined;
-    const scaleMax =
-      typeof jobEvaluator?.scale_max === "number"
-        ? jobEvaluator.scale_max
-        : undefined;
-
-    const {
-      match: displayMatch,
-      score: displayScore,
-      reasoning: displayReasoning,
-    } = resolveCardDisplay(
-      showHuman && selectedAnnotation
-        ? annotationToSource(selectedAnnotation)
-        : runToSource(r),
-      outputType,
-    );
-
-    return (
-      <div
-        key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-        className="space-y-2"
-      >
-        {(hasHumans || alwaysShowSourcePills) && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {!hideAgreementGlyph && hasHumans && (
-              <AgreementGlyph
-                perfect={humansForEvaluator?.agreement === 1}
-                agreement={humansForEvaluator?.agreement ?? null}
-                pairCount={humansForEvaluator?.pair_count ?? 0}
-              />
-            )}
-            {hasEvaluatorLabel && (
-              <SourcePill
-                selected={selection === "evaluator"}
-                onClick={() => setSelection("evaluator")}
-                primaryLabel="Evaluator"
-                monoSuffix={showVersionInSourcePill ? versionLabel : null}
-              />
-            )}
-            {annotationPills.map((a) => {
-              const aligned = isAnnotationAligned(
-                a.value?.value,
-                r.value?.value,
-                outputType,
-              );
-              return (
-                <SourcePill
-                  key={a.annotation_id}
-                  primaryLabel={annotatorDisplayName(a)}
-                  selected={selection === a.annotator_id}
-                  onClick={() => setSelection(a.annotator_id)}
-                  tone={aligned ? "aligned" : "misaligned"}
-                />
-              );
-            })}
-          </div>
-        )}
-        <EvaluatorVerdictCard
-          mode="read"
-          name={evaluatorName}
-          description={jobEvaluator?.description ?? null}
-          versionLabel={showVersionInSourcePill ? null : versionLabel}
-          outputType={outputType}
-          evaluatorUuid={ev.evaluator_id}
-          enableLink={linkEvaluators}
-          variableValues={
-            evaluatorVariablesByEvaluatorId[ev.evaluator_id] ?? null
-          }
-          match={displayMatch}
-          score={displayScore}
-          scaleMin={scaleMin}
-          scaleMax={scaleMax}
-          trueLabel={getBinaryLabel(binaryScale, true)}
-          falseLabel={getBinaryLabel(binaryScale, false)}
-          trueDescription={getBinaryDescription(binaryScale, true)}
-          falseDescription={getBinaryDescription(binaryScale, false)}
-          ratingScale={toRatingScale(jobEvaluator?.output_config?.scale)}
-          reasoning={displayReasoning}
-        />
-      </div>
-    );
+        );
   };
 
   if (groupVersionsByEvaluator) {
@@ -1339,19 +1350,20 @@ function GroupedEvaluatorCard({
       : defaultSelection;
 
   const selectedVersion = selection.startsWith("v:")
-    ? (versions.find(
+    ? versions.find(
         (x) => `v:${x.ev.evaluator_version_id ?? ""}` === selection,
-      ) ?? null)
+      ) ?? null
     : null;
   const selectedAnnotation = selection.startsWith("a:")
-    ? (annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null)
+    ? annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null
     : null;
 
   // The card's "anchor" run (for output value / reasoning) is either the
   // selected version or the first version that has run data. Metadata
   // (description / scale_min / scale_max / output_config) comes from the
   // top-level jobEvaluatorById lookup, not the run row.
-  const anchorRun = selectedVersion?.r ?? versions.find((x) => x.r)?.r ?? null;
+  const anchorRun =
+    selectedVersion?.r ?? versions.find((x) => x.r)?.r ?? null;
   // Resolve the JobEvaluator for the version actually being shown so
   // labels / scale come from THIS version, not a sibling.
   const anchorEv =
@@ -1363,7 +1375,10 @@ function GroupedEvaluatorCard({
     jobEvaluator?.output_type,
     jobEvaluator?.output_config?.scale,
   );
-  const evaluatorName = evaluatorDisplayName(evaluators[0], evaluatorNamesById);
+  const evaluatorName = evaluatorDisplayName(
+    evaluators[0],
+    evaluatorNamesById,
+  );
   const scaleMin =
     typeof jobEvaluator?.scale_min === "number"
       ? jobEvaluator.scale_min
@@ -1389,9 +1404,8 @@ function GroupedEvaluatorCard({
   // the user already knows who they picked. Outside of that case the
   // pill still surfaces the annotator's name.
   const hasAnyVersionPill = versions.some((x) => x.hasValue);
-  const showAnnotatorPills = !(
-    annotatorFilterActive && annotations.length === 1
-  );
+  const showAnnotatorPills =
+    !(annotatorFilterActive && annotations.length === 1);
   const pillCount =
     (hasAnyVersionPill ? versions.filter((x) => x.hasValue).length : 0) +
     (showAnnotatorPills ? annotations.length : 0);
@@ -1399,33 +1413,32 @@ function GroupedEvaluatorCard({
   return (
     <div className="space-y-2">
       {pillCount > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {versions.map((x) => {
-            if (!x.hasValue) return null;
-            const token = `v:${x.ev.evaluator_version_id ?? ""}`;
-            return (
-              <SourcePill
-                key={token}
-                selected={selection === token}
-                onClick={() => setSelection(token)}
-                primaryLabel="Evaluator"
-                monoSuffix={x.versionLabel}
-              />
-            );
-          })}
-          {showAnnotatorPills &&
-            annotations.map((a) => {
-              const token = `a:${a.annotator_id}`;
-              return (
-                <SourcePill
-                  key={token}
-                  primaryLabel={annotatorDisplayName(a)}
-                  selected={selection === token}
-                  onClick={() => setSelection(token)}
-                />
-              );
-            })}
-        </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {versions.map((x) => {
+          if (!x.hasValue) return null;
+          const token = `v:${x.ev.evaluator_version_id ?? ""}`;
+          return (
+            <SourcePill
+              key={token}
+              selected={selection === token}
+              onClick={() => setSelection(token)}
+              primaryLabel="Evaluator"
+              monoSuffix={x.versionLabel}
+            />
+          );
+        })}
+        {showAnnotatorPills && annotations.map((a) => {
+          const token = `a:${a.annotator_id}`;
+          return (
+            <SourcePill
+              key={token}
+              primaryLabel={annotatorDisplayName(a)}
+              selected={selection === token}
+              onClick={() => setSelection(token)}
+            />
+          );
+        })}
+      </div>
       )}
       <EvaluatorVerdictCard
         mode="read"
@@ -1434,7 +1447,9 @@ function GroupedEvaluatorCard({
         outputType={outputType}
         evaluatorUuid={evaluatorId}
         enableLink={linkEvaluators}
-        variableValues={evaluatorVariablesByEvaluatorId[evaluatorId] ?? null}
+        variableValues={
+          evaluatorVariablesByEvaluatorId[evaluatorId] ?? null
+        }
         match={displayMatch}
         score={displayScore}
         scaleMin={scaleMin}
@@ -1664,7 +1679,11 @@ function EvaluatorSummary({
             row?.agreement == null
               ? "No human labels for this evaluator yet. Agreement will show once they are added."
               : null;
-          const result = summariseEvaluatorRuns(runs, ev, getJobEvaluator(ev));
+          const result = summariseEvaluatorRuns(
+            runs,
+            ev,
+            getJobEvaluator(ev),
+          );
           const key = `${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`;
           if (linkEvaluators) {
             return (
@@ -1685,7 +1704,9 @@ function EvaluatorSummary({
           return (
             <AgreementStatCard
               key={key}
-              staticPillText={version ? `${name} ${version}` : name}
+              staticPillText={
+                version ? `${name} ${version}` : name
+              }
               value={value}
               valueClassName={valueClassName}
               result={result}
@@ -1893,10 +1914,7 @@ export function EvaluatorRunDetailView({
     // Gated on `canFilterByValue` too: without it a filter picked on one
     // run keeps hiding items after you move to a run whose bar is hidden,
     // and there is no control on screen to clear it.
-    if (
-      canFilterByValue &&
-      usableValueFilters(valueFilters, jobEvaluators).length > 0
-    ) {
+    if (canFilterByValue && usableValueFilters(valueFilters, jobEvaluators).length > 0) {
       // An evaluator can have several version rows per item; any one of
       // them matching keeps the item.
       const scoresFor = (itemUuid: string, evaluatorId: string) =>
@@ -1965,13 +1983,15 @@ export function EvaluatorRunDetailView({
     );
   };
 
-  if (!(
-    task.type === "stt" ||
-    task.type === "tts" ||
-    task.type === "llm" ||
-    task.type === "llm-general" ||
-    task.type === "conversation"
-  )) {
+  if (
+    !(
+      task.type === "stt" ||
+      task.type === "tts" ||
+      task.type === "llm" ||
+      task.type === "llm-general" ||
+      task.type === "conversation"
+    )
+  ) {
     return null;
   }
 
@@ -2020,45 +2040,45 @@ export function EvaluatorRunDetailView({
               <span className="text-sm text-muted-foreground">—</span>
             ) : (
               detailsEvaluators.map((e) => {
-                const name = evaluatorDisplayName(e, evaluatorNamesById);
-                const label = e.evaluator_version_id
-                  ? versionLabels[e.evaluator_version_id]
-                  : null;
-                const pillClass =
-                  "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
-                const inner = (
-                  <>
-                    <span className="break-words whitespace-normal">
-                      {name}
-                    </span>
-                    {label && (
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        {label}
+                    const name = evaluatorDisplayName(e, evaluatorNamesById);
+                    const label = e.evaluator_version_id
+                      ? versionLabels[e.evaluator_version_id]
+                      : null;
+                    const pillClass =
+                      "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
+                    const inner = (
+                      <>
+                        <span className="break-words whitespace-normal">
+                          {name}
+                        </span>
+                        {label && (
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {label}
+                          </span>
+                        )}
+                      </>
+                    );
+                    if (linkEvaluators) {
+                      return (
+                        <Link
+                          key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                          href={`/evaluators/${e.evaluator_id}`}
+                          title={`Open ${name}`}
+                          className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+                        >
+                          {inner}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <span
+                        key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                        className={pillClass}
+                      >
+                        {inner}
                       </span>
-                    )}
-                  </>
-                );
-                if (linkEvaluators) {
-                  return (
-                    <Link
-                      key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                      href={`/evaluators/${e.evaluator_id}`}
-                      title={`Open ${name}`}
-                      className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-                    >
-                      {inner}
-                    </Link>
-                  );
-                }
-                return (
-                  <span
-                    key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                    className={pillClass}
-                  >
-                    {inner}
-                  </span>
-                );
-              })
+                    );
+                  })
             )}
             {statusPill}
           </div>
