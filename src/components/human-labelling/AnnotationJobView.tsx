@@ -13,6 +13,8 @@ import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
+import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
+import { isToolCallOutputItem } from "./itemOutputType";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -1218,9 +1220,14 @@ export function ItemPane({
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
-  if (taskType === "llm") return <LlmItemPane payload={payload} />;
+  // A single agent response item is input and output, never a conversation,
+  // so its own pane draws the tool call too. Only a next-reply item swaps to
+  // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
+  if (isToolCallOutputItem(payload))
+    return <ToolCallItemPane payload={payload} />;
+  if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
   return (
