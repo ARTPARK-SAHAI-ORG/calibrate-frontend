@@ -1416,8 +1416,11 @@ function EvaluatorsPane({
         {commentBlock}
         <div className="border border-border rounded-xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">
-            Is the tool call correct?
+            Tool call correctness
           </h3>
+          <p className="text-xs text-muted-foreground">
+            Is the tool call correct?
+          </p>
           <div className="flex gap-2">
             <button
               type="button"

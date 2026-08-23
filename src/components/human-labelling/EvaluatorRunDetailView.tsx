@@ -1146,8 +1146,9 @@ function ToolCallVerdictBlock({
   return (
     <div className="border border-border rounded-xl p-4 space-y-2">
       <h3 className="text-sm font-semibold text-foreground">
-        Is the tool call correct?
+        Tool call correctness
       </h3>
+      <p className="text-xs text-muted-foreground">Is the tool call correct?</p>
       {!active ? (
         <p className="text-sm text-muted-foreground">
           Nobody has answered this yet.

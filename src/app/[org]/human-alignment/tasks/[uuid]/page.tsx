@@ -4342,7 +4342,12 @@ function LabellingTaskPageInner() {
                       description: r.description,
                       input: r.input,
                       output: r.output,
-                      actual_tool_calls: r.toolCalls,
+                      // Only a real call goes on the item. An empty list
+                      // would make every screen read a plain text answer as
+                      // a tool call, so the key is dropped instead.
+                      ...(r.toolCalls.length > 0
+                        ? { actual_tool_calls: r.toolCalls }
+                        : { actual_tool_calls: undefined }),
                       evaluator_variables: r.evaluator_variables,
                     },
                   })),
