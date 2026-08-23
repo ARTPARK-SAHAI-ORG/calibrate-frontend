@@ -810,7 +810,7 @@ describe("AddTestDialog — additional branch coverage", () => {
         "Label item",
       );
       const descriptionBox = screen.getByPlaceholderText(
-        /Optional — what is this item about/,
+        /\(Optional\) What is this item about/,
       );
       await user.type(descriptionBox, "notes");
       const textareas = document.querySelectorAll("textarea[data-msg-id]");

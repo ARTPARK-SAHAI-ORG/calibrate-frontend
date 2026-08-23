@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import {
+  BINARY_FALSE_SELECTED,
+  BINARY_TRUE_SELECTED,
+  BINARY_UNSELECTED,
   EvaluatorVerdictCard,
   WriteReasoning,
 } from "@/components/EvaluatorVerdictCard";
@@ -1405,11 +1408,12 @@ function EvaluatorsPane({
     const btn = (v: boolean, on: string) =>
       `h-9 px-4 rounded-md text-sm font-medium border transition-colors ${
         readOnly ? "" : "cursor-pointer"
-      } ${verdict === v ? on : "border-border bg-background text-foreground hover:bg-muted/50"}`;
+      } ${verdict === v ? on : BINARY_UNSELECTED}`;
     return (
       <div className="space-y-4">
-        {descriptionBlock}
         <ExpectedToolCalls payload={itemPayload} />
+        {descriptionBlock}
+        {commentBlock}
         <div className="border border-border rounded-xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">
             Is the tool call correct?
@@ -1419,7 +1423,7 @@ function EvaluatorsPane({
               type="button"
               disabled={readOnly}
               onClick={() => setVerdict(true)}
-              className={btn(true, "border-green-600 bg-green-600 text-white")}
+              className={btn(true, BINARY_TRUE_SELECTED)}
             >
               Correct
             </button>
@@ -1427,14 +1431,18 @@ function EvaluatorsPane({
               type="button"
               disabled={readOnly}
               onClick={() => setVerdict(false)}
-              className={btn(false, "border-red-600 bg-red-600 text-white")}
+              className={btn(false, BINARY_FALSE_SELECTED)}
             >
               Wrong
             </button>
           </div>
           {reasoningMode !== "hidden" && (
             <WriteReasoning
-              value={typeof fields[vkey]?.comment === "string" ? fields[vkey].comment : ""}
+              value={
+                typeof fields[vkey]?.comment === "string"
+                  ? fields[vkey].comment
+                  : ""
+              }
               onChange={(text) => setField(vkey, { comment: text })}
               disabled={readOnly}
               required={reasoningMode === "required"}
@@ -1442,7 +1450,6 @@ function EvaluatorsPane({
             />
           )}
         </div>
-        {commentBlock}
       </div>
     );
   }

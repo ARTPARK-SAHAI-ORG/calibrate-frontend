@@ -470,9 +470,7 @@ function WriteControls({
           aria-pressed={value === true}
           onClick={() => onChange(true)}
           className={`${baseBtn} ${
-            value === true
-              ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400"
-              : "border-border bg-background hover:bg-muted/50"
+            value === true ? BINARY_TRUE_SELECTED : BINARY_UNSELECTED
           }`}
         >
           {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
@@ -480,7 +478,7 @@ function WriteControls({
             <OptionDescription
               text={trueText}
               active={value === true}
-              activeClass="text-green-700/80 dark:text-green-400/80"
+              activeClass="text-white/80"
             />
           )}
         </button>
@@ -490,9 +488,7 @@ function WriteControls({
           aria-pressed={value === false}
           onClick={() => onChange(false)}
           className={`${baseBtn} ${
-            value === false
-              ? "border-red-200 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/20 dark:text-red-400"
-              : "border-border bg-background hover:bg-muted/50"
+            value === false ? BINARY_FALSE_SELECTED : BINARY_UNSELECTED
           }`}
         >
           {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
@@ -500,7 +496,7 @@ function WriteControls({
             <OptionDescription
               text={falseText}
               active={value === false}
-              activeClass="text-red-700/80 dark:text-red-400/80"
+              activeClass="text-white/80"
             />
           )}
         </button>
@@ -630,6 +626,14 @@ function VariableValuesBlock({ values }: { values: Record<string, string> }) {
 /** The reasoning box under an answer. Exported because a tool-call
  * labelling item has one answer for the whole item rather than one per
  * evaluator, and its box has to look and behave exactly like this one. */
+/** How a picked yes/no answer looks on the labelling job page. One pair of
+ * classes so an evaluator answer and a tool-call answer, which sit on the
+ * same screen, cannot drift apart. */
+export const BINARY_TRUE_SELECTED = "border-green-600 bg-green-600 text-white";
+export const BINARY_FALSE_SELECTED = "border-red-600 bg-red-600 text-white";
+export const BINARY_UNSELECTED =
+  "border-border bg-background text-foreground hover:bg-muted/50";
+
 export function WriteReasoning({
   value,
   onChange,
@@ -646,14 +650,7 @@ export function WriteReasoning({
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
-        Reasoning{" "}
-        {disabled ? (
-          ""
-        ) : required ? (
-          <span className="text-red-500">*</span>
-        ) : (
-          "(optional)"
-        )}
+        Reasoning{disabled || required ? "" : " (optional)"}
       </div>
       <textarea
         value={value}

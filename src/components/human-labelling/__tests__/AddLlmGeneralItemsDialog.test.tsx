@@ -163,7 +163,7 @@ describe("AddLlmGeneralItemsDialog", () => {
     await user.type(screen.getByPlaceholderText("Your item name"), "  Item 1  ");
     await user.type(
       screen.getByPlaceholderText(
-        "Optional — what is this item about? Shown to annotators alongside the evaluators.",
+        "(Optional) What is this item about? Shown to annotators alongside the evaluators.",
       ),
       "  desc  ",
     );

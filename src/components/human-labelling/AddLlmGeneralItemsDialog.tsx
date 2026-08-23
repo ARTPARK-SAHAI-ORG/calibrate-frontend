@@ -293,7 +293,7 @@ export function AddLlmGeneralItemsDialog({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional — what is this item about? Shown to annotators alongside the evaluators."
+                placeholder="(Optional) What is this item about? Shown to annotators alongside the evaluators."
                 disabled={submitting}
                 rows={3}
                 className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
