@@ -143,7 +143,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
         },
       ],
     });
-    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
     expect(screen.queryByText("dummy")).not.toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("The output the LLM produced"),
@@ -189,6 +189,35 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       { tool: "dummy", arguments: { success: true } },
       { tool: "book_flight", arguments: { city: "Bengaluru" } },
     ]);
+  });
+
+  it("closes the tool list on Escape and on the Add tool call button again", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    const add = screen.getByRole("button", { name: "Add tool call" });
+
+    await user.click(add);
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("button", { name: "Pick book_flight" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(add);
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+    await user.click(add);
+    expect(
+      screen.queryByRole("button", { name: "Pick book_flight" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the text box when the answer was text", () => {

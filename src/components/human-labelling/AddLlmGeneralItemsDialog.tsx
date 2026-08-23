@@ -198,6 +198,19 @@ export function AddLlmGeneralItemsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialRows]);
 
+  // Escape closes the tool list, the same as every other menu in the app.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [pickerOpen]);
+
   // The workspace tool catalogue, same source the test dialog picks from.
   // Fetched only once the dialog is open.
   useEffect(() => {
@@ -538,13 +551,28 @@ export function AddLlmGeneralItemsDialog({
                       <span className="text-sm font-medium text-foreground break-words">
                         {tc.tool}
                       </span>
+                      {/* Same remove control as every other removable row in
+                          the app (see CustomFieldsEditor). */}
                       <button
                         type="button"
                         onClick={() => removeToolCall(tc.id)}
+                        aria-label={`Remove ${tc.tool}`}
                         disabled={submitting}
-                        className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Remove
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
                       </button>
                     </div>
                     {tc.params.length === 0 ? (
@@ -571,8 +599,9 @@ export function AddLlmGeneralItemsDialog({
                                 e.target.value,
                               )
                             }
+                            placeholder={`Enter ${prm.name}`}
                             disabled={submitting}
-                            className="w-full px-3 py-2 rounded-md text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                            className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </div>
                       ))
@@ -580,27 +609,49 @@ export function AddLlmGeneralItemsDialog({
                   </div>
                 ))}
                 <div className="relative">
+                  {/* Dashed add button, the app's recipe for an add action. */}
                   <button
                     type="button"
                     onClick={() => setPickerOpen((open) => !open)}
                     disabled={submitting}
-                    className="text-sm font-medium text-foreground underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full h-10 px-4 rounded-md text-[13px] font-medium border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4.5v15m7.5-7.5h-15"
+                      />
+                    </svg>
                     Add tool call
                   </button>
                   {pickerOpen && (
-                    <div className="absolute left-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
-                      <ToolPicker
-                        availableTools={availableTools}
-                        isLoading={toolsLoading}
-                        onSelectInbuiltTool={(_toolId, toolName) =>
-                          addToolCall(toolName, [])
-                        }
-                        onSelectCustomTool={(tool) =>
-                          addToolCall(tool.name, getToolParams(tool))
-                        }
+                    <>
+                      {/* Click anywhere else to close, the same invisible
+                          sheet the test dialog's tool menu uses. */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setPickerOpen(false)}
                       />
-                    </div>
+                      <div className="absolute left-0 right-0 z-50 mt-2 rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                        <ToolPicker
+                          availableTools={availableTools}
+                          isLoading={toolsLoading}
+                          onSelectInbuiltTool={(_toolId, toolName) =>
+                            addToolCall(toolName, [])
+                          }
+                          onSelectCustomTool={(tool) =>
+                            addToolCall(tool.name, getToolParams(tool))
+                          }
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
