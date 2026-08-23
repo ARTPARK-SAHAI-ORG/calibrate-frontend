@@ -1931,7 +1931,7 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("Wrong tool")).toBeInTheDocument();
   });
 
-  it("says nobody has answered when a tool-call item has no answers", () => {
+  it("shows the card with no answer when a tool-call item has none yet", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
@@ -1940,9 +1940,9 @@ describe("EvaluatorResultsPane", () => {
         toolCallVerdicts={[]}
       />,
     );
-    expect(
-      screen.getByText("Nobody has answered this yet."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+    expect(screen.queryByText("Correct")).not.toBeInTheDocument();
+    expect(screen.queryByText("Wrong")).not.toBeInTheDocument();
     expect(screen.queryByText("Binary Evaluator")).not.toBeInTheDocument();
   });
 

@@ -1149,11 +1149,9 @@ function ToolCallVerdictBlock({
         Tool call correctness
       </h3>
       <p className="text-xs text-muted-foreground">Is the tool call correct?</p>
-      {!active ? (
-        <p className="text-sm text-muted-foreground">
-          Nobody has answered this yet.
-        </p>
-      ) : (
+      {/* Nothing stands in for a missing answer: an evaluator card shows
+          nothing either when it has no score. */}
+      {active && (
         <>
           {!singleAnnotatorFiltered && (
             <div className="flex flex-wrap items-center gap-1.5">
