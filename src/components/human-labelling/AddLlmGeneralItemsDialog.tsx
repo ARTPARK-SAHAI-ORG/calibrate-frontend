@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
+import {
+  ToolCallCard,
+  normalizeToolCall,
+} from "@/components/test-results/shared";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
@@ -44,6 +48,9 @@ type AddLlmGeneralItemsDialogProps = {
     description?: string;
     input: string;
     output: string;
+    /** The tool calls the agent made, when its answer was a tool call rather
+     * than text. Shown under Output, read-only: there is no text to type. */
+    toolCalls?: unknown[];
     varValues?: VarValues;
   }[];
   onClose: () => void;
@@ -99,6 +106,7 @@ export function AddLlmGeneralItemsDialog({
   };
 
   const seed = initialRows?.[0];
+  const toolCalls = Array.isArray(seed?.toolCalls) ? seed.toolCalls : [];
   const [uuid, setUuid] = useState<string | undefined>(seed?.uuid);
   const [name, setName] = useState(seed?.name ?? "");
   const [description, setDescription] = useState(seed?.description ?? "");
@@ -376,13 +384,26 @@ export function AddLlmGeneralItemsDialog({
               <label className="block text-base font-medium text-foreground mb-2">
                 Output
               </label>
-              <textarea
-                value={output}
-                onChange={(e) => setOutput(e.target.value)}
-                placeholder="The output the LLM produced"
-                disabled={submitting}
-                className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-              />
+              {toolCalls.length > 0 ? (
+                // ponytail: read-only. Editing a tool call by hand needs a
+                // form of its own; add one if anybody asks for it.
+                <div className="flex-1 min-h-[10rem] space-y-2 overflow-y-auto">
+                  {toolCalls.map((tc, i) => {
+                    const { toolName, args } = normalizeToolCall(tc);
+                    return (
+                      <ToolCallCard key={i} toolName={toolName} args={args} />
+                    );
+                  })}
+                </div>
+              ) : (
+                <textarea
+                  value={output}
+                  onChange={(e) => setOutput(e.target.value)}
+                  placeholder="The output the LLM produced"
+                  disabled={submitting}
+                  className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                />
+              )}
             </div>
           </div>
         </div>

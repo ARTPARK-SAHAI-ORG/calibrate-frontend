@@ -63,6 +63,40 @@ function renderDialog(
   return { onClose, onSubmit, ...utils };
 }
 
+describe("AddLlmGeneralItemsDialog tool-call output", () => {
+  it("shows the tool call under Output instead of an empty box", () => {
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(screen.getByText("dummy")).toBeInTheDocument();
+    expect(screen.getByText("success")).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the text box when the answer was text", () => {
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("AddLlmGeneralItemsDialog", () => {
   it("renders nothing when closed", () => {
     render(
