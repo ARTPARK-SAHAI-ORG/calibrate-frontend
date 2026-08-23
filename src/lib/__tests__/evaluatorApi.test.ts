@@ -2,6 +2,7 @@ import { signOut } from "next-auth/react";
 import {
   isDefaultEvaluator,
   isOwnedEvaluator,
+  canDeleteEvaluator,
   getEvaluatorErrorMessage,
   isEvaluatorNameConflict,
   fetchAllEvaluators,
@@ -89,6 +90,26 @@ describe("isOwnedEvaluator", () => {
         owner_user_id: "org-1",
       } as EvaluatorData),
     ).toBe(true);
+  });
+});
+
+describe("canDeleteEvaluator", () => {
+  it("refuses only an evaluator that says it cannot be deleted", () => {
+    expect(canDeleteEvaluator({ is_deletable: false })).toBe(false);
+  });
+
+  it("allows one that says it can", () => {
+    expect(canDeleteEvaluator({ is_deletable: true })).toBe(true);
+  });
+
+  it("allows one that says nothing, so an older response cannot lock it", () => {
+    expect(canDeleteEvaluator({})).toBe(true);
+    expect(canDeleteEvaluator({ is_deletable: null })).toBe(true);
+  });
+
+  it("is unrelated to whether it is an org default", () => {
+    expect(canDeleteEvaluator({ is_deletable: false })).toBe(false);
+    expect(isDefaultEvaluator({ is_default: true })).toBe(true);
   });
 });
 
