@@ -1,4 +1,5 @@
 import {
+  evaluatorsThatCanBeRun,
   isSkippedRunResult,
   runEvaluatorsDecision,
   toItemDetailItem,
@@ -76,5 +77,23 @@ describe("isSkippedRunResult", () => {
     expect(isSkippedRunResult({ value: "yes" })).toBe(false);
     expect(isSkippedRunResult(null)).toBe(false);
     expect(isSkippedRunResult(undefined)).toBe(false);
+  });
+});
+
+describe("evaluatorsThatCanBeRun", () => {
+  it("leaves out tool call correctness, which people answer", () => {
+    expect(
+      evaluatorsThatCanBeRun([
+        { uuid: "a", evaluator_type: "llm" },
+        { uuid: "b", evaluator_type: "tool-call" },
+        { uuid: "c" },
+      ]),
+    ).toEqual([{ uuid: "a", evaluator_type: "llm" }, { uuid: "c" }]);
+  });
+
+  it("returns nothing when tool call correctness is all there is", () => {
+    expect(
+      evaluatorsThatCanBeRun([{ uuid: "b", evaluator_type: "tool-call" }]),
+    ).toEqual([]);
   });
 });

@@ -76,6 +76,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
+  evaluatorsThatCanBeRun,
   runEvaluatorsDecision,
   toItemDetailItem,
 } from "@/lib/labellingItem";
@@ -904,7 +905,7 @@ function ItemRowActions({
           aria-label="Evaluate"
           title={
             evaluateDisabled
-              ? "AI judges do not run on tool calls. A person can label this item by hand."
+              ? "Evaluators do not run on tool calls. A person can label this item by hand."
               : undefined
           }
           className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2040,9 +2041,11 @@ function LabellingTaskPageInner() {
     target?: string[] | string | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
-    const linked = task?.evaluators ?? [];
+    // Tool call correctness is answered by people, so it is not something a
+    // run can start. A task holding nothing else has no run to offer.
+    const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);
     if (linked.length === 0) {
-      toast.error("Link at least one evaluator before running.");
+      toast.error("Link an evaluator that can be run before running.");
       return;
     }
     if (
@@ -2066,7 +2069,7 @@ function LabellingTaskPageInner() {
       );
       if (decision.blocked) {
         toast.error(
-          "AI judges do not run on tool calls. A person can label them by hand.",
+          "Evaluators do not run on tool calls. A person can label them by hand.",
         );
         return;
       }
@@ -3797,10 +3800,12 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={(task?.evaluators ?? []).map((e) => ({
-            uuid: e.uuid,
-            name: e.name,
-          }))}
+          evaluators={evaluatorsThatCanBeRun(task?.evaluators ?? []).map(
+            (e) => ({
+              uuid: e.uuid,
+              name: e.name,
+            }),
+          )}
           submitting={startingRun}
           submitError={runDialogSubmitError}
           toolCallSkipCount={runDialogToolCallSkipCount}

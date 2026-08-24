@@ -940,8 +940,8 @@ export function EvaluatorResultsPane({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                AI judges do not run on tool calls. A person can label this
-                item by hand.
+                Evaluators do not run on tool calls. A person can label
+                this item by hand.
               </p>
             </div>
           );

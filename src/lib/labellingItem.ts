@@ -54,7 +54,16 @@ export function runEvaluatorsDecision(
 // tool-call row so the run page can say why the card is empty, rather than
 // leaving a blank one behind.
 export function isSkippedRunResult(
-  value: { skipped?: unknown } | null | undefined,
+  value: { skipped?: unknown; value?: unknown } | null | undefined,
 ): boolean {
   return value?.skipped === true;
+}
+
+// The evaluators an evaluation run can actually use. Tool call correctness is
+// answered by people, never by a run, so it is left out of the Run evaluators
+// dialog rather than offered as something to start.
+export function evaluatorsThatCanBeRun<
+  T extends { evaluator_type?: string },
+>(evaluators: T[]): T[] {
+  return evaluators.filter((e) => e.evaluator_type !== "tool-call");
 }

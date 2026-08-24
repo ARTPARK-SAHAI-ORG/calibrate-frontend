@@ -1838,7 +1838,7 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
     expect(
       screen.getByText(
-        /AI judges do not run on tool calls\. A person can label this item by hand\./,
+        /Evaluators do not run on tool calls\. A person can label this item by hand\./,
       ),
     ).toBeInTheDocument();
     expect(
