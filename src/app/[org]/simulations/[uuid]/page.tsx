@@ -830,7 +830,7 @@ export default function SimulationDetailPage() {
           <div className="space-y-4 md:space-y-6">
             {/* Tabs - only shown when configured */}
             {isConfigured && (
-              <div className="flex gap-4 md:gap-6 border-b border-border overflow-x-auto">
+              <div className="flex gap-4 md:gap-6 border-b border-border overflow-x-auto hide-scrollbar">
                 <button
                   onClick={() => {
                     setActiveTab("config");

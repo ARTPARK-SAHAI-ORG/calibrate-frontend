@@ -67,7 +67,7 @@ export function ItemResultsDialog({
         {/* Tabs */}
         {evaluators.length > 0 ? (
           <>
-            <div className="px-4 md:px-6 border-b border-border overflow-x-auto">
+            <div className="px-4 md:px-6 border-b border-border overflow-x-auto hide-scrollbar">
               <div className="flex items-center gap-1 min-w-max">
                 {evaluators.map((ev) => (
                   <button
