@@ -1,4 +1,10 @@
-import { toItemDetailItem } from "../labellingItem";
+import {
+  evaluatorsThatCanBeRun,
+  isSkippedRunResult,
+  runEvaluatorsDecision,
+  toItemDetailItem,
+  toolCallNotEvaluatedMessage,
+} from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -31,5 +37,93 @@ describe("toItemDetailItem", () => {
 
   it("leaves is_tool_call undefined when the source item has none", () => {
     expect(toItemDetailItem(base).is_tool_call).toBeUndefined();
+  });
+});
+
+describe("runEvaluatorsDecision", () => {
+  it("refuses a set of nothing but tool calls", () => {
+    expect(
+      runEvaluatorsDecision([{ is_tool_call: true }, { is_tool_call: true }]),
+    ).toEqual({ blocked: true });
+  });
+
+  it("keeps the tool-call rows out of a mixed run and counts them", () => {
+    expect(
+      runEvaluatorsDecision([
+        { uuid: "a", is_tool_call: true },
+        { uuid: "b", is_tool_call: false },
+        { uuid: "c" },
+      ]),
+    ).toEqual({
+      blocked: false,
+      toolCallSkipCount: 1,
+      runnable: [{ uuid: "b", is_tool_call: false }, { uuid: "c" }],
+    });
+  });
+
+  it("runs a set with no tool calls and counts none", () => {
+    expect(runEvaluatorsDecision([{ is_tool_call: false }, {}])).toEqual({
+      blocked: false,
+      toolCallSkipCount: 0,
+      runnable: [{ is_tool_call: false }, {}],
+    });
+  });
+
+  it("does not refuse an empty set", () => {
+    expect(runEvaluatorsDecision([])).toEqual({
+      blocked: false,
+      toolCallSkipCount: 0,
+      runnable: [],
+    });
+  });
+});
+
+describe("isSkippedRunResult", () => {
+  it("is true only when the run recorded a skip", () => {
+    expect(isSkippedRunResult({ skipped: true })).toBe(true);
+    expect(isSkippedRunResult({ skipped: false })).toBe(false);
+    expect(isSkippedRunResult({ value: "yes" })).toBe(false);
+    expect(isSkippedRunResult(null)).toBe(false);
+    expect(isSkippedRunResult(undefined)).toBe(false);
+  });
+});
+
+describe("evaluatorsThatCanBeRun", () => {
+  it("leaves out tool call correctness, which people answer", () => {
+    expect(
+      evaluatorsThatCanBeRun([
+        { uuid: "a", evaluator_type: "llm" },
+        { uuid: "b", evaluator_type: "tool-call" },
+        { uuid: "c" },
+      ]),
+    ).toEqual([{ uuid: "a", evaluator_type: "llm" }, { uuid: "c" }]);
+  });
+
+  it("returns nothing when tool call correctness is all there is", () => {
+    expect(
+      evaluatorsThatCanBeRun([{ uuid: "b", evaluator_type: "tool-call" }]),
+    ).toEqual([]);
+  });
+});
+
+describe("toolCallNotEvaluatedMessage", () => {
+  it("says the same thing about one item and about the chosen ones", () => {
+    expect(toolCallNotEvaluatedMessage("This item evaluates")).toBe(
+      "This item evaluates one or more tool calls, which only supports human review today. Evaluators do not run on them.",
+    );
+    expect(toolCallNotEvaluatedMessage("The chosen items evaluate")).toBe(
+      "The chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them.",
+    );
+  });
+
+  it("adds the run dialog's own ending", () => {
+    expect(
+      toolCallNotEvaluatedMessage(
+        "2 of the chosen items evaluate",
+        ", so they will be left out of this run",
+      ),
+    ).toBe(
+      "2 of the chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them, so they will be left out of this run.",
+    );
   });
 });

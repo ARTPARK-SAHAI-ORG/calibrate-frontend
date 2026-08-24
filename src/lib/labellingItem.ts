@@ -29,3 +29,58 @@ export function toItemDetailItem(
     is_tool_call: match.is_tool_call,
   };
 }
+
+// What running the AI judges over a chosen set of rows should do. A judge has
+// no wording to read on a tool call, so the backend skips those rows: a set of
+// nothing but tool calls has nothing to run and is refused before the run
+// dialog opens. A mixed set runs on `runnable` alone, so a tool-call row never
+// reaches the run at all, and `toolCallSkipCount` says how many were left out
+// so the reader is told before confirming.
+//
+// `is_tool_call` is stamped by the backend and absent on an older response, so
+// an unknown row counts as a normal one. The backend applies the same rule, so
+// erring that way only costs a round trip.
+export function runEvaluatorsDecision<T extends { is_tool_call?: boolean }>(
+  rows: T[],
+):
+  | { blocked: true }
+  | { blocked: false; toolCallSkipCount: number; runnable: T[] } {
+  const runnable = rows.filter((r) => r.is_tool_call !== true);
+  const toolCallSkipCount = rows.length - runnable.length;
+  if (rows.length > 0 && runnable.length === 0) {
+    return { blocked: true };
+  }
+  return { blocked: false, toolCallSkipCount, runnable };
+}
+
+// True when an evaluation run recorded no score for a row because the AI
+// judge does not run on it. The backend writes such a result on every
+// tool-call row so the run page can say why the card is empty, rather than
+// leaving a blank one behind.
+export function isSkippedRunResult(
+  value: { skipped?: unknown; value?: unknown } | null | undefined,
+): boolean {
+  return value?.skipped === true;
+}
+
+// The evaluators an evaluation run can actually use. Tool call correctness is
+// answered by people, never by a run, so it is left out of the Run evaluators
+// dialog rather than offered as something to start.
+export function evaluatorsThatCanBeRun<
+  T extends { evaluator_type?: string },
+>(evaluators: T[]): T[] {
+  return evaluators.filter((e) => e.evaluator_type !== "tool-call");
+}
+
+// The one sentence the app uses about a tool-call row nothing can score. It
+// appears in four places — the greyed-out Evaluate button, the refusal when
+// every chosen row is one, the note in the run dialog, and the card on the
+// evaluation run page — and they must not drift apart, so they are all built
+// here. `subject` names who is doing the evaluating, `tail` adds anything that
+// only one of them says.
+export function toolCallNotEvaluatedMessage(
+  subject: string,
+  tail = "",
+): string {
+  return `${subject} one or more tool calls, which only supports human review today. Evaluators do not run on them${tail}.`;
+}

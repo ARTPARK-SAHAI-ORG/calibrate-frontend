@@ -57,6 +57,43 @@ describe("RunEvaluatorsDialog", () => {
     mockedApiClient.mockReset();
   });
 
+  it("says how many chosen rows are tool calls left out of the run", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: 2 });
+    expect(
+      await screen.findByText(
+        /2 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says it for a single tool-call row too", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: 1 });
+    expect(
+      await screen.findByText(
+        /1 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says it without a number when the rows cannot be counted", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: null });
+    expect(
+      await screen.findByText(
+        /Any chosen item that evaluates one or more tool calls, which only supports human review today\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when no chosen row is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog();
+    expect(await screen.findByText("Relevance")).toBeInTheDocument();
+    expect(screen.queryByText(/left out of this run/)).not.toBeInTheDocument();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <RunEvaluatorsDialog

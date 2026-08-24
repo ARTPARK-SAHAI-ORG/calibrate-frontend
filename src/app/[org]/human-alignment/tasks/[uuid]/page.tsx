@@ -75,7 +75,12 @@ import {
 } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
-import { toItemDetailItem } from "@/lib/labellingItem";
+import {
+  evaluatorsThatCanBeRun,
+  runEvaluatorsDecision,
+  toItemDetailItem,
+  toolCallNotEvaluatedMessage,
+} from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -865,6 +870,7 @@ function ItemRowActions({
   onLabel,
   onEdit,
   onEvaluate,
+  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -872,6 +878,9 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
+  /** True on a tool-call row: an AI judge has no wording to read there, so
+   * the button is shown but cannot be pressed. */
+  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -889,16 +898,30 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {onEvaluate && (
-        <button
-          type="button"
-          onClick={() => onEvaluate(itemUuid)}
-          aria-label="Evaluate"
-          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
-        >
-          Evaluate
-        </button>
-      )}
+      {onEvaluate &&
+        (() => {
+          const evaluateButton = (
+            <button
+              type="button"
+              onClick={() => onEvaluate(itemUuid)}
+              disabled={evaluateDisabled}
+              aria-label="Evaluate"
+              className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Evaluate
+            </button>
+          );
+          return evaluateDisabled ? (
+            <Tooltip
+              content={toolCallNotEvaluatedMessage("This item evaluates")}
+              position="top"
+            >
+              {evaluateButton}
+            </Tooltip>
+          ) : (
+            evaluateButton
+          );
+        })()}
       {onEdit && (
         <button
           type="button"
@@ -2018,14 +2041,21 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
+  // How many of the chosen rows are tool calls that the AI judges skip. Shown
+  // in the run dialog before the run is confirmed.
+  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] = useState<
+    number | null
+  >(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
-    const linked = task?.evaluators ?? [];
+    // Tool call correctness is answered by people, so it is not something a
+    // run can start. A task holding nothing else has no run to offer.
+    const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);
     if (linked.length === 0) {
-      toast.error("Link at least one evaluator before running.");
+      toast.error("Link an evaluator that can be run before running.");
       return;
     }
     if (
@@ -2036,9 +2066,31 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
+      // Select-all reaches rows beyond the page in hand, so the rows cannot
+      // be counted. The note is still shown, without a number: the backend
+      // leaves those rows out, and refuses a run with nothing else in it.
+      setRunDialogToolCallSkipCount(null);
     } else {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
-      setRunDialogItemUuids(ids);
+      const decision = runEvaluatorsDecision(
+        (ids ?? []).map(
+          (id) =>
+            items.find((i) => i.uuid === id) ?? {
+              uuid: id,
+              is_tool_call: false,
+            },
+        ),
+      );
+      if (decision.blocked) {
+        toast.error(
+          toolCallNotEvaluatedMessage("The chosen items evaluate"),
+        );
+        return;
+      }
+      setRunDialogToolCallSkipCount(decision.toolCallSkipCount);
+      // Only the rows a run can score are sent. A tool-call row left in would
+      // sit in the finished run with nothing against it.
+      setRunDialogItemUuids(ids ? decision.runnable.map((r) => r.uuid) : null);
       setRunDialogSelectAll(null);
     }
     setRunDialogSubmitError(null);
@@ -3475,6 +3527,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3648,6 +3701,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3762,12 +3816,15 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={(task?.evaluators ?? []).map((e) => ({
-            uuid: e.uuid,
-            name: e.name,
-          }))}
+          evaluators={evaluatorsThatCanBeRun(task?.evaluators ?? []).map(
+            (e) => ({
+              uuid: e.uuid,
+              name: e.name,
+            }),
+          )}
           submitting={startingRun}
           submitError={runDialogSubmitError}
+          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);

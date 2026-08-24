@@ -1827,6 +1827,25 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("Correct")).toBeInTheDocument();
   });
 
+  it("says the judge did not run when the result is a skip", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        runs={[makeRun({ value: { skipped: true } })]}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /This item evaluates one or more tool calls, which only supports human review today\./,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No result recorded for this item."),
+    ).not.toBeInTheDocument();
+  });
+
   it("hides an optional evaluator with no human label and no score", () => {
     render(
       <EvaluatorResultsPane

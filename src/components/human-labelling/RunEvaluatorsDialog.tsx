@@ -5,6 +5,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
+import { toolCallNotEvaluatedMessage } from "@/lib/labellingItem";
 
 type LinkedEvaluator = { uuid: string; name: string };
 
@@ -57,6 +58,11 @@ type RunEvaluatorsDialogProps = {
   evaluators: LinkedEvaluator[];
   submitting: boolean;
   submitError: string | null;
+  /** How many of the chosen rows are tool calls that a run leaves out.
+   * Above zero, a note says so before the run is started. `null` means some
+   * are, but they cannot be counted: select-all reaches rows beyond the page
+   * in hand, so the note is shown without a number. */
+  toolCallSkipCount?: number | null;
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
@@ -88,6 +94,7 @@ export function RunEvaluatorsDialog({
   evaluators,
   submitting,
   submitError,
+  toolCallSkipCount = 0,
   onClose,
   onConfirm,
 }: RunEvaluatorsDialogProps) {
@@ -287,7 +294,11 @@ export function RunEvaluatorsDialog({
                       if (el) el.indeterminate = somePicked;
                     }}
                     onChange={toggleSelectAll}
-                    aria-label={pickedCount > 0 ? "Unselect all evaluators" : "Select all evaluators"}
+                    aria-label={
+                      pickedCount > 0
+                        ? "Unselect all evaluators"
+                        : "Select all evaluators"
+                    }
                     className="w-4 h-4 cursor-pointer accent-foreground"
                   />
                   <span className="text-xs font-medium text-muted-foreground">
@@ -296,108 +307,118 @@ export function RunEvaluatorsDialog({
                 </label>
               )}
               {evaluators.map((ev) => {
-              const evInfo = info[ev.uuid];
-              const versions = evInfo?.versions ?? [];
-              const liveVersionId = evInfo?.liveVersionId ?? null;
-              const isPicked = !!picked[ev.uuid];
-              const value =
-                chosenVersion[ev.uuid] ??
-                liveVersionId ??
-                versions[0]?.uuid ??
-                "";
-              return (
-                // Plain clickable surface — the real interactive
-                // controls (checkbox + version picker) are inside, so
-                // this wrapper isn't an ARIA "button". Clicking it
-                // toggles the checkbox via its native label-like
-                // behaviour; keyboard users use the inner controls
-                // directly.
-                <div
-                  key={ev.uuid}
-                  onClick={() => togglePicked(ev.uuid)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors cursor-pointer hover:bg-muted/30 ${
-                    isPicked
-                      ? "border-border bg-background"
-                      : "border-border bg-muted/20 opacity-60"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isPicked}
-                    onChange={() => togglePicked(ev.uuid)}
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={`Pick ${ev.name}`}
-                    className="w-4 h-4 cursor-pointer accent-foreground"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className="text-sm font-medium truncate"
-                      title={ev.name}
-                    >
-                      {ev.name}
-                    </div>
-                  </div>
-                  {versions.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">
-                      No versions
-                    </span>
-                  ) : (
-                    <div onClick={(e) => e.stopPropagation()}>
-                    <SingleSelectPicker<EvaluatorVersion>
-                      items={versions}
-                      selectedId={value}
-                      onSelect={(v) =>
-                        setChosenVersion((prev) => ({
-                          ...prev,
-                          [ev.uuid]: v.uuid,
-                        }))
-                      }
-                      getId={(v) => v.uuid}
-                      disabled={!isPicked}
-                      ariaLabel={`Version for ${ev.name}`}
-                      placeholder="Select version"
-                      className="w-36 shrink-0"
-                      compact
-                      renderTrigger={(v) =>
-                        v ? (
-                          <VersionLabel
-                            version={v}
-                            liveVersionId={liveVersionId}
-                          />
-                        ) : (
-                          ""
-                        )
-                      }
-                      renderOption={(v, isSel) => (
-                        <>
-                          <VersionLabel
-                            version={v}
-                            liveVersionId={liveVersionId}
-                          />
-                          {isSel && (
-                            <svg
-                              className="w-4 h-4 text-foreground flex-shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
-                        </>
-                      )}
+                const evInfo = info[ev.uuid];
+                const versions = evInfo?.versions ?? [];
+                const liveVersionId = evInfo?.liveVersionId ?? null;
+                const isPicked = !!picked[ev.uuid];
+                const value =
+                  chosenVersion[ev.uuid] ??
+                  liveVersionId ??
+                  versions[0]?.uuid ??
+                  "";
+                return (
+                  // Plain clickable surface — the real interactive
+                  // controls (checkbox + version picker) are inside, so
+                  // this wrapper isn't an ARIA "button". Clicking it
+                  // toggles the checkbox via its native label-like
+                  // behaviour; keyboard users use the inner controls
+                  // directly.
+                  <div
+                    key={ev.uuid}
+                    onClick={() => togglePicked(ev.uuid)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors cursor-pointer hover:bg-muted/30 ${
+                      isPicked
+                        ? "border-border bg-background"
+                        : "border-border bg-muted/20 opacity-60"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isPicked}
+                      onChange={() => togglePicked(ev.uuid)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Pick ${ev.name}`}
+                      className="w-4 h-4 cursor-pointer accent-foreground"
                     />
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="text-sm font-medium truncate"
+                        title={ev.name}
+                      >
+                        {ev.name}
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    {versions.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        No versions
+                      </span>
+                    ) : (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <SingleSelectPicker<EvaluatorVersion>
+                          items={versions}
+                          selectedId={value}
+                          onSelect={(v) =>
+                            setChosenVersion((prev) => ({
+                              ...prev,
+                              [ev.uuid]: v.uuid,
+                            }))
+                          }
+                          getId={(v) => v.uuid}
+                          disabled={!isPicked}
+                          ariaLabel={`Version for ${ev.name}`}
+                          placeholder="Select version"
+                          className="w-36 shrink-0"
+                          compact
+                          renderTrigger={(v) =>
+                            v ? (
+                              <VersionLabel
+                                version={v}
+                                liveVersionId={liveVersionId}
+                              />
+                            ) : (
+                              ""
+                            )
+                          }
+                          renderOption={(v, isSel) => (
+                            <>
+                              <VersionLabel
+                                version={v}
+                                liveVersionId={liveVersionId}
+                              />
+                              {isSel && (
+                                <svg
+                                  className="w-4 h-4 text-foreground flex-shrink-0"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M4.5 12.75l6 6 9-13.5"
+                                  />
+                                </svg>
+                              )}
+                            </>
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </>
+          )}
+          {toolCallSkipCount !== 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
+              {toolCallNotEvaluatedMessage(
+                toolCallSkipCount === null
+                  ? "Any chosen item that evaluates"
+                  : `${toolCallSkipCount} of the chosen items evaluate`,
+                ", so they will be left out of this run",
+              )}
+            </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>
