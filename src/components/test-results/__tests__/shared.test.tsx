@@ -75,13 +75,24 @@ describe("SmallStatusBadge", () => {
 
 describe("normalizeToolCall", () => {
   it("returns a default shape for non-object input", () => {
-    expect(normalizeToolCall(null)).toEqual({ toolName: "Unknown tool", args: {} });
-    expect(normalizeToolCall(undefined)).toEqual({ toolName: "Unknown tool", args: {} });
-    expect(normalizeToolCall("x")).toEqual({ toolName: "Unknown tool", args: {} });
+    expect(normalizeToolCall(null)).toEqual({
+      toolName: "Unknown tool",
+      args: {},
+    });
+    expect(normalizeToolCall(undefined)).toEqual({
+      toolName: "Unknown tool",
+      args: {},
+    });
+    expect(normalizeToolCall("x")).toEqual({
+      toolName: "Unknown tool",
+      args: {},
+    });
   });
 
   it("reads `tool` as a plain string plus `arguments`", () => {
-    expect(normalizeToolCall({ tool: "search", arguments: { q: "hi" } })).toEqual({
+    expect(
+      normalizeToolCall({ tool: "search", arguments: { q: "hi" } }),
+    ).toEqual({
       toolName: "search",
       args: { q: "hi" },
       output: undefined,
@@ -109,12 +120,19 @@ describe("normalizeToolCall", () => {
   });
 
   it("falls back to Unknown tool when no name shape matches", () => {
-    expect(normalizeToolCall({})).toEqual({ toolName: "Unknown tool", args: {}, output: undefined });
+    expect(normalizeToolCall({})).toEqual({
+      toolName: "Unknown tool",
+      args: {},
+      output: undefined,
+    });
   });
 
   it("parses a JSON-string `arguments` payload", () => {
     expect(
-      normalizeToolCall({ tool: "search", arguments: JSON.stringify({ q: "hi" }) }),
+      normalizeToolCall({
+        tool: "search",
+        arguments: JSON.stringify({ q: "hi" }),
+      }),
     ).toEqual({ toolName: "search", args: { q: "hi" }, output: undefined });
   });
 
@@ -125,14 +143,18 @@ describe("normalizeToolCall", () => {
   });
 
   it("ignores array-shaped arguments", () => {
-    expect(
-      normalizeToolCall({ tool: "search", arguments: [1, 2, 3] }),
-    ).toEqual({ toolName: "search", args: {}, output: undefined });
+    expect(normalizeToolCall({ tool: "search", arguments: [1, 2, 3] })).toEqual(
+      { toolName: "search", args: {}, output: undefined },
+    );
   });
 
   it("carries through a defined, non-null output", () => {
     expect(
-      normalizeToolCall({ tool: "search", arguments: {}, output: { ok: true } }),
+      normalizeToolCall({
+        tool: "search",
+        arguments: {},
+        output: { ok: true },
+      }),
     ).toEqual({ toolName: "search", args: {}, output: { ok: true } });
   });
 
@@ -160,7 +182,9 @@ describe("ToolCallCard", () => {
   });
 
   it("filters out the `headers` param", () => {
-    render(<ToolCallCard toolName="search" args={{ headers: { a: 1 }, q: "x" }} />);
+    render(
+      <ToolCallCard toolName="search" args={{ headers: { a: 1 }, q: "x" }} />,
+    );
     expect(screen.queryByText("headers")).not.toBeInTheDocument();
     expect(screen.getByText("q")).toBeInTheDocument();
   });
@@ -173,9 +197,9 @@ describe("ToolCallCard", () => {
 
   it("renders a plain-string multi-line output as monospace", () => {
     render(<ToolCallCard toolName="search" args={{}} output={"a\nb"} />);
-    expect(
-      screen.getByText((_, el) => el?.textContent === "a\nb"),
-    ).toHaveClass("font-mono");
+    expect(screen.getByText((_, el) => el?.textContent === "a\nb")).toHaveClass(
+      "font-mono",
+    );
   });
 
   it("renders no params/output section when args and output are both empty", () => {
@@ -195,10 +219,14 @@ describe("ToolCallCard", () => {
         />,
       );
       expect(screen.getByText("destination")).toBeInTheDocument();
-      const toggle = screen.getByRole("button", { name: "Collapse parameters" });
+      const toggle = screen.getByRole("button", {
+        name: "Collapse parameters",
+      });
       await user.click(toggle);
       expect(screen.getByText(/1 parameter hidden/)).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Expand parameters" }));
+      await user.click(
+        screen.getByRole("button", { name: "Expand parameters" }),
+      );
       expect(screen.getByText("destination")).toBeInTheDocument();
     });
 
@@ -319,7 +347,10 @@ describe("JudgeResultsList", () => {
       { match: true },
     ];
     render(
-      <JudgeResultsList results={results} evaluatorsByUuid={evaluatorsByUuid} />,
+      <JudgeResultsList
+        results={results}
+        evaluatorsByUuid={evaluatorsByUuid}
+      />,
     );
     expect(screen.getByText("Correctness")).toBeInTheDocument();
     expect(screen.getByText("v3")).toBeInTheDocument();
@@ -473,7 +504,17 @@ describe("EmptyStateView", () => {
 
 describe("scrollRowByPage", () => {
   function makeRect(top: number, height: number) {
-    return { top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON() {} } as DOMRect;
+    return {
+      top,
+      height,
+      bottom: top + height,
+      left: 0,
+      right: 0,
+      width: 0,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    } as DOMRect;
   }
 
   it("no-ops when container or row is null", () => {
@@ -484,7 +525,10 @@ describe("scrollRowByPage", () => {
 
   it("scrolls down when the row is below the viewport", () => {
     const container = document.createElement("div");
-    Object.defineProperty(container, "clientHeight", { value: 100, configurable: true });
+    Object.defineProperty(container, "clientHeight", {
+      value: 100,
+      configurable: true,
+    });
     container.scrollTop = 0;
     container.getBoundingClientRect = () => makeRect(0, 100);
     container.scrollTo = jest.fn();
@@ -493,12 +537,18 @@ describe("scrollRowByPage", () => {
     row.getBoundingClientRect = () => makeRect(150, 20);
 
     scrollRowByPage(container, row);
-    expect(container.scrollTo).toHaveBeenCalledWith({ top: 150, behavior: "smooth" });
+    expect(container.scrollTo).toHaveBeenCalledWith({
+      top: 150,
+      behavior: "smooth",
+    });
   });
 
   it("scrolls up when the row is above the viewport", () => {
     const container = document.createElement("div");
-    Object.defineProperty(container, "clientHeight", { value: 100, configurable: true });
+    Object.defineProperty(container, "clientHeight", {
+      value: 100,
+      configurable: true,
+    });
     container.scrollTop = 200;
     container.getBoundingClientRect = () => makeRect(0, 100);
     container.scrollTo = jest.fn();
@@ -513,7 +563,10 @@ describe("scrollRowByPage", () => {
 
   it("does nothing when the row is already fully visible", () => {
     const container = document.createElement("div");
-    Object.defineProperty(container, "clientHeight", { value: 100, configurable: true });
+    Object.defineProperty(container, "clientHeight", {
+      value: 100,
+      configurable: true,
+    });
     container.scrollTop = 0;
     container.getBoundingClientRect = () => makeRect(0, 100);
     container.scrollTo = jest.fn();
@@ -533,10 +586,13 @@ describe("isTypingTarget", () => {
   it("returns false for an element with no tagName", () => {
     expect(isTypingTarget({} as any)).toBe(false);
   });
-  it.each(["INPUT", "TEXTAREA", "SELECT"])("returns true for a %s element", (tag) => {
-    const el = document.createElement(tag.toLowerCase());
-    expect(isTypingTarget(el)).toBe(true);
-  });
+  it.each(["INPUT", "TEXTAREA", "SELECT"])(
+    "returns true for a %s element",
+    (tag) => {
+      const el = document.createElement(tag.toLowerCase());
+      expect(isTypingTarget(el)).toBe(true);
+    },
+  );
   it("returns true for a contentEditable element", () => {
     const el = document.createElement("div");
     Object.defineProperty(el, "isContentEditable", { value: true });
@@ -552,7 +608,12 @@ describe("isTypingTarget", () => {
 describe("ResultPager", () => {
   it("renders nothing when total <= 1", () => {
     const { container } = render(
-      <ResultPager currentIndex={0} total={1} onPrev={jest.fn()} onNext={jest.fn()} />,
+      <ResultPager
+        currentIndex={0}
+        total={1}
+        onPrev={jest.fn()}
+        onNext={jest.fn()}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -562,7 +623,12 @@ describe("ResultPager", () => {
     const onPrev = jest.fn();
     const onNext = jest.fn();
     render(
-      <ResultPager currentIndex={0} total={3} onPrev={onPrev} onNext={onNext} />,
+      <ResultPager
+        currentIndex={0}
+        total={3}
+        onPrev={onPrev}
+        onNext={onNext}
+      />,
     );
     expect(screen.getByText("1 of 3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
@@ -575,7 +641,12 @@ describe("ResultPager", () => {
     const user = setupUser();
     const onPrev = jest.fn();
     render(
-      <ResultPager currentIndex={2} total={3} onPrev={onPrev} onNext={jest.fn()} />,
+      <ResultPager
+        currentIndex={2}
+        total={3}
+        onPrev={onPrev}
+        onNext={jest.fn()}
+      />,
     );
     expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: /Previous/ }));
@@ -583,7 +654,14 @@ describe("ResultPager", () => {
   });
 
   it("hides the counter when currentIndex is -1 (not part of the filtered view)", () => {
-    render(<ResultPager currentIndex={-1} total={3} onPrev={jest.fn()} onNext={jest.fn()} />);
+    render(
+      <ResultPager
+        currentIndex={-1}
+        total={3}
+        onPrev={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
     expect(screen.queryByText(/of 3/)).not.toBeInTheDocument();
   });
 });
@@ -604,7 +682,11 @@ describe("TestStats", () => {
 
 describe("TestDetailView", () => {
   const baseHistory: TestCaseHistory[] = [
-    { role: "user", content: "Hi there", created_at: "2024-01-01T00:00:00.000Z" },
+    {
+      role: "user",
+      content: "Hi there",
+      created_at: "2024-01-01T00:00:00.000Z",
+    },
     { role: "assistant", content: "Hello! How can I help?" },
   ];
 
@@ -723,6 +805,33 @@ describe("TestDetailView", () => {
     expect(screen.queryByText("Because it was wrong")).not.toBeInTheDocument();
   });
 
+  it("names a finished tool-call result after the evaluator that judged it", () => {
+    render(
+      <TestDetailView
+        history={[]}
+        passed={false}
+        evaluation={{ type: "tool_call", tool_calls: [] }}
+        judgeResults={[
+          {
+            evaluator_uuid: "ev-tool",
+            match: false,
+            score: null,
+            reasoning: "The agent made the wrong tool call.",
+          },
+        ]}
+        evaluatorsByUuid={{
+          "ev-tool": {
+            uuid: "ev-tool",
+            name: "Tool call correctness",
+            output_type: "binary",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText(/Tool call correctness/)).toBeInTheDocument();
+    expect(screen.queryByText(/Tool call test/)).not.toBeInTheDocument();
+  });
+
   it("never shows a reasoning toggle for a tool-call test either", () => {
     render(
       <TestDetailView
@@ -817,7 +926,9 @@ describe("TestDetailView", () => {
         evaluation={{ type: "tool_call", criteria: "ignored" }}
       />,
     );
-    expect(screen.getByText("No conversation history available for this test")).toBeInTheDocument();
+    expect(
+      screen.getByText("No conversation history available for this test"),
+    ).toBeInTheDocument();
   });
 
   it("toggles between UI and JSON conversation views and copies the JSON", async () => {
@@ -846,7 +957,7 @@ describe("TestDetailView", () => {
     expect(screen.getByText("final")).toBeInTheDocument();
   });
 
-  describe("a Single Agent Response test (evaluation.type === \"general\")", () => {
+  describe('a Single Agent Response test (evaluation.type === "general")', () => {
     it("renders the input and output as a box pair instead of chat bubbles", () => {
       const { container } = render(
         <TestDetailView
@@ -872,7 +983,9 @@ describe("TestDetailView", () => {
         <TestDetailView
           history={[{ role: "user", content: "Book it" }]}
           output={{
-            tool_calls: [{ tool: "book", arguments: { id: 1 }, output: "done" }],
+            tool_calls: [
+              { tool: "book", arguments: { id: 1 }, output: "done" },
+            ],
           }}
           passed={true}
           evaluation={{ type: "general" }}
@@ -992,7 +1105,9 @@ describe("EvaluationCriteriaPanel", () => {
   });
 
   it("falls back to testCaseEvaluators variable_values when the judge result doesn't carry them inline", () => {
-    const judgeResults: JudgeResult[] = [{ evaluator_uuid: "ev-1", match: true }];
+    const judgeResults: JudgeResult[] = [
+      { evaluator_uuid: "ev-1", match: true },
+    ];
     render(
       <EvaluationCriteriaPanel
         testType="response"
@@ -1001,7 +1116,10 @@ describe("EvaluationCriteriaPanel", () => {
           "ev-1": { uuid: "ev-1", name: "Politeness", output_type: "binary" },
         }}
         testCaseEvaluators={[
-          { evaluator_uuid: "ev-1", variable_values: { criteria: "from test case" } },
+          {
+            evaluator_uuid: "ev-1",
+            variable_values: { criteria: "from test case" },
+          },
         ]}
       />,
     );
@@ -1021,7 +1139,9 @@ describe("EvaluationCriteriaPanel", () => {
 
   it("renders the final empty state when there's no judgeResults and no legacy criteria", () => {
     render(<EvaluationCriteriaPanel testType="response" />);
-    expect(screen.getByText("No evaluator details available")).toBeInTheDocument();
+    expect(
+      screen.getByText("No evaluator details available"),
+    ).toBeInTheDocument();
   });
 
   it("renders a tool-call test with a boolean passed verdict and expected tool calls", () => {
@@ -1049,13 +1169,17 @@ describe("EvaluationCriteriaPanel", () => {
         evaluation={{ type: "tool_call" }}
       />,
     );
-    expect(screen.getByText("No expected tool calls specified")).toBeInTheDocument();
+    expect(
+      screen.getByText("No expected tool calls specified"),
+    ).toBeInTheDocument();
   });
 
   it("infers tool_call type from evaluation.tool_calls when testType is absent", () => {
     render(
       <EvaluationCriteriaPanel
-        evaluation={{ type: "", tool_calls: [{ tool: "x", arguments: {} }] } as any}
+        evaluation={
+          { type: "", tool_calls: [{ tool: "x", arguments: {} }] } as any
+        }
       />,
     );
     expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();

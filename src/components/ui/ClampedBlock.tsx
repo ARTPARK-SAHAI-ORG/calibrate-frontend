@@ -12,8 +12,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
  * evaluator prompt's own clamp so both read the same.
  */
 export function ClampedBlock({
-  maxHeightClass = "max-h-[22rem]",
-  maxHeightPx = 352,
+  maxHeightClass = "max-h-[11rem]",
+  maxHeightPx = 176,
   children,
 }: {
   /** Tailwind class for the collapsed height. */
