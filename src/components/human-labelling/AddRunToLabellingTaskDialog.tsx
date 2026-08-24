@@ -224,6 +224,11 @@ type TransformResult = {
   items: BuiltItem[];
   skippedCount: number;
   evaluatorUuids: Set<string>;
+  /** The subset of evaluatorUuids that is the tool call evaluator. The
+   * backend attaches it to a task on its own the moment the first tool-call
+   * item lands there, unlike every other evaluator, so an existing task is
+   * still offered even when it does not have this one yet. */
+  toolCallEvaluatorUuids: Set<string>;
 };
 
 // The backend wraps failures as `Request failed: <status> - <json>`. The
@@ -445,6 +450,7 @@ export function buildItemsFromSource(
 ): TransformResult {
   const items: BuiltItem[] = [];
   const evaluatorUuids = new Set<string>();
+  const toolCallEvaluatorUuids = new Set<string>();
   let skippedCount = 0;
 
   switch (source.type) {
@@ -460,6 +466,18 @@ export function buildItemsFromSource(
       const handleRaw = (raw: RawTestCaseLike, fullName: string) => {
         if (isToolCallTest(raw)) {
           items.push(buildToolCallItem(raw, fullName));
+          // A finished tool-call test's result names the evaluator that
+          // judged it (Tool call correctness) in its own judge_results, the
+          // same as a response test does. Recorded separately from the
+          // other evaluators: unlike them, the backend attaches this one to
+          // a task by itself, so it should not stop an otherwise-matching
+          // task from being offered.
+          for (const jr of raw.judge_results ?? []) {
+            if (jr?.evaluator_uuid) {
+              evaluatorUuids.add(jr.evaluator_uuid);
+              toolCallEvaluatorUuids.add(jr.evaluator_uuid);
+            }
+          }
           return;
         }
         const built = buildOneItem(raw, fullName);
@@ -502,7 +520,7 @@ export function buildItemsFromSource(
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
       }
-      return { items, skippedCount, evaluatorUuids };
+      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
     }
     case "stt_run": {
       // STT results carry no per-row judge variable echoes, so the evaluator
@@ -519,7 +537,7 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids };
+      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
     }
     case "tts_run": {
       // TTS results carry no per-row judge variable echoes either, so the
@@ -537,7 +555,7 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids };
+      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
     }
     case "simulation_run": {
       for (const r of source.results) {
@@ -551,7 +569,7 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids };
+      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
     }
     case "traces": {
       // A general agent's trace is one input and the output it produced, which
@@ -572,7 +590,7 @@ export function buildItemsFromSource(
         for (const ev of source.evaluators ?? []) {
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
-        return { items, skippedCount, evaluatorUuids };
+        return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
       }
       for (const t of source.traces) {
         const built = buildOneItem({
@@ -600,10 +618,15 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids };
+      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
     }
     default:
-      return { items: [], skippedCount: 0, evaluatorUuids: new Set() };
+      return {
+        items: [],
+        skippedCount: 0,
+        evaluatorUuids: new Set(),
+        toolCallEvaluatorUuids: new Set(),
+      };
   }
 }
 
@@ -693,7 +716,8 @@ export function AddRunToLabellingTaskDialog({
   }, [isOpen, accessToken]);
 
   const transform = useMemo(() => buildItemsFromSource(source), [source]);
-  const { items, skippedCount, evaluatorUuids } = transform;
+  const { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids } =
+    transform;
 
   // First relevance gate: the task must be of the type this source targets.
   const typeMatchedTasks = useMemo(
@@ -711,11 +735,15 @@ export function AddRunToLabellingTaskDialog({
       typeMatchedTasks.filter((t) => {
         const taskEvals = new Set((t.evaluators ?? []).map((e) => e.uuid));
         for (const id of evaluatorUuids) {
+          // The tool call evaluator does not have to be on the task yet —
+          // the backend attaches it itself the moment the first tool-call
+          // item lands, so its absence should not rule the task out.
+          if (toolCallEvaluatorUuids.has(id)) continue;
           if (!taskEvals.has(id)) return false;
         }
         return true;
       }),
-    [typeMatchedTasks, evaluatorUuids],
+    [typeMatchedTasks, evaluatorUuids, toolCallEvaluatorUuids],
   );
 
   useEffect(() => {
