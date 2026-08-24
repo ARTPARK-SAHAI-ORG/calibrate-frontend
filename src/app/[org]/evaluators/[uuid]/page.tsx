@@ -598,12 +598,11 @@ function EvaluatorDetailPageInner() {
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
       const body: Record<string, unknown> = {
-        ...(hasNoJudge
-          ? {}
-          : {
-              judge_model: newVersionJudgeModel!.id,
-              system_prompt: newVersionSystemPrompt.trim(),
-            }),
+        // The backend wants both keys on every version. An evaluator no AI
+        // judge runs has neither, so they go as empty strings rather than
+        // being left off, which it refuses.
+        judge_model: hasNoJudge ? "" : newVersionJudgeModel!.id,
+        system_prompt: hasNoJudge ? "" : newVersionSystemPrompt.trim(),
         make_live: newVersionMarkLive,
       };
       if (newVersionChangelog.trim()) {

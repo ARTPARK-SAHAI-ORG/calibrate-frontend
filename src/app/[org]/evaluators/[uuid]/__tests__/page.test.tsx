@@ -123,6 +123,94 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+// Tool call correctness is answered by Calibrate and by people, never by an
+// AI judge. Before this, its New version dialog still demanded a judge model,
+// which cannot be picked, so the dialog could not be saved at all.
+const TOOL_CALL_EVALUATOR = {
+  ...EVALUATOR,
+  name: "Tool call correctness",
+  evaluator_type: "tool-call",
+  versions: [
+    {
+      uuid: "ver-1",
+      version_number: 1,
+      judge_model: "",
+      system_prompt: "",
+      output_config: {
+        scale: [
+          { value: true, name: "Correct", description: "Right tool call." },
+          { value: false, name: "Wrong", description: "Wrong tool call." },
+        ],
+      },
+      variables: null,
+      created_at: "2026-07-15T10:00:00Z",
+    },
+  ],
+};
+
+describe("a new version of an evaluator no AI judge runs", () => {
+  it("asks for the labels only, with no prompt and no model", async () => {
+    const user = setupUser();
+    mockEvaluator(TOOL_CALL_EVALUATOR);
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    expect(
+      screen.getByRole("heading", { name: "New version" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Judge prompt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Judge model/)).not.toBeInTheDocument();
+    // What is left: the labels, the summary of the change, the live tick.
+    expect(screen.getByDisplayValue("Correct")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Wrong")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Briefly describe what changed/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toBeInTheDocument();
+  });
+
+  it("saves, sending an empty prompt and model rather than leaving them off", async () => {
+    const user = setupUser();
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => TOOL_CALL_EVALUATOR,
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 201,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ uuid: "ver-2" }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<EvaluatorDetailPage />);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: /Create and mark live|Create version/,
+      }),
+    );
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
+    const post = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        typeof url === "string" &&
+        url.includes("/versions") &&
+        (init as RequestInit | undefined)?.method === "POST",
+    );
+    expect(post).toBeTruthy();
+    const body = JSON.parse((post![1] as RequestInit).body as string);
+    expect(body.judge_model).toBe("");
+    expect(body.system_prompt).toBe("");
+    expect(body.output_config.scale).toHaveLength(2);
+  });
+});
+
 describe("evaluator page header actions", () => {
   it("opens the name and description form from the pencil next to the name", async () => {
     const user = setupUser();
