@@ -247,6 +247,9 @@ type LabellingItem = {
   uuid: string;
   task_id: string;
   payload: unknown;
+  /** True when this row's answer was a tool call rather than a written
+   * reply. Set by the backend, the same field the labelling job sends. */
+  is_tool_call?: boolean;
   created_at: string;
   updated_at?: string;
   deleted_at: string | null;
@@ -4418,6 +4421,15 @@ function LabellingTaskPageInner() {
           isOpen={assignOpen}
           accessToken={accessToken}
           evaluators={task?.evaluators ?? []}
+          // Select-all can reach items beyond the page in hand, so this is
+          // read off the ones loaded. Getting it wrong only changes whether
+          // the row is drawn: the backend adds the evaluator to a tool-call
+          // item either way.
+          hasToolCallItems={(task?.items ?? []).some(
+            (it) =>
+              it.is_tool_call === true &&
+              (selectAllTotal || selectedItemIds.has(it.uuid)),
+          )}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />

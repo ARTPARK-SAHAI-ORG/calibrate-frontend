@@ -131,6 +131,85 @@ function baseSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// The same rule the labelling form uses: a tool-call item is answered by the
+// tool call evaluator alone, every other item by everything else.
+describe("ItemDetailDialog picks the evaluators per item", () => {
+  const row = (evaluatorId: string, versionId: string) => ({
+    item_id: "item-1",
+    payload: null,
+    evaluator_id: evaluatorId,
+    evaluator_version_id: versionId,
+    evaluator_value: true,
+    evaluator_reasoning: "",
+    human_agreement: null,
+    evaluator_agreement: null,
+    annotations: {},
+  });
+
+  const withToolCall = () =>
+    baseSummary({
+      evaluators: [
+        {
+          uuid: "ev-1",
+          name: "Correctness",
+          output_type: "binary",
+          run_count: 1,
+          versions: [{ uuid: "v1", version_number: 1, is_live: true }],
+        },
+        {
+          uuid: "ev-tool",
+          name: "Tool call correctness",
+          evaluator_type: "tool-call",
+          output_type: "binary",
+          run_count: 0,
+          versions: [{ uuid: "vt", version_number: 1, is_live: true }],
+        },
+      ],
+      rows: [row("ev-1", "v1"), row("ev-tool", "vt")],
+    });
+
+  const paneEvaluatorIds = () =>
+    (
+      JSON.parse(screen.getByTestId("pane-evaluators").textContent!) as {
+        evaluator_id: string;
+      }[]
+    ).map((e) => e.evaluator_id);
+
+  it("shows only the tool call evaluator on a tool-call item", async () => {
+    apiClientMock.mockResolvedValue(withToolCall());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={{ ...item, is_tool_call: true }}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("pane-evaluators")).toBeInTheDocument(),
+    );
+    expect(paneEvaluatorIds()).toEqual(["ev-tool"]);
+  });
+
+  it("hides the tool call evaluator on every other item", async () => {
+    apiClientMock.mockResolvedValue(withToolCall());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("pane-evaluators")).toBeInTheDocument(),
+    );
+    expect(paneEvaluatorIds()).toEqual(["ev-1"]);
+  });
+});
+
 describe("ItemDetailDialog", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -318,7 +397,12 @@ describe("ItemDetailDialog", () => {
     apiClientMock.mockResolvedValue(
       baseSummary({
         evaluators: [
-          { uuid: "ev-1", name: "Correctness", output_type: "binary", run_count: 0 },
+          {
+            uuid: "ev-1",
+            name: "Correctness",
+            output_type: "binary",
+            run_count: 0,
+          },
         ],
       }),
     );
@@ -354,19 +438,21 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
-      "false",
-    );
+    expect(
+      screen.getByTestId("pane-annotator-filter-active"),
+    ).toHaveTextContent("false");
     expect(screen.getByTestId("pane-item-comments")).toHaveTextContent(
       "Nice item",
     );
 
     await user.click(screen.getByRole("button", { name: "Alice" }));
-    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
-      "true",
-    );
+    expect(
+      screen.getByTestId("pane-annotator-filter-active"),
+    ).toHaveTextContent("true");
     // Bob left no signal on this item, so he shouldn't appear as filterable.
-    expect(screen.queryByRole("button", { name: "Bob" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Bob" }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show the annotator picker when nobody has left a signal", async () => {
@@ -513,7 +599,9 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: /Live versions only/ }));
+    await user.click(
+      screen.getByRole("button", { name: /Live versions only/ }),
+    );
     expect(
       screen.getByRole("button", { name: /Live versions only/ }),
     ).toHaveAttribute("aria-pressed", "false");

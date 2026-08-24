@@ -28,6 +28,7 @@ function renderDialog(
       isOpen
       accessToken="tok"
       evaluators={evaluators}
+      hasToolCallItems={false}
       onClose={onClose}
       onConfirm={onConfirm}
       {...props}
@@ -47,6 +48,7 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen={false}
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -629,5 +631,58 @@ describe("AssignAnnotatorsDialog", () => {
         screen.getByRole("group", { name: "Reasoning on each label" }),
       ).getByLabelText("Optional"),
     ).toBeChecked();
+  });
+});
+
+// Tool call correctness is never a choice: a tool-call item is answered by it
+// and the backend adds it whether or not it is ticked here.
+describe("AssignAnnotatorsDialog and the tool call label", () => {
+  const TOOL_CALL = {
+    uuid: "ev-tool",
+    name: "Tool call correctness",
+    description: "Did the agent call the right tool",
+    evaluator_type: "tool-call",
+  };
+
+  beforeEach(() => {
+    mockedApiClient.mockReset();
+  });
+
+  it("leaves it out entirely when nothing chosen is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+  });
+
+  it("shows it ticked and not untickable when something chosen is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    const box = screen.getByRole("checkbox", {
+      name: "Tool call correctness is always included",
+    });
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+  });
+
+  it("sends it along with the labels that were chosen", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][1]).toContain("ev-tool");
   });
 });

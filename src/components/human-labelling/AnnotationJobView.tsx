@@ -14,7 +14,6 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
-import { isToolCallOutputItem } from "./itemOutputType";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -1264,8 +1263,7 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  if (isToolCallOutputItem(payload))
-    return <ToolCallItemPane payload={payload} />;
+  if (item.is_tool_call === true) return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;

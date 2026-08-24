@@ -24,6 +24,8 @@ import { JobsCreatedDialog, type CreatedJob } from "./JobsCreatedDialog";
 export type ReviewItem = {
   uuid: string;
   payload?: unknown;
+  /** True when this row's answer was a tool call. Set by the backend. */
+  is_tool_call?: boolean;
 };
 
 export type ReviewEvaluator = {
@@ -129,6 +131,7 @@ export function SendForReviewFlow({
       <AssignAnnotatorsDialog
         isOpen={assignOpen}
         accessToken={accessToken}
+        hasToolCallItems={sendable.some((it) => it.is_tool_call === true)}
         evaluators={evaluators}
         onClose={() => setAssignOpen(false)}
         onConfirm={handleConfirm}
