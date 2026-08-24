@@ -228,6 +228,11 @@ function EvaluatorDetailPageInner() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editNameError, setEditNameError] = useState<string | null>(null);
 
+  // Tool call correctness is answered by Calibrate and by people, never by an
+  // AI judge, so a new version of it has no prompt and no model. Only its
+  // labels, the summary of the change and the live tick apply.
+  const hasNoJudge = evaluator?.evaluator_type === "tool-call";
+
   // New version dialog state
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [newVersionJudgeModel, setNewVersionJudgeModel] =
@@ -580,8 +585,8 @@ function EvaluatorDetailPageInner() {
             .length > 0,
       );
     if (
-      !newVersionJudgeModel ||
-      !newVersionSystemPrompt.trim() ||
+      (!hasNoJudge &&
+        (!newVersionJudgeModel || !newVersionSystemPrompt.trim())) ||
       !scaleValid ||
       !variableDescriptionsValid
     ) {
@@ -593,8 +598,12 @@ function EvaluatorDetailPageInner() {
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
       const body: Record<string, unknown> = {
-        judge_model: newVersionJudgeModel.id,
-        system_prompt: newVersionSystemPrompt.trim(),
+        ...(hasNoJudge
+          ? {}
+          : {
+              judge_model: newVersionJudgeModel!.id,
+              system_prompt: newVersionSystemPrompt.trim(),
+            }),
         make_live: newVersionMarkLive,
       };
       if (newVersionChangelog.trim()) {
@@ -1240,27 +1249,38 @@ function EvaluatorDetailPageInner() {
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)_minmax(300px,0.9fr)] gap-4 md:gap-6">
-                {/* Left column — Prompt */}
-                <div>
-                  <label className="block text-xs md:text-sm font-medium mb-2">
-                    Judge prompt <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={newVersionSystemPrompt}
-                    onChange={(e) => setNewVersionSystemPrompt(e.target.value)}
-                    placeholder={
-                      supportsEvaluatorVariables(evaluator.evaluator_type)
-                        ? "Describe how the judge should grade a response. Reference existing variables with {{name}}."
-                        : "Describe how the judge should grade a response"
-                    }
-                    className={`w-full px-4 py-3 rounded-md text-sm md:text-base border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none h-[360px] lg:h-[560px] ${
-                      newVersionValidated && !newVersionSystemPrompt.trim()
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                </div>
+              <div
+                className={`grid grid-cols-1 gap-4 md:gap-6 ${
+                  hasNoJudge
+                    ? "lg:grid-cols-[minmax(280px,1fr)_minmax(300px,1fr)]"
+                    : "lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)_minmax(300px,0.9fr)]"
+                }`}
+              >
+                {/* Left column — Prompt. Absent on an evaluator no AI judge
+                    runs: there is no prompt to write. */}
+                {!hasNoJudge && (
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-2">
+                      Judge prompt <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={newVersionSystemPrompt}
+                      onChange={(e) =>
+                        setNewVersionSystemPrompt(e.target.value)
+                      }
+                      placeholder={
+                        supportsEvaluatorVariables(evaluator.evaluator_type)
+                          ? "Describe how the judge should grade a response. Reference existing variables with {{name}}."
+                          : "Describe how the judge should grade a response"
+                      }
+                      className={`w-full px-4 py-3 rounded-md text-sm md:text-base border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none h-[360px] lg:h-[560px] ${
+                        newVersionValidated && !newVersionSystemPrompt.trim()
+                          ? "border-red-500"
+                          : "border-border"
+                      }`}
+                    />
+                  </div>
+                )}
 
                 {/* Middle column — Labels (rating scale / binary labels) */}
                 <div className="space-y-4 md:space-y-5">
@@ -1313,51 +1333,56 @@ function EvaluatorDetailPageInner() {
                         Mark the new version as the live version
                       </span>
                       <span className="text-xs md:text-sm text-emerald-700/75 dark:text-emerald-300/75">
-                        New tests will use this prompt version after it is
-                        created
+                        {hasNoJudge
+                          ? "New tests will use this version after it is created"
+                          : "New tests will use this prompt version after it is created"}
                       </span>
                     </span>
                   </label>
 
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium mb-2">
-                      Judge model <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setNewVersionLlmModalOpen(true)}
-                      className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent flex items-center justify-between cursor-pointer transition-colors ${
-                        newVersionValidated && !newVersionJudgeModel
-                          ? "border-red-500"
-                          : "border-border"
-                      }`}
-                    >
-                      <span
-                        className={
-                          newVersionJudgeModel
-                            ? "text-foreground"
-                            : "text-muted-foreground"
-                        }
+                  {/* No AI judge runs this evaluator, so there is no model
+                      to pick. */}
+                  {!hasNoJudge && (
+                    <div>
+                      <label className="block text-xs md:text-sm font-medium mb-2">
+                        Judge model <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setNewVersionLlmModalOpen(true)}
+                        className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent flex items-center justify-between cursor-pointer transition-colors ${
+                          newVersionValidated && !newVersionJudgeModel
+                            ? "border-red-500"
+                            : "border-border"
+                        }`}
                       >
-                        {newVersionJudgeModel
-                          ? newVersionJudgeModel.name
-                          : "Select judge model"}
-                      </span>
-                      <svg
-                        className="w-4 h-4 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </button>
-                  </div>
+                        <span
+                          className={
+                            newVersionJudgeModel
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {newVersionJudgeModel
+                            ? newVersionJudgeModel.name
+                            : "Select judge model"}
+                        </span>
+                        <svg
+                          className="w-4 h-4 text-muted-foreground"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
 
                   {(() => {
                     const existingVariables =
