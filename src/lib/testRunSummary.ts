@@ -6,7 +6,10 @@
  * Summary tab can render per-evaluator metrics with the same cards.
  */
 
-import type { JudgeResult, TestRunEvaluator } from "@/components/test-results/shared";
+import type {
+  JudgeResult,
+  TestRunEvaluator,
+} from "@/components/test-results/shared";
 import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary";
 
 type ResultLike = { judge_results?: JudgeResult[] | null };
@@ -91,7 +94,9 @@ export function buildEvaluatorSummaryFromResults(
     if (isRating) {
       const scores = jrs
         .map((j) => j.score)
-        .filter((s): s is number => typeof s === "number" && Number.isFinite(s));
+        .filter(
+          (s): s is number => typeof s === "number" && Number.isFinite(s),
+        );
       if (scores.length === 0) continue;
       const sum = scores.reduce((a, b) => a + b, 0);
       out.push({
@@ -127,4 +132,31 @@ export function buildEvaluatorSummaryFromResults(
   }
 
   return out;
+}
+
+/** One row of a run, as far as finding the tool-call evaluator needs. */
+export type ToolCallEvaluatorRowLike = {
+  testCase?: { evaluation?: { type?: string } | null } | null;
+  judgeResults?: { evaluator_uuid?: string | null }[] | null;
+};
+
+/**
+ * The evaluator that judged this run's tool-call tests, or null when the run
+ * has none.
+ *
+ * Found from the rows on purpose. The run's evaluator list does not say what
+ * kind each evaluator is, and the evaluator's name can be changed by the
+ * workspace, so neither can be trusted. A tool-call test's judge result names
+ * the evaluator directly, which cannot drift.
+ */
+export function toolCallEvaluatorUuidFromRows(
+  rows: readonly ToolCallEvaluatorRowLike[],
+): string | null {
+  for (const row of rows) {
+    if (row?.testCase?.evaluation?.type !== "tool_call") continue;
+    for (const jr of row.judgeResults ?? []) {
+      if (jr?.evaluator_uuid) return jr.evaluator_uuid;
+    }
+  }
+  return null;
 }

@@ -2,6 +2,7 @@ import {
   ToolCallCard,
   normalizeToolCall,
 } from "@/components/test-results/shared";
+import { ClampedBlock } from "@/components/ui/ClampedBlock";
 
 /**
  * The tool calls a tool-call test expected, drawn the way the run results
@@ -21,14 +22,16 @@ export function ExpectedToolCalls({
       <h3 className="text-sm font-semibold text-foreground">
         Expected tool calls
       </h3>
-      <div className="space-y-2">
-        {expected.map((tc, i) => {
-          const { toolName, args } = normalizeToolCall(tc);
-          return (
-            <ToolCallCard key={i} toolName={toolName} args={args} expected />
-          );
-        })}
-      </div>
+      <ClampedBlock>
+        <div className="space-y-2">
+          {expected.map((tc, i) => {
+            const { toolName, args } = normalizeToolCall(tc);
+            return (
+              <ToolCallCard key={i} toolName={toolName} args={args} expected />
+            );
+          })}
+        </div>
+      </ClampedBlock>
     </div>
   );
 }

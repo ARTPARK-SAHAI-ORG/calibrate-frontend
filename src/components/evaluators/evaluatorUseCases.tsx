@@ -78,6 +78,9 @@ const TYPE_TONE: Record<EvaluatorType, CardTone> = {
   llm: "orange",
   "llm-general": "teal",
   conversation: "pink",
+  // Never offered in the create flow: it comes with the product. Listed here
+  // only so every type has a colour where one is looked up.
+  "tool-call": "amber",
 };
 
 const TONE_INACTIVE_CLASSES: Record<CardTone, string> = {

@@ -31,6 +31,42 @@ jest.mock("../bulk-upload-shared", () => ({
   },
 }));
 
+const accessTokenMock = jest.fn<string | null, []>(() => null);
+jest.mock("../../../hooks/useAccessToken", () => ({
+  useAccessToken: () => accessTokenMock(),
+}));
+
+jest.mock("../../ToolPicker", () => ({
+  __esModule: true,
+  getToolParams: (tool: { name: string }) =>
+    tool.name === "book_flight" ? [{ name: "city", value: "" }] : [],
+  ToolPicker: ({
+    onSelectCustomTool,
+    onSelectInbuiltTool,
+  }: {
+    onSelectCustomTool: (
+      tool: { name: string },
+      params: { name: string; value: string }[],
+    ) => void;
+    onSelectInbuiltTool: (toolId: string, toolName: string) => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => onSelectCustomTool({ name: "book_flight" }, [])}
+      >
+        Pick book_flight
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectInbuiltTool("end_call", "End conversation")}
+      >
+        Pick End conversation
+      </button>
+    </>
+  ),
+}));
+
 const evaluatorWithVars: LlmGeneralEvaluatorDef = {
   uuid: "ev-1",
   name: "Relevance",
@@ -63,6 +99,231 @@ function renderDialog(
   return { onClose, onSubmit, ...utils };
 }
 
+describe("AddLlmGeneralItemsDialog tool-call output", () => {
+  it("shows the tool call under Output instead of an empty box", () => {
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(screen.getByText("dummy")).toBeInTheDocument();
+    expect(screen.getByText("success")).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves an edited argument value, with true kept as a yes/no", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    const box = screen.getByDisplayValue("true");
+    await user.clear(box);
+    await user.type(box, "false");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: false } },
+    ]);
+  });
+
+  it("removes a tool call and puts the text box back", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
+    expect(screen.queryByText("dummy")).not.toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toBeInTheDocument();
+  });
+
+  it("lets the item be saved on a tool call alone, with no text answer", () => {
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("adds a second tool call from the picker and sends both", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick book_flight" }));
+    await user.type(screen.getByLabelText("city"), "Bengaluru");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: true } },
+      { tool: "book_flight", arguments: { city: "Bengaluru" } },
+    ]);
+  });
+
+  it("closes the tool list on Escape and on the Add tool call button again", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    const add = screen.getByRole("button", { name: "Add tool call" });
+
+    await user.click(add);
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("button", { name: "Pick book_flight" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(add);
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+    await user.click(add);
+    expect(
+      screen.queryByRole("button", { name: "Pick book_flight" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("records a built-in tool by the name the agent calls, not its label", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", { name: "Pick End conversation" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "end_call", arguments: {} },
+    ]);
+  });
+
+  it("keeps a phone number as text and only converts true, false and null", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { phone: "", success: true, note: "" },
+            },
+          ],
+        },
+      ],
+    });
+    await user.type(screen.getByLabelText("phone"), "9876543210");
+    await user.type(screen.getByLabelText("note"), "null");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      {
+        tool: "dummy",
+        arguments: { phone: "9876543210", success: true, note: null },
+      },
+    ]);
+  });
+
+  it("asks for the tool list with the signed-in token", async () => {
+    accessTokenMock.mockReturnValue("tok-123");
+    process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend.test";
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderDialog({ mode: "add" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/tools");
+    expect(
+      (init as { headers: Record<string, string> }).headers.Authorization,
+    ).toBe("Bearer tok-123");
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("does not ask for the tool list before the token is known", () => {
+    accessTokenMock.mockReturnValue(null);
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderDialog({ mode: "add" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the text box when the answer was text", () => {
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("AddLlmGeneralItemsDialog", () => {
   it("renders nothing when closed", () => {
     render(
@@ -89,10 +350,7 @@ describe("AddLlmGeneralItemsDialog", () => {
     const addButton = screen.getByRole("button", { name: "Add item" });
     expect(addButton).toBeDisabled();
 
-    await user.type(
-      screen.getByPlaceholderText("Your item name"),
-      "Item 1",
-    );
+    await user.type(screen.getByPlaceholderText("Your item name"), "Item 1");
     expect(addButton).toBeDisabled();
 
     await user.type(
@@ -160,10 +418,13 @@ describe("AddLlmGeneralItemsDialog", () => {
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     renderDialog({ evaluators: [evaluatorWithVars], onSubmit });
 
-    await user.type(screen.getByPlaceholderText("Your item name"), "  Item 1  ");
+    await user.type(
+      screen.getByPlaceholderText("Your item name"),
+      "  Item 1  ",
+    );
     await user.type(
       screen.getByPlaceholderText(
-        "Optional — what is this item about? Shown to annotators alongside the evaluators.",
+        "(Optional) What is this item about? Shown to annotators alongside the evaluators.",
       ),
       "  desc  ",
     );
@@ -187,6 +448,7 @@ describe("AddLlmGeneralItemsDialog", () => {
         description: "desc",
         input: "in",
         output: "out",
+        toolCalls: [],
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
       },
     ]);
@@ -253,7 +515,9 @@ describe("AddLlmGeneralItemsDialog", () => {
     const user = setupUser();
     const onSubmit = jest
       .fn()
-      .mockRejectedValue(new Error("Request failed: 500 - Internal Server Error"));
+      .mockRejectedValue(
+        new Error("Request failed: 500 - Internal Server Error"),
+      );
     renderDialog({ onSubmit });
 
     await user.type(screen.getByPlaceholderText("Your item name"), "Item 1");

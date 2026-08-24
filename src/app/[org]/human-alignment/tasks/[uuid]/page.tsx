@@ -3933,9 +3933,16 @@ function LabellingTaskPageInner() {
             const trimmedDescription = editLlmItemDescription.trim();
             const descriptionField = { description: trimmedDescription };
 
+            // Same rule as the single agent response edit: the save replaces
+            // the whole item, so keep what the form has no field for.
+            const existingPayload = (editingItem?.payload ?? {}) as Record<
+              string,
+              unknown
+            >;
             let payload: Record<string, unknown>;
             if (taskType === "conversation") {
               payload = {
+                ...existingPayload,
                 name: editLlmItemName.trim(),
                 ...descriptionField,
                 transcript: history,
@@ -3957,6 +3964,7 @@ function LabellingTaskPageInner() {
                 agent_response = last.content;
               }
               payload = {
+                ...existingPayload,
                 name: editLlmItemName.trim(),
                 ...descriptionField,
                 chat_history,
@@ -4283,6 +4291,9 @@ function LabellingTaskPageInner() {
                   ...(r.description ? { description: r.description } : {}),
                   input: r.input,
                   output: r.output,
+                  ...(r.toolCalls.length > 0
+                    ? { actual_tool_calls: r.toolCalls }
+                    : {}),
                   ...(Object.keys(r.evaluator_variables).length > 0
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
@@ -4316,6 +4327,9 @@ function LabellingTaskPageInner() {
                 typeof p.description === "string" ? p.description : "",
               input: typeof p.input === "string" ? p.input : "",
               output: typeof p.output === "string" ? p.output : "",
+              toolCalls: Array.isArray(p.actual_tool_calls)
+                ? p.actual_tool_calls
+                : [],
               varValues: readEvaluatorVariables(p),
             };
           })}
@@ -4335,14 +4349,24 @@ function LabellingTaskPageInner() {
                   .filter((r) => !!r.uuid)
                   .map((r) => ({
                     uuid: r.uuid,
+                    // The save replaces the whole item, so start from what
+                    // the item already holds. Without this, editing an item
+                    // whose answer was a tool call deletes the call: the
+                    // form has no field for it.
                     payload: {
-                      ...(r.name ? { name: r.name } : {}),
-                      ...(r.description ? { description: r.description } : {}),
+                      ...(((items.find((it) => it.uuid === r.uuid)?.payload ??
+                        {}) as Record<string, unknown>) || {}),
+                      name: r.name,
+                      description: r.description,
                       input: r.input,
                       output: r.output,
-                      ...(Object.keys(r.evaluator_variables).length > 0
-                        ? { evaluator_variables: r.evaluator_variables }
-                        : {}),
+                      // Only a real call goes on the item. An empty list
+                      // would make every screen read a plain text answer as
+                      // a tool call, so the key is dropped instead.
+                      ...(r.toolCalls.length > 0
+                        ? { actual_tool_calls: r.toolCalls }
+                        : { actual_tool_calls: undefined }),
+                      evaluator_variables: r.evaluator_variables,
                     },
                   })),
               },

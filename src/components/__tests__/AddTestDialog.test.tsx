@@ -1150,7 +1150,7 @@ describe("AddTestDialog", () => {
         />,
       );
       const descriptionBox = screen.getByPlaceholderText(
-        /Optional — what is this item about/,
+        /\(Optional\) What is this item about/,
       );
       await user.type(descriptionBox, "Some notes");
       expect(descriptionBox).toHaveValue("Some notes");

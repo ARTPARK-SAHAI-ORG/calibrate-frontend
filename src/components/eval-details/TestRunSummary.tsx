@@ -36,6 +36,11 @@ type TestRunSummaryProps = {
    * total, a dedicated "Tool calls" pass-rate card is shown alongside the
    * overall pass rate so tool-call results aren't hidden inside the total. */
   toolCall?: { passed: number; total: number };
+  /** The Tool call correctness evaluator in this run, when it has one. Its
+   * card already reports the tool-call pass rate, so the dedicated "Tool
+   * calls" card is dropped rather than showing the same number twice. Older
+   * runs have no such evaluator and keep the card. */
+  toolCallEvaluatorUuid?: string | null;
   /** Per-evaluator aggregates (same shape benchmark uses), single model. */
   evaluatorSummary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Disable evaluator detail links for public share pages. */
@@ -183,6 +188,7 @@ export function TestRunSummary({
   cost,
   tokens,
   toolCall,
+  toolCallEvaluatorUuid = null,
   evaluatorSummary,
   enableEvaluatorLinks = true,
 }: TestRunSummaryProps) {
@@ -193,6 +199,9 @@ export function TestRunSummary({
       : null;
 
   const evaluators = evaluatorSummary ?? [];
+  const toolCallEvaluatorCharted =
+    !!toolCallEvaluatorUuid &&
+    evaluators.some((e) => e.evaluator_uuid === toolCallEvaluatorUuid);
 
   // Caption under each aggregate card. Latency shows its p95/p99 tail (or the
   // legacy min–max range for historical runs); cost/tokens show their min–max
@@ -239,7 +248,8 @@ export function TestRunSummary({
         </div>
       </div>
 
-      {(evaluators.length > 0 || toolCallRate !== null) && (
+      {(evaluators.length > 0 ||
+        (toolCallRate !== null && !toolCallEvaluatorCharted)) && (
         <div>
           <h2 className="text-base md:text-lg font-semibold mb-3">
             Evaluators
@@ -248,7 +258,7 @@ export function TestRunSummary({
             {/* Tool-call tests are judged by the expected tool calls on the
                 test itself, not by an evaluator, so their pass rate sits
                 beside the evaluator cards rather than in the run totals. */}
-            {toolCallRate !== null && toolCall && (
+            {toolCallRate !== null && toolCall && !toolCallEvaluatorCharted && (
               <MetricCard
                 label="Tool calls"
                 value={formatPercent(toolCallRate)}

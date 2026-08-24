@@ -471,8 +471,8 @@ function WriteControls({
           onClick={() => onChange(true)}
           className={`${baseBtn} ${
             value === true
-              ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400"
-              : "border-border bg-background hover:bg-muted/50"
+              ? "border-green-600 bg-green-600 text-white"
+              : "border-border bg-background text-foreground hover:bg-muted/50"
           }`}
         >
           {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
@@ -480,7 +480,7 @@ function WriteControls({
             <OptionDescription
               text={trueText}
               active={value === true}
-              activeClass="text-green-700/80 dark:text-green-400/80"
+              activeClass="text-white/80"
             />
           )}
         </button>
@@ -491,8 +491,8 @@ function WriteControls({
           onClick={() => onChange(false)}
           className={`${baseBtn} ${
             value === false
-              ? "border-red-200 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/20 dark:text-red-400"
-              : "border-border bg-background hover:bg-muted/50"
+              ? "border-red-600 bg-red-600 text-white"
+              : "border-border bg-background text-foreground hover:bg-muted/50"
           }`}
         >
           {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
@@ -500,7 +500,7 @@ function WriteControls({
             <OptionDescription
               text={falseText}
               active={value === false}
-              activeClass="text-red-700/80 dark:text-red-400/80"
+              activeClass="text-white/80"
             />
           )}
         </button>
@@ -643,14 +643,7 @@ function WriteReasoning({
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
-        Reasoning{" "}
-        {disabled ? (
-          ""
-        ) : required ? (
-          <span className="text-red-500">*</span>
-        ) : (
-          "(optional)"
-        )}
+        Reasoning{disabled || required ? "" : " (optional)"}
       </div>
       <textarea
         value={value}

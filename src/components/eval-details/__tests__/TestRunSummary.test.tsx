@@ -21,9 +21,51 @@ describe("TestRunSummary", () => {
     expect(screen.getByText("3/4")).toBeInTheDocument();
   });
 
+  it("drops the Tool calls card when the run's own evaluator already reports it", () => {
+    const summary: BenchmarkEvaluatorSummaryEntry[] = [
+      {
+        metric_key: "tool-call-correctness",
+        name: "Tool call correctness",
+        evaluator_uuid: "ev-tool",
+        type: "binary",
+        passed: 1,
+        total: 2,
+        pass_rate: 50,
+      },
+    ];
+    render(
+      <TestRunSummary
+        passed={3}
+        total={4}
+        toolCall={{ passed: 1, total: 2 }}
+        toolCallEvaluatorUuid="ev-tool"
+        evaluatorSummary={summary}
+      />,
+    );
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+    // The same number would otherwise appear twice under Evaluators.
+    expect(screen.queryByText("Tool calls")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Tool calls card when the run carries no such evaluator", () => {
+    render(
+      <TestRunSummary
+        passed={3}
+        total={4}
+        toolCall={{ passed: 1, total: 2 }}
+        toolCallEvaluatorUuid={null}
+      />,
+    );
+    expect(screen.getByText("Tool calls")).toBeInTheDocument();
+  });
+
   it("shows the tool-call card under Evaluators only when toolCall.total > 0", () => {
     const { rerender } = render(
-      <TestRunSummary passed={3} total={4} toolCall={{ passed: 1, total: 2 }} />,
+      <TestRunSummary
+        passed={3}
+        total={4}
+        toolCall={{ passed: 1, total: 2 }}
+      />,
     );
     const toolCalls = screen.getByText("Tool calls");
     expect(toolCalls).toBeInTheDocument();
@@ -37,7 +79,13 @@ describe("TestRunSummary", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("1/2")).toBeInTheDocument();
 
-    rerender(<TestRunSummary passed={2} total={4} toolCall={{ passed: 0, total: 0 }} />);
+    rerender(
+      <TestRunSummary
+        passed={2}
+        total={4}
+        toolCall={{ passed: 0, total: 0 }}
+      />,
+    );
     expect(screen.queryByText("Tool calls")).not.toBeInTheDocument();
     expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   });
@@ -107,7 +155,13 @@ describe("TestRunSummary", () => {
         pass_rate: 80,
       },
     ];
-    render(<TestRunSummary passed={1} total={1} evaluatorSummary={evaluatorSummary} />);
+    render(
+      <TestRunSummary
+        passed={1}
+        total={1}
+        evaluatorSummary={evaluatorSummary}
+      />,
+    );
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
     expect(screen.getByText("Semantic Match")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
@@ -150,7 +204,13 @@ describe("TestRunSummary", () => {
         pass_rate: 50,
       },
     ];
-    render(<TestRunSummary passed={1} total={1} evaluatorSummary={evaluatorSummary} />);
+    render(
+      <TestRunSummary
+        passed={1}
+        total={1}
+        evaluatorSummary={evaluatorSummary}
+      />,
+    );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     // falls back to metric_key when name absent
     expect(screen.getByText("no_uuid_metric")).toBeInTheDocument();
@@ -170,7 +230,13 @@ describe("TestRunSummary", () => {
         scale_max: 5,
       },
     ];
-    render(<TestRunSummary passed={1} total={1} evaluatorSummary={evaluatorSummary} />);
+    render(
+      <TestRunSummary
+        passed={1}
+        total={1}
+        evaluatorSummary={evaluatorSummary}
+      />,
+    );
     expect(screen.getByText("Quality (1–5)")).toBeInTheDocument();
     expect(screen.getByText("4.26/5")).toBeInTheDocument();
     expect(screen.getByText("mean of 7")).toBeInTheDocument();
@@ -190,7 +256,13 @@ describe("TestRunSummary", () => {
         scale_max: undefined as unknown as number,
       },
     ];
-    render(<TestRunSummary passed={1} total={1} evaluatorSummary={evaluatorSummary} />);
+    render(
+      <TestRunSummary
+        passed={1}
+        total={1}
+        evaluatorSummary={evaluatorSummary}
+      />,
+    );
     expect(screen.getByText("Quality")).toBeInTheDocument();
     expect(screen.getByText("4.2")).toBeInTheDocument();
   });
@@ -211,7 +283,11 @@ describe("TestRunSummary", () => {
       },
     ];
     const { container } = render(
-      <TestRunSummary passed={1} total={1} evaluatorSummary={evaluatorSummary} />,
+      <TestRunSummary
+        passed={1}
+        total={1}
+        evaluatorSummary={evaluatorSummary}
+      />,
     );
     expect(container.querySelectorAll("svg").length).toBeGreaterThan(0);
   });
