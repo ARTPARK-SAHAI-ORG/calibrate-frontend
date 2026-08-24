@@ -57,6 +57,33 @@ describe("RunEvaluatorsDialog", () => {
     mockedApiClient.mockReset();
   });
 
+  it("says how many chosen rows are tool calls left out of the run", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: 2 });
+    expect(
+      await screen.findByText(
+        /2 of the chosen items are tool calls\. AI judges do not run on tool calls, so they are left out of this run\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says it in the singular for one tool-call row", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: 1 });
+    expect(
+      await screen.findByText(
+        /1 of the chosen items is a tool call\. AI judges do not run on tool calls, so it is left out of this run\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when no chosen row is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog();
+    expect(await screen.findByText("Relevance")).toBeInTheDocument();
+    expect(screen.queryByText(/left out of this run/)).not.toBeInTheDocument();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <RunEvaluatorsDialog

@@ -75,7 +75,10 @@ import {
 } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
-import { toItemDetailItem } from "@/lib/labellingItem";
+import {
+  runEvaluatorsDecision,
+  toItemDetailItem,
+} from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -865,6 +868,7 @@ function ItemRowActions({
   onLabel,
   onEdit,
   onEvaluate,
+  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -872,6 +876,9 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
+  /** True on a tool-call row: an AI judge has no wording to read there, so
+   * the button is shown but cannot be pressed. */
+  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -893,8 +900,14 @@ function ItemRowActions({
         <button
           type="button"
           onClick={() => onEvaluate(itemUuid)}
+          disabled={evaluateDisabled}
           aria-label="Evaluate"
-          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+          title={
+            evaluateDisabled
+              ? "AI judges do not run on tool calls. A person can label this item by hand."
+              : undefined
+          }
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Evaluate
         </button>
@@ -2018,6 +2031,10 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
+  // How many of the chosen rows are tool calls that the AI judges skip. Shown
+  // in the run dialog before the run is confirmed.
+  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] =
+    useState<number>(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
@@ -2036,8 +2053,24 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
+      // Select-all reaches rows beyond the page in hand, so there is nothing
+      // to count here. The backend refuses a run of nothing but tool calls
+      // either way.
+      setRunDialogToolCallSkipCount(0);
     } else {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
+      const decision = runEvaluatorsDecision(
+        (ids ?? []).map(
+          (id) => items.find((i) => i.uuid === id) ?? { is_tool_call: false },
+        ),
+      );
+      if (decision.blocked) {
+        toast.error(
+          "AI judges do not run on tool calls. A person can label them by hand.",
+        );
+        return;
+      }
+      setRunDialogToolCallSkipCount(decision.toolCallSkipCount);
       setRunDialogItemUuids(ids);
       setRunDialogSelectAll(null);
     }
@@ -3475,6 +3508,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3648,6 +3682,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
+                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3768,6 +3803,7 @@ function LabellingTaskPageInner() {
           }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
+          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);

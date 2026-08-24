@@ -23,6 +23,7 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
+import { isSkippedRunResult } from "@/lib/labellingItem";
 import {
   ItemPane,
   itemPaneHasOwnPadding,
@@ -53,7 +54,13 @@ export type EvaluatorRunRow = {
   item_id: string;
   evaluator_id: string;
   evaluator_version_id: string;
-  value: { value?: unknown; reasoning?: unknown } | null;
+  /** `skipped` is set instead of `value` when the AI judge did not run on
+   * this row at all — today, a tool-call row. */
+  value: {
+    value?: unknown;
+    reasoning?: unknown;
+    skipped?: unknown;
+  } | null;
   status: string;
   created_at: string;
   completed_at: string | null;
@@ -911,6 +918,30 @@ export function EvaluatorResultsPane({
               </div>
               <p className="text-xs text-red-600 dark:text-red-400">
                 No result recorded for this item.
+              </p>
+            </div>
+          );
+        }
+
+        // The judge did not run on this row, so there is no score to draw.
+        // Say why, rather than leaving an empty card behind.
+        if (isSkippedRunResult(r.value)) {
+          return (
+            <div
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              className="border border-border bg-muted/30 rounded-xl p-4 space-y-1.5"
+            >
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="text-sm font-semibold">{evaluatorName}</h3>
+                {versionLabel && (
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                    {versionLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                AI judges do not run on tool calls. A person can label this
+                item by hand.
               </p>
             </div>
           );
