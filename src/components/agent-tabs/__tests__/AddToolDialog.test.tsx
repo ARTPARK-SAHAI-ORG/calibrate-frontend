@@ -114,19 +114,37 @@ describe("AddToolDialog", () => {
     expect(screen.queryByText(/^Add \(/)).not.toBeInTheDocument();
   });
 
-  it("selects and deselects tools, updating the Add button count", async () => {
+  it("selects and deselects tools via checkbox, updating the Add button count", async () => {
     const user = setupUser();
     renderComponent();
 
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     expect(screen.getByText("Add (1)")).toBeInTheDocument();
 
-    await user.click(screen.getByText("Calendar booking"));
+    await user.click(screen.getByLabelText("Select Calendar booking"));
     expect(screen.getByText("Add (2)")).toBeInTheDocument();
 
     // Deselect
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     expect(screen.getByText("Add (1)")).toBeInTheDocument();
+  });
+
+  it("shows a tool's details in the preview column when its name is clicked", async () => {
+    const user = setupUser();
+    renderComponent();
+
+    expect(
+      screen.getByText("Select a tool to see its details"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByText("Weather lookup"));
+    expect(
+      screen.queryByText("Select a tool to see its details"),
+    ).not.toBeInTheDocument();
+    // Description shows once in the row and again in the preview column.
+    expect(screen.getAllByText("Gets the weather").length).toBe(2);
+    // Clicking the name previews it, it does not also select it.
+    expect(screen.queryByText(/^Add \(/)).not.toBeInTheDocument();
   });
 
   it("closes and resets state via the header close (X) button", async () => {
@@ -135,7 +153,7 @@ describe("AddToolDialog", () => {
     renderComponent({ onClose });
 
     await user.type(screen.getByPlaceholderText("Search tools"), "weather");
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
 
     const closeButton = screen.getAllByRole("button")[0];
     await user.click(closeButton);
@@ -147,9 +165,18 @@ describe("AddToolDialog", () => {
     const onClose = jest.fn();
     const { container } = renderComponent({ onClose });
 
-    const backdrop = container.querySelector(".absolute.inset-0.-z-10") as HTMLElement;
+    const backdrop = container.querySelector(".fixed.inset-0") as HTMLElement;
     await user.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close when clicking inside the dialog panel", async () => {
+    const user = setupUser();
+    const onClose = jest.fn();
+    renderComponent({ onClose });
+
+    await user.click(screen.getByText("Add Tools"));
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("adds selected tools successfully", async () => {
@@ -159,7 +186,7 @@ describe("AddToolDialog", () => {
     const onClose = jest.fn();
     renderComponent({ onToolsAdded, onClose });
 
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     await user.click(screen.getByText("Add (1)"));
 
     await waitFor(() => {
@@ -184,7 +211,7 @@ describe("AddToolDialog", () => {
     const onToolsAdded = jest.fn();
     renderComponent({ onToolsAdded });
 
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     await user.click(screen.getByText("Add (1)"));
 
     await waitFor(() => {
@@ -199,7 +226,7 @@ describe("AddToolDialog", () => {
     const onClose = jest.fn();
     renderComponent({ onClose });
 
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     await user.click(screen.getByText("Add (1)"));
 
     await waitFor(() => {
@@ -214,7 +241,7 @@ describe("AddToolDialog", () => {
     const onClose = jest.fn();
     renderComponent({ onClose });
 
-    await user.click(screen.getByText("Weather lookup"));
+    await user.click(screen.getByLabelText("Select Weather lookup"));
     await user.click(screen.getByText("Add (1)"));
 
     await waitFor(() => {
