@@ -160,6 +160,7 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 - Tailwind v4 with semantic tokens (`foreground`, `background`, `muted`, `accent`, `border`). Avoid hardcoded colors outside the validation/status patterns documented in `.cursor/rules/design.md`.
 - All interactive elements need `cursor-pointer`; disabled elements `cursor-not-allowed disabled:opacity-50`.
+- Hover text comes from `Tooltip` in `src/components/Tooltip.tsx`, never the browser's own `title` attribute. The browser's version is a grey box in its own font that ignores every style in this app, and it does not show at all on a touch screen. Wrap the control: `<Tooltip content="..." position="top">{button}</Tooltip>`. It works on a disabled button too, because the hover is on the wrapper, not the button. Keep `aria-label` on the control itself for screen readers.
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
 

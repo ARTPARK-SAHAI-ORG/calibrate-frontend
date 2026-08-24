@@ -898,22 +898,30 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {onEvaluate && (
-        <button
-          type="button"
-          onClick={() => onEvaluate(itemUuid)}
-          disabled={evaluateDisabled}
-          aria-label="Evaluate"
-          title={
-            evaluateDisabled
-              ? toolCallNotEvaluatedMessage("This item evaluates")
-              : undefined
-          }
-          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Evaluate
-        </button>
-      )}
+      {onEvaluate &&
+        (() => {
+          const evaluateButton = (
+            <button
+              type="button"
+              onClick={() => onEvaluate(itemUuid)}
+              disabled={evaluateDisabled}
+              aria-label="Evaluate"
+              className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Evaluate
+            </button>
+          );
+          return evaluateDisabled ? (
+            <Tooltip
+              content={toolCallNotEvaluatedMessage("This item evaluates")}
+              position="top"
+            >
+              {evaluateButton}
+            </Tooltip>
+          ) : (
+            evaluateButton
+          );
+        })()}
       {onEdit && (
         <button
           type="button"
