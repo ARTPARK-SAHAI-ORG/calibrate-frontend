@@ -105,6 +105,11 @@ type AssignAnnotatorsDialogProps = {
    * such an item is always answered by it. With no such item it is not shown
    * at all. */
   hasToolCallItems: boolean;
+  /** True when at least one of the chosen items is answered by written text
+   * rather than a tool call. The AI-judge labels only apply to such an item,
+   * so with none chosen they are left out entirely — there is nothing for
+   * them to judge. */
+  hasNonToolCallItems: boolean;
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
   onConfirm: (
@@ -119,6 +124,7 @@ export function AssignAnnotatorsDialog({
   accessToken,
   evaluators,
   hasToolCallItems,
+  hasNonToolCallItems,
   onClose,
   onConfirm,
 }: AssignAnnotatorsDialogProps) {
@@ -173,9 +179,13 @@ export function AssignAnnotatorsDialog({
   const toolCallEvaluators = evaluators.filter(
     (ev) => ev.evaluator_type === "tool-call",
   );
-  const choosableEvaluators = evaluators.filter(
-    (ev) => ev.evaluator_type !== "tool-call",
-  );
+  // The AI-judge labels only apply to an item answered in writing. With no
+  // such item in the selection none of them belong in the picker at all —
+  // this is what was missing before: the full task list showed here no
+  // matter which items were actually chosen.
+  const choosableEvaluators = hasNonToolCallItems
+    ? evaluators.filter((ev) => ev.evaluator_type !== "tool-call")
+    : [];
   const shownToolCallEvaluators = hasToolCallItems ? toolCallEvaluators : [];
 
   const evaluatorIdsKey = choosableEvaluators.map((ev) => ev.uuid).join(",");
@@ -227,13 +237,14 @@ export function AssignAnnotatorsDialog({
     choosableEvaluators.length > 0 &&
     pickedEvaluators.size === choosableEvaluators.length;
 
-  // Only worth offering an evaluator choice (and the wider layout) when the
-  // task has more than one evaluator to pick between.
-  // Unchanged rule: nothing to choose between with one label or none. The
-  // tool call row is not a choice, but it is worth showing, so it opens the
-  // column on its own.
-  const showEvaluatorChoice =
-    choosableEvaluators.length > 1 || shownToolCallEvaluators.length > 0;
+  // Only worth showing the column when there is more than one label on
+  // screen in total (choosable ones plus the locked tool-call one). With
+  // just one — a single choosable label, or only the tool-call label because
+  // every chosen item is a tool call — there is nothing to weigh, so the
+  // column is left out, same as the original one-label rule.
+  const totalShownLabels =
+    choosableEvaluators.length + shownToolCallEvaluators.length;
+  const showEvaluatorChoice = totalShownLabels > 1;
 
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;

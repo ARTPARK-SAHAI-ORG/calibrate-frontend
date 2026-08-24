@@ -29,6 +29,7 @@ function renderDialog(
       accessToken="tok"
       evaluators={evaluators}
       hasToolCallItems={false}
+      hasNonToolCallItems={true}
       onClose={onClose}
       onConfirm={onConfirm}
       {...props}
@@ -49,6 +50,7 @@ describe("AssignAnnotatorsDialog", () => {
         accessToken="tok"
         evaluators={evaluators}
         hasToolCallItems={false}
+        hasNonToolCallItems={true}
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -684,5 +686,49 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("button", { name: /Assign/ }));
     await waitFor(() => expect(onConfirm).toHaveBeenCalled());
     expect(onConfirm.mock.calls[0][1]).toContain("ev-tool");
+  });
+
+  it("leaves out the AI-judge labels entirely when every chosen item is a tool call", async () => {
+    // This was the actual bug: the response evaluator was drawn from the
+    // task's full list with no regard for which items were selected, so it
+    // showed up as a pickable label even though nothing chosen could use it.
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+      hasNonToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+  });
+
+  it("hides the whole label picker when the only label left is the locked tool-call one", async () => {
+    // Same rule as a task with a single label: nothing to weigh, so no
+    // column at all — the evaluator is still included, just not shown as a
+    // choice.
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+      hasNonToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+  });
+
+  it("still sends the tool-call label even with the picker hidden", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+      hasNonToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][1]).toEqual(["ev-tool"]);
   });
 });

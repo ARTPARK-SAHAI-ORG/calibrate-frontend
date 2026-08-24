@@ -132,6 +132,7 @@ export function SendForReviewFlow({
         isOpen={assignOpen}
         accessToken={accessToken}
         hasToolCallItems={sendable.some((it) => it.is_tool_call === true)}
+        hasNonToolCallItems={sendable.some((it) => it.is_tool_call !== true)}
         evaluators={evaluators}
         onClose={() => setAssignOpen(false)}
         onConfirm={handleConfirm}

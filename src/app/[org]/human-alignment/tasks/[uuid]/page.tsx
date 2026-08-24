@@ -4431,6 +4431,11 @@ function LabellingTaskPageInner() {
               it.is_tool_call === true &&
               (selectAllTotal || selectedItemIds.has(it.uuid)),
           )}
+          hasNonToolCallItems={(task?.items ?? []).some(
+            (it) =>
+              it.is_tool_call !== true &&
+              (selectAllTotal || selectedItemIds.has(it.uuid)),
+          )}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />
