@@ -147,6 +147,25 @@ describe("ToolsTabContent", () => {
     ).toBeInTheDocument();
   });
 
+  it("hides the header's own Add tool / Create tool buttons while the empty-state placeholder is showing", () => {
+    renderComponent({ agentTools: [] });
+    // Only the placeholder's own pair, not a second header pair above it.
+    expect(screen.getAllByRole("button", { name: "Add tool" })).toHaveLength(
+      1
+    );
+    expect(
+      screen.getAllByRole("button", { name: "Create tool" })
+    ).toHaveLength(1);
+  });
+
+  it("gives the empty-state Add tool button the header's primary style, not the same look as Create tool", () => {
+    renderComponent({ agentTools: [] });
+    const addButton = screen.getByRole("button", { name: "Add tool" });
+    const createButton = screen.getByRole("button", { name: "Create tool" });
+    expect(addButton.className).toContain("bg-foreground");
+    expect(createButton.className).not.toContain("bg-foreground");
+  });
+
   it("shows a no-match message and opens the add dialog from the empty state when search matches nothing", async () => {
     const user = setupUser();
     renderComponent();

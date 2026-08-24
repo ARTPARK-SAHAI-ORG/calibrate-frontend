@@ -57,25 +57,34 @@ export function ToolsTabContent({
           .includes(toolsSearchQuery.toLowerCase()))
   );
 
+  // The header's own Add tool / Create tool buttons repeat the empty-state
+  // box's buttons below, so they only show once the list actually has
+  // something to list — otherwise the placeholder box is the only place
+  // those buttons appear.
+  const showingList =
+    !agentToolsLoading && !agentToolsError && filteredTools.length > 0;
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 md:gap-3">
-          <button
-            onClick={() => setAddToolDialogOpen(true)}
-            className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Add tool
-          </button>
-          <button
-            onClick={() => setCreateToolOpen(true)}
-            className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-          >
-            Create tool
-          </button>
+      {showingList && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={() => setAddToolDialogOpen(true)}
+              className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              Add tool
+            </button>
+            <button
+              onClick={() => setCreateToolOpen(true)}
+              className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              Create tool
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 md:gap-6">
         {/* Left Column - Tools List */}
@@ -169,7 +178,7 @@ export function ToolsTabContent({
               <div className="flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setAddToolDialogOpen(true)}
-                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   Add tool
                 </button>
