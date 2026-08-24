@@ -31,6 +31,7 @@ import {
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -1436,6 +1437,12 @@ export function AddTestDialog({
   const [scrollToEvaluatorUuid, setScrollToEvaluatorUuid] = useState<
     string | null
   >(null);
+  // The evaluator whose prompt is on show, from either the attached-card list
+  // or the "Add evaluator" dropdown. Null until a name is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   const evaluatorsContainerRef = useRef<HTMLDivElement>(null);
 
   const [localValidationAttempted, setLocalValidationAttempted] =
@@ -3947,13 +3954,14 @@ export function AddTestDialog({
                                   const checked =
                                     evaluatorPickerSelectedIds.has(o.uuid);
                                   return (
-                                    <label
+                                    <div
                                       key={o.uuid}
-                                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors"
                                     >
                                       <span className="flex h-5 items-center flex-shrink-0">
                                         <input
                                           type="checkbox"
+                                          aria-label={`Select ${o.name}`}
                                           checked={checked}
                                           onChange={() =>
                                             toggleEvaluatorPickerSelection(
@@ -3963,7 +3971,19 @@ export function AddTestDialog({
                                           className="w-4 h-4 cursor-pointer accent-foreground"
                                         />
                                       </span>
-                                      <div className="min-w-0 flex-1">
+                                      {/* Opens the prompt on top rather than
+                                          ticking the box, so an evaluator can
+                                          be read before it is added. */}
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPreviewEvaluator({
+                                            uuid: o.uuid,
+                                            name: o.name,
+                                          })
+                                        }
+                                        className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
+                                      >
                                         <div className="text-sm font-medium text-foreground">
                                           {o.name}
                                         </div>
@@ -3972,8 +3992,8 @@ export function AddTestDialog({
                                             {o.description}
                                           </div>
                                         )}
-                                      </div>
-                                    </label>
+                                      </button>
+                                    </div>
                                   );
                                 };
                                 const renderSection = (
@@ -4090,7 +4110,19 @@ export function AddTestDialog({
                                 ev.variables.length > 0 ? "mb-3" : ""
                               }`}
                             >
-                              <div className="min-w-0 flex-1">
+                              {/* Opens the prompt on top, so how this
+                                  evaluator judges can be read without leaving
+                                  the test. */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewEvaluator({
+                                    uuid: ev.evaluator_uuid,
+                                    name: ev.name,
+                                  })
+                                }
+                                className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
+                              >
                                 <div className="text-sm font-semibold text-foreground">
                                   {ev.name}
                                 </div>
@@ -4099,7 +4131,7 @@ export function AddTestDialog({
                                     {ev.description}
                                   </div>
                                 )}
-                              </div>
+                              </button>
                               {!isLabelItem && (
                                 <button
                                   onClick={() =>
@@ -5710,6 +5742,12 @@ export function AddTestDialog({
           setAvailableLLMEvaluators((prev) => [...prev, option]);
           attachEvaluatorsFromOptions([option]);
         }}
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </div>
   );

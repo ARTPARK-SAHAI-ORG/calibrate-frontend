@@ -740,6 +740,81 @@ describe("AddTestDialog", () => {
       );
       expect(screen.queryByText("Tone check")).not.toBeInTheDocument();
     });
+
+    it("opens how the evaluator judges when its name is clicked, both attached and in the picker", async () => {
+      // The list endpoint the rest of this file mocks carries no prompt
+      // text; the preview asks for the evaluator on its own.
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes("/evaluators/eval-correctness")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              uuid: "eval-correctness",
+              name: "Correctness",
+              live_version_index: 0,
+              versions: [
+                {
+                  uuid: "v1",
+                  version_number: 1,
+                  judge_model: "google/gemini-2.5-flash",
+                  system_prompt: "Judge whether the reply is correct.",
+                  output_config: null,
+                  variables: null,
+                },
+              ],
+            }),
+          });
+        }
+        if (url.includes("/evaluators")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [CORRECTNESS_EVALUATOR, TONE_EVALUATOR],
+              total: 2,
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [WEATHER_TOOL],
+        });
+      });
+
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      // Clicking the name on the attached card opens its prompt.
+      await user.click(
+        screen.getByRole("button", { name: /^Correctness/ }),
+      );
+      expect(
+        screen.getByRole("heading", { name: "Correctness" }),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText("Judge whether the reply is correct."),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Close preview" }));
+      expect(
+        screen.queryByRole("heading", { name: "Correctness" }),
+      ).not.toBeInTheDocument();
+
+      // Clicking a name in the "Add evaluator" dropdown opens its prompt
+      // without ticking its checkbox.
+      await user.click(screen.getByRole("button", { name: "Add evaluator" }));
+      await user.click(screen.getByRole("button", { name: /^Tone check/ }));
+      expect(
+        screen.getByRole("heading", { name: "Tone check" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: /Tone check/i }),
+      ).not.toBeChecked();
+    });
   });
 
   describe("conversation tab", () => {
