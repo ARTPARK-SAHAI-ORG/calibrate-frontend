@@ -150,7 +150,7 @@ export default function WorkspaceSettingsPage() {
           </p>
         ) : (
           <div className="space-y-6 md:space-y-8">
-            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
+            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto hide-scrollbar">
               {SETTINGS_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (

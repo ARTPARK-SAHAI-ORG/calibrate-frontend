@@ -255,7 +255,7 @@ export function VersionCard({
             <pre
               ref={promptRef}
               className={`border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto ${
-                isPromptOverflowing && !promptExpanded
+                clampPrompt && !promptExpanded
                   ? "max-h-[7.5rem] overflow-hidden"
                   : ""
               }`}

@@ -926,7 +926,7 @@ function EvaluatorDetailPageInner() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
+            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto hide-scrollbar">
               <button
                 onClick={() => handleTabChange("prompts")}
                 className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
