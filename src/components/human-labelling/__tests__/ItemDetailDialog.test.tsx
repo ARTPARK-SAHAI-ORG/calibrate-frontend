@@ -131,6 +131,7 @@ function baseSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+
 // The same rule the labelling form uses: a tool-call item is answered by the
 // tool call evaluator alone, every other item by everything else.
 describe("ItemDetailDialog picks the evaluators per item", () => {
@@ -397,12 +398,7 @@ describe("ItemDetailDialog", () => {
     apiClientMock.mockResolvedValue(
       baseSummary({
         evaluators: [
-          {
-            uuid: "ev-1",
-            name: "Correctness",
-            output_type: "binary",
-            run_count: 0,
-          },
+          { uuid: "ev-1", name: "Correctness", output_type: "binary", run_count: 0 },
         ],
       }),
     );
@@ -438,21 +434,19 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("pane-annotator-filter-active"),
-    ).toHaveTextContent("false");
+    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
+      "false",
+    );
     expect(screen.getByTestId("pane-item-comments")).toHaveTextContent(
       "Nice item",
     );
 
     await user.click(screen.getByRole("button", { name: "Alice" }));
-    expect(
-      screen.getByTestId("pane-annotator-filter-active"),
-    ).toHaveTextContent("true");
+    expect(screen.getByTestId("pane-annotator-filter-active")).toHaveTextContent(
+      "true",
+    );
     // Bob left no signal on this item, so he shouldn't appear as filterable.
-    expect(
-      screen.queryByRole("button", { name: "Bob" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bob" })).not.toBeInTheDocument();
   });
 
   it("does not show the annotator picker when nobody has left a signal", async () => {
@@ -599,9 +593,7 @@ describe("ItemDetailDialog", () => {
     await waitFor(() =>
       expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
     );
-    await user.click(
-      screen.getByRole("button", { name: /Live versions only/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Live versions only/ }));
     expect(
       screen.getByRole("button", { name: /Live versions only/ }),
     ).toHaveAttribute("aria-pressed", "false");

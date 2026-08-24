@@ -5,10 +5,7 @@ import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
 import { DialogNavHeader } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
-import {
-  MultiSelectPicker,
-  type PickerItem,
-} from "@/components/MultiSelectPicker";
+import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -359,10 +356,14 @@ export function ItemDetailDialog({
       const evDescription =
         summaryEv?.description ?? taskEv?.description ?? null;
       const evOutputType =
-        summaryEv?.output_type ??
-        (taskEv?.output_type as "binary" | "rating" | undefined);
+        summaryEv?.output_type ?? (taskEv?.output_type as
+          | "binary"
+          | "rating"
+          | undefined);
       const evVersion = row.evaluator_version_id
-        ? summaryEv?.versions?.find((v) => v.uuid === row.evaluator_version_id)
+        ? summaryEv?.versions?.find(
+            (v) => v.uuid === row.evaluator_version_id,
+          )
         : undefined;
 
       const evKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}`;
@@ -599,63 +600,63 @@ export function ItemDetailDialog({
               </div>
             )}
             {hasAnyEvaluatorRun && (
-              <Tooltip
-                position="bottom"
-                content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
-              >
-                <button
-                  type="button"
-                  onClick={() => setLiveOnly((v) => !v)}
-                  aria-pressed={liveOnly}
-                  className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
-                    liveOnly
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {liveOnly ? (
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 12.75l6 6 9-13.5"
-                      />
-                    </svg>
-                  ) : (
-                    <span
-                      className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                      aria-hidden
-                    />
-                  )}
-                  Live versions only
-                </button>
-              </Tooltip>
-            )}
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+            <Tooltip
+              position="bottom"
+              content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+              <button
+                type="button"
+                onClick={() => setLiveOnly((v) => !v)}
+                aria-pressed={liveOnly}
+                className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
+                  liveOnly
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+                {liveOnly ? (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                ) : (
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                    aria-hidden
+                  />
+                )}
+                Live versions only
+              </button>
+            </Tooltip>
+            )}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
           </div>
         </div>
 
