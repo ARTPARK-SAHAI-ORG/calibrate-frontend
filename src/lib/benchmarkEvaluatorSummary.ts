@@ -40,8 +40,7 @@ export type BenchmarkEvaluatorSummaryRating = {
 };
 
 export type BenchmarkEvaluatorSummaryEntry =
-  | BenchmarkEvaluatorSummaryBinary
-  | BenchmarkEvaluatorSummaryRating;
+  BenchmarkEvaluatorSummaryBinary | BenchmarkEvaluatorSummaryRating;
 
 /** Minimal per-test shape needed to derive the tool-call pass-rate split. */
 export type BenchmarkToolCallTestLike = {
@@ -154,13 +153,14 @@ export function benchmarkRatingEvaluatorCaption(
 /** Stable column key per evaluator metric (matches row keys). */
 export function benchmarkEvaluatorColumnKey(metric_key: string): string {
   const safe =
-    metric_key.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "") ||
-    "metric";
+    metric_key.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "") || "metric";
   return `ev_${safe}`;
 }
 
 /** Collect ordered metric keys from first-seen order across models. */
-export function benchmarkMetricKeyOrder(models: BenchmarkModelLike[]): string[] {
+export function benchmarkMetricKeyOrder(
+  models: BenchmarkModelLike[],
+): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
   for (const m of models) {
@@ -179,7 +179,9 @@ function firstEntryForMetric(
   metric_key: string,
 ): BenchmarkEvaluatorSummaryEntry | undefined {
   for (const m of models) {
-    const found = (m.evaluator_summary ?? []).find((e) => e.metric_key === metric_key);
+    const found = (m.evaluator_summary ?? []).find(
+      (e) => e.metric_key === metric_key,
+    );
     if (found) return found;
   }
   return undefined;
@@ -279,7 +281,10 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   if (!showOverallPassRate && evaluators.length === 0) return null;
 
-  const modelsOrdered = orderedCanonicalModels(leaderboardSummary, modelResults);
+  const modelsOrdered = orderedCanonicalModels(
+    leaderboardSummary,
+    modelResults,
+  );
   const rows: Record<string, unknown>[] = [];
   let showToolCallPassRate = false;
   let showLatency = false;

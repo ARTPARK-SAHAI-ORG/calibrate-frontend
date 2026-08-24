@@ -25,6 +25,7 @@ import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   buildEvaluatorSummaryFromResults,
+  toolCallEvaluatorUuidFromRows,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
@@ -216,11 +217,12 @@ export default function PublicTestRunPage() {
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
             toolCall={toolCall}
-            toolCallEvaluatorUuid={
-              (data.evaluators ?? []).find(
-                (e) => e.evaluator_type === "tool-call",
-              )?.uuid ?? null
-            }
+            toolCallEvaluatorUuid={toolCallEvaluatorUuidFromRows(
+              results.map((r) => ({
+                testCase: r.test_case,
+                judgeResults: r.judge_results,
+              })),
+            )}
             evaluatorSummary={buildEvaluatorSummaryFromResults(
               results,
               Object.fromEntries(

@@ -32,6 +32,7 @@ import {
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   buildEvaluatorSummaryFromResults,
+  toolCallEvaluatorUuidFromRows,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
@@ -307,12 +308,12 @@ export function TestRunnerDialog({
   // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
   // backend `evaluator_summary` block (only benchmarks do), so aggregate it
   // from each case's judge_results against the run's evaluator metadata.
-  // The Tool call correctness evaluator, when the run has one. Recognised by
-  // its kind, not its name, which a workspace may change.
+  // The evaluator that judged the tool-call tests, when the run has one.
+  // Found from the rows rather than the run's evaluator list, which carries
+  // no kind, and never by name, which a workspace can change.
   const toolCallEvaluatorUuid = useMemo(
-    () =>
-      runEvaluators.find((e) => e.evaluator_type === "tool-call")?.uuid ?? null,
-    [runEvaluators],
+    () => toolCallEvaluatorUuidFromRows(rows),
+    [rows],
   );
 
   const evaluatorSummary = useMemo(

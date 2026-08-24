@@ -182,9 +182,6 @@ export type TestRunEvaluator = {
   uuid: string;
   name: string;
   description?: string | null;
-  /** What kind of evaluator this is. Only read to recognise the tool-call
-   * one, whose name a workspace may change. */
-  evaluator_type?: string | null;
   /** Version number of the pinned evaluator version the run executed
    * against. Rendered as a small "vN" pill next to the evaluator name —
    * mirrors the labelling evaluator-run page. Optional because older run
