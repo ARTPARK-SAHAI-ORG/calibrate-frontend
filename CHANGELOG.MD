@@ -1,5 +1,6 @@
 ## August 2026
 
+- Fix width of evaluators list on human alignment tasks ([#425](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/425))
 - Answer a tool-call row with its own evaluator, not the AI judges ([#424](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/424))
 - Do not offer Delete on an evaluator that may not be deleted ([#423](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/423))
 - Show and edit an item's tool calls, and keep them when it is saved ([#422](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/422))
