@@ -43,7 +43,7 @@ it("shows only the evaluators that can be added to an agent", () => {
   );
   expect(screen.getByTestId("evaluator-library")).toHaveAttribute(
     "data-kinds",
-    "llm,llm-general",
+    "llm,llm-general,tool-call",
   );
   expect(screen.getByTestId("active-item")).toHaveTextContent(
     "agent-evaluators",

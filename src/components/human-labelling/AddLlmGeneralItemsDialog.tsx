@@ -535,92 +535,16 @@ export function AddLlmGeneralItemsDialog({
               />
             </div>
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <label className="block text-base font-medium text-foreground mb-2">
-                Output
-              </label>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-                {toolCalls.length === 0 && (
-                  <textarea
-                    value={output}
-                    onChange={(e) => setOutput(e.target.value)}
-                    placeholder="The output the LLM produced"
-                    disabled={submitting}
-                    className="min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                  />
-                )}
-                {toolCalls.map((tc) => (
-                  <div
-                    key={tc.id}
-                    className="rounded-lg border border-border p-3 space-y-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground break-words">
-                        {tc.tool}
-                      </span>
-                      {/* Same remove control as every other removable row in
-                          the app (see CustomFieldsEditor). */}
-                      <button
-                        type="button"
-                        onClick={() => removeToolCall(tc.id)}
-                        aria-label={`Remove ${tc.tool}`}
-                        disabled={submitting}
-                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                    {tc.params.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        This tool takes no values.
-                      </p>
-                    ) : (
-                      tc.params.map((prm) => (
-                        <div key={prm.name} className="space-y-1">
-                          <label
-                            htmlFor={`${tc.id}-${prm.name}`}
-                            className="block text-xs font-medium text-muted-foreground"
-                          >
-                            {prm.name}
-                          </label>
-                          <input
-                            id={`${tc.id}-${prm.name}`}
-                            type="text"
-                            value={prm.value}
-                            onChange={(e) =>
-                              updateToolCallParam(
-                                tc.id,
-                                prm.name,
-                                e.target.value,
-                              )
-                            }
-                            placeholder={`Enter ${prm.name}`}
-                            disabled={submitting}
-                            className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ))}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="block text-base font-medium text-foreground">
+                  Output
+                </label>
                 <div className="relative">
-                  {/* Dashed add button, the app's recipe for an add action. */}
                   <button
                     type="button"
                     onClick={() => setPickerOpen((open) => !open)}
                     disabled={submitting}
-                    className="w-full h-10 px-4 rounded-md text-[13px] font-medium border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg
                       className="w-3.5 h-3.5"
@@ -645,7 +569,7 @@ export function AddLlmGeneralItemsDialog({
                         className="fixed inset-0 z-40"
                         onClick={() => setPickerOpen(false)}
                       />
-                      <div className="absolute left-0 right-0 z-50 mt-2 rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                      <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
                         <ToolPicker
                           availableTools={availableTools}
                           isLoading={toolsLoading}
@@ -660,6 +584,97 @@ export function AddLlmGeneralItemsDialog({
                     </>
                   )}
                 </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
+                {toolCalls.length === 0 && (
+                  <textarea
+                    value={output}
+                    onChange={(e) => setOutput(e.target.value)}
+                    placeholder="The output the LLM produced"
+                    disabled={submitting}
+                    className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                  />
+                )}
+                {toolCalls.map((tc) => (
+                  // Same card the test dialog draws a tool call with, in the
+                  // conversation tab: header row with the wrench and the tool
+                  // name, remove button on the left, parameters below.
+                  <div key={tc.id} className="flex w-full items-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => removeToolCall(tc.id)}
+                      disabled={submitting}
+                      title="Remove tool call"
+                      aria-label={`Remove ${tc.tool}`}
+                      className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                        />
+                      </svg>
+                    </button>
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="bg-muted border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <svg
+                            className="w-4 h-4 text-muted-foreground"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                            />
+                          </svg>
+                          <span className="text-sm font-medium text-foreground">
+                            {tc.tool}
+                          </span>
+                        </div>
+                        {tc.params.length > 0 && (
+                          <div className="space-y-3 mt-3">
+                            {tc.params.map((prm) => (
+                              <div key={prm.name}>
+                                <label
+                                  htmlFor={`${tc.id}-${prm.name}`}
+                                  className="block text-sm font-medium text-foreground mb-1.5"
+                                >
+                                  {prm.name}
+                                </label>
+                                <input
+                                  id={`${tc.id}-${prm.name}`}
+                                  type="text"
+                                  value={prm.value}
+                                  onChange={(e) =>
+                                    updateToolCallParam(
+                                      tc.id,
+                                      prm.name,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={`Enter ${prm.name}`}
+                                  disabled={submitting}
+                                  className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

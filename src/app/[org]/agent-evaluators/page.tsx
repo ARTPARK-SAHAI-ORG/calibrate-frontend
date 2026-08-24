@@ -29,7 +29,7 @@ export default function AgentEvaluatorsPage() {
       <div className="py-4 md:py-6">
         <EvaluatorLibraryPanel
           title="Evaluators"
-          evaluatorTypes={["llm", "llm-general"]}
+          evaluatorTypes={["llm", "llm-general", "tool-call"]}
           description="LLM judges for evaluating an agent's responses"
         />
       </div>

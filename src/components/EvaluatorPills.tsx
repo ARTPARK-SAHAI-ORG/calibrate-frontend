@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/Tooltip";
 type Kind = "single" | "side_by_side";
 type OutputType = "binary" | "rating";
 export type EvaluatorType =
-  "tts" | "stt" | "llm" | "llm-general" | "conversation";
+  "tts" | "stt" | "llm" | "llm-general" | "conversation" | "tool-call";
 
 const baseClasses =
   "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
@@ -26,6 +26,7 @@ export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   llm: "Agent reply",
   "llm-general": "Agent response",
   conversation: "Full conversation",
+  "tool-call": "Tool call",
 };
 
 export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
@@ -34,6 +35,7 @@ export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
   llm: "Evaluate the agent's next reply in a conversation",
   "llm-general": "Evaluate an LLM's output for a given text input",
   conversation: "Evaluate the agent's performance in a whole conversation",
+  "tool-call": "Judge whether the agent called the right tool",
 };
 
 const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {
@@ -42,6 +44,7 @@ const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {
   llm: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
   "llm-general": "bg-teal-500/10 text-teal-600 dark:text-teal-400",
   conversation: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
+  "tool-call": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
 };
 
 export function EvaluatorTypePill({

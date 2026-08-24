@@ -51,6 +51,25 @@ function setup(props: Partial<React.ComponentProps<typeof VersionCard>> = {}) {
   return { ...utils, onSetLive, props: merged };
 }
 
+describe("VersionCard with no judge behind it", () => {
+  it("shows no Model and no Prompt when the evaluator has neither", () => {
+    setup({
+      version: makeVersion({ judge_model: "", system_prompt: "" }),
+      isDefault: true,
+      isLive: true,
+    });
+    expect(screen.queryByText("Model")).not.toBeInTheDocument();
+    expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
+  });
+
+  it("still shows them when the evaluator has a judge", () => {
+    setup({ isDefault: true, isLive: true });
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("gpt-4o")).toBeInTheDocument();
+    expect(screen.getByText("Prompt")).toBeInTheDocument();
+  });
+});
+
 describe("VersionCard", () => {
   it("renders judge model", () => {
     setup();

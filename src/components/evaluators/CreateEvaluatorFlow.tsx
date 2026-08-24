@@ -63,6 +63,7 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   llm: "text",
   "llm-general": "text",
   conversation: "text",
+  "tool-call": "text",
 };
 
 const JUDGE_PROVIDER_SLUGS = [
