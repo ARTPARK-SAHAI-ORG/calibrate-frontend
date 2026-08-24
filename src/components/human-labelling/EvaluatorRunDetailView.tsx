@@ -940,8 +940,8 @@ export function EvaluatorResultsPane({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Evaluators do not run on tool calls. A person can label
-                this item by hand.
+                This item evaluates one or more tool calls, which only
+                supports human review today. Evaluators do not run on them.
               </p>
             </div>
           );

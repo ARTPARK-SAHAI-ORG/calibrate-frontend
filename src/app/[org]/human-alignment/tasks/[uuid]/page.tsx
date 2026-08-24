@@ -905,7 +905,7 @@ function ItemRowActions({
           aria-label="Evaluate"
           title={
             evaluateDisabled
-              ? "Evaluators do not run on tool calls. A person can label this item by hand."
+              ? "This item evaluates one or more tool calls, which only supports human review today. Evaluators do not run on them."
               : undefined
           }
           className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2069,7 +2069,7 @@ function LabellingTaskPageInner() {
       );
       if (decision.blocked) {
         toast.error(
-          "Evaluators do not run on tool calls. A person can label them by hand.",
+          "The chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them.",
         );
         return;
       }

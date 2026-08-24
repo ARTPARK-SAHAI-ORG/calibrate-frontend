@@ -62,17 +62,17 @@ describe("RunEvaluatorsDialog", () => {
     renderDialog({ toolCallSkipCount: 2 });
     expect(
       await screen.findByText(
-        /2 of the chosen items are tool calls\. Evaluators do not run on tool calls, so they are left out of this run\./,
+        /2 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
       ),
     ).toBeInTheDocument();
   });
 
-  it("says it in the singular for one tool-call row", async () => {
+  it("says it for a single tool-call row too", async () => {
     mockedApiClient.mockResolvedValue(detailResponse);
     renderDialog({ toolCallSkipCount: 1 });
     expect(
       await screen.findByText(
-        /1 of the chosen items is a tool call\. Evaluators do not run on tool calls, so it is left out of this run\./,
+        /1 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
       ),
     ).toBeInTheDocument();
   });
