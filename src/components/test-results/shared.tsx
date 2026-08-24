@@ -16,6 +16,7 @@ import {
   WarningTriangleIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
+import { ClampedBlock } from "@/components/ui/ClampedBlock";
 import {
   binaryScaleFor,
   getBinaryDescription,
@@ -1543,19 +1544,21 @@ export function EvaluationCriteriaPanel({
             Expected Tool Calls
           </h3>
           {hasExpectedToolCalls ? (
-            <div className="space-y-2">
-              {evaluation!.tool_calls!.map((tc, i) => {
-                const { toolName, args } = normalizeToolCall(tc);
-                return (
-                  <ToolCallCard
-                    key={i}
-                    toolName={toolName}
-                    args={args}
-                    expected
-                  />
-                );
-              })}
-            </div>
+            <ClampedBlock>
+              <div className="space-y-2">
+                {evaluation!.tool_calls!.map((tc, i) => {
+                  const { toolName, args } = normalizeToolCall(tc);
+                  return (
+                    <ToolCallCard
+                      key={i}
+                      toolName={toolName}
+                      args={args}
+                      expected
+                    />
+                  );
+                })}
+              </div>
+            </ClampedBlock>
           ) : (
             <p className="text-xs text-muted-foreground">
               No expected tool calls specified
