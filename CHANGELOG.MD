@@ -1,5 +1,6 @@
 ## August 2026
 
+- Show and edit an item's tool calls, and keep them when it is saved ([#422](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/422))
 - Let a tool-call test be submitted for labelling ([#417](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/417))
 - Let single agent response test results be submitted for labelling ([#416](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/416))
 - Show a single agent response tool call test as input and output ([#415](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/415))
