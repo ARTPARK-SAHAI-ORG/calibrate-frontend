@@ -9,6 +9,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { SearchInput } from "@/components/ui";
 import {
+  canDeleteEvaluator,
   deleteEvaluator,
   fetchAllEvaluators,
   isDefaultEvaluator,
@@ -227,17 +228,19 @@ export function EvaluatorLibraryPanel({
                   >
                     View
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeleteError(null);
-                      setDeleteTarget(evaluator);
-                    }}
-                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                    title="Delete evaluator"
-                  >
-                    Delete
-                  </button>
+                  {canDeleteEvaluator(evaluator) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(evaluator);
+                      }}
+                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      title="Delete evaluator"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

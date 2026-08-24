@@ -62,6 +62,7 @@ jest.mock("../../../lib/evaluatorApi", () => ({
     typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
   isDefaultEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? e.is_default : !e.owner_user_id,
+  canDeleteEvaluator: (e: EvaluatorData) => !e.is_protected,
 }));
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
@@ -222,6 +223,24 @@ describe("EvaluatorsTabContent", () => {
       expect(mockDelete).toHaveBeenCalledWith("ev-1", "test-token"),
     );
     expect(mockDetach).not.toHaveBeenCalled();
+  });
+
+  it("offers no permanent delete on an evaluator that cannot be deleted", async () => {
+    const locked = evaluator({ is_protected: true });
+    mockFetchAgentEvaluators.mockResolvedValue([locked]);
+    mockFetchAllEvaluators.mockResolvedValue([locked]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    // Taking it off this agent is still fine, deleting it is not.
+    expect(
+      screen.queryByRole("checkbox", {
+        name: /Also delete this evaluator permanently from my evaluator library/,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens the create flow from the header", async () => {

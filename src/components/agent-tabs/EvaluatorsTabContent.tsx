@@ -16,6 +16,7 @@ import {
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
+  canDeleteEvaluator,
 } from "@/lib/evaluatorApi";
 
 // Two remove flavours share one confirmation dialog:
@@ -219,10 +220,11 @@ export function EvaluatorsTabContent({
     deleteMode === "permanent"
       ? `Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from every agent that uses it and cannot be undone.`
       : `Are you sure you want to remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`;
-  // Every evaluator is now permanently deletable — org-scoped default forks
-  // included (the backend permits DELETE on them, only true seed templates 403,
-  // and those are never returned to an org).
-  const canPermanentlyDelete = !!deleteTarget;
+  // Org-scoped default forks are permanently deletable too. The exception is
+  // an evaluator the product needs, which says so with `is_protected`;
+  // detaching it from this agent is still fine.
+  const canPermanentlyDelete =
+    !!deleteTarget && canDeleteEvaluator(deleteTarget);
 
   const renderHeaderButtons = () => (
     <div className="flex flex-wrap items-center gap-2 md:gap-3">

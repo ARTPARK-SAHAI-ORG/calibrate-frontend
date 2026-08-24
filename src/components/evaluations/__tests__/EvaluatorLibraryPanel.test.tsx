@@ -60,6 +60,26 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+test("offers no Delete on an evaluator that cannot be deleted", async () => {
+  mockFetch.mockResolvedValue([
+    { ...evaluator("ev-1", "Word accuracy", "stt"), is_protected: true },
+    evaluator("ev-2", "Clarity", "stt"),
+  ]);
+
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
+  );
+
+  await screen.findByText("Word accuracy");
+  // One Delete for Clarity, none for the protected one.
+  expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
+  const protectedRow = screen.getByText("Word accuracy").closest("div");
+  expect(protectedRow).not.toBeNull();
+});
+
 test("lists only the evaluators of this kind", async () => {
   mockFetch.mockResolvedValue([
     evaluator("ev-1", "Word accuracy", "stt"),
