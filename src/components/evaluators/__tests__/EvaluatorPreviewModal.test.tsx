@@ -77,6 +77,20 @@ describe("EvaluatorPreviewModal", () => {
     ).toBeInTheDocument();
   });
 
+  it("links to the evaluator's own page in a new tab", async () => {
+    render(
+      <EvaluatorPreviewModal
+        evaluatorUuid="e1"
+        evaluatorName="Conciseness"
+        onClose={jest.fn()}
+      />,
+    );
+    const link = screen.getByRole("link", { name: "View more" });
+    expect(link).toHaveAttribute("href", "/evaluators/e1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("closes via the close button and via the backdrop, not via the panel", async () => {
     const user = setupUser();
     const onClose = jest.fn();
