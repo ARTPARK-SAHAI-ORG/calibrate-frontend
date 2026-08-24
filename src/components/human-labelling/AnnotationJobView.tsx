@@ -24,7 +24,12 @@ import {
   valueFilterEvaluators,
   type ValueFilter,
 } from "./ItemValueFilter";
-import { useUrlValueFilters } from "./valueFilterUrl";
+import {
+  ITEM_PARAM,
+  readUrlParam,
+  useUrlValueFilters,
+  writeUrlParam,
+} from "./valueFilterUrl";
 import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
 import type { ReviewItem } from "./SendForReviewFlow";
 import { buildJobHumanScoreCards, readSavedValue } from "./jobHumanScores";
@@ -328,6 +333,17 @@ export function AnnotationJobView({
       setItemComments(comments);
       setSavedComments(comments);
 
+      // A reload or a shared link names the item that was open; honour that
+      // over either default below, in every mode.
+      const urlItemId = readUrlParam(ITEM_PARAM);
+      const fromUrl = urlItemId
+        ? data.items.findIndex((it) => it.uuid === urlItemId)
+        : -1;
+      if (fromUrl >= 0) {
+        setCurrentIndex(fromUrl);
+        return;
+      }
+
       // Read-only views (admin, public-readonly) always start on the first
       // item — they're reviewing what's been labelled, not picking up where
       // the annotator left off. Write mode jumps to the first item that
@@ -617,6 +633,13 @@ function AnnotateView({
     () => new Map(data.items.map((it, i) => [it.uuid, i + 1])),
     [data.items],
   );
+
+  // Keep the address bar pointed at whichever item is open, from every way
+  // of getting there (initial load, Previous/Next, the sidebar, a filter
+  // change), so reloading or sharing the link lands back on it.
+  useEffect(() => {
+    writeUrlParam(ITEM_PARAM, currentItem?.uuid ?? null);
+  }, [currentItem?.uuid]);
 
   const prevStatus = useRef(data.job.status);
   useEffect(() => {

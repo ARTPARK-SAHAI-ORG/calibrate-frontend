@@ -14,6 +14,7 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
+import { EvaluatorPillList } from "@/components/EvaluatorPillList";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Select } from "@/components/ui/Select";
@@ -563,7 +564,7 @@ function HumanLabellingPageInner() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_260px_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
                   </div>
@@ -588,7 +589,7 @@ function HumanLabellingPageInner() {
                       onClick={() =>
                         router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
-                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_260px_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       <p className="text-sm font-medium text-foreground truncate">
                         {task.name}
@@ -605,25 +606,7 @@ function HumanLabellingPageInner() {
                       <p className="text-sm text-muted-foreground tabular-nums">
                         {task.item_count ?? 0}
                       </p>
-                      <div className="flex flex-wrap gap-1">
-                        {evaluators.length === 0 ? (
-                          <span className="text-sm text-muted-foreground">
-                            —
-                          </span>
-                        ) : (
-                          evaluators.map((ev) => (
-                            <Link
-                              key={ev.uuid}
-                              href={`/evaluators/${ev.uuid}`}
-                              onClick={(e) => e.stopPropagation()}
-                              title={`Open ${ev.name}`}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer max-w-full"
-                            >
-                              <span className="truncate">{ev.name}</span>
-                            </Link>
-                          ))
-                        )}
-                      </div>
+                      <EvaluatorPillList evaluators={evaluators} />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -680,18 +663,8 @@ function HumanLabellingPageInner() {
                           {(task.item_count ?? 0) === 1 ? "" : "s"}
                         </p>
                         {evaluators.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {evaluators.map((ev) => (
-                              <Link
-                                key={ev.uuid}
-                                href={`/evaluators/${ev.uuid}`}
-                                onClick={(e) => e.stopPropagation()}
-                                title={`Open ${ev.name}`}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer max-w-full"
-                              >
-                                <span className="truncate">{ev.name}</span>
-                              </Link>
-                            ))}
+                          <div className="mt-2">
+                            <EvaluatorPillList evaluators={evaluators} />
                           </div>
                         )}
                       </div>

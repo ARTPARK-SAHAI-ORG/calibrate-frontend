@@ -5,6 +5,11 @@ import {
   jobStatusPillClass,
   type AnnotationJobMeta,
 } from "../AnnotationJobView";
+import { ITEM_PARAM, readUrlParam } from "../valueFilterUrl";
+
+function setSearch(search: string) {
+  window.history.replaceState(null, "", `/annotate-job/tok${search}`);
+}
 
 // jsdom doesn't implement scrollIntoView; the shared conversation renderer
 // (TestDetailView, used by LlmItemPane) calls it to keep the latest message
@@ -255,6 +260,38 @@ describe("AnnotationJobView", () => {
     const sidebarButtons = screen.getAllByTitle(/^Item 2/);
     await user.click(sidebarButtons[0]);
     expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+  });
+
+  it("keeps the address bar pointed at whichever item is open", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
+    expect(readUrlParam(ITEM_PARAM)).toBe("item-1");
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(readUrlParam(ITEM_PARAM)).toBe("item-2");
+  });
+
+  it("reopens the item named in the address bar on reload, in every mode", async () => {
+    setSearch(`?${ITEM_PARAM}=item-2`);
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+    );
+  });
+
+  it("falls back to the default start item when the address bar names one no longer in the job", async () => {
+    setSearch(`?${ITEM_PARAM}=item-missing`);
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+    );
   });
 
   it("shows 'No items in this job.' when there are no items", async () => {
