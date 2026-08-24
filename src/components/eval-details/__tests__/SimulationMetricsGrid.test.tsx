@@ -1,11 +1,60 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, waitFor } from "@/test-utils";
 import { setupUser } from "@/test-utils";
 import {
   SimulationMetricsGrid,
   formatMetricCardValue,
   type MetricData,
 } from "../SimulationMetricsGrid";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the prompt preview measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetchEvaluatorDetail = fetchEvaluatorDetail as jest.Mock;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockFetchEvaluatorDetail.mockResolvedValue({
+    uuid: "uuid-123",
+    name: "accuracy",
+    description: "Measures correctness",
+    output_type: "rating",
+    evaluator_type: "llm",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge whether the reply is accurate.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 describe("formatMetricCardValue", () => {
   it("formats rating metrics as mean/scale_max", () => {
@@ -103,7 +152,8 @@ describe("SimulationMetricsGrid", () => {
     expect(screen.queryByText("accuracy")).not.toBeInTheDocument();
   });
 
-  it("renders evaluator cards as links with description tooltip when evaluatorUuidByName/description provided", () => {
+  it("renders evaluator cards as buttons with description tooltip, and opens the evaluator preview on click", async () => {
+    const user = setupUser();
     const metrics = {
       accuracy: { mean: 0.9, std: 0, values: [] },
     };
@@ -115,16 +165,27 @@ describe("SimulationMetricsGrid", () => {
         evaluatorDescriptionByName={{ accuracy: "Measures correctness" }}
       />,
     );
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/evaluators/uuid-123");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    const card = screen.getByRole("button", { name: /accuracy/ });
+
+    await user.click(card);
+
+    expect(await screen.findByText("accuracy", { selector: "h2" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockFetchEvaluatorDetail).toHaveBeenCalledWith("uuid-123", "tok"),
+    );
+    expect(
+      await screen.findByText("Judge whether the reply is accurate."),
+    ).toBeInTheDocument();
   });
 
-  it("renders a plain (non-link) card when no evaluatorUuid is provided for a metric", () => {
+  it("renders a plain (non-link, non-button) card when no evaluatorUuid is provided for a metric", () => {
     const metrics = {
       accuracy: { mean: 0.9, std: 0, values: [] },
     };
     render(<SimulationMetricsGrid metrics={metrics} type="text" />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("accuracy")).toBeInTheDocument();
   });
 });

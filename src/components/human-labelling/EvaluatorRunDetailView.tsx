@@ -9,8 +9,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "@/lib/nav";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   binaryScaleFor,
   getBinaryDescription,
@@ -1625,7 +1625,7 @@ function EvaluatorSummary({
               <AgreementStatCard
                 key={key}
                 evaluatorPill={{
-                  href: `/evaluators/${ev.evaluator_id}`,
+                  uuid: ev.evaluator_id,
                   name,
                   versionLabel: version,
                 }}
@@ -1697,6 +1697,13 @@ export function EvaluatorRunDetailView({
   onVisibleItemsChange,
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Which evaluator's judging details are open in the preview modal, if
+  // any. Only used when `linkEvaluators` is true — on public pages the
+  // pill row stays plain text and this never gets set.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   // Both filters live in the address bar, so a reload or a shared link opens
   // the run narrowed the same way.
   const [filterDisagreements, setFilterDisagreements] = useState(
@@ -1995,14 +2002,20 @@ export function EvaluatorRunDetailView({
                     );
                     if (linkEvaluators) {
                       return (
-                        <Link
+                        <button
                           key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                          href={`/evaluators/${e.evaluator_id}`}
+                          type="button"
+                          onClick={() =>
+                            setPreviewEvaluator({
+                              uuid: e.evaluator_id,
+                              name,
+                            })
+                          }
                           title={`Open ${name}`}
                           className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
                         >
                           {inner}
-                        </Link>
+                        </button>
                       );
                     }
                     return (
@@ -2203,6 +2216,14 @@ export function EvaluatorRunDetailView({
             {job.error}
           </pre>
         </div>
+      )}
+
+      {linkEvaluators && (
+        <EvaluatorPreviewModal
+          evaluatorUuid={previewEvaluator?.uuid ?? null}
+          evaluatorName={previewEvaluator?.name}
+          onClose={() => setPreviewEvaluator(null)}
+        />
       )}
     </>
   );

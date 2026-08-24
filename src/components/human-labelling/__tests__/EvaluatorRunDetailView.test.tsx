@@ -14,6 +14,23 @@ jest.mock("../AnnotationJobView", () => ({
     taskType === "llm" || taskType === "conversation",
 }));
 
+// The evaluator pill row opens EvaluatorPreviewModal, which fetches the
+// evaluator's own judging details. Mocked the same way
+// EvaluatorPromptPreview.test.tsx and EvaluatorPreviewModal.test.tsx do.
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
 import {
   EvaluatorRunDetailView,
   EvaluatorResultsPane,
@@ -1350,22 +1367,63 @@ describe("EvaluatorRunDetailView", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders the top-level evaluator pill row (linked) when no agreement cards will render", () => {
+  it("renders the top-level evaluator pill row as a button (linked) when no agreement cards will render", () => {
     const job = makeJob({ runs: [], items: [] });
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{ "v-bin-1": "v1" }} linkEvaluators />,
     );
-    const link = screen.getByRole("link", { name: /Binary Evaluator/i });
-    expect(link).toHaveAttribute("href", "/evaluators/ev-bin");
+    expect(
+      screen.getByRole("button", { name: /Binary Evaluator/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Binary Evaluator/i })).not.toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
-  it("renders the top-level evaluator pill row as plain text when linkEvaluators=false", () => {
+  it("opens the evaluator preview modal when the linked pill is clicked", async () => {
+    const mockFetch = fetchEvaluatorDetail as jest.Mock;
+    mockFetch.mockResolvedValue({
+      uuid: "ev-bin",
+      name: "Binary Evaluator",
+      description: null,
+      output_type: "binary" as const,
+      evaluator_type: "llm",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v-bin-1",
+          version_number: 1,
+          judge_model: "google/gemini-2.5-flash",
+          system_prompt: "Judge whether the reply is correct.",
+          output_config: null,
+          variables: null,
+        },
+      ],
+    });
+    const user = setupUser();
+    const job = makeJob({ runs: [], items: [] });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{ "v-bin-1": "v1" }} linkEvaluators />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Binary Evaluator/i }));
+
+    expect(
+      screen.getByRole("heading", { name: "Binary Evaluator" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Judge whether the reply is correct."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the top-level evaluator pill row as plain text (no button, no modal) when linkEvaluators=false", () => {
     const job = makeJob({ runs: [], items: [] });
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} linkEvaluators={false} />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Binary Evaluator/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
   });
 

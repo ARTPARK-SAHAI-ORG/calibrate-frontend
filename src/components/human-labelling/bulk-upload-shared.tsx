@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Link } from "@/lib/nav";
 import { jsPDF } from "jspdf";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { apiClient } from "@/lib/api";
 import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
@@ -573,6 +573,11 @@ export function EvaluatorAnnotationColumnsHelp({
 }: {
   evaluators: EvaluatorMeta[];
 }) {
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
+
   return (
     <>
       {evaluators.map((e) => {
@@ -585,14 +590,13 @@ export function EvaluatorAnnotationColumnsHelp({
               ? `any value between ${e.scale_min}-${e.scale_max}`
               : "value";
         const pill = (
-          <Link
-            href={`/evaluators/${e.uuid}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setPreviewEvaluator({ uuid: e.uuid, name: e.name })}
             className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
           >
             {e.name}
-          </Link>
+          </button>
         );
         return (
           <React.Fragment key={e.uuid}>
@@ -612,6 +616,11 @@ export function EvaluatorAnnotationColumnsHelp({
           </React.Fragment>
         );
       })}
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
     </>
   );
 }

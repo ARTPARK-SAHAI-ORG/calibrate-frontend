@@ -20,12 +20,12 @@
 // other callers (tool-call verdicts in test-results/shared.tsx) reuse the
 // exact same toggle visual without duplicating it.
 
-import { Link } from "@/lib/nav";
 import { useState } from "react";
 import {
   DEFAULT_BINARY_FALSE_LABEL,
   DEFAULT_BINARY_TRUE_LABEL,
 } from "@/lib/binaryLabels";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 export type EvaluatorOutputType = "binary" | "rating";
 
@@ -166,6 +166,14 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   const [open, setOpen] = useState(false);
 
+  // The evaluator whose prompt is on show, opened from the name in the
+  // header. Null until the name is clicked. Only relevant when the card
+  // was rendered with `enableLink` — see NameLabel.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
+
   const surface = evaluatorCardSurfaceClass(tone);
 
   // Read mode has no option buttons, so the per-option rubric that write
@@ -190,6 +198,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 name={props.name}
                 uuid={props.evaluatorUuid}
                 enableLink={props.enableLink}
+                onOpenPreview={setPreviewEvaluator}
               />
             </span>
             {props.versionLabel && (
@@ -288,6 +297,12 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           )}
         </div>
       )}
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
     </div>
   );
 }
@@ -296,10 +311,12 @@ function NameLabel({
   name,
   uuid,
   enableLink,
+  onOpenPreview,
 }: {
   name: string;
   uuid?: string;
   enableLink?: boolean;
+  onOpenPreview: (evaluator: { uuid: string; name: string }) => void;
 }) {
   const cls =
     // Stays inline so the wrapper around it can shorten a long name with an
@@ -307,12 +324,13 @@ function NameLabel({
     "text-sm font-medium text-foreground align-middle";
   if (enableLink && uuid) {
     return (
-      <Link
-        href={`/evaluators/${uuid}`}
+      <button
+        type="button"
+        onClick={() => onOpenPreview({ uuid, name })}
         className={`${cls} hover:underline underline-offset-2 cursor-pointer`}
       >
         {name}
-      </Link>
+      </button>
     );
   }
   return <span className={cls}>{name}</span>;

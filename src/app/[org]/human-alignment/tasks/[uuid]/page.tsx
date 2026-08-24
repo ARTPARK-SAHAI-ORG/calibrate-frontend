@@ -11,7 +11,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  Link,
   replaceUrl,
   useParams,
   useRouter,
@@ -52,6 +51,7 @@ import {
   type CreatedJob,
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import {
   AgreementStatCard,
@@ -1400,6 +1400,12 @@ function LabellingTaskPageInner() {
   const [evDragSourceIdx, setEvDragSourceIdx] = useState<number | null>(null);
   const [evDragOverIdx, setEvDragOverIdx] = useState<number | null>(null);
   const [evReordering, setEvReordering] = useState(false);
+  // The evaluator whose prompt is on show, opened by clicking one of the
+  // pills above. Null until a pill is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   const fetchTask = useCallback(async () => {
     if (!accessToken || !uuid) return;
@@ -2605,9 +2611,12 @@ function LabellingTaskPageInner() {
                     evDragSourceIdx !== null &&
                     evDragSourceIdx !== idx;
                   return (
-                    <Link
+                    <button
                       key={ev.uuid}
-                      href={`/evaluators/${ev.uuid}`}
+                      type="button"
+                      onClick={() =>
+                        setPreviewEvaluator({ uuid: ev.uuid, name: ev.name })
+                      }
                       draggable={!evReordering && evaluatorsList.length > 1}
                       onDragStart={(e) => {
                         if (evReordering || evaluatorsList.length <= 1) {
@@ -2657,7 +2666,7 @@ function LabellingTaskPageInner() {
                       }
                     >
                       {ev.name}
-                    </Link>
+                    </button>
                   );
                 })}
               </div>
@@ -2966,7 +2975,7 @@ function LabellingTaskPageInner() {
                       <AgreementStatCard
                         key={ev.evaluator_id}
                         evaluatorPill={{
-                          href: `/evaluators/${ev.evaluator_id}`,
+                          uuid: ev.evaluator_id,
                           name: ev.name,
                         }}
                         value={
@@ -4609,6 +4618,12 @@ function LabellingTaskPageInner() {
           }}
         />
       )}
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
 
       <ItemDetailDialog
         isOpen={!!itemDetailUuid}

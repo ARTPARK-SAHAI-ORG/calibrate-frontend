@@ -1,7 +1,56 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { TestRunSummary } from "../TestRunSummary";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the evaluator preview's prompt card measures
+// its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetchEvaluatorDetail = fetchEvaluatorDetail as jest.Mock;
+
+beforeEach(() => {
+  mockFetchEvaluatorDetail.mockReset();
+  mockFetchEvaluatorDetail.mockResolvedValue({
+    uuid: "uuid-123",
+    name: "Semantic Match",
+    output_type: "binary",
+    evaluator_type: "llm",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge whether the meaning matches.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 describe("TestRunSummary", () => {
   it("renders pass rate, latency, cost, tokens with null aggregates as em dashes", () => {
@@ -142,7 +191,8 @@ describe("TestRunSummary", () => {
     expect(screen.getByText("100")).toBeInTheDocument();
   });
 
-  it("renders binary evaluator card with pass-rate progress and evaluator link when uuid present", () => {
+  it("renders binary evaluator card with pass-rate progress and, when clicked, opens how the evaluator judges", async () => {
+    const user = setupUser();
     const evaluatorSummary: BenchmarkEvaluatorSummaryEntry[] = [
       {
         metric_key: "semantic_match",
@@ -163,14 +213,27 @@ describe("TestRunSummary", () => {
       />,
     );
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
-    expect(screen.getByText("Semantic Match")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getByText("8/10")).toBeInTheDocument();
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/evaluators/uuid-123");
+    // No plain link out of the run window any more — a button that opens
+    // the preview in a modal on top of it instead.
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    const card = screen.getByRole("button", { name: /Semantic Match/ });
+
+    await user.click(card);
+
+    expect(mockFetchEvaluatorDetail).toHaveBeenCalledWith("uuid-123", "tok");
+    // Modal heading uses the evaluator's name; its own body text confirms
+    // it's showing the evaluator's prompt, not just an empty shell.
+    expect(
+      await screen.findByRole("heading", { name: "Semantic Match" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Judge whether the meaning matches."),
+    ).toBeInTheDocument();
   });
 
-  it("renders binary evaluator as a plain div (no link) when enableEvaluatorLinks=false", () => {
+  it("renders binary evaluator as a plain div (no link, no button) when enableEvaluatorLinks=false", () => {
     const evaluatorSummary: BenchmarkEvaluatorSummaryEntry[] = [
       {
         metric_key: "semantic_match",
@@ -191,6 +254,7 @@ describe("TestRunSummary", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("Semantic Match")).toBeInTheDocument();
   });
 
@@ -212,6 +276,7 @@ describe("TestRunSummary", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     // falls back to metric_key when name absent
     expect(screen.getByText("no_uuid_metric")).toBeInTheDocument();
   });

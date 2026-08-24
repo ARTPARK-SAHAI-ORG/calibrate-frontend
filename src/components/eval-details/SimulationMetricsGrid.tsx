@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "@/lib/nav";
 import { Tooltip } from "@/components/Tooltip";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 // `MetricData` represents one entry in `runData.metrics`. Newer simulation
 // runs include `type` (`"binary" | "rating"`) plus rating bounds
@@ -61,6 +61,11 @@ export function SimulationMetricsGrid({
   evaluatorDescriptionByName,
 }: SimulationMetricsGridProps) {
   const [activeTab, setActiveTab] = useState<"performance" | "latency">("performance");
+  // The evaluator whose prompt is on show, opened from a metric card's name.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   if (!metrics) return null;
 
@@ -120,9 +125,10 @@ export function SimulationMetricsGrid({
           {regularMetrics.map(([key, metric]) => {
             const evaluatorUuid = evaluatorUuidByName?.[key];
             const description = evaluatorDescriptionByName?.[key];
-            // When linkable, the entire card becomes a `<Link>` (with
-            // hover-highlight + arrow icon) so the affordance is
-            // obvious. Otherwise it's a plain div.
+            // When an evaluator uuid is available, the entire card
+            // becomes a button that opens a preview of how that
+            // evaluator judges (with hover-highlight + arrow icon) so
+            // the affordance is obvious. Otherwise it's a plain div.
             const cardInner = (
               <>
                 <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
@@ -152,13 +158,14 @@ export function SimulationMetricsGrid({
             );
             if (evaluatorUuid) {
               return (
-                <Link
+                <button
+                  type="button"
                   key={key}
-                  href={`/evaluators/${evaluatorUuid}`}
-                  className="group block border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => setPreviewEvaluator({ uuid: evaluatorUuid, name: key })}
+                  className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
                 >
                   {cardInner}
-                </Link>
+                </button>
               );
             }
             return (
@@ -181,6 +188,11 @@ export function SimulationMetricsGrid({
           ))}
         </div>
       )}
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
     </div>
   );
 }

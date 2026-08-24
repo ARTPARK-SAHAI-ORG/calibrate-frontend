@@ -7,6 +7,56 @@ import {
   readVerdictTone,
   evaluatorCardSurfaceClass,
 } from "../EvaluatorVerdictCard";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
+jest.mock("../../hooks", () => ({
+  ...jest.requireActual("../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the prompt preview card measures its own
+// overflow inside the modal.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetchEvaluatorDetail = fetchEvaluatorDetail as jest.Mock;
+
+beforeEach(() => {
+  mockFetchEvaluatorDetail.mockReset();
+  mockFetchEvaluatorDetail.mockResolvedValue({
+    uuid: "abc-123",
+    name: "Linked Eval",
+    description: null,
+    output_type: "binary",
+    evaluator_type: "llm",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge the reply.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 describe("readVerdictTone", () => {
   it("returns green for binary match=true", () => {
@@ -312,7 +362,8 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(pill.className).toContain("flex-shrink-0");
   });
 
-  it("renders name as a link when enableLink and evaluatorUuid are set", () => {
+  it("renders name as a button that opens the evaluator's prompt in a modal when enableLink and evaluatorUuid are set", async () => {
+    const user = setupUser();
     render(
       <EvaluatorVerdictCard
         mode="read"
@@ -323,8 +374,13 @@ describe("EvaluatorVerdictCard - header extras", () => {
         evaluatorUuid="abc-123"
       />,
     );
-    const link = screen.getByRole("link", { name: "Linked Eval" });
-    expect(link).toHaveAttribute("href", "/evaluators/abc-123");
+    expect(screen.queryByRole("link", { name: "Linked Eval" })).not.toBeInTheDocument();
+    const nameButton = screen.getByRole("button", { name: "Linked Eval" });
+    await user.click(nameButton);
+    expect(
+      await screen.findByRole("heading", { name: "Linked Eval" }),
+    ).toBeInTheDocument();
+    expect(mockFetchEvaluatorDetail).toHaveBeenCalledWith("abc-123", "tok");
   });
 
   it("renders name as plain text when enableLink is false", () => {
@@ -337,6 +393,7 @@ describe("EvaluatorVerdictCard - header extras", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Plain Eval" })).not.toBeInTheDocument();
     expect(screen.getByText("Plain Eval")).toBeInTheDocument();
   });
 
@@ -351,6 +408,7 @@ describe("EvaluatorVerdictCard - header extras", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Plain Eval 2" })).not.toBeInTheDocument();
   });
 });
 

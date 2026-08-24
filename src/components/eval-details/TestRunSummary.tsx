@@ -1,6 +1,6 @@
-import React from "react";
-import { Link } from "@/lib/nav";
+import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   formatLatencyMs,
   formatCostUsd,
@@ -192,6 +192,13 @@ export function TestRunSummary({
   evaluatorSummary,
   enableEvaluatorLinks = true,
 }: TestRunSummaryProps) {
+  // The evaluator whose prompt is on show, opened from a metric card's name.
+  // Null until a card is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
+
   const rate = total > 0 ? (passed / total) * 100 : null;
   const toolCallRate =
     toolCall && toolCall.total > 0
@@ -289,14 +296,18 @@ export function TestRunSummary({
                 </>
               );
               if (uuid && enableEvaluatorLinks) {
+                const evaluatorName = entry.name ?? entry.metric_key;
                 return (
-                  <Link
+                  <button
                     key={entry.metric_key}
-                    href={`/evaluators/${uuid}`}
-                    className="group block border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
+                    type="button"
+                    onClick={() =>
+                      setPreviewEvaluator({ uuid, name: evaluatorName })
+                    }
+                    className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
                   >
                     {cardInner}
-                  </Link>
+                  </button>
                 );
               }
               return (
@@ -311,6 +322,12 @@ export function TestRunSummary({
           </div>
         </div>
       )}
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
     </div>
   );
 }

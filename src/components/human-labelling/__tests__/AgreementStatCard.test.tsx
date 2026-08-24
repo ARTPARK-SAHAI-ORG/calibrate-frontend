@@ -1,6 +1,55 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { AgreementStatCard, agreementColor } from "../AgreementStatCard";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the prompt card measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetch = fetchEvaluatorDetail as jest.Mock;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockFetch.mockResolvedValue({
+    uuid: "ev-1",
+    name: "Correctness",
+    description: "Rates correctness",
+    output_type: "rating",
+    evaluator_type: "llm",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge whether the reply is correct.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 describe("agreementColor", () => {
   it("returns muted color for null/undefined", () => {
@@ -48,25 +97,44 @@ describe("AgreementStatCard", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{
-          href: "/evaluators/ev-1",
+          uuid: "ev-1",
           name: "Correctness",
           versionLabel: "v2",
         }}
         value="90%"
       />
     );
-    const link = screen.getByRole("link", { name: /Correctness/ });
-    expect(link).toHaveAttribute("href", "/evaluators/ev-1");
-    expect(link).toHaveAttribute("title", "Open Correctness");
+    const button = screen.getByRole("button", { name: /Correctness/ });
+    expect(button).toHaveAttribute("title", "Open Correctness");
     expect(screen.getByText("v2")).toBeInTheDocument();
     expect(screen.getByText("alignment")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
+  it("opens the evaluator preview modal when the pill is clicked", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+      />
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Correctness/ }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Correctness" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Judge whether the reply is correct."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("ev-1", "tok");
+  });
+
   it("shows the evaluator's own result next to the agreement number", () => {
     render(
       <AgreementStatCard
-        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
         value="90%"
         result={{
           label: "Correct",
@@ -90,7 +158,7 @@ describe("AgreementStatCard", () => {
   it("shows the result on its own when agreement belongs to another section", () => {
     render(
       <AgreementStatCard
-        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
         value={null}
         result={{
           label: "Score",
@@ -114,7 +182,7 @@ describe("AgreementStatCard", () => {
   it("drops the score's label when the section heading already names it", () => {
     render(
       <AgreementStatCard
-        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
         value={null}
         result={{
           label: "Score",
@@ -136,7 +204,7 @@ describe("AgreementStatCard", () => {
   it("keeps both labels when the agreement number is on the card too", () => {
     render(
       <AgreementStatCard
-        evaluatorPill={{ href: "/evaluators/ev-1", name: "Correctness" }}
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
         value="90%"
         result={{ label: "Score", value: "75%", ratio: 0.75 }}
         showResultLabel={false}
@@ -164,7 +232,7 @@ describe("AgreementStatCard", () => {
   it("renders the evaluator pill variant without a version label", () => {
     render(
       <AgreementStatCard
-        evaluatorPill={{ href: "/evaluators/ev-2", name: "Tone" }}
+        evaluatorPill={{ uuid: "ev-2", name: "Tone" }}
         value="70%"
       />
     );
@@ -176,7 +244,7 @@ describe("AgreementStatCard", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{
-          href: "/evaluators/ev-3",
+          uuid: "ev-3",
           name: "Safety",
           versionLabel: null,
         }}
