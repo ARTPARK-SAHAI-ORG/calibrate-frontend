@@ -79,6 +79,7 @@ import {
   evaluatorsThatCanBeRun,
   runEvaluatorsDecision,
   toItemDetailItem,
+  toolCallNotEvaluatedMessage,
 } from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
@@ -905,7 +906,7 @@ function ItemRowActions({
           aria-label="Evaluate"
           title={
             evaluateDisabled
-              ? "This item evaluates one or more tool calls, which only supports human review today. Evaluators do not run on them."
+              ? toolCallNotEvaluatedMessage("This item evaluates")
               : undefined
           }
           className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2073,7 +2074,7 @@ function LabellingTaskPageInner() {
       );
       if (decision.blocked) {
         toast.error(
-          "The chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them.",
+          toolCallNotEvaluatedMessage("The chosen items evaluate"),
         );
         return;
       }

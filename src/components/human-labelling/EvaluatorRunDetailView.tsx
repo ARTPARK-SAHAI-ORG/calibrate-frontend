@@ -23,7 +23,10 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
-import { isSkippedRunResult } from "@/lib/labellingItem";
+import {
+  isSkippedRunResult,
+  toolCallNotEvaluatedMessage,
+} from "@/lib/labellingItem";
 import {
   ItemPane,
   itemPaneHasOwnPadding,
@@ -940,8 +943,7 @@ export function EvaluatorResultsPane({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                This item evaluates one or more tool calls, which only
-                supports human review today. Evaluators do not run on them.
+                {toolCallNotEvaluatedMessage("This item evaluates")}
               </p>
             </div>
           );

@@ -3,6 +3,7 @@ import {
   isSkippedRunResult,
   runEvaluatorsDecision,
   toItemDetailItem,
+  toolCallNotEvaluatedMessage,
 } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
@@ -102,5 +103,27 @@ describe("evaluatorsThatCanBeRun", () => {
     expect(
       evaluatorsThatCanBeRun([{ uuid: "b", evaluator_type: "tool-call" }]),
     ).toEqual([]);
+  });
+});
+
+describe("toolCallNotEvaluatedMessage", () => {
+  it("says the same thing about one item and about the chosen ones", () => {
+    expect(toolCallNotEvaluatedMessage("This item evaluates")).toBe(
+      "This item evaluates one or more tool calls, which only supports human review today. Evaluators do not run on them.",
+    );
+    expect(toolCallNotEvaluatedMessage("The chosen items evaluate")).toBe(
+      "The chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them.",
+    );
+  });
+
+  it("adds the run dialog's own ending", () => {
+    expect(
+      toolCallNotEvaluatedMessage(
+        "2 of the chosen items evaluate",
+        ", so they will be left out of this run",
+      ),
+    ).toBe(
+      "2 of the chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them, so they will be left out of this run.",
+    );
   });
 });

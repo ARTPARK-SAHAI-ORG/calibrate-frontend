@@ -71,3 +71,16 @@ export function evaluatorsThatCanBeRun<
 >(evaluators: T[]): T[] {
   return evaluators.filter((e) => e.evaluator_type !== "tool-call");
 }
+
+// The one sentence the app uses about a tool-call row nothing can score. It
+// appears in four places — the greyed-out Evaluate button, the refusal when
+// every chosen row is one, the note in the run dialog, and the card on the
+// evaluation run page — and they must not drift apart, so they are all built
+// here. `subject` names who is doing the evaluating, `tail` adds anything that
+// only one of them says.
+export function toolCallNotEvaluatedMessage(
+  subject: string,
+  tail = "",
+): string {
+  return `${subject} one or more tool calls, which only supports human review today. Evaluators do not run on them${tail}.`;
+}

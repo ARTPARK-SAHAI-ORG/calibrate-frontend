@@ -5,6 +5,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
+import { toolCallNotEvaluatedMessage } from "@/lib/labellingItem";
 
 type LinkedEvaluator = { uuid: string; name: string };
 
@@ -409,7 +410,10 @@ export function RunEvaluatorsDialog({
           )}
           {toolCallSkipCount > 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
-              {`${toolCallSkipCount} of the chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them, so they will be left out of this run.`}
+              {toolCallNotEvaluatedMessage(
+                `${toolCallSkipCount} of the chosen items evaluate`,
+                ", so they will be left out of this run",
+              )}
             </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
