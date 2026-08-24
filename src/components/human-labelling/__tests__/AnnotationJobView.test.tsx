@@ -1686,6 +1686,38 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     expect(screen.queryByText("Quality")).not.toBeInTheDocument();
   });
 
+  it("saves a tool-call row from its own evaluator alone", async () => {
+    // The save used to walk the task's whole evaluator list. On a tool-call
+    // row the AI judges had no answer, so it gave up and nothing was sent.
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(mixedJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const post = fetchMock.mock.calls.find(
+      ([url, opts]) =>
+        typeof url === "string" &&
+        url.endsWith("/annotations") &&
+        (opts as RequestInit | undefined)?.method === "POST",
+    );
+    expect(post).toBeTruthy();
+    const body = JSON.parse((post![1] as RequestInit).body as string);
+    expect(body.annotations).toHaveLength(1);
+    expect(body.annotations[0].evaluator_id).toBe("ev-tool");
+    expect(body.annotations[0].value.value).toBe(true);
+  });
+
   it("hides the tool call evaluator on every other row", async () => {
     const user = setupUser();
     fetchMock.mockResolvedValue(jsonResponse(mixedJob()));

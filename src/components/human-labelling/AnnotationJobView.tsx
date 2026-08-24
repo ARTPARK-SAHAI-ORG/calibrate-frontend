@@ -762,7 +762,9 @@ function AnnotateView({
       evaluator_id: string | null;
       value: Record<string, unknown>;
     }[] = [];
-    for (const ev of evaluators) {
+    // The row's own evaluators, not the task's whole list: an AI judge that
+    // does not apply to this row has no answer and would refuse the save.
+    for (const ev of evaluatorsFor(currentItem.uuid)) {
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
       if (!hasFieldValue(f)) {
