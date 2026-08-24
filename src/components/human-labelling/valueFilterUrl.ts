@@ -21,6 +21,9 @@ import type { ValueFilter } from "./ItemValueFilter";
 export const VALUE_FILTERS_PARAM = "scores";
 /** The query name for the run page's disagreements-only toggle. */
 export const DISAGREEMENTS_PARAM = "disagreements";
+/** The query name for the item currently open in an annotation job, so a
+ * reload or a shared link lands back on the same item. */
+export const ITEM_PARAM = "item";
 
 export function readUrlParam(param: string): string | null {
   if (typeof window === "undefined") return null;
