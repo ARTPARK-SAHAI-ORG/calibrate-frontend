@@ -1646,3 +1646,90 @@ describe("AnnotationJobView expected tool calls", () => {
     expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
   });
 });
+
+// A task can hold both kinds of row. Which evaluators a row is answered by
+// depends on the row, not on the task.
+describe("AnnotationJobView picks the evaluators per row", () => {
+  const TOOL_CALL_EVALUATOR = {
+    uuid: "ev-tool",
+    name: "Tool call correctness",
+    description: "Did the agent call the right tool",
+    evaluator_type: "tool-call",
+    output_type: "binary" as const,
+  };
+
+  const mixedJob = (over: Record<string, unknown> = {}) =>
+    jobResponse({
+      evaluators: [...evaluators, TOOL_CALL_EVALUATOR],
+      items: [
+        { ...items[0], is_tool_call: true },
+        { ...items[1], is_tool_call: false },
+      ],
+      ...over,
+    });
+
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it("shows only the tool call evaluator on a tool-call row", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(mixedJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    expect(screen.queryByText("Quality")).not.toBeInTheDocument();
+  });
+
+  it("saves a tool-call row from its own evaluator alone", async () => {
+    // The save used to walk the task's whole evaluator list. On a tool-call
+    // row the AI judges had no answer, so it gave up and nothing was sent.
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(jsonResponse(mixedJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const post = fetchMock.mock.calls.find(
+      ([url, opts]) =>
+        typeof url === "string" &&
+        url.endsWith("/annotations") &&
+        (opts as RequestInit | undefined)?.method === "POST",
+    );
+    expect(post).toBeTruthy();
+    const body = JSON.parse((post![1] as RequestInit).body as string);
+    expect(body.annotations).toHaveLength(1);
+    expect(body.annotations[0].evaluator_id).toBe("ev-tool");
+    expect(body.annotations[0].value.value).toBe(true);
+  });
+
+  it("hides the tool call evaluator on every other row", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(jsonResponse(mixedJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Quality")).toBeInTheDocument();
+    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+  });
+});

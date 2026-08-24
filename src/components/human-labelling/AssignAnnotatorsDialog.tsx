@@ -14,6 +14,7 @@ type TaskEvaluator = {
   uuid: string;
   name: string;
   description?: string | null;
+  evaluator_type?: string | null;
 };
 
 /** Returns a new Set with `id` toggled in or out. */
@@ -99,6 +100,16 @@ type AssignAnnotatorsDialogProps = {
   accessToken: string;
   /** Evaluators linked to the task — the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
+  /** True when at least one of the chosen items is answered by a tool call.
+   * Tool call correctness is then shown ticked and cannot be unticked, since
+   * such an item is always answered by it. With no such item it is not shown
+   * at all. */
+  hasToolCallItems: boolean;
+  /** True when at least one of the chosen items is answered by written text
+   * rather than a tool call. The AI-judge labels only apply to such an item,
+   * so with none chosen they are left out entirely — there is nothing for
+   * them to judge. */
+  hasNonToolCallItems: boolean;
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
   onConfirm: (
@@ -112,6 +123,8 @@ export function AssignAnnotatorsDialog({
   isOpen,
   accessToken,
   evaluators,
+  hasToolCallItems,
+  hasNonToolCallItems,
   onClose,
   onConfirm,
 }: AssignAnnotatorsDialogProps) {
@@ -159,7 +172,23 @@ export function AssignAnnotatorsDialog({
 
   // Start with every label picked, and re-seed if the task's labels arrive
   // (or change) while the dialog is open.
-  const evaluatorIdsKey = evaluators.map((ev) => ev.uuid).join(",");
+  // Tool call correctness is never a choice. It comes with a tool-call item
+  // and is added by the backend whether or not it is ticked here, so it is
+  // shown as already on when such an item is in the selection, and left out
+  // entirely when none is.
+  const toolCallEvaluators = evaluators.filter(
+    (ev) => ev.evaluator_type === "tool-call",
+  );
+  // The AI-judge labels only apply to an item answered in writing. With no
+  // such item in the selection none of them belong in the picker at all —
+  // this is what was missing before: the full task list showed here no
+  // matter which items were actually chosen.
+  const choosableEvaluators = hasNonToolCallItems
+    ? evaluators.filter((ev) => ev.evaluator_type !== "tool-call")
+    : [];
+  const shownToolCallEvaluators = hasToolCallItems ? toolCallEvaluators : [];
+
+  const evaluatorIdsKey = choosableEvaluators.map((ev) => ev.uuid).join(",");
   useEffect(() => {
     if (!isOpen) return;
     setPickedEvaluators(
@@ -203,20 +232,30 @@ export function AssignAnnotatorsDialog({
   // A task with no labels at all can still be assigned; one with labels needs
   // at least one picked.
   const evaluatorSelectionValid =
-    evaluators.length === 0 || pickedEvaluators.size > 0;
+    choosableEvaluators.length === 0 || pickedEvaluators.size > 0;
   const allEvaluatorsPicked =
-    evaluators.length > 0 && pickedEvaluators.size === evaluators.length;
+    choosableEvaluators.length > 0 &&
+    pickedEvaluators.size === choosableEvaluators.length;
 
-  // Only worth offering an evaluator choice (and the wider layout) when the
-  // task has more than one evaluator to pick between.
-  const showEvaluatorChoice = evaluators.length > 1;
+  // Only worth showing the column when there is more than one label on
+  // screen in total (choosable ones plus the locked tool-call one). With
+  // just one — a single choosable label, or only the tool-call label because
+  // every chosen item is a tool call — there is nothing to weigh, so the
+  // column is left out, same as the original one-label rule.
+  const totalShownLabels =
+    choosableEvaluators.length + shownToolCallEvaluators.length;
+  const showEvaluatorChoice = totalShownLabels > 1;
 
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await onConfirm(Array.from(picked), Array.from(pickedEvaluators), {
+      const evaluatorIds = [
+        ...pickedEvaluators,
+        ...shownToolCallEvaluators.map((ev) => ev.uuid),
+      ];
+      await onConfirm(Array.from(picked), evaluatorIds, {
         comments_enabled: commentsEnabled,
         reasoning_mode: reasoningMode,
       });
@@ -373,7 +412,7 @@ export function AssignAnnotatorsDialog({
                 <p className="text-xs text-muted-foreground">
                   Pick one or more labels to show in the labelling jobs created
                 </p>
-                {evaluators.length > 1 && (
+                {choosableEvaluators.length > 1 && (
                   <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -387,7 +426,7 @@ export function AssignAnnotatorsDialog({
                         setPickedEvaluators(
                           pickedEvaluators.size > 0
                             ? new Set()
-                            : new Set(evaluators.map((ev) => ev.uuid)),
+                            : new Set(choosableEvaluators.map((ev) => ev.uuid)),
                         )
                       }
                       aria-label={
@@ -405,7 +444,7 @@ export function AssignAnnotatorsDialog({
                   </label>
                 )}
                 <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
-                  {evaluators.map((ev) => {
+                  {choosableEvaluators.map((ev) => {
                     const checked = pickedEvaluators.has(ev.uuid);
                     return (
                       <label
@@ -433,6 +472,35 @@ export function AssignAnnotatorsDialog({
                       </label>
                     );
                   })}
+                  {/* Always on, never a choice: a tool-call item is answered
+                      by this one and the backend adds it either way. */}
+                  {shownToolCallEvaluators.map((ev) => (
+                    <div
+                      key={ev.uuid}
+                      className="flex items-start gap-3 px-3 py-2 rounded-md border border-border bg-muted/30"
+                    >
+                      <span className="flex h-5 items-center flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked
+                          disabled
+                          readOnly
+                          aria-label={`${ev.name} is always included`}
+                          className="w-4 h-4 accent-foreground cursor-not-allowed"
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">
+                          {ev.name}
+                        </div>
+                        {ev.description && (
+                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {ev.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -75,6 +75,7 @@ import {
 } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
+import { toItemDetailItem } from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -247,6 +248,9 @@ type LabellingItem = {
   uuid: string;
   task_id: string;
   payload: unknown;
+  /** True when this row's answer was a tool call rather than a written
+   * reply. Set by the backend, the same field the labelling job sends. */
+  is_tool_call?: boolean;
   created_at: string;
   updated_at?: string;
   deleted_at: string | null;
@@ -278,7 +282,8 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
+    evaluator_type?:
+      "llm" | "llm-general" | "stt" | "tts" | "conversation" | "tool-call";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -1536,7 +1541,23 @@ function LabellingTaskPageInner() {
   // raw count: a count with no usable value behind it (an evaluator missing
   // from the task's own list, or one whose output type is not recorded)
   // formats to nothing, and a card with nothing in it is worse than no card.
-  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
+  // Tool call correctness is answered by people, never by an AI judge, so
+  // there is nothing to compare its answers against. It gets no agreement
+  // card and is left out of the note about missing alignment numbers, where
+  // it would otherwise read as an evaluator that failed to run.
+  const toolCallEvaluatorIds = useMemo(
+    () =>
+      new Set(
+        (task?.evaluators ?? [])
+          .filter((e) => e.evaluator_type === "tool-call")
+          .map((e) => e.uuid),
+      ),
+    [task],
+  );
+  const judgedEvaluators = (agreement?.evaluators ?? []).filter(
+    (ev) => !toolCallEvaluatorIds.has(ev.evaluator_id),
+  );
+  const evaluatorsThatRan = judgedEvaluators.filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
   // An evaluator with a card but no alignment number has no human labels on
@@ -1552,7 +1573,7 @@ function LabellingTaskPageInner() {
   // has labelled anything, "no human labels yet" is the truth. When labels do
   // exist, the missing alignment number means the evaluator did not run on the
   // items that were labelled, so say that instead.
-  const anyHumanLabels = (agreement?.evaluators ?? []).some(
+  const anyHumanLabels = judgedEvaluators.some(
     (ev) => (ev.human_result?.count ?? 0) > 0,
   );
   const allEvaluatorsMissing =
@@ -1774,8 +1795,13 @@ function LabellingTaskPageInner() {
     (taskSummary?.pagination?.total ?? 0) > 0 ||
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
+  // Falls back to the kind of the task's first evaluator. Tool call
+  // correctness is never a task kind of its own, so it is skipped: a task
+  // holding it also holds the judges that say what the task is.
+  const firstEvaluatorKind = task?.evaluators?.[0]?.evaluator_type;
   const taskType =
-    task?.type ?? task?.evaluators?.[0]?.evaluator_type;
+    task?.type ??
+    (firstEvaluatorKind === "tool-call" ? undefined : firstEvaluatorKind);
   const canAddItem =
     taskType === "llm" ||
     taskType === "conversation" ||
@@ -2884,7 +2910,7 @@ function LabellingTaskPageInner() {
                         agreement.human_human?.current,
                       )}
                     />
-                    {(agreement.evaluators ?? []).map((ev) => (
+                    {judgedEvaluators.map((ev) => (
                       <AgreementStatCard
                         key={ev.evaluator_id}
                         evaluatorPill={{
@@ -4413,6 +4439,20 @@ function LabellingTaskPageInner() {
           isOpen={assignOpen}
           accessToken={accessToken}
           evaluators={task?.evaluators ?? []}
+          // Select-all can reach items beyond the page in hand, so this is
+          // read off the ones loaded. Getting it wrong only changes whether
+          // the row is drawn: the backend adds the evaluator to a tool-call
+          // item either way.
+          hasToolCallItems={(task?.items ?? []).some(
+            (it) =>
+              it.is_tool_call === true &&
+              (selectAllTotal || selectedItemIds.has(it.uuid)),
+          )}
+          hasNonToolCallItems={(task?.items ?? []).some(
+            (it) =>
+              it.is_tool_call !== true &&
+              (selectAllTotal || selectedItemIds.has(it.uuid)),
+          )}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />
@@ -4537,15 +4577,7 @@ function LabellingTaskPageInner() {
         item={(() => {
           if (!itemDetailUuid) return null;
           const match = items.find((i) => i.uuid === itemDetailUuid);
-          if (!match) return null;
-          return {
-            id: match.id,
-            uuid: match.uuid,
-            task_id: match.task_id,
-            payload: match.payload,
-            created_at: match.created_at,
-            deleted_at: match.deleted_at,
-          };
+          return match ? toItemDetailItem(match) : null;
         })()}
         accessToken={accessToken}
         hasPrev={itemPager.hasPrev}

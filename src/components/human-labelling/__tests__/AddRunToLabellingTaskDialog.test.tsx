@@ -353,7 +353,12 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     const result = buildItemsFromSource({
       type: "bogus",
     } as unknown as AddRunToLabellingTaskSource);
-    expect(result).toEqual({ items: [], skippedCount: 0, evaluatorUuids: new Set() });
+    expect(result).toEqual({
+      items: [],
+      skippedCount: 0,
+      evaluatorUuids: new Set(),
+      toolCallEvaluatorUuids: new Set(),
+    });
   });
 
   it("builds stt items from an stt_run source", () => {
@@ -1292,5 +1297,99 @@ describe("tool-call tests submitted for labelling", () => {
     expect(items[0].payload.agent_response).toBe("");
     expect(items[0].payload.input).toBeUndefined();
     expect(items[0].payload.output).toBeUndefined();
+  });
+});
+
+// The bug: an existing task that already has the response judges but not
+// Tool call correctness was never offered as a place to submit a tool-call
+// test result, because the picker demanded every evaluator already be on
+// the task. The backend attaches Tool call correctness to a task itself the
+// moment the first tool-call item lands there, so its absence must not rule
+// a task out.
+describe("submitting a tool-call test result finds a task missing only the tool call evaluator", () => {
+  const toolCallSource: AddRunToLabellingTaskSource = {
+    type: "test_run",
+    runUuid: "run-uuid-toolcall01",
+    results: [
+      {
+        test_case: {
+          name: "Books the flight",
+          evaluation: { type: "tool_call", tool_calls: [] },
+          history: [{ role: "user", content: "book it" }],
+        },
+        output: { tool_calls: [{ tool: "book_flight", arguments: {} }] },
+        judge_results: [{ evaluator_uuid: "ev-tool" }],
+      } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+    ],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAccessTokenMock.mockReturnValue("token-123");
+  });
+
+  it("names the tool-call evaluator separately from the ones a task must already have", () => {
+    const result = buildItemsFromSource(toolCallSource);
+    expect(result.evaluatorUuids).toEqual(new Set(["ev-tool"]));
+    expect(result.toolCallEvaluatorUuids).toEqual(new Set(["ev-tool"]));
+  });
+
+  it("offers an existing agent-reply task that has response judges but not the tool call evaluator", async () => {
+    const task = {
+      uuid: "task-1",
+      name: "new task",
+      type: "llm",
+      evaluators: [{ uuid: "ev-reply-1" }, { uuid: "ev-reply-2" }],
+    };
+    apiClientMock.mockResolvedValue({ items: [task] });
+    unwrapListMock.mockReturnValue([task]);
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={toolCallSource}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("combobox")).toHaveValue("task-1");
+    });
+    expect(
+      screen.queryByText(/No existing tasks were found/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still rules a task out for a response evaluator it is genuinely missing", async () => {
+    const mixedSource: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-mixed001",
+      results: [
+        ...toolCallSource.results,
+        {
+          test_case: { name: "Greeting", evaluation: { type: "response" } },
+          output: { response: "hi" },
+          judge_results: [{ evaluator_uuid: "ev-reply-needed" }],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    };
+    const task = {
+      uuid: "task-1",
+      name: "new task",
+      type: "llm",
+      evaluators: [{ uuid: "ev-reply-1" }],
+    };
+    apiClientMock.mockResolvedValue({ items: [task] });
+    unwrapListMock.mockReturnValue([task]);
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={mixedSource}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No existing tasks were found/),
+      ).toBeInTheDocument(),
+    );
   });
 });

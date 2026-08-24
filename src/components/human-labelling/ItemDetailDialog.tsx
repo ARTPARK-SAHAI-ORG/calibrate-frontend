@@ -315,7 +315,18 @@ export function ItemDetailDialog({
     // so different versions of the same evaluator render their own labels.
     const jobEvaluators: JobEvaluator[] = [];
 
+    // The same rule the labelling form uses: a tool-call item is answered by
+    // the tool call evaluator alone, every other item by everything else.
+    // Without this the item view showed columns for evaluators the annotator
+    // was never asked about, always empty.
+    const isToolCallItem = item.is_tool_call === true;
+    const evaluatorApplies = (evaluatorId: string) =>
+      (summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type ===
+        "tool-call") ===
+      isToolCallItem;
+
     for (const row of summary.rows) {
+      if (!evaluatorApplies(row.evaluator_id)) continue;
       const human_annotations: HumanAnnotation[] = [];
       for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
         if (!ann || ann.value === null || ann.value === undefined) continue;
