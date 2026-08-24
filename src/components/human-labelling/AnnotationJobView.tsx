@@ -110,6 +110,9 @@ export type Item = {
   payload: Record<string, unknown> | unknown;
   created_at: string;
   deleted_at: string | null;
+  /** True when this row's answer was a tool call rather than a written
+   * reply. Set by the backend; absent on an older response. */
+  is_tool_call?: boolean;
 };
 
 type Annotation = {
@@ -144,6 +147,29 @@ type FieldValue = { value: unknown; comment: string };
 
 function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
+}
+
+/**
+ * The evaluators that apply to one row.
+ *
+ * A tool-call row is answered by the tool call evaluator alone: the AI judges
+ * read a written reply and there is none. Every other row is answered by
+ * everything except that one. This is the ONE place the rule lives — the
+ * cards on screen, the "is this row finished?" checks and the submit guard
+ * all ask here, so they cannot disagree.
+ *
+ * The list can come back empty, on a tool-call row in a workspace that
+ * deleted its tool call evaluator. Such a row shows nothing and must not
+ * hold the job open, which `itemCompleted` takes care of.
+ */
+function evaluatorsForItem(
+  evaluators: Evaluator[],
+  item: { is_tool_call?: boolean } | null | undefined,
+): Evaluator[] {
+  const wantToolCall = item?.is_tool_call === true;
+  return evaluators.filter(
+    (ev) => (ev.evaluator_type === "tool-call") === wantToolCall,
+  );
 }
 
 /** The evaluators an annotator must answer before an item counts as done.
@@ -315,9 +341,10 @@ export function AnnotationJobView({
         setCurrentIndex(0);
         return;
       }
-      const required = requiredOnly(data.evaluators);
       const firstIncomplete = data.items.findIndex((it) =>
-        required.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+        requiredOnly(evaluatorsForItem(data.evaluators, it)).some(
+          (ev) => !saved.has(fieldKey(it.uuid, ev.uuid)),
+        ),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
@@ -608,11 +635,22 @@ function AnnotateView({
     prevStatus.current = data.job.status;
   }, [data.job.status, isAdmin]);
 
+  // Which evaluators apply depends on the row, so these are looked up by
+  // item id rather than held as one list.
+  const itemById = useMemo(() => {
+    const m = new Map<string, Item>();
+    for (const it of data.items) m.set(it.uuid, it);
+    return m;
+  }, [data.items]);
+  const evaluatorsFor = useCallback(
+    (itemId: string) => evaluatorsForItem(evaluators, itemById.get(itemId)),
+    [evaluators, itemById],
+  );
   // Optional evaluators may be left blank, so every "is this item finished?"
   // question is asked of the required ones only.
-  const requiredEvaluators = useMemo(
-    () => requiredOnly(evaluators),
-    [evaluators],
+  const requiredEvaluatorsFor = useCallback(
+    (itemId: string) => requiredOnly(evaluatorsFor(itemId)),
+    [evaluatorsFor],
   );
 
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
@@ -631,16 +669,21 @@ function AnnotateView({
   // when the annotator moves on.
   const itemCompleted = useCallback(
     (itemId: string) => {
+      const applicable = evaluatorsFor(itemId);
+      // Nothing to answer, so nothing to wait for. A tool-call row in a
+      // workspace that deleted its tool call evaluator lands here, and it
+      // must not hold the job open.
+      if (applicable.length === 0) return true;
       const savedFor = (ev: Evaluator) =>
         savedKeys.has(fieldKey(itemId, ev.uuid));
-      if (!requiredEvaluators.every(savedFor)) return false;
-      if (!evaluators.some(savedFor)) return false;
-      return !evaluators.some(
+      if (!requiredOnly(applicable).every(savedFor)) return false;
+      if (!applicable.some(savedFor)) return false;
+      return !applicable.some(
         (ev) => evaluatorAnswered(itemId, ev) && !savedFor(ev),
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requiredEvaluators, evaluators, savedKeys, fields],
+    [evaluatorsFor, savedKeys, fields],
   );
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !==
@@ -683,7 +726,7 @@ function AnnotateView({
    * without reasoning, on a job that requires it. */
   const reasoningMissingFor = (itemId: string): FieldKey[] => {
     if (reasoningMode !== "required") return [];
-    return evaluators
+    return evaluatorsFor(itemId)
       .map((ev) => fieldKey(itemId, ev.uuid))
       .filter(
         (k) =>
@@ -808,8 +851,10 @@ function AnnotateView({
       }
 
       if (advance) {
+        // Asked of the row's own evaluators, so a tool-call row already
+        // answered is not offered again as the next unfinished one.
         const isItemDone = (itemId: string) =>
-          requiredEvaluators.every((ev) => {
+          requiredEvaluatorsFor(itemId).every((ev) => {
             const k = fieldKey(itemId, ev.uuid);
             return justSaved.has(k) || savedKeys.has(k);
           });
@@ -860,8 +905,8 @@ function AnnotateView({
           return;
         }
         if (
-          evaluators.length > 0 &&
-          requiredEvaluators.every((ev) => evaluatorAnswered(uuid, ev))
+          evaluatorsFor(uuid).length > 0 &&
+          requiredEvaluatorsFor(uuid).every((ev) => evaluatorAnswered(uuid, ev))
         ) {
           const ok = await handleSubmitItem({ advance: false });
           if (!ok) return;
@@ -869,7 +914,7 @@ function AnnotateView({
           return;
         }
         if (
-          evaluators.some((ev) => evaluatorAnswered(uuid, ev)) ||
+          evaluatorsFor(uuid).some((ev) => evaluatorAnswered(uuid, ev)) ||
           commentChangedFor(uuid)
         ) {
           setPendingNavReason("unanswered");
@@ -974,8 +1019,8 @@ function AnnotateView({
                   !!currentItem && !currentItemSaved && unsavedCount === 1;
                 const allEvaluatorsAnswered =
                   !!currentItem &&
-                  evaluators.length > 0 &&
-                  requiredEvaluators.every((ev) =>
+                  evaluatorsFor(currentItem.uuid).length > 0 &&
+                  requiredEvaluatorsFor(currentItem.uuid).every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
                 const disabled =
@@ -1314,14 +1359,16 @@ function EvaluatorsPane({
     </div>
   ) : null;
 
-  if (evaluators.length === 0) {
+  if (evaluatorsForItem(evaluators, item).length === 0) {
     return (
       <div className="space-y-3">
         <ExpectedToolCalls payload={itemPayload} />
         {descriptionBlock}
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          No evaluators are attached to this task.
+          {evaluators.length === 0
+            ? "No evaluators are attached to this task."
+            : "There is nothing to answer on this item."}
         </div>
       </div>
     );
@@ -1349,7 +1396,7 @@ function EvaluatorsPane({
       <ExpectedToolCalls payload={itemPayload} />
       {descriptionBlock}
       {commentBlock}
-      {evaluators.map((ev) => {
+      {evaluatorsForItem(evaluators, item).map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
         // Reviewing what came back: an optional evaluator the annotator
