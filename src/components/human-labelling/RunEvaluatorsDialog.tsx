@@ -58,9 +58,11 @@ type RunEvaluatorsDialogProps = {
   evaluators: LinkedEvaluator[];
   submitting: boolean;
   submitError: string | null;
-  /** How many of the chosen rows are tool calls that the AI judges skip.
-   * Above zero, a note says so before the run is started. */
-  toolCallSkipCount?: number;
+  /** How many of the chosen rows are tool calls that a run leaves out.
+   * Above zero, a note says so before the run is started. `null` means some
+   * are, but they cannot be counted: select-all reaches rows beyond the page
+   * in hand, so the note is shown without a number. */
+  toolCallSkipCount?: number | null;
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
@@ -408,10 +410,12 @@ export function RunEvaluatorsDialog({
               })}
             </>
           )}
-          {toolCallSkipCount > 0 && (
+          {toolCallSkipCount !== 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
               {toolCallNotEvaluatedMessage(
-                `${toolCallSkipCount} of the chosen items evaluate`,
+                toolCallSkipCount === null
+                  ? "Any chosen item that evaluates"
+                  : `${toolCallSkipCount} of the chosen items evaluate`,
                 ", so they will be left out of this run",
               )}
             </div>

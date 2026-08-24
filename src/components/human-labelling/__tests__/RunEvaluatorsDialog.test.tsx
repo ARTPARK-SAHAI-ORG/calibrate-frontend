@@ -77,6 +77,16 @@ describe("RunEvaluatorsDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("says it without a number when the rows cannot be counted", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    renderDialog({ toolCallSkipCount: null });
+    expect(
+      await screen.findByText(
+        /Any chosen item that evaluates one or more tool calls, which only supports human review today\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("says nothing when no chosen row is a tool call", async () => {
     mockedApiClient.mockResolvedValue(detailResponse);
     renderDialog();

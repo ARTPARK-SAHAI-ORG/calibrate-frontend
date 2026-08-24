@@ -2043,8 +2043,9 @@ function LabellingTaskPageInner() {
   >(null);
   // How many of the chosen rows are tool calls that the AI judges skip. Shown
   // in the run dialog before the run is confirmed.
-  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] =
-    useState<number>(0);
+  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] = useState<
+    number | null
+  >(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
@@ -2065,10 +2066,10 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
-      // Select-all reaches rows beyond the page in hand, so there is nothing
-      // to count here. The backend refuses a run of nothing but tool calls
-      // either way.
-      setRunDialogToolCallSkipCount(0);
+      // Select-all reaches rows beyond the page in hand, so the rows cannot
+      // be counted. The note is still shown, without a number: the backend
+      // leaves those rows out, and refuses a run with nothing else in it.
+      setRunDialogToolCallSkipCount(null);
     } else {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
       const decision = runEvaluatorsDecision(
