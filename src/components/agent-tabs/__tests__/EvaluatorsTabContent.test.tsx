@@ -62,7 +62,7 @@ jest.mock("../../../lib/evaluatorApi", () => ({
     typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
   isDefaultEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? e.is_default : !e.owner_user_id,
-  canDeleteEvaluator: (e: EvaluatorData) => e.is_deletable !== false,
+  canDeleteEvaluator: (e: EvaluatorData) => !e.is_protected,
 }));
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
@@ -226,7 +226,7 @@ describe("EvaluatorsTabContent", () => {
   });
 
   it("offers no permanent delete on an evaluator that cannot be deleted", async () => {
-    const locked = evaluator({ is_deletable: false });
+    const locked = evaluator({ is_protected: true });
     mockFetchAgentEvaluators.mockResolvedValue([locked]);
     mockFetchAllEvaluators.mockResolvedValue([locked]);
     const user = setupUser();

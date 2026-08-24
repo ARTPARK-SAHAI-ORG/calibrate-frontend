@@ -108,8 +108,8 @@ type EvaluatorDetail = {
   kind: "single" | "side_by_side";
   output_type: "binary" | "rating";
   owner_user_id: string | null;
-  /** False on an evaluator nobody may remove. Absent means deletable. */
-  is_deletable?: boolean | null;
+  /** True on an evaluator nobody may remove or retarget. */
+  is_protected?: boolean | null;
   slug: string | null;
   live_version_id: string | null;
   // Index into `versions[]` for the live version. Replaces the

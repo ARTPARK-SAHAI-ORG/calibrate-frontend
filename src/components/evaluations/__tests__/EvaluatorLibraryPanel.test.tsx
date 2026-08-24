@@ -62,7 +62,7 @@ beforeEach(() => {
 
 test("offers no Delete on an evaluator that cannot be deleted", async () => {
   mockFetch.mockResolvedValue([
-    { ...evaluator("ev-1", "Word accuracy", "stt"), is_deletable: false },
+    { ...evaluator("ev-1", "Word accuracy", "stt"), is_protected: true },
     evaluator("ev-2", "Clarity", "stt"),
   ]);
 

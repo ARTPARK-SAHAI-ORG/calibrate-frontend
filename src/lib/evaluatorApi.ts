@@ -46,12 +46,12 @@ export type EvaluatorData = {
   output_type?: "binary" | "rating";
   evaluator_type?: EvaluatorType;
   /**
-   * False on an evaluator the product needs and nobody may remove, such as
-   * Tool call correctness. Absent means it can be deleted, which is how every
-   * evaluator behaved before this existed. The backend refuses the delete too;
-   * this is only what decides whether the button is offered.
+   * True on an evaluator the product needs, such as Tool call correctness:
+   * nobody may delete it, and what it judges is fixed. Absent means neither
+   * rule applies, which is how every evaluator behaved before this existed.
+   * The backend enforces both; this only decides what the screens offer.
    */
-  is_deletable?: boolean | null;
+  is_protected?: boolean | null;
   /** Returned by `GET /evaluators?include_defaults=true`. */
   live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
 };
@@ -87,14 +87,14 @@ export function isOwnedEvaluator(e: { is_default?: boolean | null }): boolean {
  * offering a Delete on an evaluator must ask here rather than reading the
  * field itself, so protecting the next evaluator is a backend change alone.
  *
- * Only an explicit `false` protects it. Absent leaves the evaluator deletable,
+ * Only an explicit `true` protects it. Absent leaves the evaluator deletable,
  * which is how everything behaved before the field existed, so a list endpoint
  * that does not send it yet cannot lock the button by accident.
  */
 export function canDeleteEvaluator(e: {
-  is_deletable?: boolean | null;
+  is_protected?: boolean | null;
 }): boolean {
-  return e.is_deletable !== false;
+  return !e.is_protected;
 }
 
 /**

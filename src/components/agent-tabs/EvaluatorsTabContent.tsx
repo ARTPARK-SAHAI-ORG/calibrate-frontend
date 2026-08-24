@@ -221,7 +221,7 @@ export function EvaluatorsTabContent({
       ? `Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from every agent that uses it and cannot be undone.`
       : `Are you sure you want to remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`;
   // Org-scoped default forks are permanently deletable too. The exception is
-  // an evaluator the product needs, which says so with `is_deletable: false`;
+  // an evaluator the product needs, which says so with `is_protected`;
   // detaching it from this agent is still fine.
   const canPermanentlyDelete =
     !!deleteTarget && canDeleteEvaluator(deleteTarget);

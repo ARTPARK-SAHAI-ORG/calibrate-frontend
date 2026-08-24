@@ -95,20 +95,20 @@ describe("isOwnedEvaluator", () => {
 
 describe("canDeleteEvaluator", () => {
   it("refuses only an evaluator that says it cannot be deleted", () => {
-    expect(canDeleteEvaluator({ is_deletable: false })).toBe(false);
+    expect(canDeleteEvaluator({ is_protected: true })).toBe(false);
   });
 
   it("allows one that says it can", () => {
-    expect(canDeleteEvaluator({ is_deletable: true })).toBe(true);
+    expect(canDeleteEvaluator({ is_protected: false })).toBe(true);
   });
 
   it("allows one that says nothing, so an older response cannot lock it", () => {
     expect(canDeleteEvaluator({})).toBe(true);
-    expect(canDeleteEvaluator({ is_deletable: null })).toBe(true);
+    expect(canDeleteEvaluator({ is_protected: null })).toBe(true);
   });
 
   it("is unrelated to whether it is an org default", () => {
-    expect(canDeleteEvaluator({ is_deletable: false })).toBe(false);
+    expect(canDeleteEvaluator({ is_protected: true })).toBe(false);
     expect(isDefaultEvaluator({ is_default: true })).toBe(true);
   });
 });
