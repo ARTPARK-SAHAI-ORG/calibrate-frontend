@@ -1511,32 +1511,16 @@ export function EvaluationCriteriaPanel({
         <h3 className="text-sm font-semibold text-foreground">Evaluators</h3>
       )}
 
-      {/* Tool-call test: the result shows first, then the expected tool
-          calls. A finished row now carries a judge result for the Tool call
-          correctness evaluator, drawn by the same card a response test uses,
-          so the evaluator's own name and labels show rather than a fixed
-          word. Older runs carry no judge result and fall back to the run's
-          own pass or fail; while a run is still going there is neither, so
-          only the reasoning shows and no colour is claimed. */}
+      {/* Tool-call test: the expected tool calls first, then the answer
+          below them, so both kinds of answer sit in the same place. A
+          finished row carries a judge result for the Tool call correctness
+          evaluator, drawn by the same card a response test uses, so the
+          evaluator's own name and labels show rather than a fixed word.
+          Older runs carry no judge result and fall back to the run's own
+          pass or fail; while a run is still going there is neither, so only
+          the reasoning shows and no colour is claimed. */}
       {isToolCall && (
         <>
-          {!hasJudgeResults &&
-            (typeof passed === "boolean" ? (
-              <EvaluatorVerdictCard
-                mode="read"
-                name="Tool call test"
-                outputType="binary"
-                enableLink={false}
-                match={passed}
-                reasoning={reasoning ?? null}
-              />
-            ) : (
-              <CollapsibleReasoningStrip
-                text={reasoning}
-                mutedBody={false}
-                leadingLabel="Reasoning"
-              />
-            ))}
           <h3 className="text-sm font-semibold text-foreground">
             Expected Tool Calls
           </h3>
@@ -1561,6 +1545,23 @@ export function EvaluationCriteriaPanel({
               No expected tool calls specified
             </p>
           )}
+          {!hasJudgeResults &&
+            (typeof passed === "boolean" ? (
+              <EvaluatorVerdictCard
+                mode="read"
+                name="Tool call test"
+                outputType="binary"
+                enableLink={false}
+                match={passed}
+                reasoning={reasoning ?? null}
+              />
+            ) : (
+              <CollapsibleReasoningStrip
+                text={reasoning}
+                mutedBody={false}
+                leadingLabel="Reasoning"
+              />
+            ))}
         </>
       )}
 

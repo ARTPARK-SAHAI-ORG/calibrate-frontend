@@ -805,33 +805,6 @@ describe("TestDetailView", () => {
     expect(screen.queryByText("Because it was wrong")).not.toBeInTheDocument();
   });
 
-  it("names a finished tool-call result after the evaluator that judged it", () => {
-    render(
-      <TestDetailView
-        history={[]}
-        passed={false}
-        evaluation={{ type: "tool_call", tool_calls: [] }}
-        judgeResults={[
-          {
-            evaluator_uuid: "ev-tool",
-            match: false,
-            score: null,
-            reasoning: "The agent made the wrong tool call.",
-          },
-        ]}
-        evaluatorsByUuid={{
-          "ev-tool": {
-            uuid: "ev-tool",
-            name: "Tool call correctness",
-            output_type: "binary",
-          },
-        }}
-      />,
-    );
-    expect(screen.getByText(/Tool call correctness/)).toBeInTheDocument();
-    expect(screen.queryByText(/Tool call test/)).not.toBeInTheDocument();
-  });
-
   it("never shows a reasoning toggle for a tool-call test either", () => {
     render(
       <TestDetailView
@@ -1044,6 +1017,68 @@ describe("TestDetailView", () => {
       expect(screen.queryByText("Input")).not.toBeInTheDocument();
       expect(screen.getByText("Agent Tool Call")).toBeInTheDocument();
     });
+  });
+});
+
+describe("EvaluationCriteriaPanel tool-call answers", () => {
+  const TOOL_CALL_EVALUATION = {
+    type: "tool_call",
+    tool_calls: [{ tool: "book_flight", arguments: { city: "NYC" } }],
+  };
+
+  it("names a finished answer after the evaluator that judged it", () => {
+    render(
+      <EvaluationCriteriaPanel
+        testType="tool_call"
+        passed={false}
+        evaluation={TOOL_CALL_EVALUATION}
+        judgeResults={[
+          {
+            evaluator_uuid: "ev-tool",
+            match: false,
+            reasoning: "The agent made the wrong tool call.",
+          },
+        ]}
+        evaluatorsByUuid={{
+          "ev-tool": {
+            uuid: "ev-tool",
+            name: "Tool call correctness",
+            output_type: "binary",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+    expect(screen.queryByText("Tool call test")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the run's own pass or fail when there is no judge result", () => {
+    render(
+      <EvaluationCriteriaPanel
+        testType="tool_call"
+        passed={false}
+        reasoning="No tool calls were generated"
+        evaluation={TOOL_CALL_EVALUATION}
+      />,
+    );
+    expect(screen.getByText("Tool call test")).toBeInTheDocument();
+  });
+
+  it("puts that older answer below the expected tool calls, not above", () => {
+    render(
+      <EvaluationCriteriaPanel
+        testType="tool_call"
+        passed={false}
+        reasoning="No tool calls were generated"
+        evaluation={TOOL_CALL_EVALUATION}
+      />,
+    );
+    const heading = screen.getByText("Expected Tool Calls");
+    const answer = screen.getByText("Tool call test");
+    expect(
+      heading.compareDocumentPosition(answer) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
