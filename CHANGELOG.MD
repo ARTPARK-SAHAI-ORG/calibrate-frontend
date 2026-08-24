@@ -1,5 +1,6 @@
 ## August 2026
 
+- Do not offer Delete on an evaluator that may not be deleted ([#423](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/423))
 - Show and edit an item's tool calls, and keep them when it is saved ([#422](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/422))
 - Let a tool-call test be submitted for labelling ([#417](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/417))
 - Let single agent response test results be submitted for labelling ([#416](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/416))
