@@ -75,6 +75,7 @@ import {
 } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
+import { toItemDetailItem } from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -4552,16 +4553,7 @@ function LabellingTaskPageInner() {
         item={(() => {
           if (!itemDetailUuid) return null;
           const match = items.find((i) => i.uuid === itemDetailUuid);
-          if (!match) return null;
-          return {
-            id: match.id,
-            uuid: match.uuid,
-            task_id: match.task_id,
-            payload: match.payload,
-            created_at: match.created_at,
-            deleted_at: match.deleted_at,
-            is_tool_call: match.is_tool_call,
-          };
+          return match ? toItemDetailItem(match) : null;
         })()}
         accessToken={accessToken}
         hasPrev={itemPager.hasPrev}
