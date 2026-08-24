@@ -181,6 +181,9 @@ export type TestRunEvaluator = {
   uuid: string;
   name: string;
   description?: string | null;
+  /** What kind of evaluator this is. Only read to recognise the tool-call
+   * one, whose name a workspace may change. */
+  evaluator_type?: string | null;
   /** Version number of the pinned evaluator version the run executed
    * against. Rendered as a small "vN" pill next to the evaluator name —
    * mirrors the labelling evaluator-run page. Optional because older run
@@ -572,7 +575,11 @@ export function ToolCallCard({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d={open ? "M4.5 15.75l7.5-7.5 7.5 7.5" : "M19.5 8.25l-7.5 7.5-7.5-7.5"}
+                d={
+                  open
+                    ? "M4.5 15.75l7.5-7.5 7.5 7.5"
+                    : "M19.5 8.25l-7.5 7.5-7.5-7.5"
+                }
               />
             </svg>
           </button>
@@ -772,7 +779,7 @@ export function JudgeResultsList({
       <div className="space-y-2">
         {results.map((r, i) => {
           const ev = r.evaluator_uuid
-            ? evaluatorsByUuid?.[r.evaluator_uuid] ?? null
+            ? (evaluatorsByUuid?.[r.evaluator_uuid] ?? null)
             : null;
           return (
             <JudgeResultCard
@@ -1014,9 +1021,7 @@ export function TestDetailView({
               </p>
             )}
             {output?.tool_calls && output.tool_calls.length > 0 && (
-              <div
-                className={`space-y-3 ${output.response ? "mt-3" : ""}`}
-              >
+              <div className={`space-y-3 ${output.response ? "mt-3" : ""}`}>
                 {output.tool_calls.map((toolCall, index) => {
                   const {
                     toolName,
@@ -1061,116 +1066,116 @@ export function TestDetailView({
               </pre>
             </div>
           ) : (
-          <div className="space-y-4">
-            {history.map((message, index) => {
-              const isEvalTarget = index === evalTargetIndex;
-              const timestamp = formatTurnTimestamp(message.created_at);
-              // Tool-response entries are surfaced inline on their parent
-              // tool_call card via the `output` prop — skip them here so
-              // they don't render as empty rows.
-              if (message.role === "tool") return null;
-              return (
-              <div
-                key={index}
-                className={`space-y-1 ${
-                  message.role === "user" ? "flex flex-col items-end" : ""
-                } ${
-                  isEvalTarget
-                    ? "border-l-2 border-blue-500 pl-4 -ml-4"
-                    : ""
-                }`}
-              >
-                {/* User Message */}
-                {message.role === "user" && (
-                  <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
-                    <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted border border-border">
-                      <p className="text-sm text-foreground whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    </div>
-                    {timestamp && (
-                      <span className="self-start text-[11px] text-muted-foreground tabular-nums mt-1">
-                        {timestamp}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Agent Message (text response) */}
-                {message.role === "assistant" && !message.tool_calls && (
-                  <>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-foreground">
-                        Agent
-                      </span>
-                      {isEvalTarget && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                          Evaluation target
-                        </span>
-                      )}
-                    </div>
-                    <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
-                      <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
-                        <p className="text-sm text-foreground whitespace-pre-wrap">
-                          {message.content}
-                        </p>
-                      </div>
-                      {timestamp && (
-                        <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
-                          {timestamp}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* Agent Tool Call from history. The tool's response (if
-                   present as a later `role: "tool"` entry with a matching
-                   `tool_call_id`) is attached as the card's `output` so the
-                   reviewer can see what the tool returned alongside the
-                   call. */}
-                {message.role === "assistant" &&
-                  message.tool_calls &&
-                  message.tool_calls.length > 0 && (
-                    <>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-foreground">
-                          Agent Tool Call
-                        </span>
-                        {isEvalTarget && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            Evaluation target
-                          </span>
-                        )}
-                      </div>
-                      <div className="w-[88%] md:w-3/4 flex flex-col">
-                        {message.tool_calls.map((toolCall, tcIndex) => {
-                          const { toolName, args } =
-                            normalizeToolCall(toolCall);
-                          const toolResponse = toolResponseByCallId.get(
-                            toolCall.id,
-                          );
-                          return (
-                            <ToolCallCard
-                              key={tcIndex}
-                              toolName={toolName}
-                              args={args}
-                              output={toolResponse}
-                            />
-                          );
-                        })}
+            <div className="space-y-4">
+              {history.map((message, index) => {
+                const isEvalTarget = index === evalTargetIndex;
+                const timestamp = formatTurnTimestamp(message.created_at);
+                // Tool-response entries are surfaced inline on their parent
+                // tool_call card via the `output` prop — skip them here so
+                // they don't render as empty rows.
+                if (message.role === "tool") return null;
+                return (
+                  <div
+                    key={index}
+                    className={`space-y-1 ${
+                      message.role === "user" ? "flex flex-col items-end" : ""
+                    } ${
+                      isEvalTarget
+                        ? "border-l-2 border-blue-500 pl-4 -ml-4"
+                        : ""
+                    }`}
+                  >
+                    {/* User Message */}
+                    {message.role === "user" && (
+                      <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
+                        <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted border border-border">
+                          <p className="text-sm text-foreground whitespace-pre-wrap">
+                            {message.content}
+                          </p>
+                        </div>
                         {timestamp && (
-                          <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                          <span className="self-start text-[11px] text-muted-foreground tabular-nums mt-1">
                             {timestamp}
                           </span>
                         )}
                       </div>
-                    </>
-                  )}
-              </div>
-              );
-            })}
-          </div>
+                    )}
+
+                    {/* Agent Message (text response) */}
+                    {message.role === "assistant" && !message.tool_calls && (
+                      <>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-foreground">
+                            Agent
+                          </span>
+                          {isEvalTarget && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                              Evaluation target
+                            </span>
+                          )}
+                        </div>
+                        <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
+                          <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                          </div>
+                          {timestamp && (
+                            <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                              {timestamp}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Agent Tool Call from history. The tool's response (if
+                   present as a later `role: "tool"` entry with a matching
+                   `tool_call_id`) is attached as the card's `output` so the
+                   reviewer can see what the tool returned alongside the
+                   call. */}
+                    {message.role === "assistant" &&
+                      message.tool_calls &&
+                      message.tool_calls.length > 0 && (
+                        <>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground">
+                              Agent Tool Call
+                            </span>
+                            {isEvalTarget && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                Evaluation target
+                              </span>
+                            )}
+                          </div>
+                          <div className="w-[88%] md:w-3/4 flex flex-col">
+                            {message.tool_calls.map((toolCall, tcIndex) => {
+                              const { toolName, args } =
+                                normalizeToolCall(toolCall);
+                              const toolResponse = toolResponseByCallId.get(
+                                toolCall.id,
+                              );
+                              return (
+                                <ToolCallCard
+                                  key={tcIndex}
+                                  toolName={toolName}
+                                  args={args}
+                                  output={toolResponse}
+                                />
+                              );
+                            })}
+                            {timestamp && (
+                              <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                                {timestamp}
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -1259,13 +1264,16 @@ export function TestDetailView({
       )}
 
       {/* Show empty state if no history and no output */}
-      {!isGeneralType && history.length === 0 && !output && !hasJudgeResults && (
-        <div className="text-center py-8">
-          <p className="text-sm text-muted-foreground">
-            No conversation history available for this test
-          </p>
-        </div>
-      )}
+      {!isGeneralType &&
+        history.length === 0 &&
+        !output &&
+        !hasJudgeResults && (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">
+              No conversation history available for this test
+            </p>
+          </div>
+        )}
       <div ref={bottomRef} />
     </div>
   );
@@ -1335,7 +1343,7 @@ function EvaluatorPanelCard({
   const effectiveVariables =
     result.variable_values && typeof result.variable_values === "object"
       ? result.variable_values
-      : variableValues ?? null;
+      : (variableValues ?? null);
   const scale = evaluator?.output_config?.scale ?? null;
   // The card falls back to binary whenever the row has no score, so a
   // rating evaluator's scale must not be read as true/false here.
@@ -1479,7 +1487,8 @@ export function EvaluationCriteriaPanel({
   // `result.variable_values` field isn't populated (older snapshots).
   // Match strictly by `evaluator_uuid` so a rename can't collide with a
   // different evaluator that happens to share the new name.
-  const variablesByUuid: Record<string, Record<string, string> | undefined> = {};
+  const variablesByUuid: Record<string, Record<string, string> | undefined> =
+    {};
   if (testCaseEvaluators) {
     for (const e of testCaseEvaluators) {
       if (e?.evaluator_uuid && e.variable_values) {
@@ -1504,33 +1513,32 @@ export function EvaluationCriteriaPanel({
         <h3 className="text-sm font-semibold text-foreground">Evaluators</h3>
       )}
 
-      {/* Tool-call test: the result (pass/fail + reasoning) shows first,
-          followed by the expected tool calls below it. The deterministic
-          tool-call match is binary, so we surface it through the same
-          `EvaluatorVerdictCard` (read mode) the response-test per-evaluator
-          cards use — name fixed to "Tool call test", verdict driven by the
-          top-level `passed` field, reasoning attached as the collapsible
-          explainer. While the run is still pending (`passed` null/undefined),
-          we fall back to the neutral reasoning strip so the card doesn't show
-          a misleading colour. */}
+      {/* Tool-call test: the result shows first, then the expected tool
+          calls. A finished row now carries a judge result for the Tool call
+          correctness evaluator, drawn by the same card a response test uses,
+          so the evaluator's own name and labels show rather than a fixed
+          word. Older runs carry no judge result and fall back to the run's
+          own pass or fail; while a run is still going there is neither, so
+          only the reasoning shows and no colour is claimed. */}
       {isToolCall && (
         <>
-          {typeof passed === "boolean" ? (
-            <EvaluatorVerdictCard
-              mode="read"
-              name="Tool call test"
-              outputType="binary"
-              enableLink={false}
-              match={passed}
-              reasoning={reasoning ?? null}
-            />
-          ) : (
-            <CollapsibleReasoningStrip
-              text={reasoning}
-              mutedBody={false}
-              leadingLabel="Reasoning"
-            />
-          )}
+          {!hasJudgeResults &&
+            (typeof passed === "boolean" ? (
+              <EvaluatorVerdictCard
+                mode="read"
+                name="Tool call test"
+                outputType="binary"
+                enableLink={false}
+                match={passed}
+                reasoning={reasoning ?? null}
+              />
+            ) : (
+              <CollapsibleReasoningStrip
+                text={reasoning}
+                mutedBody={false}
+                leadingLabel="Reasoning"
+              />
+            ))}
           <h3 className="text-sm font-semibold text-foreground">
             Expected Tool Calls
           </h3>
@@ -1556,12 +1564,13 @@ export function EvaluationCriteriaPanel({
         </>
       )}
 
-      {/* Response test, new format: per-evaluator cards. */}
-      {!isToolCall && hasJudgeResults && (
+      {/* Per-evaluator cards. A tool-call row reaches here too now that its
+          answer comes back as an ordinary evaluator result. */}
+      {hasJudgeResults && (
         <div className="space-y-3">
           {judgeResults!.map((jr, i) => {
             const ev = jr.evaluator_uuid
-              ? evaluatorsByUuid?.[jr.evaluator_uuid] ?? null
+              ? (evaluatorsByUuid?.[jr.evaluator_uuid] ?? null)
               : null;
             return (
               <EvaluatorPanelCard
@@ -1710,9 +1719,24 @@ export function ResultPager({
     "inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0";
   return (
     <div className="flex items-center gap-2">
-      <button type="button" onClick={onPrev} disabled={!hasPrev} className={btn}>
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={!hasPrev}
+        className={btn}
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 19l-7-7 7-7"
+          />
         </svg>
         Previous
       </button>
@@ -1721,9 +1745,20 @@ export function ResultPager({
           {currentIndex + 1} of {total}
         </span>
       )}
-      <button type="button" onClick={onNext} disabled={!hasNext} className={btn}>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!hasNext}
+        className={btn}
+      >
         Next
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
       </button>

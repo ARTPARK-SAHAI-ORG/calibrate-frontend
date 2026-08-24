@@ -307,6 +307,14 @@ export function TestRunnerDialog({
   // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
   // backend `evaluator_summary` block (only benchmarks do), so aggregate it
   // from each case's judge_results against the run's evaluator metadata.
+  // The Tool call correctness evaluator, when the run has one. Recognised by
+  // its kind, not its name, which a workspace may change.
+  const toolCallEvaluatorUuid = useMemo(
+    () =>
+      runEvaluators.find((e) => e.evaluator_type === "tool-call")?.uuid ?? null,
+    [runEvaluators],
+  );
+
   const evaluatorSummary = useMemo(
     () =>
       buildEvaluatorSummaryFromResults(
@@ -418,27 +426,27 @@ export function TestRunnerDialog({
               </div>
             )}
             {showLabelling && (
-                <div className="hidden md:block">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeTab === "summary") {
-                        setActiveTab("outputs");
-                      }
-                      if (labellingSelectedIds.size === 0) {
-                        toast.error(
-                          "Select one or more tests to submit for labelling",
-                        );
-                        return;
-                      }
-                      setAddToTaskOpen(true);
-                    }}
-                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                  >
-                    Submit for labelling
-                  </button>
-                </div>
-              )}
+              <div className="hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTab === "summary") {
+                      setActiveTab("outputs");
+                    }
+                    if (labellingSelectedIds.size === 0) {
+                      toast.error(
+                        "Select one or more tests to submit for labelling",
+                      );
+                      return;
+                    }
+                    setAddToTaskOpen(true);
+                  }}
+                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                >
+                  Submit for labelling
+                </button>
+              </div>
+            )}
             {/* Share button — only shown when run is done */}
             {runStatus === "done" && backendAccessToken && (
               <div className="hidden md:block">
@@ -548,6 +556,7 @@ export function TestRunnerDialog({
                   cost={run?.cost ?? null}
                   tokens={run?.total_tokens ?? null}
                   toolCall={toolCall}
+                  toolCallEvaluatorUuid={toolCallEvaluatorUuid}
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>

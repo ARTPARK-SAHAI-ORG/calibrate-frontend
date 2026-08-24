@@ -10,7 +10,11 @@ import {
   ResultPager,
   type PagerNav,
 } from "@/components/test-results/shared";
-import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
+import {
+  PublicPageLayout,
+  PublicNotFound,
+  PublicLoading,
+} from "@/components/PublicPageLayout";
 import {
   TestRunOutputsPanel,
   TestRunSummary,
@@ -35,7 +39,11 @@ type TestCaseResult = {
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
   chat_history?: { role: string; content: string }[];
-  evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
+  evaluation?: {
+    passed: boolean;
+    message?: string;
+    details?: Record<string, any>;
+  };
   judge_results?: JudgeResult[] | null;
   /** Per-case agent latency (ms) / cost (USD) / total tokens. */
   latency_ms?: number | null;
@@ -79,7 +87,9 @@ export default function PublicTestRunPage() {
     "summary",
   );
 
-  useEffect(() => { document.title = "LLM component test | Calibrate"; }, []);
+  useEffect(() => {
+    document.title = "LLM component test | Calibrate";
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -91,11 +101,17 @@ export default function PublicTestRunPage() {
           headers: { accept: "application/json" },
         });
 
-        if (res.status === 404) { setNotFound(true); return; }
+        if (res.status === 404) {
+          setNotFound(true);
+          return;
+        }
         if (!res.ok) throw new Error("Failed to load results");
 
         const result: TestRunStatusResponse = await res.json();
-        if (result.status !== "done" && result.status !== "completed") { setNotFound(true); return; }
+        if (result.status !== "done" && result.status !== "completed") {
+          setNotFound(true);
+          return;
+        }
 
         setData(result);
         if (result.results?.length) setSelectedId(`test-0`);
@@ -108,8 +124,18 @@ export default function PublicTestRunPage() {
     fetchData();
   }, [token]);
 
-  if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
-  if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
+  if (isLoading)
+    return (
+      <PublicPageLayout>
+        <PublicLoading />
+      </PublicPageLayout>
+    );
+  if (notFound || !data)
+    return (
+      <PublicPageLayout>
+        <PublicNotFound />
+      </PublicPageLayout>
+    );
 
   const results = data.results ?? [];
   const passed = results.filter((r) => getStatus(r) === "passed").length;
@@ -128,7 +154,10 @@ export default function PublicTestRunPage() {
   );
 
   return (
-    <PublicPageLayout title="LLM component test" contentClassName="max-w-[92rem]">
+    <PublicPageLayout
+      title="LLM component test"
+      contentClassName="max-w-[92rem]"
+    >
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
@@ -187,6 +216,11 @@ export default function PublicTestRunPage() {
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
             toolCall={toolCall}
+            toolCallEvaluatorUuid={
+              (data.evaluators ?? []).find(
+                (e) => e.evaluator_type === "tool-call",
+              )?.uuid ?? null
+            }
             evaluatorSummary={buildEvaluatorSummaryFromResults(
               results,
               Object.fromEntries(
@@ -199,16 +233,22 @@ export default function PublicTestRunPage() {
 
         {/* Outputs tab */}
         {activeTab === "outputs" && results.length > 0 && (
-          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
+          <div
+            className="border border-border rounded-xl overflow-hidden"
+            style={{ height: "calc(100vh - 220px)", minHeight: 620 }}
+          >
             <TestRunOutputsPanel
               results={results.map((r, i) => ({
                 id: `test-${i}`,
-                name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
+                name:
+                  r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
                 status: getStatus(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,
                 reasoning: r.reasoning,
-                evaluation: r.evaluation ?? { passed: getStatus(r) === "passed" },
+                evaluation: r.evaluation ?? {
+                  passed: getStatus(r) === "passed",
+                },
                 judgeResults: r.judge_results ?? null,
                 error: r.error,
               }))}
