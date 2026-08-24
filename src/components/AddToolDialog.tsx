@@ -10,7 +10,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import { parseSchemaNode, NormalizedToolParam } from "@/lib/toolParams";
 
-type ToolData = {
+export type ToolData = {
   uuid: string;
   name: string;
   description?: string;
@@ -19,7 +19,7 @@ type ToolData = {
   updated_at: string;
 };
 
-type ToolType = "structured_output" | "webhook";
+export type ToolType = "structured_output" | "webhook";
 
 type AddToolDialogProps = {
   isOpen: boolean;

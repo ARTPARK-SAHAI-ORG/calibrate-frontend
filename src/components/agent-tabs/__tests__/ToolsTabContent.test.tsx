@@ -1,6 +1,11 @@
 import React from "react";
-import { render, screen, setupUser, act } from "@/test-utils";
+import { render, screen, setupUser, act, waitFor } from "@/test-utils";
 import { ToolsTabContent } from "../ToolsTabContent";
+
+const reportErrorMock = jest.fn();
+jest.mock("../../../lib/reportError", () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+}));
 
 // AddToolDialog / DeleteToolDialog are separately-tested, heavier
 // components with their own network calls. Stub them here and capture the
@@ -20,6 +25,40 @@ jest.mock("../DeleteToolDialog", () => ({
     deleteToolProps = props;
     return props.isOpen ? <div data-testid="delete-tool-dialog" /> : null;
   },
+}));
+
+// CreateToolFlow is separately tested. Stubbed to a button that reports the
+// tool it "created" and the full list, the same shape the real flow reports.
+let createToolProps: any = null;
+const CREATED_TOOL = {
+  uuid: "tool-new",
+  name: "Freshly made",
+  config: {},
+  created_at: "2024-01-01",
+  updated_at: "2024-01-01",
+};
+jest.mock("../../tools/CreateToolFlow", () => ({
+  CreateToolFlow: (props: any) => {
+    createToolProps = props;
+    return props.isOpen ? (
+      <button
+        onClick={() =>
+          props.onCreated(CREATED_TOOL, [...props.knownTools, CREATED_TOOL])
+        }
+      >
+        Finish creating
+      </button>
+    ) : null;
+  },
+}));
+
+const attachToolsToAgentMock = jest.fn();
+jest.mock("../../../lib/agentTools", () => ({
+  attachToolsToAgent: (...args: unknown[]) => attachToolsToAgentMock(...args),
+}));
+
+jest.mock("../../../hooks/useAccessToken", () => ({
+  useAccessToken: () => "test-token",
 }));
 
 const toolA = {
@@ -67,6 +106,10 @@ describe("ToolsTabContent", () => {
   beforeEach(() => {
     addToolProps = null;
     deleteToolProps = null;
+    createToolProps = null;
+    attachToolsToAgentMock.mockReset();
+    attachToolsToAgentMock.mockResolvedValue(undefined);
+    reportErrorMock.mockReset();
   });
 
   it("shows a loading state", () => {
@@ -240,5 +283,54 @@ describe("ToolsTabContent", () => {
   it("passes endConversationEnabled/setEndConversationEnabled through to the in-built tools panel", () => {
     renderComponent({ endConversationEnabled: true });
     expect(screen.getByText("1 active tool")).toBeInTheDocument();
+  });
+
+  describe("Create tool", () => {
+    it("opens the flow from the header button", async () => {
+      const user = setupUser();
+      renderComponent();
+      expect(createToolProps.isOpen).toBe(false);
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      expect(createToolProps.isOpen).toBe(true);
+    });
+
+    it("opens the flow from the empty-state button too", async () => {
+      const user = setupUser();
+      renderComponent({ agentTools: [] });
+      const buttons = screen.getAllByRole("button", { name: "Create tool" });
+      await user.click(buttons[buttons.length - 1]);
+      expect(createToolProps.isOpen).toBe(true);
+    });
+
+    it("attaches the created tool to this agent and adds it to the list", async () => {
+      const user = setupUser();
+      const setAgentTools = jest.fn();
+      renderComponent({ setAgentTools });
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      await user.click(screen.getByText("Finish creating"));
+
+      expect(attachToolsToAgentMock).toHaveBeenCalledWith(
+        "agent-1",
+        ["tool-new"],
+        "test-token",
+      );
+      // Closed straight away rather than waiting on the attach call.
+      expect(createToolProps.isOpen).toBe(false);
+      // setAgentTools took a function, appending the new tool.
+      const updater = setAgentTools.mock.calls[0][0];
+      expect(updater([toolA])).toEqual([toolA, CREATED_TOOL]);
+    });
+
+    it("reports the failure instead of silently dropping the tool when attaching fails", async () => {
+      const user = setupUser();
+      attachToolsToAgentMock.mockRejectedValue(new Error("network down"));
+      const setAgentTools = jest.fn();
+      renderComponent({ setAgentTools });
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      await user.click(screen.getByText("Finish creating"));
+
+      await waitFor(() => expect(reportErrorMock).toHaveBeenCalled());
+      expect(setAgentTools).not.toHaveBeenCalled();
+    });
   });
 });

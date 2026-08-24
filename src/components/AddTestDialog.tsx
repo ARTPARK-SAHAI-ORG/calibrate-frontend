@@ -17,6 +17,8 @@ import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
 import { isCreatableTestType } from "@/constants/testTypes";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { attachToolsToAgent } from "@/lib/agentTools";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
@@ -789,6 +791,11 @@ type AddTestDialogProps = {
     options?: { runAfterSave?: boolean },
   ) => void;
   initialTab?: "next-reply" | "tool-invocation" | "conversation";
+  /** The agent these tests belong to, when the dialog was opened from its
+   * own Tests tab. A tool written here is added to that agent as well as to
+   * the workspace. Absent on the standalone tests page, where there is no
+   * one agent to add it to. */
+  agentUuid?: string;
   initialConfig?: TestConfig;
   initialEvaluators?: AttachedEvaluatorInit[];
   /**
@@ -888,6 +895,7 @@ export function AddTestDialog({
   validationAttempted,
   onSubmit,
   initialTab,
+  agentUuid,
   initialConfig,
   initialEvaluators,
   agentEvaluatorUuids,
@@ -1082,6 +1090,7 @@ export function AddTestDialog({
   }
 
   // Available tools state - declared early so it's available for initialConfig parsing
+  const [createToolOpen, setCreateToolOpen] = useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
 
@@ -4247,18 +4256,28 @@ export function AddTestDialog({
                         <label className="text-base font-medium text-foreground">
                           Tools to test
                         </label>
-                        <button
-                          onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                          className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
-                            localValidationAttempted &&
-                            activeTab === "tool-invocation" &&
-                            selectedTools.length === 0
-                              ? "border-red-500 text-red-400"
-                              : "border-border"
-                          }`}
-                        >
-                          Add tool
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              setToolDropdownOpen(!toolDropdownOpen)
+                            }
+                            className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
+                              localValidationAttempted &&
+                              activeTab === "tool-invocation" &&
+                              selectedTools.length === 0
+                                ? "border-red-500 text-red-400"
+                                : "border-border"
+                            }`}
+                          >
+                            Add tool
+                          </button>
+                          <button
+                            onClick={() => setCreateToolOpen(true)}
+                            className="px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
+                          >
+                            Create tool
+                          </button>
+                        </div>
                       </div>
 
                       {/* Tool Dropdown */}
@@ -5748,6 +5767,31 @@ export function AddTestDialog({
         evaluatorUuid={previewEvaluator?.uuid ?? null}
         evaluatorName={previewEvaluator?.name}
         onClose={() => setPreviewEvaluator(null)}
+      />
+
+      {/* Making a tool from inside the test, the same way. It goes into the
+          workspace, into this test, and onto the agent when the dialog was
+          opened from that agent's own Tests tab. */}
+      <CreateToolFlow
+        isOpen={createToolOpen}
+        onClose={() => setCreateToolOpen(false)}
+        accessToken={backendAccessToken ?? undefined}
+        knownTools={availableTools}
+        onCreated={async (tool, allTools) => {
+          setCreateToolOpen(false);
+          setAvailableTools(allTools);
+          addToolFromSelection(tool);
+          if (!agentUuid) return;
+          try {
+            await attachToolsToAgent(
+              agentUuid,
+              [tool.uuid],
+              backendAccessToken ?? undefined,
+            );
+          } catch (err) {
+            reportError("Error adding the new tool to the agent", err);
+          }
+        }}
       />
     </div>
   );

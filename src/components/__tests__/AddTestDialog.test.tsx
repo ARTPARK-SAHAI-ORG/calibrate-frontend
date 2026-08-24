@@ -91,6 +91,35 @@ jest.mock("../../lib/reportError", () => ({
   reportError: jest.fn(),
 }));
 
+// CreateToolFlow is separately tested. Stubbed to a button that reports the
+// tool it "created" and the full list, the same shape the real flow reports.
+let createToolFlowProps: any = null;
+jest.mock("../tools/CreateToolFlow", () => ({
+  __esModule: true,
+  CreateToolFlow: (props: any) => {
+    createToolFlowProps = props;
+    return props.isOpen ? (
+      <button
+        type="button"
+        onClick={() =>
+          props.onCreated(
+            { uuid: "tool-new", name: "get_forecast", config: {} },
+            [...props.knownTools, { uuid: "tool-new", name: "get_forecast", config: {} }],
+          )
+        }
+      >
+        Finish creating tool
+      </button>
+    ) : null;
+  },
+}));
+
+const attachToolsToAgentMock = jest.fn();
+jest.mock("../../lib/agentTools", () => ({
+  __esModule: true,
+  attachToolsToAgent: (...args: unknown[]) => attachToolsToAgentMock(...args),
+}));
+
 const WEATHER_TOOL = {
   uuid: "tool-weather",
   name: "get_weather",
@@ -188,6 +217,9 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://127.0.0.1:8000";
   localStorage.setItem("access_token", "test-token");
   (global as any).fetch = mockFetchImpl();
+  createToolFlowProps = null;
+  attachToolsToAgentMock.mockReset();
+  attachToolsToAgentMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -974,6 +1006,53 @@ describe("AddTestDialog", () => {
       expect(removeBtn).toBeTruthy();
       await user.click(removeBtn as HTMLElement);
       expect(screen.queryByText("get_weather")).not.toBeInTheDocument();
+    });
+
+    it("opens the create-tool flow from its own button, separate from the tool picker", async () => {
+      const user = setupUser();
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      expect(createToolFlowProps.isOpen).toBe(true);
+      expect(
+        screen.queryByTestId("tool-picker"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("selects the newly created tool into the test's tool call, with no agent to attach to", async () => {
+      const user = setupUser();
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      await user.click(screen.getByText("Finish creating tool"));
+
+      expect(screen.getByText("get_forecast")).toBeInTheDocument();
+      expect(attachToolsToAgentMock).not.toHaveBeenCalled();
+    });
+
+    it("also attaches the new tool to the agent when the dialog is scoped to one", async () => {
+      const user = setupUser();
+      render(
+        <AddTestDialog
+          {...baseProps({
+            initialTab: "tool-invocation",
+            agentUuid: "agent-42",
+          })}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Create tool" }));
+      await user.click(screen.getByText("Finish creating tool"));
+
+      expect(screen.getByText("get_forecast")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(attachToolsToAgentMock).toHaveBeenCalledWith(
+          "agent-42",
+          ["tool-new"],
+          "test-token",
+        ),
+      );
     });
 
     it("switches a tool's parameter editor into JSON mode and edits raw JSON", async () => {

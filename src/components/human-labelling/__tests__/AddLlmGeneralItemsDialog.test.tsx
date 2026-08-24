@@ -67,6 +67,32 @@ jest.mock("../../ToolPicker", () => ({
   ),
 }));
 
+// CreateToolFlow is separately tested. Stubbed to a button that reports the
+// tool it "created" and the full list, the same shape the real flow reports.
+let createToolFlowProps: any = null;
+jest.mock("../../tools/CreateToolFlow", () => ({
+  __esModule: true,
+  CreateToolFlow: (props: any) => {
+    createToolFlowProps = props;
+    return props.isOpen ? (
+      <button
+        type="button"
+        onClick={() =>
+          props.onCreated(
+            { uuid: "tool-new", name: "book_flight", config: {} },
+            [
+              ...props.knownTools,
+              { uuid: "tool-new", name: "book_flight", config: {} },
+            ],
+          )
+        }
+      >
+        Finish creating tool
+      </button>
+    ) : null;
+  },
+}));
+
 const evaluatorWithVars: LlmGeneralEvaluatorDef = {
   uuid: "ev-1",
   name: "Relevance",
@@ -309,6 +335,40 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     renderDialog({ mode: "add" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the create-tool flow from its own button, separate from the picker", async () => {
+    const user = setupUser();
+    renderDialog({ mode: "add" });
+    expect(createToolFlowProps.isOpen).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+    expect(createToolFlowProps.isOpen).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: "Pick book_flight" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("puts a freshly created tool straight onto the item as a tool call", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+    await user.click(
+      screen.getByRole("button", { name: "Finish creating tool" }),
+    );
+
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("city"), "Bengaluru");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "book_flight", arguments: { city: "Bengaluru" } },
+    ]);
   });
 
   it("keeps the text box when the answer was text", () => {

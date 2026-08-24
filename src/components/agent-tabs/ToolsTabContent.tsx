@@ -4,6 +4,10 @@ import React, { useState } from "react";
 import { AddToolDialog } from "./AddToolDialog";
 import { DeleteToolDialog } from "./DeleteToolDialog";
 import { InbuiltToolsPanel } from "./InbuiltToolsPanel";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { attachToolsToAgent } from "@/lib/agentTools";
+import { useAccessToken } from "@/hooks/useAccessToken";
+import { reportError } from "@/lib/reportError";
 
 type ToolData = {
   uuid: string;
@@ -37,7 +41,9 @@ export function ToolsTabContent({
   endConversationEnabled,
   setEndConversationEnabled,
 }: ToolsTabContentProps) {
+  const accessToken = useAccessToken();
   const [toolsSearchQuery, setToolsSearchQuery] = useState("");
+  const [createToolOpen, setCreateToolOpen] = useState(false);
   const [addToolDialogOpen, setAddToolDialogOpen] = useState(false);
   const [deleteToolDialogOpen, setDeleteToolDialogOpen] = useState(false);
   const [toolToDelete, setToolToDelete] = useState<ToolData | null>(null);
@@ -55,12 +61,20 @@ export function ToolsTabContent({
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => setAddToolDialogOpen(true)}
-          className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-        >
-          Add tool
-        </button>
+        <div className="flex items-center gap-2 md:gap-3">
+          <button
+            onClick={() => setAddToolDialogOpen(true)}
+            className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            Add tool
+          </button>
+          <button
+            onClick={() => setCreateToolOpen(true)}
+            className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+          >
+            Create tool
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 md:gap-6">
@@ -152,12 +166,20 @@ export function ToolsTabContent({
                   ? "No tools match your search"
                   : "No tools have been added to this agent yet"}
               </p>
-              <button
-                onClick={() => setAddToolDialogOpen(true)}
-                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                Add tool
-              </button>
+              <div className="flex items-center gap-2 md:gap-3">
+                <button
+                  onClick={() => setAddToolDialogOpen(true)}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  Add tool
+                </button>
+                <button
+                  onClick={() => setCreateToolOpen(true)}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  Create tool
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -302,6 +324,24 @@ export function ToolsTabContent({
         allTools={allTools}
         allToolsLoading={allToolsLoading}
         onToolsAdded={(tools) => setAgentTools((prev) => [...prev, ...tools])}
+      />
+
+      {/* Writing a new tool. A tool written here is for this agent, so it
+          goes onto it as well as into the workspace's library. */}
+      <CreateToolFlow
+        isOpen={createToolOpen}
+        onClose={() => setCreateToolOpen(false)}
+        accessToken={accessToken ?? undefined}
+        knownTools={allTools}
+        onCreated={async (tool) => {
+          setCreateToolOpen(false);
+          try {
+            await attachToolsToAgent(agentUuid, [tool.uuid], accessToken ?? undefined);
+            setAgentTools((prev) => [...prev, tool]);
+          } catch (err) {
+            reportError("Error adding the new tool to the agent", err);
+          }
+        }}
       />
 
       {/* Delete Tool Confirmation Dialog */}

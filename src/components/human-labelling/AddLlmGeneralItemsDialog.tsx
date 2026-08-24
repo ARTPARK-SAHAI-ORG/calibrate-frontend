@@ -5,6 +5,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
 import { ToolPicker, getToolParams } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { getDefaultHeaders } from "@/lib/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
@@ -172,6 +173,7 @@ export function AddLlmGeneralItemsDialog({
     seedToolCalls(seed?.toolCalls),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [createToolOpen, setCreateToolOpen] = useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [varValues, setVarValues] = useState<VarValues>(() =>
@@ -539,50 +541,60 @@ export function AddLlmGeneralItemsDialog({
                 <label className="block text-base font-medium text-foreground">
                   Output
                 </label>
-                <div className="relative">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setPickerOpen((open) => !open)}
+                    onClick={() => setCreateToolOpen(true)}
                     disabled={submitting}
                     className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 4.5v15m7.5-7.5h-15"
-                      />
-                    </svg>
-                    Add tool call
+                    Create tool
                   </button>
-                  {pickerOpen && (
-                    <>
-                      {/* Click anywhere else to close, the same invisible
-                          sheet the test dialog's tool menu uses. */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setPickerOpen(false)}
-                      />
-                      <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
-                        <ToolPicker
-                          availableTools={availableTools}
-                          isLoading={toolsLoading}
-                          onSelectInbuiltTool={(toolId) =>
-                            addToolCall(toolId, [])
-                          }
-                          onSelectCustomTool={(tool) =>
-                            addToolCall(tool.name, getToolParams(tool))
-                          }
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen((open) => !open)}
+                      disabled={submitting}
+                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 4.5v15m7.5-7.5h-15"
                         />
-                      </div>
-                    </>
-                  )}
+                      </svg>
+                      Add tool call
+                    </button>
+                    {pickerOpen && (
+                      <>
+                        {/* Click anywhere else to close, the same invisible
+                          sheet the test dialog's tool menu uses. */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setPickerOpen(false)}
+                        />
+                        <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                          <ToolPicker
+                            availableTools={availableTools}
+                            isLoading={toolsLoading}
+                            onSelectInbuiltTool={(toolId) =>
+                              addToolCall(toolId, [])
+                            }
+                            onSelectCustomTool={(tool) =>
+                              addToolCall(tool.name, getToolParams(tool))
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
@@ -707,6 +719,21 @@ export function AddLlmGeneralItemsDialog({
         open={discardConfirmOpen}
         onKeepEditing={closeDiscardConfirm}
         onDiscard={doClose}
+      />
+
+      {/* Writing a new tool from inside this item. It goes into the
+          workspace's tool list and straight onto the item's output, the
+          same as picking an existing one. */}
+      <CreateToolFlow
+        isOpen={createToolOpen}
+        onClose={() => setCreateToolOpen(false)}
+        accessToken={accessToken ?? undefined}
+        knownTools={availableTools}
+        onCreated={(tool, allTools) => {
+          setCreateToolOpen(false);
+          setAvailableTools(allTools);
+          addToolCall(tool.name, getToolParams(tool));
+        }}
       />
     </div>
   );

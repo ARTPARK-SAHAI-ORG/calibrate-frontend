@@ -2296,6 +2296,7 @@ export function TestsTabContent({
           editingTestUuid is set), submits via PUT /tests/{uuid}. */}
       {createDialogOpen && (
         <AddTestDialog
+          agentUuid={agentUuid}
           isOpen={createDialogOpen}
           onClose={() => {
             setCreateDialogOpen(false);
