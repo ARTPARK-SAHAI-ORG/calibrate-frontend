@@ -46,26 +46,33 @@ describe("runEvaluatorsDecision", () => {
     ).toEqual({ blocked: true });
   });
 
-  it("runs a mixed set and counts the tool calls left out", () => {
+  it("keeps the tool-call rows out of a mixed run and counts them", () => {
     expect(
       runEvaluatorsDecision([
-        { is_tool_call: true },
-        { is_tool_call: false },
-        {},
+        { uuid: "a", is_tool_call: true },
+        { uuid: "b", is_tool_call: false },
+        { uuid: "c" },
       ]),
-    ).toEqual({ blocked: false, toolCallSkipCount: 1 });
+    ).toEqual({
+      blocked: false,
+      toolCallSkipCount: 1,
+      runnable: [{ uuid: "b", is_tool_call: false }, { uuid: "c" }],
+    });
   });
 
   it("runs a set with no tool calls and counts none", () => {
-    expect(
-      runEvaluatorsDecision([{ is_tool_call: false }, {}]),
-    ).toEqual({ blocked: false, toolCallSkipCount: 0 });
+    expect(runEvaluatorsDecision([{ is_tool_call: false }, {}])).toEqual({
+      blocked: false,
+      toolCallSkipCount: 0,
+      runnable: [{ is_tool_call: false }, {}],
+    });
   });
 
   it("does not refuse an empty set", () => {
     expect(runEvaluatorsDecision([])).toEqual({
       blocked: false,
       toolCallSkipCount: 0,
+      runnable: [],
     });
   });
 });

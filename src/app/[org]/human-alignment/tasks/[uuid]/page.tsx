@@ -2064,7 +2064,11 @@ function LabellingTaskPageInner() {
       const ids = Array.isArray(target) ? target : target ? [target] : null;
       const decision = runEvaluatorsDecision(
         (ids ?? []).map(
-          (id) => items.find((i) => i.uuid === id) ?? { is_tool_call: false },
+          (id) =>
+            items.find((i) => i.uuid === id) ?? {
+              uuid: id,
+              is_tool_call: false,
+            },
         ),
       );
       if (decision.blocked) {
@@ -2074,7 +2078,9 @@ function LabellingTaskPageInner() {
         return;
       }
       setRunDialogToolCallSkipCount(decision.toolCallSkipCount);
-      setRunDialogItemUuids(ids);
+      // Only the rows a run can score are sent. A tool-call row left in would
+      // sit in the finished run with nothing against it.
+      setRunDialogItemUuids(ids ? decision.runnable.map((r) => r.uuid) : null);
       setRunDialogSelectAll(null);
     }
     setRunDialogSubmitError(null);

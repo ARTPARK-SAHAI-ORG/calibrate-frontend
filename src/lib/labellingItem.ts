@@ -33,20 +33,24 @@ export function toItemDetailItem(
 // What running the AI judges over a chosen set of rows should do. A judge has
 // no wording to read on a tool call, so the backend skips those rows: a set of
 // nothing but tool calls has nothing to run and is refused before the run
-// dialog opens, and a mixed set runs with `toolCallSkipCount` saying how many
-// are left out, so the reader is told before confirming.
+// dialog opens. A mixed set runs on `runnable` alone, so a tool-call row never
+// reaches the run at all, and `toolCallSkipCount` says how many were left out
+// so the reader is told before confirming.
 //
 // `is_tool_call` is stamped by the backend and absent on an older response, so
 // an unknown row counts as a normal one. The backend applies the same rule, so
 // erring that way only costs a round trip.
-export function runEvaluatorsDecision(
-  rows: { is_tool_call?: boolean }[],
-): { blocked: true } | { blocked: false; toolCallSkipCount: number } {
-  const toolCallSkipCount = rows.filter((r) => r.is_tool_call === true).length;
-  if (rows.length > 0 && toolCallSkipCount === rows.length) {
+export function runEvaluatorsDecision<T extends { is_tool_call?: boolean }>(
+  rows: T[],
+):
+  | { blocked: true }
+  | { blocked: false; toolCallSkipCount: number; runnable: T[] } {
+  const runnable = rows.filter((r) => r.is_tool_call !== true);
+  const toolCallSkipCount = rows.length - runnable.length;
+  if (rows.length > 0 && runnable.length === 0) {
     return { blocked: true };
   }
-  return { blocked: false, toolCallSkipCount };
+  return { blocked: false, toolCallSkipCount, runnable };
 }
 
 // True when an evaluation run recorded no score for a row because the AI
