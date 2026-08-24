@@ -4560,6 +4560,7 @@ function LabellingTaskPageInner() {
             payload: match.payload,
             created_at: match.created_at,
             deleted_at: match.deleted_at,
+            is_tool_call: match.is_tool_call,
           };
         })()}
         accessToken={accessToken}
