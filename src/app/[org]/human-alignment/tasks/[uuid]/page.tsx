@@ -278,7 +278,8 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
+    evaluator_type?:
+      "llm" | "llm-general" | "stt" | "tts" | "conversation" | "tool-call";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -301,12 +302,7 @@ type LabellingTask = {
 };
 
 type TaskKind =
-  | "llm"
-  | "llm-general"
-  | "stt"
-  | "tts"
-  | "conversation"
-  | undefined;
+  "llm" | "llm-general" | "stt" | "tts" | "conversation" | undefined;
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -353,7 +349,9 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
 }
 
 function sanitizeCsvName(s: string): string {
-  return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
+  return (
+    s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed"
+  );
 }
 
 function buildItemsCsv(
@@ -396,8 +394,10 @@ function buildItemsCsv(
     const set = versionsByEval.get(ev.uuid);
     if (!set || set.size === 0) return [null];
     return [...set].sort((a, b) => {
-      const an: number = (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
-      const bn: number = (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
+      const an: number =
+        (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
+      const bn: number =
+        (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
       return an - bn;
     });
   };
@@ -818,11 +818,7 @@ function EvaluatorRunsList({
   );
 }
 
-function SortIndicator({
-  direction,
-}: {
-  direction: "asc" | "desc" | null;
-}) {
+function SortIndicator({ direction }: { direction: "asc" | "desc" | null }) {
   return (
     <svg
       className={`w-3 h-3 transition-transform ${
@@ -834,11 +830,7 @@ function SortIndicator({
       strokeWidth={2}
       aria-hidden="true"
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 9l-7 7-7-7"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
   );
 }
@@ -919,7 +911,6 @@ function ItemRowActions({
   );
 }
 
-
 function LabelledByCell({
   labellers,
   annotatorNameById,
@@ -937,11 +928,9 @@ function LabelledByCell({
     );
   }
   const ids = Array.from(labellers);
-  const nameFor = (id: string) =>
-    annotatorNameById.get(id) ?? id.slice(0, 8);
+  const nameFor = (id: string) => annotatorNameById.get(id) ?? id.slice(0, 8);
   const visibleIds = ids.length <= 2 ? ids : ids.slice(0, 1);
-  const remainingNames =
-    ids.length <= 2 ? [] : ids.slice(1).map(nameFor);
+  const remainingNames = ids.length <= 2 ? [] : ids.slice(1).map(nameFor);
   return (
     <div className="flex flex-wrap gap-1 min-w-0">
       {visibleIds.map((id) => (
@@ -1241,8 +1230,11 @@ function LabellingTaskPageInner() {
   const [task, setTask] = useState<LabellingTask | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureError } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureError,
+  } = usePageErrorState();
   /** False until the first task GET for this route finishes (avoids empty-state flash on Items/Jobs). */
   const [taskFetchCompleted, setTaskFetchCompleted] = useState(false);
 
@@ -1313,14 +1305,14 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
-    {
-      uuid: string;
-      name: string;
-      description?: string;
-      input: string;
-      output: string;
-      varValues?: Record<string, Record<string, string>>;
-    }[]
+    | {
+        uuid: string;
+        name: string;
+        description?: string;
+        input: string;
+        output: string;
+        varValues?: Record<string, Record<string, string>>;
+      }[]
     | null
   >(null);
 
@@ -1411,9 +1403,7 @@ function LabellingTaskPageInner() {
       const optimistic = targetOrder
         .map((id) => byUuid.get(id))
         .filter((e): e is NonNullable<typeof e> => !!e);
-      setTask((prev) =>
-        prev ? { ...prev, evaluators: optimistic } : prev,
-      );
+      setTask((prev) => (prev ? { ...prev, evaluators: optimistic } : prev));
       try {
         const result = await apiClient<{
           message: string;
@@ -1488,9 +1478,7 @@ function LabellingTaskPageInner() {
   // that turns them into "82%" or "3.9 / 5" comes from the task's own
   // evaluator list, so the two are joined here by evaluator uuid.
   const { evaluatorResultStats, humanScoreCards } = useMemo(() => {
-    const scaleById = new Map(
-      (task?.evaluators ?? []).map((e) => [e.uuid, e]),
-    );
+    const scaleById = new Map((task?.evaluators ?? []).map((e) => [e.uuid, e]));
     const byEvaluator: Record<string, EvaluatorResultStat | null> = {};
     const humanCards: {
       evaluatorId: string;
@@ -1536,7 +1524,23 @@ function LabellingTaskPageInner() {
   // raw count: a count with no usable value behind it (an evaluator missing
   // from the task's own list, or one whose output type is not recorded)
   // formats to nothing, and a card with nothing in it is worse than no card.
-  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
+  // Tool call correctness is answered by people, never by an AI judge, so
+  // there is nothing to compare its answers against. It gets no agreement
+  // card and is left out of the note about missing alignment numbers, where
+  // it would otherwise read as an evaluator that failed to run.
+  const toolCallEvaluatorIds = useMemo(
+    () =>
+      new Set(
+        (task?.evaluators ?? [])
+          .filter((e) => e.evaluator_type === "tool-call")
+          .map((e) => e.uuid),
+      ),
+    [task],
+  );
+  const judgedEvaluators = (agreement?.evaluators ?? []).filter(
+    (ev) => !toolCallEvaluatorIds.has(ev.evaluator_id),
+  );
+  const evaluatorsThatRan = judgedEvaluators.filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
   // An evaluator with a card but no alignment number has no human labels on
@@ -1552,7 +1556,7 @@ function LabellingTaskPageInner() {
   // has labelled anything, "no human labels yet" is the truth. When labels do
   // exist, the missing alignment number means the evaluator did not run on the
   // items that were labelled, so say that instead.
-  const anyHumanLabels = (agreement?.evaluators ?? []).some(
+  const anyHumanLabels = judgedEvaluators.some(
     (ev) => (ev.human_result?.count ?? 0) > 0,
   );
   const allEvaluatorsMissing =
@@ -1568,9 +1572,7 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
-    null,
-  );
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   /** False until the first summary fetch for this task completes (so the
    * Items tab's "Labelled by" column doesn't flash "Not labelled yet" before
@@ -1674,7 +1676,9 @@ function LabellingTaskPageInner() {
     const out = new Map<string, Set<string>>();
     if (!taskSummary) return out;
     for (const row of taskSummary.rows) {
-      for (const [annotatorUuid, ann] of Object.entries(row.annotations ?? {})) {
+      for (const [annotatorUuid, ann] of Object.entries(
+        row.annotations ?? {},
+      )) {
         if (ann && ann.value !== null && ann.value !== undefined) {
           if (!out.has(row.item_id)) out.set(row.item_id, new Set());
           out.get(row.item_id)!.add(annotatorUuid);
@@ -1774,8 +1778,13 @@ function LabellingTaskPageInner() {
     (taskSummary?.pagination?.total ?? 0) > 0 ||
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
+  // Falls back to the kind of the task's first evaluator. Tool call
+  // correctness is never a task kind of its own, so it is skipped: a task
+  // holding it also holds the judges that say what the task is.
+  const firstEvaluatorKind = task?.evaluators?.[0]?.evaluator_type;
   const taskType =
-    task?.type ?? task?.evaluators?.[0]?.evaluator_type;
+    task?.type ??
+    (firstEvaluatorKind === "tool-call" ? undefined : firstEvaluatorKind);
   const canAddItem =
     taskType === "llm" ||
     taskType === "conversation" ||
@@ -1859,9 +1868,7 @@ function LabellingTaskPageInner() {
       return;
     }
     const [start, end] =
-      anchorIdx <= targetIdx
-        ? [anchorIdx, targetIdx]
-        : [targetIdx, anchorIdx];
+      anchorIdx <= targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
     setSelectedItemIds((prev) => {
       const next = new Set(prev);
       for (let i = start; i <= end; i++) next.add(items[i].uuid);
@@ -1938,9 +1945,7 @@ function LabellingTaskPageInner() {
       });
       return next.size === prev.size ? prev : next;
     });
-    setLastSelectedItemUuid((prev) =>
-      prev && !ids.has(prev) ? null : prev,
-    );
+    setLastSelectedItemUuid((prev) => (prev && !ids.has(prev) ? null : prev));
   }, [items]);
 
   const toggleJob = (jobUuid: string) => {
@@ -2162,8 +2167,7 @@ function LabellingTaskPageInner() {
   };
 
   const handleDeleteSelected = async () => {
-    if ((selectedItemIds.size === 0 && !selectAllTotal) || !accessToken)
-      return;
+    if ((selectedItemIds.size === 0 && !selectAllTotal) || !accessToken) return;
     setDeletingSelected(true);
     try {
       const body: Record<string, unknown> = selectAllTotal
@@ -2884,7 +2888,7 @@ function LabellingTaskPageInner() {
                         agreement.human_human?.current,
                       )}
                     />
-                    {(agreement.evaluators ?? []).map((ev) => (
+                    {judgedEvaluators.map((ev) => (
                       <AgreementStatCard
                         key={ev.evaluator_id}
                         evaluatorPill={{
@@ -2903,7 +2907,6 @@ function LabellingTaskPageInner() {
                 </section>
               </div>
             )}
-
           </div>
         )}
 
@@ -3098,7 +3101,10 @@ function LabellingTaskPageInner() {
                           const meta = itemMetaByUuid.get(row.item_id);
                           allItems.push(
                             meta
-                              ? { ...meta, payload: row.payload ?? meta.payload }
+                              ? {
+                                  ...meta,
+                                  payload: row.payload ?? meta.payload,
+                                }
                               : {
                                   id: 0,
                                   uuid: row.item_id,
@@ -3152,9 +3158,7 @@ function LabellingTaskPageInner() {
                 >
                   <div
                     className={`flex items-center gap-2 text-sm ${
-                      selectAllTotal
-                        ? "text-amber-700 dark:text-amber-300"
-                        : ""
+                      selectAllTotal ? "text-amber-700 dark:text-amber-300" : ""
                     }`}
                   >
                     <span>
@@ -3162,9 +3166,8 @@ function LabellingTaskPageInner() {
                         {selectAllTotal ? itemsTotal : selectedItemIds.size}
                       </span>{" "}
                       item
-                      {(selectAllTotal
-                        ? itemsTotal
-                        : selectedItemIds.size) === 1
+                      {(selectAllTotal ? itemsTotal : selectedItemIds.size) ===
+                      1
                         ? ""
                         : "s"}{" "}
                       selected
@@ -3252,383 +3255,385 @@ function LabellingTaskPageInner() {
               )}
 
               <div className="space-y-1 pt-1">
-              <ServerPaginatedListBar
-                total={itemsTotal}
-                offset={loadedItemsOffset}
-                loadedCount={items.length}
-                pageSize={itemsLimit}
-                onPageSizeChange={(next) => {
-                  setItemsLimit(next);
-                  setItemsOffset(0);
-                }}
-                currentPage={itemsCurrentPage}
-                pageCount={itemsPageCount}
-                onPrev={() =>
-                  setItemsOffset((prev) => Math.max(0, prev - itemsLimit))
-                }
-                onNext={() => setItemsOffset((prev) => prev + itemsLimit)}
-                prevDisabled={itemsOffset === 0 || summaryLoading}
-                nextDisabled={
-                  itemsOffset + itemsLimit >= itemsTotal || summaryLoading
-                }
-                itemNoun="item"
-              />
-              {items.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
-                  {itemsSearch
-                    ? `No items match "${itemsSearch}".`
-                    : "No items on this page."}
-                </div>
-              ) : taskType === "stt" || taskType === "tts" ? (
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all"
-                      className="w-5 h-5 cursor-pointer accent-foreground"
-                    />
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleItemsSort}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
-                      aria-label="Sort by updated at"
-                    >
-                      <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
-                    </button>
-                    <div className="text-sm font-medium text-muted-foreground text-center">
-                      Actions
-                    </div>
+                <ServerPaginatedListBar
+                  total={itemsTotal}
+                  offset={loadedItemsOffset}
+                  loadedCount={items.length}
+                  pageSize={itemsLimit}
+                  onPageSizeChange={(next) => {
+                    setItemsLimit(next);
+                    setItemsOffset(0);
+                  }}
+                  currentPage={itemsCurrentPage}
+                  pageCount={itemsPageCount}
+                  onPrev={() =>
+                    setItemsOffset((prev) => Math.max(0, prev - itemsLimit))
+                  }
+                  onNext={() => setItemsOffset((prev) => prev + itemsLimit)}
+                  prevDisabled={itemsOffset === 0 || summaryLoading}
+                  nextDisabled={
+                    itemsOffset + itemsLimit >= itemsTotal || summaryLoading
+                  }
+                  itemNoun="item"
+                />
+                {items.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                    {itemsSearch
+                      ? `No items match "${itemsSearch}".`
+                      : "No items on this page."}
                   </div>
-                  {items.map((item) => {
-                    const p = (item.payload ?? {}) as Record<string, unknown>;
-                    const name = typeof p.name === "string" ? p.name : "";
-                    const isSelected =
-                      selectAllTotal || selectedItemIds.has(item.uuid);
-                    const labellerIds = labellersByItem.get(item.uuid);
-                    return (
-                      <Fragment key={item.uuid}>
-                        <div
-                          onMouseDown={(e) => {
-                            // Shift+click on text triggers a browser text-selection
-                            // range; suppress it so range-selecting rows stays clean.
-                            if (e.shiftKey) e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                              selectRangeTo(item.uuid);
-                              return;
-                            }
-                            openItemDetail(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
-                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
+                ) : taskType === "stt" || taskType === "tts" ? (
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected;
+                        }}
+                        onChange={toggleSelectAll}
+                        aria-label="Select all"
+                        className="w-5 h-5 cursor-pointer accent-foreground"
+                      />
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Name
+                      </div>
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Labelled by
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleItemsSort}
+                        className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                        aria-label="Sort by updated at"
+                      >
+                        <span>Updated at</span>
+                        <SortIndicator direction={itemsSort} />
+                      </button>
+                      <div className="text-sm font-medium text-muted-foreground text-center">
+                        Actions
+                      </div>
+                    </div>
+                    {items.map((item) => {
+                      const p = (item.payload ?? {}) as Record<string, unknown>;
+                      const name = typeof p.name === "string" ? p.name : "";
+                      const isSelected =
+                        selectAllTotal || selectedItemIds.has(item.uuid);
+                      const labellerIds = labellersByItem.get(item.uuid);
+                      return (
+                        <Fragment key={item.uuid}>
+                          <div
                             onMouseDown={(e) => {
-                              pendingShiftRef.current = e.shiftKey;
+                              // Shift+click on text triggers a browser text-selection
+                              // range; suppress it so range-selecting rows stays clean.
+                              if (e.shiftKey) e.preventDefault();
                             }}
-                            onChange={() => {
-                              if (pendingShiftRef.current) {
+                            onClick={(e) => {
+                              if (e.shiftKey) {
+                                e.preventDefault();
                                 selectRangeTo(item.uuid);
-                              } else {
-                                toggleItem(item.uuid);
-                              }
-                              pendingShiftRef.current = false;
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select item ${item.id}`}
-                            className="w-5 h-5 cursor-pointer accent-foreground"
-                          />
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {name || "—"}
-                          </p>
-                          <LabelledByCell
-                            labellers={labellerIds}
-                            annotatorNameById={annotatorNameById}
-                          />
-                          <div className="text-sm text-muted-foreground whitespace-nowrap">
-                            {formatItemUpdatedAt(item)}
-                          </div>
-                          <ItemRowActions
-                            itemUuid={item.uuid}
-                            onDelete={requestDeleteOneItem}
-                            onLabel={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    // Sole row → skip the select-then-bulk
-                                    // dance and open the assign dialog
-                                    // straight on this item.
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      setAssignOpen(true);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
-                            }
-                            onEdit={(uuid) => {
-                              if (taskType === "tts") {
-                                setEditTtsSingleItemUuid(uuid);
-                                setEditTtsItemsOpen(true);
-                              } else {
-                                setEditSttSingleItemUuid(uuid);
-                                setEditSttItemsOpen(true);
-                              }
-                            }}
-                            onDuplicate={(uuid) => {
-                              const item = items.find((i) => i.uuid === uuid);
-                              if (!item) return;
-                              const p = (item.payload ?? {}) as Record<
-                                string,
-                                unknown
-                              >;
-                              const nm =
-                                typeof p.name === "string"
-                                  ? (p.name as string)
-                                  : `Item ${item.id}`;
-                              if (taskType === "tts") {
-                                setDuplicateTtsRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${nm}`,
-                                    text:
-                                      typeof p.text === "string"
-                                        ? (p.text as string)
-                                        : "",
-                                    audio:
-                                      typeof p.audio_path === "string"
-                                        ? (p.audio_path as string)
-                                        : "",
-                                  },
-                                ]);
-                                setAddTtsItemsOpen(true);
-                              } else {
-                                setDuplicateSttRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${nm}`,
-                                    actual:
-                                      typeof p.reference_transcript === "string"
-                                        ? (p.reference_transcript as string)
-                                        : "",
-                                    predicted:
-                                      typeof p.predicted_transcript === "string"
-                                        ? (p.predicted_transcript as string)
-                                        : "",
-                                  },
-                                ]);
-                                setAddSttItemsOpen(true);
-                              }
-                            }}
-                            onEvaluate={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      handleRunEvaluators([uuid]);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all"
-                      className="w-5 h-5 cursor-pointer accent-foreground"
-                    />
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleItemsSort}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
-                      aria-label="Sort by updated at"
-                    >
-                      <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
-                    </button>
-                    <div className="text-sm font-medium text-muted-foreground text-center">
-                      Actions
-                    </div>
-                  </div>
-                  {items.map((item) => {
-                    const isSelected =
-                      selectAllTotal || selectedItemIds.has(item.uuid);
-                    const labellerIds = labellersByItem.get(item.uuid);
-                    return (
-                      <Fragment key={item.uuid}>
-                        <div
-                          onMouseDown={(e) => {
-                            // Shift+click on text triggers a browser text-selection
-                            // range; suppress it so range-selecting rows stays clean.
-                            if (e.shiftKey) e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                              selectRangeTo(item.uuid);
-                              return;
-                            }
-                            openItemDetail(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
-                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onMouseDown={(e) => {
-                              pendingShiftRef.current = e.shiftKey;
-                            }}
-                            onChange={() => {
-                              if (pendingShiftRef.current) {
-                                selectRangeTo(item.uuid);
-                              } else {
-                                toggleItem(item.uuid);
-                              }
-                              pendingShiftRef.current = false;
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select item ${item.id}`}
-                            className="w-5 h-5 cursor-pointer accent-foreground"
-                          />
-                          <p className="text-sm text-foreground line-clamp-1">
-                            {previewItemPayload(item.payload, taskType)}
-                          </p>
-                          <LabelledByCell
-                            labellers={labellerIds}
-                            annotatorNameById={annotatorNameById}
-                          />
-                          <div className="text-sm text-muted-foreground whitespace-nowrap">
-                            {formatItemUpdatedAt(item)}
-                          </div>
-                          <ItemRowActions
-                            itemUuid={item.uuid}
-                            onDelete={requestDeleteOneItem}
-                            onLabel={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    // Sole row → skip the select-then-bulk
-                                    // dance and open the assign dialog
-                                    // straight on this item.
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      setAssignOpen(true);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
-                            }
-                            onEdit={(uuid) => {
-                              if (taskType === "llm-general") {
-                                setEditLlmGeneralSingleItemUuid(uuid);
-                                setEditLlmGeneralItemsOpen(true);
-                              } else {
-                                setEditLlmItemUuid(uuid);
-                              }
-                            }}
-                            onDuplicate={(uuid) => {
-                              const item = items.find((i) => i.uuid === uuid);
-                              if (!item) return;
-                              const p = (item.payload ?? null) as Record<
-                                string,
-                                unknown
-                              > | null;
-                              const name =
-                                typeof p?.name === "string"
-                                  ? (p.name as string)
-                                  : `Item ${item.id}`;
-                              if (taskType === "llm-general") {
-                                setDuplicateLlmGeneralRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${name}`,
-                                    description:
-                                      typeof p?.description === "string"
-                                        ? (p.description as string)
-                                        : "",
-                                    input:
-                                      typeof p?.input === "string"
-                                        ? (p.input as string)
-                                        : "",
-                                    output:
-                                      typeof p?.output === "string"
-                                        ? (p.output as string)
-                                        : "",
-                                    varValues: readEvaluatorVariables(p),
-                                  },
-                                ]);
-                                setAddLlmGeneralItemsOpen(true);
                                 return;
                               }
-                              const desc =
-                                typeof p?.description === "string"
-                                  ? (p.description as string)
-                                  : "";
-                              setNewItemName(`Copy of ${name}`);
-                              setNewItemDescription(desc);
-                              setDuplicateSourcePayload(p);
-                              setCreateItemError(null);
-                              setValidationAttempted(false);
-                              setAddItemOpen(true);
+                              openItemDetail(item.uuid);
                             }}
-                            onEvaluate={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      handleRunEvaluators([uuid]);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
+                            className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                              isSelected ? "bg-muted/30" : "hover:bg-muted/20"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onMouseDown={(e) => {
+                                pendingShiftRef.current = e.shiftKey;
+                              }}
+                              onChange={() => {
+                                if (pendingShiftRef.current) {
+                                  selectRangeTo(item.uuid);
+                                } else {
+                                  toggleItem(item.uuid);
+                                }
+                                pendingShiftRef.current = false;
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Select item ${item.id}`}
+                              className="w-5 h-5 cursor-pointer accent-foreground"
+                            />
+                            <p className="text-sm text-foreground line-clamp-2">
+                              {name || "—"}
+                            </p>
+                            <LabelledByCell
+                              labellers={labellerIds}
+                              annotatorNameById={annotatorNameById}
+                            />
+                            <div className="text-sm text-muted-foreground whitespace-nowrap">
+                              {formatItemUpdatedAt(item)}
+                            </div>
+                            <ItemRowActions
+                              itemUuid={item.uuid}
+                              onDelete={requestDeleteOneItem}
+                              onLabel={
+                                selectedItemIds.size === 0 && !selectAllTotal
+                                  ? (uuid) => {
+                                      // Sole row → skip the select-then-bulk
+                                      // dance and open the assign dialog
+                                      // straight on this item.
+                                      if (items.length === 1) {
+                                        setSelectedItemIds(new Set([uuid]));
+                                        setAssignOpen(true);
+                                      } else {
+                                        enterBulkModeWithScroll(uuid);
+                                      }
                                     }
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                </div>
-              )}
+                                  : undefined
+                              }
+                              onEdit={(uuid) => {
+                                if (taskType === "tts") {
+                                  setEditTtsSingleItemUuid(uuid);
+                                  setEditTtsItemsOpen(true);
+                                } else {
+                                  setEditSttSingleItemUuid(uuid);
+                                  setEditSttItemsOpen(true);
+                                }
+                              }}
+                              onDuplicate={(uuid) => {
+                                const item = items.find((i) => i.uuid === uuid);
+                                if (!item) return;
+                                const p = (item.payload ?? {}) as Record<
+                                  string,
+                                  unknown
+                                >;
+                                const nm =
+                                  typeof p.name === "string"
+                                    ? (p.name as string)
+                                    : `Item ${item.id}`;
+                                if (taskType === "tts") {
+                                  setDuplicateTtsRows([
+                                    {
+                                      uuid: item.uuid,
+                                      name: `Copy of ${nm}`,
+                                      text:
+                                        typeof p.text === "string"
+                                          ? (p.text as string)
+                                          : "",
+                                      audio:
+                                        typeof p.audio_path === "string"
+                                          ? (p.audio_path as string)
+                                          : "",
+                                    },
+                                  ]);
+                                  setAddTtsItemsOpen(true);
+                                } else {
+                                  setDuplicateSttRows([
+                                    {
+                                      uuid: item.uuid,
+                                      name: `Copy of ${nm}`,
+                                      actual:
+                                        typeof p.reference_transcript ===
+                                        "string"
+                                          ? (p.reference_transcript as string)
+                                          : "",
+                                      predicted:
+                                        typeof p.predicted_transcript ===
+                                        "string"
+                                          ? (p.predicted_transcript as string)
+                                          : "",
+                                    },
+                                  ]);
+                                  setAddSttItemsOpen(true);
+                                }
+                              }}
+                              onEvaluate={
+                                selectedItemIds.size === 0 && !selectAllTotal
+                                  ? (uuid) => {
+                                      if (items.length === 1) {
+                                        setSelectedItemIds(new Set([uuid]));
+                                        handleRunEvaluators([uuid]);
+                                      } else {
+                                        enterBulkModeWithScroll(uuid);
+                                      }
+                                    }
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected;
+                        }}
+                        onChange={toggleSelectAll}
+                        aria-label="Select all"
+                        className="w-5 h-5 cursor-pointer accent-foreground"
+                      />
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Name
+                      </div>
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Labelled by
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleItemsSort}
+                        className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                        aria-label="Sort by updated at"
+                      >
+                        <span>Updated at</span>
+                        <SortIndicator direction={itemsSort} />
+                      </button>
+                      <div className="text-sm font-medium text-muted-foreground text-center">
+                        Actions
+                      </div>
+                    </div>
+                    {items.map((item) => {
+                      const isSelected =
+                        selectAllTotal || selectedItemIds.has(item.uuid);
+                      const labellerIds = labellersByItem.get(item.uuid);
+                      return (
+                        <Fragment key={item.uuid}>
+                          <div
+                            onMouseDown={(e) => {
+                              // Shift+click on text triggers a browser text-selection
+                              // range; suppress it so range-selecting rows stays clean.
+                              if (e.shiftKey) e.preventDefault();
+                            }}
+                            onClick={(e) => {
+                              if (e.shiftKey) {
+                                e.preventDefault();
+                                selectRangeTo(item.uuid);
+                                return;
+                              }
+                              openItemDetail(item.uuid);
+                            }}
+                            className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                              isSelected ? "bg-muted/30" : "hover:bg-muted/20"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onMouseDown={(e) => {
+                                pendingShiftRef.current = e.shiftKey;
+                              }}
+                              onChange={() => {
+                                if (pendingShiftRef.current) {
+                                  selectRangeTo(item.uuid);
+                                } else {
+                                  toggleItem(item.uuid);
+                                }
+                                pendingShiftRef.current = false;
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Select item ${item.id}`}
+                              className="w-5 h-5 cursor-pointer accent-foreground"
+                            />
+                            <p className="text-sm text-foreground line-clamp-1">
+                              {previewItemPayload(item.payload, taskType)}
+                            </p>
+                            <LabelledByCell
+                              labellers={labellerIds}
+                              annotatorNameById={annotatorNameById}
+                            />
+                            <div className="text-sm text-muted-foreground whitespace-nowrap">
+                              {formatItemUpdatedAt(item)}
+                            </div>
+                            <ItemRowActions
+                              itemUuid={item.uuid}
+                              onDelete={requestDeleteOneItem}
+                              onLabel={
+                                selectedItemIds.size === 0 && !selectAllTotal
+                                  ? (uuid) => {
+                                      // Sole row → skip the select-then-bulk
+                                      // dance and open the assign dialog
+                                      // straight on this item.
+                                      if (items.length === 1) {
+                                        setSelectedItemIds(new Set([uuid]));
+                                        setAssignOpen(true);
+                                      } else {
+                                        enterBulkModeWithScroll(uuid);
+                                      }
+                                    }
+                                  : undefined
+                              }
+                              onEdit={(uuid) => {
+                                if (taskType === "llm-general") {
+                                  setEditLlmGeneralSingleItemUuid(uuid);
+                                  setEditLlmGeneralItemsOpen(true);
+                                } else {
+                                  setEditLlmItemUuid(uuid);
+                                }
+                              }}
+                              onDuplicate={(uuid) => {
+                                const item = items.find((i) => i.uuid === uuid);
+                                if (!item) return;
+                                const p = (item.payload ?? null) as Record<
+                                  string,
+                                  unknown
+                                > | null;
+                                const name =
+                                  typeof p?.name === "string"
+                                    ? (p.name as string)
+                                    : `Item ${item.id}`;
+                                if (taskType === "llm-general") {
+                                  setDuplicateLlmGeneralRows([
+                                    {
+                                      uuid: item.uuid,
+                                      name: `Copy of ${name}`,
+                                      description:
+                                        typeof p?.description === "string"
+                                          ? (p.description as string)
+                                          : "",
+                                      input:
+                                        typeof p?.input === "string"
+                                          ? (p.input as string)
+                                          : "",
+                                      output:
+                                        typeof p?.output === "string"
+                                          ? (p.output as string)
+                                          : "",
+                                      varValues: readEvaluatorVariables(p),
+                                    },
+                                  ]);
+                                  setAddLlmGeneralItemsOpen(true);
+                                  return;
+                                }
+                                const desc =
+                                  typeof p?.description === "string"
+                                    ? (p.description as string)
+                                    : "";
+                                setNewItemName(`Copy of ${name}`);
+                                setNewItemDescription(desc);
+                                setDuplicateSourcePayload(p);
+                                setCreateItemError(null);
+                                setValidationAttempted(false);
+                                setAddItemOpen(true);
+                              }}
+                              onEvaluate={
+                                selectedItemIds.size === 0 && !selectAllTotal
+                                  ? (uuid) => {
+                                      if (items.length === 1) {
+                                        setSelectedItemIds(new Set([uuid]));
+                                        handleRunEvaluators([uuid]);
+                                      } else {
+                                        enterBulkModeWithScroll(uuid);
+                                      }
+                                    }
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {/* Bottom padding clears the fixed Talk-to-us FAB (bottom-6 right-6). */}
               <div className="pb-20" />
@@ -3879,122 +3884,122 @@ function LabellingTaskPageInner() {
       {!!editLlmItemUuid &&
         taskType !== "stt" &&
         taskType !== "llm-general" && (
-        <AddTestDialog
-          key={editLlmItemUuid}
-          isOpen={true}
-          onClose={() => {
-            if (!savingLlmItem) setEditLlmItemUuid(null);
-          }}
-          isEditing={true}
-          isLoading={false}
-          isCreating={savingLlmItem}
-          createError={editLlmError}
-          testName={editLlmItemName}
-          setTestName={setEditLlmItemName}
-          itemDescription={editLlmItemDescription}
-          setItemDescription={setEditLlmItemDescription}
-          validationAttempted={false}
-          mode="labelItem"
-          allowAgentLastMessage={taskType === "conversation"}
-          requireAssistantLastMessage={taskType === "llm"}
-          initialConfig={editingInitialConfig}
-          initialEvaluators={editingInitialEvaluators}
-          onSubmit={async (
-            config: TestConfig,
-            evaluators: EvaluatorRefPayload[],
-          ) => {
-            if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
-              return;
-            const history = (config.history ?? []).filter((h) => {
-              if (h.role === "assistant") {
-                if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
-                  return true;
-                return typeof h.content === "string" && h.content.length > 0;
+          <AddTestDialog
+            key={editLlmItemUuid}
+            isOpen={true}
+            onClose={() => {
+              if (!savingLlmItem) setEditLlmItemUuid(null);
+            }}
+            isEditing={true}
+            isLoading={false}
+            isCreating={savingLlmItem}
+            createError={editLlmError}
+            testName={editLlmItemName}
+            setTestName={setEditLlmItemName}
+            itemDescription={editLlmItemDescription}
+            setItemDescription={setEditLlmItemDescription}
+            validationAttempted={false}
+            mode="labelItem"
+            allowAgentLastMessage={taskType === "conversation"}
+            requireAssistantLastMessage={taskType === "llm"}
+            initialConfig={editingInitialConfig}
+            initialEvaluators={editingInitialEvaluators}
+            onSubmit={async (
+              config: TestConfig,
+              evaluators: EvaluatorRefPayload[],
+            ) => {
+              if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
+                return;
+              const history = (config.history ?? []).filter((h) => {
+                if (h.role === "assistant") {
+                  if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
+                    return true;
+                  return typeof h.content === "string" && h.content.length > 0;
+                }
+                if (h.role === "user") {
+                  return typeof h.content === "string" && h.content.length > 0;
+                }
+                if (h.role === "tool") {
+                  return typeof h.content === "string";
+                }
+                return false;
+              });
+              const evaluator_variables: Record<
+                string,
+                Record<string, string>
+              > = {};
+              for (const e of evaluators) {
+                if (e.variable_values) {
+                  evaluator_variables[e.evaluator_uuid] = {
+                    ...e.variable_values,
+                  };
+                }
               }
-              if (h.role === "user") {
-                return typeof h.content === "string" && h.content.length > 0;
-              }
-              if (h.role === "tool") {
-                return typeof h.content === "string";
-              }
-              return false;
-            });
-            const evaluator_variables: Record<
-              string,
-              Record<string, string>
-            > = {};
-            for (const e of evaluators) {
-              if (e.variable_values) {
-                evaluator_variables[e.evaluator_uuid] = {
-                  ...e.variable_values,
+              const trimmedDescription = editLlmItemDescription.trim();
+              const descriptionField = { description: trimmedDescription };
+
+              // Same rule as the single agent response edit: the save replaces
+              // the whole item, so keep what the form has no field for.
+              const existingPayload = (editingItem?.payload ?? {}) as Record<
+                string,
+                unknown
+              >;
+              let payload: Record<string, unknown>;
+              if (taskType === "conversation") {
+                payload = {
+                  ...existingPayload,
+                  name: editLlmItemName.trim(),
+                  ...descriptionField,
+                  transcript: history,
+                  evaluator_variables,
+                };
+              } else {
+                let chat_history = history;
+                let agent_response = "";
+                const last = history[history.length - 1];
+                if (
+                  last &&
+                  last.role === "assistant" &&
+                  !(
+                    Array.isArray(last.tool_calls) && last.tool_calls.length > 0
+                  ) &&
+                  typeof last.content === "string"
+                ) {
+                  chat_history = history.slice(0, -1);
+                  agent_response = last.content;
+                }
+                payload = {
+                  ...existingPayload,
+                  name: editLlmItemName.trim(),
+                  ...descriptionField,
+                  chat_history,
+                  agent_response,
+                  evaluator_variables,
                 };
               }
-            }
-            const trimmedDescription = editLlmItemDescription.trim();
-            const descriptionField = { description: trimmedDescription };
-
-            // Same rule as the single agent response edit: the save replaces
-            // the whole item, so keep what the form has no field for.
-            const existingPayload = (editingItem?.payload ?? {}) as Record<
-              string,
-              unknown
-            >;
-            let payload: Record<string, unknown>;
-            if (taskType === "conversation") {
-              payload = {
-                ...existingPayload,
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                transcript: history,
-                evaluator_variables,
-              };
-            } else {
-              let chat_history = history;
-              let agent_response = "";
-              const last = history[history.length - 1];
-              if (
-                last &&
-                last.role === "assistant" &&
-                !(
-                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
-                ) &&
-                typeof last.content === "string"
-              ) {
-                chat_history = history.slice(0, -1);
-                agent_response = last.content;
-              }
-              payload = {
-                ...existingPayload,
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                chat_history,
-                agent_response,
-                evaluator_variables,
-              };
-            }
-            setSavingLlmItem(true);
-            setEditLlmError(null);
-            try {
-              await apiClient<{ updated_count: number }>(
-                `/annotation-tasks/${uuid}/items`,
-                accessToken,
-                {
-                  method: "PUT",
-                  body: {
-                    updates: [{ uuid: editLlmItemUuid, payload }],
+              setSavingLlmItem(true);
+              setEditLlmError(null);
+              try {
+                await apiClient<{ updated_count: number }>(
+                  `/annotation-tasks/${uuid}/items`,
+                  accessToken,
+                  {
+                    method: "PUT",
+                    body: {
+                      updates: [{ uuid: editLlmItemUuid, payload }],
+                    },
                   },
-                },
-              );
-              setEditLlmItemUuid(null);
-              await Promise.all([fetchTask(), fetchTaskSummary()]);
-            } catch (err) {
-              setEditLlmError(parseApiError(err, "Failed to save item"));
-            } finally {
-              setSavingLlmItem(false);
-            }
-          }}
-        />
-      )}
+                );
+                setEditLlmItemUuid(null);
+                await Promise.all([fetchTask(), fetchTaskSummary()]);
+              } catch (err) {
+                setEditLlmError(parseApiError(err, "Failed to save item"));
+              } finally {
+                setSavingLlmItem(false);
+              }
+            }}
+          />
+        )}
 
       {accessToken && task && (
         <EditTaskDialog
@@ -4439,9 +4444,7 @@ function LabellingTaskPageInner() {
               ? "Any annotations on this item will also be lost."
               : "Any annotations on these items will also be lost.";
           const scopeClause =
-            selectAllTotal && itemsSearch
-              ? ` matching "${itemsSearch}"`
-              : "";
+            selectAllTotal && itemsSearch ? ` matching "${itemsSearch}"` : "";
           return `Delete ${count} ${itemWord}${scopeClause}? ${annotationsClause} This cannot be undone.`;
         })()}
         confirmText="Delete"

@@ -1700,24 +1700,4 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     expect(screen.getByText("Quality")).toBeInTheDocument();
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
   });
-
-  it("says there is nothing to answer when the row's evaluator is gone", async () => {
-    // The workspace deleted its tool call evaluator, so a tool-call row has
-    // no evaluator left that applies to it.
-    fetchMock.mockResolvedValue(
-      jsonResponse(
-        jobResponse({
-          evaluators,
-          items: [{ ...items[0], is_tool_call: true }],
-        }),
-      ),
-    );
-    render(<AnnotationJobView token="tok" mode="public" />);
-    await waitFor(() =>
-      expect(
-        screen.getByText("There is nothing to answer on this item."),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
-  });
 });

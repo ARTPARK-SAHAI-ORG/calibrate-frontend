@@ -157,10 +157,6 @@ function fieldKey(itemId: string, evaluatorId: string): FieldKey {
  * everything except that one. This is the ONE place the rule lives — the
  * cards on screen, the "is this row finished?" checks and the submit guard
  * all ask here, so they cannot disagree.
- *
- * The list can come back empty, on a tool-call row in a workspace that
- * deleted its tool call evaluator. Such a row shows nothing and must not
- * hold the job open, which `itemCompleted` takes care of.
  */
 function evaluatorsForItem(
   evaluators: Evaluator[],
@@ -670,10 +666,6 @@ function AnnotateView({
   const itemCompleted = useCallback(
     (itemId: string) => {
       const applicable = evaluatorsFor(itemId);
-      // Nothing to answer, so nothing to wait for. A tool-call row in a
-      // workspace that deleted its tool call evaluator lands here, and it
-      // must not hold the job open.
-      if (applicable.length === 0) return true;
       const savedFor = (ev: Evaluator) =>
         savedKeys.has(fieldKey(itemId, ev.uuid));
       if (!requiredOnly(applicable).every(savedFor)) return false;
@@ -1359,16 +1351,14 @@ function EvaluatorsPane({
     </div>
   ) : null;
 
-  if (evaluatorsForItem(evaluators, item).length === 0) {
+  if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
         <ExpectedToolCalls payload={itemPayload} />
         {descriptionBlock}
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          {evaluators.length === 0
-            ? "No evaluators are attached to this task."
-            : "There is nothing to answer on this item."}
+          No evaluators are attached to this task.
         </div>
       </div>
     );
