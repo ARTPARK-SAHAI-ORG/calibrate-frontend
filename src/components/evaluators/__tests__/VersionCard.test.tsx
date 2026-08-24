@@ -348,5 +348,18 @@ describe("VersionCard", () => {
       setup({ isLive: true });
       expect(screen.queryByText("View more")).not.toBeInTheDocument();
     });
+
+    it("shows the full prompt with no clipped box and no View more on the selected-detail pane, even when it overflows", () => {
+      Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+        configurable: true,
+        value: 500,
+      });
+      setup({ isLive: true, isSelectedDetail: true });
+
+      expect(screen.queryByText("View more")).not.toBeInTheDocument();
+      const pre = screen.getByText("You are a helpful judge.");
+      expect(pre.className).not.toMatch(/max-h-\[7\.5rem\]/);
+      expect(pre.className).not.toMatch(/overflow-hidden/);
+    });
   });
 });
