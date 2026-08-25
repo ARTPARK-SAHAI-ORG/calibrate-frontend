@@ -31,6 +31,7 @@ export function EvaluatorScoreCards({
   description,
   cards,
   headingAside,
+  actions,
   linkEvaluators = true,
   singleRow = false,
   showWhenEmpty = false,
@@ -42,6 +43,11 @@ export function EvaluatorScoreCards({
    * labelling job's status, which belongs beside the words rather than on a
    * line of its own. */
   headingAside?: React.ReactNode;
+  /** Sits on the heading row, pinned to the far right. Used for a labelling
+   * job's page-level buttons (send for review, copy link, share) — they stay
+   * beside the short heading line instead of sharing a row with the cards,
+   * so the cards always get the full width to scroll or wrap in below. */
+  actions?: React.ReactNode;
   /** Link each evaluator name to its own page. Off on pages anyone can open
    * with a link, where there is nothing to send the reader to. */
   linkEvaluators?: boolean;
@@ -57,9 +63,14 @@ export function EvaluatorScoreCards({
   if (cards.length === 0 && !showWhenEmpty) return null;
   return (
     <section>
-      <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">{heading}</h2>
-        {headingAside}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold">{heading}</h2>
+          {headingAside}
+        </div>
+        {actions && (
+          <div className="flex items-center gap-2 shrink-0">{actions}</div>
+        )}
       </div>
       {description && (
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
