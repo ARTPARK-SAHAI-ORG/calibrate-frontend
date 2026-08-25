@@ -38,7 +38,7 @@ export const FIRST_EVAL_TOUR_ID = "first-eval";
 // The welcome card's help links (driver.js renders the description as HTML).
 function welcomeDescription(): string {
   const docsUrl =
-    process.env.NEXT_PUBLIC_DOCS_URL || "https://calibrate.artpark.ai/docs";
+    process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.calibrate.artpark.ai";
   // No underline (modern link style); the accent color + weight signal it.
   const link = (href: string, text: string) =>
     `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--tour-link, #6366f1);font-weight:500;text-decoration:none;">${text}</a>`;

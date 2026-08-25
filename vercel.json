@@ -1,12 +1,14 @@
 {
-    "rewrites": [
+    "redirects": [
       {
         "source": "/docs",
-        "destination": "https://amandalmia.mintlify.dev/docs"
+        "destination": "https://docs.calibrate.artpark.ai",
+        "permanent": true
       },
       {
         "source": "/docs/:match*",
-        "destination": "https://amandalmia.mintlify.dev/docs/:match*"
+        "destination": "https://docs.calibrate.artpark.ai/:match*",
+        "permanent": true
       }
     ]
   }
