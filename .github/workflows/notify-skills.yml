@@ -1,0 +1,36 @@
+name: notify-skills
+
+# Tells the calibrate-skills repo that something shipped, so it can check whether
+# what the skills say about this app is still true.
+#
+# The skills are the instructions a coding agent follows to drive the `calibrate`
+# command. They also tell people where to click in here: the settings page for
+# creating an API key, the page for one agent, and the words to look for on
+# screen. That is the part this app can break without anyone noticing, because
+# none of it appears in the API description that repo already watches.
+#
+# This only says what shipped. All the reading and deciding happens over there,
+# and most releases are read and dropped.
+on:
+  push:
+    branches: [prod]
+
+jobs:
+  notify:
+    # Anyone who forks this repo gets a copy of this file. The repository check
+    # keeps their pushes from firing at our skills repo.
+    if: github.repository == 'ARTPARK-SAHAI-ORG/calibrate-frontend'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tell calibrate-skills what shipped
+        env:
+          # A personal access token with contents: write on dalmia/calibrate-skills.
+          # The token a workflow gets by default cannot reach another repository.
+          TOKEN: ${{ secrets.SKILLS_DISPATCH_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/dalmia/calibrate-skills/dispatches \
+            -d "{\"event_type\":\"frontend-released\",\"client_payload\":{\"sha\":\"$SHA\"}}"
