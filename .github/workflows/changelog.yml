@@ -72,7 +72,11 @@ jobs:
           } > pr.md
 
       - name: Write the entry
+        # Kept going so a failure here loses the wording, never the entry: the
+        # step below falls back to the pull request title. The last step in the
+        # job then fails the run, so a silent fallback cannot go unnoticed.
         continue-on-error: true
+        id: entry
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -138,3 +142,13 @@ jobs:
           # this file at once. A rejected push here means someone pushed straight
           # to main, which should fail loudly rather than be worked around.
           git push
+
+      # The changelog is already written and pushed by this point, so failing
+      # here costs nothing and is the only thing that makes a broken Claude step
+      # visible. Without it the run is green while every entry silently falls
+      # back to the pull request title.
+      - name: Fail if the entry could not be written
+        if: steps.entry.outcome == 'failure'
+        run: |
+          echo "::error::Claude could not write the changelog line, so the pull request title was used instead. The entry landed; the wording did not."
+          exit 1
