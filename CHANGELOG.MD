@@ -1,5 +1,6 @@
 ## August 2026
 
+- Make evaluator names clickable to preview instead of navigating away ([#428](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/428))
 - Fix prompt clamp/scroll on evaluator detail page ([#427](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/427))
 - Keep tool-call rows out of an AI judge run, and say so where it shows ([#420](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/420))
 - Fix width of evaluators list on human alignment tasks ([#425](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/425))
