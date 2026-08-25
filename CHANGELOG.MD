@@ -1,5 +1,6 @@
 ## August 2026
 
+- Changelog: go red when Claude could not write the line ([#436](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/436))
 - Send the range, not just the latest commit ([#435](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/435))
 - Tell the skills repo when something ships ([#434](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/434))
 - Fix action buttons wrapping below score cards on labelling job page ([#433](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/433))
