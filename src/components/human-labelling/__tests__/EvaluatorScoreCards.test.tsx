@@ -197,4 +197,33 @@ describe("EvaluatorScoreCards", () => {
     // Beside the words, not on a line of its own.
     expect(heading.parentElement).toHaveTextContent("In progress");
   });
+
+  it("puts the actions on the heading row, not beside the cards", () => {
+    const { container } = render(
+      <EvaluatorScoreCards
+        heading="Human scores"
+        description="What annotators gave"
+        cards={cards}
+        actions={<button type="button">Share</button>}
+      />,
+    );
+    const headingRow = screen.getByRole("heading", {
+      name: "Human scores",
+    }).parentElement?.parentElement;
+    expect(headingRow).toHaveTextContent("Share");
+    // The cards row stays on its own line, unaffected by the actions.
+    const cardsRow = container.querySelector("section > div:last-of-type");
+    expect(cardsRow).not.toHaveTextContent("Share");
+  });
+
+  it("renders no actions slot when none are given", () => {
+    render(
+      <EvaluatorScoreCards
+        heading="Human scores"
+        description="What annotators gave"
+        cards={cards}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+  });
 });

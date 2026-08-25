@@ -152,30 +152,22 @@ export default function AdminAnnotateJobPage() {
         <Breadcrumbs items={crumbs} className="md:hidden" />
 
         {meta && (
-          <>
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              {/* The person who labelled this job, with how far they have
-                  got beside their name. Both show from the moment the job
-                  exists. The scores and the line explaining them wait until
-                  labelling has started, since there is nothing to count
-                  before that. The status rides on the heading rather than
-                  taking a row of its own: this page fills the window height,
-                  so anything taller is taken from the item being read. */}
-              <div className="min-w-0">
-                <EvaluatorScoreCards
-                  heading={meta.annotator.name || HUMAN_SCORES_HEADING}
-                  description={
-                    meta.jobStatus === "pending" ? "" : HUMAN_SCORES_DESCRIPTION
-                  }
-                  cards={
-                    meta.jobStatus === "pending" ? NO_SCORES : meta.humanScores
-                  }
-                  headingAside={statusPill}
-                  showWhenEmpty
-                  singleRow
-                />
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
+          /* The person who labelled this job, with how far they have got
+             beside their name, and the page's action buttons pinned to the
+             far right of that same short line. The scores and the line
+             explaining them wait until labelling has started, since there
+             is nothing to count before that. The cards always get the full
+             width of the page on the line below, so they are never squeezed
+             into whatever space is left before the buttons. */
+          <EvaluatorScoreCards
+            heading={meta.annotator.name || HUMAN_SCORES_HEADING}
+            description={
+              meta.jobStatus === "pending" ? "" : HUMAN_SCORES_DESCRIPTION
+            }
+            cards={meta.jobStatus === "pending" ? NO_SCORES : meta.humanScores}
+            headingAside={statusPill}
+            actions={
+              <>
                 <SendForReviewFlow
                   accessToken={accessToken}
                   taskUuid={taskUuid}
@@ -238,9 +230,11 @@ export default function AdminAnnotateJobPage() {
                     initialShareToken={meta.job.view_token}
                   />
                 )}
-              </div>
-            </div>
-          </>
+              </>
+            }
+            showWhenEmpty
+            singleRow
+          />
         )}
 
         <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
