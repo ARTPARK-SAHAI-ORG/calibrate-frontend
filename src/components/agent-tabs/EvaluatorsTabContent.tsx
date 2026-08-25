@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   isDefaultEvaluator,
   type EvaluatorData,
@@ -70,6 +70,13 @@ export function EvaluatorsTabContent({
   const [deleteMode, setDeleteMode] = useState<DeleteMode>("remove");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // The evaluator whose prompt is on show, opened from a card's cover or its
+  // "View" button. Null until one is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   const loadAttached = useCallback(async () => {
     if (!backendAccessToken) return;
@@ -344,12 +351,18 @@ export function EvaluatorsTabContent({
                 data-evaluator-name={evaluator.name}
                 className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
               >
-                {/* Covers the whole card so it behaves like a link: clicking anywhere
-                    opens the evaluator, and the buttons still sit above it. */}
-                <Link
-                  href={`/evaluators/${evaluator.uuid}`}
+                {/* Covers the whole card so clicking anywhere opens the preview,
+                    and the buttons still sit above it. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPreviewEvaluator({
+                      uuid: evaluator.uuid,
+                      name: evaluator.name,
+                    })
+                  }
                   aria-label={`Open ${evaluator.name}`}
-                  className="absolute inset-0 rounded-xl z-0"
+                  className="absolute inset-0 rounded-xl z-0 cursor-pointer"
                 />
                 <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -368,13 +381,19 @@ export function EvaluatorsTabContent({
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
-                    <Link
-                      href={`/evaluators/${evaluator.uuid}`}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewEvaluator({
+                          uuid: evaluator.uuid,
+                          name: evaluator.name,
+                        })
+                      }
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
                       title="View evaluator"
                     >
                       View
-                    </Link>
+                    </button>
                     <button
                       onClick={() => openRemoveDialog(evaluator)}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
@@ -450,6 +469,12 @@ export function EvaluatorsTabContent({
             )}
           </div>
         }
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </div>
   );

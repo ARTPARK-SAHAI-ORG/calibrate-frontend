@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback, FormEvent } from "react";
-import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
+import { replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import {
   CartesianGrid,
   Line,
@@ -15,6 +15,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPillList } from "@/components/EvaluatorPillList";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Select } from "@/components/ui/Select";
@@ -1242,6 +1243,10 @@ function AgreementOverview({
   const [sortKey, setSortKey] = useState<SortKey>("current");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   const rows: SeriesRow[] = (() => {
     if (!agreement) return [];
@@ -1450,14 +1455,20 @@ function AgreementOverview({
                         </p>
                       ) : (
                         <>
-                          <Link
-                            href={`/evaluators/${row.key}`}
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewEvaluator({
+                                uuid: row.key,
+                                name: row.name,
+                              });
+                            }}
                             title={`Open ${row.name}`}
                             className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full min-w-0"
                           >
                             <span className="truncate">{row.name}</span>
-                          </Link>
+                          </button>
                           <span className="text-sm font-medium text-foreground shrink-0">
                             alignment
                           </span>
@@ -1528,14 +1539,20 @@ function AgreementOverview({
                         </p>
                       ) : (
                         <>
-                          <Link
-                            href={`/evaluators/${row.key}`}
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewEvaluator({
+                                uuid: row.key,
+                                name: row.name,
+                              });
+                            }}
                             title={`Open ${row.name}`}
                             className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate flex-1 min-w-0"
                           >
                             <span className="truncate">{row.name}</span>
-                          </Link>
+                          </button>
                           <span className="text-sm font-medium text-foreground shrink-0">
                             alignment
                           </span>
@@ -1583,6 +1600,11 @@ function AgreementOverview({
           </div>
         </>
       )}
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
     </div>
   );
 }

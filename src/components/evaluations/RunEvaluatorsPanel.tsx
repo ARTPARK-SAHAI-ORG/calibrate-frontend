@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@/lib/nav";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -54,6 +54,10 @@ export function RunEvaluatorsPanel({
 }: RunEvaluatorsPanelProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   const byUuid = new Map(available.map((e) => [e.uuid, e]));
   // Keep the order they were added in, and drop any that no longer exist.
@@ -146,14 +150,19 @@ export function RunEvaluatorsPanel({
               key={evaluator.uuid}
               className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
             >
-              {/* Covers the whole card so it behaves like a link: clicking anywhere
-                  opens the evaluator, and the buttons still sit above it. */}
-              <Link
-                href={`/evaluators/${evaluator.uuid}`}
+              {/* Covers the whole card so it behaves like a button: clicking
+                  anywhere opens how the evaluator judges, and the buttons
+                  still sit above it. */}
+              <button
+                type="button"
                 aria-label={`Open ${evaluator.name}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="absolute inset-0 rounded-xl z-0"
+                onClick={() =>
+                  setPreviewEvaluator({
+                    uuid: evaluator.uuid,
+                    name: evaluator.name,
+                  })
+                }
+                className="absolute inset-0 rounded-xl z-0 cursor-pointer"
               />
               <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -170,17 +179,21 @@ export function RunEvaluatorsPanel({
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
-                  {/* Same buttons as the agent's Evaluators tab. A new tab
-                      keeps the run being set up on screen. */}
-                  <Link
-                    href={`/evaluators/${evaluator.uuid}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  {/* Same buttons as the agent's Evaluators tab. Opens over
+                      the run being set up rather than leaving the page. */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewEvaluator({
+                        uuid: evaluator.uuid,
+                        name: evaluator.name,
+                      })
+                    }
                     className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
                     title="View evaluator"
                   >
                     View
-                  </Link>
+                  </button>
                   {!readOnly && (
                     <button
                       type="button"
@@ -229,6 +242,12 @@ export function RunEvaluatorsPanel({
           onSelectedChange([...selectedUuids, evaluator.uuid]);
           onRefresh();
         }}
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </div>
   );

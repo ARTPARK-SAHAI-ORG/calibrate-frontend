@@ -8,11 +8,12 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { Link, useParams, useRouter } from "@/lib/nav";
+import { useParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -217,6 +218,12 @@ export default function SimulationRunPage() {
   const [activeMetricsTab, setActiveMetricsTab] = useState<
     "results" | "performance" | "latency"
   >("performance");
+
+  // The evaluator whose prompt is on show, opened from a metric card's name.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
 
   // Set default tab based on screen size: "results" for mobile, "performance" for desktop
   useEffect(() => {
@@ -1034,10 +1041,11 @@ export default function SimulationRunPage() {
                               ? "This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"
                               : "");
                           // When we have an evaluator UUID, the entire
-                          // card becomes a Link so the affordance is
-                          // obvious (hover-highlight + arrow icon).
-                          // Built-in keys like `stt_llm_judge` aren't
-                          // user evaluators and render as plain divs.
+                          // card becomes a button that opens a preview
+                          // of how that evaluator judges (hover-highlight
+                          // + arrow icon). Built-in keys like
+                          // `stt_llm_judge` aren't user evaluators and
+                          // render as plain divs.
                           const cardInner = (
                             <>
                               <div className="mb-1 flex items-center gap-1.5">
@@ -1085,13 +1093,16 @@ export default function SimulationRunPage() {
                           );
                           if (evaluatorUuid) {
                             return (
-                              <Link
+                              <button
+                                type="button"
                                 key={key}
-                                href={`/evaluators/${evaluatorUuid}`}
-                                className="group block border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
+                                onClick={() =>
+                                  setPreviewEvaluator({ uuid: evaluatorUuid, name: key })
+                                }
+                                className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
                               >
                                 {cardInner}
-                              </Link>
+                              </button>
                             );
                           }
                           return (
@@ -2216,6 +2227,12 @@ export default function SimulationRunPage() {
           results: conversationLabellingResults,
           evaluators: conversationLabellingEvaluators,
         }}
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </AppLayout>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { Link } from "@/lib/nav";
+import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 export function agreementColor(v: number | null | undefined): string {
   if (v == null) return "text-muted-foreground";
@@ -63,7 +64,7 @@ export function AgreementStatCard(
       }
     | {
         evaluatorPill: {
-          href: string;
+          uuid: string;
           name: string;
           versionLabel?: string | null;
         };
@@ -95,6 +96,12 @@ export function AgreementStatCard(
     showResultLabel = true,
     warning = null,
   } = props;
+  // The evaluator whose prompt is on show, opened from the pill below. Null
+  // until the pill is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   const warningMark = warning ? (
     <Tooltip content={warning} position="top">
       <span
@@ -119,81 +126,94 @@ export function AgreementStatCard(
     </Tooltip>
   ) : null;
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
-      {"staticPillText" in props ? (
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className={`${agreementStatPillBase} cursor-default`}
-            title={props.staticPillText}
-          >
-            <span className="truncate">{props.staticPillText}</span>
-          </span>
-          {warningMark}
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <Link
-            href={props.evaluatorPill.href}
-            className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-            title={`Open ${props.evaluatorPill.name}`}
-          >
-            <span className="break-words whitespace-normal">
-              {props.evaluatorPill.name}
+    <>
+      <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
+        {"staticPillText" in props ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={`${agreementStatPillBase} cursor-default`}
+              title={props.staticPillText}
+            >
+              <span className="truncate">{props.staticPillText}</span>
             </span>
-            {props.evaluatorPill.versionLabel && (
-              <span className="font-mono text-[11px] text-muted-foreground">
-                {props.evaluatorPill.versionLabel}
+            {warningMark}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() =>
+                setPreviewEvaluator({
+                  uuid: props.evaluatorPill.uuid,
+                  name: props.evaluatorPill.name,
+                })
+              }
+              className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+              title={`Open ${props.evaluatorPill.name}`}
+            >
+              <span className="break-words whitespace-normal">
+                {props.evaluatorPill.name}
+              </span>
+              {props.evaluatorPill.versionLabel && (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {props.evaluatorPill.versionLabel}
+                </span>
+              )}
+            </button>
+            {!result && (
+              <span className="text-sm font-medium text-foreground shrink-0">
+                alignment
               </span>
             )}
-          </Link>
-          {!result && (
-            <span className="text-sm font-medium text-foreground shrink-0">
-              alignment
-            </span>
-          )}
-          {warningMark}
-        </div>
-      )}
-      {result && (value != null || showResultLabel) ? (
-        // Each number is labelled, so the card reads the same whether or not
-        // there is a human agreement number to sit beside the score. On its
-        // own the score sits in the middle of the card.
-        <div
-          className={`mt-2 flex items-start gap-6 ${
-            value == null ? "justify-center text-center" : ""
-          }`}
-        >
-          <Stat
-            label={result.label}
-            value={result.value}
-            valueClassName={
-              result.ratio == null ? "" : agreementColor(result.ratio)
-            }
-            title={result.title}
-          />
-          {value != null && (
+            {warningMark}
+          </div>
+        )}
+        {result && (value != null || showResultLabel) ? (
+          // Each number is labelled, so the card reads the same whether or not
+          // there is a human agreement number to sit beside the score. On its
+          // own the score sits in the middle of the card.
+          <div
+            className={`mt-2 flex items-start gap-6 ${
+              value == null ? "justify-center text-center" : ""
+            }`}
+          >
             <Stat
-              label="Human agreement"
-              value={value}
-              valueClassName={valueClassName}
+              label={result.label}
+              value={result.value}
+              valueClassName={
+                result.ratio == null ? "" : agreementColor(result.ratio)
+              }
+              title={result.title}
             />
-          )}
-        </div>
-      ) : (
-        // One number, named by the section the card sits in.
-        <div
-          className={`text-2xl font-semibold tabular-nums mt-2 ${
-            result
-              ? result.ratio == null
-                ? ""
-                : agreementColor(result.ratio)
-              : valueClassName
-          }`}
-          title={result?.title}
-        >
-          {result ? result.value : (value ?? "—")}
-        </div>
-      )}
-    </div>
+            {value != null && (
+              <Stat
+                label="Human agreement"
+                value={value}
+                valueClassName={valueClassName}
+              />
+            )}
+          </div>
+        ) : (
+          // One number, named by the section the card sits in.
+          <div
+            className={`text-2xl font-semibold tabular-nums mt-2 ${
+              result
+                ? result.ratio == null
+                  ? ""
+                  : agreementColor(result.ratio)
+                : valueClassName
+            }`}
+            title={result?.title}
+          >
+            {result ? result.value : (value ?? "—")}
+          </div>
+        )}
+      </div>
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
+      />
+    </>
   );
 }

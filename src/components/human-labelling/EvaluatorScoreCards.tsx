@@ -75,7 +75,7 @@ export function EvaluatorScoreCards({
             {...(linkEvaluators
               ? {
                   evaluatorPill: {
-                    href: `/evaluators/${card.evaluatorId}`,
+                    uuid: card.evaluatorId,
                     name: card.name,
                   },
                 }

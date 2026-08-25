@@ -1,6 +1,55 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { EvaluatorScoreCards } from "../EvaluatorScoreCards";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the prompt card measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetch = fetchEvaluatorDetail as jest.Mock;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockFetch.mockResolvedValue({
+    uuid: "ev-1",
+    name: "Correctness",
+    description: "Rates correctness",
+    output_type: "rating",
+    evaluator_type: "llm",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge whether the reply is correct.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 const cards = [
   {
@@ -74,7 +123,8 @@ describe("EvaluatorScoreCards", () => {
     expect(container.querySelector("p")).toBeNull();
   });
 
-  it("links each evaluator name to its own page by default", () => {
+  it("opens each evaluator's preview when its name is clicked by default", async () => {
+    const user = setupUser();
     render(
       <EvaluatorScoreCards
         heading="Human scores"
@@ -82,17 +132,19 @@ describe("EvaluatorScoreCards", () => {
         cards={cards}
       />,
     );
-    expect(screen.getByRole("link", { name: /Correctness/ })).toHaveAttribute(
-      "href",
-      "/evaluators/ev-1",
-    );
-    expect(screen.getByRole("link", { name: /Tone/ })).toHaveAttribute(
-      "href",
-      "/evaluators/ev-2",
-    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Correctness/ }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Correctness" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Judge whether the reply is correct."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("ev-1", "tok");
   });
 
-  it("shows the name without a link when linking is off", () => {
+  it("shows the name without a preview button when linking is off", () => {
     render(
       <EvaluatorScoreCards
         heading="Human scores"
@@ -103,7 +155,7 @@ describe("EvaluatorScoreCards", () => {
     );
     expect(screen.getByText("Correctness")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
   it("wraps the cards onto more rows by default", () => {
     const { container } = render(

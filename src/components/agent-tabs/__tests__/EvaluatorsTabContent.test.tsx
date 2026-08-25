@@ -1,9 +1,24 @@
 import { render, screen, waitFor, setupUser } from "@/test-utils";
 import { EvaluatorsTabContent } from "../EvaluatorsTabContent";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
+
+// jsdom has no ResizeObserver; EvaluatorPreviewModal's prompt card measures
+// its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
 
 // The tab only needs a stable access token to kick off its loads.
 jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
 }));
 
@@ -63,7 +78,11 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   isDefaultEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? e.is_default : !e.owner_user_id,
   canDeleteEvaluator: (e: EvaluatorData) => !e.is_protected,
+  // EvaluatorPreviewModal -> EvaluatorPromptPreview reads this directly.
+  fetchEvaluatorDetail: jest.fn(),
 }));
+
+const mockFetchEvaluatorDetail = fetchEvaluatorDetail as jest.Mock;
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
   uuid: "ev-1",
@@ -108,12 +127,87 @@ describe("EvaluatorsTabContent", () => {
     expect(
       await screen.findByText("Follows Refund Policy"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
-      "href",
-      "/evaluators/ev-1",
-    );
+    expect(
+      screen.getByRole("button", { name: "View" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Remove" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the evaluator preview from the View button, and closes it", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchEvaluatorDetail.mockResolvedValue({
+      uuid: "ev-1",
+      name: "Follows Refund Policy",
+      description: "Checks the agent honours the refund policy",
+      output_type: "binary",
+      evaluator_type: "llm",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v1",
+          version_number: 1,
+          judge_model: "google/gemini-2.5-flash",
+          system_prompt: "Judge whether the refund policy was followed.",
+          output_config: null,
+          variables: null,
+        },
+      ],
+    });
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "View" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Follows Refund Policy", level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Judge whether the refund policy was followed."),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(
+      screen.queryByRole("heading", { name: "Follows Refund Policy", level: 2 }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the evaluator preview from clicking the card itself", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchEvaluatorDetail.mockResolvedValue({
+      uuid: "ev-1",
+      name: "Follows Refund Policy",
+      description: "Checks the agent honours the refund policy",
+      output_type: "binary",
+      evaluator_type: "llm",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v1",
+          version_number: 1,
+          judge_model: "google/gemini-2.5-flash",
+          system_prompt: "Judge whether the refund policy was followed.",
+          output_config: null,
+          variables: null,
+        },
+      ],
+    });
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(
+      screen.getByRole("button", { name: "Open Follows Refund Policy" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Follows Refund Policy", level: 2 }),
     ).toBeInTheDocument();
   });
 

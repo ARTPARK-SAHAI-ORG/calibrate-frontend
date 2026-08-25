@@ -8,6 +8,7 @@ import {
   fireEvent,
   act,
 } from "@/test-utils";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -106,6 +107,33 @@ jest.mock("../../../lib/api", () => ({
 }));
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { apiClient } = require("../../../lib/api") as { apiClient: jest.Mock };
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the evaluator preview modal's prompt card
+// measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetchEvaluatorDetail = fetchEvaluatorDetail as jest.Mock;
 
 beforeEach(() => {
   jspdfMock.__addPageCalls.length = 0;
@@ -1018,44 +1046,85 @@ describe("AnnotationOptIn", () => {
 });
 
 describe("EvaluatorAnnotationColumnsHelp", () => {
+  const EVALUATORS: EvaluatorMeta[] = [
+    {
+      uuid: "1",
+      name: "Correctness",
+      output_type: "binary",
+      scale_min: null,
+      scale_max: null,
+    },
+    {
+      uuid: "2",
+      name: "Score",
+      output_type: "rating",
+      scale_min: 1,
+      scale_max: 5,
+    },
+    {
+      uuid: "3",
+      name: "Vague",
+      output_type: "rating",
+      scale_min: null,
+      scale_max: null,
+    },
+  ];
+
   it("renders value/reasoning bullets for binary, rating-with-scale, and rating-without-scale evaluators", () => {
     render(
       <ul>
-        <EvaluatorAnnotationColumnsHelp
-          evaluators={[
-            {
-              uuid: "1",
-              name: "Correctness",
-              output_type: "binary",
-              scale_min: null,
-              scale_max: null,
-            },
-            {
-              uuid: "2",
-              name: "Score",
-              output_type: "rating",
-              scale_min: 1,
-              scale_max: 5,
-            },
-            {
-              uuid: "3",
-              name: "Vague",
-              output_type: "rating",
-              scale_min: null,
-              scale_max: null,
-            },
-          ]}
-        />
+        <EvaluatorAnnotationColumnsHelp evaluators={EVALUATORS} />
       </ul>,
     );
     expect(screen.getByText("Correctness/value")).toBeInTheDocument();
     expect(screen.getByText("Correctness/reasoning")).toBeInTheDocument();
     expect(screen.getByText(/true\/false/)).toBeInTheDocument();
     expect(screen.getByText(/any value between 1-5/)).toBeInTheDocument();
-    const links = screen.getAllByRole("link");
-    expect(links.some((l) => l.getAttribute("href") === "/evaluators/1")).toBe(
-      true,
+    // The evaluator name is a button that opens a preview, not a link that
+    // navigates away from the wizard.
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    const pills = screen.getAllByRole("button", { name: "Correctness" });
+    expect(pills.length).toBeGreaterThan(0);
+  });
+
+  it("opens the evaluator preview on click and shows how it judges", async () => {
+    const user = setupUser();
+    mockFetchEvaluatorDetail.mockResolvedValue({
+      uuid: "1",
+      name: "Correctness",
+      description: "Checks correctness",
+      output_type: "binary",
+      evaluator_type: "llm",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v1",
+          version_number: 1,
+          judge_model: "google/gemini-2.5-flash",
+          system_prompt: "Judge whether the reply is correct.",
+          output_config: null,
+          variables: null,
+        },
+      ],
+    });
+
+    render(
+      <ul>
+        <EvaluatorAnnotationColumnsHelp evaluators={EVALUATORS} />
+      </ul>,
     );
+
+    await user.click(screen.getAllByRole("button", { name: "Correctness" })[0]);
+
+    expect(
+      await screen.findByText("Judge whether the reply is correct."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Correctness" })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Close preview"));
+    expect(
+      screen.queryByText("Judge whether the reply is correct."),
+    ).not.toBeInTheDocument();
   });
 });
 

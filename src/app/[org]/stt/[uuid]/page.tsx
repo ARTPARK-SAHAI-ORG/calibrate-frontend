@@ -34,6 +34,7 @@ import {
 } from "@/components/eval-details";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { SARVAM_METRIC_FIELDS } from "@/components/eval-details/sarvamMetrics";
 import {
   AddRunToLabellingTaskDialog,
@@ -275,6 +276,12 @@ export default function STTEvaluationDetailPage() {
   );
   const [sttEvaluators, setSttEvaluators] = useState<EvaluatorSummary[]>([]);
   const [aboutEvaluators, setAboutEvaluators] = useState<EvaluatorAbout[]>([]);
+  // The evaluator whose prompt is on show in the About tab. Null until a
+  // name is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1021,13 +1028,19 @@ export default function STTEvaluationDetailPage() {
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
-                          <Link
-                            href={`/evaluators/${e.uuid}`}
-                            className="text-foreground underline-offset-2 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewEvaluator({
+                                uuid: e.uuid,
+                                name: e.name,
+                              })
+                            }
+                            className="text-foreground underline-offset-2 hover:underline cursor-pointer"
                             title={`Open evaluator: ${e.name}`}
                           >
                             {e.name}
-                          </Link>
+                          </button>
                         ),
                         description:
                           e.description ||
@@ -1139,6 +1152,12 @@ export default function STTEvaluationDetailPage() {
           rows: sttLabellingRows,
           evaluators: sttLabellingEvaluators,
         }}
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </AppLayout>
   );

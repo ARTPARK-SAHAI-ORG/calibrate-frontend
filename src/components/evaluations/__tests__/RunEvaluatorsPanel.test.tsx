@@ -1,5 +1,6 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { RunEvaluatorsPanel } from "../RunEvaluatorsPanel";
+import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 jest.mock("../../agent-tabs/AddEvaluatorsDialog", () => ({
@@ -21,6 +22,32 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   CreateEvaluatorFlow: ({ open }: { open: boolean }) =>
     open ? <div data-testid="create-flow" /> : null,
 }));
+
+jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
+  useAccessToken: () => "tok",
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  fetchEvaluatorDetail: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+// jsdom has no ResizeObserver; the preview's prompt card measures its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
+
+const mockFetchDetail = fetchEvaluatorDetail as jest.Mock;
 
 const evaluator = (uuid: string, name: string): EvaluatorData => ({
   uuid,
@@ -49,6 +76,28 @@ function renderPanel(
   );
   return { ...utils, onSelectedChange };
 }
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockFetchDetail.mockResolvedValue({
+    uuid: "ev-1",
+    name: "Semantic match",
+    description: "",
+    output_type: "rating",
+    evaluator_type: "stt",
+    live_version_index: 0,
+    versions: [
+      {
+        uuid: "v1",
+        version_number: 1,
+        judge_model: "google/gemini-2.5-flash",
+        system_prompt: "Judge whether the transcript matches.",
+        output_config: null,
+        variables: null,
+      },
+    ],
+  });
+});
 
 describe("RunEvaluatorsPanel", () => {
   it("shows a card for each chosen evaluator", () => {
@@ -117,6 +166,44 @@ describe("RunEvaluatorsPanel", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add evaluators" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens how the evaluator judges when its View button is clicked", async () => {
+    const user = setupUser();
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: "View" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Semantic match", level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Judge whether the transcript matches."),
+    ).toBeInTheDocument();
+    expect(mockFetchDetail).toHaveBeenCalledWith("ev-1", "tok");
+  });
+
+  it("opens the same preview when the card itself is clicked", async () => {
+    const user = setupUser();
+    renderPanel();
+    await user.click(
+      screen.getByRole("button", { name: "Open Semantic match" }),
+    );
+
+    expect(
+      await screen.findByText("Judge whether the transcript matches."),
+    ).toBeInTheDocument();
+  });
+
+  it("closes the preview", async () => {
+    const user = setupUser();
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await screen.findByText("Judge whether the transcript matches.");
+
+    await user.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(
+      screen.queryByText("Judge whether the transcript matches."),
     ).not.toBeInTheDocument();
   });
 });

@@ -30,6 +30,7 @@ import {
   hasTtsTopPicks,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
   AddRunToLabellingTaskDialog,
@@ -230,6 +231,12 @@ export default function TTSEvaluationDetailPage() {
   );
   const [ttsEvaluators, setTtsEvaluators] = useState<EvaluatorSummary[]>([]);
   const [aboutEvaluators, setAboutEvaluators] = useState<EvaluatorAbout[]>([]);
+  // The evaluator whose prompt is on show in the About tab. Null until a
+  // name is clicked.
+  const [previewEvaluator, setPreviewEvaluator] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Set page title and collapse main sidebar for more space
@@ -954,13 +961,19 @@ export default function TTSEvaluationDetailPage() {
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
-                          <Link
-                            href={`/evaluators/${e.uuid}`}
-                            className="text-foreground underline-offset-2 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewEvaluator({
+                                uuid: e.uuid,
+                                name: e.name,
+                              })
+                            }
+                            className="text-foreground underline-offset-2 hover:underline cursor-pointer"
                             title={`Open evaluator: ${e.name}`}
                           >
                             {e.name}
-                          </Link>
+                          </button>
                         ),
                         description:
                           e.description ||
@@ -1052,6 +1065,12 @@ export default function TTSEvaluationDetailPage() {
           rows: ttsLabellingRows,
           evaluators: ttsLabellingEvaluators,
         }}
+      />
+
+      <EvaluatorPreviewModal
+        evaluatorUuid={previewEvaluator?.uuid ?? null}
+        evaluatorName={previewEvaluator?.name}
+        onClose={() => setPreviewEvaluator(null)}
       />
     </AppLayout>
   );
