@@ -9,8 +9,8 @@ name: notify-skills
 # screen. That is the part this app can break without anyone noticing, because
 # none of it appears in the API description that repo already watches.
 #
-# This only says what shipped. All the reading and deciding happens over there,
-# and most releases are read and dropped.
+# This only says what shipped, and the range it shipped over. All the reading and
+# deciding happens over there, and most releases are read and dropped.
 on:
   push:
     branches: [prod]
@@ -28,9 +28,12 @@ jobs:
           # The token a workflow gets by default cannot reach another repository.
           TOKEN: ${{ secrets.SKILLS_DISPATCH_TOKEN }}
           SHA: ${{ github.sha }}
+          # Where prod was before this push. It is what lets the other side read
+          # exactly this release and nothing else.
+          BEFORE: ${{ github.event.before }}
         run: |
           curl -fsSL -X POST \
             -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/dalmia/calibrate-skills/dispatches \
-            -d "{\"event_type\":\"frontend-released\",\"client_payload\":{\"sha\":\"$SHA\"}}"
+            -d "{\"event_type\":\"frontend-released\",\"client_payload\":{\"sha\":\"$SHA\",\"before\":\"$BEFORE\"}}"
