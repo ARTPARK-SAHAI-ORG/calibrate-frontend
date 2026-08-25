@@ -147,7 +147,11 @@ async function createNextReplyTestOnAgent(
   // createUnattachedLlmEvaluator).
   await page.getByRole("button", { name: "Add evaluator" }).click();
   await page.getByPlaceholder("Search evaluators").fill(extraEvaluatorName);
-  await page.getByText(extraEvaluatorName, { exact: true }).first().click();
+  // The row's name opens a preview of the evaluator now; the checkbox is
+  // what selects it.
+  await page
+    .getByRole("checkbox", { name: `Select ${extraEvaluatorName}` })
+    .click();
   await page.getByRole("button", { name: "Add (1)" }).click();
 
   await page.getByRole("button", { name: "Create", exact: true }).click();
