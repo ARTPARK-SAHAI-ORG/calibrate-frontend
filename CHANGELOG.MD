@@ -1,5 +1,6 @@
 ## August 2026
 
+- Tell the skills repo when something ships ([#434](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/434))
 - Fix action buttons wrapping below score cards on labelling job page ([#433](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/433))
 - Point docs links at docs.calibrate.artpark.ai ([#432](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/432))
 - Remove the pre-push check that blocks pushes with untested changed lines ([#431](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/431))
