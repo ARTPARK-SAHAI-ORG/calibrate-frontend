@@ -161,7 +161,7 @@ export default function AdminAnnotateJobPage() {
                   before that. The status rides on the heading rather than
                   taking a row of its own: this page fills the window height,
                   so anything taller is taken from the item being read. */}
-              <div className="min-w-0">
+              <div className="flex-1 min-w-0">
                 <EvaluatorScoreCards
                   heading={meta.annotator.name || HUMAN_SCORES_HEADING}
                   description={
