@@ -4596,8 +4596,8 @@ This pattern helps users understand the relationship between features and provid
 
 ```bash
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000  # Backend API URL
-NEXT_PUBLIC_APP_URL=https://penseapp.vercel.app  # App base URL (required)
-NEXT_PUBLIC_DOCS_URL=https://penseapp.vercel.app/docs  # Documentation base URL (required)
+NEXT_PUBLIC_APP_URL=https://calibrate.artpark.ai  # App base URL (required)
+NEXT_PUBLIC_DOCS_URL=https://docs.calibrate.artpark.ai  # Documentation base URL (required)
 AUTH_SECRET=                                    # NextAuth secret
 GOOGLE_CLIENT_ID=                              # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
