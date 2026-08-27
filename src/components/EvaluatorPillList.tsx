@@ -42,7 +42,7 @@ export function EvaluatorPillList({
   const rest = evaluators.length <= 2 ? [] : evaluators.slice(1);
   return (
     <div className="flex items-center gap-1 min-w-0">
-      {visible.map((ev) =>
+      {visible.map((ev, index) =>
         ev.uuid ? (
           <button
             key={ev.uuid}
@@ -59,7 +59,13 @@ export function EvaluatorPillList({
         ) : (
           // A plain pill can be clipped by a narrow column, so the whole name
           // is on hover. There is nothing to open, so no click handler.
-          <Tooltip key={ev.name} content={ev.name} className="min-w-0 shrink">
+          // Keyed by position: a list with no ids can hold the same name
+          // twice, and two pills with the same key confuse React.
+          <Tooltip
+            key={`${index}-${ev.name}`}
+            content={ev.name}
+            className="min-w-0 shrink"
+          >
             <span className={`${EVALUATOR_PILL_CLASSES} w-full truncate`}>
               <span className="truncate">{ev.name}</span>
             </span>
@@ -70,9 +76,9 @@ export function EvaluatorPillList({
         <Tooltip
           content={
             <div className="flex flex-wrap gap-1 max-w-64">
-              {rest.map((ev) => (
+              {rest.map((ev, index) => (
                 <span
-                  key={ev.uuid ?? ev.name}
+                  key={ev.uuid ?? `${index}-${ev.name}`}
                   className={EVALUATOR_PILL_CLASSES}
                 >
                   {ev.name}

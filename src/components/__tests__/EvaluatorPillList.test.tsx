@@ -174,3 +174,14 @@ describe("pills for names with no evaluator behind them", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
+
+describe("two items sharing a name", () => {
+  it("draws both pills without React complaining about repeated keys", () => {
+    const warn = jest.spyOn(console, "error").mockImplementation(() => {});
+    render(<NamePillList names={["Correctness", "Correctness"]} />);
+
+    expect(screen.getAllByText("Correctness")).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
