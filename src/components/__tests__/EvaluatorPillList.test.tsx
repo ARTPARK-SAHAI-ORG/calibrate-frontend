@@ -193,6 +193,38 @@ describe("the full name on hover", () => {
   });
 });
 
+  it("keeps watching the pill after the name turns out to be cut off", async () => {
+    // The wrapper around the pill changes when the name is cut off, which
+    // mounts a new span. If the size watcher stayed on the old one, widening
+    // the column later would never clear the hover text.
+    const observed: Element[] = [];
+    class RecordingResizeObserver {
+      observe(el: Element) {
+        observed.push(el);
+      }
+      disconnect() {}
+    }
+    const previous = global.ResizeObserver;
+    (
+      global as unknown as { ResizeObserver: typeof RecordingResizeObserver }
+    ).ResizeObserver = RecordingResizeObserver;
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(<NamePillList names={["a very long model name indeed"]} />);
+
+    await waitFor(() => expect(observed.length).toBeGreaterThan(1));
+    expect(document.body.contains(observed[observed.length - 1])).toBe(true);
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+    (global as unknown as { ResizeObserver: unknown }).ResizeObserver = previous;
+  });
+
 describe("the evaluators folded into the +N chip", () => {
   it("opens a preview when one of them is clicked", async () => {
     const user = setupUser();

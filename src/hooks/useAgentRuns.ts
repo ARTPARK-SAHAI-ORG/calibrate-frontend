@@ -23,11 +23,13 @@ export type AgentRun = {
   error?: boolean;
   results?: UnitTestResultLike[] | null;
   /**
-   * Names of the evaluators that judged this run, no duplicates. "Tool call"
-   * is added last when the run included a tool-call test. Absent on older
-   * backends, empty when the run had no evaluators.
+   * The evaluators that judged this run, no duplicates. "Tool call" is added
+   * last when the run included a tool-call test, and carries no id because it
+   * is not an evaluator in the library. Absent on older backends, empty when
+   * the run had no evaluators. Older backends send bare names instead of
+   * `{uuid, name}`, so both shapes are read.
    */
-  evaluators?: string[] | null;
+  evaluators?: (string | { uuid?: string | null; name?: string | null })[] | null;
   model_results?:
     | {
         model: string;

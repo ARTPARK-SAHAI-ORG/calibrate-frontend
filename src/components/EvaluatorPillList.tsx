@@ -22,10 +22,9 @@ const EVALUATOR_PILL_CLASSES =
  * covers the row and tells the reader nothing.
  */
 function useIsNameClipped(name: string) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const [el, setEl] = useState<HTMLSpanElement | null>(null);
   const [clipped, setClipped] = useState(false);
   useEffect(() => {
-    const el = ref.current;
     if (!el) return;
     const measure = () => setClipped(el.scrollWidth > el.clientWidth);
     measure();
@@ -33,8 +32,12 @@ function useIsNameClipped(name: string) {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [name]);
-  return { ref, clipped };
+  }, [el, name]);
+  // The wrapper around the pill changes when the name turns out to be cut
+  // off, which mounts a new span. Keeping the span in state rather than a ref
+  // re-runs the effect on that new one, so widening the column later still
+  // clears the hover text.
+  return { ref: setEl, clipped };
 }
 
 /**

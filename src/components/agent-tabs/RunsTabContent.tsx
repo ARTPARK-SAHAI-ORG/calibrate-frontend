@@ -200,15 +200,16 @@ function RunModels({ run }: { run: AgentRun }) {
 /**
  * The evaluators that judged a run, in the same fixed-width pills the human
  * alignment tasks list uses, so one row with many evaluators does not push
- * every other row's columns out of line. The runs list carries their names
- * only, so these pills are not clickable.
+ * every other row's columns out of line. A pill opens how that evaluator
+ * judges, except for "Tool call" and for runs read from an older backend that
+ * sends names with no id.
  */
 function RunEvaluators({ run }: { run: AgentRun }) {
-  return (
-    <EvaluatorPillList
-      evaluators={(run.evaluators ?? []).map((name) => ({ name }))}
-    />
-  );
+  const evaluators = (run.evaluators ?? []).flatMap((ev) => {
+    if (typeof ev === "string") return [{ name: ev }];
+    return ev.name ? [{ uuid: ev.uuid, name: ev.name }] : [];
+  });
+  return <EvaluatorPillList evaluators={evaluators} />;
 }
 
 /**
