@@ -230,9 +230,11 @@ describe("RunsTabContent", () => {
     const cells = Array.from(row.querySelectorAll("td")).map(
       (td) => td.textContent,
     );
-    // Run, result, tests, models, evaluators, created at.
-    expect(cells[4]).toBe("CorrectnessScript FidelityTool call");
-    // Plain chips, nothing to click.
+    // Run, result, tests, models, evaluators, created at. The first
+    // evaluator, then how many more, so a run with many of them does not push
+    // the other rows' columns out of line.
+    expect(cells[4]).toBe("Correctness+2");
+    // The runs list carries names only, so there is nothing to click through to.
     expect(
       (row.querySelectorAll("td")[4] as HTMLElement).querySelector(
         "a, button",

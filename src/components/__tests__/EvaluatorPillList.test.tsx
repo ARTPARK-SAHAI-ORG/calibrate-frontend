@@ -1,5 +1,5 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
-import { EvaluatorPillList } from "../EvaluatorPillList";
+import { EvaluatorPillList, NamePillList } from "../EvaluatorPillList";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 
 jest.mock("../../hooks", () => ({
@@ -155,5 +155,22 @@ describe("EvaluatorPillList", () => {
         screen.queryByText("Judge whether the reply is concise."),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe("pills for names with no evaluator behind them", () => {
+  it("shows a plain pill that cannot be clicked through to a preview", () => {
+    render(<EvaluatorPillList evaluators={[{ name: "Correctness" }]} />);
+
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("folds a long list of plain names into a +N chip", () => {
+    render(<NamePillList names={["a", "b", "c", "d", "e"]} />);
+
+    expect(screen.getByText("a")).toBeInTheDocument();
+    expect(screen.getByText("+4")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

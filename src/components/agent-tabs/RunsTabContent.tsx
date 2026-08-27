@@ -18,6 +18,10 @@ import {
   runDisplayName,
 } from "@/lib/testTypes";
 import { ServerPaginatedListBar } from "@/components/ui";
+import {
+  EvaluatorPillList,
+  NamePillList,
+} from "@/components/EvaluatorPillList";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -190,33 +194,20 @@ function RunModels({ run }: { run: AgentRun }) {
   const models = runModels(run);
   if (models.length === 0)
     return <span className="text-sm text-muted-foreground/70">Default</span>;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {models.map((model) => (
-        <span
-          key={model}
-          className={`${PILL_CLASS} bg-muted text-muted-foreground`}
-        >
-          {model}
-        </span>
-      ))}
-    </div>
-  );
+  return <NamePillList names={models} />;
 }
 
-/** The evaluators that judged a run, as plain chips. A dash when there are none. */
+/**
+ * The evaluators that judged a run, in the same fixed-width pills the human
+ * alignment tasks list uses, so one row with many evaluators does not push
+ * every other row's columns out of line. The runs list carries their names
+ * only, so these pills are not clickable.
+ */
 function RunEvaluators({ run }: { run: AgentRun }) {
-  const names = run.evaluators ?? [];
-  if (names.length === 0)
-    return <span className="text-sm text-muted-foreground">—</span>;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {names.map((name) => (
-        <span key={name} className={`${PILL_CLASS} bg-muted text-muted-foreground`}>
-          {name}
-        </span>
-      ))}
-    </div>
+    <EvaluatorPillList
+      evaluators={(run.evaluators ?? []).map((name) => ({ name }))}
+    />
   );
 }
 
@@ -484,10 +475,10 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
                     Tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-56">
                     Models
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-64">
                     Evaluators
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
