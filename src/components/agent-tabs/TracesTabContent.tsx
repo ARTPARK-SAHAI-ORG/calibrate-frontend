@@ -39,6 +39,7 @@ import {
   fetchTraces,
   type TraceDetail,
   type TraceOutputFilter,
+  type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
@@ -142,7 +143,18 @@ export function TracesTabContent({
   const isGeneral = agentNature === "general";
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
-  const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
+  // A tick survives the reader turning the page, but the row behind it does
+  // not, so every ticked trace is held here as it is ticked. What follows then
+  // reads all of them and not only the ones on the page in front of the reader.
+  const pickedRef = useRef(new Map<string, TraceSummary>());
+  items.forEach((trace) => {
+    if (selected.has(trace.uuid)) pickedRef.current.set(trace.uuid, trace);
+    else pickedRef.current.delete(trace.uuid);
+  });
+  const selectedTraces = Array.from(selected).flatMap((uuid) => {
+    const trace = pickedRef.current.get(uuid);
+    return trace ? [trace] : [];
+  });
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
@@ -330,9 +342,15 @@ export function TracesTabContent({
 
   // The choice was made against one list, so a new search or filter drops it
   // rather than acting on rows the reader never saw.
+  // Ticks are dropped with it: they are kept across pages, but a trace the
+  // list no longer matches cannot be seen on screen, so it must not stay in
+  // what the next action works on.
   useEffect(() => {
     setEveryTraceMatching(false);
     setWholeListKind(null);
+    pickedRef.current.clear();
+    deletion.clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, outputFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.

@@ -1389,6 +1389,60 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
   });
 
+  it("keeps the ticks when the reader moves to another page", async () => {
+    const user = setupUser();
+    const page1 = [
+      trace(),
+      trace({
+        uuid: "trace-2",
+        message_id: "msg-002",
+        input_preview: "Second",
+      }),
+    ];
+    mockUseTraces.mockReturnValue(tracesResult(page1, { total: 4 }));
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getAllByLabelText("Select trace")[1]);
+    expect(screen.getByText("Add to tests (2)")).toBeInTheDocument();
+
+    // Page two lands. The two traces ticked on page one are no longer on
+    // screen, so this is exactly where the ticks used to disappear.
+    mockUseTraces.mockReturnValue(
+      tracesResult(
+        [
+          trace({
+            uuid: "trace-3",
+            message_id: "msg-003",
+            input_preview: "Third",
+          }),
+        ],
+        { total: 4, offset: 2, loadedOffset: 2 },
+      ),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+
+    expect(screen.getByText("Add to tests (2)")).toBeInTheDocument();
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (3)")).toBeInTheDocument();
+    // The one on page two replied, so the whole set still goes for labelling.
+    expect(screen.getByText("Submit for labelling (3)")).toBeInTheDocument();
+  });
+
+  it("drops the ticks when the list is searched, since they cannot be seen", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument(),
+    );
+  });
+
   it("ticks and unticks the open trace from inside its window", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(

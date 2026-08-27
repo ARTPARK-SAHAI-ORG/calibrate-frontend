@@ -325,38 +325,42 @@ export function TraceDetailDialog({
             hasNext={hasNext}
             position={position}
           />
-          {onToggleSelected && (
-            <Button
-              size="sm"
-              variant={isSelected ? "primary" : "secondary"}
-              onClick={onToggleSelected}
-              className="flex-shrink-0 whitespace-nowrap"
+          {/* Kept together so both sit in the top right corner. Loose in the
+              header they would be spread apart by the row's own spacing. */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {onToggleSelected && (
+              <Button
+                size="sm"
+                variant={isSelected ? "secondary" : "primary"}
+                onClick={onToggleSelected}
+                className="whitespace-nowrap"
+              >
+                {isSelected
+                  ? "Remove trace from selection"
+                  : "Add trace to selection"}
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
             >
-              {isSelected
-                ? "Remove trace from selection"
-                : "Add trace to selection"}
-            </Button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
