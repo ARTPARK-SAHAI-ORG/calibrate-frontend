@@ -23,6 +23,12 @@ type UseBulkDeletionArgs<T extends { uuid: string }> = {
   selectLabel: string;
   /** Whether an item can be bulk-deleted. Defaults to every item eligible. */
   isEligible?: (item: T) => boolean;
+  /** Set for a list that loads one page at a time from the backend, so a tick
+   *  survives the reader moving to another page. The caller must then clear
+   *  the selection itself whenever the list is narrowed (a search, a filter),
+   *  since a tick can no longer be seen on screen. Off by default: a list that
+   *  holds every row already shows everything a tick can reach. */
+  keepSelectionAcrossPages?: boolean;
   /** Tooltip for an ineligible item's disabled checkbox. */
   ineligibleTooltip?: (item: T) => string;
   /** Builds the bulk-delete request from the selected uuids. */
@@ -51,6 +57,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
   accessToken,
   selectLabel,
   isEligible = () => true,
+  keepSelectionAcrossPages = false,
   ineligibleTooltip,
   buildBulkRequest,
   buildSingleRequest,
@@ -73,6 +80,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
   // visible eligible set actually changes, not on every render.
   const eligibleKey = eligibleItems.map((i) => i.uuid).join(",");
   useEffect(() => {
+    if (keepSelectionAcrossPages) return;
     const visible = new Set(eligibleItems.map((i) => i.uuid));
     setSelectedUuids((prev) => {
       let changed = false;
@@ -84,7 +92,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
       return changed ? next : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligibleKey]);
+  }, [eligibleKey, keepSelectionAcrossPages]);
 
   const toggleSelection = (uuid: string) => {
     const item = items.find((i) => i.uuid === uuid);

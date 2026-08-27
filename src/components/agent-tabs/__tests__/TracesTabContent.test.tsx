@@ -146,6 +146,9 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onPrev,
     onNext,
     position,
+    isSelected,
+    onToggleSelected,
+    selectedCount,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -154,10 +157,21 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onPrev?: () => void;
     onNext?: () => void;
     position?: { index: number; total: number };
+    isSelected?: boolean;
+    onToggleSelected?: () => void;
+    selectedCount?: number;
   }) =>
     isOpen ? (
       <div data-testid="trace-detail">
         {traceUuid}
+        <button
+          type="button"
+          onClick={onToggleSelected}
+          data-testid="trace-detail-toggle"
+        >
+          {isSelected ? "remove from selection" : "add to selection"}
+        </button>
+        <span data-testid="trace-detail-count">{selectedCount}</span>
         <span data-testid="trace-detail-position">
           {position ? `${position.index + 1} of ${position.total}` : ""}
         </span>
@@ -547,7 +561,9 @@ describe("TracesTabContent", () => {
     expect(toast.error).toHaveBeenCalledWith(
       "Labelling works on the traces you tick. Untick the whole list and pick the ones to send.",
     );
-    expect(screen.queryByTestId("labelling-evaluators")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("labelling-evaluators"),
+    ).not.toBeInTheDocument();
   });
 
   it("says how many will really go when the whole list is asked for", async () => {
@@ -842,12 +858,13 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (1)"));
     await user.click(screen.getByText("finish adding"));
 
-    // Two uuids came back, so the message says two, and the selection clears.
+    // Two uuids came back, so the message says two. The ticks stay on, so the
+    // same traces can be sent for labelling without picking them again.
     expect(toast.success).toHaveBeenCalledWith(
       "Created 2 tests",
       expect.anything(),
     );
-    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
   });
 
   it("offers to attach an evaluator the agent does not have after adding tests", async () => {
@@ -1181,7 +1198,7 @@ describe("TracesTabContent", () => {
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
     });
 
-    it("clears the selection but leaves the task dialog open on its confirmation", async () => {
+    it("keeps the selection and leaves the task dialog open on its confirmation", async () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
 
@@ -1197,9 +1214,8 @@ describe("TracesTabContent", () => {
       // The dialog keeps showing its own confirmation, which is where the
       // reader opens the task or closes it.
       expect(screen.getByTestId("labelling-task")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Submit for labelling (1)"),
-      ).not.toBeInTheDocument();
+      // The same traces are often wanted as tests too, so nothing is unticked.
+      expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
 
       await user.click(screen.getByText("close labelling"));
       expect(screen.queryByTestId("labelling-task")).not.toBeInTheDocument();
@@ -1331,41 +1347,6 @@ describe("TracesTabContent", () => {
       );
     });
 
-    it("clears only the traces that were submitted", async () => {
-      const user = setupUser();
-      mockUseTraces.mockReturnValue(
-        tracesResult([
-          trace(),
-          trace({
-            uuid: "trace-2",
-            message_id: "msg-002",
-            input_preview: "Second",
-          }),
-          trace({
-            uuid: "trace-3",
-            message_id: "msg-003",
-            input_preview: "Third",
-          }),
-        ]),
-      );
-      render(<TracesTabContent {...tabProps} />);
-
-      await user.click(screen.getAllByLabelText("Select trace")[0]);
-      await user.click(screen.getByText("Submit for labelling (1)"));
-      await user.click(screen.getByText("choose evaluators"));
-      await waitFor(() =>
-        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
-      );
-
-      // Two more get ticked while the task dialog is open.
-      await user.click(screen.getAllByLabelText("Select trace")[1]);
-      await user.click(screen.getAllByLabelText("Select trace")[2]);
-      await user.click(screen.getByText("finish labelling"));
-
-      // Only the submitted one is unticked; the other two are still ticked.
-      expect(screen.getByText("Submit for labelling (2)")).toBeInTheDocument();
-    });
-
     it("says so when the traces cannot be loaded, instead of opening an empty task", async () => {
       const user = setupUser();
       fetchTrace.mockRejectedValue(new Error("boom"));
@@ -1409,6 +1390,89 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByText("Second")[0]);
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("keeps the ticks when the reader moves to another page", async () => {
+    const user = setupUser();
+    const page1 = [
+      trace(),
+      trace({
+        uuid: "trace-2",
+        message_id: "msg-002",
+        input_preview: "Second",
+      }),
+    ];
+    mockUseTraces.mockReturnValue(tracesResult(page1, { total: 4 }));
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getAllByLabelText("Select trace")[1]);
+    expect(screen.getByText("Add to tests (2)")).toBeInTheDocument();
+
+    // Page two lands. The two traces ticked on page one are no longer on
+    // screen, so this is exactly where the ticks used to disappear.
+    mockUseTraces.mockReturnValue(
+      tracesResult(
+        [
+          trace({
+            uuid: "trace-3",
+            message_id: "msg-003",
+            input_preview: "Third",
+          }),
+        ],
+        { total: 4, offset: 2, loadedOffset: 2 },
+      ),
+    );
+    rerender(<TracesTabContent {...tabProps} />);
+
+    expect(screen.getByText("Add to tests (2)")).toBeInTheDocument();
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (3)")).toBeInTheDocument();
+    // The one on page two replied, so the whole set still goes for labelling.
+    expect(screen.getByText("Submit for labelling (3)")).toBeInTheDocument();
+  });
+
+  it("drops the ticks when the list is searched, since they cannot be seen", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("ticks and unticks the open trace from inside its window", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace(),
+        trace({
+          uuid: "trace-2",
+          message_id: "msg-002",
+          input_preview: "Second",
+        }),
+      ]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByText("Second")[0]);
+    await user.click(screen.getByTestId("trace-detail-toggle"));
+
+    // Ticked without leaving the trace, so the bulk actions are ready for it,
+    // and the running count is on the window itself.
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-detail-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("trace-detail-toggle")).toHaveTextContent(
+      "remove from selection",
+    );
+
+    await user.click(screen.getByTestId("trace-detail-toggle"));
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
   });
 
   it("steps to the next and previous trace within the loaded page", async () => {

@@ -45,6 +45,11 @@ export function useTraceDeletion({
     onDeleted,
     accessToken,
     selectLabel: "Select trace",
+    // The traces list loads one page at a time, so a tick has to survive the
+    // reader moving to another page: they pick traces while reading them, one
+    // after another, and the page turns under them. TracesTabContent clears
+    // the selection whenever the list is searched or filtered.
+    keepSelectionAcrossPages: true,
     buildBulkRequest: (backendUrl, uuids) =>
       selectAll
         ? {

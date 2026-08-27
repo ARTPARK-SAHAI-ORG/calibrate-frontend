@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { DialogNavHeader, LoadingState } from "@/components/ui";
+import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
 import {
   TestDetailView,
@@ -33,6 +33,15 @@ type TraceDetailDialogProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** Whether this trace is ticked in the list behind the dialog. */
+  isSelected?: boolean;
+  /** Tick or untick this trace without closing the dialog and going back to
+   *  the list for its checkbox. */
+  onToggleSelected?: () => void;
+  /** How many traces are ticked in the list behind the dialog. Shown next to
+   *  the button so the reader can see the pile growing without closing the
+   *  window to look at the count. */
+  selectedCount?: number;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -249,6 +258,9 @@ export function TraceDetailDialog({
   hasPrev = false,
   hasNext = false,
   position,
+  isSelected = false,
+  onToggleSelected,
+  selectedCount = 0,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -318,26 +330,52 @@ export function TraceDetailDialog({
             hasNext={hasNext}
             position={position}
           />
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
+          {/* Kept together so both sit in the top right corner. Loose in the
+              header they would be spread apart by the row's own spacing. */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Only while this trace is in the selection: the count answers
+                "what did that press do", so it goes away with the trace it
+                was counting. */}
+            {onToggleSelected && isSelected && selectedCount > 0 && (
+              <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
+                {selectedCount} selected
+              </span>
+            )}
+            {onToggleSelected && (
+              // Both states are filled so neither reads as switched off, and
+              // they are different colours so a glance says which one it is.
+              <Button
+                size="sm"
+                variant={isSelected ? "danger" : "primary"}
+                onClick={onToggleSelected}
+                className="whitespace-nowrap"
+              >
+                {isSelected
+                  ? "Remove trace from selection"
+                  : "Add trace to selection"}
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">

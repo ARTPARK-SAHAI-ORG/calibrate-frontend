@@ -39,6 +39,7 @@ import {
   fetchTraces,
   type TraceDetail,
   type TraceOutputFilter,
+  type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
@@ -142,7 +143,18 @@ export function TracesTabContent({
   const isGeneral = agentNature === "general";
   const [convertOpen, setConvertOpen] = useState(false);
   const selected = deletion.selectedUuids;
-  const selectedTraces = items.filter((trace) => selected.has(trace.uuid));
+  // A tick survives the reader turning the page, but the row behind it does
+  // not, so every ticked trace is held here as it is ticked. What follows then
+  // reads all of them and not only the ones on the page in front of the reader.
+  const pickedRef = useRef(new Map<string, TraceSummary>());
+  items.forEach((trace) => {
+    if (selected.has(trace.uuid)) pickedRef.current.set(trace.uuid, trace);
+    else pickedRef.current.delete(trace.uuid);
+  });
+  const selectedTraces = Array.from(selected).flatMap((uuid) => {
+    const trace = pickedRef.current.get(uuid);
+    return trace ? [trace] : [];
+  });
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
@@ -182,12 +194,8 @@ export function TracesTabContent({
     TraceLabellingItem[] | null
   >(null);
 
-  // What was selected when the reader pressed submit. The fetches take time and
-  // the ticks can change underneath, so the submitted set is what everything
-  // afterwards works from.
-  const [submittedUuids, setSubmittedUuids] = useState<string[]>([]);
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
+  // The ticks can change while the traces are loading, so the set the submit
+  // started from is what the check afterwards compares against.
   const labellableRef = useRef(labellableUuids);
   labellableRef.current = labellableUuids;
 
@@ -195,7 +203,6 @@ export function TracesTabContent({
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
     const uuids = labellableRef.current;
-    setSubmittedUuids(uuids);
     setIsPreparingLabelling(true);
     try {
       const settled = await Promise.allSettled(
@@ -274,7 +281,9 @@ export function TracesTabContent({
       chosen.map((ev) => ev.uuid),
       {
         knownNames: new Map(
-          chosen.flatMap((ev) => (ev.name ? [[ev.uuid, ev.name] as const] : [])),
+          chosen.flatMap((ev) =>
+            ev.name ? [[ev.uuid, ev.name] as const] : [],
+          ),
         ),
       },
     );
@@ -333,25 +342,21 @@ export function TracesTabContent({
 
   // The choice was made against one list, so a new search or filter drops it
   // rather than acting on rows the reader never saw.
+  // Ticks are dropped with it: they are kept across pages, but a trace the
+  // list no longer matches cannot be seen on screen, so it must not stay in
+  // what the next action works on.
   useEffect(() => {
     setEveryTraceMatching(false);
     setWholeListKind(null);
+    pickedRef.current.clear();
+    deletion.clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, outputFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
     if (!deletion.allSelected) setEveryTraceMatching(false);
   }, [deletion.allSelected]);
-
-  /** Untick only the traces that were actually submitted. */
-  const clearSubmitted = () => {
-    const submitted = new Set(submittedUuids);
-    items.forEach((item) => {
-      if (submitted.has(item.uuid) && selectedRef.current.has(item.uuid)) {
-        deletion.checkboxProps(item).onToggle();
-      }
-    });
-  };
 
   // The setup steps go away once the first trace lands, so the code that sends
   // one stays reachable from here: to add another service, or to check a field.
@@ -389,6 +394,9 @@ export function TracesTabContent({
     onOpen: openTrace,
     onPageStartChange: setOffset,
   });
+  // The trace on show, so it can be ticked from inside the dialog rather than
+  // closing it and finding the row again.
+  const openTraceItem = items.find((item) => item.uuid === openTraceUuid);
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -559,10 +567,10 @@ export function TracesTabContent({
                         everyTraceMatching
                           ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
                           : selected.size === 0
-                          ? "Select at least one trace to submit for labelling."
-                          : hasToolCallTrace
-                            ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
-                            : "Labelling traces that only made tool calls is not supported yet."
+                            ? "Select at least one trace to submit for labelling."
+                            : hasToolCallTrace
+                              ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
+                              : "Labelling traces that only made tool calls is not supported yet."
                       }
                       onOpen={() => setEvaluatorStepOpen(true)}
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
@@ -641,6 +649,13 @@ export function TracesTabContent({
         onPrev={itemPager.prev}
         onNext={itemPager.next}
         position={itemPager.position}
+        isSelected={openTraceUuid != null && selected.has(openTraceUuid)}
+        selectedCount={selectionCount}
+        onToggleSelected={
+          openTraceItem
+            ? () => deletion.checkboxProps(openTraceItem).onToggle()
+            : undefined
+        }
       />
 
       <ConvertTracesToTestsDialog
@@ -676,7 +691,6 @@ export function TracesTabContent({
         agentNature={agentNature}
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
-          deletion.clearSelection();
           const created = result.created;
           // The created tests belong to this agent, so reload the Tests tab
           // and send the reader there rather than to the whole test library.
@@ -721,11 +735,13 @@ export function TracesTabContent({
           }}
           // The dialog stays open on its own confirmation, which is where the
           // reader opens the task or closes it, same as every other submit for
-          // labelling flow. Only the ticks the submit used are cleared here.
+          // labelling flow. The ticks stay on, so the same traces can also be
+          // added to tests without picking them all again.
           onAdded={() => {
-            clearSubmitted();
-            offerAgentDefaults(labellingEvaluators, (isOne) =>
-              `The traces you just sent for labelling are scored against ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+            offerAgentDefaults(
+              labellingEvaluators,
+              (isOne) =>
+                `The traces you just sent for labelling are scored against ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
             );
           }}
         />
