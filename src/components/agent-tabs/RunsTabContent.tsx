@@ -9,13 +9,19 @@ import {
   usePageSize,
   type AgentRun,
   type RunResultFilter,
+  type RunTypeFilter,
 } from "@/hooks";
 import {
   getUnitTestBreakdown,
   isRunErrored,
   isRunInProgress,
+  runDisplayName,
 } from "@/lib/testTypes";
 import { ServerPaginatedListBar } from "@/components/ui";
+import {
+  EvaluatorPillList,
+  NamePillList,
+} from "@/components/EvaluatorPillList";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -38,23 +44,36 @@ const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "error", label: "Error" },
 ];
 
+// A run that tried the tests against several models at once is rare next to
+// ordinary runs, so it gets pushed off the first page. This asks the backend
+// for those runs only.
+const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
+  { value: "all", label: "All runs" },
+  { value: "llm-benchmark", label: "Model comparisons" },
+];
+
 /**
- * How many tests the run covered. A run tried against several models holds its
- * tests inside each model's own results, so fall back to the first model's
- * count. Null when the list carries none of these, which shows as a dash
- * rather than a made-up number.
+ * How many tests the run covered. A run tried against several models counts
+ * its tests inside each model's own results, so fall back to the first
+ * model's own count, and then to the cases behind it (the runs list carries
+ * the count but not the cases; the run-detail endpoints carry both). Null when
+ * the run carries none of these, which shows as a dash rather than a made-up
+ * number.
  */
 export function runTestCount(run: AgentRun): number | null {
   if (typeof run.total_tests === "number") return run.total_tests;
   if (run.results && run.results.length > 0) return run.results.length;
   const firstModel = run.model_results?.[0];
+  if (typeof firstModel?.total_tests === "number") return firstModel.total_tests;
   if (firstModel?.test_results) return firstModel.test_results.length;
   return null;
 }
 
-/** How many models the run tried the tests against. A plain run tries one. */
-export function runModelCount(run: AgentRun): number {
-  return run.type === "llm-benchmark" ? (run.model_results?.length ?? 0) : 1;
+/** The models a run tried the tests against, as the run stored them. */
+export function runModels(run: AgentRun): string[] {
+  return (run.model_results ?? [])
+    .map((m) => m.model?.replace(/__/g, "/") ?? "")
+    .filter(Boolean);
 }
 
 const PILL_CLASS =
@@ -138,19 +157,57 @@ function RunResult({ run }: { run: AgentRun }) {
   );
 }
 
-/** The evaluators that judged a run, as plain chips. A dash when there are none. */
-function RunEvaluators({ run }: { run: AgentRun }) {
-  const names = run.evaluators ?? [];
-  if (names.length === 0)
-    return <span className="text-sm text-muted-foreground">—</span>;
+/** One row of filter buttons, the chosen one filled in. */
+function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {names.map((name) => (
-        <span key={name} className={`${PILL_CLASS} bg-muted text-muted-foreground`}>
-          {name}
-        </span>
+    <>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+            value === option.value
+              ? "bg-foreground text-background border-foreground"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {option.label}
+        </button>
       ))}
-    </div>
+    </>
+  );
+}
+
+/**
+ * The models a run tried the tests against, as plain chips. A run that was not
+ * a model comparison used the agent's own model, which reads as "Default".
+ */
+function RunModels({ run }: { run: AgentRun }) {
+  const models = runModels(run);
+  if (models.length === 0)
+    return <span className="text-sm text-muted-foreground/70">Default</span>;
+  return <NamePillList names={models} />;
+}
+
+/**
+ * The evaluators that judged a run, in the same fixed-width pills the human
+ * alignment tasks list uses, so one row with many evaluators does not push
+ * every other row's columns out of line. The runs list carries their names
+ * only, so these pills are not clickable.
+ */
+function RunEvaluators({ run }: { run: AgentRun }) {
+  return (
+    <EvaluatorPillList
+      evaluators={(run.evaluators ?? []).map((name) => ({ name }))}
+    />
   );
 }
 
@@ -162,13 +219,21 @@ function RunEvaluators({ run }: { run: AgentRun }) {
 export function RunsTabContent({
   agentUuid,
   agentName,
+  isActive = true,
 }: {
   agentUuid: string;
   agentName: string;
+  /**
+   * Whether this tab is the one showing. Only the tab on screen acts on
+   * `?runId=`: the Tests tab names its own open run the same way, and a run
+   * opened there must not also open a hidden window here.
+   */
+  isActive?: boolean;
 }) {
   const backendAccessToken = useAccessToken();
   const [pageSize, setPageSize] = usePageSize();
   const [filter, setFilter] = useState<RunResultFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<RunTypeFilter>("all");
 
   // The page a reload should reopen on, read once from `?page=` at start-up.
   // A `?runId=` link is more specific about where to land (it names the run,
@@ -189,7 +254,7 @@ export function RunsTabContent({
   // plain page one before anyone told it which run to land on, wasting that
   // request.
   const [pendingRunId, setPendingRunId] = useState<string | null>(() =>
-    typeof window === "undefined"
+    typeof window === "undefined" || !isActive
       ? null
       : new URLSearchParams(window.location.search).get("runId"),
   );
@@ -199,6 +264,7 @@ export function RunsTabContent({
   );
   const { setParam: setRunIdParam } = useDialogUrlParam({
     param: "runId",
+    enabled: isActive,
     onOpen: (uuid) => setPendingRunId(uuid),
     onClose: () => {
       setPendingRunId(null);
@@ -225,6 +291,7 @@ export function RunsTabContent({
     accessToken: backendAccessToken,
     pageSize,
     filter,
+    typeFilter,
     aroundRunId: pendingRunId,
     initialOffset,
   });
@@ -322,20 +389,18 @@ export function RunsTabContent({
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      <div className="flex flex-wrap gap-1.5">
-        {RESULT_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
-              filter === f.value
-                ? "bg-foreground text-background border-foreground"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterChips
+          options={RESULT_FILTERS}
+          value={filter}
+          onChange={setFilter}
+        />
+        <span className="w-px h-5 bg-border mx-1" aria-hidden="true" />
+        <FilterChips
+          options={TYPE_FILTERS}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />
       </div>
 
       {error && (
@@ -369,14 +434,14 @@ export function RunsTabContent({
       ) : items.length === 0 ? (
         <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <h3 className="text-base md:text-lg font-semibold text-foreground mb-1">
-            {filter === "all"
+            {filter === "all" && typeFilter === "all"
               ? "No evaluations yet"
               : "No evaluations match this filter"}
           </h3>
           <p className="text-sm md:text-base text-muted-foreground text-center">
-            {filter === "all"
+            {filter === "all" && typeFilter === "all"
               ? "Run this agent's tests from the Tests tab. Every evaluation appears here with what it covered and how it went."
-              : "Choose another result to see more runs"}
+              : "Choose another filter to see more runs"}
           </p>
         </div>
       ) : (
@@ -401,7 +466,7 @@ export function RunsTabContent({
             <table className="w-full">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-44">
                     Run
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -410,10 +475,10 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
                     Tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-56">
                     Models
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-64">
                     Evaluators
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
@@ -429,11 +494,8 @@ export function RunsTabContent({
                     className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     <td className="px-4 py-3">
-                      <span
-                        className="block truncate font-mono text-xs text-foreground"
-                        title={run.uuid}
-                      >
-                        {run.uuid}
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {runDisplayName(run.type, run.name)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -444,8 +506,8 @@ export function RunsTabContent({
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runTestCount(run))}
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
-                      {countCell(runModelCount(run))}
+                    <td className="px-4 py-3">
+                      <RunModels run={run} />
                     </td>
                     <td className="px-4 py-3">
                       <RunEvaluators run={run} />
@@ -468,16 +530,15 @@ export function RunsTabContent({
                 className="border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className="min-w-0 truncate font-mono text-xs text-foreground"
-                    title={run.uuid}
-                  >
-                    {run.uuid}
+                  <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                    {runDisplayName(run.type, run.name)}
                   </span>
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                    {countCell(runTestCount(run))} tests,{" "}
-                    {countCell(runModelCount(run))} models
+                    {countCell(runTestCount(run))} tests
                   </span>
+                </div>
+                <div className="mt-2">
+                  <RunModels run={run} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />

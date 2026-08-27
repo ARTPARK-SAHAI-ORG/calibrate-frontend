@@ -1,5 +1,9 @@
 import { act, renderHook, waitFor } from "@/test-utils";
-import { useAgentRuns, type RunResultFilter } from "../useAgentRuns";
+import {
+  useAgentRuns,
+  type RunResultFilter,
+  type RunTypeFilter,
+} from "../useAgentRuns";
 
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -147,15 +151,27 @@ describe("useAgentRuns initialOffset", () => {
   /** Renders with a starting page, and lets the filter be changed after. */
   function setupWithInitialOffset(initialOffset: number) {
     return renderHook(
-      ({ filter }: { filter: RunResultFilter }) =>
+      ({
+        filter,
+        typeFilter,
+      }: {
+        filter: RunResultFilter;
+        typeFilter?: RunTypeFilter;
+      }) =>
         useAgentRuns({
           agentUuid: AGENT_UUID,
           accessToken: "tok",
           pageSize: 50,
           filter,
+          typeFilter,
           initialOffset,
         }),
-      { initialProps: { filter: "all" as RunResultFilter } },
+      {
+        initialProps: { filter: "all" } as {
+          filter: RunResultFilter;
+          typeFilter?: RunTypeFilter;
+        },
+      },
     );
   }
 
@@ -200,5 +216,16 @@ describe("useAgentRuns initialOffset", () => {
     await waitFor(() => expect(result.current.offset).toBe(0));
     expect(lastRunsUrl().searchParams.get("offset")).toBe("0");
     expect(lastRunsUrl().searchParams.get("has_failures")).toBe("true");
+  });
+
+  it("goes back to page one and asks for benchmarks only when that filter changes", async () => {
+    const { result, rerender } = setupWithInitialOffset(50);
+    await waitFor(() => expect(result.current.offset).toBe(50));
+    expect(lastRunsUrl().searchParams.has("type")).toBe(false);
+
+    rerender({ filter: "all", typeFilter: "llm-benchmark" });
+
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(lastRunsUrl().searchParams.get("type")).toBe("llm-benchmark");
   });
 });

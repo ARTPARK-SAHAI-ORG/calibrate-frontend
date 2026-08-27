@@ -17,6 +17,7 @@ export {
   useAgentRuns,
   type AgentRun,
   type RunResultFilter,
+  type RunTypeFilter,
 } from "./useAgentRuns";
 export { usePageSize, PAGE_SIZE_OPTIONS } from "./usePageSize";
 export { useTraceDeletion } from "./useTraceDeletion";

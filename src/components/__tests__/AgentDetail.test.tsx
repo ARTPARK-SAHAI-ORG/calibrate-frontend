@@ -269,22 +269,54 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("opens a connection agent on its Evaluators tab with the unverified badge", async () => {
+  it("opens a connection agent on its Evaluations tab with the unverified badge", async () => {
     mockFetchSequenceForAgent(connectionAgent);
     render(<AgentDetail agentUuid={connectionAgent.uuid} />);
 
     await waitFor(() =>
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
-    // Connection is set up once; evaluators and tests are the daily work, so
-    // the page opens there and Connection sits next to Settings.
-    expect(screen.getByTestId("evaluators-tab-content")).toBeInTheDocument();
+    // Connection is set up once; past runs are what the reader comes back for,
+    // so the page opens on Evaluations and Connection sits next to Settings.
+    expect(screen.getByTestId("runs-tab-content")).toBeInTheDocument();
     expect(screen.getByText("Verify")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
     expect(screen.getByText("Traces")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+  });
+
+  it("puts Evaluations, then Tests, then Evaluators in that order", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    const tabNames = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim())
+      .filter((label): label is string =>
+        [
+          "Agent",
+          "Tools",
+          "Evaluations",
+          "Tests",
+          "Evaluators",
+          "Traces",
+          "Settings",
+        ].includes(label ?? ""),
+      );
+    expect(tabNames).toEqual([
+      "Agent",
+      "Tools",
+      "Evaluations",
+      "Tests",
+      "Evaluators",
+      "Traces",
+      "Settings",
+    ]);
   });
 
   it("switches tabs on click for a build agent", async () => {
@@ -372,7 +404,7 @@ describe("AgentDetail", () => {
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${connectionAgent.uuid}`,
     );
-    expectVisibleTab("traces-tab-content", "evaluators-tab-content");
+    expectVisibleTab("traces-tab-content", "runs-tab-content");
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(

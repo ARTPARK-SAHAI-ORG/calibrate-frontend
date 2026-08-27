@@ -36,6 +36,33 @@ export function testTypeLabel(
 }
 
 /**
+ * What to call a run that tried the tests against several models at once. The
+ * backend names those runs "Benchmark 3"; everywhere a reader can see one, the
+ * app calls it a model comparison, which is the word on the button that starts
+ * it and on the filter that lists them.
+ */
+export function modelComparisonName(name?: string | null): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return "Model comparison";
+  return trimmed.replace(/^Benchmark\b/, "Model comparison");
+}
+
+/**
+ * What to call one run where it is listed. The backend names runs "Run 12" and
+ * "Benchmark 3"; on screen those are an evaluation run and a model comparison,
+ * the words used on the tab and on the button that starts each one.
+ */
+export function runDisplayName(
+  type: string | null | undefined,
+  name?: string | null,
+): string {
+  if (type === "llm-benchmark") return modelComparisonName(name);
+  const trimmed = name?.trim();
+  if (!trimmed) return "Evaluation run";
+  return trimmed.replace(/^Run\b/, "Evaluation run");
+}
+
+/**
  * Minimal per-test result shape needed to categorise a run. Both the agent
  * Tests tab and the /tests Runs table have richer local `TestRunResult` types;
  * those are structurally compatible with this.

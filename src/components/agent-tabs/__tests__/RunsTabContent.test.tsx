@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, setupUser, act, waitFor } from "@/test-utils";
-import { RunsTabContent, runTestCount, runModelCount } from "../RunsTabContent";
+import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 
 const BACKEND = "http://test-backend";
@@ -136,6 +136,19 @@ describe("run counts", () => {
     ).toBe(2);
   });
 
+  it("reads a model comparison's count from the list, which carries no cases", () => {
+    // The runs list gives each model a `total_tests` but not the cases behind
+    // it, so a finished comparison showed a dash until the count was read.
+    expect(
+      runTestCount({
+        ...benchmarkRun,
+        total_tests: null,
+        results: null,
+        model_results: [{ model: "a", total_tests: 4 }],
+      }),
+    ).toBe(4);
+  });
+
   it("has no test count when the run carries none", () => {
     expect(
       runTestCount({
@@ -147,19 +160,29 @@ describe("run counts", () => {
     ).toBeNull();
   });
 
-  it("counts one model for a plain run and every model for a benchmark", () => {
-    expect(runModelCount(unitRun)).toBe(1);
-    expect(runModelCount(benchmarkRun)).toBe(2);
+  it("names no model for a plain run and every model for a comparison", () => {
+    expect(runModels(unitRun)).toEqual([]);
+    expect(runModels(benchmarkRun)).toEqual(["a", "b"]);
+    // The backend stores a model with "__" where the name has a "/".
+    expect(
+      runModels({
+        ...benchmarkRun,
+        model_results: [{ model: "google__gemini-2.5-flash" }],
+      }),
+    ).toEqual(["google/gemini-2.5-flash"]);
   });
 });
 
 describe("RunsTabContent", () => {
   it("names each run and when it was created", async () => {
-    state.runs = [{ ...unitRun, created_at: "2026-01-18 09:30:00" }];
+    state.runs = [
+      { ...unitRun, name: "Run 4", created_at: "2026-01-18 09:30:00" },
+    ];
     renderTab();
     await screen.findAllByText("1 Success");
-    // The whole id, so two runs can be told apart and one can be quoted.
-    expect(screen.getAllByTitle("run-unit").length).toBeGreaterThan(0);
+    // The name the run is known by, not its id.
+    expect(screen.getAllByText("Evaluation run 4").length).toBeGreaterThan(0);
+    expect(screen.queryByText("run-unit")).not.toBeInTheDocument();
     // The day and time it started, not "3 min ago".
     expect(screen.getAllByText(/Jan 18/).length).toBeGreaterThan(0);
   });
@@ -188,9 +211,10 @@ describe("RunsTabContent", () => {
     // Run, result, tests, models: the counts sit third and fourth, for the
     // plain run and the benchmark.
     expect(cells[0]?.[2]).toBe("3");
-    expect(cells[0]?.[3]).toBe("1");
+    // A plain run used the agent's own model, so there is nothing to name.
+    expect(cells[0]?.[3]).toBe("Default");
     expect(cells[1]?.[2]).toBe("4");
-    expect(cells[1]?.[3]).toBe("2");
+    expect(cells[1]?.[3]).toBe("ab");
     // No Test or Benchmark label anywhere.
     expect(screen.queryByText("Benchmark")).not.toBeInTheDocument();
   });
@@ -206,9 +230,11 @@ describe("RunsTabContent", () => {
     const cells = Array.from(row.querySelectorAll("td")).map(
       (td) => td.textContent,
     );
-    // Run, result, tests, models, evaluators, created at.
-    expect(cells[4]).toBe("CorrectnessScript FidelityTool call");
-    // Plain chips, nothing to click.
+    // Run, result, tests, models, evaluators, created at. The first
+    // evaluator, then how many more, so a run with many of them does not push
+    // the other rows' columns out of line.
+    expect(cells[4]).toBe("Correctness+2");
+    // The runs list carries names only, so there is nothing to click through to.
     expect(
       (row.querySelectorAll("td")[4] as HTMLElement).querySelector(
         "a, button",
@@ -280,6 +306,32 @@ describe("RunsTabContent", () => {
       expect(q.get("has_failures")).toBeNull();
       expect(q.get("status")).toBeNull();
     });
+  });
+
+  it("asks the backend for model comparisons only when that filter is on", async () => {
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+    expect(lastRunsQuery().get("type")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Model comparisons" }));
+    await waitFor(() =>
+      expect(lastRunsQuery().get("type")).toBe("llm-benchmark"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "All runs" }));
+    await waitFor(() => expect(lastRunsQuery().get("type")).toBeNull());
+  });
+
+  it("says a filter is hiding the runs when only model comparisons are asked for", async () => {
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+
+    state.runs = [];
+    state.total = 0;
+    await user.click(screen.getByRole("button", { name: "Model comparisons" }));
+    await screen.findByText("No evaluations match this filter");
   });
 
   it("asks for one page at a time", async () => {

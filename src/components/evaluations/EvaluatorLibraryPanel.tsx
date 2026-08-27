@@ -138,7 +138,7 @@ export function EvaluatorLibraryPanel({
         </div>
       ) : (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <p className="text-sm md:text-base font-medium text-foreground">
+          <p className="text-sm md:text-base text-muted-foreground">
             {description}
           </p>
           {createButton}

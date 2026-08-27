@@ -63,7 +63,7 @@ jest.mock("../../BenchmarkRerunDialog", () => ({
 
 const pastRun = {
   uuid: "run-7",
-  name: "",
+  name: "Run 7",
   type: "llm-unit-test",
   status: "done",
   created_at: "2026-01-01T00:00:00Z",
@@ -75,7 +75,7 @@ const pastRun = {
 
 const benchRun = {
   uuid: "run-bench",
-  name: "",
+  name: "Benchmark 2",
   type: "llm-benchmark",
   status: "done",
   created_at: "2026-01-01T00:00:00Z",
@@ -196,7 +196,7 @@ describe("RunsTabContent run deep-link", () => {
     const user = setupUser();
     renderTab();
 
-    await user.click((await screen.findAllByTitle("run-bench"))[0]);
+    await user.click((await screen.findAllByText("Model comparison 2"))[0]);
     expect(await screen.findByTestId("benchmark-results")).toBeInTheDocument();
     expect(runIdInUrl()).toBe("run-bench");
 
@@ -231,7 +231,7 @@ describe("RunsTabContent run deep-link", () => {
 
     const user = setupUser();
     renderTab();
-    await screen.findAllByTitle("run-7");
+    await screen.findAllByText("Evaluation run 7");
 
     // The address names an earlier run again — e.g. the Back button — while
     // its lookup is still in flight. (Clicking a filter is just this test's
@@ -240,7 +240,7 @@ describe("RunsTabContent run deep-link", () => {
     await user.click(screen.getByRole("button", { name: "All passed" }));
 
     // Before that lookup resolves, the reader clicks a different run.
-    await user.click((await screen.findAllByTitle("run-bench"))[0]);
+    await user.click((await screen.findAllByText("Model comparison 2"))[0]);
     expect(await screen.findByTestId("benchmark-results")).toHaveTextContent(
       "bench:run-bench",
     );

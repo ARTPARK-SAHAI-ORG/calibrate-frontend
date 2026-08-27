@@ -139,9 +139,9 @@ test.describe("Agent detail (authenticated, real backend)", () => {
 
     await createAgent(page, name, "connection");
 
-    // Connection agents open on the Evaluators tab now (AgentDetail sets
-    // activeTab="evaluators" for type === "connection"), so reach the
-    // Connection tab, which sits just before Settings.
+    // Connection agents open on the Evaluations tab now (AgentDetail sets
+    // activeTab="runs" for type === "connection"), so reach the Connection
+    // tab, which sits just before Settings.
     await page
       .getByRole("button", { name: "Connection", exact: true })
       .click();

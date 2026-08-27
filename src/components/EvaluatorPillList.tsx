@@ -5,7 +5,11 @@ import { Tooltip } from "@/components/Tooltip";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 export type EvaluatorPillItem = {
-  uuid: string;
+  /**
+   * The evaluator this pill stands for, when the list it came from carries
+   * one. Without it the pill is plain text: there is nothing to preview.
+   */
+  uuid?: string | null;
   name: string;
 };
 
@@ -38,26 +42,45 @@ export function EvaluatorPillList({
   const rest = evaluators.length <= 2 ? [] : evaluators.slice(1);
   return (
     <div className="flex items-center gap-1 min-w-0">
-      {visible.map((ev) => (
-        <button
-          key={ev.uuid}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPreviewEvaluator({ uuid: ev.uuid, name: ev.name });
-          }}
-          title={`Open ${ev.name}`}
-          className={`${EVALUATOR_PILL_CLASSES} min-w-0 shrink truncate hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-        >
-          <span className="truncate">{ev.name}</span>
-        </button>
-      ))}
+      {visible.map((ev, index) =>
+        ev.uuid ? (
+          <button
+            key={ev.uuid}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewEvaluator({ uuid: ev.uuid as string, name: ev.name });
+            }}
+            title={`Open ${ev.name}`}
+            className={`${EVALUATOR_PILL_CLASSES} min-w-0 shrink truncate hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+          >
+            <span className="truncate">{ev.name}</span>
+          </button>
+        ) : (
+          // A plain pill can be clipped by a narrow column, so the whole name
+          // is on hover. There is nothing to open, so no click handler.
+          // Keyed by position: a list with no ids can hold the same name
+          // twice, and two pills with the same key confuse React.
+          <Tooltip
+            key={`${index}-${ev.name}`}
+            content={ev.name}
+            className="min-w-0 shrink"
+          >
+            <span className={`${EVALUATOR_PILL_CLASSES} w-full truncate`}>
+              <span className="truncate">{ev.name}</span>
+            </span>
+          </Tooltip>
+        ),
+      )}
       {rest.length > 0 && (
         <Tooltip
           content={
             <div className="flex flex-wrap gap-1 max-w-64">
-              {rest.map((ev) => (
-                <span key={ev.uuid} className={EVALUATOR_PILL_CLASSES}>
+              {rest.map((ev, index) => (
+                <span
+                  key={ev.uuid ?? `${index}-${ev.name}`}
+                  className={EVALUATOR_PILL_CLASSES}
+                >
                   {ev.name}
                 </span>
               ))}
@@ -79,4 +102,13 @@ export function EvaluatorPillList({
       />
     </div>
   );
+}
+
+/**
+ * The same fixed-width pills for plain names that are not evaluators, so a
+ * table row stays one line high whatever it holds. Used for the models a run
+ * tried.
+ */
+export function NamePillList({ names }: { names: string[] }) {
+  return <EvaluatorPillList evaluators={names.map((name) => ({ name }))} />;
 }

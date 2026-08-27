@@ -28,12 +28,29 @@ export type AgentRun = {
    * backends, empty when the run had no evaluators.
    */
   evaluators?: string[] | null;
-  model_results?: { model: string; test_results?: unknown[] }[] | null;
+  model_results?:
+    | {
+        model: string;
+        /**
+         * How many tests this model was tried on. The runs list carries this
+         * count but not the per-case `test_results` behind it, which only the
+         * run-detail endpoints return.
+         */
+        total_tests?: number | null;
+        test_results?: unknown[];
+      }[]
+    | null;
   created_at?: string;
 };
 
 /** Which runs to ask for. The backend does the filtering, not the browser. */
 export type RunResultFilter = "all" | "passed" | "failed" | "error";
+
+/**
+ * Which kind of run to ask for: every run, or only the ones that tried the
+ * tests against several models at once.
+ */
+export type RunTypeFilter = "all" | "llm-benchmark";
 
 /** The query the backend needs for each choice of result. */
 function filterParams(filter: RunResultFilter): Record<string, string> {
@@ -55,6 +72,8 @@ type UseAgentRunsArgs = {
   accessToken: string | null;
   pageSize: number;
   filter: RunResultFilter;
+  /** Defaults to every kind of run. */
+  typeFilter?: RunTypeFilter;
   /**
    * A run to land the list on directly, wherever its page actually is,
    * instead of always starting at page one — for opening a run from a link.
@@ -84,6 +103,7 @@ export function useAgentRuns({
   accessToken,
   pageSize,
   filter,
+  typeFilter = "all",
   aroundRunId,
   initialOffset = 0,
 }: UseAgentRunsArgs) {
@@ -122,7 +142,7 @@ export function useAgentRuns({
   // development React mounts every component twice, and a "have I run
   // before" flag would see its second run as a change and reset the page the
   // reader asked for.
-  const listKey = `${agentUuid}|${pageSize}|${filter}`;
+  const listKey = `${agentUuid}|${pageSize}|${filter}|${typeFilter}`;
   const listKeyRef = useRef(listKey);
 
   useEffect(() => {
@@ -151,6 +171,7 @@ export function useAgentRuns({
             ? { around: requestedAroundId as string }
             : { offset: String(targetOffset) }),
           ...filterParams(filter),
+          ...(typeFilter === "all" ? {} : { type: typeFilter }),
         });
         const response = await fetch(
           `${backendUrl}/agent-tests/agent/${agentUuid}/runs?${params}`,
@@ -195,7 +216,7 @@ export function useAgentRuns({
       }
     },
     // `aroundRunId` deliberately left out — see `aroundRunIdRef` above.
-    [accessToken, agentUuid, pageSize, filter],
+    [accessToken, agentUuid, pageSize, filter, typeFilter],
   );
 
   useEffect(() => {

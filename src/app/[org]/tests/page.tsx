@@ -48,7 +48,11 @@ import {
 } from "@/components/ui/SearchModeInput";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
-import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
+import {
+  testTypeLabel,
+  getUnitTestBreakdown,
+  runDisplayName,
+} from "@/lib/testTypes";
 import {
   TestTypeFilter,
   type TestTypeFilterValue,
@@ -126,7 +130,12 @@ type AllRun = {
   agent_name: string;
 };
 
-function getRunDisplayName(run: AllRun): string {
+/**
+ * The small line under a run's name: what it covered, e.g. "4 tests" or
+ * "3 models", or the single test's own name when a run held just one. Not to
+ * be confused with `runDisplayName`, which gives the run's own name.
+ */
+function runCoverageLine(run: AllRun): string {
   if (run.type === "llm-benchmark") {
     const modelCount = run.model_results?.length ?? 0;
     return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
@@ -1652,7 +1661,7 @@ function LLMPageInner() {
                         : "border-border text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {f === "all" ? "All types" : f === "llm-unit-test" ? "Tests" : "Benchmarks"}
+                    {f === "all" ? "All types" : f === "llm-unit-test" ? "Tests" : "Model comparisons"}
                   </button>
                 ))}
               </div>
@@ -1786,8 +1795,10 @@ function LLMPageInner() {
                         className="grid grid-cols-[1fr_1fr_120px_140px_120px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{getRunDisplayName(run)}</p>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {runDisplayName(run.type, run.name)}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{runCoverageLine(run)}</p>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">{run.agent_name}</p>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${
@@ -1795,7 +1806,7 @@ function LLMPageInner() {
                             ? "bg-blue-500/20 text-blue-400"
                             : "bg-purple-500/20 text-purple-400"
                         }`}>
-                          {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                          {run.type === "llm-unit-test" ? "Test" : "Model comparison"}
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {run.status === "pending" || run.status === "queued" || run.status === "in_progress" ? (
@@ -1855,13 +1866,15 @@ function LLMPageInner() {
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
+                            <p className="text-sm font-medium text-foreground truncate">
+                            {runDisplayName(run.type, run.name)}
+                          </p>
                             <p className="text-xs text-muted-foreground truncate">{run.agent_name}</p>
                           </div>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
                             run.type === "llm-unit-test" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
                           }`}>
-                            {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                            {run.type === "llm-unit-test" ? "Test" : "Model comparison"}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">

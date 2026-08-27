@@ -40,7 +40,7 @@ describe("makeOptimisticBenchmarkRun", () => {
     const run = makeOptimisticBenchmarkRun("task-3", ["gpt-4", "claude"], NOW);
     expect(run).toEqual({
       uuid: "task-3",
-      name: "Benchmark",
+      name: "Model comparison",
       status: "pending",
       type: "llm-benchmark",
       updated_at: NOW,

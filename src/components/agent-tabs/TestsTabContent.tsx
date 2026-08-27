@@ -119,6 +119,10 @@ function TestCheckbox({
 
 type TestsTabContentProps = {
   agentUuid: string;
+  // Whether this tab is the one showing. Only the tab on screen acts on
+  // `?runId=`, so a run opened here and a run opened on the Evaluations tab
+  // can never open two windows for the same run at once.
+  isActive?: boolean;
   agentName?: string;
   agentType?: "agent" | "connection";
   connectionVerified?: boolean;
@@ -168,6 +172,7 @@ const carriesEvaluators = (type: string) =>
 
 export function TestsTabContent({
   agentUuid,
+  isActive = true,
   agentName = "Agent",
   agentType,
   connectionVerified,
@@ -315,14 +320,24 @@ export function TestsTabContent({
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
   //
-  // The address is deliberately left alone. `?runId=` belongs to the
-  // Evaluations tab, which is where runs are listed; both tabs stay mounted
-  // once visited, so if this tab watched that param too, a run opened there
-  // would open a second, hidden copy of this window here.
+  // The run is named in the address as `?runId=<uuid>`, so a reload reopens
+  // the same run and the link can be shared. The Evaluations tab names its own
+  // open run the same way; only the tab on screen acts on the param, so a run
+  // opened here never opens a second, hidden window there.
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
-  const openTestRun = (uuid: string) => setOpenTestRunId(uuid);
+  const { setParam: setRunIdParam } = useDialogUrlParam({
+    param: "runId",
+    enabled: isActive,
+    onOpen: (uuid) => setOpenTestRunId(uuid),
+    onClose: () => setOpenTestRunId(null),
+  });
+  const openTestRun = (uuid: string) => {
+    setOpenTestRunId(uuid);
+    setRunIdParam(uuid);
+  };
   const closeTestRun = () => {
     setOpenTestRunId(null);
+    setRunIdParam(null);
     onRunWindowClosed?.();
   };
   // Key of the run control whose "create run" call is in flight ("all",
