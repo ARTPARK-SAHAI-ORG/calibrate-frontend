@@ -57,12 +57,13 @@ export function EvaluatorPillList({
             <span className="truncate">{ev.name}</span>
           </button>
         ) : (
-          <span
-            key={ev.name}
-            className={`${EVALUATOR_PILL_CLASSES} min-w-0 shrink truncate`}
-          >
-            <span className="truncate">{ev.name}</span>
-          </span>
+          // A plain pill can be clipped by a narrow column, so the whole name
+          // is on hover. There is nothing to open, so no click handler.
+          <Tooltip key={ev.name} content={ev.name} className="min-w-0 shrink">
+            <span className={`${EVALUATOR_PILL_CLASSES} w-full truncate`}>
+              <span className="truncate">{ev.name}</span>
+            </span>
+          </Tooltip>
         ),
       )}
       {rest.length > 0 && (

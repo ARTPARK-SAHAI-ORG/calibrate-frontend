@@ -130,7 +130,12 @@ type AllRun = {
   agent_name: string;
 };
 
-function getRunDisplayName(run: AllRun): string {
+/**
+ * The small line under a run's name: what it covered, e.g. "4 tests" or
+ * "3 models", or the single test's own name when a run held just one. Not to
+ * be confused with `runDisplayName`, which gives the run's own name.
+ */
+function runCoverageLine(run: AllRun): string {
   if (run.type === "llm-benchmark") {
     const modelCount = run.model_results?.length ?? 0;
     return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
@@ -1793,7 +1798,7 @@ function LLMPageInner() {
                           <p className="text-sm font-medium text-foreground truncate">
                             {runDisplayName(run.type, run.name)}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">{getRunDisplayName(run)}</p>
+                          <p className="text-xs text-muted-foreground truncate">{runCoverageLine(run)}</p>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">{run.agent_name}</p>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${
