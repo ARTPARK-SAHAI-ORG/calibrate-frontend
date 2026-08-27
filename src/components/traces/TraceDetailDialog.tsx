@@ -339,8 +339,11 @@ export function TraceDetailDialog({
               </span>
             )}
             {onToggleSelected && (
+              // Both states are filled so neither reads as switched off, and
+              // they are different colours so a glance says which one it is.
               <Button
                 size="sm"
+                variant={isSelected ? "danger" : "primary"}
                 onClick={onToggleSelected}
                 className="whitespace-nowrap"
               >
