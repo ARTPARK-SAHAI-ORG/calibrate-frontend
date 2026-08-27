@@ -28,7 +28,18 @@ export type AgentRun = {
    * backends, empty when the run had no evaluators.
    */
   evaluators?: string[] | null;
-  model_results?: { model: string; test_results?: unknown[] }[] | null;
+  model_results?:
+    | {
+        model: string;
+        /**
+         * How many tests this model was tried on. The runs list carries this
+         * count but not the per-case `test_results` behind it, which only the
+         * run-detail endpoints return.
+         */
+        total_tests?: number | null;
+        test_results?: unknown[];
+      }[]
+    | null;
   created_at?: string;
 };
 

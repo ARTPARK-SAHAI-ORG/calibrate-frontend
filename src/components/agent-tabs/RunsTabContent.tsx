@@ -48,15 +48,18 @@ const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
 ];
 
 /**
- * How many tests the run covered. A run tried against several models holds its
- * tests inside each model's own results, so fall back to the first model's
- * count. Null when the list carries none of these, which shows as a dash
- * rather than a made-up number.
+ * How many tests the run covered. A run tried against several models counts
+ * its tests inside each model's own results, so fall back to the first
+ * model's own count, and then to the cases behind it (the runs list carries
+ * the count but not the cases; the run-detail endpoints carry both). Null when
+ * the run carries none of these, which shows as a dash rather than a made-up
+ * number.
  */
 export function runTestCount(run: AgentRun): number | null {
   if (typeof run.total_tests === "number") return run.total_tests;
   if (run.results && run.results.length > 0) return run.results.length;
   const firstModel = run.model_results?.[0];
+  if (typeof firstModel?.total_tests === "number") return firstModel.total_tests;
   if (firstModel?.test_results) return firstModel.test_results.length;
   return null;
 }
@@ -200,9 +203,16 @@ function RunEvaluators({ run }: { run: AgentRun }) {
 export function RunsTabContent({
   agentUuid,
   agentName,
+  isActive = true,
 }: {
   agentUuid: string;
   agentName: string;
+  /**
+   * Whether this tab is the one showing. Only the tab on screen acts on
+   * `?runId=`: the Tests tab names its own open run the same way, and a run
+   * opened there must not also open a hidden window here.
+   */
+  isActive?: boolean;
 }) {
   const backendAccessToken = useAccessToken();
   const [pageSize, setPageSize] = usePageSize();
@@ -228,7 +238,7 @@ export function RunsTabContent({
   // plain page one before anyone told it which run to land on, wasting that
   // request.
   const [pendingRunId, setPendingRunId] = useState<string | null>(() =>
-    typeof window === "undefined"
+    typeof window === "undefined" || !isActive
       ? null
       : new URLSearchParams(window.location.search).get("runId"),
   );
@@ -238,6 +248,7 @@ export function RunsTabContent({
   );
   const { setParam: setRunIdParam } = useDialogUrlParam({
     param: "runId",
+    enabled: isActive,
     onOpen: (uuid) => setPendingRunId(uuid),
     onClose: () => {
       setPendingRunId(null);

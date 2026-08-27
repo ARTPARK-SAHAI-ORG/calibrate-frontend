@@ -22,13 +22,19 @@ const useMaxRowsPerEvalMock = jest.fn();
 // run), so the args are kept per param and this file drives the `testId` one.
 let dialogUrlParamArgs: any = null;
 const setTestIdParamMock = jest.fn();
+// The same, for the `runId` param that names the run being watched.
+let runIdParamArgs: any = null;
+const setRunIdParamMock = jest.fn();
 
 jest.mock("../../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
   useMaxRowsPerEval: () => useMaxRowsPerEvalMock(),
   useDialogUrlParam: (args: any) => {
-    if (args.param !== "testId") return { setParam: jest.fn() };
+    if (args.param === "runId") {
+      runIdParamArgs = args;
+      return { setParam: setRunIdParamMock };
+    }
     dialogUrlParamArgs = args;
     return { setParam: setTestIdParamMock };
   },
@@ -679,6 +685,37 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByTestId("runner-task-id")).toHaveTextContent("task-new");
   });
 
+  it("names the run it just started in the address, and clears it on close", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await screen.findByTestId("test-runner-dialog");
+    expect(setRunIdParamMock).toHaveBeenCalledWith("task-new");
+
+    await user.click(screen.getByText("CloseRunner"));
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith(null);
+  });
+
+  it("reopens the run the address names, so a reload comes back to it", async () => {
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+
+    await act(async () => {
+      runIdParamArgs.onOpen("task-from-address");
+    });
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
+      "task-from-address",
+    );
+
+    await act(async () => {
+      runIdParamArgs.onClose();
+    });
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+
   it("runs the selected tests from the bulk toolbar", async () => {
     const user = setupUser();
     renderComponent();
@@ -1273,19 +1310,6 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await user.click(screen.getByTestId("compare-bulk"));
     await screen.findByTestId("benchmark-dialog");
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
-  });
-
-  it("leaves ?runId= alone: that belongs to the Evaluations tab", async () => {
-    state.agentTests = [responseTest];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("Run all tests"));
-    await screen.findByTestId("test-runner-dialog");
-    // Both tabs stay mounted, so writing the run into the address here would
-    // open a second copy of this window in the Evaluations tab.
-    expect(new URLSearchParams(window.location.search).get("runId")).toBeNull();
   });
 
   it("tells the parent when the run window is closed", async () => {

@@ -136,6 +136,19 @@ describe("run counts", () => {
     ).toBe(2);
   });
 
+  it("reads a model comparison's count from the list, which carries no cases", () => {
+    // The runs list gives each model a `total_tests` but not the cases behind
+    // it, so a finished comparison showed a dash until the count was read.
+    expect(
+      runTestCount({
+        ...benchmarkRun,
+        total_tests: null,
+        results: null,
+        model_results: [{ model: "a", total_tests: 4 }],
+      }),
+    ).toBe(4);
+  });
+
   it("has no test count when the run carries none", () => {
     expect(
       runTestCount({

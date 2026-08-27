@@ -1283,6 +1283,7 @@ export function AgentDetail({
               agentUuid={agentUuid}
               agentName={agent.name}
               agentType={agent.type}
+              isActive={activeTab === "tests"}
               agentNature={agent.interaction_type ?? "conversation"}
               connectionVerified={
                 agent.type === "connection"
@@ -1344,6 +1345,7 @@ export function AgentDetail({
               key={runsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
+              isActive={activeTab === "runs"}
             />
           </div>
         )}
