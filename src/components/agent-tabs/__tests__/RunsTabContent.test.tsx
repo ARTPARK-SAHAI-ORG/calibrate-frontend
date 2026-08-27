@@ -282,6 +282,32 @@ describe("RunsTabContent", () => {
     });
   });
 
+  it("asks the backend for model comparisons only when that filter is on", async () => {
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+    expect(lastRunsQuery().get("type")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Model comparisons" }));
+    await waitFor(() =>
+      expect(lastRunsQuery().get("type")).toBe("llm-benchmark"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "All runs" }));
+    await waitFor(() => expect(lastRunsQuery().get("type")).toBeNull());
+  });
+
+  it("says a filter is hiding the runs when only model comparisons are asked for", async () => {
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+
+    state.runs = [];
+    state.total = 0;
+    await user.click(screen.getByRole("button", { name: "Model comparisons" }));
+    await screen.findByText("No evaluations match this filter");
+  });
+
   it("asks for one page at a time", async () => {
     renderTab();
     await screen.findAllByText("1 Success");

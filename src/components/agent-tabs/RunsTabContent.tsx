@@ -9,6 +9,7 @@ import {
   usePageSize,
   type AgentRun,
   type RunResultFilter,
+  type RunTypeFilter,
 } from "@/hooks";
 import {
   getUnitTestBreakdown,
@@ -36,6 +37,14 @@ const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "passed", label: "All passed" },
   { value: "failed", label: "All failed" },
   { value: "error", label: "Error" },
+];
+
+// A run that tried the tests against several models at once is rare next to
+// ordinary runs, so it gets pushed off the first page. This asks the backend
+// for those runs only.
+const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
+  { value: "all", label: "All runs" },
+  { value: "llm-benchmark", label: "Model comparisons" },
 ];
 
 /**
@@ -138,6 +147,35 @@ function RunResult({ run }: { run: AgentRun }) {
   );
 }
 
+/** One row of filter buttons, the chosen one filled in. */
+function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+            value === option.value
+              ? "bg-foreground text-background border-foreground"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </>
+  );
+}
+
 /** The evaluators that judged a run, as plain chips. A dash when there are none. */
 function RunEvaluators({ run }: { run: AgentRun }) {
   const names = run.evaluators ?? [];
@@ -169,6 +207,7 @@ export function RunsTabContent({
   const backendAccessToken = useAccessToken();
   const [pageSize, setPageSize] = usePageSize();
   const [filter, setFilter] = useState<RunResultFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<RunTypeFilter>("all");
 
   // The page a reload should reopen on, read once from `?page=` at start-up.
   // A `?runId=` link is more specific about where to land (it names the run,
@@ -225,6 +264,7 @@ export function RunsTabContent({
     accessToken: backendAccessToken,
     pageSize,
     filter,
+    typeFilter,
     aroundRunId: pendingRunId,
     initialOffset,
   });
@@ -322,20 +362,18 @@ export function RunsTabContent({
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      <div className="flex flex-wrap gap-1.5">
-        {RESULT_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
-              filter === f.value
-                ? "bg-foreground text-background border-foreground"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterChips
+          options={RESULT_FILTERS}
+          value={filter}
+          onChange={setFilter}
+        />
+        <span className="w-px h-5 bg-border mx-1" aria-hidden="true" />
+        <FilterChips
+          options={TYPE_FILTERS}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />
       </div>
 
       {error && (
@@ -369,14 +407,14 @@ export function RunsTabContent({
       ) : items.length === 0 ? (
         <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <h3 className="text-base md:text-lg font-semibold text-foreground mb-1">
-            {filter === "all"
+            {filter === "all" && typeFilter === "all"
               ? "No evaluations yet"
               : "No evaluations match this filter"}
           </h3>
           <p className="text-sm md:text-base text-muted-foreground text-center">
-            {filter === "all"
+            {filter === "all" && typeFilter === "all"
               ? "Run this agent's tests from the Tests tab. Every evaluation appears here with what it covered and how it went."
-              : "Choose another result to see more runs"}
+              : "Choose another filter to see more runs"}
           </p>
         </div>
       ) : (
