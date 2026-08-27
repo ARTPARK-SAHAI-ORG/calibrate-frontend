@@ -333,7 +333,10 @@ export function TraceDetailDialog({
           {/* Kept together so both sit in the top right corner. Loose in the
               header they would be spread apart by the row's own spacing. */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {onToggleSelected && selectedCount > 0 && (
+            {/* Only while this trace is in the selection: the count answers
+                "what did that press do", so it goes away with the trace it
+                was counting. */}
+            {onToggleSelected && isSelected && selectedCount > 0 && (
               <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
                 {selectedCount} selected
               </span>

@@ -633,9 +633,10 @@ describe("adding the open trace to the selection", () => {
     expect(screen.getByText("Remove trace from selection")).toBeInTheDocument();
   });
 
-  it("shows how many traces are ticked, and nothing when none are", async () => {
+  it("shows the count only while this trace is in the selection", async () => {
     mockFetchTrace.mockResolvedValue(detail);
 
+    // Other traces are ticked, but not this one, so the count stays away.
     const { rerender } = render(
       <TraceDetailDialog
         isOpen
@@ -643,7 +644,7 @@ describe("adding the open trace to the selection", () => {
         accessToken="tok"
         traceUuid="t1"
         onToggleSelected={jest.fn()}
-        selectedCount={0}
+        selectedCount={2}
       />,
     );
 
