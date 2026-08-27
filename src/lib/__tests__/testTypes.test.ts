@@ -2,6 +2,7 @@ import {
   testTypeLabel,
   getUnitTestBreakdown,
   modelComparisonName,
+  runDisplayName,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -103,5 +104,22 @@ describe("modelComparisonName", () => {
 
   it("leaves a name of its own alone", () => {
     expect(modelComparisonName("Nightly sweep")).toBe("Nightly sweep");
+  });
+});
+
+describe("runDisplayName", () => {
+  it("calls a plain run an evaluation run, keeping its number", () => {
+    expect(runDisplayName("llm-unit-test", "Run 12")).toBe("Evaluation run 12");
+  });
+
+  it("calls a multi-model run a model comparison", () => {
+    expect(runDisplayName("llm-benchmark", "Benchmark 3")).toBe(
+      "Model comparison 3",
+    );
+  });
+
+  it("names a run the backend has not named yet", () => {
+    expect(runDisplayName("llm-unit-test", "")).toBe("Evaluation run");
+    expect(runDisplayName("llm-benchmark", null)).toBe("Model comparison");
   });
 });

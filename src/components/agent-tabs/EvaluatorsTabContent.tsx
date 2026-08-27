@@ -261,7 +261,7 @@ export function EvaluatorsTabContent({
       {attachedEvaluators.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* No heading: the tab strip above already says Evaluators. */}
-          <p className="text-sm md:text-base font-medium text-foreground">
+          <p className="text-sm md:text-base text-muted-foreground">
             LLM judges for evaluating the agent&rsquo;s{" "}
             {agentNature === "general" ? "output" : "responses"}
           </p>

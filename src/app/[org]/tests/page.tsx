@@ -51,7 +51,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import {
   testTypeLabel,
   getUnitTestBreakdown,
-  modelComparisonName,
+  runDisplayName,
 } from "@/lib/testTypes";
 import {
   TestTypeFilter,
@@ -1791,9 +1791,7 @@ function LLMPageInner() {
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">
-                            {run.type === "llm-benchmark"
-                              ? modelComparisonName(run.name)
-                              : run.name}
+                            {runDisplayName(run.type, run.name)}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">{getRunDisplayName(run)}</p>
                         </div>
@@ -1864,9 +1862,7 @@ function LLMPageInner() {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">
-                            {run.type === "llm-benchmark"
-                              ? modelComparisonName(run.name)
-                              : run.name}
+                            {runDisplayName(run.type, run.name)}
                           </p>
                             <p className="text-xs text-muted-foreground truncate">{run.agent_name}</p>
                           </div>

@@ -15,6 +15,7 @@ import {
   getUnitTestBreakdown,
   isRunErrored,
   isRunInProgress,
+  runDisplayName,
 } from "@/lib/testTypes";
 import { ServerPaginatedListBar } from "@/components/ui";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -64,9 +65,11 @@ export function runTestCount(run: AgentRun): number | null {
   return null;
 }
 
-/** How many models the run tried the tests against. A plain run tries one. */
-export function runModelCount(run: AgentRun): number {
-  return run.type === "llm-benchmark" ? (run.model_results?.length ?? 0) : 1;
+/** The models a run tried the tests against, as the run stored them. */
+export function runModels(run: AgentRun): string[] {
+  return (run.model_results ?? [])
+    .map((m) => m.model?.replace(/__/g, "/") ?? "")
+    .filter(Boolean);
 }
 
 const PILL_CLASS =
@@ -176,6 +179,28 @@ function FilterChips<T extends string>({
         </button>
       ))}
     </>
+  );
+}
+
+/**
+ * The models a run tried the tests against, as plain chips. A run that was not
+ * a model comparison used the agent's own model, which reads as "Default".
+ */
+function RunModels({ run }: { run: AgentRun }) {
+  const models = runModels(run);
+  if (models.length === 0)
+    return <span className="text-sm text-muted-foreground/70">Default</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {models.map((model) => (
+        <span
+          key={model}
+          className={`${PILL_CLASS} bg-muted text-muted-foreground`}
+        >
+          {model}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -450,7 +475,7 @@ export function RunsTabContent({
             <table className="w-full">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-44">
                     Run
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -459,7 +484,7 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
                     Tests
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Models
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -478,11 +503,8 @@ export function RunsTabContent({
                     className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     <td className="px-4 py-3">
-                      <span
-                        className="block truncate font-mono text-xs text-foreground"
-                        title={run.uuid}
-                      >
-                        {run.uuid}
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {runDisplayName(run.type, run.name)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -493,8 +515,8 @@ export function RunsTabContent({
                     <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {countCell(runTestCount(run))}
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
-                      {countCell(runModelCount(run))}
+                    <td className="px-4 py-3">
+                      <RunModels run={run} />
                     </td>
                     <td className="px-4 py-3">
                       <RunEvaluators run={run} />
@@ -517,16 +539,15 @@ export function RunsTabContent({
                 className="border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className="min-w-0 truncate font-mono text-xs text-foreground"
-                    title={run.uuid}
-                  >
-                    {run.uuid}
+                  <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                    {runDisplayName(run.type, run.name)}
                   </span>
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                    {countCell(runTestCount(run))} tests,{" "}
-                    {countCell(runModelCount(run))} models
+                    {countCell(runTestCount(run))} tests
                   </span>
+                </div>
+                <div className="mt-2">
+                  <RunModels run={run} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />

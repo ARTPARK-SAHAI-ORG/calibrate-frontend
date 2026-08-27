@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, setupUser, act, waitFor } from "@/test-utils";
-import { RunsTabContent, runTestCount, runModelCount } from "../RunsTabContent";
+import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 
 const BACKEND = "http://test-backend";
@@ -160,19 +160,29 @@ describe("run counts", () => {
     ).toBeNull();
   });
 
-  it("counts one model for a plain run and every model for a benchmark", () => {
-    expect(runModelCount(unitRun)).toBe(1);
-    expect(runModelCount(benchmarkRun)).toBe(2);
+  it("names no model for a plain run and every model for a comparison", () => {
+    expect(runModels(unitRun)).toEqual([]);
+    expect(runModels(benchmarkRun)).toEqual(["a", "b"]);
+    // The backend stores a model with "__" where the name has a "/".
+    expect(
+      runModels({
+        ...benchmarkRun,
+        model_results: [{ model: "google__gemini-2.5-flash" }],
+      }),
+    ).toEqual(["google/gemini-2.5-flash"]);
   });
 });
 
 describe("RunsTabContent", () => {
   it("names each run and when it was created", async () => {
-    state.runs = [{ ...unitRun, created_at: "2026-01-18 09:30:00" }];
+    state.runs = [
+      { ...unitRun, name: "Run 4", created_at: "2026-01-18 09:30:00" },
+    ];
     renderTab();
     await screen.findAllByText("1 Success");
-    // The whole id, so two runs can be told apart and one can be quoted.
-    expect(screen.getAllByTitle("run-unit").length).toBeGreaterThan(0);
+    // The name the run is known by, not its id.
+    expect(screen.getAllByText("Evaluation run 4").length).toBeGreaterThan(0);
+    expect(screen.queryByText("run-unit")).not.toBeInTheDocument();
     // The day and time it started, not "3 min ago".
     expect(screen.getAllByText(/Jan 18/).length).toBeGreaterThan(0);
   });
@@ -201,9 +211,10 @@ describe("RunsTabContent", () => {
     // Run, result, tests, models: the counts sit third and fourth, for the
     // plain run and the benchmark.
     expect(cells[0]?.[2]).toBe("3");
-    expect(cells[0]?.[3]).toBe("1");
+    // A plain run used the agent's own model, so there is nothing to name.
+    expect(cells[0]?.[3]).toBe("Default");
     expect(cells[1]?.[2]).toBe("4");
-    expect(cells[1]?.[3]).toBe("2");
+    expect(cells[1]?.[3]).toBe("ab");
     // No Test or Benchmark label anywhere.
     expect(screen.queryByText("Benchmark")).not.toBeInTheDocument();
   });
