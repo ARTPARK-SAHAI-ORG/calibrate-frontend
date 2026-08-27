@@ -28,6 +28,36 @@ describe("Tooltip", () => {
     );
   });
 
+  it("keeps the tooltip open while the pointer is inside it", async () => {
+    const user = setupUser();
+    render(
+      <Tooltip content={<a href="/somewhere">Reachable link</a>}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("Trigger"));
+    const link = await screen.findByText("Reachable link");
+
+    // The popup must accept the pointer at all: jsdom does not enforce
+    // pointer-events, so the class is checked directly.
+    expect(link.closest("div.fixed")?.className).not.toContain(
+      "pointer-events-none",
+    );
+
+    // Leaving the trigger for the popup itself must not close it.
+    await user.unhover(screen.getByText("Trigger"));
+    await user.hover(link);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.getByText("Reachable link")).toBeInTheDocument();
+
+    // Leaving the popup closes it.
+    await user.unhover(link);
+    await waitFor(() =>
+      expect(screen.queryByText("Reachable link")).not.toBeInTheDocument(),
+    );
+  });
+
   it("hides the tooltip on click (onClickCapture)", async () => {
     const user = setupUser();
     render(
