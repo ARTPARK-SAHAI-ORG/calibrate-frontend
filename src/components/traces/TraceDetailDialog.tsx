@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { DialogNavHeader, LoadingState } from "@/components/ui";
+import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
 import {
   TestDetailView,
@@ -33,6 +33,11 @@ type TraceDetailDialogProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** Whether this trace is ticked in the list behind the dialog. */
+  isSelected?: boolean;
+  /** Tick or untick this trace without closing the dialog and going back to
+   *  the list for its checkbox. */
+  onToggleSelected?: () => void;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -249,6 +254,8 @@ export function TraceDetailDialog({
   hasPrev = false,
   hasNext = false,
   position,
+  isSelected = false,
+  onToggleSelected,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -318,6 +325,18 @@ export function TraceDetailDialog({
             hasNext={hasNext}
             position={position}
           />
+          {onToggleSelected && (
+            <Button
+              size="sm"
+              variant={isSelected ? "primary" : "secondary"}
+              onClick={onToggleSelected}
+              className="flex-shrink-0 whitespace-nowrap"
+            >
+              {isSelected
+                ? "Remove trace from selection"
+                : "Add trace to selection"}
+            </Button>
+          )}
           <button
             type="button"
             onClick={onClose}

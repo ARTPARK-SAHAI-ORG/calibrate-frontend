@@ -60,9 +60,9 @@ describe("humanTraceName", () => {
     ).toBe("second");
   });
   it("falls back to Trace when there is no user text", () => {
-    expect(humanTraceName({ input: [{ role: "assistant", content: "hi" }] })).toBe(
-      "Trace",
-    );
+    expect(
+      humanTraceName({ input: [{ role: "assistant", content: "hi" }] }),
+    ).toBe("Trace");
   });
 });
 
@@ -112,7 +112,9 @@ describe("turnsToHistory / toTestCaseOutput", () => {
     });
   });
   it("returns undefined output when there is no reply and no tool calls", () => {
-    expect(toTestCaseOutput({ response: "  ", tool_calls: [] })).toBeUndefined();
+    expect(
+      toTestCaseOutput({ response: "  ", tool_calls: [] }),
+    ).toBeUndefined();
   });
 });
 
@@ -141,13 +143,13 @@ it("titles the dialog with the trace's own id and renders the shared conversatio
   );
 
   await waitFor(() =>
-    expect(screen.getByText("At 14 weeks, for OPV and DPT.")).toBeInTheDocument(),
+    expect(
+      screen.getByText("At 14 weeks, for OPV and DPT."),
+    ).toBeInTheDocument(),
   );
   expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t1");
   expect(screen.getByRole("heading", { name: "t1" })).toBeInTheDocument();
-  expect(
-    screen.getByText("When is the next vaccination?"),
-  ).toBeInTheDocument();
+  expect(screen.getByText("When is the next vaccination?")).toBeInTheDocument();
   // The agent's instructions are stored on the trace but never drawn.
   expect(
     screen.queryByText("You are a vaccination assistant."),
@@ -179,7 +181,9 @@ it("puts ids, created time, and metadata in the side column and omits missing id
   expect(screen.getByText("Created")).toBeInTheDocument();
   expect(screen.getByText("gen_ai.request.model")).toBeInTheDocument();
   expect(screen.getByText("gpt-4")).toBeInTheDocument();
-  expect(screen.queryByText("No message or conversation ID")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("No message or conversation ID"),
+  ).not.toBeInTheDocument();
 });
 
 it.each<{
@@ -226,7 +230,9 @@ it.each<{
     await waitFor(() =>
       expect(screen.getByText("Created")).toBeInTheDocument(),
     );
-    expect(screen.queryByText("No message or conversation ID")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No message or conversation ID"),
+    ).not.toBeInTheDocument();
     if (showsName) {
       expect(screen.getByText("Name")).toBeInTheDocument();
       expect(screen.getByText("msg-1")).toBeInTheDocument();
@@ -269,7 +275,9 @@ it("renders a tool-call-only output without a missing-reply placeholder", async 
     />,
   );
   await waitFor(() => expect(screen.getByText("x")).toBeInTheDocument());
-  expect(screen.queryByRole("heading", { name: "Metadata" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "Metadata" }),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText("No text response")).not.toBeInTheDocument();
   expect(screen.getAllByText("Agent Tool Call").length).toBeGreaterThan(0);
 });
@@ -346,14 +354,18 @@ it("never shows the previous trace under the next one's heading", async () => {
   expect(screen.getByRole("heading", { name: "t2" })).toBeInTheDocument();
 
   // The second trace has not arrived yet, so nothing of the first is left.
-  expect(screen.queryByText("At 14 weeks, for OPV and DPT.")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("At 14 weeks, for OPV and DPT."),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText("msg-1")).not.toBeInTheDocument();
   expect(screen.queryByText("gpt-4")).not.toBeInTheDocument();
 
   await act(async () => {
     resolveB(traceB);
   });
-  expect(await screen.findByText("At the block health centre.")).toBeInTheDocument();
+  expect(
+    await screen.findByText("At the block health centre."),
+  ).toBeInTheDocument();
   expect(screen.getByText("msg-2")).toBeInTheDocument();
 });
 
@@ -479,7 +491,10 @@ describe("a general agent's trace", () => {
     mockFetchTrace.mockResolvedValue({
       ...detail,
       input: "Practice: Compound\nAdoption type: non_adopter",
-      output: { response: "Keeping your compound clean helps.", tool_calls: null },
+      output: {
+        response: "Keeping your compound clean helps.",
+        tool_calls: null,
+      },
     });
 
     render(
@@ -493,9 +508,7 @@ describe("a general agent's trace", () => {
 
     expect(await screen.findByText("Input")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Practice: Compound/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Practice: Compound/)).toBeInTheDocument();
     expect(
       screen.getByText("Keeping your compound clean helps."),
     ).toBeInTheDocument();
@@ -509,7 +522,9 @@ describe("a general agent's trace", () => {
       input: "Book a slot for next week",
       output: {
         response: null,
-        tool_calls: [{ tool: "book_appointment", arguments: { date: "2026-03-14" } }],
+        tool_calls: [
+          { tool: "book_appointment", arguments: { date: "2026-03-14" } },
+        ],
       },
     });
 
@@ -584,4 +599,55 @@ it("shows a tool result on a conversational agent's trace too", async () => {
 
   expect(await screen.findByText("Tool Response")).toBeInTheDocument();
   expect(screen.getByText(/"confirmed": true/)).toBeInTheDocument();
+});
+
+describe("adding the open trace to the selection", () => {
+  it("ticks it without closing, and reads back as ticked", async () => {
+    const user = setupUser();
+    const onToggleSelected = jest.fn();
+    mockFetchTrace.mockResolvedValue(detail);
+
+    const { rerender } = render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        onToggleSelected={onToggleSelected}
+      />,
+    );
+
+    await user.click(await screen.findByText("Add trace to selection"));
+    expect(onToggleSelected).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        isSelected
+        onToggleSelected={onToggleSelected}
+      />,
+    );
+    expect(screen.getByText("Remove trace from selection")).toBeInTheDocument();
+  });
+
+  it("leaves the button out where there is no selection to add to", async () => {
+    mockFetchTrace.mockResolvedValue(detail);
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+      />,
+    );
+
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(
+      screen.queryByText("Add trace to selection"),
+    ).not.toBeInTheDocument();
+  });
 });
