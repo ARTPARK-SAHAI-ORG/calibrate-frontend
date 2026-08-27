@@ -633,6 +633,37 @@ describe("adding the open trace to the selection", () => {
     expect(screen.getByText("Remove trace from selection")).toBeInTheDocument();
   });
 
+  it("shows how many traces are ticked, and nothing when none are", async () => {
+    mockFetchTrace.mockResolvedValue(detail);
+
+    const { rerender } = render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        onToggleSelected={jest.fn()}
+        selectedCount={0}
+      />,
+    );
+
+    await screen.findByText("Add trace to selection");
+    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+
+    rerender(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        isSelected
+        onToggleSelected={jest.fn()}
+        selectedCount={3}
+      />,
+    );
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+  });
+
   it("leaves the button out where there is no selection to add to", async () => {
     mockFetchTrace.mockResolvedValue(detail);
 

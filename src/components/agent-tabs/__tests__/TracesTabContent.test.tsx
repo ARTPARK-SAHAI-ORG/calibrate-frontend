@@ -148,6 +148,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     position,
     isSelected,
     onToggleSelected,
+    selectedCount,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -158,6 +159,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     position?: { index: number; total: number };
     isSelected?: boolean;
     onToggleSelected?: () => void;
+    selectedCount?: number;
   }) =>
     isOpen ? (
       <div data-testid="trace-detail">
@@ -169,6 +171,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
         >
           {isSelected ? "remove from selection" : "add to selection"}
         </button>
+        <span data-testid="trace-detail-count">{selectedCount}</span>
         <span data-testid="trace-detail-position">
           {position ? `${position.index + 1} of ${position.total}` : ""}
         </span>
@@ -1460,8 +1463,10 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByText("Second")[0]);
     await user.click(screen.getByTestId("trace-detail-toggle"));
 
-    // Ticked without leaving the trace, so the bulk actions are ready for it.
+    // Ticked without leaving the trace, so the bulk actions are ready for it,
+    // and the running count is on the window itself.
     expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-detail-count")).toHaveTextContent("1");
     expect(screen.getByTestId("trace-detail-toggle")).toHaveTextContent(
       "remove from selection",
     );

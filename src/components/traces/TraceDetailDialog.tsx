@@ -38,6 +38,10 @@ type TraceDetailDialogProps = {
   /** Tick or untick this trace without closing the dialog and going back to
    *  the list for its checkbox. */
   onToggleSelected?: () => void;
+  /** How many traces are ticked in the list behind the dialog. Shown next to
+   *  the button so the reader can see the pile growing without closing the
+   *  window to look at the count. */
+  selectedCount?: number;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -256,6 +260,7 @@ export function TraceDetailDialog({
   position,
   isSelected = false,
   onToggleSelected,
+  selectedCount = 0,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -328,10 +333,14 @@ export function TraceDetailDialog({
           {/* Kept together so both sit in the top right corner. Loose in the
               header they would be spread apart by the row's own spacing. */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {onToggleSelected && selectedCount > 0 && (
+              <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
+                {selectedCount} selected
+              </span>
+            )}
             {onToggleSelected && (
               <Button
                 size="sm"
-                variant={isSelected ? "secondary" : "primary"}
                 onClick={onToggleSelected}
                 className="whitespace-nowrap"
               >

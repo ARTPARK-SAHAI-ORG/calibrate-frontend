@@ -650,6 +650,7 @@ export function TracesTabContent({
         onNext={itemPager.next}
         position={itemPager.position}
         isSelected={openTraceUuid != null && selected.has(openTraceUuid)}
+        selectedCount={selectionCount}
         onToggleSelected={
           openTraceItem
             ? () => deletion.checkboxProps(openTraceItem).onToggle()
