@@ -106,22 +106,26 @@ const tabLabels: Record<TabType, string> = {
   settings: "Settings",
 };
 
+// Evaluations, then Tests, then Evaluators: past runs are what the reader
+// comes back for, and the tests and evaluators behind them follow. Agent and
+// Tools stay in front of all three on a build agent, since that is where it is
+// put together.
 const calibrateTabs: TabType[] = [
   "agent",
   "tools",
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
-  "evaluators",
-  "tests",
   "runs",
+  "tests",
+  "evaluators",
   "traces",
   "settings",
 ];
-// Connection sits next to Settings: it is set up once, while evaluators and
-// tests are what the reader comes back to.
+// Connection sits next to Settings: it is set up once, while evaluations,
+// tests and evaluators are what the reader comes back to.
 const connectionTabs: TabType[] = [
-  "evaluators",
-  "tests",
   "runs",
+  "tests",
+  "evaluators",
   "traces",
   "connection",
   "settings",
@@ -433,12 +437,12 @@ export function AgentDetail({
         setAgent(data);
 
         // Set initial tab based on agent type. A Connect agent opens on
-        // Evaluators: its connection is set up once, while its evaluators and
-        // tests are what the reader comes back for.
+        // Evaluations, its first tab: its connection is set up once, while its
+        // past runs are what the reader comes back for.
         const currentTab = searchParams.get("tab") as TabType | null;
         if (data.type === "connection") {
           if (!currentTab || !connectionTabs.includes(currentTab)) {
-            setActiveTab("evaluators");
+            setActiveTab("runs");
           }
         } else {
           if (!currentTab || !calibrateTabs.includes(currentTab)) {
