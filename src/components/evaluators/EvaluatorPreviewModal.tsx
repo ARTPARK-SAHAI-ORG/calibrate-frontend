@@ -22,7 +22,12 @@ export function EvaluatorPreviewModal({
   return (
     <div
       className="fixed inset-0 z-[160] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={onClose}
+      // This sits inside the table row that opened it, so a click on the dark
+      // area would otherwise also open the row behind it.
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         className="bg-background rounded-xl w-full max-w-2xl h-[80vh] shadow-2xl overflow-hidden flex flex-col"

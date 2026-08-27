@@ -158,6 +158,115 @@ describe("EvaluatorPillList", () => {
   });
 });
 
+describe("the full name on hover", () => {
+  it("does not repeat a name the column shows in full", async () => {
+    const user = setupUser();
+    render(<NamePillList names={["openai/gpt-5.6-sol"]} />);
+
+    await user.hover(screen.getByText("openai/gpt-5.6-sol"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the pill itself, no popup saying the same thing again.
+    expect(screen.getAllByText("openai/gpt-5.6-sol")).toHaveLength(1);
+  });
+
+  it("shows the full name when the column has cut it off", async () => {
+    const user = setupUser();
+    // jsdom has no layout, so the cut-off name is described directly.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(<NamePillList names={["a very long model name indeed"]} />);
+
+    await user.hover(screen.getByText("a very long model name indeed"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("a very long model name indeed").length,
+      ).toBeGreaterThan(1),
+    );
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  });
+});
+
+describe("the evaluators folded into the +N chip", () => {
+  it("opens a preview when one of them is clicked", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorPillList
+        evaluators={[
+          { uuid: "1", name: "Script Fidelity test" },
+          { uuid: "2", name: "Reply Conciseness" },
+          { uuid: "3", name: "Correctness" },
+        ]}
+      />,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    await user.click(
+      await screen.findByRole("button", { name: "Reply Conciseness" }),
+    );
+
+    expect(
+      await screen.findByText("Judge whether the reply is concise."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("2", "tok");
+  });
+
+  it("does not pass the click on to the row behind it", async () => {
+    const user = setupUser();
+    const onRowClick = jest.fn();
+    render(
+      <div onClick={onRowClick}>
+        <EvaluatorPillList
+          evaluators={[
+            { uuid: "1", name: "Script Fidelity test" },
+            { uuid: "2", name: "Reply Conciseness" },
+            { uuid: "3", name: "Correctness" },
+          ]}
+        />
+      </div>,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    await user.click(
+      await screen.findByRole("button", { name: "Reply Conciseness" }),
+    );
+
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it("does not open the row when the preview is closed by clicking outside it", async () => {
+    const user = setupUser();
+    const onRowClick = jest.fn();
+    render(
+      <div onClick={onRowClick}>
+        <EvaluatorPillList evaluators={[{ uuid: "1", name: "Conciseness" }]} />
+      </div>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Conciseness" }));
+    const heading = await screen.findByText(
+      "Judge whether the reply is concise.",
+    );
+    onRowClick.mockClear();
+
+    // The dark area around the preview closes it.
+    await user.click(heading.closest("div.fixed") as HTMLElement);
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Judge whether the reply is concise."),
+      ).not.toBeInTheDocument(),
+    );
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});
+
 describe("pills for names with no evaluator behind them", () => {
   it("shows a plain pill that cannot be clicked through to a preview", () => {
     render(<EvaluatorPillList evaluators={[{ name: "Correctness" }]} />);

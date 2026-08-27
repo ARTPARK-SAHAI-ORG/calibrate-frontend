@@ -136,6 +136,9 @@ export function Tooltip({
       className="fixed z-[9999]"
       onMouseEnter={show}
       onMouseLeave={hide}
+      // Clicking something inside the popup usually opens a dialog over it,
+      // and the pointer never leaves, so close the popup on the way.
+      onClickCapture={hideNow}
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,
