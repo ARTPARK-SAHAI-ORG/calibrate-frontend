@@ -23,6 +23,7 @@ import {
 import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
 import { StatusBadge, RerunIconButton } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
+import { modelComparisonName } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -604,7 +605,7 @@ export function BenchmarkResultsDialog({
           <div className="min-w-0">
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                {runName ?? "Benchmark"}
+                {modelComparisonName(runName)}
               </h2>
               {showRerunButton && handleRerunClick && (
                 <RerunIconButton
@@ -636,7 +637,7 @@ export function BenchmarkResultsDialog({
             {isDone && !error && hasAnyResults && (
               <div className="hidden md:block">
                 <ExportResultsButton
-                  filename={`${runName ?? "benchmark"}-${agentName}`}
+                  filename={`${modelComparisonName(runName)}-${agentName}`}
                   getRows={() =>
                     buildBenchmarkCsv(
                       modelResults.flatMap((m) =>

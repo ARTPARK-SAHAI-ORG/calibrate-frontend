@@ -48,7 +48,11 @@ import {
 } from "@/components/ui/SearchModeInput";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
-import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
+import {
+  testTypeLabel,
+  getUnitTestBreakdown,
+  modelComparisonName,
+} from "@/lib/testTypes";
 import {
   TestTypeFilter,
   type TestTypeFilterValue,
@@ -1652,7 +1656,7 @@ function LLMPageInner() {
                         : "border-border text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {f === "all" ? "All types" : f === "llm-unit-test" ? "Tests" : "Benchmarks"}
+                    {f === "all" ? "All types" : f === "llm-unit-test" ? "Tests" : "Model comparisons"}
                   </button>
                 ))}
               </div>
@@ -1786,7 +1790,11 @@ function LLMPageInner() {
                         className="grid grid-cols-[1fr_1fr_120px_140px_120px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {run.type === "llm-benchmark"
+                              ? modelComparisonName(run.name)
+                              : run.name}
+                          </p>
                           <p className="text-xs text-muted-foreground truncate">{getRunDisplayName(run)}</p>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">{run.agent_name}</p>
@@ -1795,7 +1803,7 @@ function LLMPageInner() {
                             ? "bg-blue-500/20 text-blue-400"
                             : "bg-purple-500/20 text-purple-400"
                         }`}>
-                          {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                          {run.type === "llm-unit-test" ? "Test" : "Model comparison"}
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {run.status === "pending" || run.status === "queued" || run.status === "in_progress" ? (
@@ -1855,13 +1863,17 @@ function LLMPageInner() {
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
+                            <p className="text-sm font-medium text-foreground truncate">
+                            {run.type === "llm-benchmark"
+                              ? modelComparisonName(run.name)
+                              : run.name}
+                          </p>
                             <p className="text-xs text-muted-foreground truncate">{run.agent_name}</p>
                           </div>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
                             run.type === "llm-unit-test" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
                           }`}>
-                            {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                            {run.type === "llm-unit-test" ? "Test" : "Model comparison"}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">

@@ -62,7 +62,7 @@ export function makeOptimisticBenchmarkRun(
 ): OptimisticRun {
   return {
     uuid: taskId,
-    name: "Benchmark",
+    name: "Model comparison",
     status: "pending",
     type: "llm-benchmark",
     updated_at: updatedAt,

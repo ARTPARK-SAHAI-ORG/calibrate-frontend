@@ -40,6 +40,18 @@ export function testTypeLabel(
  * Tests tab and the /tests Runs table have richer local `TestRunResult` types;
  * those are structurally compatible with this.
  */
+/**
+ * What to call a run that tried the tests against several models at once. The
+ * backend names those runs "Benchmark 3"; everywhere a reader can see one, the
+ * app calls it a model comparison, which is the word on the button that starts
+ * it and on the filter that lists them.
+ */
+export function modelComparisonName(name?: string | null): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return "Model comparison";
+  return trimmed.replace(/^Benchmark\b/, "Model comparison");
+}
+
 export type UnitTestResultLike = {
   passed: boolean | null;
   status?: string;

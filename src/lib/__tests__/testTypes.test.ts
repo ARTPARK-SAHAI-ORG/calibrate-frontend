@@ -1,4 +1,8 @@
-import { testTypeLabel, getUnitTestBreakdown } from "../testTypes";
+import {
+  testTypeLabel,
+  getUnitTestBreakdown,
+  modelComparisonName,
+} from "../testTypes";
 
 describe("testTypeLabel", () => {
   it("labels tool_call", () => {
@@ -84,5 +88,20 @@ describe("getUnitTestBreakdown", () => {
       { passed: false, error: "oops" },
     ]);
     expect(result).toEqual({ passed: 1, failed: 1, errored: 2 });
+  });
+});
+
+describe("modelComparisonName", () => {
+  it("calls a backend-named benchmark a model comparison, keeping its number", () => {
+    expect(modelComparisonName("Benchmark 3")).toBe("Model comparison 3");
+  });
+
+  it("names an unnamed run when the backend has not sent one yet", () => {
+    expect(modelComparisonName(null)).toBe("Model comparison");
+    expect(modelComparisonName("  ")).toBe("Model comparison");
+  });
+
+  it("leaves a name of its own alone", () => {
+    expect(modelComparisonName("Nightly sweep")).toBe("Nightly sweep");
   });
 });
