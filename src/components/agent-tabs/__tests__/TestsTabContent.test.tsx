@@ -657,6 +657,120 @@ describe("TestsTabContent — paging", () => {
     await screen.findByText("Showing 1–10 of 12 tests");
   });
 
+  it("keeps the filters on screen when the chosen type has no tests", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // Every paged test is a response test, so this finds nothing.
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+
+    await screen.findByText("No tests match your search");
+    // The reader has to be able to get back to All.
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByText("Run all tests")).toBeInTheDocument();
+  });
+
+  it("counts every linked test against the run limit, not the filtered ones", async () => {
+    useMaxRowsPerEvalMock.mockReturnValue(5);
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await screen.findAllByText("Weather tool test");
+
+    // One test matches the filter, but Run all runs all 13.
+    await user.click(screen.getByText("Run all tests"));
+    expect(showLimitToast).toHaveBeenCalled();
+    expect(runPostCall()).toBeFalsy();
+  });
+
+  it("offers every test once the whole page is ticked, and counts them all", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "10 tests selected",
+    );
+
+    await user.click(screen.getByText("Select all 12 tests"));
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "12 tests selected",
+    );
+  });
+
+  it("removes every test, not only the page, once all are selected", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Remove"));
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    await waitFor(() => {
+      const unlink = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      );
+      expect(unlink).toBeTruthy();
+      expect(JSON.parse(unlink![1].body).test_uuids).toHaveLength(12);
+    });
+  });
+
+  it("runs every test with no ids when all are selected and nothing is filtered", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Run"));
+
+    await waitFor(() => expect(runPostCall()).toBeTruthy());
+    expect(JSON.parse(runPostCall()![1].body)).toEqual({});
+  });
+
+  it("names the matching tests when all are selected under a filter", async () => {
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // 13 tests, 12 of them reply tests: the reply filter spans two pages.
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await screen.findByText("Showing 1–10 of 12 tests");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Run"));
+
+    await waitFor(() => expect(runPostCall()).toBeTruthy());
+    // Not every linked test, so the run has to name the 12 that match.
+    expect(JSON.parse(runPostCall()![1].body).test_uuids).toHaveLength(12);
+  });
+
+  it("drops the across-pages selection when a row is unticked", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getAllByTitle("Select test")[0]);
+
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "9 tests selected",
+    );
+    expect(
+      screen.queryByText("Select all 12 tests"),
+    ).not.toBeInTheDocument();
+  });
+
   it("asks the backend for the chosen type and keeps the count honest", async () => {
     const user = setupUser();
     state.agentTests = [...manyTests, toolCallTest];

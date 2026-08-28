@@ -11,7 +11,11 @@ import {
   useDialogUrlParam,
   usePageSize,
 } from "@/hooks";
-import { fetchAllAgentTests, unlinkTestsFromAgent } from "@/lib/agentTestsApi";
+import {
+  fetchAgentTestsPage,
+  fetchAllAgentTests,
+  unlinkTestsFromAgent,
+} from "@/lib/agentTestsApi";
 import { ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
@@ -600,10 +604,66 @@ export function TestsTabContent({
 
   // Ticks are per page: the bulk actions can only act on the rows in hand, so
   // leaving them set while the reader turns the page would run or remove
-  // fewer tests than the count promises.
+  // fewer tests than the count promises. "Every test matching" is the way to
+  // act on more than one page, and it is dropped here too, because a filter
+  // change redefines what it stands for.
   useEffect(() => {
     setSelectedTestUuids(new Set());
+    setSelectAllMatching(false);
   }, [testsOffset, testsSearch, testsSearchMode, typeFilter, pageSize]);
+
+  /**
+   * Every test matching the search and the type is selected, not just the
+   * ticked rows on this page. Offered once every row on the page is ticked
+   * and there is more than one page. Any per-row tick drops it, since the
+   * actions cannot say "all of them except this one".
+   */
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+  const selectedTestCount = selectAllMatching
+    ? agentTestsTotal
+    : selectedTestUuids.size;
+
+  /**
+   * The tests a bulk action should act on. `allLinked` says the action covers
+   * every test linked to the agent, which Run and Compare send as no test ids
+   * at all; the tests themselves are only fetched when an action needs their
+   * ids, which is what Remove needs.
+   */
+  const selectedTestsForAction = async (): Promise<{
+    tests: TestData[];
+    allLinked: boolean;
+  }> => {
+    if (!selectAllMatching) {
+      return {
+        tests: agentTests.filter((t) => selectedTestUuids.has(t.uuid)),
+        allLinked: false,
+      };
+    }
+    if (!isFiltered) return { tests: [], allLinked: true };
+    if (!backendAccessToken) return { tests: [], allLinked: false };
+    // One page holding every match, so the action names them all.
+    const page = await fetchAgentTestsPage(backendAccessToken, {
+      agentUuid,
+      limit: agentTestsTotal,
+      offset: 0,
+      q: testsSearch,
+      qMode: testsSearchMode,
+      type: typeFilter,
+    });
+    return { tests: unwrapList<TestData>(page), allLinked: false };
+  };
+
+  /** The ids a removal should name, fetching them when the reader chose every
+   *  test rather than ticking rows. */
+  const selectedTestUuidsForRemoval = async (): Promise<string[]> => {
+    if (!selectAllMatching) return Array.from(selectedTestUuids);
+    if (!backendAccessToken) return [];
+    const { tests, allLinked } = await selectedTestsForAction();
+    const all = allLinked
+      ? await fetchAllAgentTests(backendAccessToken, agentUuid)
+      : tests;
+    return all.map((t) => t.uuid);
+  };
 
   // Toggle a single test's selection in the attach-existing dropdown.
   const toggleAvailableTest = (uuid: string) => {
@@ -1176,6 +1236,16 @@ export function TestsTabContent({
   };
 
   const toggleTestSelection = (uuid: string) => {
+    if (selectAllMatching) {
+      // Leaving "every test matching": no action can say "all except this
+      // one", so it collapses to this page's rows minus the one just
+      // unticked, all of which were showing as ticked.
+      const next = new Set(agentTests.map((t) => t.uuid));
+      next.delete(uuid);
+      setSelectedTestUuids(next);
+      setSelectAllMatching(false);
+      return;
+    }
     setSelectedTestUuids((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(uuid)) {
@@ -1188,8 +1258,9 @@ export function TestsTabContent({
   };
 
   const toggleSelectAll = () => {
-    if (selectedTestUuids.size === agentTests.length) {
+    if (selectAllMatching || selectedTestUuids.size === agentTests.length) {
       setSelectedTestUuids(new Set());
+      setSelectAllMatching(false);
     } else {
       setSelectedTestUuids(new Set(agentTests.map((t) => t.uuid)));
     }
@@ -1207,10 +1278,14 @@ export function TestsTabContent({
   };
 
   // Open bulk delete confirmation dialog
-  const openBulkDeleteDialog = (mode: "remove" | "permanent" = "remove") => {
-    if (selectedTestUuids.size === 0) return;
+  const openBulkDeleteDialog = async (
+    mode: "remove" | "permanent" = "remove",
+  ) => {
+    if (selectedTestCount === 0) return;
+    const uuids = await selectedTestUuidsForRemoval();
+    if (uuids.length === 0) return;
     setTestToDelete(null);
-    setTestsToDeleteBulk(Array.from(selectedTestUuids));
+    setTestsToDeleteBulk(uuids);
     setDeleteMode(mode);
     setDeleteDialogOpen(true);
   };
@@ -1296,6 +1371,7 @@ export function TestsTabContent({
         setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
       }
       setSelectedTestUuids(new Set());
+      setSelectAllMatching(false);
       closeDeleteDialog();
     } catch (err) {
       reportError(
@@ -1712,21 +1788,59 @@ export function TestsTabContent({
                 feel consistent: a muted strip with an "N selected"
                 count on the left and unprefixed action buttons on the
                 right (count is on the strip, not duplicated per button). */}
-            {selectedTestUuids.size > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 mb-3 md:mb-4">
-                <span className="text-sm">
-                  <span className="font-medium">{selectedTestUuids.size}</span>{" "}
-                  {selectedTestUuids.size === 1 ? "test" : "tests"} selected
-                </span>
+            {(selectedTestUuids.size > 0 || selectAllMatching) && (
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border px-3 py-2 mb-3 md:mb-4 transition-colors ${
+                  selectAllMatching
+                    ? "border-amber-500/50 bg-amber-500/10"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <div
+                  className={`flex flex-wrap items-center gap-2 text-sm ${
+                    selectAllMatching
+                      ? "text-amber-700 dark:text-amber-300"
+                      : ""
+                  }`}
+                >
+                  <span>
+                    <span className="font-medium">{selectedTestCount}</span>{" "}
+                    {selectedTestCount === 1 ? "test" : "tests"} selected
+                    {selectAllMatching && loadedTestsSearch ? (
+                      <span className="opacity-80">
+                        {" "}
+                        matching &ldquo;{loadedTestsSearch}&rdquo;
+                      </span>
+                    ) : null}
+                  </span>
+                  {/* Ticking every row on the page only covers this page, so
+                      offer the rest of the list when there is more of it. */}
+                  {!selectAllMatching &&
+                    agentTests.length > 0 &&
+                    selectedTestUuids.size === agentTests.length &&
+                    agentTestsTotal > agentTests.length && (
+                      <button
+                        onClick={() => setSelectAllMatching(true)}
+                        className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Select all {agentTestsTotal} test
+                        {agentTestsTotal === 1 ? "" : "s"}
+                        {testsSearch ? ` matching "${testsSearch}"` : ""}
+                      </button>
+                    )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => setSelectedTestUuids(new Set())}
+                    onClick={() => {
+                      setSelectedTestUuids(new Set());
+                      setSelectAllMatching(false);
+                    }}
                     className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
                     Clear
                   </button>
                   <button
-                    onClick={() => openBulkDeleteDialog("remove")}
+                    onClick={() => void openBulkDeleteDialog("remove")}
                     title="Detach from this agent only — the test stays in your library"
                     className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
                   >
@@ -1737,37 +1851,41 @@ export function TestsTabContent({
                     label="Compare"
                     isConnectionUnverified={isConnectionUnverified}
                     isBenchmarkDisabled={isBenchmarkDisabled}
-                    onClick={() => {
-                      const selected = agentTests.filter((t) =>
-                        selectedTestUuids.has(t.uuid),
-                      );
-                      if (selected.length === 0) return;
-                      setBenchmarkTests(selected);
+                    onClick={async () => {
+                      const { tests, allLinked } =
+                        await selectedTestsForAction();
+                      // No tests named means every test linked to the agent.
+                      if (!allLinked && tests.length === 0) return;
+                      setBenchmarkTests(allLinked ? [] : tests);
                       setBenchmarkDialogOpen(true);
                       setSelectedTestUuids(new Set());
+                      setSelectAllMatching(false);
                     }}
                   />
                   <div>
                     <button
-                      onClick={() => {
-                        if (selectedTestUuids.size > maxRowsPerEval) {
+                      onClick={async () => {
+                        if (selectedTestCount > maxRowsPerEval) {
                           showLimitToast(
                             `You can only run up to ${maxRowsPerEval} tests at a time.`,
                           );
                           return;
                         }
-                        const selected = agentTests.filter((t) =>
-                          selectedTestUuids.has(t.uuid),
-                        );
-                        if (selected.length === 0) return;
+                        const { tests, allLinked } =
+                          await selectedTestsForAction();
+                        if (!allLinked && tests.length === 0) return;
                         // Clear the ticks only once the run has started, so the
                         // bar and its spinner stay up during the wait. A failed
                         // run keeps the selection so it can be retried.
-                        void launchTestRun(selected, false, "bulk").then(
-                          (taskId) => {
-                            if (taskId) setSelectedTestUuids(new Set());
-                          },
+                        const taskId = await launchTestRun(
+                          tests,
+                          allLinked,
+                          "bulk",
                         );
+                        if (taskId) {
+                          setSelectedTestUuids(new Set());
+                          setSelectAllMatching(false);
+                        }
                       }}
                       disabled={startingRun !== null}
                       aria-busy={startingRun === "bulk"}
