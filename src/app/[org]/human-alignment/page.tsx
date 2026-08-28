@@ -715,7 +715,7 @@ function HumanLabellingPageInner() {
               )}
               <button
                 onClick={() => setAddAnnotatorOpen(true)}
-                className="ml-auto h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+                className="ml-auto h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
               >
                 Add annotator
               </button>
