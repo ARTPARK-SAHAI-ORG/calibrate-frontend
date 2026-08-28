@@ -158,17 +158,23 @@ jobs:
         if: steps.append.outputs.skipped != 'true'
         env:
           NUMBER: ${{ github.event.pull_request.number }}
+          CHANGELOG_TOKEN: ${{ secrets.CHANGELOG_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # [skip ci] keeps this commit from re-running the whole test suite,
           # which tests.yml would otherwise do on every push to main.
           git commit -m "changelog: #${NUMBER} [skip ci]" -- CHANGELOG.MD
+          # The step above hands its own token to git, replacing the admin one
+          # the checkout stored, so the push has to name the admin token again.
+          # Without it the push goes as the Actions bot, which is not allowed
+          # past the rule that every change to main comes through a pull request.
+          #
           # No rebase or retry: main only moves through merged pull requests, and
           # the concurrency group above already keeps two of those from writing
           # this file at once. A rejected push here means someone pushed straight
           # to main, which should fail loudly rather than be worked around.
-          git push
+          git push "https://x-access-token:${CHANGELOG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
 
       # The changelog is already written and pushed by this point, so failing
       # here costs nothing and is the only thing that makes a broken Claude step
