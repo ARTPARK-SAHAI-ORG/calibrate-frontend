@@ -158,6 +158,186 @@ describe("EvaluatorPillList", () => {
   });
 });
 
+describe("the full name on hover", () => {
+  it("does not repeat a name the column shows in full", async () => {
+    const user = setupUser();
+    render(<NamePillList names={["openai/gpt-5.6-sol"]} />);
+
+    await user.hover(screen.getByText("openai/gpt-5.6-sol"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the pill itself, no popup saying the same thing again.
+    expect(screen.getAllByText("openai/gpt-5.6-sol")).toHaveLength(1);
+  });
+
+  it("shows the full name when the column has cut it off", async () => {
+    const user = setupUser();
+    // jsdom has no layout, so the cut-off name is described directly.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(<NamePillList names={["a very long model name indeed"]} />);
+
+    await user.hover(screen.getByText("a very long model name indeed"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("a very long model name indeed").length,
+      ).toBeGreaterThan(1),
+    );
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  });
+});
+
+  it("keeps watching the pill after the name turns out to be cut off", async () => {
+    // The wrapper around the pill changes when the name is cut off, which
+    // mounts a new span. If the size watcher stayed on the old one, widening
+    // the column later would never clear the hover text.
+    const observed: Element[] = [];
+    class RecordingResizeObserver {
+      observe(el: Element) {
+        observed.push(el);
+      }
+      disconnect() {}
+    }
+    const previous = global.ResizeObserver;
+    (
+      global as unknown as { ResizeObserver: typeof RecordingResizeObserver }
+    ).ResizeObserver = RecordingResizeObserver;
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(<NamePillList names={["a very long model name indeed"]} />);
+
+    await waitFor(() => expect(observed.length).toBeGreaterThan(1));
+    expect(document.body.contains(observed[observed.length - 1])).toBe(true);
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+    (global as unknown as { ResizeObserver: unknown }).ResizeObserver = previous;
+  });
+
+describe("the evaluators folded into the +N chip", () => {
+  it("opens a preview when one of them is clicked", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorPillList
+        evaluators={[
+          { uuid: "1", name: "Script Fidelity test" },
+          { uuid: "2", name: "Reply Conciseness" },
+          { uuid: "3", name: "Correctness" },
+        ]}
+      />,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    await user.click(
+      await screen.findByRole("button", { name: "Reply Conciseness" }),
+    );
+
+    expect(
+      await screen.findByText("Judge whether the reply is concise."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("2", "tok");
+  });
+
+  it("does not give a long name in the popup its own hover text", async () => {
+    // Hover text there would be drawn outside the popup, so moving onto it
+    // would close the popup and leave one name floating on its own. Inside the
+    // popup a long name runs onto a second line instead.
+    const user = setupUser();
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(
+      <EvaluatorPillList
+        evaluators={[
+          { uuid: "1", name: "Script Fidelity test" },
+          { uuid: "2", name: "a very long evaluator name indeed" },
+          { uuid: "3", name: "Correctness" },
+        ]}
+      />,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    const pill = await screen.findByRole("button", {
+      name: "a very long evaluator name indeed",
+    });
+    await user.hover(pill);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Only the pill in the popup, no second copy in hover text of its own.
+    expect(
+      screen.getAllByText("a very long evaluator name indeed"),
+    ).toHaveLength(1);
+    // And the popup is still open.
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  });
+
+  it("does not pass the click on to the row behind it", async () => {
+    const user = setupUser();
+    const onRowClick = jest.fn();
+    render(
+      <div onClick={onRowClick}>
+        <EvaluatorPillList
+          evaluators={[
+            { uuid: "1", name: "Script Fidelity test" },
+            { uuid: "2", name: "Reply Conciseness" },
+            { uuid: "3", name: "Correctness" },
+          ]}
+        />
+      </div>,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    await user.click(
+      await screen.findByRole("button", { name: "Reply Conciseness" }),
+    );
+
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it("does not open the row when the preview is closed by clicking outside it", async () => {
+    const user = setupUser();
+    const onRowClick = jest.fn();
+    render(
+      <div onClick={onRowClick}>
+        <EvaluatorPillList evaluators={[{ uuid: "1", name: "Conciseness" }]} />
+      </div>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Conciseness" }));
+    const heading = await screen.findByText(
+      "Judge whether the reply is concise.",
+    );
+    onRowClick.mockClear();
+
+    // The dark area around the preview closes it.
+    await user.click(heading.closest("div.fixed") as HTMLElement);
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Judge whether the reply is concise."),
+      ).not.toBeInTheDocument(),
+    );
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});
+
 describe("pills for names with no evaluator behind them", () => {
   it("shows a plain pill that cannot be clicked through to a preview", () => {
     render(<EvaluatorPillList evaluators={[{ name: "Correctness" }]} />);

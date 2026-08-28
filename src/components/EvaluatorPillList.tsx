@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
@@ -15,6 +15,78 @@ export type EvaluatorPillItem = {
 
 const EVALUATOR_PILL_CLASSES =
   "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground max-w-full";
+
+/**
+ * True while the column is narrow enough to cut the name off. A pill whose
+ * name is fully readable must not put the same name in a hover popup: it
+ * covers the row and tells the reader nothing.
+ */
+function useIsNameClipped(name: string) {
+  const [el, setEl] = useState<HTMLSpanElement | null>(null);
+  const [clipped, setClipped] = useState(false);
+  useEffect(() => {
+    if (!el) return;
+    const measure = () => setClipped(el.scrollWidth > el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [el, name]);
+  // The wrapper around the pill changes when the name turns out to be cut
+  // off, which mounts a new span. Keeping the span in state rather than a ref
+  // re-runs the effect on that new one, so widening the column later still
+  // clears the hover text.
+  return { ref: setEl, clipped };
+}
+
+/**
+ * One pill. `onOpen` makes it a button that opens how the evaluator judges;
+ * without it the pill is plain text. In a table row the name is cut to fit the
+ * column and the whole of it is on hover. `wrap` is for the "+N" popup, which
+ * has room to run a long name onto a second line: hover text there would be
+ * drawn outside the popup, and moving onto it would close the popup.
+ */
+function NamePill({
+  name,
+  onOpen,
+  wrap = false,
+}: {
+  name: string;
+  onOpen?: (e: React.MouseEvent) => void;
+  wrap?: boolean;
+}) {
+  const { ref, clipped } = useIsNameClipped(name);
+  const label = wrap ? (
+    <span className="break-words">{name}</span>
+  ) : (
+    <span ref={ref} className="truncate">
+      {name}
+    </span>
+  );
+  const pillClasses = `${EVALUATOR_PILL_CLASSES} ${
+    wrap ? "" : "w-full truncate"
+  }`;
+  const pill = onOpen ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`${pillClasses} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+    >
+      {label}
+    </button>
+  ) : (
+    <span className={pillClasses}>{label}</span>
+  );
+  if (wrap) return pill;
+  return clipped ? (
+    <Tooltip content={name} className="min-w-0 shrink">
+      {pill}
+    </Tooltip>
+  ) : (
+    <div className="relative min-w-0 shrink">{pill}</div>
+  );
+}
 
 /**
  * Fixed-width evaluators cell: shows up to 2 pills (each opens how that
@@ -42,47 +114,49 @@ export function EvaluatorPillList({
   const rest = evaluators.length <= 2 ? [] : evaluators.slice(1);
   return (
     <div className="flex items-center gap-1 min-w-0">
-      {visible.map((ev, index) =>
-        ev.uuid ? (
-          <button
-            key={ev.uuid}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPreviewEvaluator({ uuid: ev.uuid as string, name: ev.name });
-            }}
-            title={`Open ${ev.name}`}
-            className={`${EVALUATOR_PILL_CLASSES} min-w-0 shrink truncate hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-          >
-            <span className="truncate">{ev.name}</span>
-          </button>
-        ) : (
-          // A plain pill can be clipped by a narrow column, so the whole name
-          // is on hover. There is nothing to open, so no click handler.
-          // Keyed by position: a list with no ids can hold the same name
-          // twice, and two pills with the same key confuse React.
-          <Tooltip
-            key={`${index}-${ev.name}`}
-            content={ev.name}
-            className="min-w-0 shrink"
-          >
-            <span className={`${EVALUATOR_PILL_CLASSES} w-full truncate`}>
-              <span className="truncate">{ev.name}</span>
-            </span>
-          </Tooltip>
-        ),
-      )}
+      {visible.map((ev, index) => (
+        // Keyed by position: a list with no ids can hold the same name twice,
+        // and two pills with the same key confuse React.
+        <NamePill
+          key={ev.uuid ?? `${index}-${ev.name}`}
+          name={ev.name}
+          onOpen={
+            ev.uuid
+              ? (e) => {
+                  e.stopPropagation();
+                  setPreviewEvaluator({
+                    uuid: ev.uuid as string,
+                    name: ev.name,
+                  });
+                }
+              : undefined
+          }
+        />
+      ))}
       {rest.length > 0 && (
         <Tooltip
           content={
+            // The pills in here open the same preview as the ones in the row.
+            // The popup is drawn outside the table, but a click in it still
+            // reaches the row underneath, so each pill stops its own click.
             <div className="flex flex-wrap gap-1 max-w-64">
               {rest.map((ev, index) => (
-                <span
+                <NamePill
                   key={ev.uuid ?? `${index}-${ev.name}`}
-                  className={EVALUATOR_PILL_CLASSES}
-                >
-                  {ev.name}
-                </span>
+                  name={ev.name}
+                  wrap
+                  onOpen={
+                    ev.uuid
+                      ? (e) => {
+                          e.stopPropagation();
+                          setPreviewEvaluator({
+                            uuid: ev.uuid as string,
+                            name: ev.name,
+                          });
+                        }
+                      : undefined
+                  }
+                />
               ))}
             </div>
           }

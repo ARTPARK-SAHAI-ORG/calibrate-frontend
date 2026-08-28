@@ -20,6 +20,31 @@ export function Tooltip({
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  // Closing is delayed so the pointer can cross the 8px gap between the
+  // trigger and the popup without the popup vanishing on the way. Hovering
+  // the popup itself cancels the pending close, so a popup holding pills or
+  // links can be read and reached.
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setIsVisible(true);
+  };
+  const hide = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setIsVisible(false), 150);
+  };
+  const hideNow = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setIsVisible(false);
+  };
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   const updateTooltipPosition = () => {
     if (!triggerRef.current) return;
@@ -108,7 +133,14 @@ export function Tooltip({
   const tooltipContent = isVisible && (
     <div
       ref={tooltipRef}
-      className="fixed z-[9999] pointer-events-none"
+      className="fixed z-[9999]"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      // Clicking something inside the popup usually opens a dialog over it,
+      // and the pointer never leaves, so close the popup on the way. Closing
+      // is left to `hide`'s timer on purpose: closing here and now tears the
+      // popup down mid-click, and whatever was clicked never gets to run.
+      onClickCapture={hide}
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,
@@ -128,14 +160,14 @@ export function Tooltip({
       <div
         ref={triggerRef}
         className={`relative ${className}`}
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
+        onMouseEnter={show}
+        onMouseLeave={hide}
         // Hide on click too: clicking the trigger often opens a dialog/overlay
         // on top of it, so the pointer never physically leaves and no
         // mouseleave fires — leaving the tooltip stuck on screen. Use the
         // capture phase so it still fires when the child button calls
         // stopPropagation() in its own (bubble-phase) onClick.
-        onClickCapture={() => setIsVisible(false)}
+        onClickCapture={hideNow}
       >
         {children}
       </div>

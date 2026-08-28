@@ -1,5 +1,12 @@
 import React from "react";
-import { render, screen, setupUser, act, waitFor } from "@/test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  act,
+  waitFor,
+  within,
+} from "@/test-utils";
 import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 
@@ -221,7 +228,14 @@ describe("RunsTabContent", () => {
 
   it("names the evaluators that judged each run as chips", async () => {
     state.runs = [
-      { ...unitRun, evaluators: ["Correctness", "Script Fidelity", "Tool call"] },
+      {
+        ...unitRun,
+        evaluators: [
+          { uuid: "ev1", name: "Correctness" },
+          { uuid: "ev2", name: "Script Fidelity" },
+          { uuid: null, name: "Tool call" },
+        ],
+      },
     ];
     renderTab();
     await screen.findAllByText("1 Success");
@@ -234,11 +248,30 @@ describe("RunsTabContent", () => {
     // evaluator, then how many more, so a run with many of them does not push
     // the other rows' columns out of line.
     expect(cells[4]).toBe("Correctness+2");
-    // The runs list carries names only, so there is nothing to click through to.
+    // The name is a button, so it opens how that evaluator judges.
     expect(
-      (row.querySelectorAll("td")[4] as HTMLElement).querySelector(
-        "a, button",
-      ),
+      within(row.querySelectorAll("td")[4] as HTMLElement).getByRole("button", {
+        name: "Correctness",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("still names the evaluators when the backend sends bare names", async () => {
+    // An older backend sends `evaluators` as plain strings. The names still
+    // show; there is just no id, so nothing to open.
+    state.runs = [
+      { ...unitRun, evaluators: ["Correctness", "Script Fidelity", "Tool call"] },
+    ];
+    renderTab();
+    await screen.findAllByText("1 Success");
+
+    const row = document.querySelector("tbody tr") as HTMLElement;
+    const cells = Array.from(row.querySelectorAll("td")).map(
+      (td) => td.textContent,
+    );
+    expect(cells[4]).toBe("Correctness+2");
+    expect(
+      (row.querySelectorAll("td")[4] as HTMLElement).querySelector("button"),
     ).toBeNull();
   });
 
