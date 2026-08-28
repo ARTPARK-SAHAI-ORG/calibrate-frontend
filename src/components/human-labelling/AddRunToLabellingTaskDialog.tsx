@@ -357,6 +357,8 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
 function buildToolCallItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
+  /** Version number per evaluator, from the run's own evaluators block. */
+  versionByEvaluator?: Record<string, number>,
 ): BuiltItem {
   const name =
     nameOverride ??
@@ -371,30 +373,39 @@ function buildToolCallItem(
   // actually did rather than an empty tool-call panel.
   const response = raw.output?.response ?? "";
 
+  // The run gives a tool-call row the tool call correctness evaluator's
+  // verdict: pass or fail, with the difference between the calls expected and
+  // the calls made as its reasoning. Carry it over so the item lands scored,
+  // the same as a response item.
+  const evaluator_results = buildEvaluatorResults(
+    raw.judge_results,
+    versionByEvaluator,
+  );
+  const withResults = (payload: BuiltItem["payload"]): BuiltItem =>
+    Object.keys(evaluator_results).length > 0
+      ? { payload, evaluator_results }
+      : { payload };
+
   // A single agent response agent has no conversation, so its tool-call test
   // is labelled as the one input it was given and the output it produced —
   // the same shape its response tests use in an Agent Response task.
   if (isGeneralTestCase(raw)) {
-    return {
-      payload: {
-        name,
-        input: generalInputOf(raw),
-        output: response,
-        actual_tool_calls,
-        expected_tool_calls,
-      },
-    };
+    return withResults({
+      name,
+      input: generalInputOf(raw),
+      output: response,
+      actual_tool_calls,
+      expected_tool_calls,
+    });
   }
 
-  return {
-    payload: {
-      name,
-      chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
-      expected_tool_calls,
-      actual_tool_calls,
-      agent_response: response,
-    },
-  };
+  return withResults({
+    name,
+    chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
+    expected_tool_calls,
+    actual_tool_calls,
+    agent_response: response,
+  });
 }
 
 /** The verdict on one judge_results row, or null when the evaluator did not
@@ -412,6 +423,24 @@ function seedFromJudgeResult(jr: {
         : null;
   if (value === null) return null;
   return jr.reasoning ? { value, reasoning: jr.reasoning } : { value };
+}
+
+/** Every verdict on a result, keyed by evaluator uuid, ready to send. */
+function buildEvaluatorResults(
+  judgeResults: RawTestCaseLike["judge_results"],
+  versionByEvaluator?: Record<string, number>,
+): Record<string, EvaluatorResultSeed> {
+  const out: Record<string, EvaluatorResultSeed> = {};
+  for (const jr of judgeResults ?? []) {
+    const uuid = jr?.evaluator_uuid ?? null;
+    if (!uuid) continue;
+    const seed = seedFromJudgeResult(jr);
+    if (!seed) continue;
+    const version = versionByEvaluator?.[uuid];
+    out[uuid] =
+      typeof version === "number" ? { ...seed, version_number: version } : seed;
+  }
+  return out;
 }
 
 function buildOneItem(
@@ -444,7 +473,12 @@ function buildOneItem(
   ];
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
-  const evaluator_results: Record<string, EvaluatorResultSeed> = {};
+  // Carry each verdict across, so the task holds the score without the
+  // evaluators being run a second time on the same text.
+  const evaluator_results = buildEvaluatorResults(
+    raw.judge_results,
+    versionByEvaluator,
+  );
   const evaluatorUuids: string[] = [];
   // judge_results is the result-level echo populated for every response
   // test; test_case.evaluators is a config-level echo that may be absent.
@@ -456,16 +490,6 @@ function buildOneItem(
     evaluatorUuids.push(uuid);
     if (jr?.variable_values && typeof jr.variable_values === "object") {
       evaluator_variables[uuid] = { ...jr.variable_values };
-    }
-    // Carry the verdict itself across, so the task holds the score without
-    // the evaluators being run a second time on the same text.
-    const seed = seedFromJudgeResult(jr);
-    if (seed) {
-      const version = versionByEvaluator?.[uuid];
-      evaluator_results[uuid] =
-        typeof version === "number"
-          ? { ...seed, version_number: version }
-          : seed;
     }
   }
   for (const ref of raw.test_case?.evaluators ?? []) {
@@ -529,7 +553,7 @@ export function buildItemsFromSource(
       }
       const handleRaw = (raw: RawTestCaseLike, fullName: string) => {
         if (isToolCallTest(raw)) {
-          items.push(buildToolCallItem(raw, fullName));
+          items.push(buildToolCallItem(raw, fullName, versionByEvaluator));
           // A finished tool-call test's result names the evaluator that
           // judged it (Tool call correctness) in its own judge_results, the
           // same as a response test does. Recorded separately from the

@@ -432,7 +432,45 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     });
   });
 
-  it("carries no verdicts for a tool-call test or a run that has none", () => {
+  it("carries the tool call evaluator's verdict on a tool-call item", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Books an appointment",
+            evaluation: { type: "tool_call" },
+          },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
+          judge_results: [
+            {
+              evaluator_uuid: "tool-ev",
+              match: false,
+              reasoning: "expected book(day=Monday), got book(x=1)",
+            },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "tool-ev",
+          name: "Tool call correctness",
+          output_type: "binary",
+          version_number: 1,
+        },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    });
+    expect(result.items[0].evaluator_results).toEqual({
+      "tool-ev": {
+        value: false,
+        reasoning: "expected book(day=Monday), got book(x=1)",
+        version_number: 1,
+      },
+    });
+  });
+
+  it("carries no verdicts for a tool-call test that has none, or a run that has none", () => {
     const result = buildItemsFromSource({
       type: "test_run",
       runUuid: "run-uuid-12345678",
@@ -443,7 +481,6 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
             evaluation: { type: "tool_call" },
           },
           output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
-          judge_results: [{ evaluator_uuid: "tool-ev", match: true }],
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
         {
           test_case: { name: "Unjudged", evaluation: { type: "response" } },
