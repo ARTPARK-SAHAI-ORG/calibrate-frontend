@@ -404,11 +404,11 @@ export function TestsTabContent({
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
   // The tests the benchmark dialog compares the models on: the ticked rows
-  // for the "Compare" bulk action, or every linked test for the header's
-  // "Compare models". The table holds one page at a time, so the header
-  // button fetches the whole linked list before opening the dialog.
+  // for the "Compare" bulk action, and nothing for the header's "Compare
+  // models", which means every test linked to the agent. The backend runs
+  // them all when it is sent no test ids, so comparing every test never needs
+  // the list itself.
   const [benchmarkTests, setBenchmarkTests] = useState<TestData[]>([]);
-  const [isLoadingBenchmarkTests, setIsLoadingBenchmarkTests] = useState(false);
 
   const isConnectionUnverified =
     agentType === "connection" && connectionVerified === false;
@@ -1573,20 +1573,10 @@ export function TestsTabContent({
               }
               isConnectionUnverified={isConnectionUnverified}
               isBenchmarkDisabled={isBenchmarkDisabled}
-              onClick={async () => {
-                if (!backendAccessToken || isLoadingBenchmarkTests) return;
-                setIsLoadingBenchmarkTests(true);
-                try {
-                  setBenchmarkTests(
-                    await fetchAllAgentTests(backendAccessToken, agentUuid),
-                  );
-                  setBenchmarkDialogOpen(true);
-                } catch (err) {
-                  reportError("Error fetching agent tests to compare:", err);
-                  toast.error("Failed to load this agent's tests");
-                } finally {
-                  setIsLoadingBenchmarkTests(false);
-                }
+              onClick={() => {
+                // No tests named means every test linked to the agent.
+                setBenchmarkTests([]);
+                setBenchmarkDialogOpen(true);
               }}
             />
           </div>
@@ -2301,6 +2291,7 @@ export function TestsTabContent({
         agentName={agentName}
         agentNature={agentNature}
         tests={benchmarkTests}
+        totalTests={linkedTestsTotal}
         onBenchmarkCreated={() => onRunStarted?.()}
         agentType={agentType}
         benchmarkModelsVerified={benchmarkModelsVerified}

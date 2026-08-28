@@ -32,10 +32,7 @@ type TestData = {
 };
 
 type ModelVerificationStatus =
-  | "unverified"
-  | "verifying"
-  | "verified"
-  | "failed";
+  "unverified" | "verifying" | "verified" | "failed";
 
 type BenchmarkDialogProps = {
   isOpen: boolean;
@@ -44,7 +41,12 @@ type BenchmarkDialogProps = {
   /** A general agent is probed with one input, not a conversation. */
   agentNature?: "conversation" | "general";
   agentName: string;
+  /** The tests to compare the models on. Empty means every test linked to the
+   *  agent: the backend runs them all when it is sent no uuids, so comparing
+   *  every test does not need the list. */
   tests: TestData[];
+  /** How many tests an empty `tests` stands for, for the progress numbers. */
+  totalTests?: number;
   onBenchmarkCreated?: (taskId: string) => void;
   agentType?: "agent" | "connection";
   benchmarkModelsVerified?: Record<
@@ -61,6 +63,7 @@ export function BenchmarkDialog({
   agentNature = "conversation",
   agentName,
   tests,
+  totalTests,
   onBenchmarkCreated,
   agentType,
   benchmarkModelsVerified: initialBenchmarkModelsVerified,
@@ -102,11 +105,11 @@ export function BenchmarkDialog({
   >({});
 
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
-  const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(null);
+  const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(
+    null,
+  );
   const [pendingVerifyAction, setPendingVerifyAction] = useState<
-    | { type: "run-comparison" }
-    | { type: "retry-all" }
-    | null
+    { type: "run-comparison" } | { type: "retry-all" } | null
   >(null);
 
   if (!isOpen) return null;
@@ -473,9 +476,7 @@ export function BenchmarkDialog({
                             : "text-muted-foreground"
                         }
                       >
-                        {selectedModel
-                          ? selectedModel.name
-                          : "Select a model"}
+                        {selectedModel ? selectedModel.name : "Select a model"}
                       </span>
                       <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
@@ -603,6 +604,7 @@ export function BenchmarkDialog({
         agentName={agentName}
         testUuids={tests.map((t) => t.uuid)}
         testNames={tests.map((t) => t.name)}
+        totalTests={tests.length > 0 ? tests.length : totalTests}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
         onBenchmarkCreated={onBenchmarkCreated}
       />

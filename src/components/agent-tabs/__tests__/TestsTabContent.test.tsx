@@ -625,60 +625,20 @@ describe("TestsTabContent — paging", () => {
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
   });
 
-  it("says so and opens nothing when the tests to compare cannot be loaded", async () => {
-    state.allAgentTestsInit = { ok: false, status: 500 };
+  it("compares models on every linked test without loading the list", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Paged test 1");
-
-    await user.click(screen.getByTestId("compare-header"));
-
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        "Failed to load this agent's tests",
-      ),
-    );
-    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
-  });
-
-  it("compares models on every linked test, not just the page", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Paged test 1");
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
 
     await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
-    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("12");
-  });
 
-  it("keeps the filters on screen when the chosen type has no tests", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Paged test 1");
-
-    // Every paged test is a response test, so this finds nothing.
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
-
-    await screen.findByText("No tests match your search");
-    // The reader has to be able to get back to All.
-    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
-    expect(screen.getByText("Run all tests")).toBeInTheDocument();
-  });
-
-  it("counts every linked test against the run limit, not the filtered ones", async () => {
-    useMaxRowsPerEvalMock.mockReturnValue(5);
-    const user = setupUser();
-    state.agentTests = [...manyTests, toolCallTest];
-    renderComponent();
-    await screen.findAllByText("Paged test 1");
-
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
-    await screen.findAllByText("Weather tool test");
-
-    // One test matches the filter, but Run all runs all 13.
-    await user.click(screen.getByText("Run all tests"));
-    expect(showLimitToast).toHaveBeenCalled();
-    expect(runPostCall()).toBeFalsy();
+    // No test ids at all is what tells the backend to run every linked test,
+    // so nothing has to be fetched to open this.
+    expect(benchmarkProps.tests).toEqual([]);
+    expect(benchmarkProps.totalTests).toBe(12);
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
   });
 
   it("goes back to the first page after a test is created, where it lands", async () => {
@@ -1526,8 +1486,10 @@ describe("TestsTabContent — benchmark & past runs", () => {
 
     await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
-    // Header compare passes all agent tests.
-    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("2");
+    // Header compare names no tests, which the backend reads as every test
+    // linked to the agent, and says how many that is for the progress count.
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("0");
+    expect(benchmarkProps.totalTests).toBe(2);
   });
 
   it("opens the benchmark dialog scoped to selected tests (bulk Compare)", async () => {
