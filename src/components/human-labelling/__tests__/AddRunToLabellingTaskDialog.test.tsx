@@ -29,10 +29,14 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
   it("treats response and tool-call test cases as eligible", () => {
     expect(
-      isLabellingEligibleRaw({ test_case: { evaluation: { type: "response" } } }),
+      isLabellingEligibleRaw({
+        test_case: { evaluation: { type: "response" } },
+      }),
     ).toBe(true);
     expect(
-      isLabellingEligibleRaw({ test_case: { evaluation: { type: "tool_call" } } }),
+      isLabellingEligibleRaw({
+        test_case: { evaluation: { type: "tool_call" } },
+      }),
     ).toBe(true);
     expect(isLabellingEligibleRaw({})).toBe(false);
     expect(
@@ -45,7 +49,9 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
 
   it("treats a single agent response test and its tool-call test as eligible", () => {
     expect(
-      isLabellingEligibleRaw({ test_case: { evaluation: { type: "general" } } }),
+      isLabellingEligibleRaw({
+        test_case: { evaluation: { type: "general" } },
+      }),
     ).toBe(true);
     expect(
       isLabellingEligibleRaw({
@@ -267,9 +273,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           test_case: {
             name: "T1",
             evaluation: { type: "response" },
-            evaluators: [
-              { uuid: "ev-2", variable_values: { foo: "bar" } },
-            ],
+            evaluators: [{ uuid: "ev-2", variable_values: { foo: "bar" } }],
           },
           output: { response: "resp" },
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
@@ -330,6 +334,162 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       role: "assistant",
       tool_calls: [{ function: { name: "process_user_turn" } }],
     });
+  });
+
+  it("carries each evaluator's verdict across with the item, pinned to the version that produced it", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Greeting",
+            evaluation: { type: "response" },
+            history: [{ role: "user", content: "hi" }],
+          },
+          output: { response: "hello!" },
+          judge_results: [
+            { evaluator_uuid: "ev-1", match: true, reasoning: "polite" },
+            { evaluator_uuid: "ev-2", score: 4 },
+            // Did not finish: nothing to carry over.
+            { evaluator_uuid: "ev-3", match: null, score: null },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "ev-1",
+          name: "Correctness",
+          output_type: "binary",
+          version_number: 3,
+        },
+        { uuid: "ev-2", name: "Tone", output_type: "rating" },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    };
+
+    const result = buildItemsFromSource(source);
+    expect(result.items[0].evaluator_results).toEqual({
+      "ev-1": { value: true, reasoning: "polite", version_number: 3 },
+      "ev-2": { value: 4 },
+    });
+  });
+
+  it("carries verdicts across for a single agent response test", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "One shot",
+            evaluation: { type: "general" },
+            input: "summarise this",
+          },
+          output: { response: "a summary" },
+          judge_results: [{ evaluator_uuid: "ev-1", score: 2 }],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    });
+    expect(result.items[0].payload.input).toBe("summarise this");
+    expect(result.items[0].evaluator_results).toEqual({ "ev-1": { value: 2 } });
+  });
+
+  it("carries verdicts across for every model in a benchmark", () => {
+    const result = buildItemsFromSource({
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-1234",
+      modelResults: [
+        {
+          model: "gpt-4",
+          test_results: [
+            {
+              test_case: { name: "A", evaluation: { type: "response" } },
+              output: { response: "r1" },
+              judge_results: [{ evaluator_uuid: "ev-1", match: true }],
+            },
+          ],
+        },
+        {
+          model: "claude",
+          test_results: [
+            {
+              test_case: { name: "A", evaluation: { type: "response" } },
+              output: { response: "r2" },
+              judge_results: [{ evaluator_uuid: "ev-1", match: false }],
+            },
+          ],
+        },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+      evaluators: [
+        { uuid: "ev-1", name: "Correctness", output_type: "binary" },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    });
+    expect(result.items[0].evaluator_results).toEqual({
+      "ev-1": { value: true },
+    });
+    expect(result.items[1].evaluator_results).toEqual({
+      "ev-1": { value: false },
+    });
+  });
+
+  it("carries the tool call evaluator's verdict on a tool-call item", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Books an appointment",
+            evaluation: { type: "tool_call" },
+          },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
+          judge_results: [
+            {
+              evaluator_uuid: "tool-ev",
+              match: false,
+              reasoning: "expected book(day=Monday), got book(x=1)",
+            },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "tool-ev",
+          name: "Tool call correctness",
+          output_type: "binary",
+          version_number: 1,
+        },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    });
+    expect(result.items[0].evaluator_results).toEqual({
+      "tool-ev": {
+        value: false,
+        reasoning: "expected book(day=Monday), got book(x=1)",
+        version_number: 1,
+      },
+    });
+  });
+
+  it("carries no verdicts for a tool-call test that has none, or a run that has none", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Tool call test",
+            evaluation: { type: "tool_call" },
+          },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        {
+          test_case: { name: "Unjudged", evaluation: { type: "response" } },
+          output: { response: "r" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    });
+    expect(result.items[0].evaluator_results).toBeUndefined();
+    expect(result.items[1].evaluator_results).toBeUndefined();
   });
 
   it("falls back to run-level evaluators when no per-test evaluator uuids are present", () => {
@@ -600,9 +760,13 @@ describe("AddRunToLabellingTaskDialog", () => {
       expect(screen.queryByText("Loading tasks")).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/No existing tasks were found that include the evaluator in the selected tests/),
+      screen.getByText(
+        /No existing tasks were found that include the evaluator in the selected test results/,
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+    ).toBeInTheDocument();
   });
 
   it("shows an error when loading tasks fails", async () => {
@@ -652,11 +816,21 @@ describe("AddRunToLabellingTaskDialog", () => {
   it("filters out tasks missing required evaluators and explains why", async () => {
     apiClientMock.mockResolvedValue({
       items: [
-        { uuid: "task-1", name: "Missing Evaluator Task", type: "llm", evaluators: [] },
+        {
+          uuid: "task-1",
+          name: "Missing Evaluator Task",
+          type: "llm",
+          evaluators: [],
+        },
       ],
     });
     unwrapListMock.mockReturnValue([
-      { uuid: "task-1", name: "Missing Evaluator Task", type: "llm", evaluators: [] },
+      {
+        uuid: "task-1",
+        name: "Missing Evaluator Task",
+        type: "llm",
+        evaluators: [],
+      },
     ]);
     render(
       <AddRunToLabellingTaskDialog
@@ -667,7 +841,9 @@ describe("AddRunToLabellingTaskDialog", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByText(/No existing tasks were found that include the evaluator in the selected tests/),
+        screen.getByText(
+          /No existing tasks were found that include the evaluator in the selected test results/,
+        ),
       ).toBeInTheDocument(),
     );
   });
@@ -676,13 +852,33 @@ describe("AddRunToLabellingTaskDialog", () => {
     const user = setupUser();
     apiClientMock.mockResolvedValue({
       items: [
-        { uuid: "task-1", name: "Task One", type: "llm", evaluators: [{ uuid: "ev-1" }] },
-        { uuid: "task-2", name: "Task Two", type: "llm", evaluators: [{ uuid: "ev-1" }] },
+        {
+          uuid: "task-1",
+          name: "Task One",
+          type: "llm",
+          evaluators: [{ uuid: "ev-1" }],
+        },
+        {
+          uuid: "task-2",
+          name: "Task Two",
+          type: "llm",
+          evaluators: [{ uuid: "ev-1" }],
+        },
       ],
     });
     unwrapListMock.mockReturnValue([
-      { uuid: "task-1", name: "Task One", type: "llm", evaluators: [{ uuid: "ev-1" }] },
-      { uuid: "task-2", name: "Task Two", type: "llm", evaluators: [{ uuid: "ev-1" }] },
+      {
+        uuid: "task-1",
+        name: "Task One",
+        type: "llm",
+        evaluators: [{ uuid: "ev-1" }],
+      },
+      {
+        uuid: "task-2",
+        name: "Task Two",
+        type: "llm",
+        evaluators: [{ uuid: "ev-1" }],
+      },
     ]);
     render(
       <AddRunToLabellingTaskDialog
@@ -695,7 +891,9 @@ describe("AddRunToLabellingTaskDialog", () => {
       expect(screen.getByText("Use existing task")).toBeInTheDocument(),
     );
     await user.click(screen.getByText("Create new task"));
-    expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+    ).toBeInTheDocument();
     await user.click(screen.getByText("Use existing task"));
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
@@ -712,28 +910,38 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
+      expect(
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      ).toBeInTheDocument(),
     );
     // canSubmit gates on newName.trim(), so the button is disabled — assert
     // that state directly rather than relying on click-through validation.
-    expect(screen.getByRole("button", { name: /Create task & add/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /Create task & add/ }),
+    ).toBeDisabled();
   });
 
   it("creates a new task, posts items, and reports success", async () => {
     const user = setupUser();
     const onAdded = jest.fn();
-    apiClientMock.mockImplementation((path: string, _token: string, opts?: { method?: string; body?: unknown }) => {
-      if (path === "/annotation-tasks" && (!opts || !opts.method)) {
-        return Promise.resolve({ items: [] });
-      }
-      if (path === "/annotation-tasks" && opts?.method === "POST") {
-        return Promise.resolve({ uuid: "new-task-uuid" });
-      }
-      if (path === "/annotation-tasks/new-task-uuid/items") {
-        return Promise.resolve({});
-      }
-      return Promise.reject(new Error(`unexpected call ${path}`));
-    });
+    apiClientMock.mockImplementation(
+      (
+        path: string,
+        _token: string,
+        opts?: { method?: string; body?: unknown },
+      ) => {
+        if (path === "/annotation-tasks" && (!opts || !opts.method)) {
+          return Promise.resolve({ items: [] });
+        }
+        if (path === "/annotation-tasks" && opts?.method === "POST") {
+          return Promise.resolve({ uuid: "new-task-uuid" });
+        }
+        if (path === "/annotation-tasks/new-task-uuid/items") {
+          return Promise.resolve({});
+        }
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
     unwrapListMock.mockReturnValue([]);
 
     render(
@@ -745,9 +953,14 @@ describe("AddRunToLabellingTaskDialog", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
+      expect(
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      ).toBeInTheDocument(),
     );
-    await user.type(screen.getByPlaceholderText(/e.g. Maternal health helpline/), "New Task");
+    await user.type(
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      "New Task",
+    );
     await user.type(
       screen.getByPlaceholderText("Short description of the labelling task"),
       "Some description",
@@ -755,7 +968,7 @@ describe("AddRunToLabellingTaskDialog", () => {
     await user.click(screen.getByRole("button", { name: /Create task & add/ }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Added 1 test/)).toBeInTheDocument(),
+      expect(screen.getByText(/Added 1 test result/)).toBeInTheDocument(),
     );
     expect(onAdded).toHaveBeenCalledWith("new-task-uuid", 1);
     expect(screen.getByRole("link", { name: "View task" })).toHaveAttribute(
@@ -771,6 +984,83 @@ describe("AddRunToLabellingTaskDialog", () => {
       description: "Some description",
       type: "llm",
       evaluator_ids: ["ev-1"],
+    });
+  });
+
+  it("posts the run's evaluator verdicts with the items and says they came across", async () => {
+    const user = setupUser();
+    const scoredSource: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: { name: "Greeting", evaluation: { type: "response" } },
+          output: { response: "hi" },
+          judge_results: [
+            { evaluator_uuid: "ev-1", match: true, reasoning: "on point" },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "ev-1",
+          name: "Correctness",
+          output_type: "binary",
+          version_number: 2,
+        },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    };
+    let postedItemsBody: unknown = null;
+    apiClientMock.mockImplementation(
+      (
+        path: string,
+        _token: string,
+        opts?: { method?: string; body?: unknown },
+      ) => {
+        if (path === "/annotation-tasks" && (!opts || !opts.method)) {
+          return Promise.resolve({ items: [] });
+        }
+        if (path === "/annotation-tasks" && opts?.method === "POST") {
+          return Promise.resolve({ uuid: "new-task-uuid" });
+        }
+        if (path === "/annotation-tasks/new-task-uuid/items") {
+          postedItemsBody = opts?.body;
+          return Promise.resolve({});
+        }
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
+    unwrapListMock.mockReturnValue([]);
+
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={scoredSource}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      ).toBeInTheDocument(),
+    );
+    await user.type(
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      "Scored Task",
+    );
+    await user.click(screen.getByRole("button", { name: /Create task & add/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Added 1 test result/)).toBeInTheDocument(),
+    );
+    expect(postedItemsBody).toEqual({
+      items: [
+        expect.objectContaining({
+          evaluator_results: {
+            "ev-1": { value: true, reasoning: "on point", version_number: 2 },
+          },
+        }),
+      ],
     });
   });
 
@@ -911,7 +1201,9 @@ describe("AddRunToLabellingTaskDialog", () => {
         screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       ).toBeInTheDocument(),
     );
-    expect(screen.getByText(/Submit 1 trace for labelling/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Submit 1 trace for labelling/),
+    ).toBeInTheDocument();
     await user.type(
       screen.getByPlaceholderText(/e.g. Maternal health helpline/),
       "Trace batch",
@@ -954,24 +1246,32 @@ describe("AddRunToLabellingTaskDialog", () => {
   it("retries after an ITEM_NAME_CONFLICT, skipping conflicting items", async () => {
     const user = setupUser();
     const tasks = [
-      { uuid: "task-1", name: "Task One", type: "llm", evaluators: [{ uuid: "ev-1" }] },
+      {
+        uuid: "task-1",
+        name: "Task One",
+        type: "llm",
+        evaluators: [{ uuid: "ev-1" }],
+      },
     ];
     let itemsCallCount = 0;
-    apiClientMock.mockImplementation((path: string, _token: string, opts?: { method?: string }) => {
-      if (path === "/annotation-tasks" && !opts) return Promise.resolve({ items: tasks });
-      if (path === "/annotation-tasks/task-1/items") {
-        itemsCallCount += 1;
-        if (itemsCallCount === 1) {
-          return Promise.reject(
-            new Error(
-              'Request failed: 409 - {"detail":{"code":"ITEM_NAME_CONFLICT","conflicting_names":["Greeting — run-uuid"]}}',
-            ),
-          );
+    apiClientMock.mockImplementation(
+      (path: string, _token: string, opts?: { method?: string }) => {
+        if (path === "/annotation-tasks" && !opts)
+          return Promise.resolve({ items: tasks });
+        if (path === "/annotation-tasks/task-1/items") {
+          itemsCallCount += 1;
+          if (itemsCallCount === 1) {
+            return Promise.reject(
+              new Error(
+                'Request failed: 409 - {"detail":{"code":"ITEM_NAME_CONFLICT","conflicting_names":["Greeting — run-uuid"]}}',
+              ),
+            );
+          }
+          return Promise.resolve({});
         }
-        return Promise.resolve({});
-      }
-      return Promise.reject(new Error("unexpected"));
-    });
+        return Promise.reject(new Error("unexpected"));
+      },
+    );
     unwrapListMock.mockReturnValue(tasks);
 
     render(
@@ -987,7 +1287,7 @@ describe("AddRunToLabellingTaskDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add to task" }));
     await waitFor(() =>
       expect(
-        screen.getByText("This test is already in the task"),
+        screen.getByText("This test result is already in the task"),
       ).toBeInTheDocument(),
     );
     expect(itemsCallCount).toBe(1);
@@ -1001,14 +1301,22 @@ describe("AddRunToLabellingTaskDialog", () => {
   it("surfaces a generic failure when adding items fails outright", async () => {
     const user = setupUser();
     const tasks = [
-      { uuid: "task-1", name: "Task One", type: "llm", evaluators: [{ uuid: "ev-1" }] },
+      {
+        uuid: "task-1",
+        name: "Task One",
+        type: "llm",
+        evaluators: [{ uuid: "ev-1" }],
+      },
     ];
-    apiClientMock.mockImplementation((path: string, _token: string, opts?: { method?: string }) => {
-      if (path === "/annotation-tasks" && !opts) return Promise.resolve({ items: tasks });
-      if (path === "/annotation-tasks/task-1/items")
-        return Promise.reject(new Error("network down"));
-      return Promise.reject(new Error("unexpected"));
-    });
+    apiClientMock.mockImplementation(
+      (path: string, _token: string, opts?: { method?: string }) => {
+        if (path === "/annotation-tasks" && !opts)
+          return Promise.resolve({ items: tasks });
+        if (path === "/annotation-tasks/task-1/items")
+          return Promise.reject(new Error("network down"));
+        return Promise.reject(new Error("unexpected"));
+      },
+    );
     unwrapListMock.mockReturnValue(tasks);
 
     render(
@@ -1033,14 +1341,12 @@ describe("AddRunToLabellingTaskDialog", () => {
     unwrapListMock.mockReturnValue([]);
     const onClose = jest.fn();
     render(
-      <AddRunToLabellingTaskDialog
-        isOpen
-        onClose={onClose}
-        source={source}
-      />,
+      <AddRunToLabellingTaskDialog isOpen onClose={onClose} source={source} />,
     );
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/e.g. Maternal health helpline/)).toBeInTheDocument(),
+      expect(
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      ).toBeInTheDocument(),
     );
     await user.click(screen.getByLabelText("Close"));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -1141,7 +1447,8 @@ describe("tool-call tests submitted for labelling", () => {
       runUuid: "run-uuid-12345678",
       results: [toolCallTest],
     };
-    const { items, skippedCount, evaluatorUuids } = buildItemsFromSource(source);
+    const { items, skippedCount, evaluatorUuids } =
+      buildItemsFromSource(source);
     expect(items).toHaveLength(1);
     expect(skippedCount).toBe(0);
     expect(evaluatorUuids.size).toBe(0);

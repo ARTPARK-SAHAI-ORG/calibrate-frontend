@@ -182,7 +182,7 @@ export function itemNounForSource(source: AddRunToLabellingTaskSource): {
     case "traces":
       return { one: "trace", many: "traces" };
     default:
-      return { one: "test", many: "tests" };
+      return { one: "test result", many: "test results" };
   }
 }
 
@@ -218,6 +218,21 @@ type BuiltItem = {
     description?: string;
     [key: string]: unknown;
   };
+  /** The verdicts the run's evaluators already gave this result, keyed by
+   * evaluator uuid. Sent alongside the item so the task holds the scores the
+   * moment the items land, with no second call to the models. Absent when the
+   * source has no verdicts (traces, a tool-call test, an unfinished run). */
+  evaluator_results?: Record<string, EvaluatorResultSeed>;
+};
+
+/** One evaluator's verdict carried over from the run. `value` is a bool for a
+ * binary evaluator and a number for a rating one; `version_number` pins the
+ * version that produced it, so the task shows that version rather than
+ * whichever is live now. */
+export type EvaluatorResultSeed = {
+  value: boolean | number;
+  reasoning?: string;
+  version_number?: number;
 };
 
 type TransformResult = {
@@ -287,6 +302,12 @@ type RawTestCaseLike = {
   judge_results?: Array<{
     evaluator_uuid?: string | null;
     variable_values?: Record<string, string> | null;
+    /** The verdict itself: `match` for a binary evaluator, `score` for a
+     * rating one. Exactly one is set on a finished row; both are absent when
+     * the evaluator did not finish. */
+    match?: boolean | null;
+    score?: number | null;
+    reasoning?: string | null;
   }> | null;
 };
 
@@ -336,6 +357,8 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
 function buildToolCallItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
+  /** Version number per evaluator, from the run's own evaluators block. */
+  versionByEvaluator?: Record<string, number>,
 ): BuiltItem {
   const name =
     nameOverride ??
@@ -350,35 +373,82 @@ function buildToolCallItem(
   // actually did rather than an empty tool-call panel.
   const response = raw.output?.response ?? "";
 
+  // The run gives a tool-call row the tool call correctness evaluator's
+  // verdict: pass or fail, with the difference between the calls expected and
+  // the calls made as its reasoning. Carry it over so the item lands scored,
+  // the same as a response item.
+  const evaluator_results = buildEvaluatorResults(
+    raw.judge_results,
+    versionByEvaluator,
+  );
+  const withResults = (payload: BuiltItem["payload"]): BuiltItem =>
+    Object.keys(evaluator_results).length > 0
+      ? { payload, evaluator_results }
+      : { payload };
+
   // A single agent response agent has no conversation, so its tool-call test
   // is labelled as the one input it was given and the output it produced —
   // the same shape its response tests use in an Agent Response task.
   if (isGeneralTestCase(raw)) {
-    return {
-      payload: {
-        name,
-        input: generalInputOf(raw),
-        output: response,
-        actual_tool_calls,
-        expected_tool_calls,
-      },
-    };
+    return withResults({
+      name,
+      input: generalInputOf(raw),
+      output: response,
+      actual_tool_calls,
+      expected_tool_calls,
+    });
   }
 
-  return {
-    payload: {
-      name,
-      chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
-      expected_tool_calls,
-      actual_tool_calls,
-      agent_response: response,
-    },
-  };
+  return withResults({
+    name,
+    chat_history: raw.test_case?.history ?? raw.chat_history ?? [],
+    expected_tool_calls,
+    actual_tool_calls,
+    agent_response: response,
+  });
+}
+
+/** The verdict on one judge_results row, or null when the evaluator did not
+ * finish and so has nothing to carry over. */
+function seedFromJudgeResult(jr: {
+  match?: boolean | null;
+  score?: number | null;
+  reasoning?: string | null;
+}): Omit<EvaluatorResultSeed, "version_number"> | null {
+  const value =
+    typeof jr.match === "boolean"
+      ? jr.match
+      : typeof jr.score === "number"
+        ? jr.score
+        : null;
+  if (value === null) return null;
+  return jr.reasoning ? { value, reasoning: jr.reasoning } : { value };
+}
+
+/** Every verdict on a result, keyed by evaluator uuid, ready to send. */
+function buildEvaluatorResults(
+  judgeResults: RawTestCaseLike["judge_results"],
+  versionByEvaluator?: Record<string, number>,
+): Record<string, EvaluatorResultSeed> {
+  const out: Record<string, EvaluatorResultSeed> = {};
+  for (const jr of judgeResults ?? []) {
+    const uuid = jr?.evaluator_uuid ?? null;
+    if (!uuid) continue;
+    const seed = seedFromJudgeResult(jr);
+    if (!seed) continue;
+    const version = versionByEvaluator?.[uuid];
+    out[uuid] =
+      typeof version === "number" ? { ...seed, version_number: version } : seed;
+  }
+  return out;
 }
 
 function buildOneItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
+  /** Version number per evaluator, from the run's own evaluators block, so
+   * each carried-over verdict names the version that produced it. */
+  versionByEvaluator?: Record<string, number>,
 ): { item: BuiltItem; evaluatorUuids: string[] } | null {
   // This builds a RESPONSE item. A tool-call test is eligible for labelling
   // too, but goes through `buildToolCallItem` instead — pushing one through
@@ -403,6 +473,12 @@ function buildOneItem(
   ];
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
+  // Carry each verdict across, so the task holds the score without the
+  // evaluators being run a second time on the same text.
+  const evaluator_results = buildEvaluatorResults(
+    raw.judge_results,
+    versionByEvaluator,
+  );
   const evaluatorUuids: string[] = [];
   // judge_results is the result-level echo populated for every response
   // test; test_case.evaluators is a config-level echo that may be absent.
@@ -442,7 +518,11 @@ function buildOneItem(
       }
     : { name, chat_history, agent_response, evaluator_variables };
 
-  return { item: { payload }, evaluatorUuids };
+  const item: BuiltItem =
+    Object.keys(evaluator_results).length > 0
+      ? { payload, evaluator_results }
+      : { payload };
+  return { item, evaluatorUuids };
 }
 
 export function buildItemsFromSource(
@@ -463,9 +543,17 @@ export function buildItemsFromSource(
       // Response and tool-call tests both become items in the task: a
       // response test → a response item scored by the evaluators, a tool-call
       // test → a tool-call item a person marks correct or wrong.
+      // The run names the version each evaluator ran at once, at the top
+      // level, not on every verdict, so build the lookup once here.
+      const versionByEvaluator: Record<string, number> = {};
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid && typeof ev.version_number === "number") {
+          versionByEvaluator[ev.uuid] = ev.version_number;
+        }
+      }
       const handleRaw = (raw: RawTestCaseLike, fullName: string) => {
         if (isToolCallTest(raw)) {
-          items.push(buildToolCallItem(raw, fullName));
+          items.push(buildToolCallItem(raw, fullName, versionByEvaluator));
           // A finished tool-call test's result names the evaluator that
           // judged it (Tool call correctness) in its own judge_results, the
           // same as a response test does. Recorded separately from the
@@ -480,7 +568,7 @@ export function buildItemsFromSource(
           }
           return;
         }
-        const built = buildOneItem(raw, fullName);
+        const built = buildOneItem(raw, fullName, versionByEvaluator);
         if (!built) {
           skippedCount += 1;
           return;
@@ -520,7 +608,12 @@ export function buildItemsFromSource(
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
       }
-      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+      return {
+        items,
+        skippedCount,
+        evaluatorUuids,
+        toolCallEvaluatorUuids,
+      };
     }
     case "stt_run": {
       // STT results carry no per-row judge variable echoes, so the evaluator
@@ -537,7 +630,12 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+      return {
+        items,
+        skippedCount,
+        evaluatorUuids,
+        toolCallEvaluatorUuids,
+      };
     }
     case "tts_run": {
       // TTS results carry no per-row judge variable echoes either, so the
@@ -555,7 +653,12 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+      return {
+        items,
+        skippedCount,
+        evaluatorUuids,
+        toolCallEvaluatorUuids,
+      };
     }
     case "simulation_run": {
       for (const r of source.results) {
@@ -569,7 +672,12 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+      return {
+        items,
+        skippedCount,
+        evaluatorUuids,
+        toolCallEvaluatorUuids,
+      };
     }
     case "traces": {
       // A general agent's trace is one input and the output it produced, which
@@ -590,7 +698,12 @@ export function buildItemsFromSource(
         for (const ev of source.evaluators ?? []) {
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
-        return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+        return {
+          items,
+          skippedCount,
+          evaluatorUuids,
+          toolCallEvaluatorUuids,
+        };
       }
       for (const t of source.traces) {
         const built = buildOneItem({
@@ -618,7 +731,12 @@ export function buildItemsFromSource(
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
-      return { items, skippedCount, evaluatorUuids, toolCallEvaluatorUuids };
+      return {
+        items,
+        skippedCount,
+        evaluatorUuids,
+        toolCallEvaluatorUuids,
+      };
     }
     default:
       return {
@@ -969,7 +1087,9 @@ export function AddRunToLabellingTaskDialog({
             <p className="text-sm text-foreground">
               Added {success.itemsCreated}{" "}
               {success.itemsCreated === 1 ? noun.one : noun.many} to{" "}
-              <span className="font-medium">{success.taskName}</span>
+              <span className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground font-medium">
+                {success.taskName}
+              </span>
               {success.itemsSkipped > 0
                 ? `. ${success.itemsSkipped} ${
                     success.itemsSkipped === 1 ? noun.one : noun.many
