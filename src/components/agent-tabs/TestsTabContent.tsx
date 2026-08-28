@@ -310,7 +310,8 @@ export function TestsTabContent({
   const [testsToDeleteBulk, setTestsToDeleteBulk] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   /**
-   * "remove": detach test from this agent only (DELETE /agent-tests).
+   * "remove": detach test from this agent only
+   * (POST /agent-tests/bulk-unlink).
    * "permanent": delete the test record itself (DELETE /tests/{uuid}); affects all agents.
    */
   const [deleteMode, setDeleteMode] = useState<"remove" | "permanent">(
@@ -1253,27 +1254,27 @@ export function TestsTabContent({
         } = await response.json();
         actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
       } else {
-        for (const uuid of uuidsToRemove) {
-          const response = await fetch(`${backendUrl}/agent-tests`, {
-            method: "DELETE",
-            headers: {
-              ...getDefaultHeaders(backendAccessToken),
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              agent_uuid: agentUuid,
-              test_uuid: uuid,
-            }),
-          });
+        // Single bulk call: handles 1 or many uuids; unlinks every test from
+        // this agent and leaves the test rows in the library.
+        const response = await fetch(`${backendUrl}/agent-tests/bulk-unlink`, {
+          method: "POST",
+          headers: {
+            ...getDefaultHeaders(backendAccessToken),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agent_uuid: agentUuid,
+            test_uuids: uuidsToRemove,
+          }),
+        });
 
-          if (response.status === 401) {
-            await signOut({ callbackUrl: "/login" });
-            return;
-          }
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
-          if (!response.ok) {
-            throw new Error("Failed to remove test from agent");
-          }
+        if (!response.ok) {
+          throw new Error("Failed to remove test from agent");
         }
       }
 

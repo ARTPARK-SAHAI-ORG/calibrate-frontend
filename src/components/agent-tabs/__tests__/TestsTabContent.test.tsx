@@ -287,6 +287,16 @@ function installFetch() {
         state.startRunInit,
       );
     }
+    if (url.includes("/agent-tests/bulk-unlink")) {
+      const body = JSON.parse(opts.body);
+      return jsonResponse(
+        state.bulkUnlink ?? {
+          deleted_count: body.test_uuids.length,
+          message: "unlinked",
+        },
+        state.bulkUnlinkInit,
+      );
+    }
     if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
       return jsonResponse(
@@ -1055,7 +1065,7 @@ describe("TestsTabContent — delete flows", () => {
     state.agentTests = [responseTest, toolCallTest];
   });
 
-  it("removes a single test from the agent (DELETE /agent-tests)", async () => {
+  it("removes a single test from the agent (POST /agent-tests/bulk-unlink)", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
@@ -1068,11 +1078,15 @@ describe("TestsTabContent — delete flows", () => {
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
     );
-    const deleteCall = (global.fetch as jest.Mock).mock.calls.find(
-      (c: any[]) =>
-        c[1]?.method === "DELETE" && String(c[0]).endsWith("/agent-tests"),
+    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
     );
-    expect(deleteCall).toBeTruthy();
+    expect(unlinkCalls).toHaveLength(1);
+    expect(unlinkCalls[0][1].method).toBe("POST");
+    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+      agent_uuid: "agent-1",
+      test_uuids: [responseTest.uuid],
+    });
   });
 
   it("does not offer to delete a single test from the library", async () => {
@@ -1103,6 +1117,32 @@ describe("TestsTabContent — delete flows", () => {
 
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
+    );
+
+    // One call for the whole selection, not one per test.
+    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+    );
+    expect(unlinkCalls).toHaveLength(1);
+    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+      agent_uuid: "agent-1",
+      test_uuids: [responseTest.uuid, toolCallTest.uuid],
+    });
+  });
+
+  it("keeps the tests on screen when the unlink call fails", async () => {
+    state.bulkUnlinkInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Remove"));
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0),
     );
   });
 
