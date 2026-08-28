@@ -932,7 +932,10 @@ describe("AddRunToLabellingTaskDialog", () => {
         }
         if (path === "/annotation-tasks/new-task-uuid/items") {
           postedItemsBody = opts?.body;
-          return Promise.resolve({});
+          return Promise.resolve({
+            evaluator_result_count: 1,
+            evaluator_run_job_id: "scores-run-uuid",
+          });
         }
         return Promise.reject(new Error(`unexpected call ${path}`));
       },
@@ -961,8 +964,13 @@ describe("AddRunToLabellingTaskDialog", () => {
       expect(screen.getByText(/Added 1 test/)).toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/scores the evaluators already gave came across/),
+      screen.getByText(/the evaluators already gave came across/),
     ).toBeInTheDocument();
+    // The count comes from the backend, and links to the run holding them.
+    expect(screen.getByRole("link", { name: "1 score" })).toHaveAttribute(
+      "href",
+      "/human-alignment/tasks/new-task-uuid/evaluator-runs/scores-run-uuid",
+    );
     expect(postedItemsBody).toEqual({
       items: [
         expect.objectContaining({

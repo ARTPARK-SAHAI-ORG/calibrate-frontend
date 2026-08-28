@@ -198,6 +198,13 @@ type LabellingTaskEvaluatorRef = {
   name?: string;
 };
 
+/** What `POST /annotation-tasks/{uuid}/items` returns. The two score fields
+ * come back only when the items carried evaluator verdicts. */
+type ItemsPostResponse = {
+  evaluator_result_count?: number;
+  evaluator_run_job_id?: string | null;
+};
+
 type LabellingTask = {
   uuid: string;
   name: string;
@@ -765,8 +772,12 @@ export function AddRunToLabellingTaskDialog({
     taskName: string;
     itemsCreated: number;
     itemsSkipped: number;
-    /** Verdicts carried over with the items that were added. */
+    /** Verdicts carried over with the items that were added, as the backend
+     * counted them. */
     scoresAdded: number;
+    /** The evaluator run the carried-over scores were recorded as, so the
+     * reader can open them. Absent when no scores came across. */
+    scoresRunUuid?: string;
   } | null>(null);
   const onAddedFiredRef = useRef(false);
 
@@ -931,11 +942,16 @@ export function AddRunToLabellingTaskDialog({
       // through instead of failing the whole batch.
       let toPost = items;
       let itemsSkipped = 0;
+      // The response reports how many carried-over scores were stored and
+      // which evaluator run holds them. Both are absent when the items
+      // carried none.
+      let added: ItemsPostResponse = {};
       try {
-        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
-          method: "POST",
-          body: { items: toPost },
-        });
+        added = await apiClient<ItemsPostResponse>(
+          `/annotation-tasks/${taskUuid}/items`,
+          accessToken,
+          { method: "POST", body: { items: toPost } },
+        );
       } catch (err) {
         const detail = extractApiErrorDetail(err);
         if (
@@ -957,10 +973,11 @@ export function AddRunToLabellingTaskDialog({
           setSubmitting(false);
           return;
         }
-        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
-          method: "POST",
-          body: { items: toPost },
-        });
+        added = await apiClient<ItemsPostResponse>(
+          `/annotation-tasks/${taskUuid}/items`,
+          accessToken,
+          { method: "POST", body: { items: toPost } },
+        );
       }
 
       if (!mountedRef.current) return;
@@ -969,10 +986,14 @@ export function AddRunToLabellingTaskDialog({
         taskName,
         itemsCreated: toPost.length,
         itemsSkipped,
-        scoresAdded: toPost.reduce(
-          (n, it) => n + Object.keys(it.evaluator_results ?? {}).length,
-          0,
-        ),
+        scoresAdded:
+          typeof added?.evaluator_result_count === "number"
+            ? added.evaluator_result_count
+            : toPost.reduce(
+                (n, it) => n + Object.keys(it.evaluator_results ?? {}).length,
+                0,
+              ),
+        scoresRunUuid: added?.evaluator_run_job_id ?? undefined,
       });
       if (onAdded && !onAddedFiredRef.current) {
         onAddedFiredRef.current = true;
@@ -1093,9 +1114,21 @@ export function AddRunToLabellingTaskDialog({
             </p>
             {success.scoresAdded > 0 && (
               <p className="text-sm text-muted-foreground">
-                The scores the evaluators already gave came across with{" "}
-                {success.itemsCreated === 1 ? "it" : "them"}, so you do not
-                have to run the evaluators again.
+                {success.scoresRunUuid ? (
+                  <Link
+                    href={`/human-alignment/tasks/${success.taskUuid}/evaluator-runs/${success.scoresRunUuid}`}
+                    className="underline hover:text-foreground"
+                  >
+                    {success.scoresAdded}{" "}
+                    {success.scoresAdded === 1 ? "score" : "scores"}
+                  </Link>
+                ) : (
+                  `${success.scoresAdded} ${
+                    success.scoresAdded === 1 ? "score" : "scores"
+                  }`
+                )}{" "}
+                the evaluators already gave came across, so you do not have to
+                run the evaluators again.
               </p>
             )}
             <div className="flex items-center justify-end gap-2 md:gap-3">
