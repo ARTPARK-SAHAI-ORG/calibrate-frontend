@@ -80,6 +80,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Without this the action swaps the run's own identity for a GitHub App
+          # token, and that swap is refused here with "Invalid OIDC token", which
+          # is what made every entry fall back to the pull request title. This
+          # step only reads pr.md and writes entry.txt, so the token every
+          # workflow already gets is enough, and handing it over skips the swap.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: '--allowed-tools "Read,Write"'
           prompt: |
             Read pr.md. It describes one pull request that just merged into
