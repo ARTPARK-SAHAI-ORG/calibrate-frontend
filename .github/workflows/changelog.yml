@@ -91,10 +91,10 @@ jobs:
             First decide whether there is anything to say at all. Some pull
             requests change nothing a person using Calibrate can see: a fix to a
             test, a change to how the code is built or checked, a change to one of
-            these workflow files, notes for developers. If this is one of those,
-            write exactly SKIP to entry.txt and nothing else. The changelog then
-            gets no line for it. Only do this when you are sure: when in doubt,
-            write the sentence.
+            these workflow files, notes for developers, or a change to CHANGELOG.MD
+            itself. If this is one of those, write exactly SKIP to entry.txt and
+            nothing else. The changelog then gets no line for it. Only do this when
+            you are sure: when in doubt, write the sentence.
 
             Rules for the sentence:
             - Say what changed for the person using the app, not what the code does.
