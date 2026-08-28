@@ -681,6 +681,22 @@ describe("TestsTabContent — paging", () => {
     expect(runPostCall()).toBeFalsy();
   });
 
+  it("goes back to the first page after a test is created, where it lands", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findByText("Showing 11–12 of 12 tests");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await screen.findByText("Showing 1–10 of 12 tests");
+  });
+
   it("asks the backend for the chosen type and keeps the count honest", async () => {
     const user = setupUser();
     state.agentTests = [...manyTests, toolCallTest];

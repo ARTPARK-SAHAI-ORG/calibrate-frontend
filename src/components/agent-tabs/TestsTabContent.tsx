@@ -244,6 +244,7 @@ export function TestsTabContent({
     isLoading: agentTestsLoading,
     error: agentTestsError,
     refetch: fetchAgentTests,
+    goToFirstPage: showFirstTestsPage,
     handleRemoved: handleTestsRemoved,
     hasPrev: hasPrevTestsPage,
     hasNext: hasNextTestsPage,
@@ -709,7 +710,8 @@ export function TestsTabContent({
       setSearchQuery("");
       setDropdownTypeFilter("all");
       setSelectedAvailableUuids(new Set());
-      await fetchAgentTests();
+      // The newest links are at the top of the list, so show the first page.
+      await showFirstTestsPage();
     } catch (err) {
       reportError("Error adding tests to agent:", err);
       toast.error(
@@ -815,7 +817,8 @@ export function TestsTabContent({
         uuids?: string[] | null;
         warnings?: string[] | null;
       } | null;
-      await fetchAgentTests();
+      // A new test is at the top of the list, so show the first page.
+      await showFirstTestsPage();
       if (result?.warnings && result.warnings.length > 0) {
         setCreateError(
           `Test created but could not be attached to this agent: ${result.warnings.join("; ")}`,
@@ -2246,7 +2249,8 @@ export function TestsTabContent({
         isOpen={bulkUploadOpen}
         onClose={() => setBulkUploadOpen(false)}
         onSuccess={() => {
-          fetchAgentTests();
+          // Uploaded tests are at the top of the list.
+          void showFirstTestsPage();
         }}
         lockedAgentUuid={agentUuid}
         agentNature={agentNature}

@@ -4,9 +4,12 @@ import { TestTypeFilter, matchesTestTypeFilter } from "../TestTypeFilter";
 describe("TestTypeFilter", () => {
   it("renders all filter options with default md size", () => {
     render(<TestTypeFilter value="all" onChange={jest.fn()} />);
-    ["All", "Agent Response", "Tool Call", "Conversation"].forEach((label) => {
+    ["All", "Agent Response", "Tool Call"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     });
+    expect(
+      screen.queryByRole("button", { name: "Conversation" }),
+    ).not.toBeInTheDocument();
   });
 
   it("highlights the active option", () => {
@@ -21,8 +24,8 @@ describe("TestTypeFilter", () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(<TestTypeFilter value="all" onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Conversation" }));
-    expect(onChange).toHaveBeenCalledWith("conversation");
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    expect(onChange).toHaveBeenCalledWith("tool_call");
   });
 
   it("applies sm size classes", () => {

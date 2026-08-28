@@ -21,7 +21,6 @@ const TEST_TYPE_FILTER_OPTIONS: {
   { value: "all", label: "All" },
   { value: "response", label: testTypeLabel("response") },
   { value: "tool_call", label: testTypeLabel("tool_call") },
-  { value: "conversation", label: testTypeLabel("conversation") },
 ];
 
 interface TestTypeFilterProps {

@@ -225,6 +225,41 @@ describe("useAgentTests", () => {
     await waitFor(() => expect(result.current.loadedQ).toBe("zzz"));
   });
 
+  it("goes back to the first page when asked", async () => {
+    mockFetchPage.mockResolvedValue(page([{ uuid: "t1" }], 25));
+
+    const { result } = renderHook(() =>
+      useAgentTests({ agentUuid: "a1", accessToken: "tok", pageSize: 10 }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(10));
+
+    act(() => {
+      void result.current.goToFirstPage();
+    });
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(mockFetchPage).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ offset: 0 }),
+    );
+  });
+
+  it("re-asks for the first page when already on it", async () => {
+    mockFetchPage.mockResolvedValue(page([{ uuid: "t1" }], 5));
+
+    const { result } = renderHook(() =>
+      useAgentTests({ agentUuid: "a1", accessToken: "tok", pageSize: 10 }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const callsBefore = mockFetchPage.mock.calls.length;
+
+    await act(async () => {
+      await result.current.goToFirstPage();
+    });
+    expect(mockFetchPage.mock.calls.length).toBe(callsBefore + 1);
+  });
+
   it("re-asks for the current page on refetch", async () => {
     mockFetchPage.mockResolvedValue(page([{ uuid: "t1" }], 1));
 

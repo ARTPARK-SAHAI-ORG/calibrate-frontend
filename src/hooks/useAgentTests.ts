@@ -91,6 +91,16 @@ export function useAgentTests({
 
   const refetch = useCallback(() => load(offset), [load, offset]);
 
+  /** Go back to the first page and load it. For after a test is added: the
+   *  newest tests are at the top of the list, so a reader sitting on a later
+   *  page would otherwise see nothing change. */
+  const goToFirstPage = useCallback(() => {
+    if (offset === 0) return load(0);
+    // Changing the offset is what triggers the load for the new page.
+    setOffset(0);
+    return Promise.resolve();
+  }, [offset, load]);
+
   /** Re-sync after `count` tests were removed, stepping back a page when the
    *  current one would now start past the end of the list. */
   const handleRemoved = useCallback(
@@ -128,6 +138,7 @@ export function useAgentTests({
     isLoading,
     error,
     refetch,
+    goToFirstPage,
     handleRemoved,
     hasPrev,
     hasNext,
