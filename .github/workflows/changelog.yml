@@ -88,6 +88,14 @@ jobs:
             do, or what stopped going wrong, and put that sentence alone in
             entry.txt.
 
+            First decide whether there is anything to say at all. Some pull
+            requests change nothing a person using Calibrate can see: a fix to a
+            test, a change to how the code is built or checked, a change to one of
+            these workflow files, notes for developers. If this is one of those,
+            write exactly SKIP to entry.txt and nothing else. The changelog then
+            gets no line for it. Only do this when you are sure: when in doubt,
+            write the sentence.
+
             Rules for the sentence:
             - Say what changed for the person using the app, not what the code does.
             - Plain everyday words. No technical vocabulary at all: no hook,
@@ -106,6 +114,7 @@ jobs:
             pull request number, no quotes.
 
       - name: Add it to the changelog
+        id: append
         env:
           TITLE: ${{ github.event.pull_request.title }}
           NUMBER: ${{ github.event.pull_request.number }}
@@ -115,6 +124,17 @@ jobs:
           # a sentence, so a failure there loses the wording, never the entry.
           LINE=$(head -1 entry.txt 2>/dev/null | sed -E 's/^[-*] *//; s/ *$//')
           [ -n "$LINE" ] || LINE=$(printf '%s' "$TITLE" | sed -E 's/ *\(#[0-9]+\) *$//')
+
+          # SKIP means the step above read the pull request and found nothing a
+          # person using the app can see. It is a word it writes on purpose, not
+          # an empty file, so a failure there still falls back to the title above
+          # rather than being mistaken for this.
+          if [ "$LINE" = "SKIP" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Nothing a person using the app can see. No changelog line."
+            rm -f pr.md entry.txt
+            exit 0
+          fi
           ENTRY="- ${LINE} ([#${NUMBER}](${URL}))"
           MONTH=$(date -u +'%B %Y')
 
@@ -129,6 +149,7 @@ jobs:
           rm -f pr.md entry.txt
 
       - name: Commit to main
+        if: steps.append.outputs.skipped != 'true'
         env:
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
