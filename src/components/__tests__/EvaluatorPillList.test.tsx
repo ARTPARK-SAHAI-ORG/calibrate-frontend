@@ -249,6 +249,45 @@ describe("the evaluators folded into the +N chip", () => {
     expect(mockFetch).toHaveBeenCalledWith("2", "tok");
   });
 
+  it("does not give a long name in the popup its own hover text", async () => {
+    // Hover text there would be drawn outside the popup, so moving onto it
+    // would close the popup and leave one name floating on its own. Inside the
+    // popup a long name runs onto a second line instead.
+    const user = setupUser();
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+
+    render(
+      <EvaluatorPillList
+        evaluators={[
+          { uuid: "1", name: "Script Fidelity test" },
+          { uuid: "2", name: "a very long evaluator name indeed" },
+          { uuid: "3", name: "Correctness" },
+        ]}
+      />,
+    );
+
+    await user.hover(screen.getByText("+2"));
+    const pill = await screen.findByRole("button", {
+      name: "a very long evaluator name indeed",
+    });
+    await user.hover(pill);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Only the pill in the popup, no second copy in hover text of its own.
+    expect(
+      screen.getAllByText("a very long evaluator name indeed"),
+    ).toHaveLength(1);
+    // And the popup is still open.
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  });
+
   it("does not pass the click on to the row behind it", async () => {
     const user = setupUser();
     const onRowClick = jest.fn();

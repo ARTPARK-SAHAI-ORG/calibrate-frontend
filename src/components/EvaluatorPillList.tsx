@@ -42,34 +42,43 @@ function useIsNameClipped(name: string) {
 
 /**
  * One pill. `onOpen` makes it a button that opens how the evaluator judges;
- * without it the pill is plain text. Either way the full name is on hover
- * only when the column has cut it off.
+ * without it the pill is plain text. In a table row the name is cut to fit the
+ * column and the whole of it is on hover. `wrap` is for the "+N" popup, which
+ * has room to run a long name onto a second line: hover text there would be
+ * drawn outside the popup, and moving onto it would close the popup.
  */
 function NamePill({
   name,
   onOpen,
+  wrap = false,
 }: {
   name: string;
   onOpen?: (e: React.MouseEvent) => void;
+  wrap?: boolean;
 }) {
   const { ref, clipped } = useIsNameClipped(name);
+  const label = wrap ? (
+    <span className="break-words">{name}</span>
+  ) : (
+    <span ref={ref} className="truncate">
+      {name}
+    </span>
+  );
+  const pillClasses = `${EVALUATOR_PILL_CLASSES} ${
+    wrap ? "" : "w-full truncate"
+  }`;
   const pill = onOpen ? (
     <button
       type="button"
       onClick={onOpen}
-      className={`${EVALUATOR_PILL_CLASSES} w-full truncate hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+      className={`${pillClasses} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
     >
-      <span ref={ref} className="truncate">
-        {name}
-      </span>
+      {label}
     </button>
   ) : (
-    <span className={`${EVALUATOR_PILL_CLASSES} w-full truncate`}>
-      <span ref={ref} className="truncate">
-        {name}
-      </span>
-    </span>
+    <span className={pillClasses}>{label}</span>
   );
+  if (wrap) return pill;
   return clipped ? (
     <Tooltip content={name} className="min-w-0 shrink">
       {pill}
@@ -135,6 +144,7 @@ export function EvaluatorPillList({
                 <NamePill
                   key={ev.uuid ?? `${index}-${ev.name}`}
                   name={ev.name}
+                  wrap
                   onOpen={
                     ev.uuid
                       ? (e) => {
