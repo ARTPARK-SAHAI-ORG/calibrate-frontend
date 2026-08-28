@@ -59,7 +59,10 @@ import {
 } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
-import { hasTaskOverviewData } from "@/lib/taskOverviewData";
+import {
+  hasTaskOverviewData,
+  taskEvaluatorScoreCards,
+} from "@/lib/taskOverviewData";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -1538,10 +1541,12 @@ function LabellingTaskPageInner() {
   // raw count: a count with no usable value behind it (an evaluator missing
   // from the task's own list, or one whose output type is not recorded)
   // formats to nothing, and a card with nothing in it is worse than no card.
-  // Tool call correctness is answered by people, never by an AI judge, so
-  // there is nothing to compare its answers against. It gets no agreement
-  // card and is left out of the note about missing alignment numbers, where
-  // it would otherwise read as an evaluator that failed to run.
+  // Tool call correctness is not judged by a model, so there is nothing to
+  // compare its answers against. It gets no agreement card and is left out
+  // of the note about missing alignment numbers, where it would otherwise
+  // read as an evaluator that failed to run. It does keep a score card, so
+  // the reader can see it is on the task even before any tool call result
+  // has been carried across.
   const toolCallEvaluatorIds = useMemo(
     () =>
       new Set(
@@ -1557,6 +1562,16 @@ function LabellingTaskPageInner() {
   const evaluatorsThatRan = judgedEvaluators.filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
+  const evaluatorScoreCards = useMemo(
+    () =>
+      taskEvaluatorScoreCards(
+        agreement?.evaluators ?? [],
+        evaluatorResultStats,
+        toolCallEvaluatorIds,
+      ),
+    [agreement, evaluatorResultStats, toolCallEvaluatorIds],
+  );
+  const hasEvaluatorScoreCard = evaluatorScoreCards.length > 0;
   // An evaluator with a card but no alignment number has no human labels on
   // its items. Warn once, with wording that says whether that is all of the
   // evaluators on screen or only some. Counted off the same list the cards
@@ -1652,8 +1667,8 @@ function LabellingTaskPageInner() {
       handleTabChange("items");
       return;
     }
-    // Items exist — if the overview has nothing to show (no annotator
-    // agreement, no evaluator score, no human labels, no finished evaluation
+    // Items exist — if the overview has nothing to show (no evaluator score
+    // card, no annotator agreement, no human labels, no finished evaluation
     // run) it is just an empty state, so skip straight to the items tab. Wait
     // for every overview-tab fetch to complete first so the user doesn't see a
     // spinner→bounce flicker on slow connections. If the agreement
@@ -1671,13 +1686,14 @@ function LabellingTaskPageInner() {
     }
     if (!agreement) return;
     autoTabSwitchedRef.current = true;
-    if (!hasTaskOverviewData(agreement, runs)) {
+    if (!hasTaskOverviewData(agreement, runs, hasEvaluatorScoreCard)) {
       handleTabChange("items");
     }
   }, [
     task,
     initialTab,
     handleTabChange,
+    hasEvaluatorScoreCard,
     agreement,
     agreementError,
     agreementFetchCompleted,
@@ -2848,7 +2864,8 @@ function LabellingTaskPageInner() {
                 </svg>
                 Loading
               </div>
-            ) : !agreement || !hasTaskOverviewData(agreement, runs) ? (
+            ) : !agreement ||
+              !hasTaskOverviewData(agreement, runs, hasEvaluatorScoreCard) ? (
               <EmptyState
                 icon={
                   <svg
@@ -2877,16 +2894,13 @@ function LabellingTaskPageInner() {
               />
             ) : (
               <div className="space-y-6">
-                {/* Only evaluators that produced a score. One that never ran
-                    has nothing to put in this section. */}
+                {/* Evaluators that produced a score, plus tool call
+                    correctness, which keeps an empty card until its results
+                    are carried across. */}
                 <EvaluatorScoreCards
                   heading="Evaluator scores"
                   description="What each evaluator scored across the items in this task"
-                  cards={evaluatorsThatRan.map((ev) => ({
-                    evaluatorId: ev.evaluator_id,
-                    name: ev.name,
-                    stat: evaluatorResultStats[ev.evaluator_id]!,
-                  }))}
+                  cards={evaluatorScoreCards}
                 />
                 {/* The same numbers taken from the labels annotators gave.
                     An evaluator nobody has labelled for has no card, so the
