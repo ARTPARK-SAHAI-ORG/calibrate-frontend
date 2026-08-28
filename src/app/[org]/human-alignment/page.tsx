@@ -18,6 +18,7 @@ import { EvaluatorPillList } from "@/components/EvaluatorPillList";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
 import { apiClient, unwrapList } from "@/lib/api";
@@ -165,6 +166,7 @@ function HumanLabellingPageInner() {
   }, []);
 
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
+  const [annotatorSearch, setAnnotatorSearch] = useState("");
   const [annotatorsLoading, setAnnotatorsLoading] = useState(false);
   const [annotatorsError, setAnnotatorsError] = useState<string | null>(null);
   /** False until the first annotators fetch for a visited Annotators tab finishes. */
@@ -398,6 +400,9 @@ function HumanLabellingPageInner() {
 
   const tasksCount = tasks.length;
   const annotatorsCount = annotators.length;
+  const visibleAnnotators = annotators.filter((a) =>
+    a.name.toLowerCase().includes(annotatorSearch.trim().toLowerCase()),
+  );
 
   /**
    * Mirrors the `hasNoAgreementData` check inside <AgreementOverview/>: true
@@ -779,8 +784,27 @@ function HumanLabellingPageInner() {
               />
             ) : (
               <>
+                <SearchInput
+                  value={annotatorSearch}
+                  onChange={setAnnotatorSearch}
+                  placeholder="Search annotators"
+                  className="max-w-md"
+                />
+
+                {visibleAnnotators.length === 0 && (
+                  <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
+                    No annotators match your search.
+                  </p>
+                )}
+
                 {/* Desktop table */}
-                <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+                <div
+                  className={`${
+                    visibleAnnotators.length === 0
+                      ? "hidden"
+                      : "hidden md:block"
+                  } border border-border rounded-xl overflow-hidden`}
+                >
                   <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
@@ -793,7 +817,7 @@ function HumanLabellingPageInner() {
                     </div>
                     <div />
                   </div>
-                  {annotators.map((annotator) => {
+                  {visibleAnnotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
                     const isEditing = editingAnnotatorUuid === annotator.uuid;
                     return (
@@ -966,7 +990,7 @@ function HumanLabellingPageInner() {
 
                 {/* Mobile cards */}
                 <div className="md:hidden space-y-2">
-                  {annotators.map((annotator) => {
+                  {visibleAnnotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
                     const isEditing = editingAnnotatorUuid === annotator.uuid;
                     return (

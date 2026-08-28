@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { apiClient } from "@/lib/api";
 import { AddAnnotatorInline, type NewAnnotator } from "./AddAnnotatorInline";
 
@@ -131,6 +132,7 @@ export function AssignAnnotatorsDialog({
   useHideFloatingButton(isOpen);
 
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -200,15 +202,24 @@ export function AssignAnnotatorsDialog({
 
   const toggle = (id: string) => setPicked((prev) => toggleInSet(prev, id));
 
-  const allPicked = annotators.length > 0 && picked.size === annotators.length;
-  const somePicked = picked.size > 0 && !allPicked;
+  // Select all and the list itself work on what the search leaves visible.
+  const visible = annotators.filter((a) =>
+    a.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const allPicked =
+    visible.length > 0 && visible.every((a) => picked.has(a.uuid));
+  const somePicked = visible.some((a) => picked.has(a.uuid)) && !allPicked;
   // Anything picked (all or just some) → clearing is the useful action.
   const toggleSelectAll = () => {
-    if (picked.size > 0) {
-      setPicked(new Set());
-    } else {
-      setPicked(new Set(annotators.map((a) => a.uuid)));
-    }
+    setPicked((prev) => {
+      const next = new Set(prev);
+      const anyPicked = visible.some((a) => next.has(a.uuid));
+      visible.forEach((a) => {
+        if (anyPicked) next.delete(a.uuid);
+        else next.add(a.uuid);
+      });
+      return next;
+    });
   };
 
   // A freshly added annotator is almost always one the user wants to assign,
@@ -327,6 +338,13 @@ export function AssignAnnotatorsDialog({
                 disabled={submitting || loading}
                 onAdded={handleAnnotatorAdded}
               />
+              {annotators.length > 1 && (
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search annotators"
+                />
+              )}
               <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -355,7 +373,7 @@ export function AssignAnnotatorsDialog({
                   <p className="text-sm text-red-500">{loadError}</p>
                 ) : (
                   <>
-                    {annotators.length > 1 && (
+                    {visible.length > 1 && (
                       <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -376,7 +394,7 @@ export function AssignAnnotatorsDialog({
                         </span>
                       </label>
                     )}
-                    {annotators.map((a) => (
+                    {visible.map((a) => (
                       <label
                         key={a.uuid}
                         className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
@@ -394,6 +412,11 @@ export function AssignAnnotatorsDialog({
                         </div>
                       </label>
                     ))}
+                    {!noAnnotators && visible.length === 0 && (
+                      <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
+                        No annotators match your search.
+                      </p>
+                    )}
                     {noAnnotators && (
                       <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
                         No annotators added yet

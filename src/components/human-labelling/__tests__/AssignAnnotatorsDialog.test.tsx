@@ -236,6 +236,59 @@ describe("AssignAnnotatorsDialog", () => {
     expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
   });
 
+  it("filters the annotator list by the search box", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "bo");
+    expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+
+    await user.clear(screen.getByPlaceholderText("Search annotators"));
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("says when nothing matches the search", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "zzz");
+    expect(
+      screen.getByText("No annotators match your search."),
+    ).toBeInTheDocument();
+  });
+
+  it("select all only picks the annotators left by the search", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "ali");
+    await user.click(screen.getByText("Alice"));
+    await user.clear(screen.getByPlaceholderText("Search annotators"));
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0]).toEqual(["a-1"]);
+  });
+
+  it("hides the select-all control when the search leaves one annotator", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "ali");
+    expect(
+      screen.queryByRole("checkbox", { name: /all annotators/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not show the select-all control with a single annotator", async () => {
     mockedApiClient.mockResolvedValue([annotators[0]]);
     renderDialog();
