@@ -258,6 +258,20 @@ export function TestsTabContent({
     type: typeFilter,
   });
 
+  // How many tests this agent has in all. `agentTestsTotal` counts only the
+  // ones matching the search and the type, so it cannot answer "does this
+  // agent have any tests" or "how many would Run all run": both of those are
+  // about every linked test. The last count taken with nothing filtered is
+  // that number, so it is remembered while a filter is on.
+  const isFiltered = typeFilter !== "all" || testsSearch.trim() !== "";
+  const linkedTestsTotalRef = useRef(0);
+  if (!isFiltered && !agentTestsLoading) {
+    linkedTestsTotalRef.current = agentTestsTotal;
+  }
+  const linkedTestsTotal = isFiltered
+    ? linkedTestsTotalRef.current
+    : agentTestsTotal;
+
   // All available tests state
   const [allTests, setAllTests] = useState<TestData[]>([]);
   const [allTestsLoading, setAllTestsLoading] = useState(false);
@@ -514,7 +528,7 @@ export function TestsTabContent({
   useEffect(() => {
     if (
       !agentTestsLoading &&
-      agentTestsTotal === 0 &&
+      linkedTestsTotal === 0 &&
       !allTestsAttempted &&
       !allTestsLoading &&
       backendAccessToken
@@ -523,7 +537,7 @@ export function TestsTabContent({
     }
   }, [
     agentTestsLoading,
-    agentTestsTotal,
+    linkedTestsTotal,
     allTestsAttempted,
     allTestsLoading,
     backendAccessToken,
@@ -1498,7 +1512,7 @@ export function TestsTabContent({
           tests" actions (Add / Create / Bulk upload) on the right.
           Multi-select bulk actions (Run / Remove / Delete subset) live
           above the table in their own toolbar, not here. */}
-      {agentTestsTotal > 0 && (
+      {linkedTestsTotal > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* Left group: act-on-the-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -1507,7 +1521,7 @@ export function TestsTabContent({
               <button
                 data-tour="tests-run-all"
                 onClick={() => {
-                  if (agentTestsTotal > maxRowsPerEval) {
+                  if (linkedTestsTotal > maxRowsPerEval) {
                     showLimitToast(
                       `You can only run up to ${maxRowsPerEval} tests at a time.`,
                     );
@@ -1591,7 +1605,7 @@ export function TestsTabContent({
           so showing the empty state before it resolves makes it briefly look
           like there are no tests available to add. */}
       {agentTestsLoading ||
-      (!agentTestsError && agentTestsTotal === 0 && !allTestsAttempted) ? (
+      (!agentTestsError && linkedTestsTotal === 0 && !allTestsAttempted) ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="flex items-center gap-3">
             <svg
@@ -1627,7 +1641,7 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : agentTestsTotal === 0 && !loadedTestsSearch ? (
+      ) : linkedTestsTotal === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg

@@ -651,6 +651,36 @@ describe("TestsTabContent — paging", () => {
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("12");
   });
 
+  it("keeps the filters on screen when the chosen type has no tests", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // Every paged test is a response test, so this finds nothing.
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+
+    await screen.findByText("No tests match your search");
+    // The reader has to be able to get back to All.
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByText("Run all tests")).toBeInTheDocument();
+  });
+
+  it("counts every linked test against the run limit, not the filtered ones", async () => {
+    useMaxRowsPerEvalMock.mockReturnValue(5);
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await screen.findAllByText("Weather tool test");
+
+    // One test matches the filter, but Run all runs all 13.
+    await user.click(screen.getByText("Run all tests"));
+    expect(showLimitToast).toHaveBeenCalled();
+    expect(runPostCall()).toBeFalsy();
+  });
+
   it("asks the backend for the chosen type and keeps the count honest", async () => {
     const user = setupUser();
     state.agentTests = [...manyTests, toolCallTest];
