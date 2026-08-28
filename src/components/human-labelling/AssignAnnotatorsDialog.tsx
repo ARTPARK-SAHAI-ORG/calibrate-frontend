@@ -380,16 +380,20 @@ export function AssignAnnotatorsDialog({
                 <p className="text-xs font-medium text-muted-foreground">
                   Annotators
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(true)}
-                  // Disabled until the list has loaded, otherwise the in-flight
-                  // fetch would land afterwards and drop the new annotator.
-                  disabled={submitting || loading}
-                  className="h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add annotator
-                </button>
+                {/* With none yet the button sits in the placeholder below. */}
+                {!noAnnotators && (
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
+                    // Disabled until the list has loaded, otherwise the
+                    // in-flight fetch would land afterwards and drop the new
+                    // annotator.
+                    disabled={submitting || loading}
+                    className="h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add annotator
+                  </button>
+                )}
               </div>
               {annotators.length > 1 && (
                 <SearchInput
@@ -566,9 +570,19 @@ export function AssignAnnotatorsDialog({
                       </p>
                     )}
                     {noAnnotators && (
-                      <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
-                        No annotators added yet
-                      </p>
+                      <div className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 flex flex-col items-center gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          No annotators added yet
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setAddOpen(true)}
+                          disabled={submitting}
+                          className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add annotator
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
