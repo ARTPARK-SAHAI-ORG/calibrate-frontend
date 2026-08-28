@@ -1,5 +1,6 @@
 ## August 2026
 
+- Sending test and benchmark results to a labelling task now carries over the scores the evaluators already gave, so those evaluators do not need to run again on the same text ([#459](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/459))
 - Searching and filtering an agent's tests now covers every linked test instead of just the ones loaded on screen, and removing several tests at once happens in one step ([#457](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/457))
 - Rewrite the changelog lines that were copied from pull request titles ([#446](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/446))
 - A hover box stays open while the pointer is inside it, so the evaluators it lists can be read and opened ([#445](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/445))
