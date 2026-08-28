@@ -356,7 +356,7 @@ describe("AssignAnnotatorsDialog", () => {
 
     await user.type(screen.getByPlaceholderText("Search annotators"), "zzz");
     expect(
-      screen.getByText("No annotators match your search."),
+      screen.getByText("No annotators match your search"),
     ).toBeInTheDocument();
   });
 

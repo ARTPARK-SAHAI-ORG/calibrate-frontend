@@ -764,7 +764,7 @@ function HumanLabellingPageInner() {
               <>
                 {visibleAnnotators.length === 0 && (
                   <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
-                    No annotators match your search.
+                    No annotators match your search
                   </p>
                 )}
 
