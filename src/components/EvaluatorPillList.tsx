@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
