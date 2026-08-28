@@ -695,22 +695,22 @@ function HumanLabellingPageInner() {
               <p className="text-sm text-red-500">{removeAnnotatorError}</p>
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
-              {annotators.length > 0 && (
+            {annotators.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3">
                 <SearchInput
                   value={annotatorSearch}
                   onChange={setAnnotatorSearch}
                   placeholder="Search annotators"
                   className="flex-1 min-w-0 max-w-md"
                 />
-              )}
-              <button
-                onClick={() => setAddAnnotatorOpen(true)}
-                className="ml-auto h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
-              >
-                Add annotator
-              </button>
-            </div>
+                <button
+                  onClick={() => setAddAnnotatorOpen(true)}
+                  className="ml-auto h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+                >
+                  Add annotator
+                </button>
+              </div>
+            )}
 
             {/* Annotator list */}
             {annotatorsLoading || !annotatorsFetchCompleted ? (
@@ -759,6 +759,10 @@ function HumanLabellingPageInner() {
                 }
                 title="No annotators yet"
                 description="Add an annotator so they can be assigned to labelling tasks"
+                action={{
+                  label: "Add annotator",
+                  onClick: () => setAddAnnotatorOpen(true),
+                }}
               />
             ) : (
               <>
