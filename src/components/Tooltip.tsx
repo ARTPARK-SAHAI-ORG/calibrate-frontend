@@ -137,8 +137,10 @@ export function Tooltip({
       onMouseEnter={show}
       onMouseLeave={hide}
       // Clicking something inside the popup usually opens a dialog over it,
-      // and the pointer never leaves, so close the popup on the way.
-      onClickCapture={hideNow}
+      // and the pointer never leaves, so close the popup on the way. Closing
+      // is left to `hide`'s timer on purpose: closing here and now tears the
+      // popup down mid-click, and whatever was clicked never gets to run.
+      onClickCapture={hide}
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,

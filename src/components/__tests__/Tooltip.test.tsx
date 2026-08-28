@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { fireEvent, render, screen, setupUser, waitFor } from "@/test-utils";
 import { Tooltip } from "../Tooltip";
 
 describe("Tooltip", () => {
@@ -55,6 +55,37 @@ describe("Tooltip", () => {
     await user.unhover(link);
     await waitFor(() =>
       expect(screen.queryByText("Reachable link")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("lets a click inside the popup reach what was clicked", async () => {
+    // Closing the popup the moment the click starts pulls the button out of
+    // the page before its own handler runs, and in a browser nothing happens.
+    const user = setupUser();
+    const onPick = jest.fn();
+    render(
+      <Tooltip
+        content={
+          <button type="button" onClick={onPick}>
+            Pick me
+          </button>
+        }
+      >
+        <span>Trigger</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("Trigger"));
+    const pick = await screen.findByText("Pick me");
+
+    fireEvent.click(pick);
+    expect(onPick).toHaveBeenCalledTimes(1);
+    // Still on screen right after the click, not torn down during it.
+    expect(screen.queryByText("Pick me")).toBeInTheDocument();
+
+    // It does close, just a moment later.
+    await waitFor(() =>
+      expect(screen.queryByText("Pick me")).not.toBeInTheDocument(),
     );
   });
 
