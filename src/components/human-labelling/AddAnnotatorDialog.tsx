@@ -56,7 +56,7 @@ export function AddAnnotatorDialog({
           Add annotator
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Annotators can be assigned to labelling tasks.
+          Annotators can be assigned to labelling tasks
         </p>
 
         <label className="block text-sm font-medium text-foreground mb-1.5">
