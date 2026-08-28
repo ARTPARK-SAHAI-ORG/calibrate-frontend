@@ -332,6 +332,125 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     });
   });
 
+  it("carries each evaluator's verdict across with the item, pinned to the version that produced it", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "Greeting",
+            evaluation: { type: "response" },
+            history: [{ role: "user", content: "hi" }],
+          },
+          output: { response: "hello!" },
+          judge_results: [
+            { evaluator_uuid: "ev-1", match: true, reasoning: "polite" },
+            { evaluator_uuid: "ev-2", score: 4 },
+            // Did not finish: nothing to carry over.
+            { evaluator_uuid: "ev-3", match: null, score: null },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "ev-1",
+          name: "Correctness",
+          output_type: "binary",
+          version_number: 3,
+        },
+        { uuid: "ev-2", name: "Tone", output_type: "rating" },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    };
+
+    const result = buildItemsFromSource(source);
+    expect(result.items[0].evaluator_results).toEqual({
+      "ev-1": { value: true, reasoning: "polite", version_number: 3 },
+      "ev-2": { value: 4 },
+    });
+    expect(result.scoreCount).toBe(2);
+  });
+
+  it("carries verdicts across for a single agent response test", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: {
+            name: "One shot",
+            evaluation: { type: "general" },
+            input: "summarise this",
+          },
+          output: { response: "a summary" },
+          judge_results: [{ evaluator_uuid: "ev-1", score: 2 }],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    });
+    expect(result.items[0].payload.input).toBe("summarise this");
+    expect(result.items[0].evaluator_results).toEqual({ "ev-1": { value: 2 } });
+  });
+
+  it("carries verdicts across for every model in a benchmark", () => {
+    const result = buildItemsFromSource({
+      type: "benchmark_run",
+      benchmarkUuid: "bench-uuid-1234",
+      modelResults: [
+        {
+          model: "gpt-4",
+          test_results: [
+            {
+              test_case: { name: "A", evaluation: { type: "response" } },
+              output: { response: "r1" },
+              judge_results: [{ evaluator_uuid: "ev-1", match: true }],
+            },
+          ],
+        },
+        {
+          model: "claude",
+          test_results: [
+            {
+              test_case: { name: "A", evaluation: { type: "response" } },
+              output: { response: "r2" },
+              judge_results: [{ evaluator_uuid: "ev-1", match: false }],
+            },
+          ],
+        },
+      ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
+      evaluators: [
+        { uuid: "ev-1", name: "Correctness", output_type: "binary" },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    });
+    expect(result.items[0].evaluator_results).toEqual({
+      "ev-1": { value: true },
+    });
+    expect(result.items[1].evaluator_results).toEqual({
+      "ev-1": { value: false },
+    });
+    expect(result.scoreCount).toBe(2);
+  });
+
+  it("carries no verdicts for a tool-call test or a run that has none", () => {
+    const result = buildItemsFromSource({
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: { name: "Tool call test", evaluation: { type: "tool_call" } },
+          output: { tool_calls: [{ tool: "book", arguments: { x: 1 } }] },
+          judge_results: [{ evaluator_uuid: "tool-ev", match: true }],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+        {
+          test_case: { name: "Unjudged", evaluation: { type: "response" } },
+          output: { response: "r" },
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+    });
+    expect(result.items[0].evaluator_results).toBeUndefined();
+    expect(result.items[1].evaluator_results).toBeUndefined();
+    expect(result.scoreCount).toBe(0);
+  });
+
   it("falls back to run-level evaluators when no per-test evaluator uuids are present", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
@@ -356,6 +475,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result).toEqual({
       items: [],
       skippedCount: 0,
+      scoreCount: 0,
       evaluatorUuids: new Set(),
       toolCallEvaluatorUuids: new Set(),
     });
@@ -771,6 +891,86 @@ describe("AddRunToLabellingTaskDialog", () => {
       description: "Some description",
       type: "llm",
       evaluator_ids: ["ev-1"],
+    });
+  });
+
+  it("posts the run's evaluator verdicts with the items and says they came across", async () => {
+    const user = setupUser();
+    const scoredSource: AddRunToLabellingTaskSource = {
+      type: "test_run",
+      runUuid: "run-uuid-12345678",
+      results: [
+        {
+          test_case: { name: "Greeting", evaluation: { type: "response" } },
+          output: { response: "hi" },
+          judge_results: [
+            { evaluator_uuid: "ev-1", match: true, reasoning: "on point" },
+          ],
+        } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
+      ],
+      evaluators: [
+        {
+          uuid: "ev-1",
+          name: "Correctness",
+          output_type: "binary",
+          version_number: 2,
+        },
+      ] as unknown as import("@/components/test-results/shared").TestRunEvaluator[],
+    };
+    let postedItemsBody: unknown = null;
+    apiClientMock.mockImplementation(
+      (
+        path: string,
+        _token: string,
+        opts?: { method?: string; body?: unknown },
+      ) => {
+        if (path === "/annotation-tasks" && (!opts || !opts.method)) {
+          return Promise.resolve({ items: [] });
+        }
+        if (path === "/annotation-tasks" && opts?.method === "POST") {
+          return Promise.resolve({ uuid: "new-task-uuid" });
+        }
+        if (path === "/annotation-tasks/new-task-uuid/items") {
+          postedItemsBody = opts?.body;
+          return Promise.resolve({});
+        }
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
+    unwrapListMock.mockReturnValue([]);
+
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={scoredSource}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      ).toBeInTheDocument(),
+    );
+    await user.type(
+      screen.getByPlaceholderText(/e.g. Maternal health helpline/),
+      "Scored Task",
+    );
+    await user.click(screen.getByRole("button", { name: /Create task & add/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Added 1 test/)).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/scores the evaluators already gave came across/),
+    ).toBeInTheDocument();
+    expect(postedItemsBody).toEqual({
+      items: [
+        expect.objectContaining({
+          evaluator_results: {
+            "ev-1": { value: true, reasoning: "on point", version_number: 2 },
+          },
+        }),
+      ],
     });
   });
 
