@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
+import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
@@ -301,20 +302,12 @@ function HumanLabellingPageInner() {
 
   const handleAddAnnotator = async (name: string) => {
     if (!accessToken) return;
-    try {
-      const { uuid } = await apiClient<{ uuid: string; message: string }>(
-        "/annotators",
-        accessToken,
-        { method: "POST", body: { name } },
-      );
-      setAnnotators((prev) =>
-        [...prev.filter((a) => a.uuid !== uuid), { uuid, name }].sort((a, b) =>
-          a.name.localeCompare(b.name),
-        ),
-      );
-    } catch (err) {
-      throw new Error(parseApiError(err, "Failed to add annotator"));
-    }
+    const { uuid } = await createAnnotator(accessToken, name);
+    setAnnotators((prev) =>
+      [...prev.filter((a) => a.uuid !== uuid), { uuid, name }].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    );
   };
 
   const startEditAnnotator = (a: Annotator) => {
@@ -337,11 +330,7 @@ function HumanLabellingPageInner() {
     setSavingAnnotatorEdit(true);
     setAnnotatorEditError(null);
     try {
-      await apiClient<{ message: string }>(
-        `/annotators/${editingAnnotatorUuid}`,
-        accessToken,
-        { method: "PUT", body: { name } },
-      );
+      await renameAnnotator(accessToken, editingAnnotatorUuid, name);
       setAnnotators((prev) =>
         prev
           .map((a) => (a.uuid === editingAnnotatorUuid ? { ...a, name } : a))
@@ -349,7 +338,9 @@ function HumanLabellingPageInner() {
       );
       setEditingAnnotatorUuid(null);
     } catch (err) {
-      setAnnotatorEditError(parseApiError(err, "Failed to rename annotator"));
+      setAnnotatorEditError(
+        err instanceof Error ? err.message : "Failed to rename annotator",
+      );
     } finally {
       setSavingAnnotatorEdit(false);
     }

@@ -199,6 +199,93 @@ describe("AssignAnnotatorsDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("renames an annotator from the list", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    const input = screen.getByLabelText("Annotator name");
+    await user.clear(input);
+    await user.type(input, "Alicia");
+
+    mockedApiClient.mockResolvedValueOnce({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(await screen.findByText("Alicia")).toBeInTheDocument();
+    expect(mockedApiClient).toHaveBeenLastCalledWith("/annotators/a-1", "tok", {
+      method: "PUT",
+      body: { name: "Alicia" },
+    });
+  });
+
+  it("saves a rename on Enter and leaves the selection alone", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    mockedApiClient.mockResolvedValueOnce({ message: "ok" });
+    await user.type(screen.getByLabelText("Annotator name"), "!{Enter}");
+
+    await screen.findByText("Alice!");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+    expect(onConfirm.mock.calls[0][0]).toEqual(["a-1"]);
+  });
+
+  it("closes the rename box on Escape and on Cancel, keeping the old name", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.type(screen.getByLabelText("Annotator name"), "x{Escape}");
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.click(screen.getByRole("button", { name: "Cancel rename" }));
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("skips the request when the name is unchanged", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(mockedApiClient).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the backend message when a rename fails", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.type(screen.getByLabelText("Annotator name"), "x");
+
+    mockedApiClient.mockRejectedValueOnce(
+      new Error('Request failed: 400 - {"detail":"Name already used"}'),
+    );
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+    expect(await screen.findByText("Name already used")).toBeInTheDocument();
+
+    mockedApiClient.mockRejectedValueOnce("boom");
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+    expect(
+      await screen.findByText("Failed to rename annotator"),
+    ).toBeInTheDocument();
+  });
+
   it("lists annotators and keeps Assign disabled until one is picked", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);

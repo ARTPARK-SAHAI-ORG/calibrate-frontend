@@ -1,43 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { createAnnotator, type NewAnnotator } from "@/lib/annotatorApi";
 
-export type NewAnnotator = { uuid: string; name: string };
-
-// Same shape as the copies in the other labelling dialogs — kept local so this
-// component doesn't pull in the heavy bulk-upload module.
-function parseApiError(err: unknown, fallback: string): string {
-  if (!(err instanceof Error)) return fallback;
-  const match = err.message.match(/Request failed: \d+ - (.+)$/);
-  if (match) {
-    try {
-      const parsed = JSON.parse(match[1]);
-      if (parsed && typeof parsed.detail === "string") return parsed.detail;
-    } catch {
-      // not JSON
-    }
-    return match[1];
-  }
-  return err.message || fallback;
-}
-
-/** Creates an annotator, raising the backend's own message when it fails. */
-export async function createAnnotator(
-  accessToken: string,
-  name: string,
-): Promise<NewAnnotator> {
-  try {
-    const { uuid } = await apiClient<{ uuid: string; message: string }>(
-      "/annotators",
-      accessToken,
-      { method: "POST", body: { name } },
-    );
-    return { uuid, name };
-  } catch (err) {
-    throw new Error(parseApiError(err, "Failed to add annotator"));
-  }
-}
+export type { NewAnnotator };
 
 type AddAnnotatorInlineProps = {
   accessToken: string;
@@ -70,7 +36,7 @@ export function AddAnnotatorInline({
       onAdded(await createAnnotator(accessToken, trimmed));
       setName("");
     } catch (err) {
-      setError(parseApiError(err, "Failed to add annotator"));
+      setError(err instanceof Error ? err.message : "Failed to add annotator");
     } finally {
       setAdding(false);
     }
