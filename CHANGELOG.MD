@@ -1,5 +1,6 @@
 ## August 2026
 
+- You can now search the annotators list by name, both on the Annotators tab and when assigning annotators to a labelling task ([#463](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/463))
 - On a labelling task, tool call correctness now shows its own card under evaluator scores even before it has a score to show ([#461](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/461))
 - Sending test and benchmark results to a labelling task now carries over the scores the evaluators already gave, so those evaluators do not need to run again on the same text ([#459](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/459))
 - Searching and filtering an agent's tests now covers every linked test instead of just the ones loaded on screen, and removing several tests at once happens in one step ([#457](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/457))
