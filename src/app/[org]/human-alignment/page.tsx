@@ -457,21 +457,12 @@ function HumanLabellingPageInner() {
               labellers, and track the alignment of LLM judges with humans
             </p>
           </div>
-          {activeTab === "annotators" ? (
-            <button
-              onClick={() => setAddAnnotatorOpen(true)}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-            >
-              Add annotator
-            </button>
-          ) : (
-            <button
-              onClick={handleCreateTask}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-            >
-              Create new labelling task
-            </button>
-          )}
+          <button
+            onClick={handleCreateTask}
+            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+          >
+            Create new labelling task
+          </button>
         </div>
 
         {/* Tabs */}
@@ -713,6 +704,23 @@ function HumanLabellingPageInner() {
               <p className="text-sm text-red-500">{removeAnnotatorError}</p>
             )}
 
+            <div className="flex flex-wrap items-center gap-3">
+              {annotators.length > 0 && (
+                <SearchInput
+                  value={annotatorSearch}
+                  onChange={setAnnotatorSearch}
+                  placeholder="Search annotators"
+                  className="flex-1 min-w-0 max-w-md"
+                />
+              )}
+              <button
+                onClick={() => setAddAnnotatorOpen(true)}
+                className="ml-auto h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+              >
+                Add annotator
+              </button>
+            </div>
+
             {/* Annotator list */}
             {annotatorsLoading || !annotatorsFetchCompleted ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
@@ -763,13 +771,6 @@ function HumanLabellingPageInner() {
               />
             ) : (
               <>
-                <SearchInput
-                  value={annotatorSearch}
-                  onChange={setAnnotatorSearch}
-                  placeholder="Search annotators"
-                  className="max-w-md"
-                />
-
                 {visibleAnnotators.length === 0 && (
                   <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
                     No annotators match your search.
