@@ -1,5 +1,6 @@
 ## August 2026
 
+- Searching and filtering an agent's tests now covers every linked test instead of just the ones loaded on screen, and removing several tests at once happens in one step ([#457](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/457))
 - Rewrite the changelog lines that were copied from pull request titles ([#446](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/446))
 - A hover box stays open while the pointer is inside it, so the evaluators it lists can be read and opened ([#445](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/445))
 - Find model comparison runs on the agent Evaluations tab with a new filter, and see each run by its name and the models it tried instead of a long id ([#444](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/444))
