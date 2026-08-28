@@ -38,6 +38,14 @@ function renderDialog(
   return { onClose, onConfirm, ...utils };
 }
 
+/** The opener sits in the annotators column; the submit is inside the dialog. */
+const addAnnotatorButtons = () =>
+  screen.getAllByRole("button", { name: "Add annotator" });
+const openAddDialog = (user: ReturnType<typeof setupUser>) =>
+  user.click(addAnnotatorButtons()[0]);
+const submitAddDialog = (user: ReturnType<typeof setupUser>) =>
+  user.click(addAnnotatorButtons()[1]);
+
 describe("AssignAnnotatorsDialog", () => {
   beforeEach(() => {
     mockedApiClient.mockReset();
@@ -94,19 +102,21 @@ describe("AssignAnnotatorsDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("disables the inline add form until annotators have loaded", async () => {
+  it("disables Add annotator until the annotators have loaded", async () => {
     mockedApiClient.mockReturnValue(new Promise(() => {}));
     renderDialog();
-    expect(screen.getByLabelText("New annotator name")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Add annotator" }),
+    ).toBeDisabled();
   });
 
-  it("points at the inline form when there are no annotators", async () => {
+  it("offers Add annotator when there are none yet", async () => {
     mockedApiClient.mockResolvedValue([]);
     renderDialog();
     expect(
       await screen.findByText("No annotators added yet"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("New annotator name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add annotator" })).toBeEnabled();
   });
 
   it("tolerates a non-array response by treating it as empty", async () => {
@@ -117,21 +127,26 @@ describe("AssignAnnotatorsDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("adds an annotator inline, selects it, and enables Assign", async () => {
+  it("adds an annotator from the dialog, selects it, and enables Assign", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValueOnce([]);
     const { onConfirm } = renderDialog();
     await screen.findByText("No annotators added yet");
 
     mockedApiClient.mockResolvedValueOnce({ uuid: "a-9", message: "ok" });
-    await user.type(screen.getByLabelText("New annotator name"), "Carol");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await openAddDialog(user);
+    await user.type(screen.getByPlaceholderText("Annotator name"), "Carol");
+    await submitAddDialog(user);
 
     expect(await screen.findByText("Carol")).toBeInTheDocument();
     expect(mockedApiClient).toHaveBeenLastCalledWith("/annotators", "tok", {
       method: "POST",
       body: { name: "Carol" },
     });
+    // The add dialog closes itself once the annotator is created.
+    expect(
+      screen.queryByPlaceholderText("Annotator name"),
+    ).not.toBeInTheDocument();
     // Auto-selected, so Assign is immediately usable.
     const assign = screen.getByRole("button", { name: "Assign" });
     expect(assign).not.toBeDisabled();
@@ -140,8 +155,6 @@ describe("AssignAnnotatorsDialog", () => {
       comments_enabled: true,
       reasoning_mode: "optional",
     });
-    // Input is cleared for the next one.
-    expect(screen.getByLabelText("New annotator name")).toHaveValue("");
   });
 
   it("shows an error when adding an annotator fails", async () => {
@@ -150,41 +163,126 @@ describe("AssignAnnotatorsDialog", () => {
     renderDialog();
     await screen.findByText("No annotators added yet");
 
+    await openAddDialog(user);
+    await user.type(screen.getByPlaceholderText("Annotator name"), "Alice");
+
     mockedApiClient.mockRejectedValueOnce(
       new Error('Request failed: 400 - {"detail":"Name already used"}'),
     );
-    await user.type(screen.getByLabelText("New annotator name"), "Alice");
-    await user.click(screen.getByRole("button", { name: "Add" }));
-
+    await submitAddDialog(user);
     expect(await screen.findByText("Name already used")).toBeInTheDocument();
-    // Typing again clears the error.
-    await user.type(screen.getByLabelText("New annotator name"), "x");
-    expect(screen.queryByText("Name already used")).not.toBeInTheDocument();
 
     // A non-Error rejection falls back to the default message.
     mockedApiClient.mockRejectedValueOnce("boom");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await submitAddDialog(user);
     expect(
       await screen.findByText("Failed to add annotator"),
     ).toBeInTheDocument();
 
     // A plain Error message is shown as-is.
     mockedApiClient.mockRejectedValueOnce(new Error("Network down"));
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await submitAddDialog(user);
     expect(await screen.findByText("Network down")).toBeInTheDocument();
 
     // A structured failure whose body isn't JSON shows the raw body.
     mockedApiClient.mockRejectedValueOnce(
       new Error("Request failed: 500 - upstream exploded"),
     );
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await submitAddDialog(user);
     expect(await screen.findByText("upstream exploded")).toBeInTheDocument();
 
     // An Error with no message falls back to the default.
     mockedApiClient.mockRejectedValueOnce(new Error(""));
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await submitAddDialog(user);
     expect(
       await screen.findByText("Failed to add annotator"),
+    ).toBeInTheDocument();
+  });
+
+  it("renames an annotator from the list", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    const input = screen.getByLabelText("Annotator name");
+    await user.clear(input);
+    await user.type(input, "Alicia");
+
+    mockedApiClient.mockResolvedValueOnce({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(await screen.findByText("Alicia")).toBeInTheDocument();
+    expect(mockedApiClient).toHaveBeenLastCalledWith("/annotators/a-1", "tok", {
+      method: "PUT",
+      body: { name: "Alicia" },
+    });
+  });
+
+  it("saves a rename on Enter and leaves the selection alone", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    mockedApiClient.mockResolvedValueOnce({ message: "ok" });
+    await user.type(screen.getByLabelText("Annotator name"), "!{Enter}");
+
+    await screen.findByText("Alice!");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+    expect(onConfirm.mock.calls[0][0]).toEqual(["a-1"]);
+  });
+
+  it("closes the rename box on Escape and on Cancel, keeping the old name", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.type(screen.getByLabelText("Annotator name"), "x{Escape}");
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.click(screen.getByRole("button", { name: "Cancel rename" }));
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("skips the request when the name is unchanged", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(mockedApiClient).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the backend message when a rename fails", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValueOnce(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Rename Alice" }));
+    await user.type(screen.getByLabelText("Annotator name"), "x");
+
+    mockedApiClient.mockRejectedValueOnce(
+      new Error('Request failed: 400 - {"detail":"Name already used"}'),
+    );
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+    expect(await screen.findByText("Name already used")).toBeInTheDocument();
+
+    mockedApiClient.mockRejectedValueOnce("boom");
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+    expect(
+      await screen.findByText("Failed to rename annotator"),
     ).toBeInTheDocument();
   });
 
@@ -234,6 +332,59 @@ describe("AssignAnnotatorsDialog", () => {
       screen.getByRole("checkbox", { name: "Unselect all annotators" }),
     );
     expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+  });
+
+  it("filters the annotator list by the search box", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "bo");
+    expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+
+    await user.clear(screen.getByPlaceholderText("Search annotators"));
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("says when nothing matches the search", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "zzz");
+    expect(
+      screen.getByText("No annotators match your search"),
+    ).toBeInTheDocument();
+  });
+
+  it("select all only picks the annotators left by the search", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "ali");
+    await user.click(screen.getByText("Alice"));
+    await user.clear(screen.getByPlaceholderText("Search annotators"));
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0]).toEqual(["a-1"]);
+  });
+
+  it("hides the select-all control when the search leaves one annotator", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.type(screen.getByPlaceholderText("Search annotators"), "ali");
+    expect(
+      screen.queryByRole("checkbox", { name: /all annotators/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show the select-all control with a single annotator", async () => {

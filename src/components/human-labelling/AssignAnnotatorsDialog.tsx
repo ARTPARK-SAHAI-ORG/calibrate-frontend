@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { apiClient } from "@/lib/api";
-import { AddAnnotatorInline, type NewAnnotator } from "./AddAnnotatorInline";
+import {
+  createAnnotator,
+  renameAnnotator,
+  type NewAnnotator,
+} from "@/lib/annotatorApi";
+import { AddAnnotatorDialog } from "./AddAnnotatorDialog";
 
 type Annotator = {
   uuid: string;
@@ -131,6 +137,12 @@ export function AssignAnnotatorsDialog({
   useHideFloatingButton(isOpen);
 
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
+  const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [editingUuid, setEditingUuid] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -200,15 +212,24 @@ export function AssignAnnotatorsDialog({
 
   const toggle = (id: string) => setPicked((prev) => toggleInSet(prev, id));
 
-  const allPicked = annotators.length > 0 && picked.size === annotators.length;
-  const somePicked = picked.size > 0 && !allPicked;
+  // Select all and the list itself work on what the search leaves visible.
+  const visible = annotators.filter((a) =>
+    a.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const allPicked =
+    visible.length > 0 && visible.every((a) => picked.has(a.uuid));
+  const somePicked = visible.some((a) => picked.has(a.uuid)) && !allPicked;
   // Anything picked (all or just some) → clearing is the useful action.
   const toggleSelectAll = () => {
-    if (picked.size > 0) {
-      setPicked(new Set());
-    } else {
-      setPicked(new Set(annotators.map((a) => a.uuid)));
-    }
+    setPicked((prev) => {
+      const next = new Set(prev);
+      const anyPicked = visible.some((a) => next.has(a.uuid));
+      visible.forEach((a) => {
+        if (anyPicked) next.delete(a.uuid);
+        else next.add(a.uuid);
+      });
+      return next;
+    });
   };
 
   // A freshly added annotator is almost always one the user wants to assign,
@@ -221,6 +242,44 @@ export function AssignAnnotatorsDialog({
     );
     setPicked((prev) => new Set(prev).add(a.uuid));
     setLoadError(null);
+  };
+
+  const startEdit = (a: Annotator) => {
+    setEditingUuid(a.uuid);
+    setEditingName(a.name);
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingUuid(null);
+    setEditError(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingUuid || savingEdit) return;
+    const name = editingName.trim();
+    const current = annotators.find((a) => a.uuid === editingUuid);
+    if (!name || !current || name === current.name) {
+      cancelEdit();
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      await renameAnnotator(accessToken, editingUuid, name);
+      setAnnotators((prev) =>
+        prev
+          .map((a) => (a.uuid === editingUuid ? { ...a, name } : a))
+          .sort((x, y) => x.name.localeCompare(y.name)),
+      );
+      setEditingUuid(null);
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "Failed to rename annotator",
+      );
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   // The dialog is short in this state, so it gets tighter outer spacing.
@@ -275,7 +334,7 @@ export function AssignAnnotatorsDialog({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-5xl" : "max-w-3xl"
+          showEvaluatorChoice ? "max-w-6xl" : "max-w-4xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -317,16 +376,32 @@ export function AssignAnnotatorsDialog({
                 noAnnotators ? "-my-2" : ""
               }`}
             >
-              <p className="text-xs font-medium text-muted-foreground">
-                Annotators
-              </p>
-              <AddAnnotatorInline
-                accessToken={accessToken}
-                // Disabled until the list has loaded, otherwise the in-flight
-                // fetch would land afterwards and drop the new annotator.
-                disabled={submitting || loading}
-                onAdded={handleAnnotatorAdded}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Annotators
+                </p>
+                {/* With none yet the button sits in the placeholder below. */}
+                {!noAnnotators && (
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
+                    // Disabled until the list has loaded, otherwise the
+                    // in-flight fetch would land afterwards and drop the new
+                    // annotator.
+                    disabled={submitting || loading}
+                    className="h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add annotator
+                  </button>
+                )}
+              </div>
+              {annotators.length > 1 && (
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search annotators"
+                />
+              )}
               <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -355,7 +430,7 @@ export function AssignAnnotatorsDialog({
                   <p className="text-sm text-red-500">{loadError}</p>
                 ) : (
                   <>
-                    {annotators.length > 1 && (
+                    {visible.length > 1 && (
                       <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -376,28 +451,138 @@ export function AssignAnnotatorsDialog({
                         </span>
                       </label>
                     )}
-                    {annotators.map((a) => (
-                      <label
-                        key={a.uuid}
-                        className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={picked.has(a.uuid)}
-                          onChange={() => toggle(a.uuid)}
-                          className="w-4 h-4 cursor-pointer accent-foreground"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
-                            {a.name}
+                    {visible.map((a) =>
+                      editingUuid === a.uuid ? (
+                        <div
+                          key={a.uuid}
+                          className="flex items-start gap-2 px-3 py-2 rounded-md border border-border"
+                        >
+                          <div className="flex-1 min-w-0 flex flex-col gap-1">
+                            <input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEdit();
+                                else if (e.key === "Escape") cancelEdit();
+                              }}
+                              disabled={savingEdit}
+                              autoFocus
+                              aria-label="Annotator name"
+                              className={`min-w-0 text-sm font-medium bg-background border rounded-md px-2 py-1 outline-none focus:border-foreground disabled:opacity-50 ${
+                                editError ? "border-red-500" : "border-border"
+                              }`}
+                            />
+                            {editError && (
+                              <p className="text-xs text-red-500">
+                                {editError}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={saveEdit}
+                              disabled={savingEdit || !editingName.trim()}
+                              aria-label="Save name"
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4.5 12.75l6 6 9-13.5"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              disabled={savingEdit}
+                              aria-label="Cancel rename"
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
                           </div>
                         </div>
-                      </label>
-                    ))}
-                    {noAnnotators && (
+                      ) : (
+                        <div
+                          key={a.uuid}
+                          className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors"
+                        >
+                          <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={picked.has(a.uuid)}
+                              onChange={() => toggle(a.uuid)}
+                              className="w-4 h-4 cursor-pointer accent-foreground"
+                            />
+                            <span className="text-sm font-medium truncate">
+                              {a.name}
+                            </span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(a)}
+                            disabled={submitting}
+                            aria-label={`Rename ${a.name}`}
+                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      ),
+                    )}
+                    {!noAnnotators && visible.length === 0 && (
                       <p className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 text-center text-sm text-muted-foreground">
-                        No annotators added yet
+                        No annotators match your search
                       </p>
+                    )}
+                    {noAnnotators && (
+                      <div className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-6 flex flex-col items-center gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          No annotators added yet
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setAddOpen(true)}
+                          disabled={submitting}
+                          className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add annotator
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -563,6 +748,14 @@ export function AssignAnnotatorsDialog({
             {submitting ? "Assigning..." : "Assign"}
           </button>
         </div>
+
+        <AddAnnotatorDialog
+          isOpen={addOpen}
+          onClose={() => setAddOpen(false)}
+          onCreate={async (name) => {
+            handleAnnotatorAdded(await createAnnotator(accessToken, name));
+          }}
+        />
       </div>
     </div>
   );
