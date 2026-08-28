@@ -22,6 +22,23 @@ function parseApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
+/** Creates an annotator, raising the backend's own message when it fails. */
+export async function createAnnotator(
+  accessToken: string,
+  name: string,
+): Promise<NewAnnotator> {
+  try {
+    const { uuid } = await apiClient<{ uuid: string; message: string }>(
+      "/annotators",
+      accessToken,
+      { method: "POST", body: { name } },
+    );
+    return { uuid, name };
+  } catch (err) {
+    throw new Error(parseApiError(err, "Failed to add annotator"));
+  }
+}
+
 type AddAnnotatorInlineProps = {
   accessToken: string;
   disabled?: boolean;
@@ -50,12 +67,7 @@ export function AddAnnotatorInline({
     setAdding(true);
     setError(null);
     try {
-      const { uuid } = await apiClient<{ uuid: string; message: string }>(
-        "/annotators",
-        accessToken,
-        { method: "POST", body: { name: trimmed } },
-      );
-      onAdded({ uuid, name: trimmed });
+      onAdded(await createAnnotator(accessToken, trimmed));
       setName("");
     } catch (err) {
       setError(parseApiError(err, "Failed to add annotator"));

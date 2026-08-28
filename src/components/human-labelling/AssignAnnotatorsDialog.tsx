@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { apiClient } from "@/lib/api";
-import { AddAnnotatorInline, type NewAnnotator } from "./AddAnnotatorInline";
+import { createAnnotator, type NewAnnotator } from "./AddAnnotatorInline";
+import { AddAnnotatorDialog } from "./AddAnnotatorDialog";
 
 type Annotator = {
   uuid: string;
@@ -133,6 +134,7 @@ export function AssignAnnotatorsDialog({
 
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
   const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -286,7 +288,7 @@ export function AssignAnnotatorsDialog({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-5xl" : "max-w-3xl"
+          showEvaluatorChoice ? "max-w-6xl" : "max-w-4xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -328,16 +330,21 @@ export function AssignAnnotatorsDialog({
                 noAnnotators ? "-my-2" : ""
               }`}
             >
-              <p className="text-xs font-medium text-muted-foreground">
-                Annotators
-              </p>
-              <AddAnnotatorInline
-                accessToken={accessToken}
-                // Disabled until the list has loaded, otherwise the in-flight
-                // fetch would land afterwards and drop the new annotator.
-                disabled={submitting || loading}
-                onAdded={handleAnnotatorAdded}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Annotators
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  // Disabled until the list has loaded, otherwise the in-flight
+                  // fetch would land afterwards and drop the new annotator.
+                  disabled={submitting || loading}
+                  className="h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add annotator
+                </button>
+              </div>
               {annotators.length > 1 && (
                 <SearchInput
                   value={search}
@@ -586,6 +593,14 @@ export function AssignAnnotatorsDialog({
             {submitting ? "Assigning..." : "Assign"}
           </button>
         </div>
+
+        <AddAnnotatorDialog
+          isOpen={addOpen}
+          onClose={() => setAddOpen(false)}
+          onCreate={async (name) => {
+            handleAnnotatorAdded(await createAnnotator(accessToken, name));
+          }}
+        />
       </div>
     </div>
   );
