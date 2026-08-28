@@ -102,10 +102,15 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
       page.getByRole("heading", { name: "Human alignment", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    // Add annotator via the inline form (input placeholder "Annotator name" +
-    // "Add" submit button).
+    // Add annotator: the header button opens a dialog with the name field.
+    await page
+      .getByRole("button", { name: "Add annotator", exact: true })
+      .click();
     await page.getByPlaceholder("Annotator name").fill(name);
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Add annotator", exact: true })
+      .last()
+      .click();
 
     // The new annotator appears in the list; its per-row rename button carries
     // the name in its aria-label (desktop + mobile, so scope to first).

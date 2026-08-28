@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, FormEvent } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import {
   CartesianGrid,
@@ -16,6 +16,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPillList } from "@/components/EvaluatorPillList";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { AddAnnotatorDialog } from "@/components/human-labelling/AddAnnotatorDialog";
 import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLabellingTaskDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
@@ -173,9 +174,10 @@ function HumanLabellingPageInner() {
   const [annotatorsFetchCompleted, setAnnotatorsFetchCompleted] =
     useState(false);
 
-  const [newAnnotatorName, setNewAnnotatorName] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [addAnnotatorOpen, setAddAnnotatorOpen] = useState(false);
+  const [removeAnnotatorError, setRemoveAnnotatorError] = useState<
+    string | null
+  >(null);
 
   const [annotatorToDelete, setAnnotatorToDelete] = useState<Annotator | null>(
     null,
@@ -297,12 +299,8 @@ function HumanLabellingPageInner() {
     setCreateDialogOpen(true);
   };
 
-  const handleAddAnnotator = async (e: FormEvent) => {
-    e.preventDefault();
-    const name = newAnnotatorName.trim();
-    if (!name || !accessToken || isAdding) return;
-    setIsAdding(true);
-    setAddError(null);
+  const handleAddAnnotator = async (name: string) => {
+    if (!accessToken) return;
     try {
       const { uuid } = await apiClient<{ uuid: string; message: string }>(
         "/annotators",
@@ -314,11 +312,8 @@ function HumanLabellingPageInner() {
           a.name.localeCompare(b.name),
         ),
       );
-      setNewAnnotatorName("");
     } catch (err) {
-      setAddError(parseApiError(err, "Failed to add annotator"));
-    } finally {
-      setIsAdding(false);
+      throw new Error(parseApiError(err, "Failed to add annotator"));
     }
   };
 
@@ -374,7 +369,7 @@ function HumanLabellingPageInner() {
       );
       setAnnotatorToDelete(null);
     } catch (err) {
-      setAddError(parseApiError(err, "Failed to remove annotator"));
+      setRemoveAnnotatorError(parseApiError(err, "Failed to remove annotator"));
     } finally {
       setIsDeleting(false);
     }
@@ -462,12 +457,21 @@ function HumanLabellingPageInner() {
               labellers, and track the alignment of LLM judges with humans
             </p>
           </div>
-          <button
-            onClick={handleCreateTask}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-          >
-            Create new labelling task
-          </button>
+          {activeTab === "annotators" ? (
+            <button
+              onClick={() => setAddAnnotatorOpen(true)}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+            >
+              Add annotator
+            </button>
+          ) : (
+            <button
+              onClick={handleCreateTask}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+            >
+              Create new labelling task
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -705,34 +709,9 @@ function HumanLabellingPageInner() {
 
         {activeTab === "annotators" && (
           <div className="space-y-4">
-            {/* Add annotator form */}
-            <form
-              onSubmit={handleAddAnnotator}
-              className="flex flex-col sm:flex-row gap-2 sm:gap-3"
-            >
-              <input
-                type="text"
-                value={newAnnotatorName}
-                onChange={(e) => {
-                  setNewAnnotatorName(e.target.value);
-                  if (addError) setAddError(null);
-                }}
-                placeholder="Annotator name"
-                disabled={isAdding}
-                className={`flex-1 max-w-md h-9 md:h-10 px-3 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${
-                  addError ? "border-red-500" : "border-border"
-                }`}
-              />
-              <button
-                type="submit"
-                disabled={!newAnnotatorName.trim() || isAdding}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isAdding ? "Adding..." : "Add"}
-              </button>
-            </form>
-
-            {addError && <p className="text-sm text-red-500">{addError}</p>}
+            {removeAnnotatorError && (
+              <p className="text-sm text-red-500">{removeAnnotatorError}</p>
+            )}
 
             {/* Annotator list */}
             {annotatorsLoading || !annotatorsFetchCompleted ? (
@@ -780,7 +759,7 @@ function HumanLabellingPageInner() {
                   </svg>
                 }
                 title="No annotators yet"
-                description="Add annotators above so they can be assigned to labelling tasks"
+                description="Add an annotator so they can be assigned to labelling tasks"
               />
             ) : (
               <>
@@ -1172,6 +1151,12 @@ function HumanLabellingPageInner() {
           }}
         />
       )}
+
+      <AddAnnotatorDialog
+        isOpen={addAnnotatorOpen}
+        onClose={() => setAddAnnotatorOpen(false)}
+        onCreate={handleAddAnnotator}
+      />
 
       <DeleteConfirmationDialog
         isOpen={!!taskToDelete}
