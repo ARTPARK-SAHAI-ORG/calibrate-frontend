@@ -35,6 +35,28 @@ export function testTypeLabel(
   }
 }
 
+/** The test-type filter value: a concrete test type, or "all" for no filter. */
+export type TestTypeFilterValue = "all" | TestType;
+
+/**
+ * Does a test's type belong under the chosen filter chip?
+ *
+ * The "response" chip also matches "general" tests. To the reader they are one
+ * thing, "Agent Response": a general agent's test and a conversation agent's
+ * test are both a reply being judged, and both show that same name. The split
+ * lives only in how the test stores its content, so a single chip has to
+ * select both or a general agent's tests would have no chip that finds them.
+ */
+export function matchesTestTypeFilter(
+  testType: string | null | undefined,
+  filter: TestTypeFilterValue,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "response")
+    return testType === "response" || testType === "general";
+  return testType === filter;
+}
+
 /**
  * What to call a run that tried the tests against several models at once. The
  * backend names those runs "Benchmark 3"; everywhere a reader can see one, the

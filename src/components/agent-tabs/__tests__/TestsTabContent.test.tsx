@@ -29,6 +29,11 @@ const setRunIdParamMock = jest.fn();
 jest.mock("../../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+  usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
+  PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
+    .PAGE_SIZE_OPTIONS,
+  useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
+    .useAgentTests,
   useMaxRowsPerEval: () => useMaxRowsPerEvalMock(),
   useDialogUrlParam: (args: any) => {
     if (args.param === "runId") {
@@ -223,6 +228,9 @@ function jsonResponse(body: any, init: ResInit = {}) {
   return {
     ok,
     status,
+    // `apiClient` (used by the paged agent-tests fetch) reads the content
+    // type and the raw text, not just `json()`.
+    headers: new Headers({ "content-type": "application/json" }),
     json: async () => body,
     text: async () => JSON.stringify(body),
     clone() {
@@ -273,15 +281,42 @@ let state: any;
 function installFetch() {
   global.fetch = jest.fn(async (url: string, opts: any = {}) => {
     const method = opts.method || "GET";
-    if (url.includes("/agent-tests/agent/") && url.endsWith("/tests")) {
-      return jsonResponse(state.agentTests, state.agentTestsInit);
+    // The agent's tests are paged, so the address carries `limit`/`offset`
+    // (and `q` while searching); match on the path alone.
+    const path = String(url).split("?")[0];
+    if (url.includes("/agent-tests/agent/") && path.endsWith("/tests")) {
+      if (state.agentTestsInit) {
+        return jsonResponse(state.agentTests, state.agentTestsInit);
+      }
+      // Search, type filter and paging all happen on the backend, so the fake
+      // one does them here rather than handing the whole list over.
+      const params = new URLSearchParams(String(url).split("?")[1] ?? "");
+      // No page size means the whole linked list, which is what Compare
+      // models asks for.
+      if (!params.get("limit") && state.allAgentTestsInit) {
+        return jsonResponse({}, state.allAgentTestsInit);
+      }
+      const q = (params.get("q") ?? "").toLowerCase();
+      const types = (params.get("type") ?? "").split(",").filter(Boolean);
+      const matching = state.agentTests.filter((t: any) => {
+        if (types.length > 0 && !types.includes(t.type)) return false;
+        return !q || t.name.toLowerCase().includes(q);
+      });
+      const limit = Number(params.get("limit") ?? matching.length);
+      const offset = Number(params.get("offset") ?? 0);
+      return jsonResponse({
+        items: matching.slice(offset, offset + limit),
+        total: matching.length,
+        limit,
+        offset,
+      });
     }
-    if (url.includes("/agent-tests/agent/") && url.endsWith("/runs")) {
+    if (url.includes("/agent-tests/agent/") && path.endsWith("/runs")) {
       return jsonResponse(state.pastRuns, state.pastRunsInit);
     }
     // POST /agent-tests/agent/{uuid}/run — starting a run. The component
     // creates the run here first and only then opens the runner dialog.
-    if (url.includes("/agent-tests/agent/") && url.endsWith("/run")) {
+    if (url.includes("/agent-tests/agent/") && path.endsWith("/run")) {
       return jsonResponse(
         state.startRun ?? { task_id: "task-new" },
         state.startRunInit,
@@ -289,6 +324,14 @@ function installFetch() {
     }
     if (url.includes("/agent-tests/bulk-unlink")) {
       const body = JSON.parse(opts.body);
+      if (!state.bulkUnlinkInit) {
+        // The tab re-asks for the page after a removal, so the fake backend
+        // has to actually drop the rows.
+        const removed = new Set<string>(body.test_uuids);
+        state.agentTests = state.agentTests.filter(
+          (t: any) => !removed.has(t.uuid),
+        );
+      }
       return jsonResponse(
         state.bulkUnlink ?? {
           deleted_count: body.test_uuids.length,
@@ -299,6 +342,10 @@ function installFetch() {
     }
     if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
+      const removed = new Set<string>(body.test_uuids);
+      state.agentTests = state.agentTests.filter(
+        (t: any) => !removed.has(t.uuid),
+      );
       return jsonResponse(
         state.bulkDelete ?? {
           deleted_count: body.test_uuids.length,
@@ -413,6 +460,7 @@ beforeEach(() => {
   (readNameConflictMessage as jest.Mock).mockResolvedValue(null);
   state = {
     agentTests: [],
+    allAgentTestsInit: null as ResInit | null,
     pastRuns: [],
     allTests: [],
     testDetail: {
@@ -459,7 +507,7 @@ describe("TestsTabContent — load states", () => {
     const user = setupUser();
     renderComponent();
 
-    await screen.findByText("Failed to fetch agent tests");
+    await screen.findByText("Failed to load agent tests");
     await user.click(screen.getByText("Retry"));
     expect(reloadMock).toHaveBeenCalled();
 
@@ -483,10 +531,10 @@ describe("TestsTabContent — load states", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("throws (surfaces error) when BACKEND_URL is unset", async () => {
+  it("shows the error state when BACKEND_URL is unset", async () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = "";
     renderComponent();
-    await screen.findByText("BACKEND_URL environment variable is not set");
+    await screen.findByText("Failed to load agent tests");
   });
 });
 
@@ -514,6 +562,229 @@ describe("TestsTabContent — empty states", () => {
   });
 });
 
+describe("TestsTabContent — paging", () => {
+  // 12 tests so the smallest page size (10) leaves a second page.
+  const manyTests = Array.from({ length: 12 }, (_, i) => ({
+    ...responseTest,
+    uuid: `p${i + 1}`,
+    name: `Paged test ${i + 1}`,
+  }));
+
+  beforeEach(() => {
+    window.localStorage.setItem("calibrate:items-page-size", "10");
+    state.agentTests = manyTests;
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("shows one page at a time and says how many there are in all", async () => {
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
+    expect(screen.queryAllByText("Paged test 11")).toHaveLength(0);
+  });
+
+  it("turns to the next page and back", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 11");
+    expect(screen.getByText("Showing 11–12 of 12 tests")).toBeInTheDocument();
+    expect(screen.queryAllByText("Paged test 1")).toHaveLength(0);
+
+    await user.click(screen.getByLabelText("Previous page"));
+    await screen.findAllByText("Paged test 1");
+  });
+
+  it("clears the ticked rows when the page turns", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    expect(screen.getByText(/tests selected/)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 11");
+    expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
+  });
+
+  it("runs every linked test from Run all, not just the page", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByText("Run all tests"));
+    await waitFor(() => expect(runPostCall()).toBeTruthy());
+    // No list of test ids at all means "every test linked to this agent".
+    expect(JSON.parse(runPostCall()![1].body)).toEqual({});
+  });
+
+  it("compares models on every linked test without loading the list", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+
+    // No test ids at all is what tells the backend to run every linked test,
+    // so nothing has to be fetched to open this.
+    expect(benchmarkProps.tests).toEqual([]);
+    expect(benchmarkProps.totalTests).toBe(12);
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+  });
+
+  it("goes back to the first page after a test is created, where it lands", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findByText("Showing 11–12 of 12 tests");
+
+    await user.click(screen.getByText("Create test"));
+    await screen.findByTestId("add-test-dialog");
+    await user.click(screen.getByText("SetName"));
+    await user.click(screen.getByText("SubmitResponse"));
+
+    await screen.findByText("Showing 1–10 of 12 tests");
+  });
+
+  it("keeps the filters on screen when the chosen type has no tests", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // Every paged test is a response test, so this finds nothing.
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+
+    await screen.findByText("No tests match your search");
+    // The reader has to be able to get back to All.
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByText("Run all tests")).toBeInTheDocument();
+  });
+
+  it("counts every linked test against the run limit, not the filtered ones", async () => {
+    useMaxRowsPerEvalMock.mockReturnValue(5);
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await screen.findAllByText("Weather tool test");
+
+    // One test matches the filter, but Run all runs all 13.
+    await user.click(screen.getByText("Run all tests"));
+    expect(showLimitToast).toHaveBeenCalled();
+    expect(runPostCall()).toBeFalsy();
+  });
+
+  it("offers every test once the whole page is ticked, and counts them all", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "10 tests selected",
+    );
+
+    await user.click(screen.getByText("Select all 12 tests"));
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "12 tests selected",
+    );
+  });
+
+  it("removes every test, not only the page, once all are selected", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Remove"));
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    await waitFor(() => {
+      const unlink = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      );
+      expect(unlink).toBeTruthy();
+      expect(JSON.parse(unlink![1].body).test_uuids).toHaveLength(12);
+    });
+  });
+
+  it("runs every test with no ids when all are selected and nothing is filtered", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Run"));
+
+    await waitFor(() => expect(runPostCall()).toBeTruthy());
+    expect(JSON.parse(runPostCall()![1].body)).toEqual({});
+  });
+
+  it("names the matching tests when all are selected under a filter", async () => {
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // 13 tests, 12 of them reply tests: the reply filter spans two pages.
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await screen.findByText("Showing 1–10 of 12 tests");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Run"));
+
+    await waitFor(() => expect(runPostCall()).toBeTruthy());
+    // Not every linked test, so the run has to name the 12 that match.
+    expect(JSON.parse(runPostCall()![1].body).test_uuids).toHaveLength(12);
+  });
+
+  it("drops the across-pages selection when a row is unticked", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getAllByTitle("Select test")[0]);
+
+    expect(screen.getByText(/tests selected/)).toHaveTextContent(
+      "9 tests selected",
+    );
+    expect(
+      screen.queryByText("Select all 12 tests"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks the backend for the chosen type and keeps the count honest", async () => {
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+
+    await screen.findAllByText("Weather tool test");
+    expect(screen.queryAllByText("Paged test 1")).toHaveLength(0);
+    expect(screen.getByText("1 test")).toBeInTheDocument();
+  });
+});
+
 describe("TestsTabContent — populated table", () => {
   beforeEach(() => {
     state.agentTests = [responseTest, toolCallTest];
@@ -527,44 +798,30 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getAllByText("Agent Response").length).toBeGreaterThan(0);
   });
 
-  it("filters the list via the search input", async () => {
+  it("asks the backend for the tests matching what was typed", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
+    // The backend does the searching, so the tab sends `q` and shows whatever
+    // comes back rather than filtering the rows it already has.
+    state.agentTests = [toolCallTest];
     await user.type(screen.getByPlaceholderText("Search tests"), "Weather");
-    expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
-    expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
 
-    // No match → empty message.
+    await waitFor(() =>
+      expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
+    );
+    expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
+    const searched = (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+      String(url).includes("q=Weather"),
+    );
+    expect(searched).toBe(true);
+
+    // No match → the search-specific empty message, not the setup one.
+    state.agentTests = [];
     await user.clear(screen.getByPlaceholderText("Search tests"));
     await user.type(screen.getByPlaceholderText("Search tests"), "zzz");
-    expect(screen.getByText("No tests match your search")).toBeInTheDocument();
-  });
-
-  it("filters the list by test type", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    // "Tool Call" also appears as a type label in the table, so scope to the
-    // filter's button role.
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
-    expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
-    expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
-  });
-
-  it("keeps a general agent's tests under the Agent Response filter", async () => {
-    state.agentTests = [responseTest, toolCallTest, generalTest];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Capital question test");
-
-    // "Agent Response" is also a type label in the table, so scope to the chip.
-    await user.click(screen.getByRole("button", { name: "Agent Response" }));
-    expect(screen.getAllByText("Capital question test")[0]).toBeInTheDocument();
-    expect(screen.getAllByText("Greeting test")[0]).toBeInTheDocument();
-    expect(screen.queryAllByText("Weather tool test")).toHaveLength(0);
+    await screen.findByText("No tests match your search");
   });
 
   it("sends the evaluators when a general test is edited", async () => {
@@ -1343,8 +1600,10 @@ describe("TestsTabContent — benchmark & past runs", () => {
 
     await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
-    // Header compare passes all agent tests.
-    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("2");
+    // Header compare names no tests, which the backend reads as every test
+    // linked to the agent, and says how many that is for the progress count.
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("0");
+    expect(benchmarkProps.totalTests).toBe(2);
   });
 
   it("opens the benchmark dialog scoped to selected tests (bulk Compare)", async () => {

@@ -6,6 +6,9 @@ const AGENT_UUID = "agent-1";
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
+  usePageSize: () => [50, jest.fn()],
+  useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
+    .useAgentTests,
   useMaxRowsPerEval: () => 100,
   useDialogUrlParam: () => ({ setParam: jest.fn() }),
 }));
@@ -72,7 +75,15 @@ const agentTest = {
 };
 
 function jsonResponse(data: unknown, ok = true, status = 200) {
-  return { ok, status, json: async () => data };
+  return {
+    ok,
+    status,
+    // `apiClient` (used by the paged agent-tests fetch) reads the content
+    // type and the raw text, not just `json()`.
+    headers: new Headers({ "content-type": "application/json" }),
+    json: async () => data,
+    text: async () => JSON.stringify(data),
+  };
 }
 
 let runPosts = 0;

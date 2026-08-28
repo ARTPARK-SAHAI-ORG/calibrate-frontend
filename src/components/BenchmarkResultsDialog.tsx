@@ -68,8 +68,14 @@ type BenchmarkResultsDialogProps = {
   onGoBack?: () => void; // Called when user wants to go back to model selection on error
   agentUuid: string;
   agentName: string;
+  /** The tests to run. Empty means every test linked to the agent, which is
+   *  what the backend does with no uuids. */
   testUuids: string[];
   testNames: string[];
+  /** How many tests the run covers, for the progress numbers before the first
+   *  result arrives. Needed when `testNames` is empty because the run covers
+   *  every linked test. Defaults to the number of names. */
+  totalTests?: number;
   models: string[];
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
@@ -92,6 +98,7 @@ export function BenchmarkResultsDialog({
   agentName,
   testUuids,
   testNames,
+  totalTests,
   models,
   taskId,
   onBenchmarkCreated,
@@ -506,7 +513,7 @@ export function BenchmarkResultsDialog({
         model,
         success: null,
         message: "",
-        total_tests: testNames.length,
+        total_tests: totalTests ?? testNames.length,
         passed: null,
         failed: null,
         test_results: null,
@@ -523,7 +530,7 @@ export function BenchmarkResultsDialog({
             model,
             success: null,
             message: "",
-            total_tests: testNames.length,
+            total_tests: totalTests ?? testNames.length,
             passed: null,
             failed: null,
             test_results: null,
@@ -576,15 +583,16 @@ export function BenchmarkResultsDialog({
   // fall back to what the loaded results carry: models from the model rows, the
   // executed test uuids from the run, and test names from the first model row.
   const rerunModels =
-    models.length > 0 ? models : modelResults.map((m) => m.model).filter(Boolean);
+    models.length > 0
+      ? models
+      : modelResults.map((m) => m.model).filter(Boolean);
   const rerunTestUuids = testUuids.length > 0 ? testUuids : runTestUuids;
   const rerunTestNames =
     testNames.length > 0
       ? testNames
       : (
-          modelResults.find(
-            (m) => m.test_results && m.test_results.length > 0,
-          )?.test_results ?? []
+          modelResults.find((m) => m.test_results && m.test_results.length > 0)
+            ?.test_results ?? []
         ).map((tr) => tr.name ?? "");
   // Direct rerun wins over the go-back-to-picker fallback when available. It
   // needs the executed test uuids to reproduce the run's subset — a benchmark
@@ -671,24 +679,24 @@ export function BenchmarkResultsDialog({
             )}
             {/* Submit for labelling — only shown when benchmark is done */}
             {showLabelling && currentTaskId && (
-                <button
-                  onClick={() => {
-                    if (activeTab !== "outputs") {
-                      setActiveTab("outputs");
-                    }
-                    if (labellingSelectedKeys.size === 0) {
-                      toast.error(
-                        "Select one or more tests to submit for labelling",
-                      );
-                      return;
-                    }
-                    setAddToTaskOpen(true);
-                  }}
-                  className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                >
-                  Submit for labelling
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (activeTab !== "outputs") {
+                    setActiveTab("outputs");
+                  }
+                  if (labellingSelectedKeys.size === 0) {
+                    toast.error(
+                      "Select one or more tests to submit for labelling",
+                    );
+                    return;
+                  }
+                  setAddToTaskOpen(true);
+                }}
+                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+              >
+                Submit for labelling
+              </button>
+            )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
