@@ -1141,9 +1141,17 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
+    // Wait for the failed call to have been made and settled, then check
+    // nothing was taken off the list and the window is still open.
     await waitFor(() =>
-      expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0),
+      expect(
+        (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+          String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+        ),
+      ).toHaveLength(1),
     );
+    expect(screen.getByTestId("delete-dialog")).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
   });
 
   it("closes the delete dialog via Cancel/Close", async () => {
