@@ -1,5 +1,6 @@
 ## August 2026
 
+- Rewrite the changelog lines that were copied from pull request titles ([#446](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/446))
 - A hover box stays open while the pointer is inside it, so the evaluators it lists can be read and opened ([#445](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/445))
 - Find model comparison runs on the agent Evaluations tab with a new filter, and see each run by its name and the models it tried instead of a long id ([#444](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/444))
 - Tick a trace from inside the trace window, and keep your ticks after adding traces to tests or sending them for labelling ([#443](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/443))
