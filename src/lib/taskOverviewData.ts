@@ -10,6 +10,10 @@ import type { EvaluatorResultStat } from "@/components/human-labelling/Agreement
  * A finished evaluation run counts as well, because the agreement figures
  * only cover the evaluator's live version and a run on an older version
  * still has scores the user can open.
+ *
+ * A card that stays on screen with nothing in it counts too. Tool call
+ * correctness keeps one, so a task made only of tool call items has an
+ * overview to show from the day it is created.
  */
 export function hasTaskOverviewData(
   agreement: {
@@ -21,8 +25,11 @@ export function hasTaskOverviewData(
     }[];
   } | null,
   runs: { status?: string }[],
+  /** Whether `taskEvaluatorScoreCards` produced a card. */
+  hasScoreCard = false,
 ): boolean {
   if (!agreement) return false;
+  if (hasScoreCard) return true;
   if ((agreement.human_human?.pair_count ?? 0) > 0) return true;
   const evaluators = agreement.evaluators ?? [];
   if (

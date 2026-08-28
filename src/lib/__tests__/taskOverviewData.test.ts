@@ -98,6 +98,22 @@ describe("hasTaskOverviewData", () => {
   });
 });
 
+describe("hasTaskOverviewData with an evaluator score card", () => {
+  const empty = { human_human: { pair_count: 0 }, evaluators: [] };
+
+  it("is true when a card is on screen with nothing else to show", () => {
+    expect(hasTaskOverviewData(empty, [], true)).toBe(true);
+  });
+
+  it("is still false without one", () => {
+    expect(hasTaskOverviewData(empty, [], false)).toBe(false);
+  });
+
+  it("is false with no agreement response, card or not", () => {
+    expect(hasTaskOverviewData(null, [], true)).toBe(false);
+  });
+});
+
 describe("taskEvaluatorScoreCards", () => {
   const stat = { label: "Score", value: "89%", ratio: 0.89 };
   const evaluators = [

@@ -1562,11 +1562,16 @@ function LabellingTaskPageInner() {
   const evaluatorsThatRan = judgedEvaluators.filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
-  const evaluatorScoreCards = taskEvaluatorScoreCards(
-    agreement?.evaluators ?? [],
-    evaluatorResultStats,
-    toolCallEvaluatorIds,
+  const evaluatorScoreCards = useMemo(
+    () =>
+      taskEvaluatorScoreCards(
+        agreement?.evaluators ?? [],
+        evaluatorResultStats,
+        toolCallEvaluatorIds,
+      ),
+    [agreement, evaluatorResultStats, toolCallEvaluatorIds],
   );
+  const hasEvaluatorScoreCard = evaluatorScoreCards.length > 0;
   // An evaluator with a card but no alignment number has no human labels on
   // its items. Warn once, with wording that says whether that is all of the
   // evaluators on screen or only some. Counted off the same list the cards
@@ -1662,8 +1667,8 @@ function LabellingTaskPageInner() {
       handleTabChange("items");
       return;
     }
-    // Items exist — if the overview has nothing to show (no annotator
-    // agreement, no evaluator score, no human labels, no finished evaluation
+    // Items exist — if the overview has nothing to show (no evaluator score
+    // card, no annotator agreement, no human labels, no finished evaluation
     // run) it is just an empty state, so skip straight to the items tab. Wait
     // for every overview-tab fetch to complete first so the user doesn't see a
     // spinner→bounce flicker on slow connections. If the agreement
@@ -1681,13 +1686,14 @@ function LabellingTaskPageInner() {
     }
     if (!agreement) return;
     autoTabSwitchedRef.current = true;
-    if (!hasTaskOverviewData(agreement, runs)) {
+    if (!hasTaskOverviewData(agreement, runs, hasEvaluatorScoreCard)) {
       handleTabChange("items");
     }
   }, [
     task,
     initialTab,
     handleTabChange,
+    hasEvaluatorScoreCard,
     agreement,
     agreementError,
     agreementFetchCompleted,
@@ -2858,7 +2864,8 @@ function LabellingTaskPageInner() {
                 </svg>
                 Loading
               </div>
-            ) : !agreement || !hasTaskOverviewData(agreement, runs) ? (
+            ) : !agreement ||
+              !hasTaskOverviewData(agreement, runs, hasEvaluatorScoreCard) ? (
               <EmptyState
                 icon={
                   <svg
