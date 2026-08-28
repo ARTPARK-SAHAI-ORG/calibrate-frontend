@@ -85,6 +85,21 @@ describe("EvaluatorScoreCards", () => {
     expect(screen.getByText("3.5 / 5")).toBeInTheDocument();
   });
 
+  it("shows a dash, and not the word alignment, for a card with no score", () => {
+    render(
+      <EvaluatorScoreCards
+        heading="Evaluator scores"
+        description="What each evaluator scored across the items in this task"
+        cards={[
+          { evaluatorId: "tc-1", name: "Tool call correctness", stat: null },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+    expect(screen.getByText("\u2014")).toBeInTheDocument();
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+  });
+
   it("renders nothing when there are no cards", () => {
     const { container } = render(
       <EvaluatorScoreCards

@@ -83,6 +83,12 @@ export function AgreementStatCard(
      * name and its number. Ignored when the human agreement number is also
      * on the card: two numbers side by side always need their own names. */
     showResultLabel?: boolean;
+    /** Name the number beside the evaluator when the card has no score on
+     * it. On for the reliability cards, whose number is the agreement with
+     * humans. Off where the section heading already says what the card is,
+     * so an evaluator with nothing to show reads as empty, not as an
+     * agreement number. */
+    showAlignmentLabel?: boolean;
     /** Why this evaluator has no human agreement number. Shown as a small
      * mark beside the name that explains itself on hover, so a run with
      * unlabelled evaluators does not need a banner above the cards. */
@@ -94,6 +100,7 @@ export function AgreementStatCard(
     valueClassName = "",
     result = null,
     showResultLabel = true,
+    showAlignmentLabel = true,
     warning = null,
   } = props;
   // The evaluator whose prompt is on show, opened from the pill below. Null
@@ -160,7 +167,7 @@ export function AgreementStatCard(
                 </span>
               )}
             </button>
-            {!result && (
+            {!result && showAlignmentLabel && (
               <span className="text-sm font-medium text-foreground shrink-0">
                 alignment
               </span>

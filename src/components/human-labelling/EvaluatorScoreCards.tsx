@@ -8,7 +8,9 @@ import {
 export type EvaluatorScoreCard = {
   evaluatorId: string;
   name: string;
-  stat: EvaluatorResultStat;
+  /** Null when the evaluator has no score to show. The card stays, with a
+   * dash in place of the number. */
+  stat: EvaluatorResultStat | null;
 };
 
 /** The words above the cards on a labelling job. The heading is the name of
@@ -23,8 +25,7 @@ export const HUMAN_SCORES_DESCRIPTION =
  * Used wherever a screen answers "what was scored here": the evaluators' own
  * scores and the scores annotators gave, on the labelling task overview and
  * on a labelling job. One component so the same question always looks the
- * same. An evaluator with no number to show has no card, and a row with no
- * cards does not appear at all.
+ * same. A row with no cards does not appear at all.
  */
 export function EvaluatorScoreCards({
   heading,
@@ -94,6 +95,7 @@ export function EvaluatorScoreCards({
             value={null}
             result={card.stat}
             showResultLabel={false}
+            showAlignmentLabel={false}
           />
         ))}
       </div>

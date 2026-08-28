@@ -1,4 +1,7 @@
-import { hasTaskOverviewData } from "../taskOverviewData";
+import {
+  hasTaskOverviewData,
+  taskEvaluatorScoreCards,
+} from "../taskOverviewData";
 
 describe("hasTaskOverviewData", () => {
   it("is false with no agreement response", () => {
@@ -93,5 +96,48 @@ describe("hasTaskOverviewData", () => {
         [{ status: "completed" }],
       ),
     ).toBe(true);
+  });
+});
+
+describe("taskEvaluatorScoreCards", () => {
+  const stat = { label: "Score", value: "89%", ratio: 0.89 };
+  const evaluators = [
+    { evaluator_id: "ev-1", name: "Correctness" },
+    { evaluator_id: "ev-2", name: "Reply Conciseness" },
+    { evaluator_id: "tc-1", name: "Tool call correctness" },
+  ];
+
+  it("leaves out an evaluator that has no score", () => {
+    const cards = taskEvaluatorScoreCards(
+      evaluators,
+      { "ev-1": stat, "ev-2": null },
+      new Set(),
+    );
+    expect(cards).toEqual([
+      { evaluatorId: "ev-1", name: "Correctness", stat },
+    ]);
+  });
+
+  it("keeps an empty card for tool call correctness", () => {
+    const cards = taskEvaluatorScoreCards(
+      evaluators,
+      { "ev-1": stat },
+      new Set(["tc-1"]),
+    );
+    expect(cards).toEqual([
+      { evaluatorId: "ev-1", name: "Correctness", stat },
+      { evaluatorId: "tc-1", name: "Tool call correctness", stat: null },
+    ]);
+  });
+
+  it("shows the tool call score once there is one", () => {
+    const cards = taskEvaluatorScoreCards(
+      evaluators,
+      { "tc-1": stat },
+      new Set(["tc-1"]),
+    );
+    expect(cards).toEqual([
+      { evaluatorId: "tc-1", name: "Tool call correctness", stat },
+    ]);
   });
 });
