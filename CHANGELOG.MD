@@ -1,5 +1,6 @@
 ## August 2026
 
+- Keep a hover popup open while the pointer is inside it ([#445](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/445))
 - Make model comparison runs findable on the agent Evaluations tab ([#444](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/444))
 - Tick a trace from inside the trace window, and keep the ticks ([#443](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/443))
 - Changelog: go red when Claude could not write the line ([#436](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/436))
