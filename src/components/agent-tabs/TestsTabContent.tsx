@@ -4,7 +4,19 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
-import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
+import {
+  useAccessToken,
+  useAgentTests,
+  useMaxRowsPerEval,
+  useDialogUrlParam,
+  usePageSize,
+} from "@/hooks";
+import { fetchAllAgentTests, unlinkTestsFromAgent } from "@/lib/agentTestsApi";
+import { ServerPaginatedListBar } from "@/components/ui";
+import {
+  SearchModeInput,
+  type SearchMode,
+} from "@/components/ui/SearchModeInput";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
 import { startTestRunOrNotify } from "@/lib/testRunApi";
@@ -38,18 +50,10 @@ import {
   type TestTypeFilterValue,
 } from "@/components/TestTypeFilter";
 import {
-  SearchModeInput,
-  matchesSearchMode,
-  type SearchMode,
-} from "@/components/ui/SearchModeInput";
-import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
-import {
-  type EvaluatorData,
-  fetchAgentEvaluators,
-} from "@/lib/evaluatorApi";
+import { type EvaluatorData, fetchAgentEvaluators } from "@/lib/evaluatorApi";
 
 type TestData = {
   uuid: string;
@@ -212,10 +216,47 @@ export function TestsTabContent({
     // way is the point at which the test dialog behind it can close.
     onSettled: () => closeTestDialogAfterSave(),
   });
-  // Agent tests state (tests attached to the agent)
-  const [agentTests, setAgentTests] = useState<TestData[]>([]);
-  const [agentTestsLoading, setAgentTestsLoading] = useState(true);
-  const [agentTestsError, setAgentTestsError] = useState<string | null>(null);
+  // The agent's tests, one page at a time. The backend does the paging and
+  // the name search, so the count and the pages cover every matching test and
+  // not just the ones on screen.
+  const [pageSize, setPageSize] = usePageSize();
+  // The search runs on the backend, so wait for a pause in typing before
+  // asking for a new page.
+  const [testsSearchQuery, setTestsSearchQuery] = useState("");
+  const [testsSearchMode, setTestsSearchMode] =
+    useState<SearchMode>("contains");
+  // Which kind of test to list. The backend filters before it cuts the page,
+  // so the count and the pages cover every test of that kind.
+  const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
+  const [testsSearch, setTestsSearch] = useState("");
+  useEffect(() => {
+    const handle = window.setTimeout(
+      () => setTestsSearch(testsSearchQuery),
+      300,
+    );
+    return () => window.clearTimeout(handle);
+  }, [testsSearchQuery]);
+  const {
+    items: agentTests,
+    total: agentTestsTotal,
+    loadedQ: loadedTestsSearch,
+    offset: testsOffset,
+    isLoading: agentTestsLoading,
+    error: agentTestsError,
+    refetch: fetchAgentTests,
+    handleRemoved: handleTestsRemoved,
+    hasPrev: hasPrevTestsPage,
+    hasNext: hasNextTestsPage,
+    prevPage: prevTestsPage,
+    nextPage: nextTestsPage,
+  } = useAgentTests({
+    agentUuid,
+    accessToken: backendAccessToken,
+    pageSize,
+    q: testsSearch,
+    qMode: testsSearchMode,
+    type: typeFilter,
+  });
 
   // All available tests state
   const [allTests, setAllTests] = useState<TestData[]>([]);
@@ -248,13 +289,6 @@ export function TestsTabContent({
     Set<string>
   >(new Set());
   const [isAddingTests, setIsAddingTests] = useState(false);
-  const [testsSearchQuery, setTestsSearchQuery] = useState("");
-  const [testsSearchMode, setTestsSearchMode] =
-    useState<SearchMode>("contains");
-  // Filter the agent's tests by test type. "all" shows both kinds; "response"
-  // is Agent Response, "tool_call" is Tool Call. The "select all" checkbox keys
-  // off `filteredAgentTests`, so this filter also narrows what gets selected.
-  const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Create-test dialog state (single test created in-place from the agent
@@ -354,12 +388,12 @@ export function TestsTabContent({
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
-  // When set, the benchmark dialog is scoped to this subset of tests (the
-  // "Compare" bulk action on selected rows). null → compare all linked tests
-  // (the header "Compare models" button).
-  const [benchmarkTestSubset, setBenchmarkTestSubset] = useState<
-    TestData[] | null
-  >(null);
+  // The tests the benchmark dialog compares the models on: the ticked rows
+  // for the "Compare" bulk action, or every linked test for the header's
+  // "Compare models". The table holds one page at a time, so the header
+  // button fetches the whole linked list before opening the dialog.
+  const [benchmarkTests, setBenchmarkTests] = useState<TestData[]>([]);
+  const [isLoadingBenchmarkTests, setIsLoadingBenchmarkTests] = useState(false);
 
   const isConnectionUnverified =
     agentType === "connection" && connectionVerified === false;
@@ -369,55 +403,6 @@ export function TestsTabContent({
   // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
   // models + test subset as a completed run and shows it live.
   const benchmarkRerun = useBenchmarkRerun();
-
-  // Fetch tests attached to this agent. Exposed as a callback so the
-  // create/bulk-upload flows below can refresh the list after the bulk API
-  // auto-attaches new tests to this agent.
-  const fetchAgentTests = useCallback(async () => {
-    if (!backendAccessToken) return;
-
-    try {
-      setAgentTestsLoading(true);
-      setAgentTestsError(null);
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) {
-        throw new Error("BACKEND_URL environment variable is not set");
-      }
-
-      const response = await fetch(
-        `${backendUrl}/agent-tests/agent/${agentUuid}/tests`,
-        {
-          method: "GET",
-          headers: getDefaultHeaders(backendAccessToken),
-        },
-      );
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch agent tests");
-      }
-
-      const data = await response.json();
-      setAgentTests(unwrapList<TestData>(data));
-    } catch (err) {
-      reportError("Error fetching agent tests:", err);
-      setAgentTestsError(
-        err instanceof Error ? err.message : "Failed to load agent tests",
-      );
-    } finally {
-      setAgentTestsLoading(false);
-    }
-  }, [agentUuid, backendAccessToken]);
-
-  useEffect(() => {
-    if (agentUuid && backendAccessToken) {
-      fetchAgentTests();
-    }
-  }, [agentUuid, backendAccessToken, fetchAgentTests]);
 
   // Load the agent's attached evaluators (best-effort; failure just means new
   // tests fall back to the default seed and the post-save prompt is skipped).
@@ -501,6 +486,27 @@ export function TestsTabContent({
     }
   }, [showTestDropdown, backendAccessToken, fetchAllTests]);
 
+  // Every test already linked to this agent, for the attach-existing list to
+  // leave out. Fetched when that list opens, since the table itself only ever
+  // holds one page.
+  const [linkedTestUuids, setLinkedTestUuids] = useState<string[]>([]);
+  useEffect(() => {
+    if (!showTestDropdown || !backendAccessToken) return;
+    let cancelled = false;
+    fetchAllAgentTests(backendAccessToken, agentUuid)
+      .then((tests) => {
+        if (!cancelled) setLinkedTestUuids(tests.map((t) => t.uuid));
+      })
+      .catch((err) => {
+        // Worst case the list offers a test that is already linked; adding it
+        // again is a no-op on the backend.
+        reportError("Error fetching linked tests:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showTestDropdown, backendAccessToken, agentUuid]);
+
   // (2) Fetch when the agent's tests list is known to be empty, so the
   // empty state can decide whether to show the Add-test button. Gated
   // on `allTestsAttempted` so a failure doesn't trigger a tight retry
@@ -508,7 +514,7 @@ export function TestsTabContent({
   useEffect(() => {
     if (
       !agentTestsLoading &&
-      agentTests.length === 0 &&
+      agentTestsTotal === 0 &&
       !allTestsAttempted &&
       !allTestsLoading &&
       backendAccessToken
@@ -517,7 +523,7 @@ export function TestsTabContent({
     }
   }, [
     agentTestsLoading,
-    agentTests.length,
+    agentTestsTotal,
     allTestsAttempted,
     allTestsLoading,
     backendAccessToken,
@@ -547,8 +553,10 @@ export function TestsTabContent({
     };
   }, [showTestDropdown]);
 
-  // Filter out tests already attached to the agent
-  const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
+  // Filter out tests already attached to the agent. The table shows one page
+  // at a time, so the whole linked list is fetched separately here — a test
+  // linked but sitting on another page must still be left out.
+  const agentTestUuids = new Set(linkedTestUuids);
   const availableTests = allTests.filter(
     (test) => !agentTestUuids.has(test.uuid),
   );
@@ -571,15 +579,16 @@ export function TestsTabContent({
       selectedAvailableUuids.has(test.uuid),
     );
 
-  // Filter agent tests by search query AND test type. Both filters apply
-  // together (AND). The type filter also constrains the select-all checkbox
-  // since it operates on `filteredAgentTests`.
-  const filteredAgentTests = agentTests.filter((test) => {
-    if (!matchesTestTypeFilter(test.type, typeFilter)) return false;
-    const q = testsSearchQuery.trim();
-    if (!q) return true;
-    return matchesSearchMode(test.name, q, testsSearchMode);
-  });
+  const testsPageCount =
+    pageSize > 0 ? Math.max(1, Math.ceil(agentTestsTotal / pageSize)) : 1;
+  const testsCurrentPage = Math.floor(testsOffset / pageSize) + 1;
+
+  // Ticks are per page: the bulk actions can only act on the rows in hand, so
+  // leaving them set while the reader turns the page would run or remove
+  // fewer tests than the count promises.
+  useEffect(() => {
+    setSelectedTestUuids(new Set());
+  }, [testsOffset, testsSearch, testsSearchMode, typeFilter, pageSize]);
 
   // Toggle a single test's selection in the attach-existing dropdown.
   const toggleAvailableTest = (uuid: string) => {
@@ -1162,10 +1171,10 @@ export function TestsTabContent({
   };
 
   const toggleSelectAll = () => {
-    if (selectedTestUuids.size === filteredAgentTests.length) {
+    if (selectedTestUuids.size === agentTests.length) {
       setSelectedTestUuids(new Set());
     } else {
-      setSelectedTestUuids(new Set(filteredAgentTests.map((t) => t.uuid)));
+      setSelectedTestUuids(new Set(agentTests.map((t) => t.uuid)));
     }
   };
 
@@ -1254,32 +1263,16 @@ export function TestsTabContent({
         } = await response.json();
         actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
       } else {
-        // Single bulk call: handles 1 or many uuids; unlinks every test from
-        // this agent and leaves the test rows in the library.
-        const response = await fetch(`${backendUrl}/agent-tests/bulk-unlink`, {
-          method: "POST",
-          headers: {
-            ...getDefaultHeaders(backendAccessToken),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agent_uuid: agentUuid,
-            test_uuids: uuidsToRemove,
-          }),
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to remove test from agent");
-        }
+        // One call for the whole selection, however many were ticked.
+        await unlinkTestsFromAgent(
+          backendAccessToken as string,
+          agentUuid,
+          uuidsToRemove,
+        );
       }
 
       const removedSet = new Set(actuallyDeleted);
-      setAgentTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
+      handleTestsRemoved(actuallyDeleted.length);
       // When deleting permanently, also drop the test from the "all tests"
       // dropdown so it doesn't reappear as available to add.
       if (deleteMode === "permanent") {
@@ -1505,7 +1498,7 @@ export function TestsTabContent({
           tests" actions (Add / Create / Bulk upload) on the right.
           Multi-select bulk actions (Run / Remove / Delete subset) live
           above the table in their own toolbar, not here. */}
-      {agentTests.length > 0 && (
+      {agentTestsTotal > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* Left group: act-on-the-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -1514,7 +1507,7 @@ export function TestsTabContent({
               <button
                 data-tour="tests-run-all"
                 onClick={() => {
-                  if (agentTests.length > maxRowsPerEval) {
+                  if (agentTestsTotal > maxRowsPerEval) {
                     showLimitToast(
                       `You can only run up to ${maxRowsPerEval} tests at a time.`,
                     );
@@ -1563,9 +1556,20 @@ export function TestsTabContent({
               }
               isConnectionUnverified={isConnectionUnverified}
               isBenchmarkDisabled={isBenchmarkDisabled}
-              onClick={() => {
-                setBenchmarkTestSubset(null);
-                setBenchmarkDialogOpen(true);
+              onClick={async () => {
+                if (!backendAccessToken || isLoadingBenchmarkTests) return;
+                setIsLoadingBenchmarkTests(true);
+                try {
+                  setBenchmarkTests(
+                    await fetchAllAgentTests(backendAccessToken, agentUuid),
+                  );
+                  setBenchmarkDialogOpen(true);
+                } catch (err) {
+                  reportError("Error fetching agent tests to compare:", err);
+                  toast.error("Failed to load this agent's tests");
+                } finally {
+                  setIsLoadingBenchmarkTests(false);
+                }
               }}
             />
           </div>
@@ -1587,7 +1591,7 @@ export function TestsTabContent({
           so showing the empty state before it resolves makes it briefly look
           like there are no tests available to add. */}
       {agentTestsLoading ||
-      (!agentTestsError && agentTests.length === 0 && !allTestsAttempted) ? (
+      (!agentTestsError && agentTestsTotal === 0 && !allTestsAttempted) ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="flex items-center gap-3">
             <svg
@@ -1623,7 +1627,7 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : agentTests.length === 0 ? (
+      ) : agentTestsTotal === 0 && !loadedTestsSearch ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -1658,49 +1662,12 @@ export function TestsTabContent({
             {renderNewTestButtons()}
           </div>
         </div>
-      ) : agentTests.length === 0 ? (
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex-1 border border-border rounded-xl p-6 md:p-10 flex flex-col items-center justify-center bg-muted/20 min-h-[220px] md:min-h-[280px]">
-              <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
-                <svg
-                  className="w-7 h-7 text-muted-foreground"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M9 3h6v2h-1v4.5l4.5 7.5c.5.83.5 1.5-.17 2.17-.67.67-1.34.83-2.33.83H8c-1 0-1.67-.17-2.33-.83-.67-.67-.67-1.34-.17-2.17L10 9.5V5H9V3zm3 8.5L8.5 17h7L12 11.5z" />
-                </svg>
-              </div>
-              <h3 className="text-base md:text-lg font-semibold text-foreground mb-1 text-center">
-                No tests attached
-              </h3>
-              <p className="text-sm md:text-base text-muted-foreground text-center max-w-md mb-0">
-                This agent doesn&apos;t have any tests linked right now.
-                {allTestsFetched && allTests.length === 0
-                  ? " Create a new test or upload tests in bulk."
-                  : " Add an existing test or create a new one."}
-              </p>
-              <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
-                {/* Hide Add-test only when we've confirmed the library is
-                empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
-                leave it visible — clicking it re-fetches via the
-                dropdown's own effect. */}
-                {SHOW_ADD_EXISTING_TEST &&
-                  (allTests.length > 0 ||
-                    (allTestsAttempted && !allTestsFetched)) &&
-                  renderAddTestControl()}
-                {renderNewTestButtons()}
-              </div>
-            </div>
-          </div>
-        </div>
       ) : (
         <div className="flex-1 flex flex-col">
           {/* Left Panel - Tests Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Search input with inline match-mode selector — full width so
-                long test names have room to wrap; the type filter sits below
-                it on its own row. */}
+            {/* Search — the backend matches on the test name, so it covers
+                every linked test and not only the page on screen. */}
             <SearchModeInput
               value={testsSearchQuery}
               onChange={setTestsSearchQuery}
@@ -1709,12 +1676,9 @@ export function TestsTabContent({
               placeholder="Search tests"
               className="mb-3 md:mb-4"
             />
-            {/* Type filter — iOS-style segmented control. Visually
-                differentiated from the action buttons in the page header
-                (rectangular, h-9/h-10, foreground/border styling) by
-                using a muted pill track with smaller rounded chips, a
-                leading "Filter" label, and a softer height. Sits on its
-                own row below the search bar. */}
+
+            {/* Type filter. Like the search, the backend does the filtering,
+                so the count and the pages cover every test of that kind. */}
             <div className="flex items-center gap-2 mb-3 md:mb-4">
               <svg
                 className="w-3.5 h-3.5 text-muted-foreground"
@@ -1732,31 +1696,8 @@ export function TestsTabContent({
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Type
               </span>
-              <TestTypeFilter
-                value={typeFilter}
-                onChange={(value) => {
-                  setTypeFilter(value);
-                  // Drop any selection that no longer matches the new
-                  // filter so the bulk-action counts don't drift from
-                  // what's visible.
-                  setSelectedTestUuids((prev) => {
-                    if (prev.size === 0) return prev;
-                    const next = new Set<string>();
-                    for (const t of agentTests) {
-                      if (!prev.has(t.uuid)) continue;
-                      if (!matchesTestTypeFilter(t.type, value)) continue;
-                      next.add(t.uuid);
-                    }
-                    return next;
-                  });
-                }}
-              />
+              <TestTypeFilter value={typeFilter} onChange={setTypeFilter} />
             </div>
-
-            <p className="text-sm text-muted-foreground mb-3 md:mb-4">
-              {filteredAgentTests.length}{" "}
-              {filteredAgentTests.length === 1 ? "test" : "tests"}
-            </p>
 
             {/* Bulk-action toolbar — sits immediately above the table when
                 at least one row is selected. Modelled on the same pattern
@@ -1794,7 +1735,7 @@ export function TestsTabContent({
                         selectedTestUuids.has(t.uuid),
                       );
                       if (selected.length === 0) return;
-                      setBenchmarkTestSubset(selected);
+                      setBenchmarkTests(selected);
                       setBenchmarkDialogOpen(true);
                       setSelectedTestUuids(new Set());
                     }}
@@ -1853,135 +1794,179 @@ export function TestsTabContent({
               </div>
             )}
 
-            {/* Tests Table */}
-            {filteredAgentTests.length === 0 ? (
-              <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
-                <p className="text-sm md:text-base text-muted-foreground">
-                  No tests match your search
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                  {/* The list scrolls on its own so the search, filters, and
+            <div className="space-y-1 pt-1">
+              <ServerPaginatedListBar
+                total={agentTestsTotal}
+                offset={testsOffset}
+                loadedCount={agentTests.length}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                currentPage={testsCurrentPage}
+                pageCount={testsPageCount}
+                onPrev={prevTestsPage}
+                onNext={nextTestsPage}
+                prevDisabled={!hasPrevTestsPage || agentTestsLoading}
+                nextDisabled={!hasNextTestsPage || agentTestsLoading}
+                itemNoun="test"
+              />
+
+              {/* Tests Table */}
+              {agentTests.length === 0 ? (
+                <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                  <p className="text-sm md:text-base text-muted-foreground">
+                    {loadedTestsSearch || typeFilter !== "all"
+                      ? "No tests match your search"
+                      : "No tests attached"}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+                    {/* The list scrolls on its own so the search, filters, and
                       surrounding page chrome stay in place for long test
                       lists; the header is pinned to the top via `sticky` and
                       given an opaque background so rows don't show through. */}
-                  <div className="overflow-y-auto max-h-[60vh]">
-                    {/* Table Header */}
-                    <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={toggleSelectAll}
-                          className="cursor-pointer"
-                          title="Select all"
-                        >
-                          <TestCheckbox
-                            checked={
-                              selectedTestUuids.size ===
-                                filteredAgentTests.length &&
-                              filteredAgentTests.length > 0
-                            }
-                            hoverBorder
-                          />
-                        </button>
-                      </div>
-                      <div className="text-sm font-medium text-muted-foreground">
-                        Name
-                      </div>
-                      <div className="text-sm font-medium text-muted-foreground">
-                        Type
-                      </div>
-                      <div className="w-8"></div>
-                      <div className="w-8"></div>
-                      <div className="w-8"></div>
-                    </div>
-                    {/* Table Body */}
-                    {filteredAgentTests.map((test) => (
-                      <div
-                        key={test.uuid}
-                        onClick={() => openEditTest(test.uuid)}
-                        className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
-                      >
-                        {/* Checkbox */}
+                    <div className="overflow-y-auto max-h-[60vh]">
+                      {/* Table Header */}
+                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleTestSelection(test.uuid);
-                            }}
+                            onClick={toggleSelectAll}
                             className="cursor-pointer"
-                            title="Select test"
+                            title="Select all"
                           >
                             <TestCheckbox
-                              checked={selectedTestUuids.has(test.uuid)}
+                              checked={
+                                selectedTestUuids.size === agentTests.length &&
+                                agentTests.length > 0
+                              }
                               hoverBorder
                             />
                           </button>
                         </div>
-                        {/* Name Column */}
-                        <div className="flex items-center min-w-0">
-                          <span className="text-sm font-medium text-foreground overflow-x-auto whitespace-nowrap">
-                            {test.name}
-                          </span>
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Name
                         </div>
-                        {/* Type Column with Icon */}
-                        <div className="flex items-center gap-2">
-                          {test.type === "tool_call" ? (
-                            <svg
-                              className="w-4 h-4 text-muted-foreground flex-shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                              />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-4 h-4 text-muted-foreground flex-shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                          )}
-                          <span className="text-sm text-muted-foreground">
-                            {testTypeLabel(test.type)}
-                          </span>
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Type
                         </div>
-                        {/* Run Button */}
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void launchTestRun([test], false, test.uuid);
-                            }}
-                            disabled={startingRun !== null}
-                            aria-busy={startingRun === test.uuid}
-                            className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                              startingRun !== null
-                                ? "cursor-not-allowed"
-                                : "cursor-pointer"
-                            }`}
-                            title="Run test"
-                          >
-                            {startingRun === test.uuid ? (
-                              <SpinnerIcon className="w-4 h-4 animate-spin" />
+                        <div className="w-8"></div>
+                        <div className="w-8"></div>
+                        <div className="w-8"></div>
+                      </div>
+                      {/* Table Body */}
+                      {agentTests.map((test) => (
+                        <div
+                          key={test.uuid}
+                          onClick={() => openEditTest(test.uuid)}
+                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                        >
+                          {/* Checkbox */}
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTestSelection(test.uuid);
+                              }}
+                              className="cursor-pointer"
+                              title="Select test"
+                            >
+                              <TestCheckbox
+                                checked={selectedTestUuids.has(test.uuid)}
+                                hoverBorder
+                              />
+                            </button>
+                          </div>
+                          {/* Name Column */}
+                          <div className="flex items-center min-w-0">
+                            <span className="text-sm font-medium text-foreground overflow-x-auto whitespace-nowrap">
+                              {test.name}
+                            </span>
+                          </div>
+                          {/* Type Column with Icon */}
+                          <div className="flex items-center gap-2">
+                            {test.type === "tool_call" ? (
+                              <svg
+                                className="w-4 h-4 text-muted-foreground flex-shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                />
+                              </svg>
                             ) : (
+                              <svg
+                                className="w-4 h-4 text-muted-foreground flex-shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {testTypeLabel(test.type)}
+                            </span>
+                          </div>
+                          {/* Run Button */}
+                          <div className="flex items-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void launchTestRun([test], false, test.uuid);
+                              }}
+                              disabled={startingRun !== null}
+                              aria-busy={startingRun === test.uuid}
+                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
+                                startingRun !== null
+                                  ? "cursor-not-allowed"
+                                  : "cursor-pointer"
+                              }`}
+                              title="Run test"
+                            >
+                              {startingRun === test.uuid ? (
+                                <SpinnerIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.5}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          {/* Duplicate Button — opens the create dialog pre-filled
+                          from this test; nothing is saved until submit. */}
+                          <div className="flex items-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDuplicateTest(test);
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                              title="Duplicate test"
+                            >
                               <svg
                                 className="w-4 h-4"
                                 fill="none"
@@ -1992,185 +1977,159 @@ export function TestsTabContent({
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
                                 />
                               </svg>
-                            )}
-                          </button>
-                        </div>
-                        {/* Duplicate Button — opens the create dialog pre-filled
-                          from this test; nothing is saved until submit. */}
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDuplicateTest(test);
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                            title="Duplicate test"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                        {/* Delete Button — opens a dialog whose checkbox upgrades the
+                            </button>
+                          </div>
+                          {/* Delete Button — opens a dialog whose checkbox upgrades the
                           remove-from-agent action to a permanent library delete. */}
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDeleteDialog(test, "remove");
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Delete test"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
+                          <div className="flex items-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteDialog(test, "remove");
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete test"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="md:hidden space-y-3 overflow-y-auto max-h-[60vh]">
+                    {agentTests.map((test) => (
+                      <div
+                        key={test.uuid}
+                        onClick={() => openEditTest(test.uuid)}
+                        className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTestSelection(test.uuid);
+                              }}
+                              className="mt-0.5 cursor-pointer"
+                              title="Select test"
+                            >
+                              <TestCheckbox
+                                checked={selectedTestUuids.has(test.uuid)}
+                                hoverBorder
                               />
-                            </svg>
-                          </button>
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium text-foreground truncate">
+                                {test.name}
+                              </h4>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {testTypeLabel(test.type)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void launchTestRun([test], false, test.uuid);
+                              }}
+                              disabled={startingRun !== null}
+                              aria-busy={startingRun === test.uuid}
+                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
+                                startingRun !== null
+                                  ? "cursor-not-allowed"
+                                  : "cursor-pointer"
+                              }`}
+                              title="Run test"
+                            >
+                              {startingRun === test.uuid ? (
+                                <SpinnerIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.5}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDuplicateTest(test);
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                              title="Duplicate test"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteDialog(test, "remove");
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete test"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-3 overflow-y-auto max-h-[60vh]">
-                  {filteredAgentTests.map((test) => (
-                    <div
-                      key={test.uuid}
-                      onClick={() => openEditTest(test.uuid)}
-                      className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleTestSelection(test.uuid);
-                            }}
-                            className="mt-0.5 cursor-pointer"
-                            title="Select test"
-                          >
-                            <TestCheckbox
-                              checked={selectedTestUuids.has(test.uuid)}
-                              hoverBorder
-                            />
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-foreground truncate">
-                              {test.name}
-                            </h4>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {testTypeLabel(test.type)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void launchTestRun([test], false, test.uuid);
-                            }}
-                            disabled={startingRun !== null}
-                            aria-busy={startingRun === test.uuid}
-                            className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                              startingRun !== null
-                                ? "cursor-not-allowed"
-                                : "cursor-pointer"
-                            }`}
-                            title="Run test"
-                          >
-                            {startingRun === test.uuid ? (
-                              <SpinnerIcon className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                />
-                              </svg>
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDuplicateTest(test);
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                            title="Duplicate test"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDeleteDialog(test, "remove");
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Delete test"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2318,12 +2277,12 @@ export function TestsTabContent({
         isOpen={benchmarkDialogOpen}
         onClose={() => {
           setBenchmarkDialogOpen(false);
-          setBenchmarkTestSubset(null);
+          setBenchmarkTests([]);
         }}
         agentUuid={agentUuid}
         agentName={agentName}
         agentNature={agentNature}
-        tests={benchmarkTestSubset ?? agentTests}
+        tests={benchmarkTests}
         onBenchmarkCreated={() => onRunStarted?.()}
         agentType={agentType}
         benchmarkModelsVerified={benchmarkModelsVerified}

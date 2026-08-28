@@ -1,10 +1,14 @@
 "use client";
 
 import { SegmentedFilter } from "@/components/ui";
-import { testTypeLabel, type TestType } from "@/lib/testTypes";
+import {
+  matchesTestTypeFilter,
+  testTypeLabel,
+  type TestTypeFilterValue,
+} from "@/lib/testTypes";
 
-/** The filter value: a concrete test type, or "all" for no filtering. */
-export type TestTypeFilterValue = "all" | TestType;
+export type { TestTypeFilterValue };
+export { matchesTestTypeFilter };
 
 /**
  * Options for the test-type filter, in display order. Labels come from
@@ -19,25 +23,6 @@ const TEST_TYPE_FILTER_OPTIONS: {
   { value: "tool_call", label: testTypeLabel("tool_call") },
   { value: "conversation", label: testTypeLabel("conversation") },
 ];
-
-/**
- * Does a test's type belong under the chosen filter chip?
- *
- * The "response" chip also matches "general" tests. To the reader they are one
- * thing, "Agent Response": a general agent's test and a conversation agent's test
- * are both a reply being judged, and both show that same name. The split lives
- * only in how the test stores its content, so a single chip has to select both
- * or a general agent's tests would have no chip that finds them.
- */
-export function matchesTestTypeFilter(
-  testType: string | null | undefined,
-  filter: TestTypeFilterValue,
-): boolean {
-  if (filter === "all") return true;
-  if (filter === "response")
-    return testType === "response" || testType === "general";
-  return testType === filter;
-}
 
 interface TestTypeFilterProps {
   value: TestTypeFilterValue;
