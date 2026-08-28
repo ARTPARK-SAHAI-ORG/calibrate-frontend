@@ -182,7 +182,7 @@ export function itemNounForSource(source: AddRunToLabellingTaskSource): {
     case "traces":
       return { one: "trace", many: "traces" };
     default:
-      return { one: "test", many: "tests" };
+      return { one: "test result", many: "test results" };
   }
 }
 
@@ -196,13 +196,6 @@ export type AddRunToLabellingTaskDialogProps = {
 type LabellingTaskEvaluatorRef = {
   uuid: string;
   name?: string;
-};
-
-/** What `POST /annotation-tasks/{uuid}/items` returns. The two score fields
- * come back only when the items carried evaluator verdicts. */
-type ItemsPostResponse = {
-  evaluator_result_count?: number;
-  evaluator_run_job_id?: string | null;
 };
 
 type LabellingTask = {
@@ -245,9 +238,6 @@ export type EvaluatorResultSeed = {
 type TransformResult = {
   items: BuiltItem[];
   skippedCount: number;
-  /** How many evaluator verdicts came across with these items, counted
-   * across every item and evaluator. Zero when the source has none. */
-  scoreCount: number;
   evaluatorUuids: Set<string>;
   /** The subset of evaluatorUuids that is the tool call evaluator. The
    * backend attaches it to a task on its own the moment the first tool-call
@@ -473,7 +463,9 @@ function buildOneItem(
     if (seed) {
       const version = versionByEvaluator?.[uuid];
       evaluator_results[uuid] =
-        typeof version === "number" ? { ...seed, version_number: version } : seed;
+        typeof version === "number"
+          ? { ...seed, version_number: version }
+          : seed;
     }
   }
   for (const ref of raw.test_case?.evaluators ?? []) {
@@ -516,11 +508,6 @@ export function buildItemsFromSource(
   const evaluatorUuids = new Set<string>();
   const toolCallEvaluatorUuids = new Set<string>();
   let skippedCount = 0;
-  const countScores = () =>
-    items.reduce(
-      (n, it) => n + Object.keys(it.evaluator_results ?? {}).length,
-      0,
-    );
 
   switch (source.type) {
     case "test_run":
@@ -600,7 +587,6 @@ export function buildItemsFromSource(
       return {
         items,
         skippedCount,
-        scoreCount: countScores(),
         evaluatorUuids,
         toolCallEvaluatorUuids,
       };
@@ -623,7 +609,6 @@ export function buildItemsFromSource(
       return {
         items,
         skippedCount,
-        scoreCount: countScores(),
         evaluatorUuids,
         toolCallEvaluatorUuids,
       };
@@ -647,7 +632,6 @@ export function buildItemsFromSource(
       return {
         items,
         skippedCount,
-        scoreCount: countScores(),
         evaluatorUuids,
         toolCallEvaluatorUuids,
       };
@@ -667,7 +651,6 @@ export function buildItemsFromSource(
       return {
         items,
         skippedCount,
-        scoreCount: countScores(),
         evaluatorUuids,
         toolCallEvaluatorUuids,
       };
@@ -692,12 +675,11 @@ export function buildItemsFromSource(
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
         return {
-        items,
-        skippedCount,
-        scoreCount: countScores(),
-        evaluatorUuids,
-        toolCallEvaluatorUuids,
-      };
+          items,
+          skippedCount,
+          evaluatorUuids,
+          toolCallEvaluatorUuids,
+        };
       }
       for (const t of source.traces) {
         const built = buildOneItem({
@@ -728,7 +710,6 @@ export function buildItemsFromSource(
       return {
         items,
         skippedCount,
-        scoreCount: countScores(),
         evaluatorUuids,
         toolCallEvaluatorUuids,
       };
@@ -737,7 +718,6 @@ export function buildItemsFromSource(
       return {
         items: [],
         skippedCount: 0,
-        scoreCount: 0,
         evaluatorUuids: new Set(),
         toolCallEvaluatorUuids: new Set(),
       };
@@ -772,12 +752,6 @@ export function AddRunToLabellingTaskDialog({
     taskName: string;
     itemsCreated: number;
     itemsSkipped: number;
-    /** Verdicts carried over with the items that were added, as the backend
-     * counted them. */
-    scoresAdded: number;
-    /** The evaluator run the carried-over scores were recorded as, so the
-     * reader can open them. Absent when no scores came across. */
-    scoresRunUuid?: string;
   } | null>(null);
   const onAddedFiredRef = useRef(false);
 
@@ -942,16 +916,11 @@ export function AddRunToLabellingTaskDialog({
       // through instead of failing the whole batch.
       let toPost = items;
       let itemsSkipped = 0;
-      // The response reports how many carried-over scores were stored and
-      // which evaluator run holds them. Both are absent when the items
-      // carried none.
-      let added: ItemsPostResponse = {};
       try {
-        added = await apiClient<ItemsPostResponse>(
-          `/annotation-tasks/${taskUuid}/items`,
-          accessToken,
-          { method: "POST", body: { items: toPost } },
-        );
+        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
+          method: "POST",
+          body: { items: toPost },
+        });
       } catch (err) {
         const detail = extractApiErrorDetail(err);
         if (
@@ -973,11 +942,10 @@ export function AddRunToLabellingTaskDialog({
           setSubmitting(false);
           return;
         }
-        added = await apiClient<ItemsPostResponse>(
-          `/annotation-tasks/${taskUuid}/items`,
-          accessToken,
-          { method: "POST", body: { items: toPost } },
-        );
+        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
+          method: "POST",
+          body: { items: toPost },
+        });
       }
 
       if (!mountedRef.current) return;
@@ -986,14 +954,6 @@ export function AddRunToLabellingTaskDialog({
         taskName,
         itemsCreated: toPost.length,
         itemsSkipped,
-        scoresAdded:
-          typeof added?.evaluator_result_count === "number"
-            ? added.evaluator_result_count
-            : toPost.reduce(
-                (n, it) => n + Object.keys(it.evaluator_results ?? {}).length,
-                0,
-              ),
-        scoresRunUuid: added?.evaluator_run_job_id ?? undefined,
       });
       if (onAdded && !onAddedFiredRef.current) {
         onAddedFiredRef.current = true;
@@ -1103,7 +1063,9 @@ export function AddRunToLabellingTaskDialog({
             <p className="text-sm text-foreground">
               Added {success.itemsCreated}{" "}
               {success.itemsCreated === 1 ? noun.one : noun.many} to{" "}
-              <span className="font-medium">{success.taskName}</span>
+              <span className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground font-medium">
+                {success.taskName}
+              </span>
               {success.itemsSkipped > 0
                 ? `. ${success.itemsSkipped} ${
                     success.itemsSkipped === 1 ? noun.one : noun.many
@@ -1112,25 +1074,6 @@ export function AddRunToLabellingTaskDialog({
                   } skipped`
                 : ""}
             </p>
-            {success.scoresAdded > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {success.scoresRunUuid ? (
-                  <Link
-                    href={`/human-alignment/tasks/${success.taskUuid}/evaluator-runs/${success.scoresRunUuid}`}
-                    className="underline hover:text-foreground"
-                  >
-                    {success.scoresAdded}{" "}
-                    {success.scoresAdded === 1 ? "score" : "scores"}
-                  </Link>
-                ) : (
-                  `${success.scoresAdded} ${
-                    success.scoresAdded === 1 ? "score" : "scores"
-                  }`
-                )}{" "}
-                the evaluators already gave came across, so you do not have to
-                run the evaluators again.
-              </p>
-            )}
             <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
                 onClick={onClose}
