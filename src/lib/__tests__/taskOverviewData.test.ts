@@ -51,9 +51,9 @@ describe("hasTaskOverviewData", () => {
   });
 
   it("is true when annotators agree with each other", () => {
-    expect(
-      hasTaskOverviewData({ human_human: { pair_count: 4 } }, []),
-    ).toBe(true);
+    expect(hasTaskOverviewData({ human_human: { pair_count: 4 } }, [])).toBe(
+      true,
+    );
   });
 
   it("is true when an evaluator lines up with the annotators", () => {
@@ -79,10 +79,9 @@ describe("hasTaskOverviewData", () => {
 
   it("is false when a run finished but its evaluator is off the task", () => {
     expect(
-      hasTaskOverviewData(
-        { human_human: { pair_count: 0 }, evaluators: [] },
-        [{ status: "completed" }],
-      ),
+      hasTaskOverviewData({ human_human: { pair_count: 0 }, evaluators: [] }, [
+        { status: "completed" },
+      ]),
     ).toBe(false);
   });
 
@@ -113,9 +112,7 @@ describe("taskEvaluatorScoreCards", () => {
       { "ev-1": stat, "ev-2": null },
       new Set(),
     );
-    expect(cards).toEqual([
-      { evaluatorId: "ev-1", name: "Correctness", stat },
-    ]);
+    expect(cards).toEqual([{ evaluatorId: "ev-1", name: "Correctness", stat }]);
   });
 
   it("keeps an empty card for tool call correctness", () => {
