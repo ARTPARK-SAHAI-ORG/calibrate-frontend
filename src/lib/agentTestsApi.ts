@@ -96,10 +96,9 @@ export async function unlinkTestsFromAgent(
 
 /**
  * Every test linked to an agent, in one call. The list is paged everywhere it
- * is shown; this is for the two actions that need the whole set at once:
- * comparing models on all of an agent's tests, and leaving already-linked
- * tests out of the attach-an-existing-test list. Sending no `limit` is what
- * asks the backend for all of them.
+ * is shown; this is for the one place that needs the whole set at once:
+ * leaving already-linked tests out of the attach-an-existing-test list.
+ * Sending no `limit` is what asks the backend for all of them.
  */
 export async function fetchAllAgentTests(
   accessToken: string,
