@@ -93,11 +93,18 @@ jest.mock("../../lib/reportError", () => ({
 
 // CreateToolFlow is separately tested. Stubbed to a button that reports the
 // tool it "created" and the full list, the same shape the real flow reports.
-let createToolFlowProps: any = null;
+// AddTestDialog mounts it twice (the "Tools to test" header, and "Agent tool
+// call" in the conversation history's add-message menu) as two unconditional
+// sibling instances, so every render pass calls this mock exactly twice in
+// the same JSX order — slot 0 is always the "Tools to test" instance, slot 1
+// the conversation one.
+let createToolFlowSlots: [any, any] = [null, null];
+let createToolFlowSlotCounter = 0;
 jest.mock("../tools/CreateToolFlow", () => ({
   __esModule: true,
   CreateToolFlow: (props: any) => {
-    createToolFlowProps = props;
+    createToolFlowSlots[createToolFlowSlotCounter % 2] = props;
+    createToolFlowSlotCounter++;
     return props.isOpen ? (
       <button
         type="button"
@@ -217,7 +224,8 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://127.0.0.1:8000";
   localStorage.setItem("access_token", "test-token");
   (global as any).fetch = mockFetchImpl();
-  createToolFlowProps = null;
+  createToolFlowSlots = [null, null];
+  createToolFlowSlotCounter = 0;
   attachToolsToAgentMock.mockReset();
   attachToolsToAgentMock.mockResolvedValue(undefined);
 });
@@ -691,6 +699,61 @@ describe("AddTestDialog", () => {
       expect(screen.queryByText("Tool response")).not.toBeInTheDocument();
     });
 
+    it("offers Create tool from the Add message dropdown, separate from Agent tool call's own picker", async () => {
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByTitle("Add message"));
+      expect(createToolFlowSlots[1]?.isOpen).not.toBe(true);
+      await user.click(screen.getByText("Create tool"));
+      expect(createToolFlowSlots[1].isOpen).toBe(true);
+      // The other CreateToolFlow instance (Tools to test) is untouched.
+      expect(createToolFlowSlots[0]?.isOpen).not.toBe(true);
+    });
+
+    it("adds a freshly created tool straight into the conversation as a tool call", async () => {
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByText("Create tool"));
+      await user.click(screen.getByText("Finish creating tool"));
+
+      expect(screen.getByText("get_forecast")).toBeInTheDocument();
+      expect(attachToolsToAgentMock).not.toHaveBeenCalled();
+    });
+
+    it("also attaches the freshly created conversation tool call to the agent when scoped to one", async () => {
+      const user = setupUser();
+      render(
+        <AddTestDialog
+          {...baseProps({ initialTab: "next-reply", agentUuid: "agent-42" })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByText("Create tool"));
+      await user.click(screen.getByText("Finish creating tool"));
+
+      expect(screen.getByText("get_forecast")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(attachToolsToAgentMock).toHaveBeenCalledWith(
+          "agent-42",
+          ["tool-new"],
+          "test-token",
+        ),
+      );
+    });
+
     it("opens the evaluator picker, excludes conversation-type evaluators, searches, and attaches a match", async () => {
       const user = setupUser();
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
@@ -892,7 +955,7 @@ describe("AddTestDialog", () => {
       await user.click(screen.getByRole("button", { name: "Create" }));
       expect(onSubmit).not.toHaveBeenCalled();
       expect(screen.getByRole("button", { name: "Add tool" })).toHaveClass(
-        "border-red-500",
+        "border-red-500/40",
       );
     });
 
@@ -1014,7 +1077,7 @@ describe("AddTestDialog", () => {
         <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
       );
       await user.click(screen.getByRole("button", { name: "Create tool" }));
-      expect(createToolFlowProps.isOpen).toBe(true);
+      expect(createToolFlowSlots[0].isOpen).toBe(true);
       expect(
         screen.queryByTestId("tool-picker"),
       ).not.toBeInTheDocument();

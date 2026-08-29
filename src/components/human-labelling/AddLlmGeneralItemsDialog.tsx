@@ -555,7 +555,7 @@ export function AddLlmGeneralItemsDialog({
                       type="button"
                       onClick={() => setPickerOpen((open) => !open)}
                       disabled={submitting}
-                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg
                         className="w-3.5 h-3.5"
