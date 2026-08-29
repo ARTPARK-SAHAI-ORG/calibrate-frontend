@@ -9,7 +9,7 @@ import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import Papa from "papaparse";
 import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
-import { TestTypePicker } from "@/components/TestTypePicker";
+import { TestTypePicker, type TestTab } from "@/components/TestTypePicker";
 import {
   ChatHistoryPreview,
   generateGuidelinesPdf,
@@ -21,7 +21,6 @@ import {
 import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
-import { isCreatableTestType } from "@/constants/testTypes";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
@@ -296,6 +295,14 @@ const TOOL_CALL_FIELDS: GuidelineField[] = [
       "If true, the test passes regardless of what arguments the agent sends to this tool. Useful when you only care that the tool was called, not what was passed. When true, the arguments field is ignored.",
   },
 ];
+
+// The picker names the types the way the create test flow does; the upload
+// calls them what the backend calls them.
+const TEST_TYPE_FOR_TAB: Record<TestTab, TestType> = {
+  "next-reply": "response",
+  "tool-invocation": "tool_call",
+  conversation: "conversation",
+};
 
 export function BulkUploadTestsModal({
   isOpen,
@@ -1396,9 +1403,7 @@ export function BulkUploadTestsModal({
         <TestTypePicker
           title="Bulk upload tests"
           agentNature={agentNature}
-          onNext={(tab) =>
-            setTestType(tab === "tool-invocation" ? "tool_call" : "response")
-          }
+          onNext={(tab) => setTestType(TEST_TYPE_FOR_TAB[tab])}
           onClose={onClose}
         />
       </div>
