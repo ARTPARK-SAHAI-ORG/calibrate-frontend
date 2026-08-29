@@ -1,5 +1,6 @@
 ## August 2026
 
+- When bulk uploading tests you are now asked what you want to test about the agent, the same question shown when creating a single test ([#466](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/466))
 - people can now filter an agent's traces by label and see that traces can carry labels in the setup code ([#467](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/467))
 - You can now search the annotators list by name, both on the Annotators tab and when assigning annotators to a labelling task ([#463](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/463))
 - On a labelling task, tool call correctness now shows its own card under evaluator scores even before it has a score to show ([#461](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/461))
