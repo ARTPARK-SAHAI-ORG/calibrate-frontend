@@ -108,7 +108,7 @@ export function AddToolDialog({
       onClick={handleClose}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh] md:h-[70vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] md:h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Dialog Header */}
