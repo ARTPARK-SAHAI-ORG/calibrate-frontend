@@ -70,12 +70,14 @@ test.describe("Tests page (authenticated, real backend)", () => {
     // "Bulk upload" appears top-right or in the empty-state card — .first().
     await page.getByRole("button", { name: "Bulk upload" }).first().click();
 
-    // Heading "Bulk upload tests" + the "Select the type of test" label are
-    // from BulkUploadTestsModal.tsx (~line 1298, ~1332).
+    // Heading "Bulk upload tests" + the "Select what you want to test about
+    // the agent" label are from BulkUploadTestsModal.tsx.
     await expect(
       page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText("Select the type of test")).toBeVisible();
+    await expect(
+      page.getByText("Select what you want to test about the agent"),
+    ).toBeVisible();
 
     // Close via the modal's "Cancel" button (backdrop is intentionally
     // non-dismissing here).
