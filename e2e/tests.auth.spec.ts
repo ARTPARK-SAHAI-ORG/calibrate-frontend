@@ -109,12 +109,14 @@ test.describe("Tests page (authenticated, real backend)", () => {
       page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    // Pick the "Tool Call" type card. Scope to the modal — the /tests page
-    // behind it also has "Tool Call" filter pills, which would make a bare
-    // name match ambiguous. Inside the modal the card's accessible name is
-    // "Tool Call" + its description line, so match on a substring.
+    // Pick the tool call type card. Scope to the modal — the /tests page
+    // behind it also has "Tool Call" filter pills. Inside the modal the
+    // card's accessible name is its question plus its description line, so
+    // match on a substring.
     const bulkModal = page.locator(".fixed.inset-0.z-50");
-    await bulkModal.getByRole("button", { name: /Tool Call/ }).click();
+    await bulkModal
+      .getByRole("button", { name: /Does the agent use the right tool\?/ })
+      .click();
 
     // A valid tool-call CSV: header exactly matches the modal's required
     // columns, one row whose conversation_history is a JSON array ending on a

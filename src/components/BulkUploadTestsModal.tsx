@@ -148,7 +148,8 @@ function buildResponseSampleCsv(
         {
           name: "Summary test",
           input: "Summarize this article: The city council voted today to...",
-          sampleValue: "The summary should be concise and capture the key facts",
+          sampleValue:
+            "The summary should be concise and capture the key facts",
         },
         {
           name: "Translation test",
@@ -198,7 +199,9 @@ function buildResponseSampleCsv(
     const isDemoRow = rowIdx === 1 && demoExcludedEvalName !== null;
     return [
       csvEscape(r.name),
-      "input" in r ? csvEscape(r.input) : csvEscape(JSON.stringify(r.conversation)),
+      "input" in r
+        ? csvEscape(r.input)
+        : csvEscape(JSON.stringify(r.conversation)),
       ...columns.map((c) => {
         const excluded = isDemoRow && c.evalName === demoExcludedEvalName;
         if (c.kind === "include") return csvEscape(excluded ? "false" : "true");
@@ -1429,13 +1432,16 @@ export function BulkUploadTestsModal({
               filled-foreground look the old segmented toggle had. */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-3">
-              Select the type of test
+              Select what you want to test about the agent
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl">
               {[
                 {
                   value: "response" as const,
-                  label: "Agent Response",
+                  label:
+                    agentNature === "general"
+                      ? "Does the agent give the right answer?"
+                      : "Does the agent give the right reply?",
                   description:
                     agentNature === "general"
                       ? "Evaluate the agent's output given the input"
@@ -1443,13 +1449,13 @@ export function BulkUploadTestsModal({
                 },
                 {
                   value: "tool_call" as const,
-                  label: "Tool Call",
+                  label: "Does the agent use the right tool?",
                   description:
-                    "Check whether the agent invokes the correct tool with the correct arguments",
+                    "Check whether the agent invokes the correct tool with the right arguments",
                 },
                 {
                   value: "conversation" as const,
-                  label: "Conversation",
+                  label: "Conversation test",
                   description:
                     "Generate the agent's reply, then grade the full conversation",
                 },

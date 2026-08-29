@@ -173,13 +173,17 @@ describe("BulkUploadTestsModal", () => {
   it("renders the test type selector when open", () => {
     render(<BulkUploadTestsModal {...defaultProps()} />);
     expect(screen.getByText("Bulk upload tests")).toBeInTheDocument();
-    expect(screen.getByText("Agent Response")).toBeInTheDocument();
-    expect(screen.getByText("Tool Call")).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent give the right reply?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Does the agent use the right tool?"),
+    ).toBeInTheDocument();
   });
 
   it("does not offer the conversation type", () => {
     render(<BulkUploadTestsModal {...defaultProps()} />);
-    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
   });
 
   it("closes via the header X button", async () => {
@@ -204,7 +208,7 @@ describe("BulkUploadTestsModal", () => {
   describe("Tool call uploads", () => {
     async function openToolCallDropzone(user: ReturnType<typeof setupUser>) {
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining("/tools"),
@@ -399,7 +403,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Failed to load tools/)).toBeInTheDocument(),
       );
@@ -419,7 +423,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() => expect(signOut).toHaveBeenCalled());
     });
 
@@ -462,7 +466,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
 
       const csv = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
@@ -524,7 +528,7 @@ describe("BulkUploadTestsModal", () => {
       render(
         <BulkUploadTestsModal {...defaultProps({ onSuccess, onClose })} />,
       );
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -564,7 +568,7 @@ describe("BulkUploadTestsModal", () => {
       const user = setupUser();
       const onClose = jest.fn();
       render(<BulkUploadTestsModal {...defaultProps({ onClose })} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -601,7 +605,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -632,7 +636,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -666,7 +670,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -699,7 +703,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -743,7 +747,7 @@ describe("BulkUploadTestsModal", () => {
           {...defaultProps({ lockedAgentUuid: "locked-agent" })}
         />,
       );
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -788,7 +792,7 @@ describe("BulkUploadTestsModal", () => {
     it("fetches llm evaluators and requires a selection before showing the dropzone", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining("/evaluators"),
@@ -806,7 +810,7 @@ describe("BulkUploadTestsModal", () => {
     it("parses a valid response CSV with a variable evaluator", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await waitFor(() =>
         expect(
           screen.queryByText("Loading evaluators"),
@@ -829,7 +833,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when a row has an invalid include flag", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -846,7 +850,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when a required variable value is missing", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -863,7 +867,7 @@ describe("BulkUploadTestsModal", () => {
     it("errors when every evaluator is excluded on a row", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Politeness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -887,7 +891,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Politeness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -928,7 +932,7 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await waitFor(() =>
         expect(
           screen.getByText(/Failed to load evaluators/),
@@ -950,14 +954,14 @@ describe("BulkUploadTestsModal", () => {
       });
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await waitFor(() => expect(signOut).toHaveBeenCalled());
     });
 
     it("downloads the sample CSV tailored to the selected evaluators", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -969,7 +973,7 @@ describe("BulkUploadTestsModal", () => {
     it("downloads the guidelines PDF for Agent Response, with a conversation_history column", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Agent Response");
+      await selectTestType(user, "Does the agent give the right reply?");
       await pickEvaluator(user, "Helpfulness");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -985,21 +989,29 @@ describe("BulkUploadTestsModal", () => {
   });
 
   describe("agentNature: general", () => {
-    it("hides Conversation but keeps the Agent Response label", () => {
-      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
-      expect(screen.getByText("Agent Response")).toBeInTheDocument();
+    it("hides Conversation and asks about the answer, not the reply", () => {
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent give the right answer?"),
+      ).toBeInTheDocument();
       expect(
         screen.getByText("Evaluate the agent's output given the input"),
       ).toBeInTheDocument();
-      expect(screen.getByText("Tool Call")).toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent use the right tool?"),
+      ).toBeInTheDocument();
     });
 
-    it("still shows the Agent Response label when agentNature is omitted", () => {
+    it("asks about the reply when agentNature is omitted", () => {
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      expect(screen.getByText("Agent Response")).toBeInTheDocument();
+      expect(
+        screen.getByText("Does the agent give the right reply?"),
+      ).toBeInTheDocument();
       // Conversation is hidden for every agent, not just general ones.
-      expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+      expect(screen.queryByText("Conversation test")).not.toBeInTheDocument();
     });
   });
 
@@ -1038,8 +1050,10 @@ describe("BulkUploadTestsModal", () => {
 
     it("fetches the llm-general evaluator type and shows an input column, not conversation_history, in the guidelines", async () => {
       const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Agent Response");
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      await selectTestType(user, "Does the agent give the right answer?");
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining("/evaluators"),
@@ -1060,8 +1074,10 @@ describe("BulkUploadTestsModal", () => {
 
     it("parses a row with input into { input, evaluators } and sends type general", async () => {
       const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Agent Response");
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      await selectTestType(user, "Does the agent give the right answer?");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -1095,8 +1111,10 @@ describe("BulkUploadTestsModal", () => {
 
     it("downloads a sample CSV for a general agent (input column, not conversation JSON)", async () => {
       const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Agent Response");
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      await selectTestType(user, "Does the agent give the right answer?");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -1107,8 +1125,10 @@ describe("BulkUploadTestsModal", () => {
 
     it("shows a per-row error for missing input, the same way a missing conversation history fails", async () => {
       const user = setupUser();
-      render(<BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />);
-      await selectTestType(user, "Agent Response");
+      render(
+        <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
+      );
+      await selectTestType(user, "Does the agent give the right answer?");
       await pickGeneralEvaluator(user);
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
@@ -1129,7 +1149,7 @@ describe("BulkUploadTestsModal", () => {
       render(
         <BulkUploadTestsModal {...defaultProps({ agentNature: "general" })} />,
       );
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -1156,7 +1176,9 @@ describe("BulkUploadTestsModal", () => {
       await waitFor(() =>
         expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
       );
-      expect(screen.getByText("Book room 101 for tomorrow")).toBeInTheDocument();
+      expect(
+        screen.getByText("Book room 101 for tomorrow"),
+      ).toBeInTheDocument();
 
       await user.click(screen.getByText(/Upload 1 test/));
       await waitFor(() =>
@@ -1187,9 +1209,13 @@ describe("BulkUploadTestsModal", () => {
 "Book room test","[{""role"":""user"",""content"":""hi""}]","[{""tool"":""book_room"",""arguments"":{},""accept_any_arguments"":true}]"`;
       await uploadFile(csv);
       await waitFor(() =>
-        expect(screen.getByText(/Missing required columns/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(/Missing required columns/),
+        ).toBeInTheDocument(),
       );
-      expect(screen.getByText(/Missing required columns: input/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Missing required columns: input/),
+      ).toBeInTheDocument();
     });
 
     it("fails the row when input is blank", async () => {
@@ -1208,7 +1234,7 @@ describe("BulkUploadTestsModal", () => {
     it("posts conversation_history and no input", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
@@ -1245,7 +1271,7 @@ describe("BulkUploadTestsModal", () => {
     it("rejects a CSV with more than 500 rows", async () => {
       const user = setupUser();
       render(<BulkUploadTestsModal {...defaultProps()} />);
-      await selectTestType(user, "Tool Call");
+      await selectTestType(user, "Does the agent use the right tool?");
       await waitFor(() =>
         expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
       );
