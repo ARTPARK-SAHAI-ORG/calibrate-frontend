@@ -17,6 +17,7 @@ const handleDeleted = jest.fn();
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useTraces: (args: unknown) => mockUseTraces(args),
+  useTraceLabels: () => mockUseTraceLabels(),
   // Selection is real: the convert/delete buttons only appear once a row is
   // ticked, which the selection tests exercise.
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
@@ -246,6 +247,10 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     ) : null,
 }));
 
+// The labels the agent's traces carry, which the filter offers. Most tests
+// have none, so the picker stays out of the way.
+const mockUseTraceLabels = jest.fn(() => ({ labels: [] as string[] }));
+
 const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
   uuid: "trace-1",
   agent_id: "agent-1",
@@ -271,6 +276,7 @@ function tracesResult(
     total: items.length,
     loadedQ: "",
     loadedOutputType: "all",
+    loadedLabels: [],
     offset: 0,
     setOffset: jest.fn(),
     loadedOffset: 0,
@@ -296,6 +302,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
+  mockUseTraceLabels.mockReturnValue({ labels: [] });
   fetchAgentEvaluators.mockResolvedValue([]);
 });
 
@@ -431,6 +438,41 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Tool call" }));
 
     await waitFor(() => expect(lastTracesArgs().outputType).toBe("tool_call"));
+  });
+
+  it("filters by the labels the reader picks", async () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production", "staging"],
+    });
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(lastTracesArgs().labels).toEqual([]);
+    await user.click(screen.getByText("All labels"));
+    await user.click(screen.getByText("production"));
+
+    await waitFor(() =>
+      expect(lastTracesArgs().labels).toEqual(["production"]),
+    );
+  });
+
+  it("leaves the label filter out when the traces carry no labels", () => {
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(screen.queryByText("All labels")).not.toBeInTheDocument();
+  });
+
+  it("says nothing matched instead of the setup steps when a label is picked", () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production"],
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { loadedLabels: ["production"] }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(screen.getByText("No traces match your filter")).toBeInTheDocument();
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
   });
 
   it("select all ticks the filtered traces and nothing else", async () => {

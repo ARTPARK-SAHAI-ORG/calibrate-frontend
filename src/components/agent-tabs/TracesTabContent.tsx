@@ -15,6 +15,7 @@ import {
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
+import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -32,6 +33,7 @@ import {
   useItemPager,
   usePageSize,
   useTraceDeletion,
+  useTraceLabels,
   useTraces,
 } from "@/hooks";
 import {
@@ -94,11 +96,18 @@ export function TracesTabContent({
   // not just the ones on screen.
   const [outputFilter, setOutputFilter] = useState<TraceOutputFilter>("all");
 
+  // The tags sent with the traces, and the ones picked to filter by. A trace
+  // matches when it carries any of the picked ones. The whole set comes from
+  // the backend, since one page of rows is never all of them.
+  const { labels: allLabels } = useTraceLabels(accessToken, agentUuid);
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+
   const {
     items,
     total,
     loadedQ,
     loadedOutputType,
+    loadedLabels,
     offset,
     setOffset,
     loadedOffset,
@@ -116,6 +125,7 @@ export function TracesTabContent({
     pageSize,
     q: search,
     outputType: outputFilter,
+    labels: labelFilter,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
@@ -126,6 +136,7 @@ export function TracesTabContent({
     agentId: agentUuid,
     q: search,
     outputType: outputFilter,
+    labels: labelFilter,
   };
 
   const deletion = useTraceDeletion({
@@ -312,6 +323,7 @@ export function TracesTabContent({
             offset: 0,
             agentId: agentUuid,
             q: search,
+            labels: labelFilter,
             outputType,
           }),
         ),
@@ -351,7 +363,7 @@ export function TracesTabContent({
     pickedRef.current.clear();
     deletion.clearSelection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter]);
+  }, [search, outputFilter, labelFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -426,9 +438,13 @@ export function TracesTabContent({
   // loaded back.
   const isFilteringOutput =
     outputFilter !== "all" || loadedOutputType !== "all";
-  const isNarrowed = isSearching || isFilteringOutput;
+  // Picked labels narrow the list the same way, and the rows on screen are
+  // still the filtered ones until a cleared filter has loaded back.
+  const isFiltering =
+    isFilteringOutput || labelFilter.length > 0 || loadedLabels.length > 0;
+  const isNarrowed = isSearching || isFiltering;
   const noMatchMessage =
-    isSearching && isFilteringOutput
+    isSearching && isFiltering
       ? "No traces match your search and filter"
       : isSearching
         ? "No traces match your search"
@@ -464,6 +480,23 @@ export function TracesTabContent({
             className="sm:mr-auto"
             ariaLabel="Filter traces by output"
           />
+          {/* Only worth showing once traces carry labels; an agent that sends
+              none would otherwise get an empty picker it can do nothing with. */}
+          {allLabels.length > 0 && (
+            <MultiSelectPicker
+              items={allLabels.map((label) => ({ uuid: label, name: label }))}
+              selectedItems={labelFilter.map((label) => ({
+                uuid: label,
+                name: label,
+              }))}
+              onSelectionChange={(picked) =>
+                setLabelFilter(picked.map((item) => item.uuid))
+              }
+              placeholder="All labels"
+              searchPlaceholder="Search labels"
+              className="w-full sm:w-56"
+            />
+          )}
           <RefreshButton
             loading={isRefreshing}
             onClick={() => void handleRefresh()}

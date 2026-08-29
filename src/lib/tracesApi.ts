@@ -44,6 +44,8 @@ export type TraceSummary = {
   tool_names?: string[] | null;
   /** Slim tool calls (name + arguments) for the Output column. */
   tool_calls?: TraceToolCall[] | null;
+  /** The tags sent with the trace at ingest. Empty when none were sent. */
+  labels?: string[] | null;
   turn_count: number;
   tool_call_count: number;
   metadata_count: number;
@@ -60,6 +62,7 @@ export type TraceDetail = {
   input: TraceTurn[] | string;
   output: TraceOutput;
   metadata: TraceMetadataEntry[] | null;
+  labels?: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -100,6 +103,9 @@ export type TraceListParams = {
    *  output has tool calls and no reply ("tool_call"). "all" keeps everything
    *  and is left off here. */
   outputType?: TraceOutputFilter;
+  /** Keep only traces carrying any of these labels, matched exactly and
+   *  case-sensitively. An empty list is left off here. */
+  labels?: string[];
 };
 
 /**
@@ -110,7 +116,7 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q, outputType }: TraceListParams,
+  { limit, offset, agentId, q, outputType, labels }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
@@ -120,6 +126,7 @@ export async function fetchTraces(
   if (outputType && outputType !== "all") {
     params.set("output_type", outputType);
   }
+  for (const label of labels ?? []) params.append("labels", label);
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,
@@ -132,6 +139,22 @@ export async function fetchTrace(
   traceUuid: string,
 ): Promise<TraceDetail> {
   return apiGet<TraceDetail>(`/traces/${traceUuid}`, accessToken);
+}
+
+/**
+ * The labels sent with this agent's traces, so the filter can offer them.
+ * The list is server-paginated and holds one page, so the labels on screen
+ * are never the whole set: they have to come from the backend.
+ */
+export async function fetchTraceLabels(
+  accessToken: string,
+  agentId: string,
+): Promise<string[]> {
+  const data = await apiGet<{ labels?: string[] } | string[]>(
+    `/traces/labels?agent_id=${encodeURIComponent(agentId)}`,
+    accessToken,
+  );
+  return Array.isArray(data) ? data : (data.labels ?? []);
 }
 
 /**
@@ -169,6 +192,7 @@ export type TraceFilters = {
   agentId: string;
   q?: string;
   outputType?: TraceOutputFilter;
+  labels?: string[];
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -181,6 +205,7 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
   if (filters.outputType && filters.outputType !== "all") {
     body.output_type = filters.outputType;
   }
+  if (filters.labels?.length) body.labels = filters.labels;
   return body;
 }
 
@@ -253,7 +278,11 @@ export function convertTracesErrorMessage(error: unknown): string | null {
   }
   if (typeof detail === "string") return detail;
   if (!detail || typeof detail !== "object") return null;
-  const { error: summary, evaluators, trace_ids: traceIds } = detail as {
+  const {
+    error: summary,
+    evaluators,
+    trace_ids: traceIds,
+  } = detail as {
     error?: unknown;
     evaluators?: unknown;
     trace_ids?: unknown;

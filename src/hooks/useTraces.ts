@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
+/** Shared empty default, so a caller with no labels does not hand the hook a
+ *  new array on every render. */
+const EMPTY_LABELS: string[] = [];
+
 type UseTracesArgs = {
   /** Backend JWT; the hook is idle until it's available. */
   accessToken: string | null;
@@ -14,6 +18,8 @@ type UseTracesArgs = {
   q?: string;
   /** Keep only replies or only tool calls. "all" keeps everything. */
   outputType?: TraceOutputFilter;
+  /** Keep only traces carrying any of these labels. Empty keeps everything. */
+  labels?: string[];
 };
 
 /**
@@ -28,7 +34,11 @@ export function useTraces({
   pageSize = 50,
   q = "",
   outputType = "all",
+  labels = EMPTY_LABELS,
 }: UseTracesArgs) {
+  // A new array on every render would restart the fetch forever, so the
+  // effects and the fetch key on the labels' text rather than the array.
+  const labelKey = labels.join("\u0000");
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -48,13 +58,15 @@ export function useTraces({
   // before the fetch for it resolves.
   const [loadedOutputType, setLoadedOutputType] =
     useState<TraceOutputFilter>("all");
+  // The labels the rows on screen came from, lagging `labels` the same way.
+  const [loadedLabels, setLoadedLabels] = useState<string[]>([]);
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize, q, outputType]);
+  }, [agentId, pageSize, q, outputType, labelKey]);
 
   const load = useCallback(
     async (targetOffset: number): Promise<number> => {
@@ -69,6 +81,7 @@ export function useTraces({
           agentId,
           q,
           outputType,
+          labels,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
@@ -76,6 +89,7 @@ export function useTraces({
         setTotal(nextTotal);
         setLoadedQ(q);
         setLoadedOutputType(outputType);
+        setLoadedLabels(labels);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -91,7 +105,8 @@ export function useTraces({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [accessToken, pageSize, agentId, q, outputType],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accessToken, pageSize, agentId, q, outputType, labelKey],
   );
 
   useEffect(() => {
@@ -137,6 +152,7 @@ export function useTraces({
     total,
     loadedQ,
     loadedOutputType,
+    loadedLabels,
     offset,
     setOffset,
     loadedOffset,
