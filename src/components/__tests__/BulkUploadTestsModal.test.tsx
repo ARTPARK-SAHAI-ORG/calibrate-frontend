@@ -127,11 +127,14 @@ async function uploadFile(content: string, name = "tests.csv") {
   });
 }
 
+// The dialog opens on the type picker: tap an option, then press Next to
+// move on to the upload steps.
 async function selectTestType(
   user: ReturnType<typeof setupUser>,
   label: string,
 ) {
   await user.click(screen.getByText(label));
+  await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
 function defaultProps(
@@ -197,10 +200,19 @@ describe("BulkUploadTestsModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("closes via the Cancel button", async () => {
+  it("closes from the type picker via its close button", async () => {
     const user = setupUser();
     const onClose = jest.fn();
     render(<BulkUploadTestsModal {...defaultProps({ onClose })} />);
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("closes via the Cancel button on the upload step", async () => {
+    const user = setupUser();
+    const onClose = jest.fn();
+    render(<BulkUploadTestsModal {...defaultProps({ onClose })} />);
+    await selectTestType(user, "Does the agent use the right tool?");
     await user.click(screen.getByText("Cancel"));
     expect(onClose).toHaveBeenCalled();
   });
@@ -997,9 +1009,10 @@ describe("BulkUploadTestsModal", () => {
       expect(
         screen.getByText("Does the agent give the right answer?"),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText("Evaluate the agent's output given the input"),
-      ).toBeInTheDocument();
+      // The example panel next to the options describes a single input and
+      // output, not a conversation.
+      expect(screen.getByText("Input")).toBeInTheDocument();
+      expect(screen.getByText("Agent's output")).toBeInTheDocument();
       expect(
         screen.getByText("Does the agent use the right tool?"),
       ).toBeInTheDocument();

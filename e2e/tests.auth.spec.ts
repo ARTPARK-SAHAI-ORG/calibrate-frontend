@@ -79,9 +79,9 @@ test.describe("Tests page (authenticated, real backend)", () => {
       page.getByText("Select what you want to test about the agent"),
     ).toBeVisible();
 
-    // Close via the modal's "Cancel" button (backdrop is intentionally
-    // non-dismissing here).
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    // Close via the picker's close button (backdrop is intentionally
+    // non-dismissing here, and the first step has no Cancel).
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toHaveCount(0, { timeout: 15000 });
@@ -111,14 +111,14 @@ test.describe("Tests page (authenticated, real backend)", () => {
       page.getByRole("heading", { name: "Bulk upload tests", exact: true }),
     ).toBeVisible({ timeout: 20000 });
 
-    // Pick the tool call type card. Scope to the modal — the /tests page
-    // behind it also has "Tool Call" filter pills. Inside the modal the
-    // card's accessible name is its question plus its description line, so
-    // match on a substring.
+    // Pick the tool call option on the type picker, then press Next to reach
+    // the upload step. Scope to the modal — the /tests page behind it also
+    // has "Tool Call" filter pills.
     const bulkModal = page.locator(".fixed.inset-0.z-50");
     await bulkModal
       .getByRole("button", { name: /Does the agent use the right tool\?/ })
       .click();
+    await bulkModal.getByRole("button", { name: "Next", exact: true }).click();
 
     // A valid tool-call CSV: header exactly matches the modal's required
     // columns, one row whose conversation_history is a JSON array ending on a

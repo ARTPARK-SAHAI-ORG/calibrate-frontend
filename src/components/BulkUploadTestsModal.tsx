@@ -9,6 +9,7 @@ import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import Papa from "papaparse";
 import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
+import { TestTypePicker } from "@/components/TestTypePicker";
 import {
   ChatHistoryPreview,
   generateGuidelinesPdf,
@@ -1384,6 +1385,26 @@ export function BulkUploadTestsModal({
 
   if (!isOpen) return null;
 
+  // First step: the same picker the create test flow opens on. It is shown
+  // until a type is chosen, then the upload steps take over — the type is
+  // fixed for this upload, the way it is fixed for a created test.
+  if (testType === null) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        {/* Backdrop is non-dismissing here too — see the note below. */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <TestTypePicker
+          title="Bulk upload tests"
+          agentNature={agentNature}
+          onNext={(tab) =>
+            setTestType(tab === "tool-invocation" ? "tool_call" : "response")
+          }
+          onClose={onClose}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop is non-dismissing: clicking outside must NOT close the
@@ -1426,93 +1447,6 @@ export function BulkUploadTestsModal({
           ref={dialogBodyRef}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-6"
         >
-          {/* Step 1: Test Type — two side-by-side option cards so the
-              one-line description sits next to each title, helping the
-              user pick before clicking. Selected card uses the same
-              filled-foreground look the old segmented toggle had. */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Select what you want to test about the agent
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl">
-              {[
-                {
-                  value: "response" as const,
-                  label:
-                    agentNature === "general"
-                      ? "Does the agent give the right answer?"
-                      : "Does the agent give the right reply?",
-                  description:
-                    agentNature === "general"
-                      ? "Evaluate the agent's output given the input"
-                      : "Evaluate the agent's response given a conversation history",
-                },
-                {
-                  value: "tool_call" as const,
-                  label: "Does the agent use the right tool?",
-                  description:
-                    "Check whether the agent invokes the correct tool with the right arguments",
-                },
-                {
-                  value: "conversation" as const,
-                  label: "Conversation test",
-                  description:
-                    "Generate the agent's reply, then grade the full conversation",
-                },
-              ]
-                .filter((opt) => isCreatableTestType(opt.value))
-                .filter(
-                  (opt) =>
-                    agentNature !== "general" || opt.value !== "conversation",
-                )
-                .map((opt) => {
-                  const isSelected = testType === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setTestType(opt.value);
-                        setCsvFile(null);
-                        setParsedTests([]);
-                        setParseError(null);
-                        setUploadError(null);
-                        setPendingFile(null);
-                        setSelectedEvaluators([]);
-                        setCommittedEvaluators([]);
-                        // Reset cached evaluator list so the next-reply ↔
-                        // conversation switch re-fetches with the right
-                        // evaluator_type filter.
-                        setAvailableLLMEvaluators([]);
-                        setEvaluatorsFetched(false);
-                        setEvaluatorsFetchError(null);
-                        if (fileInputRef.current)
-                          fileInputRef.current.value = "";
-                      }}
-                      className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
-                        isSelected
-                          ? "bg-foreground text-background border-foreground"
-                          : "bg-background border-border hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="text-sm font-medium mb-0.5">
-                        {opt.label}
-                      </div>
-                      <div
-                        className={`text-xs leading-snug ${
-                          isSelected
-                            ? "text-background/80"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {opt.description}
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-
           {/* Step 1.5: Evaluator picker — response uploads only.
               The CSV format depends on which evaluators (and which of
               their variables) the user wants to attach, so we ask for
