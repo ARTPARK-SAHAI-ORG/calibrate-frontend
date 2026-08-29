@@ -260,6 +260,55 @@ it("falls back to Trace when there is no trace id to show", () => {
   expect(screen.getByRole("heading", { name: "Trace" })).toBeInTheDocument();
 });
 
+it("shows the labels the trace carries above the metadata table", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    labels: ["production", "v2.1"],
+  });
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "Labels" })).toBeInTheDocument(),
+  );
+  expect(screen.getByText("production")).toBeInTheDocument();
+  expect(screen.getByText("v2.1")).toBeInTheDocument();
+  // The labels read before the metadata does, which is the order asked for.
+  const panel = screen.getByRole("heading", { name: "Labels" }).parentElement
+    ?.parentElement as HTMLElement;
+  const headings = Array.from(panel.querySelectorAll("h3")).map(
+    (heading) => heading.textContent,
+  );
+  expect(headings).toEqual(["Labels", "Metadata"]);
+});
+
+it("leaves the labels out when the trace carries none", async () => {
+  mockFetchTrace.mockResolvedValue({ ...detail, labels: [] });
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Metadata" }),
+    ).toBeInTheDocument(),
+  );
+  expect(
+    screen.queryByRole("heading", { name: "Labels" }),
+  ).not.toBeInTheDocument();
+});
+
 it("renders a tool-call-only output without a missing-reply placeholder", async () => {
   mockFetchTrace.mockResolvedValue({
     ...detail,

@@ -196,19 +196,23 @@ function MetaBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** IDs (when present), created time, and ingest metadata — the right column. */
+/** IDs (when present), created time, labels, and ingest metadata — the right
+ *  column. */
 function TraceMetaPanel({
   messageId,
   conversationId,
   createdAt,
+  labels,
   metadata,
 }: {
   messageId: string | null;
   conversationId: string | null;
   createdAt: string;
+  labels: string[] | null;
   metadata: TraceMetadataEntry[] | null;
 }) {
   const entries = metadata ?? [];
+  const tags = labels ?? [];
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -217,6 +221,21 @@ function TraceMetaPanel({
         <MetaBlock label="Conversation" value={conversationId} />
       )}
       <MetaBlock label="Created" value={formatTraceDate(createdAt)} />
+      {tags.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">Labels</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs break-all"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {entries.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
@@ -408,6 +427,7 @@ export function TraceDetailDialog({
                 messageId={trace.message_id}
                 conversationId={trace.conversation_id}
                 createdAt={trace.created_at}
+                labels={trace.labels ?? null}
                 metadata={trace.metadata}
               />
             </div>
