@@ -12,6 +12,7 @@ describe("buildSnippet", () => {
       const snippet = buildSnippet(language, values);
       expect(snippet).not.toContain("message_id");
       expect(snippet).not.toContain("conversation_id");
+      expect(snippet).not.toContain("labels");
       expect(snippet).not.toContain("metadata");
     }
   });
@@ -24,6 +25,8 @@ describe("buildSnippet", () => {
       });
       expect(snippet).toContain("message_id");
       expect(snippet).toContain("conversation_id");
+      expect(snippet).toContain("labels");
+      expect(snippet).toContain('["production", "v2.1"]');
       expect(snippet).toContain("metadata");
     }
   });
@@ -73,5 +76,17 @@ describe("snippetFields", () => {
     expect(inputMeaning("general")).toBe(
       "The input given to the agent, as a single piece of text.",
     );
+  });
+
+  it("lists labels as an optional field between conversation_id and metadata", () => {
+    const optional = snippetFields()
+      .filter((f) => f.optional)
+      .map((f) => f.name);
+    expect(optional).toEqual([
+      "message_id",
+      "conversation_id",
+      "labels",
+      "metadata",
+    ]);
   });
 });

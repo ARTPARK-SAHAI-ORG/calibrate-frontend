@@ -19,6 +19,12 @@ type MultiSelectPickerProps = {
   isLoading?: boolean;
   className?: string;
   disabled?: boolean;
+  /**
+   * "md" (default) — the form field used inside dialogs.
+   * "sm" — the shorter, less rounded control used in a list toolbar, so it
+   * matches the search box and the buttons beside it.
+   */
+  size?: "sm" | "md";
   // Optional callback fired when the dropdown opens or closes. Lets the
   // parent defer side effects (e.g. resetting an uploaded CSV) until the
   // user is done picking instead of reacting to every intermediate
@@ -36,6 +42,7 @@ export function MultiSelectPicker({
   isLoading = false,
   className = "",
   disabled = false,
+  size = "md",
   onOpenChange,
 }: MultiSelectPickerProps) {
   const [dropdownOpen, setDropdownOpenState] = useState(false);
@@ -103,7 +110,7 @@ export function MultiSelectPicker({
       const placeAbove = spaceBelow < preferred && spaceAbove > spaceBelow;
       const maxHeight = Math.max(
         180,
-        Math.floor((placeAbove ? spaceAbove : spaceBelow)),
+        Math.floor(placeAbove ? spaceAbove : spaceBelow),
       );
       setMenuRect({
         left: r.left,
@@ -174,7 +181,11 @@ export function MultiSelectPicker({
       <div className="relative" ref={triggerRef}>
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
-          className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-background text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
+          className={`w-full ${
+            size === "sm"
+              ? "min-h-10 px-3 py-1.5 rounded-md"
+              : "min-h-[44px] px-4 py-2 rounded-xl"
+          } text-sm bg-background text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
             disabled
               ? "cursor-default"
               : "hover:border-muted-foreground cursor-pointer"

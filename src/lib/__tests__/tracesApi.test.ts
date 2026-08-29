@@ -1,6 +1,7 @@
 import {
   fetchTraces,
   fetchTrace,
+  fetchTraceLabels,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -95,7 +96,12 @@ describe("fetchTraces", () => {
       new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get("q"),
     ).toBe("polio");
 
-    await fetchTraces("tok", { limit: 50, offset: 0, agentId: "ag-1", q: "  " });
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      q: "  ",
+    });
     expect(
       new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has("q"),
     ).toBe(false);
@@ -300,15 +306,82 @@ describe("convertTracesToTests", () => {
   });
 });
 
+describe("fetchTraces with labels", () => {
+  it("sends one labels value per picked label, and none when nothing is picked", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      labels: ["production", "v2.1"],
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).getAll(
+        "labels",
+      ),
+    ).toEqual(["production", "v2.1"]);
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      labels: [],
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has(
+        "labels",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("fetchTraceLabels", () => {
+  it("asks for one agent's labels and reads them out of the response", async () => {
+    mockApiGet.mockResolvedValue({ labels: ["production", "staging"] });
+
+    expect(await fetchTraceLabels("tok", "ag 1")).toEqual([
+      "production",
+      "staging",
+    ]);
+    expect(mockApiGet.mock.calls[0][0]).toBe("/traces/labels?agent_id=ag%201");
+    expect(mockApiGet.mock.calls[0][1]).toBe("tok");
+  });
+
+  it("reads a bare list, and an empty one when there are no labels", async () => {
+    mockApiGet.mockResolvedValue(["production"]);
+    expect(await fetchTraceLabels("tok", "ag-1")).toEqual(["production"]);
+
+    mockApiGet.mockResolvedValue({});
+    expect(await fetchTraceLabels("tok", "ag-1")).toEqual([]);
+  });
+});
+
 describe("selectAllBody", () => {
   it("carries the agent, the search text and the output type", () => {
     expect(
-      selectAllBody({ agentId: "ag-1", q: "  refund  ", outputType: "tool_call" }),
+      selectAllBody({
+        agentId: "ag-1",
+        q: "  refund  ",
+        outputType: "tool_call",
+      }),
     ).toEqual({
       select_all: true,
       agent_id: "ag-1",
       q: "refund",
       output_type: "tool_call",
+    });
+  });
+
+  it("carries the picked labels, and leaves them out when none are picked", () => {
+    expect(selectAllBody({ agentId: "ag-1", labels: ["production"] })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      labels: ["production"],
+    });
+    expect(selectAllBody({ agentId: "ag-1", labels: [] })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
     });
   });
 
@@ -325,7 +398,10 @@ describe("selectAllBody", () => {
 
 describe("convertTracesToTests for every trace the list matches", () => {
   it("sends the filters instead of the ticked ids", async () => {
-    mockApiPost.mockResolvedValue({ created: 3, test_uuids: ["t1", "t2", "t3"] });
+    mockApiPost.mockResolvedValue({
+      created: 3,
+      test_uuids: ["t1", "t2", "t3"],
+    });
 
     await convertTracesToTests("tok", {
       traceIds: ["stale-1"],

@@ -31,11 +31,13 @@ const EXAMPLE_INPUT = "When is the next vaccination?";
 const OPTIONAL_PYTHON = `        # Optional
         "message_id": "your-message-id",
         "conversation_id": "your-conversation-id",
+        "labels": ["production", "v2.1"],
         "metadata": [{"key": "env", "value": "production"}],`;
 
 const OPTIONAL_JAVASCRIPT = `    // Optional
     message_id: "your-message-id",
     conversation_id: "your-conversation-id",
+    labels: ["production", "v2.1"],
     metadata: [{ key: "env", value: "production" }],`;
 
 function curl({
@@ -58,6 +60,7 @@ function curl({
     ? `,
     "message_id": "your-message-id",
     "conversation_id": "your-conversation-id",
+    "labels": ["production", "v2.1"],
     "metadata": [{"key": "env", "value": "production"}]`
     : "";
   return `curl -X POST ${backendUrl}/traces \\
@@ -206,6 +209,12 @@ export function snippetFields(
       optional: true,
       meaning:
         "The unique id of the conversation that this trace belongs to. Use the same id for all turns in the same conversation.",
+    },
+    {
+      name: "labels",
+      optional: true,
+      meaning:
+        "Your own tags for this trace, such as the environment it ran in or the release it came from. Send them here, they cannot be changed later. You can filter your traces by them.",
     },
     {
       name: "metadata",

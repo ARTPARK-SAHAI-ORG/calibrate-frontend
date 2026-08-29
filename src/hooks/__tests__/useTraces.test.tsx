@@ -42,6 +42,7 @@ describe("useTraces", () => {
       agentId: "ag-1",
       q: "",
       outputType: "all",
+      labels: [],
     });
   });
 
@@ -375,5 +376,60 @@ describe("useTraces", () => {
       expect(result.current.items).toEqual([{ uuid: "new" }]),
     );
     expect(result.current.total).toBe(1);
+  });
+
+  it("sends the picked labels and returns to the first page when they change", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 200));
+
+    const { result, rerender } = renderHook(
+      ({ labels }: { labels: string[] }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", labels }),
+      { initialProps: { labels: [] as string[] } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ labels: ["production"] });
+
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith("tok", {
+        limit: 50,
+        offset: 0,
+        agentId: "ag-1",
+        q: "",
+        outputType: "all",
+        labels: ["production"],
+      }),
+    );
+  });
+
+  it("does not refetch when the same labels arrive in a new array", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+
+    const { result, rerender } = renderHook(
+      ({ labels }: { labels: string[] }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", labels }),
+      { initialProps: { labels: ["production"] } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockFetchTraces).toHaveBeenCalledTimes(1);
+
+    rerender({ labels: ["production"] });
+
+    await waitFor(() => expect(mockFetchTraces).toHaveBeenCalledTimes(1));
+  });
+
+  it("reports the labels the rows on screen came from", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", labels: ["staging"] }),
+    );
+
+    await waitFor(() =>
+      expect(result.current.loadedLabels).toEqual(["staging"]),
+    );
   });
 });
