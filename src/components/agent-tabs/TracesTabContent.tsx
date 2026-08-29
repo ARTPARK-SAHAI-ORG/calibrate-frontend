@@ -507,18 +507,18 @@ export function TracesTabContent({
               }
               placeholder="All labels"
               searchPlaceholder="Search labels"
-              className="w-full sm:w-56"
+              size="sm"
+              className="w-full sm:w-48"
             />
           )}
+          {/* Both stand the same height as the search box and the labels
+              picker beside them. */}
           <RefreshButton
+            size="md"
             loading={isRefreshing}
             onClick={() => void handleRefresh()}
           />
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setCodeOpen(true)}
-          >
+          <Button variant="secondary" onClick={() => setCodeOpen(true)}>
             View code
           </Button>
         </div>

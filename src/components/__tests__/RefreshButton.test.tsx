@@ -37,4 +37,17 @@ describe("RefreshButton", () => {
       "extra-class",
     );
   });
+
+  it("stands as tall as the search box in a list toolbar", () => {
+    const { rerender } = render(<RefreshButton onClick={jest.fn()} />);
+    expect(screen.getByRole("button", { name: "Refresh" }).className).toContain(
+      "h-7 w-7",
+    );
+
+    rerender(<RefreshButton onClick={jest.fn()} size="md" />);
+
+    expect(screen.getByRole("button", { name: "Refresh" }).className).toContain(
+      "h-10 w-10",
+    );
+  });
 });

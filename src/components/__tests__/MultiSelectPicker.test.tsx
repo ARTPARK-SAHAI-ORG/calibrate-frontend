@@ -1,8 +1,5 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
-import {
-  MultiSelectPicker,
-  PickerItem,
-} from "../MultiSelectPicker";
+import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
 
 const ITEMS: PickerItem[] = [
   { uuid: "1", name: "Alpha", description: "First item" },
@@ -21,6 +18,36 @@ describe("MultiSelectPicker", () => {
       />,
     );
     expect(screen.getByText("Pick things")).toBeInTheDocument();
+  });
+
+  it("is the taller form-field shape by default and the toolbar shape at sm", () => {
+    const { rerender } = render(
+      <MultiSelectPicker
+        items={ITEMS}
+        selectedItems={[]}
+        onSelectionChange={jest.fn()}
+        placeholder="Pick things"
+      />,
+    );
+    const trigger = () =>
+      screen.getByText("Pick things").parentElement
+        ?.parentElement as HTMLElement;
+    expect(trigger().className).toContain("rounded-xl");
+
+    rerender(
+      <MultiSelectPicker
+        items={ITEMS}
+        selectedItems={[]}
+        onSelectionChange={jest.fn()}
+        placeholder="Pick things"
+        size="sm"
+      />,
+    );
+
+    // Same height and corners as the search box it sits beside.
+    expect(trigger().className).toContain("rounded-md");
+    expect(trigger().className).toContain("min-h-10");
+    expect(trigger().className).not.toContain("rounded-xl");
   });
 
   it("renders a label when provided", () => {

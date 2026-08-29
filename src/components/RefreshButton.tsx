@@ -7,6 +7,11 @@ type RefreshButtonProps = {
   loading?: boolean;
   disabled?: boolean;
   tooltip?: string;
+  /**
+   * "sm" (default) — the small round button used beside a heading.
+   * "md" — square with the search box and the buttons in a list toolbar.
+   */
+  size?: "sm" | "md";
   className?: string;
 };
 
@@ -15,6 +20,7 @@ export function RefreshButton({
   loading,
   disabled,
   tooltip = "Refresh",
+  size = "sm",
   className,
 }: RefreshButtonProps) {
   const isDisabled = disabled || loading;
@@ -26,7 +32,9 @@ export function RefreshButton({
         onClick={onClick}
         disabled={isDisabled}
         aria-label={tooltip}
-        className={`flex items-center justify-center h-7 w-7 rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-200 hover:bg-slate-500/20 dark:hover:bg-slate-500/25 ${className ?? ""}`}
+        className={`flex items-center justify-center ${
+          size === "md" ? "h-10 w-10" : "h-7 w-7"
+        } rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-200 hover:bg-slate-500/20 dark:hover:bg-slate-500/25 ${className ?? ""}`}
       >
         <svg
           className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
@@ -40,11 +48,7 @@ export function RefreshButton({
             strokeLinejoin="round"
             d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"
           />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M21 3v5h-5"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 3v5h-5" />
         </svg>
       </button>
     </Tooltip>
