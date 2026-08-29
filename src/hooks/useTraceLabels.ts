@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchTraceLabels } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
@@ -14,6 +14,9 @@ import { reportError } from "@/lib/reportError";
  */
 export function useTraceLabels(accessToken: string | null, agentId: string) {
   const [labels, setLabels] = useState<string[]>([]);
+  // Bumped to ask again, for when new traces have landed since: a label the
+  // agent has only just started sending is not in the answer already held.
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     if (!accessToken || !agentId) return;
@@ -31,7 +34,9 @@ export function useTraceLabels(accessToken: string | null, agentId: string) {
     return () => {
       current = false;
     };
-  }, [accessToken, agentId]);
+  }, [accessToken, agentId, reloads]);
 
-  return { labels };
+  const refetch = useCallback(() => setReloads((n) => n + 1), []);
+
+  return { labels, refetch };
 }

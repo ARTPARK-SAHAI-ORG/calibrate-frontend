@@ -211,7 +211,11 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
-    selectAll?: { agentId: string; outputType?: string } | null;
+    selectAll?: {
+      agentId: string;
+      outputType?: string;
+      labels?: string[];
+    } | null;
     agentNature?: string;
     onConverted: (
       result: { created: number; test_uuids: string[] },
@@ -224,7 +228,11 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
         <span data-testid="convert-select-all">
-          {selectAll ? `${selectAll.agentId}|${selectAll.outputType}` : "none"}
+          {selectAll
+            ? `${selectAll.agentId}|${selectAll.outputType}|${(
+                selectAll.labels ?? []
+              ).join(",")}`
+            : "none"}
         </span>
         <span data-testid="convert-nature">{agentNature}</span>
         <button
@@ -249,7 +257,11 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
 
 // The labels the agent's traces carry, which the filter offers. Most tests
 // have none, so the picker stays out of the way.
-const mockUseTraceLabels = jest.fn(() => ({ labels: [] as string[] }));
+const refetchLabels = jest.fn();
+const mockUseTraceLabels = jest.fn(() => ({
+  labels: [] as string[],
+  refetch: refetchLabels,
+}));
 
 const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
   uuid: "trace-1",
@@ -302,7 +314,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
-  mockUseTraceLabels.mockReturnValue({ labels: [] });
+  mockUseTraceLabels.mockReturnValue({ labels: [], refetch: refetchLabels });
   fetchAgentEvaluators.mockResolvedValue([]);
 });
 
@@ -320,6 +332,28 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
 
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the labels again when the list is refreshed", async () => {
+    refetch.mockResolvedValue(false);
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    // A trace that has just landed can carry a label nothing has seen yet.
+    expect(refetchLabels).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the labels again when the setup steps look for the first trace", async () => {
+    refetch.mockResolvedValue(false);
+    mockUseTraces.mockReturnValue(tracesResult([]));
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByText("check"));
+
+    expect(refetchLabels).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the sending code reachable once traces exist", async () => {
@@ -443,6 +477,7 @@ describe("TracesTabContent", () => {
   it("filters by the labels the reader picks", async () => {
     mockUseTraceLabels.mockReturnValue({
       labels: ["production", "staging"],
+      refetch: refetchLabels,
     });
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
@@ -456,6 +491,134 @@ describe("TracesTabContent", () => {
     );
   });
 
+  it("takes the picked labels into a whole matching list, and counts within them", async () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production", "staging"],
+      refetch: refetchLabels,
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // Only replies in the labelled list, so the whole list is one kind.
+    fetchTraces.mockImplementation(
+      async (
+        _token: string,
+        params: {
+          outputType: string;
+        },
+      ) => ({
+        items: [],
+        total: params.outputType === "response" ? 4 : 0,
+        limit: 1,
+        offset: 0,
+      }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByText("All labels"));
+    await user.click(screen.getByText("production"));
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    // The backend re-reads the list from these filters, so the label has to
+    // be among them or it acts on traces the reader never saw.
+    expect(screen.getByTestId("convert-select-all")).toHaveTextContent(
+      "agent-1|response|production",
+    );
+    // The counts that decided the kind were read within the label too.
+    expect(fetchTraces).toHaveBeenCalledWith(
+      "test-token",
+      expect.objectContaining({ labels: ["production"] }),
+    );
+  });
+
+  it("drops the ticked traces when a label is picked", async () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production"],
+      refetch: refetchLabels,
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    expect(screen.getByText("trace selected")).toBeInTheDocument();
+
+    await user.click(screen.getByText("All labels"));
+    await user.click(screen.getByText("production"));
+
+    // The tick was made against the old list, so acting on it would reach
+    // traces the new one does not hold.
+    expect(screen.queryByText("trace selected")).not.toBeInTheDocument();
+  });
+
+  it("keeps the setup steps away the moment a label is picked", async () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production"],
+      refetch: refetchLabels,
+    });
+    // Nothing carries the label, and the rows for it have not arrived yet, so
+    // `loadedLabels` is still empty: exactly the moment after the pick.
+    mockUseTraces.mockImplementation((args: { labels: string[] }) =>
+      args.labels.length > 0
+        ? tracesResult([], { total: 0 })
+        : tracesResult([trace({ uuid: "trace-1" })]),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByText("All labels"));
+    await user.click(screen.getByText("production"));
+
+    expect(screen.getByText("No traces match your filter")).toBeInTheDocument();
+    expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
+  });
+
+  it("does not open the add-to-tests window on a list the reader has left", async () => {
+    mockUseTraceLabels.mockReturnValue({
+      labels: ["production"],
+      refetch: refetchLabels,
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    // The counts are still in flight while the reader changes the filter.
+    // Replies only, so without the guard the answer is a usable kind and the
+    // window opens on the list the reader has already left.
+    const answers: Array<(kind: { total: number }) => void> = [];
+    fetchTraces.mockImplementation(
+      (_token: string, params: { outputType: string }) =>
+        new Promise((resolve) => {
+          answers.push(() =>
+            resolve({
+              items: [],
+              total: params.outputType === "response" ? 4 : 0,
+              limit: 1,
+              offset: 0,
+            }),
+          );
+        }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+    await user.click(screen.getByText("All labels"));
+    await user.click(screen.getByText("production"));
+    await act(async () => {
+      answers.forEach((answer) => answer());
+    });
+
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+  });
+
   it("leaves the label filter out when the traces carry no labels", () => {
     render(<TracesTabContent {...tabProps} />);
 
@@ -465,6 +628,7 @@ describe("TracesTabContent", () => {
   it("says nothing matched instead of the setup steps when a label is picked", () => {
     mockUseTraceLabels.mockReturnValue({
       labels: ["production"],
+      refetch: refetchLabels,
     });
     mockUseTraces.mockReturnValue(
       tracesResult([], { loadedLabels: ["production"] }),

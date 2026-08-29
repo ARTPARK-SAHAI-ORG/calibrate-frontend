@@ -75,12 +75,35 @@ describe("useTraceLabels", () => {
     expect(result.current.labels).toEqual(["staging"]);
   });
 
-  it("leaves the list empty and reports a failure", async () => {
-    mockFetchTraceLabels.mockRejectedValue(new Error("nope"));
+  it("clears the labels it was holding when a later read fails", async () => {
+    mockFetchTraceLabels
+      .mockResolvedValueOnce(["production"])
+      .mockRejectedValueOnce(new Error("nope"));
 
     const { result } = renderHook(() => useTraceLabels("tok", "ag-1"));
+    await waitFor(() => expect(result.current.labels).toEqual(["production"]));
+
+    act(() => result.current.refetch());
 
     await waitFor(() => expect(mockReportError).toHaveBeenCalled());
     expect(result.current.labels).toEqual([]);
+  });
+
+  it("stays idle without an agent", () => {
+    renderHook(() => useTraceLabels("tok", ""));
+    expect(mockFetchTraceLabels).not.toHaveBeenCalled();
+  });
+
+  it("reads the labels again when asked", async () => {
+    mockFetchTraceLabels
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(["production"]);
+
+    const { result } = renderHook(() => useTraceLabels("tok", "ag-1"));
+    await waitFor(() => expect(mockFetchTraceLabels).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.refetch());
+
+    await waitFor(() => expect(result.current.labels).toEqual(["production"]));
   });
 });

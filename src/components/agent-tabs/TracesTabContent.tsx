@@ -99,7 +99,10 @@ export function TracesTabContent({
   // The tags sent with the traces, and the ones picked to filter by. A trace
   // matches when it carries any of the picked ones. The whole set comes from
   // the backend, since one page of rows is never all of them.
-  const { labels: allLabels } = useTraceLabels(accessToken, agentUuid);
+  const { labels: allLabels, refetch: refetchLabels } = useTraceLabels(
+    accessToken,
+    agentUuid,
+  );
   const [labelFilter, setLabelFilter] = useState<string[]>([]);
 
   const {
@@ -309,11 +312,16 @@ export function TracesTabContent({
     "response" | "tool_call" | "mixed" | null
   >(null);
   const [isCheckingKinds, setIsCheckingKinds] = useState(false);
+  // Bumped whenever the list the reader is looking at changes. The counts
+  // below take a round trip, and a filter changed while they are in flight
+  // makes their answer one about a list nobody is looking at any more.
+  const listVersionRef = useRef(0);
   const wholeListKindOf = async (): Promise<
     "response" | "tool_call" | "mixed" | null
   > => {
     if (!accessToken) return null;
     if (wholeListKind) return wholeListKind;
+    const listVersion = listVersionRef.current;
     setIsCheckingKinds(true);
     try {
       const [replies, toolCalls] = await Promise.all(
@@ -328,6 +336,7 @@ export function TracesTabContent({
           }),
         ),
       );
+      if (listVersion !== listVersionRef.current) return null;
       const kind =
         replies.total > 0 && toolCalls.total > 0
           ? "mixed"
@@ -358,6 +367,7 @@ export function TracesTabContent({
   // list no longer matches cannot be seen on screen, so it must not stay in
   // what the next action works on.
   useEffect(() => {
+    listVersionRef.current += 1;
     setEveryTraceMatching(false);
     setWholeListKind(null);
     pickedRef.current.clear();
@@ -381,6 +391,9 @@ export function TracesTabContent({
     setWholeListKind(null);
     setIsRefreshing(true);
     try {
+      // New traces can carry labels nothing has seen yet, so the filter's
+      // choices are read again with them.
+      refetchLabels();
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -517,7 +530,11 @@ export function TracesTabContent({
         <TracesEmptyState
           agentUuid={agentUuid}
           agentNature={agentNature}
-          onCheckForTraces={refetch}
+          onCheckForTraces={async () => {
+            // The first trace is also the first chance to have labels.
+            refetchLabels();
+            return refetch();
+          }}
         />
       ) : (
         <div className="space-y-3">
