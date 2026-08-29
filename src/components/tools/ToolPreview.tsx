@@ -107,10 +107,12 @@ function ParamSection({
               <span className="text-sm font-medium text-foreground">
                 {p.name || "(unnamed)"}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
                 {p.dataType}
-                {!p.required && " · optional"}
               </span>
+              {!p.required && (
+                <span className="text-xs text-muted-foreground">optional</span>
+              )}
             </div>
             {p.description && (
               <p className="text-xs text-muted-foreground mt-1">
