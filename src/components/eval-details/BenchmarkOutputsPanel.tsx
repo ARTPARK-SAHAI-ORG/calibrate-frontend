@@ -9,6 +9,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  TestCouldNotRunNotice,
   ResizeHandle,
   isTypingTarget,
   scrollRowByPage,
@@ -560,19 +561,7 @@ export function BenchmarkOutputsPanel({
         <div className="flex-1 overflow-y-auto">
           {selectedTestResult ? (
             selectedTestResult.error ? (
-              <div className="p-4 md:p-6">
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                    <span className="font-medium text-red-500">Something went wrong</span>
-                  </div>
-                  <p className="text-sm text-red-400">
-                    This test errored out before it could be evaluated. Please reach out to us if this issue persists.
-                  </p>
-                </div>
-              </div>
+              <TestCouldNotRunNotice error={selectedTestResult.error} />
             ) : selectedTestResult.passed === null && showRunningSpinner ? (
               <div className="flex items-center justify-center h-full">
                 <div className="flex items-center gap-3">

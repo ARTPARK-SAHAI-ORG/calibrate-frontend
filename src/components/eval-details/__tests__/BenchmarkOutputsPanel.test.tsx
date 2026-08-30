@@ -7,6 +7,9 @@ import {
 } from "../BenchmarkOutputsPanel";
 
 jest.mock("../../test-results/shared", () => ({
+  // The real notice, so the copy a user reads is what this test asserts.
+  TestCouldNotRunNotice: jest.requireActual("../../test-results/shared")
+    .TestCouldNotRunNotice,
   StatusIcon: ({ status }: { status: string }) => (
     <span data-testid="status-icon">{status}</span>
   ),
@@ -1022,7 +1025,7 @@ describe("BenchmarkOutputsPanel", () => {
   });
 
   describe("middle pane detail rendering", () => {
-    it("renders an error card when the selected test has .error", () => {
+    it("says the selected test could not be run and shows the real reason", () => {
       render(
         <BenchmarkOutputsPanel
           modelResults={twoModels}
@@ -1032,7 +1035,10 @@ describe("BenchmarkOutputsPanel", () => {
           onSelectTest={jest.fn()}
         />,
       );
-      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      expect(
+        screen.getByText("This test could not be run"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("boom")).toBeInTheDocument();
     });
 
     it("renders 'Running test...' spinner when passed is null and showRunningSpinner is true", () => {

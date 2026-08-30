@@ -1767,6 +1767,35 @@ export function ResultPager({
   );
 }
 
+/**
+ * Shown in place of a verdict when a test produced no answer (a timeout, an
+ * HTTP error from the agent, an unreachable judge). Amber, not red: this is
+ * not the judge saying the answer was wrong.
+ */
+export function TestCouldNotRunNotice({ error }: { error?: string }) {
+  return (
+    <div className="p-4 md:p-6">
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <WarningTriangleIcon className="w-5 h-5 text-amber-500" />
+          <span className="font-medium text-amber-600 dark:text-amber-500">
+            This test could not be run
+          </span>
+        </div>
+        {error && (
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+            {error}
+          </p>
+        )}
+        <p className="mt-2 text-sm text-muted-foreground">
+          The agent gave no answer, so this test was not scored. It does not
+          count as a wrong answer.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Shared Stats Display Component
 export function TestStats({
   passedCount,

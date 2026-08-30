@@ -6,6 +6,9 @@ import {
 } from "../TestRunOutputsPanel";
 
 jest.mock("../../test-results/shared", () => ({
+  // The real notice, so the copy a user reads is what this test asserts.
+  TestCouldNotRunNotice: jest.requireActual("../../test-results/shared")
+    .TestCouldNotRunNotice,
   StatusIcon: ({ status }: { status: string }) => (
     <span data-testid="status-icon">{status}</span>
   ),
@@ -209,7 +212,7 @@ describe("TestRunOutputsPanel", () => {
     expect(screen.getByText("Running test")).toBeInTheDocument();
   });
 
-  it("renders an error card when the result has .error set, regardless of status", () => {
+  it("says the test could not be run and shows the real reason, regardless of status", () => {
     render(
       <TestRunOutputsPanel
         results={allResults}
@@ -217,7 +220,14 @@ describe("TestRunOutputsPanel", () => {
         onSelect={jest.fn()}
       />,
     );
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByText("This test could not be run"),
+    ).toBeInTheDocument();
+    // The reason the backend gave, not a generic apology.
+    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Something went wrong"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders SharedTestDetailView (mocked) for passed/failed non-errored results", () => {
