@@ -29,18 +29,26 @@ jest.mock("../AddEvaluatorsDialog", () => ({
     isOpen,
     onAdd,
     availableEvaluators,
+    onEvaluatorDeleted,
   }: {
     isOpen: boolean;
     onAdd: (ids: string[]) => Promise<void> | void;
     availableEvaluators: EvaluatorData[];
+    onEvaluatorDeleted?: (uuid: string) => void;
   }) =>
     isOpen ? (
       <div data-testid="add-dialog">
         <span data-testid="available-evaluator-types">
           {availableEvaluators.map((e) => e.evaluator_type).join(",")}
         </span>
+        <span data-testid="available-evaluator-names">
+          {availableEvaluators.map((e) => e.name).join(",")}
+        </span>
         <button type="button" onClick={() => onAdd(["ev-2"])}>
           Confirm add
+        </button>
+        <button type="button" onClick={() => onEvaluatorDeleted?.("ev-2")}>
+          Report deleted
         </button>
       </div>
     ) : null,
@@ -221,6 +229,29 @@ describe("EvaluatorsTabContent", () => {
     await screen.findByText("No evaluators added yet");
     await user.click(screen.getByRole("button", { name: "Add evaluators" }));
     expect(screen.getByTestId("add-dialog")).toBeInTheDocument();
+  });
+
+  it("drops an evaluator deleted from the picker out of the list it offers", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([]);
+    mockFetchAllEvaluators.mockResolvedValue([
+      evaluator({ uuid: "ev-2", name: "Tone check" }),
+      evaluator({ uuid: "ev-3", name: "Policy fit" }),
+    ]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+    await screen.findByText("No evaluators added yet");
+    await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+    expect(screen.getByTestId("available-evaluator-names").textContent).toBe(
+      "Tone check,Policy fit",
+    );
+
+    // Deleted from the workspace: it must not still be on offer, or its row
+    // would open nothing and adding it would fail.
+    await user.click(screen.getByRole("button", { name: "Report deleted" }));
+    expect(screen.getByTestId("available-evaluator-names").textContent).toBe(
+      "Policy fit",
+    );
   });
 
   it("detaches an evaluator after confirming the remove dialog", async () => {

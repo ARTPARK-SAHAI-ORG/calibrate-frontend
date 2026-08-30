@@ -287,6 +287,38 @@ describe("AgentDetail", () => {
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
 
+  it("puts Tools right after Connection, before Settings, for a connection agent", async () => {
+    mockFetchSequenceForAgent(connectionAgent);
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+
+    const tabNames = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim())
+      .filter((label): label is string =>
+        [
+          "Evaluations",
+          "Tests",
+          "Evaluators",
+          "Traces",
+          "Connection",
+          "Tools",
+          "Settings",
+        ].includes(label ?? ""),
+      );
+    expect(tabNames).toEqual([
+      "Evaluations",
+      "Tests",
+      "Evaluators",
+      "Traces",
+      "Connection",
+      "Tools",
+      "Settings",
+    ]);
+  });
+
   it("puts Evaluations, then Tests, then Evaluators in that order", async () => {
     mockFetchSequenceForAgent(buildAgent);
     render(<AgentDetail agentUuid={buildAgent.uuid} />);

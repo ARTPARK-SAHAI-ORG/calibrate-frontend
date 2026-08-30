@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { AddToolDialog } from "@/components/AddToolDialog";
+import { ToolTypePill } from "@/components/tools/ToolTypePill";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -340,11 +341,9 @@ export default function ToolsPage() {
                       {tool.name}
                     </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {tool.config?.type === "webhook"
-                      ? "Webhook"
-                      : "Structured Output"}
-                  </p>
+                  <div>
+                    <ToolTypePill configType={tool.config?.type} />
+                  </div>
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {tool.description || tool.config?.description || "—"}
                   </p>
@@ -387,10 +386,8 @@ export default function ToolsPage() {
                     <div className="font-medium text-sm text-foreground mb-1">
                       {tool.name}
                     </div>
-                    <div className="text-xs text-muted-foreground mb-2">
-                      {tool.config?.type === "webhook"
-                        ? "Webhook"
-                        : "Structured Output"}
+                    <div className="mb-2">
+                      <ToolTypePill configType={tool.config?.type} />
                     </div>
                     <div className="text-xs text-muted-foreground line-clamp-2">
                       {tool.description || tool.config?.description || "—"}

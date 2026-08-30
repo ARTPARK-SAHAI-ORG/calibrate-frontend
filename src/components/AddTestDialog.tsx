@@ -17,6 +17,9 @@ import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { attachToolsToAgent } from "@/lib/agentTools";
+import { toast } from "sonner";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
@@ -716,6 +719,11 @@ type AddTestDialogProps = {
     options?: { runAfterSave?: boolean },
   ) => void;
   initialTab?: "next-reply" | "tool-invocation" | "conversation";
+  /** The agent these tests belong to, when the dialog was opened from its
+   * own Tests tab. A tool written here is added to that agent as well as to
+   * the workspace. Absent on the standalone tests page, where there is no
+   * one agent to add it to. */
+  agentUuid?: string;
   initialConfig?: TestConfig;
   initialEvaluators?: AttachedEvaluatorInit[];
   /**
@@ -815,6 +823,7 @@ export function AddTestDialog({
   validationAttempted,
   onSubmit,
   initialTab,
+  agentUuid,
   initialConfig,
   initialEvaluators,
   agentEvaluatorUuids,
@@ -915,6 +924,11 @@ export function AddTestDialog({
   };
 
   // Available tools state - declared early so it's available for initialConfig parsing
+  const [createToolOpen, setCreateToolOpen] = useState(false);
+  // Same flow, opened from "Agent tool call" in the conversation history's
+  // add-message menu instead of the "Tools to test" header.
+  const [createConversationToolOpen, setCreateConversationToolOpen] =
+    useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
 
@@ -1362,6 +1376,57 @@ export function AddTestDialog({
     const id = Date.now().toString();
     setChatMessages([...chatMessages, { id, role, content: "" }]);
     setPendingFocusId(id);
+  };
+
+  // The parameter list for a tool_call message, read off a tool's stored
+  // config the same way picking an existing tool does — shared by
+  // onSelectCustomTool below and CreateToolFlow's onCreated, so a freshly
+  // made tool behaves identically to one already in the library.
+  const computeToolCallParams = (
+    tool: AvailableTool,
+  ): Array<{ name: string; value: string; group?: string }> => {
+    const isWebhook = tool.config?.type === "webhook";
+    let allParams: Array<{ name: string; value: string; group?: string }> = [];
+
+    if (isWebhook && tool.config?.webhook) {
+      const webhook = tool.config.webhook;
+      if (webhook.queryParameters && Array.isArray(webhook.queryParameters)) {
+        webhook.queryParameters.forEach((p: any) => {
+          allParams.push({
+            name: p.id || p.name || "",
+            value: "",
+            group: "query",
+          });
+        });
+      }
+      if (webhook.body?.parameters && Array.isArray(webhook.body.parameters)) {
+        webhook.body.parameters.forEach((p: any) => {
+          allParams.push({
+            name: p.id || p.name || "",
+            value: "",
+            group: "body",
+          });
+        });
+      }
+      // Note: Headers are not shown in conversation history UI
+    } else {
+      const params = tool.config?.parameters;
+      if (Array.isArray(params)) {
+        allParams = params.map((p: any) => ({
+          name: p.id || p.name || "",
+          value: "",
+        }));
+      } else {
+        const propsObj =
+          tool.config?.parameters?.properties ||
+          tool.config?.function?.parameters?.properties ||
+          tool.config?.properties ||
+          tool.config?.parameters ||
+          {};
+        allParams = Object.keys(propsObj).map((name) => ({ name, value: "" }));
+      }
+    }
+    return allParams;
   };
 
   const addToolCallMessage = (
@@ -3771,18 +3836,28 @@ export function AddTestDialog({
                         <label className="text-base font-medium text-foreground">
                           Tools to test
                         </label>
-                        <button
-                          onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                          className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
-                            localValidationAttempted &&
-                            activeTab === "tool-invocation" &&
-                            selectedTools.length === 0
-                              ? "border-red-500 text-red-400"
-                              : "border-border"
-                          }`}
-                        >
-                          Add tool
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              setToolDropdownOpen(!toolDropdownOpen)
+                            }
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg cursor-pointer border ${
+                              localValidationAttempted &&
+                              activeTab === "tool-invocation" &&
+                              selectedTools.length === 0
+                                ? "bg-red-500/10 text-red-500 border-red-500/40 hover:bg-red-500/20 transition-colors"
+                                : "bg-foreground text-background border-transparent hover:opacity-90 transition-opacity"
+                            }`}
+                          >
+                            Add tool
+                          </button>
+                          <button
+                            onClick={() => setCreateToolOpen(true)}
+                            className="px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
+                          >
+                            Create tool
+                          </button>
+                        </div>
                       </div>
 
                       {/* Tool Dropdown */}
@@ -4826,6 +4901,32 @@ export function AddTestDialog({
                                               Agent tool call
                                             </span>
                                           </button>
+                                          <button
+                                            onClick={() => {
+                                              setAddMessageDropdownOpen(false);
+                                              setCreateConversationToolOpen(
+                                                true,
+                                              );
+                                            }}
+                                            className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer text-foreground hover:bg-muted"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 text-muted-foreground"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                              strokeWidth={1.5}
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M12 4.5v15m7.5-7.5h-15"
+                                              />
+                                            </svg>
+                                            <span className="text-sm">
+                                              Create tool
+                                            </span>
+                                          </button>
                                         </div>
                                       </>
                                     )}
@@ -4899,106 +5000,12 @@ export function AddTestDialog({
                                                   );
                                                 }}
                                                 onSelectCustomTool={(tool) => {
-                                                  const isWebhook =
-                                                    tool.config?.type ===
-                                                    "webhook";
-                                                  let allParams: Array<{
-                                                    name: string;
-                                                    value: string;
-                                                    group?: string;
-                                                  }> = [];
-
-                                                  if (
-                                                    isWebhook &&
-                                                    tool.config?.webhook
-                                                  ) {
-                                                    // Extract webhook-specific parameters
-                                                    const webhook =
-                                                      tool.config.webhook;
-
-                                                    // Query parameters (for GET requests)
-                                                    if (
-                                                      webhook.queryParameters &&
-                                                      Array.isArray(
-                                                        webhook.queryParameters,
-                                                      )
-                                                    ) {
-                                                      webhook.queryParameters.forEach(
-                                                        (p: any) => {
-                                                          allParams.push({
-                                                            name:
-                                                              p.id ||
-                                                              p.name ||
-                                                              "",
-                                                            value: "",
-                                                            group: "query",
-                                                          });
-                                                        },
-                                                      );
-                                                    }
-
-                                                    // Body parameters (for POST requests)
-                                                    if (
-                                                      webhook.body
-                                                        ?.parameters &&
-                                                      Array.isArray(
-                                                        webhook.body.parameters,
-                                                      )
-                                                    ) {
-                                                      webhook.body.parameters.forEach(
-                                                        (p: any) => {
-                                                          allParams.push({
-                                                            name:
-                                                              p.id ||
-                                                              p.name ||
-                                                              "",
-                                                            value: "",
-                                                            group: "body",
-                                                          });
-                                                        },
-                                                      );
-                                                    }
-                                                    // Note: Headers are not shown in conversation history UI
-                                                  } else {
-                                                    // Structured output tool - use regular parameters
-                                                    const params =
-                                                      tool.config?.parameters;
-                                                    if (Array.isArray(params)) {
-                                                      allParams = params.map(
-                                                        (p: any) => ({
-                                                          name:
-                                                            p.id ||
-                                                            p.name ||
-                                                            "",
-                                                          value: "",
-                                                        }),
-                                                      );
-                                                    } else {
-                                                      const propsObj =
-                                                        tool.config?.parameters
-                                                          ?.properties ||
-                                                        tool.config?.function
-                                                          ?.parameters
-                                                          ?.properties ||
-                                                        tool.config
-                                                          ?.properties ||
-                                                        tool.config
-                                                          ?.parameters ||
-                                                        {};
-                                                      allParams = Object.keys(
-                                                        propsObj,
-                                                      ).map((name) => ({
-                                                        name,
-                                                        value: "",
-                                                      }));
-                                                    }
-                                                  }
-
                                                   addToolCallMessage(
                                                     tool.uuid,
                                                     tool.name,
-                                                    allParams,
-                                                    isWebhook,
+                                                    computeToolCallParams(tool),
+                                                    tool.config?.type ===
+                                                      "webhook",
                                                   );
                                                 }}
                                               />
@@ -5272,6 +5279,66 @@ export function AddTestDialog({
         evaluatorUuid={previewEvaluator?.uuid ?? null}
         evaluatorName={previewEvaluator?.name}
         onClose={() => setPreviewEvaluator(null)}
+      />
+
+      {/* Making a tool from inside the test, the same way. It goes into the
+          workspace, into this test, and onto the agent when the dialog was
+          opened from that agent's own Tests tab. */}
+      <CreateToolFlow
+        isOpen={createToolOpen}
+        onClose={() => setCreateToolOpen(false)}
+        accessToken={backendAccessToken ?? undefined}
+        knownTools={availableTools}
+        onCreated={async (tool, allTools) => {
+          setCreateToolOpen(false);
+          setAvailableTools(allTools);
+          addToolFromSelection(tool);
+          if (!agentUuid) return;
+          try {
+            await attachToolsToAgent(
+              agentUuid,
+              [tool.uuid],
+              backendAccessToken ?? undefined,
+            );
+          } catch (err) {
+            reportError("Error adding the new tool to the agent", err);
+            toast.error(
+              `"${tool.name}" was created but could not be added to this agent.`,
+            );
+          }
+        }}
+      />
+
+      {/* Making a tool for "Agent tool call" in the conversation history, the
+          same way — the history's own picker only offered existing tools. */}
+      <CreateToolFlow
+        isOpen={createConversationToolOpen}
+        onClose={() => setCreateConversationToolOpen(false)}
+        accessToken={backendAccessToken ?? undefined}
+        knownTools={availableTools}
+        onCreated={async (tool, allTools) => {
+          setCreateConversationToolOpen(false);
+          setAvailableTools(allTools);
+          addToolCallMessage(
+            tool.uuid,
+            tool.name,
+            computeToolCallParams(tool),
+            tool.config?.type === "webhook",
+          );
+          if (!agentUuid) return;
+          try {
+            await attachToolsToAgent(
+              agentUuid,
+              [tool.uuid],
+              backendAccessToken ?? undefined,
+            );
+          } catch (err) {
+            reportError("Error adding the new tool to the agent", err);
+            toast.error(
+              `"${tool.name}" was created but could not be added to this agent.`,
+            );
+          }
+        }}
       />
     </div>
   );

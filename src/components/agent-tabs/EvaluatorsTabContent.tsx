@@ -414,6 +414,11 @@ export function EvaluatorsTabContent({
         isOpen={addDialogOpen}
         availableEvaluators={availableEvaluators}
         onClose={() => setAddDialogOpen(false)}
+        // Deleted from the workspace, so it leaves this list too, otherwise
+        // the row it was on stays and opens nothing.
+        onEvaluatorDeleted={(uuid) =>
+          setAllEvaluators((prev) => prev.filter((e) => e.uuid !== uuid))
+        }
         onCreateEvaluator={() => setCreateFlowOpen(true)}
         onAdd={handleAddEvaluators}
       />

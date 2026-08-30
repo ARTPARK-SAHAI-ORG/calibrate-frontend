@@ -121,13 +121,16 @@ const calibrateTabs: TabType[] = [
   "settings",
 ];
 // Connection sits next to Settings: it is set up once, while evaluations,
-// tests and evaluators are what the reader comes back to.
+// tests and evaluators are what the reader comes back to. Tools sits right
+// after it — a connection agent's own code decides what it can call, but the
+// tools registered here are still what its tool-call tests are built against.
 const connectionTabs: TabType[] = [
   "runs",
   "tests",
   "evaluators",
   "traces",
   "connection",
+  "tools",
   "settings",
 ];
 

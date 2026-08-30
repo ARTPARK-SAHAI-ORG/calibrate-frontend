@@ -189,6 +189,8 @@ export type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
   live_version_index?: number | null;
   versions?: EvaluatorVersionDetail[];
+  /** On the same shared base every evaluator response returns. See canDeleteEvaluator. */
+  is_protected?: boolean | null;
 };
 
 /** Fetch one evaluator with its versions. */

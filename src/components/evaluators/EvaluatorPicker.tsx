@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
+import { PickerRow } from "@/components/ui/PickerRow";
+import { EmptyState } from "@/components/ui";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 
@@ -34,6 +36,8 @@ type EvaluatorPickerProps = {
    * flex child with a real height (`flex-1 min-h-0`).
    */
   fillHeight?: boolean;
+  /** Permanently deletes the previewed evaluator. Omit to hide the button. */
+  onDeleteEvaluator?: (evaluatorUuid: string) => void;
 };
 
 /**
@@ -50,23 +54,37 @@ export function EvaluatorPicker({
   previewUuid: previewUuidProp,
   fillHeight = false,
   allowConversationType = false,
+  onDeleteEvaluator,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
-  // The evaluator whose prompt is on show. Null until one is clicked.
-  const [previewUuid, setPreviewUuid] = useState<string | null>(null);
-  // A parent that names an evaluator (one just created) opens it on the right.
-  // Clicking another row afterwards still wins, until the parent names a new one.
-  useEffect(() => {
-    if (previewUuidProp) setPreviewUuid(previewUuidProp);
-  }, [previewUuidProp]);
-
-  const q = search.trim().toLowerCase();
   // Everything this picker could offer, before the reader's own search.
   const offerable = evaluators.filter(
     // Full-conversation evaluators are hidden unless the caller is a place
     // where they are the only kind that works, such as simulation setup.
     (ev) => allowConversationType || ev.evaluator_type !== "conversation",
   );
+  // Nothing picked yet, which is not the same as nothing to show: until the
+  // reader clicks a row (or the parent names one), the first already-selected
+  // evaluator is on show, falling back to the first in the list. Worked out
+  // on every render rather than once at the start, so a list that arrives
+  // after this opens still gets a preview.
+  const [pickedUuid, setPickedUuid] = useState<string | null>(null);
+  // A parent that names an evaluator (one just created) opens it on the right.
+  // Clicking another row afterwards still wins, until the parent names a new one.
+  useEffect(() => {
+    if (previewUuidProp) setPickedUuid(previewUuidProp);
+  }, [previewUuidProp]);
+  // Settled once, the first time there is anything to show, so ticking a box
+  // afterwards does not move the prompt on the right.
+  const firstShown = useRef<string | null>(null);
+  if (firstShown.current === null && offerable.length > 0) {
+    firstShown.current =
+      offerable.find((ev) => selectedIds.has(ev.uuid))?.uuid ??
+      offerable[0].uuid;
+  }
+  const previewUuid = pickedUuid ?? firstShown.current;
+
+  const q = search.trim().toLowerCase();
   const filteredEvaluators = offerable.filter((ev) => {
     if (!q) return true;
     return (
@@ -79,47 +97,29 @@ export function EvaluatorPicker({
   const showSections =
     defaultEvaluators.length > 0 && customEvaluators.length > 0;
 
-  const renderEvaluatorRow = (ev: EvaluatorData) => {
-    const checked = selectedIds.has(ev.uuid);
-    return (
-      <div
-        key={ev.uuid}
-        className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
-          previewUuid === ev.uuid
-            ? "bg-muted/60 border-l-2 border-foreground/40 pl-[calc(0.75rem-2px)]"
-            : "hover:bg-muted/30"
-        }`}
-      >
-        {/* The box is centred against the name's own line, so it sits the
-            same way whether or not a description follows underneath. */}
-        <span className="flex h-5 items-center flex-shrink-0">
-          <input
-            type="checkbox"
-            aria-label={`Select ${ev.name}`}
-            checked={checked}
-            onChange={() => onToggle(ev.uuid)}
-            className="w-4 h-4 cursor-pointer accent-foreground"
-          />
-        </span>
-        {/* The body opens the prompt on the right rather than ticking the box,
-            so an evaluator can be read before it is added. */}
-        <button
-          type="button"
-          onClick={() => setPreviewUuid(ev.uuid)}
-          className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
-        >
-          {/* Name only: what it judges and how it scores are in the prompt
-              on the right. */}
-          <span className="text-sm font-medium text-foreground">{ev.name}</span>
-          {ev.description && (
-            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-              {ev.description}
-            </div>
-          )}
-        </button>
-      </div>
-    );
-  };
+  const renderEvaluatorRow = (ev: EvaluatorData) => (
+    // Name only: what it judges and how it scores are in the prompt on the
+    // right, so no badge here.
+    <PickerRow
+      key={ev.uuid}
+      ariaLabel={`Select ${ev.name}`}
+      checked={selectedIds.has(ev.uuid)}
+      onToggle={() => onToggle(ev.uuid)}
+      isPreviewed={previewUuid === ev.uuid}
+      onPreview={() => setPickedUuid(ev.uuid)}
+      name={ev.name}
+      description={ev.description}
+    />
+  );
+
+  const renderSectionLabel = (label: string) => (
+    <div
+      key={label}
+      className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+    >
+      {label}
+    </div>
+  );
 
   const renderEvaluatorList = () => {
     if (filteredEvaluators.length === 0) {
@@ -137,15 +137,11 @@ export function EvaluatorPicker({
     return (
       <>
         <div>
-          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            My evaluators
-          </div>
+          {renderSectionLabel("My evaluators")}
           {customEvaluators.map(renderEvaluatorRow)}
         </div>
         <div>
-          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Default
-          </div>
+          {renderSectionLabel("Default")}
           {defaultEvaluators.map(renderEvaluatorRow)}
         </div>
       </>
@@ -154,16 +150,27 @@ export function EvaluatorPicker({
 
   if (offerable.length === 0) {
     return (
-      <div
-        className={`flex flex-col items-center justify-center text-center gap-4 p-8 ${
-          fillHeight ? "md:h-full md:min-h-0" : "min-h-[12rem]"
-        }`}
-      >
-        <p className="text-sm md:text-base text-muted-foreground max-w-md text-balance">
-          {emptyMessage}
-        </p>
-        {emptyAction}
-      </div>
+      <EmptyState
+        className={fillHeight ? "md:h-full md:min-h-0" : ""}
+        icon={
+          <svg
+            className="w-7 h-7 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
+            />
+          </svg>
+        }
+        title="No evaluators to add"
+        description={emptyMessage}
+        actions={emptyAction}
+      />
     );
   }
 
@@ -225,7 +232,10 @@ export function EvaluatorPicker({
             : "md:h-[35.25rem] max-h-[60vh]"
         }`}
       >
-        <EvaluatorPromptPreview evaluatorUuid={previewUuid} />
+        <EvaluatorPromptPreview
+          evaluatorUuid={previewUuid}
+          onDelete={onDeleteEvaluator}
+        />
       </div>
     </div>
   );

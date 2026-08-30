@@ -5,15 +5,12 @@ import React, { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { useHideFloatingButton } from "@/components/AppLayout";
-
-type ToolData = {
-  uuid: string;
-  name: string;
-  description?: string;
-  config: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-};
+import { ToolLibraryPicker } from "@/components/tools/ToolLibraryPicker";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { AddToolDialog as EditToolDialog } from "@/components/AddToolDialog";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { deleteTool } from "@/lib/toolsApi";
+import type { ToolData } from "@/components/AddToolDialog";
 
 type AddToolDialogProps = {
   isOpen: boolean;
@@ -38,15 +35,79 @@ export function AddToolDialog({
   useHideFloatingButton(isOpen);
 
   const backendAccessToken = useAccessToken();
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
+  // Null until something is made, edited or deleted from inside this dialog:
+  // until then the workspace list the parent fetched is the one to read, and
+  // it arrives after this dialog first renders. Copying it up front left the
+  // picker showing an empty workspace forever.
+  const [ownTools, setOwnTools] = useState<ToolData[] | null>(null);
+  const localAllTools = ownTools ?? allTools;
+  const setLocalAllTools = (
+    update: ToolData[] | ((prev: ToolData[]) => ToolData[]),
+  ) =>
+    setOwnTools((prev) =>
+      typeof update === "function" ? update(prev ?? allTools) : update,
+    );
+  const [createToolOpen, setCreateToolOpen] = useState(false);
+  const [previewUuid, setPreviewUuid] = useState<string | null>(null);
+  // Editing the previewed tool, from its own edit/delete buttons.
+  const [editToolUuid, setEditToolUuid] = useState<string | null>(null);
+  const [editToolType, setEditToolType] = useState<
+    "webhook" | "structured_output"
+  >("structured_output");
+  const [deleteTarget, setDeleteTarget] = useState<ToolData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setSearchQuery("");
     setSelectedTools(new Set());
     onClose();
+  };
+
+  const openEditTool = (tool: ToolData) => {
+    setEditToolUuid(tool.uuid);
+    setEditToolType(
+      tool.config?.type === "webhook" ? "webhook" : "structured_output",
+    );
+  };
+
+  const confirmDeleteTool = async () => {
+    if (!deleteTarget || !backendAccessToken) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+      await deleteTool(deleteTarget.uuid, backendAccessToken);
+      setLocalAllTools((prev) =>
+        prev.filter((t) => t.uuid !== deleteTarget.uuid),
+      );
+      setSelectedTools((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.uuid);
+        return next;
+      });
+      setDeleteTarget(null);
+    } catch (err) {
+      reportError("Error deleting tool:", err);
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete tool",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleTool = (uuid: string) => {
+    setSelectedTools((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) {
+        next.delete(uuid);
+      } else {
+        next.add(uuid);
+      }
+      return next;
+    });
   };
 
   const handleAdd = async () => {
@@ -81,8 +142,8 @@ export function AddToolDialog({
       }
 
       // Get added tools data
-      const addedTools = allTools.filter((tool) =>
-        toolUuidsToAdd.includes(tool.uuid)
+      const addedTools = localAllTools.filter((tool) =>
+        toolUuidsToAdd.includes(tool.uuid),
       );
       onToolsAdded(addedTools);
 
@@ -95,161 +156,142 @@ export function AddToolDialog({
 
   // Filter out tools already added to the agent
   const agentToolUuids = new Set(agentTools.map((t) => t.uuid));
-  const baseAvailableTools = allTools.filter(
-    (tool) => !agentToolUuids.has(tool.uuid)
-  );
-
-  // Filter by search query
-  const availableTools = baseAvailableTools.filter(
-    (tool) =>
-      tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ((tool.description || tool.config?.description) &&
-        (tool.description || tool.config?.description)
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()))
+  const baseAvailableTools = localAllTools.filter(
+    (tool) => !agentToolUuids.has(tool.uuid),
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-background border border-border rounded-xl w-[40%] min-w-[500px] max-h-[80vh] flex flex-col shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="bg-background border border-border rounded-xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] md:h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Dialog Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-base font-semibold">Add Tools</h2>
-          <button
-            onClick={handleClose}
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center gap-2">
+            {/* The same offer the empty picker makes, kept in reach once
+                there is a list to read. The empty picker makes it itself, so
+                this would only say the same thing twice. */}
+            {baseAvailableTools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCreateToolOpen(true)}
+                className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Create tool
+              </button>
+            )}
+            <button
+              onClick={handleClose}
+              aria-label="Close"
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Tools List */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {allToolsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-5 h-5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-            </div>
-          ) : baseAvailableTools.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-base text-muted-foreground">
-                All available tools have been added to this agent
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Search Input */}
-              <div className="mb-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search tools"
-                  className="w-full h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
                 />
-              </div>
-
-              {availableTools.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <p className="text-base text-muted-foreground">
-                    No tools match your search
-                  </p>
-                </div>
-              ) : (
-                availableTools.map((tool) => {
-                  const isSelected = selectedTools.has(tool.uuid);
-                  return (
-                    <button
-                      key={tool.uuid}
-                      onClick={() => {
-                        setSelectedTools((prev) => {
-                          const newSet = new Set(prev);
-                          if (newSet.has(tool.uuid)) {
-                            newSet.delete(tool.uuid);
-                          } else {
-                            newSet.add(tool.uuid);
-                          }
-                          return newSet;
-                        });
-                      }}
-                      className={`w-full p-4 rounded-lg border transition-colors cursor-pointer text-left mb-3 last:mb-0 ${
-                        isSelected
-                          ? "border-foreground bg-muted/50"
-                          : "border-border bg-muted/30 hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Checkbox */}
-                        <div
-                          className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors ${
-                            isSelected
-                              ? "bg-foreground border-foreground"
-                              : "border-border"
-                          }`}
-                        >
-                          {isSelected && (
-                            <svg
-                              className="w-3 h-3 text-background"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="text-base font-medium text-foreground">
-                            {tool.name}
-                          </h4>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {tool.description || tool.config?.description}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </>
-          )}
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Tools List + Preview */}
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-4">
+          <ToolLibraryPicker
+            tools={baseAvailableTools}
+            selectedIds={selectedTools}
+            onToggle={toggleTool}
+            isLoading={allToolsLoading}
+            emptyMessage={
+              // Two different situations, and saying the wrong one is
+              // confusing: nothing in the workspace at all, or everything in
+              // it already on this agent.
+              localAllTools.length === 0
+                ? "Your workspace has no tools yet. Create one and it is added to this agent."
+                : "All available tools have been added to this agent"
+            }
+            emptyAction={
+              <button
+                type="button"
+                onClick={() => setCreateToolOpen(true)}
+                className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Create tool
+              </button>
+            }
+            previewUuid={previewUuid}
+            onEditTool={openEditTool}
+            onDeleteTool={setDeleteTarget}
+          />
+        </div>
+
+        {/* Making a tool from inside this dialog, when there is nothing
+            left to pick. It comes back here with the new tool selected and
+            previewed, ready to be added along with anything else picked. */}
+        <CreateToolFlow
+          isOpen={createToolOpen}
+          onClose={() => setCreateToolOpen(false)}
+          accessToken={backendAccessToken ?? undefined}
+          knownTools={localAllTools}
+          onCreated={(tool, updatedTools) => {
+            setCreateToolOpen(false);
+            setLocalAllTools(updatedTools);
+            setSelectedTools((prev) => new Set(prev).add(tool.uuid));
+            setPreviewUuid(tool.uuid);
+          }}
+        />
+
+        {/* Editing a tool from its own preview panel. Same builder the
+            workspace Tools page uses; the update comes back to this same
+            dialog with fresh data by uuid. */}
+        <EditToolDialog
+          isOpen={editToolUuid !== null}
+          onClose={() => setEditToolUuid(null)}
+          toolType={editToolType}
+          editingToolUuid={editToolUuid}
+          backendAccessToken={backendAccessToken ?? undefined}
+          onToolsUpdated={(updatedTools) => {
+            const updated = updatedTools.find((t) => t.uuid === editToolUuid);
+            if (!updated) return;
+            setLocalAllTools((prev) =>
+              prev.map((t) => (t.uuid === updated.uuid ? updated : t)),
+            );
+          }}
+        />
+
+        {/* Deleting a tool from its own preview panel — permanent, from the
+            whole workspace, not just this agent. */}
+        <DeleteConfirmationDialog
+          isOpen={deleteTarget !== null}
+          onClose={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          onConfirm={confirmDeleteTool}
+          title="Delete tool"
+          message={`Are you sure you want to permanently delete "${deleteTarget?.name}"? This removes it from the whole workspace, not just this agent.`}
+          confirmText="Delete"
+          isDeleting={isDeleting}
+          extraContent={
+            deleteError && (
+              <p role="alert" className="text-sm text-red-500">
+                {deleteError}
+              </p>
+            )
+          }
+        />
 
         {/* Footer - only shown when tools are selected */}
         {selectedTools.size > 0 && (
@@ -263,9 +305,6 @@ export function AddToolDialog({
           </div>
         )}
       </div>
-
-      {/* Backdrop click to close */}
-      <div className="absolute inset-0 -z-10" onClick={handleClose} />
     </div>
   );
 }

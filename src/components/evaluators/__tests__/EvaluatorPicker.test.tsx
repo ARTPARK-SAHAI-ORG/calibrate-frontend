@@ -171,7 +171,7 @@ describe("EvaluatorPicker", () => {
 });
 
 describe("EvaluatorPicker prompt column", () => {
-  it("shows nothing until a row is clicked", () => {
+  it("previews the first evaluator by default, with nothing selected", () => {
     render(
       <EvaluatorPicker
         evaluators={[evaluator()]}
@@ -180,7 +180,74 @@ describe("EvaluatorPicker prompt column", () => {
       />,
     );
     expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
-      "preview:none",
+      "preview:ev-1",
+    );
+  });
+
+  it("previews the first evaluator even when the list arrives after it opens", () => {
+    const { rerender } = render(
+      <EvaluatorPicker
+        evaluators={[]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        emptyMessage="Nothing to add"
+      />,
+    );
+    rerender(
+      <EvaluatorPicker
+        evaluators={[evaluator({ uuid: "ev-1", name: "First" })]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-1",
+    );
+  });
+
+  it("shows nothing when there is nothing to offer", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        emptyMessage="Nothing to add"
+      />,
+    );
+    expect(screen.queryByTestId("prompt-preview")).not.toBeInTheDocument();
+  });
+
+  it("previews the first already-selected evaluator, not just the first in the list", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "ev-1", name: "First" }),
+          evaluator({ uuid: "ev-2", name: "Second" }),
+          evaluator({ uuid: "ev-3", name: "Third" }),
+        ]}
+        selectedIds={new Set(["ev-3"])}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-3",
+    );
+  });
+
+  it("picks the first selected one in list order when more than one is selected", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "ev-1", name: "First" }),
+          evaluator({ uuid: "ev-2", name: "Second" }),
+          evaluator({ uuid: "ev-3", name: "Third" }),
+        ]}
+        selectedIds={new Set(["ev-2", "ev-3"])}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-2",
     );
   });
 
@@ -213,10 +280,14 @@ describe("EvaluatorPicker prompt column", () => {
       />,
     );
 
+    // Already previewed by default (the only evaluator in the list).
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-9",
+    );
     await user.click(screen.getByLabelText("Select Conciseness"));
     expect(onToggle).toHaveBeenCalledWith("ev-9");
     expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
-      "preview:none",
+      "preview:ev-9",
     );
   });
 });
