@@ -304,10 +304,23 @@ describe("RunsTabContent", () => {
   });
 
   it("says a run was stopped, alongside what it managed to do", async () => {
-    state.runs = [{ ...unitRun, aborted: true }];
+    // 10 tests, stopped after 3 passed and 1 failed: the other 6 were never
+    // asked, so they must not be counted as wrong answers.
+    state.runs = [
+      {
+        ...unitRun,
+        aborted: true,
+        total_tests: 10,
+        passed: 3,
+        failed: 1,
+        unanswered_tests: 0,
+      },
+    ];
     renderTab();
     expect((await screen.findAllByText("Stopped")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1 Success").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3 Success").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("6 Not run").length).toBeGreaterThan(0);
   });
 
   it("says a stopped model comparison was stopped rather than complete", async () => {

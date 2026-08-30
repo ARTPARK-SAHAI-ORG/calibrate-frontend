@@ -84,9 +84,11 @@ export function runDisplayName(
   return trimmed.replace(/^Run\b/, "Evaluation run");
 }
 
-/** A test row, trimmed to what the shared rule needs. */
+/** A test row, trimmed to what the shared rules need. */
 export type TestRowLike = {
   unanswered?: boolean | null;
+  passed?: boolean | null;
+  not_run?: boolean | null;
 };
 
 /**
@@ -105,11 +107,29 @@ export function isUnanswered(row: TestRowLike): boolean {
   return row.unanswered === true;
 }
 
+/**
+ * Did this test never start, because the run was stopped before it got there?
+ *
+ * Different from a test that produced no answer: that one was tried and the
+ * agent or the judge failed it. This one was never asked.
+ *
+ * The backend says so outright with `not_run`. On a stopped run that predates
+ * that field, a test with no verdict never ran either: the run is finished, so
+ * nothing more is coming for it. `runStopped` must come from `isRunStopped`.
+ */
+export function isNotRun(row: TestRowLike, runStopped: boolean): boolean {
+  if (row.not_run === true) return true;
+  return runStopped && (row.passed === null || row.passed === undefined);
+}
+
 /** A finished run, trimmed to the counts the buckets need. */
 export type RunCountsLike = {
   total_tests?: number | null;
   passed?: number | null;
+  failed?: number | null;
   unanswered_tests?: number | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean | null;
 };
 
 /**
@@ -126,6 +146,18 @@ export function getRunBreakdown(
 ): { passed: number; failed: number; unanswered: number } | null {
   const total = run.total_tests ?? 0;
   if (total <= 0) return null;
+  // A stopped run counts the tests it never started, which is every test left
+  // over once the ones it did run are taken out. Working failures out from the
+  // total instead would report each of them as a wrong answer.
+  if (isRunStopped(run)) {
+    const ranPassed = Math.max(run.passed ?? 0, 0);
+    const ranFailed = Math.max(run.failed ?? 0, 0);
+    return {
+      passed: ranPassed,
+      failed: ranFailed,
+      unanswered: Math.max(total - ranPassed - ranFailed, 0),
+    };
+  }
   const passed = Math.max(run.passed ?? 0, 0);
   const unanswered = Math.max(run.unanswered_tests ?? 0, 0);
   const failed = Math.max(total - passed - unanswered, 0);
@@ -147,7 +179,7 @@ export type RunStatusLike = {
  * window and the model comparison window all use it, so no two screens can
  * disagree about whether a run was stopped or simply ended.
  */
-export function isRunStopped(run: RunStatusLike): boolean {
+export function isRunStopped(run: { aborted?: boolean | null }): boolean {
   return run.aborted === true;
 }
 

@@ -535,7 +535,7 @@ describe("BenchmarkResultsDialog", () => {
       let stopped = false;
       (global.fetch as jest.Mock).mockImplementation(
         (url: string, init?: any) => {
-          if (url.endsWith("/agent-tests/benchmark/task-stop/abort")) {
+          if (url.endsWith("/agent-tests/run/task-stop/abort")) {
             expect(init?.method).toBe("POST");
             stopped = true;
             return Promise.resolve(
@@ -576,7 +576,7 @@ describe("BenchmarkResultsDialog", () => {
       await waitFor(() =>
         expect(
           (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-            String(url).endsWith("/agent-tests/benchmark/task-stop/abort"),
+            String(url).endsWith("/agent-tests/run/task-stop/abort"),
           ),
         ).toBe(true),
       );

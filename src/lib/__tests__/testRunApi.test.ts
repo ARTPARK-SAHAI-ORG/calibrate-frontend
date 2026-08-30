@@ -173,29 +173,17 @@ describe("testRunApi", () => {
   });
 
   describe("abortRun", () => {
-    it("posts to the run's own abort path", async () => {
+    it("posts to the one abort route, for a run and a comparison alike", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
         jsonResponse({ task_id: "task-1", status: "done", aborted: true }),
       );
 
-      const run = await abortRun(BACKEND_URL, TOKEN, "task-1", "run");
+      await abortRun(BACKEND_URL, TOKEN, "task-1");
 
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
       expect(url).toBe(`${BACKEND_URL}/agent-tests/run/task-1/abort`);
       expect(init.method).toBe("POST");
       expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
-      expect(run.aborted).toBe(true);
-    });
-
-    it("posts to the benchmark path for a model comparison", async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(
-        jsonResponse({ task_id: "task-2", status: "done", aborted: true }),
-      );
-
-      await abortRun(BACKEND_URL, TOKEN, "task-2", "benchmark");
-
-      const [url] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe(`${BACKEND_URL}/agent-tests/benchmark/task-2/abort`);
     });
 
     it("throws UnauthorizedError on a 401", async () => {
@@ -203,52 +191,54 @@ describe("testRunApi", () => {
         jsonResponse({}, false, 401),
       );
       await expect(
-        abortRun(BACKEND_URL, TOKEN, "task-1", "run"),
+        abortRun(BACKEND_URL, TOKEN, "task-1"),
       ).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("throws a plain Error on other non-ok responses", async () => {
+    it("throws a plain Error when the run has already ended", async () => {
+      // The backend answers 400 with "Can only stop a run that is queued or
+      // in progress".
       (global.fetch as jest.Mock).mockResolvedValue(
-        jsonResponse({}, false, 500),
+        jsonResponse({ detail: "Can only stop a run that is queued or in progress" }, false, 400),
       );
-      await expect(
-        abortRun(BACKEND_URL, TOKEN, "task-1", "run"),
-      ).rejects.toThrow("Failed to stop the run");
+      await expect(abortRun(BACKEND_URL, TOKEN, "task-1")).rejects.toThrow(
+        "Failed to stop the run",
+      );
     });
   });
 
   describe("abortRunOrNotify", () => {
-    it("returns the stopped run", async () => {
+    it("says the run was stopped", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
         jsonResponse({ task_id: "task-1", status: "done", aborted: true }),
       );
 
-      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
-
-      expect(run?.aborted).toBe(true);
+      await expect(
+        abortRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(true);
       expect(toast.error).not.toHaveBeenCalled();
     });
 
-    it("signs the user out on a 401 and returns null", async () => {
+    it("signs the user out on a 401 and says it did not stop", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
         jsonResponse({}, false, 401),
       );
 
-      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
-
-      expect(run).toBeNull();
+      await expect(
+        abortRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(false);
       expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
       expect(toast.error).not.toHaveBeenCalled();
     });
 
-    it("shows one message and returns null on any other failure", async () => {
+    it("shows one message on any other failure", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
         jsonResponse({}, false, 500),
       );
 
-      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
-
-      expect(run).toBeNull();
+      await expect(
+        abortRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(false);
       expect(signOut).not.toHaveBeenCalled();
       expect(toast.error).toHaveBeenCalledWith(
         "Could not stop the run. Please try again.",

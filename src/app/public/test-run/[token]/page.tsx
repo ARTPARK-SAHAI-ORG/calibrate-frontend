@@ -30,7 +30,7 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
-import { isUnanswered } from "@/lib/testTypes";
+import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
 
 type TestCaseResult = {
   test_case_id?: string;
@@ -73,7 +73,11 @@ type TestRunStatusResponse = {
   error?: string;
 };
 
-function getStatus(r: TestCaseResult): "passed" | "failed" {
+function getStatus(
+  r: TestCaseResult,
+  runStopped: boolean,
+): "passed" | "failed" | "not_run" {
+  if (isNotRun(r, runStopped)) return "not_run";
   return r.passed === true ? "passed" : "failed";
 }
 
@@ -141,18 +145,22 @@ export default function PublicTestRunPage() {
     );
 
   const results = data.results ?? [];
-  const passed = results.filter((r) => getStatus(r) === "passed").length;
+  // Someone stopped this run before it finished, so the tests it never started
+  // are neither passes nor failures.
+  const wasStopped = isRunStopped(data);
+  const passed = results.filter((r) => getStatus(r, wasStopped) === "passed")
+    .length;
   // A test that produced no answer was never scored; keep it out of the
   // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
-    (r) => getStatus(r) === "failed" && !isUnanswered(r),
+    (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
   ).length;
   // Tool-call pass/fail split for the Summary tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: r.test_case?.evaluation?.type === "tool_call",
-      passed: getStatus(r) === "passed",
-      failed: getStatus(r) === "failed" && !isUnanswered(r),
+      passed: getStatus(r, wasStopped) === "passed",
+      failed: getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
     })),
   );
 
@@ -189,7 +197,9 @@ export default function PublicTestRunPage() {
                   buildTestRunCsv(
                     results.map((r) => ({
                       name: r.name || r.test_case?.name || r.test_name,
-                      status: isUnanswered(r) ? "error" : getStatus(r),
+                      status: isUnanswered(r)
+                        ? "error"
+                        : getStatus(r, wasStopped),
                       output: r.output,
                       testCase: r.test_case,
                       reasoning: r.reasoning,
@@ -246,7 +256,7 @@ export default function PublicTestRunPage() {
                 id: `test-${i}`,
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
-                status: getStatus(r),
+                status: getStatus(r, wasStopped),
                 unanswered: isUnanswered(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,

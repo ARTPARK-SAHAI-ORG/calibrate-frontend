@@ -359,7 +359,6 @@ export function BenchmarkResultsDialog({
       backendUrl,
       backendAccessToken,
       currentTaskId,
-      "benchmark",
     );
     if (stopped) await pollBenchmarkStatus(currentTaskId, backendUrl);
   };

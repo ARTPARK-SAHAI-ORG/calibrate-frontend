@@ -1428,6 +1428,9 @@ describe("tests that produced no answer", () => {
         ).toBe(true),
       );
 
+      // The test that never started is named as not run, not left spinning.
+      expect(await screen.findByText(/Test Two:not_run/)).toBeInTheDocument();
+
       // The run is finished now, so the tabs are there to read it.
       await user.click(await screen.findByRole("button", { name: "Summary" }));
       expect(screen.getByTestId("summary-stopped")).toHaveTextContent("true");

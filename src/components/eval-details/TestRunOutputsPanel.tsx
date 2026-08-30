@@ -24,7 +24,7 @@ import { isUnanswered } from "@/lib/testTypes";
 export type TestRunResult = {
   id: string;
   name: string;
-  status: "passed" | "failed" | "running" | "pending" | "queued";
+  status: "passed" | "failed" | "running" | "pending" | "queued" | "not_run";
   /** The test produced no answer, so `status` is not a verdict on the agent. */
   unanswered?: boolean;
   output?: TestCaseOutput;
@@ -143,6 +143,7 @@ export function TestRunOutputsPanel({
     { key: "passed", label: "Passed", dotColor: "bg-green-500", items: filteredResults.filter((r) => r.status === "passed") },
     { key: "queued", label: "Queued", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "queued") },
     { key: "running", label: "Running", dotColor: "bg-yellow-500 animate-pulse", items: filteredResults.filter((r) => r.status === "running") },
+    { key: "not_run", label: "Not run", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "not_run") },
     { key: "pending", label: "Pending", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "pending") },
   ].filter((g) => g.items.length > 0);
 
@@ -338,7 +339,15 @@ export function TestRunOutputsPanel({
                         onClick={() => onSelect(result.id)}
                         className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
                       >
-                        <StatusIcon status={isErrored(result) ? "error" : result.status} />
+                        <StatusIcon
+                          status={
+                            isErrored(result)
+                              ? "error"
+                              : result.status === "not_run"
+                                ? "queued"
+                                : result.status
+                          }
+                        />
                         <span className="text-sm text-foreground truncate">{result.name}</span>
                       </button>
                     </div>
@@ -453,6 +462,16 @@ function TestResultDetail({
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Test is queued</p>
+      </div>
+    );
+  }
+
+  if (result.status === "not_run") {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <p className="text-muted-foreground text-center">
+          This test was not run. The run was stopped before it got here.
+        </p>
       </div>
     );
   }

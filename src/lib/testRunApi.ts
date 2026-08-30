@@ -30,6 +30,8 @@ export type TestCaseResult = {
    * merged with this case's per-test overrides. Absent when the agent has no
    * custom fields. */
   inputs?: Record<string, unknown> | null;
+  /** True when this test never started, because the run was stopped first. */
+  not_run?: boolean;
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
@@ -48,7 +50,9 @@ export type TestRunStatusResponse = {
   failed?: number;
   /** How many of the tests produced no answer. */
   unanswered_tests?: number;
-  /** True when the run gave up before it started every test. */
+  /** True when the run gave up before it started every test. Never set on a
+   * run someone stopped: it comes from a file the backend writes only when a
+   * run finishes on its own. */
   stopped_early?: boolean;
   /** True when someone stopped the run before it finished. The tests already
    * answered are kept; the rest were never started. */
@@ -162,21 +166,19 @@ export async function fetchTestRun(
 }
 
 /**
- * Stop a run that is still going, and return its state as the backend left it.
+ * Stop a run that is still going. One route covers both a plain test run and
+ * a model comparison, since the backend treats them as the same kind of job.
  *
- * `kind` picks the run: `"run"` for a plain test run, `"benchmark"` for one
- * that tried the tests against several models. Both come back in the same
- * shape their own GET returns, already carrying `aborted: true`, so the caller
- * can show the stopped run without waiting for the next poll.
+ * The reply carries the run's id, its status and `aborted`, and nothing else:
+ * read the results back from the endpoint the caller was already polling.
  */
 export async function abortRun(
   backendUrl: string,
   accessToken: string | null | undefined,
   taskId: string,
-  kind: "run" | "benchmark",
-): Promise<TestRunStatusResponse> {
+): Promise<void> {
   const response = await fetch(
-    `${backendUrl}/agent-tests/${kind}/${taskId}/abort`,
+    `${backendUrl}/agent-tests/run/${taskId}/abort`,
     {
       method: "POST",
       headers: getDefaultHeaders(accessToken),
@@ -185,31 +187,29 @@ export async function abortRun(
 
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to stop the run");
-
-  return response.json();
 }
 
 /**
  * `abortRun` plus the failure handling every caller needs: sign out on a 401,
- * otherwise report the error and show one toast. Returns the stopped run, or
- * null when it could not be stopped.
+ * otherwise report the error and show one toast. Returns whether the run was
+ * stopped, so the caller knows whether to read it back.
  */
 export async function abortRunOrNotify(
   backendUrl: string,
   accessToken: string | null | undefined,
   taskId: string,
-  kind: "run" | "benchmark",
-): Promise<TestRunStatusResponse | null> {
+): Promise<boolean> {
   try {
-    return await abortRun(backendUrl, accessToken, taskId, kind);
+    await abortRun(backendUrl, accessToken, taskId);
+    return true;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       await signOut({ callbackUrl: "/login" });
-      return null;
+      return false;
     }
     reportError("Error stopping test run:", error);
     toast.error("Could not stop the run. Please try again.");
-    return null;
+    return false;
   }
 }
 

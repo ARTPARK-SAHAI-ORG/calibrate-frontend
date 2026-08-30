@@ -1,6 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
-import { isRunStopped, isUnanswered } from "@/lib/testTypes";
+import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -61,7 +61,7 @@ type Row = {
   /** Present only when the backend sent one. Required to rerun this test. */
   testUuid?: string;
   name: string;
-  status: "passed" | "failed" | "running";
+  status: "passed" | "failed" | "running" | "not_run";
   /** The test produced no answer, so `status` is not a verdict on the agent. */
   unanswered: boolean;
   output?: TestCaseOutput;
@@ -220,11 +220,15 @@ export function TestRunnerDialog({
 
   const rows: Row[] = useMemo(() => {
     const results = run?.results ?? [];
+    const runStopped = run ? isRunStopped(run) : false;
     return results.map((r: TestCaseResult, i): Row => {
-      // A missing verdict means the test has not finished. A test that
-      // produced no answer says so itself and comes back with `passed: false`.
-      const status: Row["status"] =
-        r.passed === null || r.passed === undefined
+      // A missing verdict means the test has not finished — unless the run was
+      // stopped, in which case it never started and nothing more is coming. A
+      // test that produced no answer says so itself and comes back with
+      // `passed: false`.
+      const status: Row["status"] = isNotRun(r, runStopped)
+        ? "not_run"
+        : r.passed === null || r.passed === undefined
           ? "running"
           : r.passed === true
             ? "passed"
@@ -326,9 +330,9 @@ export function TestRunnerDialog({
     [rows, evaluatorsByUuid],
   );
 
-  // Stop a run that is still going. The backend hands back the run as it left
-  // it, so the window shows the stopped state at once instead of waiting for
-  // the next poll (which then sees a finished run and stops polling).
+  // Stop a run that is still going, then read it back, since the stop itself
+  // only answers with the run's id and status. The check that follows sees a
+  // finished run and stops checking on its own.
   const stopRun = async () => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) {
@@ -339,9 +343,13 @@ export function TestRunnerDialog({
       backendUrl,
       backendAccessToken,
       taskId,
-      "run",
     );
-    if (stopped) setRun(stopped);
+    if (!stopped) return;
+    try {
+      setRun(await fetchTestRun(backendUrl, backendAccessToken, taskId));
+    } catch (error) {
+      reportError("Error reading a stopped test run:", error);
+    }
   };
 
   // Start a fresh run of the same tests and hand it to the parent, which
