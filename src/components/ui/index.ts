@@ -18,6 +18,7 @@ export { DeleteIconButton } from "./DeleteIconButton";
 export { DuplicateIconButton } from "./DuplicateIconButton";
 export { RerunIconButton } from "./RerunIconButton";
 export { StopRunButton } from "./StopRunButton";
+export { StoppedRunPill } from "./StoppedRunPill";
 export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
 export { DialogNavHeader } from "./DialogNavHeader";

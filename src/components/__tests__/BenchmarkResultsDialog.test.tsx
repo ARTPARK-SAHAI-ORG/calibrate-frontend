@@ -102,6 +102,7 @@ jest.mock("../ui", () => ({
   StopRunButton: (props: any) => (
     <button onClick={() => props.onStop()}>Stop</button>
   ),
+  StoppedRunPill: () => <span>Stopped</span>,
 }));
 
 jest.mock("../../lib/api", () => ({

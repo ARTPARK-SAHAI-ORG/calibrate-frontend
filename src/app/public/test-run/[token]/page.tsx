@@ -31,6 +31,7 @@ import {
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
+import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
@@ -167,6 +168,7 @@ export default function PublicTestRunPage() {
   return (
     <PublicPageLayout
       title="LLM component test"
+      pills={wasStopped ? <StoppedRunPill /> : undefined}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">

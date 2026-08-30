@@ -26,6 +26,7 @@ import {
   RerunIconButton,
   ResultTabs,
   StopRunButton,
+  StoppedRunPill,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { abortRunOrNotify } from "@/lib/testRunApi";
@@ -658,11 +659,7 @@ export function BenchmarkResultsDialog({
               {!isDone && !isInitialLoading && currentTaskId && (
                 <StopRunButton onStop={stopBenchmark} className="shrink-0" />
               )}
-              {isDone && wasStopped && (
-                <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                  Stopped
-                </span>
-              )}
+              {isDone && wasStopped && <StoppedRunPill />}
             </div>
             <p className="text-xs text-muted-foreground truncate">
               {agentName}
