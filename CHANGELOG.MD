@@ -1,5 +1,6 @@
 ## August 2026
 
+- You can now submit traces where the agent only called a tool and gave no reply for labelling, instead of being told to unpick them first ([#421](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/421))
 - Labelling tasks, evaluators, and bulk upload screens now call this item type "Single agent response" instead of "Agent response" so it matches the agent type it describes ([#489](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/489))
 - Running all tests or comparing models now asks you to confirm first, showing which agent, how many tests, and for a comparison which models will run ([#484](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/484))
 - The top bar of a labelling item no longer changes size when you move between items or switch the live versions only button off ([#486](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/486))
