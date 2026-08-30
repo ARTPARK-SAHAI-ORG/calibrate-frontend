@@ -71,7 +71,7 @@ export type { AboutEvaluator } from "./LLMEvaluationAbout";
 export { SimulationMetricsGrid, LATENCY_KEYS } from "./SimulationMetricsGrid";
 export type { MetricData } from "./SimulationMetricsGrid";
 
-export { SimulationResultsTable } from "./SimulationResultsTable";
+export { SimulationResultsTable, isSimulationLabellable } from "./SimulationResultsTable";
 export type { SimulationResult, EvaluationResult as SimEvaluationResult, Persona, Scenario, TranscriptEntry } from "./SimulationResultsTable";
 
 export { SimulationTranscriptDialog } from "./SimulationTranscriptDialog";

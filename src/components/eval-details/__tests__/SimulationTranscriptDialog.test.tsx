@@ -286,3 +286,74 @@ describe("SimulationTranscriptDialog", () => {
     expect(container.querySelectorAll(".bg-muted.border.border-border.rounded-xl").length).toBe(0);
   });
 });
+
+describe("SimulationTranscriptDialog while the simulation is still running", () => {
+  const scrollArea = () => document.querySelector(".overflow-y-auto") as HTMLElement;
+
+  it("waits for the scores with a spinner once the conversation has turns but no results", () => {
+    const sim: SimulationResult = {
+      ...baseSimulation,
+      evaluation_results: null,
+      transcript: [{ role: "user", content: "hi" }],
+    };
+    render(<SimulationTranscriptDialog simulation={sim} runType="text" onClose={jest.fn()} />);
+    expect(screen.getByTestId("awaiting-scores")).toBeInTheDocument();
+  });
+
+  it("shows no spinner once the scores are in", () => {
+    const sim: SimulationResult = {
+      ...baseSimulation,
+      evaluation_results: [{ name: "accuracy", value: 1, reasoning: "" }],
+      transcript: [{ role: "user", content: "hi" }],
+    };
+    render(<SimulationTranscriptDialog simulation={sim} runType="text" onClose={jest.fn()} />);
+    expect(screen.queryByTestId("awaiting-scores")).not.toBeInTheDocument();
+  });
+
+  it("shows no spinner for an aborted simulation", () => {
+    const sim: SimulationResult = {
+      ...baseSimulation,
+      aborted: true,
+      evaluation_results: null,
+      transcript: [{ role: "user", content: "hi" }],
+    };
+    render(<SimulationTranscriptDialog simulation={sim} runType="text" onClose={jest.fn()} />);
+    expect(screen.queryByTestId("awaiting-scores")).not.toBeInTheDocument();
+  });
+
+  it("follows the conversation down when a new turn arrives, and stays put otherwise", () => {
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockReturnValue(500);
+    const oneTurn: SimulationResult = {
+      ...baseSimulation,
+      evaluation_results: null,
+      transcript: [{ role: "user", content: "hi" }],
+    };
+    const { rerender } = render(
+      <SimulationTranscriptDialog simulation={oneTurn} runType="text" onClose={jest.fn()} />,
+    );
+
+    scrollArea().scrollTop = 10;
+    rerender(
+      <SimulationTranscriptDialog simulation={oneTurn} runType="text" onClose={jest.fn()} />,
+    );
+    expect(scrollArea().scrollTop).toBe(10);
+
+    rerender(
+      <SimulationTranscriptDialog
+        simulation={{
+          ...oneTurn,
+          transcript: [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: "hello" },
+          ],
+        }}
+        runType="text"
+        onClose={jest.fn()}
+      />,
+    );
+    expect(scrollArea().scrollTop).toBe(500);
+    heightSpy.mockRestore();
+  });
+});
