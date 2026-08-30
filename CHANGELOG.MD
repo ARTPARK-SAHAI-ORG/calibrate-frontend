@@ -1,5 +1,6 @@
 ## August 2026
 
+- On a shared results link the evaluator columns, scores and the rating chart's scale now show correctly instead of a single generic column or a wrong 0 to 1 scale ([#496](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/496))
 - The evaluations table now resizes its columns to fit what is in them, and every run results page uses the same Results tab name instead of some calling it Outputs ([#481](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/481))
 - On a labelling task's overview, tool call correctness now only shows a card once it actually has a score, so it no longer looks like the other evaluators are missing from the task ([#494](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/494))
 - You can now submit traces where the agent only called a tool and gave no reply for labelling, instead of being told to unpick them first ([#421](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/421))
