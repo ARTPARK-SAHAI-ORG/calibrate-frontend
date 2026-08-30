@@ -1,5 +1,6 @@
 ## August 2026
 
+- From an evaluator's preview window you can now open its judge prompt for editing in a new tab with one click ([#474](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/474))
 - You can now create a new tool right from the agent's Tools tab, a tool-call test's tool list, or a labelling item's tool-call answer, without leaving to the Tools page first ([#426](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/426))
 - When bulk uploading tests you are now asked what you want to test about the agent, the same question shown when creating a single test ([#466](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/466))
 - people can now filter an agent's traces by label and see that traces can carry labels in the setup code ([#467](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/467))
