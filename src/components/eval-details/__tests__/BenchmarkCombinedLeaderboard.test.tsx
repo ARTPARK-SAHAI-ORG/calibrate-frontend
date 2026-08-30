@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { BenchmarkCombinedLeaderboard } from "../BenchmarkCombinedLeaderboard";
 import type {
   BenchmarkLeaderboardSummaryRow,
@@ -194,6 +194,23 @@ describe("a run someone stopped", () => {
     expect(
       screen.getByText(/This run was stopped after 2 of 6 tests ran/),
     ).toBeInTheDocument();
+  });
+
+  it("links to the tests that did run, and opens that tab", async () => {
+    const onReviewUnanswered = jest.fn();
+    const user = setupUser();
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[
+          { model: "a", total_tests: 4, test_results: [{ passed: true }] },
+        ]}
+        filename="x"
+        runStopped
+        onReviewUnanswered={onReviewUnanswered}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /tab/ }));
+    expect(onReviewUnanswered).toHaveBeenCalled();
   });
 
   it("says why there is nothing to compare", () => {

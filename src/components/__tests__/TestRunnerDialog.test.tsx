@@ -1412,6 +1412,60 @@ describe("tests that produced no answer", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("says it cannot stop the run when the backend address is missing", async () => {
+      mockRunThenStop();
+      const user = setupUser();
+      renderDialog();
+      const stopButton = await screen.findByRole("button", { name: "Stop" });
+
+      delete process.env.NEXT_PUBLIC_BACKEND_URL;
+      await user.click(stopButton);
+
+      expect(toast.error).toHaveBeenCalledWith(
+        "Cannot stop the run: the backend URL is not configured.",
+      );
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+          String(url).includes("/abort"),
+        ),
+      ).toBe(false);
+    });
+
+    it("keeps the window as it was when the run cannot be read back", async () => {
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes("/evaluators?include_defaults=true")) {
+          return Promise.resolve(jsonResponse([]));
+        }
+        if (url.endsWith("/agent-tests/run/task-stop/abort")) {
+          return Promise.resolve(jsonResponse({ task_id: "task-stop" }));
+        }
+        if (url.endsWith("/agent-tests/run/task-stop")) {
+          // The first read lands, the read after the stop does not.
+          return (global.fetch as jest.Mock).mock.calls.filter(([u]) =>
+            String(u).endsWith("/agent-tests/run/task-stop"),
+          ).length > 1
+            ? Promise.resolve(jsonResponse({}, false, 500))
+            : Promise.resolve(
+                jsonResponse({
+                  task_id: "task-stop",
+                  status: "in_progress",
+                  results: [
+                    { test_case_id: "t-1", name: "Test One", passed: true },
+                  ],
+                }),
+              );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      const user = setupUser();
+      renderDialog();
+      await user.click(await screen.findByRole("button", { name: "Stop" }));
+
+      // The run it already had is still on screen, and nothing crashed.
+      expect(await screen.findByText(/Test One:passed/)).toBeInTheDocument();
+    });
+
     it("stops the run and says so in the summary", async () => {
       mockRunThenStop();
       const user = setupUser();

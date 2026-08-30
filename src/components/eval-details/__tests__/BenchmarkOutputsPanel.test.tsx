@@ -158,6 +158,53 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.queryByText(/of 2 done/)).not.toBeInTheDocument();
     });
 
+    it("names the tests of a model the run never reached", () => {
+      const untried = makeModel({
+        model: "model-c",
+        success: null,
+        total_tests: 2,
+        test_results: null,
+      });
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[untried]}
+          expandedModels={new Set(["model-c"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          testNames={["First test", "Second test"]}
+          runStopped
+        />,
+      );
+      expect(screen.getByText("First test")).toBeInTheDocument();
+      expect(screen.getByText("Second test")).toBeInTheDocument();
+      expect(
+        screen.getAllByTestId("status-icon").every((n) => n.textContent === "queued"),
+      ).toBe(true);
+    });
+
+    it("says a model was never tried when it has no results at all", () => {
+      const untried = makeModel({
+        model: "model-c",
+        success: null,
+        total_tests: null,
+        test_results: null,
+      });
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[untried]}
+          expandedModels={new Set(["model-c"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runStopped
+        />,
+      );
+      expect(
+        screen.getByText("The run was stopped before this model was tried."),
+      ).toBeInTheDocument();
+    });
+
     it("says a test was not run when it is opened", () => {
       render(
         <BenchmarkOutputsPanel

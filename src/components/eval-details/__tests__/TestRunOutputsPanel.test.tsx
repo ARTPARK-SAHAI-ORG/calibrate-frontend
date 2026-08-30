@@ -584,3 +584,37 @@ describe("a run with no tests to list", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("a test the run never got to", () => {
+  const notRun = [
+    { id: "t1", name: "Ran", status: "passed" as const },
+    { id: "t2", name: "Never started", status: "not_run" as const },
+  ];
+
+  it("lists it under Not run, with the same mark a queued test has", () => {
+    render(
+      <TestRunOutputsPanel
+        results={notRun}
+        selectedId={null}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("Not run (1)")).toBeInTheDocument();
+    expect(screen.getByText("Never started")).toBeInTheDocument();
+  });
+
+  it("says it was not run when it is opened", () => {
+    render(
+      <TestRunOutputsPanel
+        results={notRun}
+        selectedId="t2"
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "This test was not run. The run was stopped before it got here.",
+      ),
+    ).toBeInTheDocument();
+  });
+});
