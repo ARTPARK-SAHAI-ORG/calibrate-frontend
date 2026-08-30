@@ -372,6 +372,29 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
   });
 
+  it("says failed when the check gives no reason to show", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: false, error: null }),
+    });
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("failed")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /see why/i })).toBeNull();
+  });
+
   it("connection agent: failed verification keeps verify dialog closed, no results, and shows failed badge with expandable detail", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       status: 200,
@@ -394,7 +417,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
@@ -450,7 +475,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("network down")).toBeInTheDocument();
@@ -470,7 +497,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
     expect(global.fetch).not.toHaveBeenCalled();
 
@@ -500,7 +529,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
 
     const retryButton = await screen.findByText("Retry failed");

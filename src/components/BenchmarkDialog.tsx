@@ -400,7 +400,7 @@ export function BenchmarkDialog({
     const isExpanded = expandedModelError === modelId;
     const hasDetails = existing.error || modelSampleResponses[modelId];
     return (
-      <span className="text-xs text-red-500 flex items-center gap-1.5">
+      <span className="text-xs text-red-500 flex items-center gap-1">
         <svg
           className="w-3 h-3"
           fill="none"
@@ -414,7 +414,8 @@ export function BenchmarkDialog({
             d="M6 18L18 6M6 6l12 12"
           />
         </svg>
-        failed
+        {/* With nothing to show, the cross alone would say nothing. */}
+        {!hasDetails && "failed"}
         {hasDetails && (
           <button
             type="button"
@@ -423,7 +424,7 @@ export function BenchmarkDialog({
               setExpandedModelError(isExpanded ? null : modelId);
             }}
             aria-expanded={isExpanded}
-            className="flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-medium text-red-500 underline underline-offset-2 hover:text-red-600 transition-colors cursor-pointer"
+            className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
           >
             {isExpanded ? "Hide" : "See why"}
             <svg
@@ -493,9 +494,15 @@ export function BenchmarkDialog({
                       </span>
                       <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
-                    {/* Verification badge for connections */}
-                    {selectedModel &&
-                      getModelVerificationBadge(selectedModel.id)}
+                    {/* Verification badge for connections. Fixed width, so a
+                        row saying "not checked" and a row offering "See why"
+                        leave the model picker beside them the same size. */}
+                    {agentType === "connection" && (
+                      <div className="w-28 shrink-0 flex items-center">
+                        {selectedModel &&
+                          getModelVerificationBadge(selectedModel.id)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Remove Button */}

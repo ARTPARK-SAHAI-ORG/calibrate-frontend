@@ -52,47 +52,36 @@ export function EnableBenchmarkDialog({
           Compare models
         </h2>
         <p className="text-sm md:text-base text-muted-foreground mb-4">
-          Choose the provider your agent uses to route model requests. Calibrate
-          sends the model name in each request when comparing models.
+          Which provider does your agent use for models?
         </p>
-        <div className="space-y-1.5 mb-5">
-          <label
-            htmlFor="benchmark-provider"
-            className="block text-sm md:text-base font-medium text-foreground"
+        <div className="relative mb-5">
+          <select
+            id="benchmark-provider"
+            aria-label="Model provider"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            disabled={isSaving}
+            className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Model provider
-          </label>
-          <div className="relative">
-            <select
-              id="benchmark-provider"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              disabled={isSaving}
-              className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {BENCHMARK_PROVIDERS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <svg
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-              />
-            </svg>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            You can change this later in the agent&apos;s Connection settings.
-          </p>
+            {BENCHMARK_PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <svg
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+            />
+          </svg>
         </div>
         <div className="flex items-center justify-end gap-2 md:gap-3">
           <button
