@@ -9,8 +9,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
-import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
@@ -598,8 +597,9 @@ export default function EvaluatorRunDetailPage() {
                           job?.details?.item_count ||
                           task?.items?.length ||
                           0;
-                        const maxRows = await getMaxRowsPerEval(accessToken);
-                        if (exceedsEvalLimit(itemCount, maxRows, "items")) {
+                        if (
+                          await overEvalLimit(accessToken, itemCount, "items")
+                        ) {
                           return;
                         }
                         setRerunError(null);

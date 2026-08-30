@@ -5,8 +5,7 @@ import { signOut } from "next-auth/react";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
 import { useOpenRouterModels, useAccessToken } from "@/hooks";
-import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import {
@@ -617,11 +616,10 @@ export function BenchmarkDialog({
               // Every test is run once per model — check the moment the
               // reader tries to run it, before the "are you sure" step,
               // since both counts are already known here.
-              const maxRows = await getMaxRowsPerEval(backendAccessToken);
               if (
-                exceedsEvalLimit(
+                await overEvalLimit(
+                  backendAccessToken,
                   (benchmarkTestCount ?? 0) * chosenModels.length,
-                  maxRows,
                   "tests",
                 )
               ) {

@@ -1,8 +1,7 @@
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
-import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "./evalLimit";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
 import type {
@@ -143,8 +142,7 @@ export async function startTestRunOrNotify(
   testUuids: string[] | null,
   testCount: number = testUuids?.length ?? 0,
 ): Promise<string | null> {
-  const maxRows = await getMaxRowsPerEval(accessToken);
-  if (exceedsEvalLimit(testCount, maxRows, "tests")) return null;
+  if (await overEvalLimit(accessToken, testCount, "tests")) return null;
   try {
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {

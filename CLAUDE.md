@@ -163,7 +163,9 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 Every action that starts a batch of work checks the workspace limit before it sends anything. The limit is one number, `max_rows_per_eval` from `GET /org-limits/me/max-rows-per-eval`: `useMaxRowsPerEval()` for rendering, `getMaxRowsPerEval(accessToken)` for everything else (both in `src/hooks/useMaxRowsPerEval.ts`, one cached request per token, falling back to `LIMITS.DEFAULT_MAX_ROWS_PER_EVAL` when it cannot be read, so a run is never blocked by an unreachable limit).
 
-`exceedsEvalLimit(count, max, noun)` in `src/constants/limits.tsx` is the check itself: it shows the limit toast with the contact link and returns true when the run is too big. **Put it in the function that creates the run, never on the button** — the buttons used to hold it and every other way in (rerun, a benchmark, a saved dataset) walked past it.
+`overEvalLimit(accessToken, count, noun)` in `src/lib/evalLimit.ts` is the check: it reads the limit and, when the run is too big, shows the limit toast with the contact link and returns true. Call it, do not re-assemble it from `getMaxRowsPerEval` + `exceedsEvalLimit` — that pairing lived inline in nine places before it was pulled into one function.
+
+**The function that creates the run must always hold the check.** That is what catches every way in, including the ones with no button of their own (rerun, a saved dataset). A button may check as well, but only as a courtesy: it saves the reader confirming, or picking models, for a run that cannot start. Never move the check onto a button and out of the function — that is the bug this section exists to prevent.
 
 Where it lives today, and what counts as one unit of work:
 

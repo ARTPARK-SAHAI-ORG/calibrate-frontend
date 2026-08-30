@@ -64,8 +64,7 @@ import {
   taskEvaluatorScoreCards,
 } from "@/lib/taskOverviewData";
 import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
-import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -2050,8 +2049,7 @@ function LabellingTaskPageInner() {
     const itemCountForLimit = isSelectAll
       ? itemsTotal
       : (Array.isArray(target) ? target.length : target ? 1 : itemsTotal);
-    const maxRows = await getMaxRowsPerEval(accessToken);
-    if (exceedsEvalLimit(itemCountForLimit, maxRows, "items")) return;
+    if (await overEvalLimit(accessToken, itemCountForLimit, "items")) return;
     // Tool call correctness is answered by people, so it is not something a
     // run can start. A task holding nothing else has no run to offer.
     const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);

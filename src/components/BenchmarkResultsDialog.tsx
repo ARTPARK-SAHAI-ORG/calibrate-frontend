@@ -41,8 +41,8 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import { useAccessToken, getMaxRowsPerEval } from "@/hooks";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { useAccessToken } from "@/hooks";
+import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -472,8 +472,13 @@ export function BenchmarkResultsDialog({
     // Every test is run once per model, so the work is tests times models.
     // Over the limit, the toast says so and we hand the user back to the model
     // picker (or close, when there is no picker to go back to).
-    const maxRows = await getMaxRowsPerEval(backendAccessToken);
-    if (exceedsEvalLimit(testUuids.length * models.length, maxRows, "tests")) {
+    if (
+      await overEvalLimit(
+        backendAccessToken,
+        testUuids.length * models.length,
+        "tests",
+      )
+    ) {
       setIsInitialLoading(false);
       (onGoBack ?? onClose)();
       return;

@@ -151,10 +151,17 @@ jest.mock("../../lib/exportTestResults", () => ({
 const useAccessTokenMock = jest.fn(() => "test-token");
 // The workspace limit on how many tests one run may cover. High by default so
 // the existing runs are never blocked; lowered in the limit test below.
-const getMaxRowsPerEvalMock = jest.fn(async () => 100);
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+}));
+
+// The run size limit, read through `overEvalLimit`, which imports this module
+// directly rather than through the hooks barrel.
+const getMaxRowsPerEvalMock = jest.fn(async () => 100);
+jest.mock("../../hooks/useMaxRowsPerEval", () => ({
+  __esModule: true,
+  useMaxRowsPerEval: () => 100,
   getMaxRowsPerEval: (...args: unknown[]) => getMaxRowsPerEvalMock(...args),
 }));
 

@@ -15,8 +15,7 @@ import {
   fetchAllAgentTests,
   unlinkTestsFromAgent,
 } from "@/lib/agentTestsApi";
-import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
@@ -1617,11 +1616,16 @@ export function TestsTabContent({
               <button
                 data-tour="tests-run-all"
                 onClick={async () => {
-                  // Check the count the moment the button is clicked, before
-                  // opening the confirm dialog — the count is already known,
-                  // no reason to make the reader confirm a run that can't start.
-                  const maxRows = await getMaxRowsPerEval(backendAccessToken);
-                  if (exceedsEvalLimit(linkedTestsTotal, maxRows, "tests")) {
+                  // Checked here as well as in the function that starts the
+                  // run, so the reader is not asked to confirm a run that
+                  // cannot start.
+                  if (
+                    await overEvalLimit(
+                      backendAccessToken,
+                      linkedTestsTotal,
+                      "tests",
+                    )
+                  ) {
                     return;
                   }
                   setRunAllConfirmOpen(true);
@@ -1673,8 +1677,13 @@ export function TestsTabContent({
                 // Comparing against even one model already runs every
                 // linked test once, so the test count alone can rule a
                 // run out before the model picker even opens.
-                const maxRows = await getMaxRowsPerEval(backendAccessToken);
-                if (exceedsEvalLimit(linkedTestsTotal, maxRows, "tests")) {
+                if (
+                  await overEvalLimit(
+                    backendAccessToken,
+                    linkedTestsTotal,
+                    "tests",
+                  )
+                ) {
                   return;
                 }
                 // No tests named means every test linked to the agent.
@@ -1887,8 +1896,13 @@ export function TestsTabContent({
                     onClick={async () => {
                       // `selectedTestCount` is already known — check it before
                       // resolving the selection or opening any dialog.
-                      const maxRows = await getMaxRowsPerEval(backendAccessToken);
-                      if (exceedsEvalLimit(selectedTestCount, maxRows, "tests")) {
+                      if (
+                        await overEvalLimit(
+                          backendAccessToken,
+                          selectedTestCount,
+                          "tests",
+                        )
+                      ) {
                         return;
                       }
                       const { tests, allLinked } =
@@ -1910,10 +1924,12 @@ export function TestsTabContent({
                       onClick={async () => {
                         // `selectedTestCount` is already known — check it
                         // before resolving the selection.
-                        const maxRows =
-                          await getMaxRowsPerEval(backendAccessToken);
                         if (
-                          exceedsEvalLimit(selectedTestCount, maxRows, "tests")
+                          await overEvalLimit(
+                            backendAccessToken,
+                            selectedTestCount,
+                            "tests",
+                          )
                         ) {
                           return;
                         }
