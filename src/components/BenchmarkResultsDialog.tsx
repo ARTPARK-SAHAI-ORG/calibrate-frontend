@@ -258,6 +258,7 @@ export function BenchmarkResultsDialog({
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
         setRunTestUuids([]);
+        setWasStopped(false);
         setError(null);
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
@@ -349,7 +350,8 @@ export function BenchmarkResultsDialog({
   // polling on its own.
   const stopBenchmark = async () => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!currentTaskId || !backendUrl) {
+    if (!currentTaskId) return;
+    if (!backendUrl) {
       toast.error("Cannot stop the run: the backend URL is not configured.");
       return;
     }
