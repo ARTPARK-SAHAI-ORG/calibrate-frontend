@@ -122,7 +122,10 @@ export function SimulationMetricsGrid({
     if (LATENCY_KEYS.includes(key)) latencyMetrics.push([key, metric]);
     else regularMetrics.push([key, metric]);
   });
-  if (latencyMetrics.length === 0 && simulations?.length) {
+  // Only a voice run shows latency at all, so there is nothing to work out
+  // for a text one: filling this in would leave a text run with a heading
+  // and nothing under it.
+  if (type === "voice" && latencyMetrics.length === 0 && simulations?.length) {
     latencyMetrics = latencyMetricsFromSimulations(simulations);
   }
 

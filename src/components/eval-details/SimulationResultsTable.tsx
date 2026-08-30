@@ -163,6 +163,54 @@ export function scoreBadge(
   };
 }
 
+// What one evaluator's cell shows for one simulation, in the table and in
+// the phone card alike: the score, or why there is no score.
+function MetricValue({
+  sim,
+  metricKey,
+  metricInfo,
+  compact,
+}: {
+  sim: SimulationResult;
+  metricKey: string;
+  metricInfo?: MetricDisplayInfo;
+  compact?: boolean;
+}) {
+  const value = getEvaluationResult(sim, metricKey);
+  const reasoning = getEvaluationReasoning(sim, metricKey);
+  if (value === null) {
+    if (sim.aborted) return <span className="text-xs text-muted-foreground">N/A</span>;
+    // The run finished but this evaluator never scored the row: nothing was
+    // measured, which is not the same as a failure.
+    if (sim.evaluation_results) return <span className="text-xs text-muted-foreground">&mdash;</span>;
+    return spinner(
+      `${compact ? "w-4 h-4" : "w-5 h-5"} flex-shrink-0 animate-spin ${
+        isProcessing(sim) ? "text-yellow-500" : "text-gray-500"
+      }`,
+    );
+  }
+  const badge = scoreBadge(metricKey, value, metricInfo);
+  const className = compact
+    ? badge.className.replace("px-2.5 py-1 rounded-md", "px-2 py-0.5 rounded")
+    : badge.className;
+  if (!reasoning) return <span className={className}>{badge.text}</span>;
+  // On a phone the score sits next to an icon to hover, since the table's
+  // wider cell is not there to hover.
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={className}>{badge.text}</span>
+        <Tooltip content={reasoning}>{infoIcon}</Tooltip>
+      </div>
+    );
+  }
+  return (
+    <Tooltip content={reasoning}>
+      <span className={className}>{badge.text}</span>
+    </Tooltip>
+  );
+}
+
 export function SimulationResultsTable({
   simulations,
   metricKeys,
@@ -269,46 +317,17 @@ export function SimulationResultsTable({
                         <div className="whitespace-nowrap">{sim.scenario.name}</div>
                       </div>
                     </td>
-                    {metricKeys.map((metricKey) => {
-                      const value = getEvaluationResult(sim, metricKey);
-                      const reasoning = getEvaluationReasoning(sim, metricKey);
-                      if (value === null) {
-                        return (
-                          <td key={metricKey} className="px-3 py-4 whitespace-nowrap">
-                            <div className="flex justify-center">
-                              {sim.aborted ? (
-                                <span className="text-xs text-muted-foreground">N/A</span>
-                              ) : sim.evaluation_results ? (
-                                // The run finished but this evaluator never
-                                // scored the row: nothing was measured, which
-                                // is not the same as a failure.
-                                <span className="text-xs text-muted-foreground">&mdash;</span>
-                              ) : (
-                                spinner(
-                                  `w-5 h-5 flex-shrink-0 animate-spin ${
-                                    processing ? "text-yellow-500" : "text-gray-500"
-                                  }`,
-                                )
-                              )}
-                            </div>
-                          </td>
-                        );
-                      }
-                      const badge = scoreBadge(metricKey, value, metricInfo?.[metricKey]);
-                      return (
-                        <td key={metricKey} className="px-3 py-4 whitespace-nowrap">
-                          <div className="flex justify-center">
-                            {reasoning ? (
-                              <Tooltip content={reasoning}>
-                                <span className={badge.className}>{badge.text}</span>
-                              </Tooltip>
-                            ) : (
-                              <span className={badge.className}>{badge.text}</span>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
+                    {metricKeys.map((metricKey) => (
+                      <td key={metricKey} className="px-3 py-4 whitespace-nowrap">
+                        <div className="flex justify-center">
+                          <MetricValue
+                            sim={sim}
+                            metricKey={metricKey}
+                            metricInfo={metricInfo?.[metricKey]}
+                          />
+                        </div>
+                      </td>
+                    ))}
                   </tr>
                 );
               })}
@@ -344,49 +363,24 @@ export function SimulationResultsTable({
                   <div className="mb-4">
                     <div className="text-xs font-semibold text-foreground mb-3">Metrics</div>
                     <div className="space-y-3">
-                      {metricKeys.map((metricKey) => {
-                        const value = getEvaluationResult(sim, metricKey);
-                        const reasoning = getEvaluationReasoning(sim, metricKey);
-                        const badge =
-                          value === null ? null : scoreBadge(metricKey, value, metricInfo?.[metricKey]);
-                        return (
-                          <div
-                            key={metricKey}
-                            className="flex items-center justify-between py-2 border-b border-border/50 last:border-b-0"
-                          >
-                            <div className="min-w-0 pr-3">
-                              <span className="text-xs text-muted-foreground">{metricKey}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {badge === null ? (
-                                sim.aborted ? (
-                                  <span className="text-xs text-muted-foreground">N/A</span>
-                                ) : sim.evaluation_results ? (
-                                  <span className="text-xs text-muted-foreground">&mdash;</span>
-                                ) : (
-                                  spinner(
-                                    `w-4 h-4 flex-shrink-0 animate-spin ${
-                                      processing ? "text-yellow-500" : "text-gray-500"
-                                    }`,
-                                  )
-                                )
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <span
-                                    className={badge.className.replace(
-                                      "px-2.5 py-1 rounded-md",
-                                      "px-2 py-0.5 rounded",
-                                    )}
-                                  >
-                                    {badge.text}
-                                  </span>
-                                  {reasoning && <Tooltip content={reasoning}>{infoIcon}</Tooltip>}
-                                </div>
-                              )}
-                            </div>
+                      {metricKeys.map((metricKey) => (
+                        <div
+                          key={metricKey}
+                          className="flex items-center justify-between py-2 border-b border-border/50 last:border-b-0"
+                        >
+                          <div className="min-w-0 pr-3">
+                            <span className="text-xs text-muted-foreground">{metricKey}</span>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-2">
+                            <MetricValue
+                              sim={sim}
+                              metricKey={metricKey}
+                              metricInfo={metricInfo?.[metricKey]}
+                              compact
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

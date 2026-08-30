@@ -248,6 +248,17 @@ describe("SimulationMetricsGrid latency from the simulations", () => {
     expect(screen.queryByText("200ms")).not.toBeInTheDocument();
   });
 
+  it("shows nothing at all for a text run whose simulations carry timings", () => {
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{}}
+        type="text"
+        simulations={[simulationWith(0.2)]}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("explains the built-in speech-to-text score, which has no description of its own", async () => {
     const user = setupUser();
     const { container } = render(
