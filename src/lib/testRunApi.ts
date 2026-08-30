@@ -1,6 +1,7 @@
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
+import { overEvalLimit } from "./evalLimit";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
 import type {
@@ -125,16 +126,23 @@ export async function startTestRun(
 }
 
 /**
- * `startTestRun` plus the failure handling every caller needs: sign out on a
- * 401, otherwise report the error and show one toast. Returns the new task id,
- * or null when the run could not be started.
+ * `startTestRun` plus the two things every caller needs: the workspace limit
+ * on how many tests one run may cover, and the failure handling (sign out on a
+ * 401, otherwise report the error and show one toast). Returns the new task
+ * id, or null when the run was over the limit or could not be started.
+ *
+ * `testCount` says how big the run is. It defaults to the length of
+ * `testUuids`, and only has to be passed when `testUuids` is null (run every
+ * test linked to the agent), where the list itself does not say.
  */
 export async function startTestRunOrNotify(
   backendUrl: string,
   accessToken: string | null | undefined,
   agentUuid: string,
   testUuids: string[] | null,
+  testCount: number = testUuids?.length ?? 0,
 ): Promise<string | null> {
+  if (await overEvalLimit(accessToken, testCount, "tests")) return null;
   try {
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {

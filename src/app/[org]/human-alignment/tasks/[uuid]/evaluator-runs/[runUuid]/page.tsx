@@ -8,6 +8,8 @@ import { Breadcrumbs, RetryIcon, type Crumb } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
+import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
@@ -257,7 +259,26 @@ export default function EvaluatorRunDetailPage() {
   const submitRerun = useCallback(
     async (selections: RunEvaluatorsSelection[]) => {
       if (!accessToken || !taskUuid || rerunSubmitting) return;
+      // Set before the limit check's own network round trip, not after — a
+      // second click landing during that await would otherwise still see
+      // `rerunSubmitting` as false and start a second rerun.
       setRerunSubmitting(true);
+      // With no resolved items the rerun covers the whole task.
+      const itemCount =
+        rerunItemIds.length ||
+        job?.details?.item_count ||
+        task?.items?.length ||
+        0;
+      const overLimit = await evaluatorRunLimitMessage(
+        accessToken,
+        itemCount,
+        selections.length,
+      );
+      if (overLimit) {
+        setRerunError(overLimit);
+        setRerunSubmitting(false);
+        return;
+      }
       setRerunError(null);
       try {
         const body: Record<string, unknown> = { evaluators: selections };
@@ -289,7 +310,15 @@ export default function EvaluatorRunDetailPage() {
         setRerunSubmitting(false);
       }
     },
-    [accessToken, taskUuid, rerunItemIds, rerunSubmitting, router],
+    [
+      accessToken,
+      taskUuid,
+      rerunItemIds,
+      job,
+      task,
+      rerunSubmitting,
+      router,
+    ],
   );
 
   const handleExport = useCallback(async () => {
@@ -558,7 +587,21 @@ export default function EvaluatorRunDetailPage() {
                   <Tooltip content="Run again on the same items" position="bottom">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!accessToken) return;
+                        // Evaluators aren't picked yet, so this can only
+                        // check the item count on its own — but that's
+                        // already the run's floor (one evaluator minimum).
+                        const itemCount =
+                          rerunItemIds.length ||
+                          job?.details?.item_count ||
+                          task?.items?.length ||
+                          0;
+                        if (
+                          await overEvalLimit(accessToken, itemCount, "items")
+                        ) {
+                          return;
+                        }
                         setRerunError(null);
                         setRerunOpen(true);
                       }}

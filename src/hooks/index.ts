@@ -11,7 +11,7 @@ export { useJobDeletion } from "./useJobDeletion";
 export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
-export { useMaxRowsPerEval } from "./useMaxRowsPerEval";
+export { useMaxRowsPerEval, getMaxRowsPerEval } from "./useMaxRowsPerEval";
 export { useTraces } from "./useTraces";
 export { useTraceLabels } from "./useTraceLabels";
 export { useAgentTests } from "./useAgentTests";

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   useAccessToken,
   useAgentTests,
-  useMaxRowsPerEval,
   useDialogUrlParam,
   usePageSize,
 } from "@/hooks";
@@ -16,6 +15,7 @@ import {
   fetchAllAgentTests,
   unlinkTestsFromAgent,
 } from "@/lib/agentTestsApi";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
@@ -47,7 +47,6 @@ import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
-import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel } from "@/lib/testTypes";
 import {
   TestTypeFilter,
@@ -203,7 +202,6 @@ export function TestsTabContent({
   agentNature,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
-  const maxRowsPerEval = useMaxRowsPerEval();
   // Evaluators currently attached to this agent — used to seed a new test's
   // evaluators and to detect which of a saved test's evaluators are "new" to
   // the agent (so we can offer to add them to the agent's defaults).
@@ -981,6 +979,10 @@ export function TestsTabContent({
         backendAccessToken,
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
+        // `tests` is only a page (or empty, for "every matching test with no
+        // filter applied") whenever allLinked is true — the real count is the
+        // server-reported total, not this page's length.
+        allLinked ? linkedTestsTotal : tests.length,
       );
       if (!taskId) return null;
       onRunStarted?.();
@@ -1613,11 +1615,17 @@ export function TestsTabContent({
             <div>
               <button
                 data-tour="tests-run-all"
-                onClick={() => {
-                  if (linkedTestsTotal > maxRowsPerEval) {
-                    showLimitToast(
-                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                    );
+                onClick={async () => {
+                  // Checked here as well as in the function that starts the
+                  // run, so the reader is not asked to confirm a run that
+                  // cannot start.
+                  if (
+                    await overEvalLimit(
+                      backendAccessToken,
+                      linkedTestsTotal,
+                      "tests",
+                    )
+                  ) {
                     return;
                   }
                   setRunAllConfirmOpen(true);
@@ -1665,7 +1673,19 @@ export function TestsTabContent({
               isBenchmarkDisabled={
                 isBenchmarkDisabled && !canEnableBenchmarkHere
               }
-              onClick={() => {
+              onClick={async () => {
+                // Comparing against even one model already runs every
+                // linked test once, so the test count alone can rule a
+                // run out before the model picker even opens.
+                if (
+                  await overEvalLimit(
+                    backendAccessToken,
+                    linkedTestsTotal,
+                    "tests",
+                  )
+                ) {
+                  return;
+                }
                 // No tests named means every test linked to the agent.
                 setBenchmarkTests([]);
                 if (canEnableBenchmarkHere) {
@@ -1874,6 +1894,17 @@ export function TestsTabContent({
                       isBenchmarkDisabled && !canEnableBenchmarkHere
                     }
                     onClick={async () => {
+                      // `selectedTestCount` is already known — check it before
+                      // resolving the selection or opening any dialog.
+                      if (
+                        await overEvalLimit(
+                          backendAccessToken,
+                          selectedTestCount,
+                          "tests",
+                        )
+                      ) {
+                        return;
+                      }
                       const { tests, allLinked } =
                         await selectedTestsForAction();
                       // No tests named means every test linked to the agent.
@@ -1891,10 +1922,15 @@ export function TestsTabContent({
                   <div>
                     <button
                       onClick={async () => {
-                        if (selectedTestCount > maxRowsPerEval) {
-                          showLimitToast(
-                            `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                          );
+                        // `selectedTestCount` is already known — check it
+                        // before resolving the selection.
+                        if (
+                          await overEvalLimit(
+                            backendAccessToken,
+                            selectedTestCount,
+                            "tests",
+                          )
+                        ) {
                           return;
                         }
                         const { tests, allLinked } =

@@ -1,5 +1,8 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { useMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
+import {
+  useMaxRowsPerEval,
+  getMaxRowsPerEval,
+} from "@/hooks/useMaxRowsPerEval";
 import { apiGet } from "@/lib/api";
 import { LIMITS } from "@/constants/limits";
 
@@ -101,5 +104,30 @@ describe("useMaxRowsPerEval", () => {
 
     resolvePromise!({ max_rows_per_eval: 99 });
     await pending;
+  });
+});
+
+describe("getMaxRowsPerEval", () => {
+  beforeEach(() => {
+    mockApiGet.mockReset();
+  });
+
+  it("returns the default without asking the backend when nobody is signed in", async () => {
+    await expect(getMaxRowsPerEval(null)).resolves.toBe(
+      LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
+    );
+    await expect(getMaxRowsPerEval(undefined)).resolves.toBe(
+      LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
+    );
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+
+  it("returns the workspace limit for a signed-in token", async () => {
+    mockApiGet.mockResolvedValue({ max_rows_per_eval: 55 });
+    await expect(getMaxRowsPerEval("token-direct")).resolves.toBe(55);
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/org-limits/me/max-rows-per-eval",
+      "token-direct",
+    );
   });
 });

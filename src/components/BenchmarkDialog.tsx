@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
 import { useOpenRouterModels, useAccessToken } from "@/hooks";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import {
@@ -611,7 +612,21 @@ export function BenchmarkDialog({
           <Button
             variant="primary"
             size="md"
-            onClick={() => setConfirmOpen(true)}
+            onClick={async () => {
+              // Every test is run once per model — check the moment the
+              // reader tries to run it, before the "are you sure" step,
+              // since both counts are already known here.
+              if (
+                await overEvalLimit(
+                  backendAccessToken,
+                  (benchmarkTestCount ?? 0) * chosenModels.length,
+                  "tests",
+                )
+              ) {
+                return;
+              }
+              setConfirmOpen(true);
+            }}
             disabled={!canRunBenchmark || isVerifying}
             className="flex items-center gap-2"
           >

@@ -63,6 +63,8 @@ import {
   hasTaskOverviewData,
   taskEvaluatorScoreCards,
 } from "@/lib/taskOverviewData";
+import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -2031,10 +2033,23 @@ function LabellingTaskPageInner() {
     number | null
   >(0);
 
-  const handleRunEvaluators = (
+  const handleRunEvaluators = async (
     target?: string[] | string | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
+    // Evaluators aren't picked yet, so this can only check the item count on
+    // its own — but that's already the run's floor (one evaluator minimum),
+    // so it catches the guaranteed-over case before the picker even opens.
+    const isSelectAll = !!(
+      target &&
+      typeof target === "object" &&
+      !Array.isArray(target) &&
+      "selectAll" in target
+    );
+    const itemCountForLimit = isSelectAll
+      ? itemsTotal
+      : (Array.isArray(target) ? target.length : target ? 1 : itemsTotal);
+    if (await overEvalLimit(accessToken, itemCountForLimit, "items")) return;
     // Tool call correctness is answered by people, so it is not something a
     // run can start. A task holding nothing else has no run to offer.
     const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);
@@ -2085,9 +2100,24 @@ function LabellingTaskPageInner() {
     selections: { evaluator_id: string; evaluator_version_id: string }[],
   ) => {
     if (!accessToken || !uuid || startingRun) return;
+    // Set before the limit check's own network round trip, not after — a
+    // second click landing during that await would otherwise still see
+    // `startingRun` as false and start a second run.
+    setStartingRun(true);
     const ids = runDialogItemUuids;
     const selectAll = runDialogSelectAll;
-    setStartingRun(true);
+    // "Select all" covers every item the current search matches.
+    const itemCount = selectAll ? itemsTotal : (ids?.length ?? itemsTotal);
+    const overLimit = await evaluatorRunLimitMessage(
+      accessToken,
+      itemCount,
+      selections.length,
+    );
+    if (overLimit) {
+      setRunDialogSubmitError(overLimit);
+      setStartingRun(false);
+      return;
+    }
     setRunDialogSubmitError(null);
     try {
       const body: Record<string, unknown> = { evaluators: selections };

@@ -11,6 +11,7 @@ import {
   useEnabledProviders,
   isProviderEnabled,
 } from "@/hooks";
+import { exceedsEvalLimit } from "@/constants/limits";
 import { toast } from "sonner";
 import {
   sttProviders,
@@ -334,6 +335,18 @@ export function SpeechToTextEvaluation({
           sarvam_judges: sarvamJudges,
           ...(datasetName.trim() ? { dataset_name: datasetName.trim() } : {}),
         };
+      }
+
+      // Rows typed or uploaded here already passed the editor's limit, but a
+      // saved dataset never did, so the row count is checked again here.
+      const rowCount =
+        inputMode === "dataset"
+          ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
+              ?.item_count ?? 0)
+          : (requestBody.texts as string[]).length;
+      if (exceedsEvalLimit(rowCount, maxRowsPerEval, "rows")) {
+        setIsEvaluating(false);
+        return;
       }
 
       const response = await fetch(`${backendUrl}/stt/evaluate`, {
