@@ -1,5 +1,6 @@
 ## August 2026
 
+- The top bar of a labelling item no longer changes size when you move between items or switch the live versions only button off ([#486](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/486))
 - A test run now shows a test that could not be run, such as one that timed out or could not reach the judge, as could not be run instead of counting it as a wrong answer ([#475](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/475))
 - The Evaluations tab on an agent no longer shows up until that agent has a run, so you no longer land on a page that just says there is nothing there yet ([#477](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/477))
 - From an evaluator's preview window you can now open its judge prompt for editing in a new tab with one click ([#474](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/474))
