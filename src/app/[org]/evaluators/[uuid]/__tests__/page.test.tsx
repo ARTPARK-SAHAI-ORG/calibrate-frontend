@@ -11,13 +11,14 @@ import React from "react";
 import { render, screen, waitFor, setupUser } from "@/test-utils";
 
 const push = jest.fn();
+let searchParams = new URLSearchParams();
 const back = jest.fn();
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
   useRouter: () => ({ push, replace: jest.fn(), back, prefetch: jest.fn() }),
   usePathname: () => "/evaluators/eval-1",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
   useParams: () => ({ uuid: "eval-1" }),
   redirect: jest.fn(),
   notFound: jest.fn(),
@@ -119,6 +120,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Every test in this file reads the same fake address. Clearing it here,
+  // rather than at the end of the test that sets it, keeps a failure from
+  // leaving ?edit=1 on for the tests that follow.
+  searchParams = new URLSearchParams();
   global.fetch = originalFetch;
   jest.clearAllMocks();
 });
@@ -233,6 +238,16 @@ describe("evaluator page header actions", () => {
     expect(screen.getByText("Judge prompt")).toBeInTheDocument();
     // Seeded from the live version rather than starting blank.
     expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
+  });
+
+  it("opens the judge prompt form straight away when the address asks for it", async () => {
+    searchParams = new URLSearchParams("edit=1");
+    render(<EvaluatorDetailPage />);
+
+    expect(await screen.findByText("Judge prompt")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
+    // Taken back out, so closing the form and reloading does not reopen it.
+    expect(window.location.search).toBe("?tab=prompts");
   });
 
   it("deletes the evaluator and returns to the page it was opened from", async () => {

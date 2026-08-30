@@ -147,9 +147,10 @@ export function EvaluatorPromptPreview({
           </h3>
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* An evaluator is edited on its own page, so this opens that page
-                in a new tab and leaves the picker as it is. */}
+                in a new tab with its edit form already up, and leaves the
+                picker as it is. */}
             <Link
-              href={`/evaluators/${detail.uuid}`}
+              href={`/evaluators/${detail.uuid}?edit=1`}
               target="_blank"
               rel="noopener noreferrer"
               title="Edit evaluator"

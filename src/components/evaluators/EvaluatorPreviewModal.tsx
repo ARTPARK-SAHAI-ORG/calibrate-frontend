@@ -38,14 +38,61 @@ export function EvaluatorPreviewModal({
             {evaluatorName ?? "Evaluator"}
           </h2>
           <div className="flex items-center gap-2 shrink-0">
-            {/* A new tab, so the test being written stays open behind it. */}
+            {/* Both open a new tab, so the test being written stays open
+                behind them. View is the evaluator page as it is; Edit adds
+                `?edit=1`, which opens that page with its Edit form already up,
+                the same edit as the button on the page itself. */}
             <Link
               href={`/evaluators/${evaluatorUuid}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+              className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
             >
-              View more
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              View
+            </Link>
+            <Link
+              href={`/evaluators/${evaluatorUuid}?edit=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.75}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75h6m-6 3h6"
+                />
+              </svg>
+              Edit
             </Link>
             <button
               type="button"
