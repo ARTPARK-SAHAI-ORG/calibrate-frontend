@@ -44,32 +44,6 @@ const setup = (
 };
 
 describe("EvaluatorPicker", () => {
-  it("keeps every row and section label in the list itself, so the lines between rows are drawn", () => {
-    const { container } = render(
-      <EvaluatorPicker
-        evaluators={[
-          evaluator({ uuid: "a", name: "Tone check" }),
-          evaluator({ uuid: "b", name: "Policy fit" }),
-          evaluator({ uuid: "c", name: "Correctness", is_default: true }),
-        ]}
-        selectedIds={new Set()}
-        onToggle={jest.fn()}
-      />,
-    );
-
-    // The list draws its dividing lines between its own children. A section
-    // that wrapped its rows in a box would hide every line inside it, which is
-    // what made this list look unlike the tool one.
-    const list = container.querySelector(".divide-y") as HTMLElement;
-    expect(Array.from(list.children).map((el) => el.textContent)).toEqual([
-      "My evaluators",
-      "Tone checkDescription",
-      "Policy fitDescription",
-      "Default",
-      "CorrectnessDescription",
-    ]);
-  });
-
   it("renders a row per evaluator with its name and description", () => {
     setup({
       evaluators: [

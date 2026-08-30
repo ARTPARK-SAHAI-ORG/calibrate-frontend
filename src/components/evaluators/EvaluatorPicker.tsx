@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
 import { PickerRow } from "@/components/ui/PickerRow";
+import { EmptyState } from "@/components/ui";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 
@@ -127,31 +128,43 @@ export function EvaluatorPicker({
       return filteredEvaluators.map(renderEvaluatorRow);
     }
 
-    // Flat, not one wrapper per section: the list draws its dividing lines
-    // between its own children, so a wrapper would swallow every line between
-    // the rows inside it and this list would stop matching the tool picker.
     return (
       <>
-        {renderSectionLabel("My evaluators")}
-        {customEvaluators.map(renderEvaluatorRow)}
-        {renderSectionLabel("Default")}
-        {defaultEvaluators.map(renderEvaluatorRow)}
+        <div>
+          {renderSectionLabel("My evaluators")}
+          {customEvaluators.map(renderEvaluatorRow)}
+        </div>
+        <div>
+          {renderSectionLabel("Default")}
+          {defaultEvaluators.map(renderEvaluatorRow)}
+        </div>
       </>
     );
   };
 
   if (offerable.length === 0) {
     return (
-      <div
-        className={`flex flex-col items-center justify-center text-center gap-4 p-8 ${
-          fillHeight ? "md:h-full md:min-h-0" : "min-h-[12rem]"
-        }`}
-      >
-        <p className="text-sm md:text-base text-muted-foreground max-w-md text-balance">
-          {emptyMessage}
-        </p>
-        {emptyAction}
-      </div>
+      <EmptyState
+        className={fillHeight ? "md:h-full md:min-h-0" : ""}
+        icon={
+          <svg
+            className="w-7 h-7 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
+            />
+          </svg>
+        }
+        title="No evaluators to add"
+        description={emptyMessage}
+        actions={emptyAction}
+      />
     );
   }
 

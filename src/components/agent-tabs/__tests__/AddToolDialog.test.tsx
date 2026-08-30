@@ -163,6 +163,50 @@ describe("AddToolDialog", () => {
     expect(
       screen.getByText("All available tools have been added to this agent")
     ).toBeInTheDocument();
+    // The app's usual placeholder: a heading over the sentence, and the one
+    // thing to do here as the filled-in button.
+    expect(screen.getByText("No tools to add")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create tool" })).toHaveClass(
+      "bg-foreground",
+      "text-background",
+    );
+  });
+
+  it("lists the workspace tools that arrive after it first renders", () => {
+    // The dialog renders (as nothing) before the tools have been fetched, so a
+    // copy taken on that first render is empty. It showed an empty workspace
+    // for the rest of the session.
+    const { rerender } = render(
+      <AddToolDialog
+        isOpen={false}
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentTools={[]}
+        allTools={[]}
+        allToolsLoading
+        onToolsAdded={jest.fn()}
+      />,
+    );
+
+    rerender(
+      <AddToolDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentTools={[]}
+        allTools={[toolA, toolB]}
+        allToolsLoading={false}
+        onToolsAdded={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Select Weather lookup")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Select Calendar booking"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("All available tools have been added to this agent"),
+    ).not.toBeInTheDocument();
   });
 
   it("offers Create tool from the empty state, and comes back with the new tool selected and previewed", async () => {

@@ -35,6 +35,19 @@ function renderPicker(
 }
 
 describe("ToolLibraryPicker", () => {
+  it("draws no line between rows, the same as the evaluator picker", () => {
+    const { container } = render(
+      <ToolLibraryPicker
+        tools={[toolA, toolB]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    // Both pickers are one screen to the reader: rows are told apart by the
+    // shading under the pointer, not by a rule between them.
+    expect(container.querySelector(".divide-y")).toBeNull();
+  });
+
   it("shows a loading state", () => {
     const { container } = renderPicker({ isLoading: true });
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();

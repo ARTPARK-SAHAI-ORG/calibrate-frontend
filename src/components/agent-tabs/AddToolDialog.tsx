@@ -36,11 +36,18 @@ export function AddToolDialog({
 
   const backendAccessToken = useAccessToken();
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
-  // Seeded from the prop, then kept up to date locally when a tool is made
-  // from inside this dialog — the workspace-wide list the parent fetched
-  // won't itself refresh until the next full load. Resets fresh on every
-  // open, since the dialog fully unmounts on close.
-  const [localAllTools, setLocalAllTools] = useState<ToolData[]>(allTools);
+  // Null until something is made, edited or deleted from inside this dialog:
+  // until then the workspace list the parent fetched is the one to read, and
+  // it arrives after this dialog first renders. Copying it up front left the
+  // picker showing an empty workspace forever.
+  const [ownTools, setOwnTools] = useState<ToolData[] | null>(null);
+  const localAllTools = ownTools ?? allTools;
+  const setLocalAllTools = (
+    update: ToolData[] | ((prev: ToolData[]) => ToolData[]),
+  ) =>
+    setOwnTools((prev) =>
+      typeof update === "function" ? update(prev ?? allTools) : update,
+    );
   const [createToolOpen, setCreateToolOpen] = useState(false);
   const [previewUuid, setPreviewUuid] = useState<string | null>(null);
   // Editing the previewed tool, from its own edit/delete buttons.
@@ -193,7 +200,7 @@ export function AddToolDialog({
               <button
                 type="button"
                 onClick={() => setCreateToolOpen(true)}
-                className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Create tool
               </button>

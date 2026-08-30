@@ -124,6 +124,11 @@ type EmptyStateProps = {
     label: string;
     onClick: () => void;
   };
+  /**
+   * Buttons to show instead of `action`, for a screen whose own button is
+   * already styled (a create flow, a pair of buttons).
+   */
+  actions?: React.ReactNode;
   className?: string;
 };
 
@@ -132,6 +137,7 @@ export function EmptyState({
   title,
   description,
   action,
+  actions,
   className = "",
 }: EmptyStateProps) {
   return (
@@ -147,7 +153,8 @@ export function EmptyState({
       <p className="text-base text-muted-foreground mb-4 text-center">
         {description}
       </p>
-      {action && (
+      {actions}
+      {!actions && action && (
         <button
           onClick={action.onClick}
           className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
