@@ -19,7 +19,6 @@ describe("eval-details barrel", () => {
       "hasSTTEmptyPredictions",
       "getFirstSTTEmptyPredictionIndex",
       "findFirstEvaluatorRuns",
-      "evaluatorColumnsFromRuns",
       "evaluatorDescriptionMapFromRuns",
       "BenchmarkOutputsPanel",
       "benchmarkLabellingKey",

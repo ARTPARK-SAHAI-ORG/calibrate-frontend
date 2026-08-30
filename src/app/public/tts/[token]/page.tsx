@@ -9,7 +9,6 @@ import {
   TTSEvaluationLeaderboard,
   TTSEvaluationOutputs,
   findFirstEvaluatorRuns,
-  evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   ratingRange,
   visibleEvaluatorColumns,
@@ -19,6 +18,11 @@ import {
   TTSEvaluationTopPicks,
   hasTtsTopPicks,
 } from "@/components/eval-details";
+import {
+  deriveEvaluatorColumns,
+  publicEvaluatorColumnArgs,
+  TTS_RESERVED_METRIC_KEYS,
+} from "@/lib/evaluatorColumns";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { ExportZipButton } from "@/components/ExportZipButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
@@ -142,25 +146,18 @@ export default function PublicTTSPage() {
     fetchData();
   }, [token]);
 
-  // Derive the per-evaluator columns. Prefers `evaluator_runs` (new format)
-  // and falls back to a single legacy `llm_judge_*` column when the
-  // response is from an older job, using the public default evaluator
-  // metadata endpoint for the fallback label/type.
+  // Derive the per-evaluator columns through the same function the signed-in
+  // page uses, so both readers get the same columns from the same response
+  // shape. See `deriveEvaluatorColumns` for the priority order across the four
+  // shapes the backend has emitted. The only difference here is that a share
+  // link knows one evaluator, the run's default, instead of the whole list.
   const evaluatorColumns: TTSEvaluatorColumn[] = useMemo(() => {
     const providerResults = data?.provider_results ?? [];
-    const firstRuns = findFirstEvaluatorRuns(providerResults);
-
-    const columns = firstRuns
-      ? evaluatorColumnsFromRuns<TTSEvaluatorColumn>(firstRuns)
-      : [
-          {
-            key: "llm_judge",
-            label: defaultEvaluator?.name ?? "Evaluator",
-            outputType: defaultEvaluator?.output_type ?? "binary",
-            scoreField: "llm_judge_score",
-            reasoningField: "llm_judge_reasoning",
-          },
-        ];
+    const columns = deriveEvaluatorColumns({
+      providerResults,
+      reservedMetricKeys: TTS_RESERVED_METRIC_KEYS,
+      ...publicEvaluatorColumnArgs(defaultEvaluator),
+    });
 
     return visibleEvaluatorColumns(columns, {
       leaderboardSummary: data?.leaderboard_summary,

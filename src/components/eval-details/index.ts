@@ -38,7 +38,6 @@ export {
   visibleEvaluatorColumns,
   evaluatorColumnHasData,
   findFirstEvaluatorRuns,
-  evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
 } from "./EvaluationRunDetails";
 export type {

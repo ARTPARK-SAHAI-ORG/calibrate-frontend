@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, setupUser } from "../../../test-utils";
 import {
   findFirstEvaluatorRuns,
-  evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   ratingRange,
   hasSTTEmptyPredictions,
@@ -190,51 +189,6 @@ describe("findFirstEvaluatorRuns", () => {
 
   it("returns undefined for an empty providerResults array", () => {
     expect(findFirstEvaluatorRuns([])).toBeUndefined();
-  });
-});
-
-describe("evaluatorColumnsFromRuns", () => {
-  it("maps runs to columns with outputType rating when aggregate.type is rating", () => {
-    const cols = evaluatorColumnsFromRuns([
-      {
-        metric_key: "clarity",
-        name: "Clarity",
-        aggregate: { type: "rating" },
-      },
-    ]);
-    expect(cols).toEqual([
-      {
-        key: "clarity",
-        label: "Clarity",
-        outputType: "rating",
-        scoreField: "clarity",
-        reasoningField: "clarity_reasoning",
-      },
-    ]);
-  });
-
-  it("defaults outputType to binary when aggregate.type is not rating", () => {
-    const cols = evaluatorColumnsFromRuns([
-      { metric_key: "pass_fail", aggregate: { type: "binary" } },
-    ]);
-    expect(cols[0].outputType).toBe("binary");
-  });
-
-  it("defaults outputType to binary when aggregate is null", () => {
-    const cols = evaluatorColumnsFromRuns([
-      { metric_key: "no_agg", aggregate: null },
-    ]);
-    expect(cols[0].outputType).toBe("binary");
-  });
-
-  it("defaults outputType to binary when aggregate is undefined", () => {
-    const cols = evaluatorColumnsFromRuns([{ metric_key: "no_agg2" }]);
-    expect(cols[0].outputType).toBe("binary");
-  });
-
-  it("falls back to metric_key for label when name is missing", () => {
-    const cols = evaluatorColumnsFromRuns([{ metric_key: "raw_key" }]);
-    expect(cols[0].label).toBe("raw_key");
   });
 });
 
