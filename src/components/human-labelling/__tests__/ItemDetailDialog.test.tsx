@@ -366,6 +366,27 @@ describe("ItemDetailDialog", () => {
     );
   });
 
+  it("keeps a spinner in the header while the next item loads", async () => {
+    let release: (value: unknown) => void = () => {};
+    apiClientMock.mockImplementation(
+      () => new Promise((resolve) => (release = resolve)),
+    );
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    expect(await screen.findByLabelText("Refreshing")).toBeInTheDocument();
+    release(baseSummary());
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Refreshing")).not.toBeInTheDocument(),
+    );
+  });
+
   it("shows the live-versions toggle only when an evaluator has run, and toggles it", async () => {
     const user = setupUser();
     apiClientMock.mockResolvedValue(baseSummary());

@@ -547,8 +547,11 @@ export function ItemDetailDialog({
             hasNext={hasNext}
             position={position}
           />
-          <div className="flex items-center gap-2 shrink-0">
-            {loading && summary && (
+          {/* min-h-11 keeps the header the same height while an item loads and
+              its controls are absent, so paging does not move the title and
+              the previous/next arrows up and down. */}
+          <div className="min-h-11 flex items-center gap-2 shrink-0">
+            {loading && (
               <svg
                 className="w-4 h-4 animate-spin text-muted-foreground"
                 fill="none"
@@ -571,9 +574,9 @@ export function ItemDetailDialog({
               </svg>
             )}
             {!loading && !error && summary && !hasAnyLabel && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+              <span className="h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
                 <svg
-                  className="w-3.5 h-3.5"
+                  className="w-3.5 h-3.5 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -616,7 +619,7 @@ export function ItemDetailDialog({
               >
                 {liveOnly ? (
                   <svg
-                    className="w-3.5 h-3.5"
+                    className="w-3.5 h-3.5 shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -630,9 +633,11 @@ export function ItemDetailDialog({
                   </svg>
                 ) : (
                   <span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                    className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center"
                     aria-hidden
-                  />
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                  </span>
                 )}
                 Live versions only
               </button>
