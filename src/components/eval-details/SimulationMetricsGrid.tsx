@@ -76,8 +76,14 @@ function latencyMetricsFromSimulations(simulations: SimulationResult[]): Array<[
     for (const sim of simulations) {
       const found = sim.evaluation_results?.find((r) => r.name === key);
       // The timings arrive as text on some responses ("2.0643304586410522"),
-      // so read every value as a number rather than trusting its type.
-      const value = found ? Number(found.value) : NaN;
+      // so read every value as a number rather than trusting its type. A
+      // simulation that reported no timing is left out rather than counted
+      // as zero, which would drag the average down: `Number(null)` is 0.
+      // Typed as a number, but the backend sends text (and sometimes
+      // nothing) here, so the check has to look at the real value.
+      const raw: unknown = found?.value;
+      if (raw === null || raw === undefined || raw === "") continue;
+      const value = Number(raw);
       if (Number.isFinite(value)) values.push(value);
     }
     if (values.length > 0) {
@@ -140,14 +146,15 @@ export function SimulationMetricsGrid({
     latencyMetrics = latencyMetricsFromSimulations(simulations);
   }
 
-  if (regularMetrics.length === 0 && latencyMetrics.length === 0) return null;
-
   // A tab is only offered when it has cards to show: a run whose numbers
   // carry no timings should not hand the reader a Latency tab that opens on
   // an empty screen.
   const isTextType = type === "text";
   const showLatency = !isTextType && latencyMetrics.length > 0;
   const showTabs = showLatency && regularMetrics.length > 0;
+  // Nothing to draw at all, so not even the heading: a text run whose saved
+  // numbers are only timings would otherwise leave an empty block.
+  if (regularMetrics.length === 0 && !showLatency) return null;
   const latencyOnScreen = showLatency && (!showTabs || activeTab === "latency");
   const performanceOnScreen = regularMetrics.length > 0 && (!showTabs || activeTab === "performance");
   const descriptionIcon = (

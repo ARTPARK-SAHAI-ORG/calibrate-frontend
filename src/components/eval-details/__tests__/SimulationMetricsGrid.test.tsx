@@ -260,6 +260,36 @@ describe("SimulationMetricsGrid latency from the simulations", () => {
     expect(screen.getByText("2.06s")).toBeInTheDocument();
   });
 
+  it("leaves out a simulation that reported no timing rather than counting it as zero", async () => {
+    const user = setupUser();
+    const missing = {
+      ...simulationWith(0),
+      evaluation_results: [
+        { name: "llm/ttft", value: null as unknown as number, reasoning: "" },
+      ],
+    };
+    render(
+      <SimulationMetricsGrid
+        metrics={{ accuracy: { mean: 0.9, std: 0, values: [] } }}
+        type="voice"
+        simulations={[simulationWith(2), missing]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    // The average of the one real timing, not of 2 and 0.
+    expect(screen.getByText("2.00s")).toBeInTheDocument();
+  });
+
+  it("shows nothing at all for a text run whose only saved numbers are timings", () => {
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{ "llm/ttft": { mean: 0.25, std: 0, values: [] } }}
+        type="text"
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("prefers the run's own latency numbers over the per-simulation ones", async () => {
     const user = setupUser();
     render(
