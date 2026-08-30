@@ -5,6 +5,7 @@ import {
   SimulationMetricsGrid,
   formatMetricCardValue,
   latencyMetricTooltip,
+  formatLatency,
   type MetricData,
 } from "../SimulationMetricsGrid";
 import type { SimulationResult } from "../SimulationResultsTable";
@@ -240,6 +241,25 @@ describe("SimulationMetricsGrid latency from the simulations", () => {
     expect(screen.getByText("300ms")).toBeInTheDocument();
   });
 
+  it("reads a timing sent as text, which is what the backend does", async () => {
+    const user = setupUser();
+    const asText = {
+      ...simulationWith(0),
+      evaluation_results: [
+        { name: "llm/ttft", value: "2.0643304586410522" as unknown as number, reasoning: "" },
+      ],
+    };
+    render(
+      <SimulationMetricsGrid
+        metrics={{ accuracy: { mean: 0.9, std: 0, values: [] } }}
+        type="voice"
+        simulations={[asText]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    expect(screen.getByText("2.06s")).toBeInTheDocument();
+  });
+
   it("prefers the run's own latency numbers over the per-simulation ones", async () => {
     const user = setupUser();
     render(
@@ -296,5 +316,20 @@ describe("SimulationMetricsGrid latency from the simulations", () => {
     await user.click(screen.getByText("Latency"));
     await user.hover(container.querySelector("svg[aria-hidden]")!.parentElement!);
     expect(await screen.findByText("Time to first byte for language model")).toBeInTheDocument();
+  });
+});
+
+describe("formatLatency", () => {
+  it("shows under a second in milliseconds and above it in seconds", () => {
+    expect(formatLatency(0.0337)).toBe("34ms");
+    expect(formatLatency(1.923)).toBe("1.92s");
+  });
+
+  it("reads a timing sent as text", () => {
+    expect(formatLatency("0.25" as unknown as number)).toBe("250ms");
+  });
+
+  it("shows a dash rather than NaN when the timing makes no sense", () => {
+    expect(formatLatency("n/a" as unknown as number)).toBe("—");
   });
 });

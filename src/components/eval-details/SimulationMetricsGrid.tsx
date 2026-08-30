@@ -54,6 +54,14 @@ export function latencyMetricTooltip(metricKey: string): string {
   return "";
 }
 
+// A timing under a second reads better in milliseconds. `mean` is coerced
+// because the backend sends these numbers as text on some responses.
+export function formatLatency(mean: number): string {
+  const value = Number(mean);
+  if (!Number.isFinite(value)) return "—";
+  return value < 1 ? `${(value * 1000).toFixed(0)}ms` : `${value.toFixed(2)}s`;
+}
+
 // Speech-to-text accuracy is a built-in score rather than an evaluator the
 // user wrote, so it carries no description of its own.
 const STT_JUDGE_DESCRIPTION =
@@ -67,7 +75,10 @@ function latencyMetricsFromSimulations(simulations: SimulationResult[]): Array<[
     const values: number[] = [];
     for (const sim of simulations) {
       const found = sim.evaluation_results?.find((r) => r.name === key);
-      if (found && typeof found.value === "number") values.push(found.value);
+      // The timings arrive as text on some responses ("2.0643304586410522"),
+      // so read every value as a number rather than trusting its type.
+      const value = found ? Number(found.value) : NaN;
+      if (Number.isFinite(value)) values.push(value);
     }
     if (values.length > 0) {
       out.push([key, { mean: values.reduce((a, b) => a + b, 0) / values.length, std: 0, values }]);
@@ -248,7 +259,7 @@ export function SimulationMetricsGrid({
                   {tooltip && <Tooltip content={tooltip}>{descriptionIcon}</Tooltip>}
                 </div>
                 <div className="text-[18px] font-semibold text-foreground">
-                  {metric.mean < 1 ? `${(metric.mean * 1000).toFixed(0)}ms` : `${metric.mean.toFixed(2)}s`}
+                  {formatLatency(metric.mean)}
                 </div>
               </div>
             );
