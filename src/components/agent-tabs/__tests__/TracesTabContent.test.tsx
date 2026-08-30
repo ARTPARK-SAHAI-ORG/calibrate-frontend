@@ -956,7 +956,10 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     mockUseTraces.mockReturnValue(
-      tracesResult([], { loadedQ: "polio", loadedFilters: { outputType: "tool_call" } }),
+      tracesResult([], {
+        loadedQ: "polio",
+        loadedFilters: { outputType: "tool_call" },
+      }),
     );
     await withFilters(user, async () => {
       await user.click(screen.getByRole("button", { name: "Tool call" }));

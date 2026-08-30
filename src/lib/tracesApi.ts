@@ -229,9 +229,6 @@ export async function validateApiKeyForAgent(
 
 export type ConvertTestType = "response" | "tool_call" | "general";
 
-/** The list the reader is looking at, when they asked for every trace in it
- *  rather than the ones they ticked. The backend re-reads the same rows, so a
- *  page they never loaded is included and a stale tick cannot slip through. */
 /** Everything the filter dialog sets, all of it always present so the dialog
  *  can hold one of these as its state. `TraceFilters` below adds the agent and
  *  the search text, which come from the tab rather than the dialog. */
@@ -263,6 +260,9 @@ export function countTraceFilters(filters: TraceFilterValues): number {
   );
 }
 
+/** The list the reader is looking at, when they asked for every trace in it
+ *  rather than the ones they ticked. The backend re-reads the same rows, so a
+ *  page they never loaded is included and a stale tick cannot slip through. */
 export type TraceFilters = Partial<TraceFilterValues> & {
   agentId: string;
   q?: string;

@@ -92,10 +92,23 @@ describe("TracesFilterDialog", () => {
     expect(applied()).toEqual(NO_TRACE_FILTERS);
   });
 
-  it("cannot clear when nothing is set", () => {
+  it("offers nothing to clear when nothing is set", () => {
     render(<TracesFilterDialog {...props} />);
 
-    expect(screen.getByRole("button", { name: "Clear all" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Clear all" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves without changing the filters when the reader cancels", async () => {
+    const user = setupUser();
+    render(<TracesFilterDialog {...props} />);
+
+    await user.type(screen.getByPlaceholderText("Any input"), "polio");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("says so instead of offering an empty picker", () => {

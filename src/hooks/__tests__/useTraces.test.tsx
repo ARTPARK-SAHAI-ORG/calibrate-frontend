@@ -86,7 +86,9 @@ describe("useTraces", () => {
         useTraces({ accessToken: "tok", agentId: "ag-1", outputType }),
       { initialProps: { outputType: "all" as TraceOutputFilter } },
     );
-    await waitFor(() => expect(result.current.loadedFilters.outputType).toBe("all"));
+    await waitFor(() =>
+      expect(result.current.loadedFilters.outputType).toBe("all"),
+    );
 
     mockFetchTraces.mockReturnValueOnce(
       new Promise((resolve) => {

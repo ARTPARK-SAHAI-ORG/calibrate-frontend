@@ -431,16 +431,12 @@ export function TracesTabContent({
   // screen are still the old search until the full list has loaded back.
   const isSearching =
     searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
-  // A chosen output kind counts the same way: once one is on, an empty list can
-  // no longer mean "this agent never sent a trace". Both the chosen value and
-  // the one the rows came from count, because after the filter is set back to
-  // All the rows on screen are still the filtered ones until the full list has
+  // A filter counts the same way: once one is on, an empty list can no longer
+  // mean "this agent never sent a trace". Both the filters the reader set and
+  // the ones the rows on screen came from count, because after a filter is
+  // cleared the rows are still the filtered ones until the full list has
   // loaded back.
-  // The filters the reader set and the ones the rows on screen came from both
-  // count, because after a filter is cleared the rows are still the filtered
-  // ones until the full list has loaded back.
-  const isFiltering =
-    filterCount > 0 || countTraceFilters(loadedFilters) > 0;
+  const isFiltering = filterCount > 0 || countTraceFilters(loadedFilters) > 0;
   const isNarrowed = isSearching || isFiltering;
   const noMatchMessage =
     isSearching && isFiltering
