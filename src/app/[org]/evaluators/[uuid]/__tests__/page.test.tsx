@@ -120,6 +120,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Every test in this file reads the same fake address. Clearing it here,
+  // rather than at the end of the test that sets it, keeps a failure from
+  // leaving ?edit=1 on for the tests that follow.
+  searchParams = new URLSearchParams();
   global.fetch = originalFetch;
   jest.clearAllMocks();
 });
@@ -242,7 +246,8 @@ describe("evaluator page header actions", () => {
 
     expect(await screen.findByText("Judge prompt")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
-    searchParams = new URLSearchParams();
+    // Taken back out, so closing the form and reloading does not reopen it.
+    expect(window.location.search).toBe("?tab=prompts");
   });
 
   it("deletes the evaluator and returns to the page it was opened from", async () => {

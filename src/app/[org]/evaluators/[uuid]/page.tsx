@@ -587,8 +587,11 @@ function EvaluatorDetailPageInner() {
     if (!evaluator || searchParams.get("edit") !== "1") return;
     editParamHandled.current = true;
     openNewVersionDialog();
+    // Take `edit=1` back out, the same way the tabs write the address, so
+    // closing the form and reloading does not open it all over again.
+    window.history.replaceState(null, "", `?tab=${activeTab}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evaluator, searchParams]);
+  }, [evaluator, searchParams, activeTab]);
 
   const createNewVersion = async () => {
     if (!backendAccessToken || !uuid || !evaluator) return;
