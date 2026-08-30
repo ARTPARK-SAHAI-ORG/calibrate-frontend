@@ -15,7 +15,8 @@ export type ResultTabId =
   | "outputs"
   | "about";
 
-const RESULT_TAB_LABELS: Record<ResultTabId, string> = {
+/** The one place each of these tabs is named. */
+export const RESULT_TAB_LABELS: Record<ResultTabId, string> = {
   summary: "Summary",
   leaderboard: "Leaderboard",
   "top-picks": "Model selection",

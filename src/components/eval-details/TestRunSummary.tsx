@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { WarningTriangleIcon } from "@/components/icons";
+import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   formatLatencyMs,
@@ -35,7 +36,6 @@ type TestRunSummaryProps = {
   onReviewUnanswered?: () => void;
   /** What that tab is called here: the run window says Results, the shared
    * page says Outputs. */
-  resultsTabLabel?: string;
   /** Aggregate per-test latency block (`{p50,p95,p99,count}`; legacy runs
    * carry `{mean,min,max,count}`). Null for eval-only runs or before metrics
    * land. */
@@ -200,7 +200,6 @@ export function TestRunSummary({
   unanswered = 0,
   stoppedEarly = false,
   onReviewUnanswered,
-  resultsTabLabel = "Results",
   latency,
   cost,
   tokens,
@@ -262,10 +261,10 @@ export function TestRunSummary({
                       onClick={onReviewUnanswered}
                       className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
                     >
-                      {resultsTabLabel} tab
+                      {RESULT_TAB_LABELS.outputs} tab
                     </button>
                   ) : (
-                    <span className="font-medium">{resultsTabLabel} tab</span>
+                    <span className="font-medium">{RESULT_TAB_LABELS.outputs} tab</span>
                   )}
                   .
                 </>

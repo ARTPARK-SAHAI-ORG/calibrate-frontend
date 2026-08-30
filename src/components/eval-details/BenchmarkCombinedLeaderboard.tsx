@@ -19,6 +19,7 @@ import {
   formatRating,
   METRIC_LABELS,
 } from "@/lib/llmMetrics";
+import { RESULT_TAB_LABELS } from "@/components/ui";
 
 type BenchmarkCombinedLeaderboardProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
@@ -31,8 +32,6 @@ type BenchmarkCombinedLeaderboardProps = {
   /** Opens the tab listing every test, so the ones that could not be run can
    * be read. Without it the note names the tab but does not link to it. */
   onReviewUnanswered?: () => void;
-  /** What that tab is called here. Both surfaces call it Results today. */
-  resultsTabLabel?: string;
 };
 
 /**
@@ -44,11 +43,9 @@ type BenchmarkCombinedLeaderboardProps = {
 function UnansweredNote({
   modelResults,
   onReviewUnanswered,
-  resultsTabLabel,
 }: {
   modelResults: BenchmarkModelLike[];
   onReviewUnanswered?: () => void;
-  resultsTabLabel: string;
 }) {
   const perModel = modelResults
     .map((m) => benchmarkAnsweredPassFail(m))
@@ -70,10 +67,10 @@ function UnansweredNote({
       onClick={onReviewUnanswered}
       className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
     >
-      {resultsTabLabel} tab
+      {RESULT_TAB_LABELS.outputs} tab
     </button>
   ) : (
-    <span className="font-medium">{resultsTabLabel} tab</span>
+    <span className="font-medium">{RESULT_TAB_LABELS.outputs} tab</span>
   );
 
   return (
@@ -207,7 +204,6 @@ export function BenchmarkCombinedLeaderboard({
   benchmarkScoreLabel = "Test pass rate (%)",
   className,
   onReviewUnanswered,
-  resultsTabLabel = "Results",
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -240,7 +236,6 @@ export function BenchmarkCombinedLeaderboard({
       <UnansweredNote
         modelResults={modelResults}
         onReviewUnanswered={onReviewUnanswered}
-        resultsTabLabel={resultsTabLabel}
       />
       <LeaderboardTab
         className={className}

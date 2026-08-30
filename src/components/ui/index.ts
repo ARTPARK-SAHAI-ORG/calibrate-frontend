@@ -23,4 +23,8 @@ export { DialogNavHeader } from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
 export { SegmentedFilter, type SegmentedFilterOption } from "./SegmentedFilter";
 export { ConfirmDialog } from "./ConfirmDialog";
-export { ResultTabs, type ResultTabId } from "./ResultTabs";
+export {
+  ResultTabs,
+  RESULT_TAB_LABELS,
+  type ResultTabId,
+} from "./ResultTabs";

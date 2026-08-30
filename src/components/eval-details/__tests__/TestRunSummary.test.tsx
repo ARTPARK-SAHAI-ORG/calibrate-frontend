@@ -401,19 +401,11 @@ describe("tests that could not be run", () => {
     expect(onReviewUnanswered).toHaveBeenCalled();
   });
 
-  it("names the tab whatever the surface calls it", () => {
-    render(
-      <TestRunSummary
-        passed={9}
-        total={10}
-        unanswered={3}
-        onReviewUnanswered={jest.fn()}
-        resultsTabLabel="Outputs"
-      />,
-    );
-    expect(
-      screen.getByRole("button", { name: "Outputs tab" }),
-    ).toBeInTheDocument();
+  it("names the tab the same on every surface", () => {
+    render(<TestRunSummary passed={9} total={10} unanswered={3} />);
+    // The shared name, so the note cannot point at a tab called something
+    // else on the public page.
+    expect(screen.getByText("Results tab")).toBeInTheDocument();
   });
 
   it("says when the run gave up before starting every test", () => {
