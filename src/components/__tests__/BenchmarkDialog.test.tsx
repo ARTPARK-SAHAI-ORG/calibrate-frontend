@@ -372,6 +372,29 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
   });
 
+  it("says failed when the check gives no reason to show", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: false, error: null }),
+    });
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("failed")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /see why/i })).toBeNull();
+  });
+
   it("connection agent: failed verification keeps verify dialog closed, no results, and shows failed badge with expandable detail", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       status: 200,
@@ -394,7 +417,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
@@ -402,12 +427,12 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
 
     // expand detail
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.getByText(/"foo": "bar"/)).toBeInTheDocument();
 
     // collapse again
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
 
@@ -450,9 +475,11 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("network down")).toBeInTheDocument();
   });
 
@@ -470,11 +497,13 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
     expect(global.fetch).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("BACKEND_URL not set")).toBeInTheDocument();
 
     process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";
@@ -500,7 +529,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
     });
 
     const retryButton = await screen.findByText("Retry failed");
@@ -646,6 +677,45 @@ describe("BenchmarkDialog", () => {
       <BenchmarkDialog {...baseProps({ onClose, agentType: "agent" })} />,
     );
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
+  });
+
+  it("does not carry a failed check into the next window", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: false, error: "connection refused" }),
+    });
+    const user = setupUser();
+    const onClose = jest.fn();
+    const { rerender } = render(
+      <BenchmarkDialog {...baseProps({ onClose, agentType: "connection" })} />,
+    );
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /see why/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    rerender(
+      <BenchmarkDialog
+        {...baseProps({ onClose, agentType: "connection", isOpen: false })}
+      />,
+    );
+    rerender(
+      <BenchmarkDialog {...baseProps({ onClose, agentType: "connection" })} />,
+    );
+
+    expect(screen.getByText("Select a model")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /see why/i })).toBeNull();
   });
 
   it("closes dialog via the Cancel button", async () => {

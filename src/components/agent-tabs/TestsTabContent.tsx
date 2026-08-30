@@ -34,6 +34,7 @@ import {
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
+import { EnableBenchmarkDialog } from "@/components/agent-tabs/EnableBenchmarkDialog";
 import { SpinnerIcon } from "@/components/icons";
 import {
   AddTestDialog,
@@ -150,6 +151,10 @@ type TestsTabContentProps = {
   onConnectionVerified?: () => void;
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
   onGoToConnectionSettings?: () => void;
+  // Called when someone turns benchmarking on from here by picking a provider.
+  // The parent saves it onto the agent's connection settings. When it is not
+  // given, Compare models stays disabled for an agent with benchmarking off.
+  onEnableBenchmark?: (provider: string) => void | Promise<void>;
   // Called the moment a run or benchmark is created here. The runs list lives
   // in the Evaluations tab, so the parent uses this to have that tab pick the
   // new one up rather than showing a stale list.
@@ -191,6 +196,7 @@ export function TestsTabContent({
   agentDefaultInputTypes,
   onConnectionVerified,
   onGoToConnectionSettings,
+  onEnableBenchmark,
   onRunStarted,
   onRunWindowClosed,
   onAgentDefaultsAttached,
@@ -419,6 +425,13 @@ export function TestsTabContent({
     agentType === "connection" && connectionVerified === false;
   const isBenchmarkDisabled =
     agentType === "connection" && supportsBenchmark !== true;
+  // Benchmarking is off, but it can be turned on from here: Compare models
+  // stays clickable and asks for the provider first instead of sending the
+  // reader to the Connection tab.
+  const canEnableBenchmarkHere = isBenchmarkDisabled && !!onEnableBenchmark;
+  // Set when Compare models was clicked with benchmarking off: holds the tests
+  // to compare so they survive the provider question.
+  const [enableBenchmarkOpen, setEnableBenchmarkOpen] = useState(false);
 
   // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
   // models + test subset as a completed run and shows it live.
@@ -1649,10 +1662,16 @@ export function TestsTabContent({
                 </>
               }
               isConnectionUnverified={isConnectionUnverified}
-              isBenchmarkDisabled={isBenchmarkDisabled}
+              isBenchmarkDisabled={
+                isBenchmarkDisabled && !canEnableBenchmarkHere
+              }
               onClick={() => {
                 // No tests named means every test linked to the agent.
                 setBenchmarkTests([]);
+                if (canEnableBenchmarkHere) {
+                  setEnableBenchmarkOpen(true);
+                  return;
+                }
                 setBenchmarkDialogOpen(true);
               }}
             />
@@ -1851,14 +1870,20 @@ export function TestsTabContent({
                     size="bulk"
                     label="Compare"
                     isConnectionUnverified={isConnectionUnverified}
-                    isBenchmarkDisabled={isBenchmarkDisabled}
+                    isBenchmarkDisabled={
+                      isBenchmarkDisabled && !canEnableBenchmarkHere
+                    }
                     onClick={async () => {
                       const { tests, allLinked } =
                         await selectedTestsForAction();
                       // No tests named means every test linked to the agent.
                       if (!allLinked && tests.length === 0) return;
                       setBenchmarkTests(allLinked ? [] : tests);
-                      setBenchmarkDialogOpen(true);
+                      if (canEnableBenchmarkHere) {
+                        setEnableBenchmarkOpen(true);
+                      } else {
+                        setBenchmarkDialogOpen(true);
+                      }
                       setSelectedTestUuids(new Set());
                       setSelectAllMatching(false);
                     }}
@@ -2417,23 +2442,43 @@ export function TestsTabContent({
         confirmText="Start the run"
       />
 
-      {/* Benchmark Dialog */}
-      <BenchmarkDialog
-        isOpen={benchmarkDialogOpen}
+      {/* Provider question, shown when Compare models is used on an agent that
+          has benchmarking turned off. Saving it opens the benchmark dialog. */}
+      <EnableBenchmarkDialog
+        isOpen={enableBenchmarkOpen}
         onClose={() => {
-          setBenchmarkDialogOpen(false);
+          setEnableBenchmarkOpen(false);
           setBenchmarkTests([]);
         }}
-        agentUuid={agentUuid}
-        agentName={agentName}
-        agentNature={agentNature}
-        tests={benchmarkTests}
-        totalTests={linkedTestsTotal}
-        onBenchmarkCreated={() => onRunStarted?.()}
-        agentType={agentType}
-        benchmarkModelsVerified={benchmarkModelsVerified}
-        benchmarkProvider={benchmarkProvider}
+        currentProvider={benchmarkProvider}
+        onConfirm={async (provider) => {
+          await onEnableBenchmark?.(provider);
+          setEnableBenchmarkOpen(false);
+          setBenchmarkDialogOpen(true);
+        }}
       />
+
+      {/* Benchmark Dialog. Rendered only while it is open, so every open starts
+          from scratch: the models picked and the checks that failed last time
+          belong to that window, not to the next one. */}
+      {benchmarkDialogOpen && (
+        <BenchmarkDialog
+          isOpen
+          onClose={() => {
+            setBenchmarkDialogOpen(false);
+            setBenchmarkTests([]);
+          }}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          agentNature={agentNature}
+          tests={benchmarkTests}
+          totalTests={linkedTestsTotal}
+          onBenchmarkCreated={() => onRunStarted?.()}
+          agentType={agentType}
+          benchmarkModelsVerified={benchmarkModelsVerified}
+          benchmarkProvider={benchmarkProvider}
+        />
+      )}
 
       {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
           test subset, skipping the model picker. */}

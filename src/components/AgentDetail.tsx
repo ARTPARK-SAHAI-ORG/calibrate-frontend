@@ -1342,6 +1342,19 @@ export function AgentDetail({
                 }))
               }
               onGoToConnectionSettings={() => performTabSwitch("connection")}
+              // Turning benchmarking on from the Tests tab. Setting it here is
+              // enough to persist it: the auto-save effects above save the
+              // benchmarking toggle for both verified and unverified agents.
+              onEnableBenchmark={
+                agent.type === "connection"
+                  ? (provider: string) =>
+                      setConnectionConfig((prev) => ({
+                        ...prev,
+                        supports_benchmark: true,
+                        benchmark_provider: provider,
+                      }))
+                  : undefined
+              }
               onRunStarted={() => {
                 markHasRuns();
                 setRunsReloadKey((k) => k + 1);
