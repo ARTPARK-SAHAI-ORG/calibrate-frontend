@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import {
   fetchEvaluatorDetail,
@@ -12,6 +13,8 @@ import {
 import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { reportError } from "@/lib/reportError";
 import { VersionCard } from "./VersionCard";
+import { EditIcon } from "@/components/icons";
+import { DeleteIconButton } from "@/components/ui";
 
 /**
  * How an evaluator judges, shown beside the picker so the reader can read the
@@ -25,6 +28,7 @@ import { VersionCard } from "./VersionCard";
 export function EvaluatorPromptPreview({
   evaluatorUuid,
   onDelete,
+  showHeader = true,
 }: {
   evaluatorUuid: string | null;
   /**
@@ -32,6 +36,11 @@ export function EvaluatorPromptPreview({
    * Hidden anyway on a locked evaluator, same rule as everywhere else.
    */
   onDelete?: (evaluatorUuid: string) => void;
+  /**
+   * Show the name and the Edit and Delete buttons above the prompt. Off where
+   * the window around it already names the evaluator and links to its page.
+   */
+  showHeader?: boolean;
 }) {
   const accessToken = useAccessToken();
   const [detail, setDetail] = useState<EvaluatorDetail | null>(null);
@@ -128,29 +137,34 @@ export function EvaluatorPromptPreview({
   const version = liveVersionOf(detail);
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-5">
-      {onDelete && canDeleteEvaluator(detail) && (
-        <div className="flex items-center justify-end mb-2">
-          <button
-            type="button"
-            onClick={() => onDelete(detail.uuid)}
-            title="Delete evaluator"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
+    <div className="h-full overflow-y-auto p-4 md:p-5 space-y-4">
+      {/* Name on the left, what can be done to it on the right, the same
+          header the tool preview has. */}
+      {showHeader && (
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-base font-semibold text-foreground">
+            {detail.name}
+          </h3>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* An evaluator is edited on its own page, so this opens that page
+                in a new tab and leaves the picker as it is. */}
+            <Link
+              href={`/evaluators/${detail.uuid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Edit evaluator"
+              aria-label="Edit evaluator"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+              <EditIcon className="w-4 h-4" />
+            </Link>
+            {onDelete && canDeleteEvaluator(detail) && (
+              <DeleteIconButton
+                onClick={() => onDelete(detail.uuid)}
+                title="Delete evaluator"
               />
-            </svg>
-          </button>
+            )}
+          </div>
         </div>
       )}
       {!version ? (
@@ -160,8 +174,6 @@ export function EvaluatorPromptPreview({
       ) : (
         // The evaluator page's own Prompts-tab card, in that card's read-only
         // shape: judge model, prompt, the values it asks for and the output.
-        // The name, type and description are already on the row to the left,
-        // so they are not repeated here.
         <VersionCard
           version={{
             uuid: version.uuid,

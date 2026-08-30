@@ -123,10 +123,32 @@ describe("EvaluatorPromptPreview", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not repeat the name and pills already on the row", async () => {
+  it("names the evaluator at the top, with Edit opening its page in a new tab", async () => {
     render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     await screen.findByText("Judge whether the reply is concise.");
-    expect(screen.queryByText("Conciseness")).not.toBeInTheDocument();
+
+    expect(
+      screen.getByRole("heading", { name: "Conciseness" }),
+    ).toBeInTheDocument();
+    const edit = screen.getByRole("link", { name: "Edit evaluator" });
+    expect(edit).toHaveAttribute("href", "/evaluators/e1");
+    expect(edit).toHaveAttribute("target", "_blank");
+  });
+
+  it("leaves the name and buttons out where the window already has them", async () => {
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" showHeader={false} />);
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(
+      screen.queryByRole("heading", { name: "Conciseness" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Edit evaluator" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not repeat the description already on the row", async () => {
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
+    await screen.findByText("Judge whether the reply is concise.");
     expect(
       screen.queryByText("Rates how concise the output is"),
     ).not.toBeInTheDocument();

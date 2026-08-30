@@ -70,7 +70,12 @@ export function EvaluatorPreviewModal({
           </div>
         </div>
         <div className="flex-1 min-h-0">
-          <EvaluatorPromptPreview evaluatorUuid={evaluatorUuid} />
+          {/* This window's own title bar already names the evaluator and
+              links to its page, so the preview does not repeat that. */}
+          <EvaluatorPromptPreview
+            evaluatorUuid={evaluatorUuid}
+            showHeader={false}
+          />
         </div>
       </div>
     </div>
