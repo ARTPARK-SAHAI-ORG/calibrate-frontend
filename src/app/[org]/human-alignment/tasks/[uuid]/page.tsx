@@ -1544,9 +1544,7 @@ function LabellingTaskPageInner() {
   // Tool call correctness is not judged by a model, so there is nothing to
   // compare its answers against. It gets no agreement card and is left out
   // of the note about missing alignment numbers, where it would otherwise
-  // read as an evaluator that failed to run. It does keep a score card, so
-  // the reader can see it is on the task even before any tool call result
-  // has been carried across.
+  // read as an evaluator that failed to run.
   const toolCallEvaluatorIds = useMemo(
     () =>
       new Set(
@@ -1564,12 +1562,8 @@ function LabellingTaskPageInner() {
   );
   const evaluatorScoreCards = useMemo(
     () =>
-      taskEvaluatorScoreCards(
-        agreement?.evaluators ?? [],
-        evaluatorResultStats,
-        toolCallEvaluatorIds,
-      ),
-    [agreement, evaluatorResultStats, toolCallEvaluatorIds],
+      taskEvaluatorScoreCards(agreement?.evaluators ?? [], evaluatorResultStats),
+    [agreement, evaluatorResultStats],
   );
   const hasEvaluatorScoreCard = evaluatorScoreCards.length > 0;
   // An evaluator with a card but no alignment number has no human labels on
@@ -2894,9 +2888,7 @@ function LabellingTaskPageInner() {
               />
             ) : (
               <div className="space-y-6">
-                {/* Evaluators that produced a score, plus tool call
-                    correctness, which keeps an empty card until its results
-                    are carried across. */}
+                {/* Only evaluators that produced a score. */}
                 <EvaluatorScoreCards
                   heading="Evaluator scores"
                   description="What each evaluator scored across the items in this task"
