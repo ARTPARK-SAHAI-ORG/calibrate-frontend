@@ -78,11 +78,11 @@ const modelA = makeModel({
   success: true,
   total_tests: 3,
   passed: 1,
-  failed: 2, // includes the errored one per API convention
+  failed: 2, // includes the one that produced no answer, per API convention
   test_results: [
     { name: "Alpha Passed", passed: true, reasoning: "good" },
     { name: "Alpha Failed", passed: false, reasoning: "bad" },
-    { name: "Alpha Errored", passed: false, error: "boom" },
+    { name: "Alpha Errored", passed: false, unanswered: true, reasoning: "boom" },
   ],
 });
 
@@ -159,7 +159,7 @@ describe("BenchmarkOutputsPanel", () => {
     expect(screen.getByText("1 passed")).toBeInTheDocument();
     // there may be multiple "1 failed" (model-a) - assert at least one exists
     expect(screen.getAllByText("1 failed").length).toBeGreaterThan(0);
-    expect(screen.getByText("1 errored")).toBeInTheDocument();
+    expect(screen.getByText("1 not run")).toBeInTheDocument();
   });
 
   it("model B is processing (success===null): shows spinner, no pass/fail counts in header, and running placeholder icon for the running row when showRunningSpinner", () => {
@@ -275,7 +275,7 @@ describe("BenchmarkOutputsPanel", () => {
           onSelectTest={jest.fn()}
         />,
       );
-      // Alpha Errored has both passed:false and error set -> should be "error", not "failed"
+      // Alpha Errored is passed:false AND unanswered -> "error", not "failed"
       const erroredRowButton = screen.getByText("Alpha Errored").closest("button")!;
       const icon = within(erroredRowButton).getByTestId("status-icon");
       expect(icon).toHaveTextContent("error");
@@ -335,7 +335,7 @@ describe("BenchmarkOutputsPanel", () => {
       );
       expect(screen.queryByText("Passed")).not.toBeInTheDocument();
       expect(screen.queryByText("Failed")).not.toBeInTheDocument();
-      expect(screen.queryByText("Errored")).not.toBeInTheDocument();
+      expect(screen.queryByText("Not run")).not.toBeInTheDocument();
     });
 
     it("shows pills when >=2 distinct statuses present, and clicking filters rows + toggles off on second click", async () => {
@@ -351,7 +351,7 @@ describe("BenchmarkOutputsPanel", () => {
       );
       const passedPill = screen.getByText("Passed");
       const failedPill = screen.getByText("Failed");
-      const erroredPill = screen.getByText("Errored");
+      const erroredPill = screen.getByText("Not run");
       expect(passedPill).toBeInTheDocument();
       expect(failedPill).toBeInTheDocument();
       expect(erroredPill).toBeInTheDocument();
@@ -379,13 +379,13 @@ describe("BenchmarkOutputsPanel", () => {
           onSelectTest={jest.fn()}
         />,
       );
-      await user.click(screen.getByText("Errored"));
+      await user.click(screen.getByText("Not run"));
       expect(screen.getByText("Alpha Errored")).toBeInTheDocument();
       expect(screen.queryByText("Alpha Passed")).not.toBeInTheDocument();
       expect(screen.queryByText("Alpha Failed")).not.toBeInTheDocument();
       // header: only errored count should show for model-a (passed/failed hidden)
       expect(screen.queryByText("1 passed")).not.toBeInTheDocument();
-      expect(screen.getByText("1 errored")).toBeInTheDocument();
+      expect(screen.getByText("1 not run")).toBeInTheDocument();
     });
   });
 
@@ -421,7 +421,7 @@ describe("BenchmarkOutputsPanel", () => {
           onSelectTest={jest.fn()}
         />,
       );
-      await user.click(screen.getByText("Errored"));
+      await user.click(screen.getByText("Not run"));
       expect(screen.queryByText("Alpha Passed")).not.toBeInTheDocument();
 
       // Rerender with modelResults that has no errored tests anymore, but still >=2 statuses (passed/failed)

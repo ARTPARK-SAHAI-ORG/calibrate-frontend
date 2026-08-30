@@ -50,7 +50,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   testTypeLabel,
-  getUnitTestBreakdown,
+  getRunBreakdown,
   runDisplayName,
 } from "@/lib/testTypes";
 import {
@@ -119,11 +119,12 @@ type AllRun = {
   total_tests: number | null;
   passed: number | null;
   failed: number | null;
+  /** How many of the run's tests produced no answer. */
+  unanswered_tests?: number | null;
   results?: TestRunResult[] | null;
   model_results?: { model: string }[] | null;
   leaderboard_summary?: null;
   results_s3_prefix?: string;
-  error: boolean;
   is_public: boolean;
   share_token: string | null;
   agent_id: string;
@@ -448,6 +449,7 @@ function LLMPageInner() {
                   total_tests: result.total_tests ?? r.total_tests,
                   passed: result.passed ?? r.passed,
                   failed: result.failed ?? r.failed,
+                  unanswered_tests: result.unanswered_tests ?? r.unanswered_tests,
                   results: result.results ?? r.results,
                   updated_at: new Date().toISOString(),
                 };
@@ -736,7 +738,6 @@ function LLMPageInner() {
   ) => {
     const newRun: AllRun = {
       ...core,
-      error: false,
       is_public: false,
       share_token: null,
       agent_id: agentUuid,
@@ -1743,8 +1744,8 @@ function LLMPageInner() {
             ) : (() => {
               const isRunning = (r: AllRun) =>
                 r.status === "pending" || r.status === "queued" || r.status === "in_progress";
-              const isError = (r: AllRun) => r.status === "failed" || r.error;
-              const isDone = (r: AllRun) => r.status === "done" && !r.error;
+              const isError = (r: AllRun) => r.status === "failed";
+              const isDone = (r: AllRun) => r.status === "done";
               const isAllPassed = (r: AllRun) => isDone(r) && (r.failed === null || r.failed === 0);
               const isAllFailed = (r: AllRun) => isDone(r) && r.failed !== null && r.failed > 0;
 
@@ -1819,13 +1820,14 @@ function LLMPageInner() {
                             </span>
                           ) : run.type === "llm-unit-test" ? (
                             (() => {
-                              // Prefer a per-test breakdown so a run whose tests
-                              // errored out shows "N Pass / N Fail / N Error"
-                              // instead of a single blanket "Error" pill. Fall
-                              // back to run-level status when there are no results.
-                              const breakdown = getUnitTestBreakdown(run.results);
+                              // Prefer the tally so a run where some tests
+                              // produced no answer shows "N Pass / N Fail /
+                              // N Not run" instead of a single blanket "Error"
+                              // pill. Fall back to the run's own status when it
+                              // reports no tests.
+                              const breakdown = getRunBreakdown(run);
                               if (!breakdown) {
-                                return run.status === "failed" || run.error ? (
+                                return run.status === "failed" ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
                                 ) : (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>
@@ -1839,13 +1841,13 @@ function LLMPageInner() {
                                   {breakdown.failed > 0 && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">{breakdown.failed} Fail</span>
                                   )}
-                                  {breakdown.errored > 0 && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-500">{breakdown.errored} Error</span>
+                                  {breakdown.unanswered > 0 && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-500">{breakdown.unanswered} Not run</span>
                                   )}
                                 </>
                               );
                             })()
-                          ) : run.status === "failed" || run.error ? (
+                          ) : run.status === "failed" ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
                           ) : (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>
@@ -1889,9 +1891,9 @@ function LLMPageInner() {
                               </span>
                             ) : run.type === "llm-unit-test" ? (
                               (() => {
-                                const breakdown = getUnitTestBreakdown(run.results);
+                                const breakdown = getRunBreakdown(run);
                                 if (!breakdown) {
-                                  return run.status === "failed" || run.error ? (
+                                  return run.status === "failed" ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
                                   ) : (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>
@@ -1905,13 +1907,13 @@ function LLMPageInner() {
                                     {breakdown.failed > 0 && (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">{breakdown.failed} Fail</span>
                                     )}
-                                    {breakdown.errored > 0 && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-500">{breakdown.errored} Error</span>
+                                    {breakdown.unanswered > 0 && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-500">{breakdown.unanswered} Not run</span>
                                     )}
                                   </>
                                 );
                               })()
-                            ) : run.status === "failed" || run.error ? (
+                            ) : run.status === "failed" ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
                             ) : (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>

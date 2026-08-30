@@ -1772,7 +1772,7 @@ export function ResultPager({
  * HTTP error from the agent, an unreachable judge). Amber, not red: this is
  * not the judge saying the answer was wrong.
  */
-export function TestCouldNotRunNotice({ error }: { error?: string }) {
+export function TestCouldNotRunNotice({ reason }: { reason?: string }) {
   return (
     <div className="p-4 md:p-6">
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
@@ -1782,9 +1782,9 @@ export function TestCouldNotRunNotice({ error }: { error?: string }) {
             This test could not be run
           </span>
         </div>
-        {error && (
+        {reason && (
           <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {error}
+            {reason}
           </p>
         )}
         <p className="mt-2 text-sm text-muted-foreground">

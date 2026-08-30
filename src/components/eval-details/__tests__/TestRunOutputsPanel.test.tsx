@@ -77,11 +77,14 @@ const failedResult = makeResult({
   status: "failed",
   reasoning: "did not match",
 });
+// A test that produced no answer. It arrives as `passed: false` like any
+// wrong answer, so only the flag tells them apart.
 const erroredResult = makeResult({
   id: "e1",
   name: "Errored Test One",
   status: "failed",
-  error: "boom",
+  unanswered: true,
+  reasoning: "boom",
 });
 const pendingResult = makeResult({
   id: "pd1",
@@ -119,7 +122,7 @@ describe("TestRunOutputsPanel", () => {
       <TestRunOutputsPanel results={allResults} selectedId={null} onSelect={jest.fn()} />,
     );
     expect(screen.getByText("Failed (1)")).toBeInTheDocument();
-    expect(screen.getByText("Errored (1)")).toBeInTheDocument();
+    expect(screen.getByText("Could not be run (1)")).toBeInTheDocument();
     expect(screen.getByText("Passed (1)")).toBeInTheDocument();
     expect(screen.getByText("Queued (1)")).toBeInTheDocument();
     expect(screen.getByText("Running (1)")).toBeInTheDocument();
@@ -239,7 +242,10 @@ describe("TestRunOutputsPanel", () => {
       />,
     );
     const detail = screen.getByTestId("test-detail-view");
-    expect(detail).toHaveTextContent(JSON.stringify({ passed: false, reasoning: "looks good" }));
+    // The verdict comes from the row's own status. It used to come from an
+    // `evaluation` block the API does not send, so a passed test was handed
+    // "passed: false".
+    expect(detail).toHaveTextContent(JSON.stringify({ passed: true, reasoning: "looks good" }));
   });
 
   it("shows EvaluationCriteriaPanel only for passed/failed non-errored selected results", () => {

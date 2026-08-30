@@ -24,6 +24,7 @@ jest.mock("../eval-details", () => ({
           <span data-testid={`inputs-${r.id}`}>
             {r.inputs ? JSON.stringify(r.inputs) : ""}
           </span>
+          <span data-testid={`unanswered-${r.id}`}>{String(r.unanswered)}</span>
           {onToggleLabellingSelection && (
             <button
               aria-label={`toggle-labelling-${r.id}`}
@@ -37,9 +38,12 @@ jest.mock("../eval-details", () => ({
       <div data-testid="selected-id">{selectedId}</div>
     </div>
   ),
-  TestRunSummary: ({ passed, total }: any) => (
+  TestRunSummary: ({ passed, total, unanswered, stoppedEarly }: any) => (
     <div data-testid="summary-panel">
       summary {passed}/{total}
+      <span data-testid="summary-gaps">
+        {JSON.stringify({ unanswered, stoppedEarly })}
+      </span>
     </div>
   ),
   LLMEvaluationAbout: (props: any) => (
@@ -176,12 +180,10 @@ describe("TestRunnerDialog", () => {
         jsonResponse({
           task_id: "task-slow",
           status: "completed",
-          name: "Slow Run",
           results: [
             {
-              test_uuid: "test-1",
+              test_case_id: "test-1",
               name: "Test One",
-              status: "passed",
               passed: true,
             },
           ],
@@ -190,7 +192,7 @@ describe("TestRunnerDialog", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Slow Run")).toBeInTheDocument(),
+      expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
@@ -207,12 +209,10 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-inputs",
             status: "in_progress",
-            name: "Inputs Run",
             results: [
               {
-                test_uuid: "t-1",
+                test_case_id: "t-1",
                 name: "basic",
-                status: "passed",
                 passed: true,
                 inputs: { condition_area: "anc", trimester: 1 },
               },
@@ -250,25 +250,24 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-rows",
             status: "in_progress",
-            name: "Rows Run",
             results: [
               // `name` wins.
               {
-                test_uuid: "t-1",
+                test_case_id: "t-1",
                 name: "From name",
                 test_name: "ignored",
                 passed: true,
               },
               // Falls back to test_case.name.
               {
-                test_uuid: "t-2",
+                test_case_id: "t-2",
                 test_case: { name: "From test_case" },
                 passed: false,
               },
               // Falls back to test_name.
-              { test_uuid: "t-3", test_name: "From test_name", passed: false },
+              { test_case_id: "t-3", test_name: "From test_name", passed: false },
               // passed: null → still running, NOT failed.
-              { test_uuid: "t-4", name: "Still Running", passed: null },
+              { test_case_id: "t-4", name: "Still Running", passed: null },
             ],
           }),
         );
@@ -354,7 +353,7 @@ describe("TestRunnerDialog", () => {
             jsonResponse({
               task_id: "task-tick",
               status: "in_progress",
-              results: [{ test_uuid: "t-1", name: "Test One", passed: null }],
+              results: [{ test_case_id: "t-1", name: "Test One", passed: null }],
             }),
           );
         }
@@ -364,8 +363,8 @@ describe("TestRunnerDialog", () => {
               task_id: "task-tick",
               status: "in_progress",
               results: [
-                { test_uuid: "t-1", name: "Test One", passed: true },
-                { test_uuid: "t-2", name: "Test Two", passed: null },
+                { test_case_id: "t-1", name: "Test One", passed: true },
+                { test_case_id: "t-2", name: "Test Two", passed: null },
               ],
             }),
           );
@@ -375,8 +374,8 @@ describe("TestRunnerDialog", () => {
             task_id: "task-tick",
             status: "done",
             results: [
-              { test_uuid: "t-1", name: "Test One", passed: true },
-              { test_uuid: "t-2", name: "Test Two", passed: false },
+              { test_case_id: "t-1", name: "Test One", passed: true },
+              { test_case_id: "t-2", name: "Test Two", passed: false },
             ],
           }),
         );
@@ -470,7 +469,6 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-rerun",
             status: "completed",
-            name: "Past Run",
             test_uuids: ["real-test-1", "real-test-2"],
             results: [
               { name: "Real Test 1", status: "passed", passed: true },
@@ -536,7 +534,6 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-idle",
             status: "in_progress",
-            name: "Idle Run",
             test_uuids: ["real-test-1"],
             results: [{ name: "Real Test 1", passed: null }],
           }),
@@ -555,7 +552,7 @@ describe("TestRunnerDialog", () => {
     };
     const { rerender } = render(<TestRunnerDialog {...props} />);
     await flush();
-    expect(screen.getByText("Idle Run")).toBeInTheDocument();
+    expect(screen.getByText("Evaluation run")).toBeInTheDocument();
 
     // Re-render repeatedly with fresh inline callback identities, which is what
     // a parent doing setState on every optimistic row update looks like.
@@ -596,7 +593,6 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-rerun-fail",
             status: "completed",
-            name: "Past Run",
             test_uuids: ["real-test-1"],
             results: [{ name: "Real Test 1", status: "passed", passed: true }],
           }),
@@ -633,7 +629,7 @@ describe("TestRunnerDialog", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(onNewRun).not.toHaveBeenCalled();
     // The run being viewed is still on screen, not cleared.
-    expect(screen.getByText("Past Run")).toBeInTheDocument();
+    expect(screen.getByText("Evaluation run")).toBeInTheDocument();
   });
 
   it("starts only one run when Rerun is clicked twice quickly", async () => {
@@ -680,7 +676,6 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-legacy",
             status: "completed",
-            name: "Legacy Run",
             // No test_uuids field → the run predates the backend snapshot.
             results: [{ name: "Only Test", status: "passed", passed: true }],
           }),
@@ -701,7 +696,7 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Legacy Run")).toBeInTheDocument(),
+      expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
     expect(
       screen.queryByRole("button", { name: /Rerun/ }),
@@ -718,13 +713,11 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-norerun",
             status: "completed",
-            name: "No Rerun Run",
             test_uuids: ["real-test-1"],
             results: [
               {
-                test_uuid: "real-test-1",
+                test_case_id: "real-test-1",
                 name: "Real Test",
-                status: "passed",
                 passed: true,
               },
             ],
@@ -745,7 +738,7 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("No Rerun Run")).toBeInTheDocument(),
+      expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
     expect(
       screen.queryByRole("button", { name: /Rerun/ }),
@@ -762,12 +755,10 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-summary",
             status: "done",
-            name: "Run One",
             results: [
               {
-                test_uuid: "test-1",
+                test_case_id: "test-1",
                 name: "Test One",
-                status: "passed",
                 passed: true,
               },
             ],
@@ -818,10 +809,10 @@ describe("TestRunnerDialog", () => {
             error: "boom",
             results: [
               {
-                test_uuid: "test-1",
-                status: "failed",
+                test_case_id: "test-1",
                 passed: false,
-                error: "boom",
+                unanswered: true,
+                reasoning: "boom",
               },
             ],
           }),
@@ -893,15 +884,13 @@ describe("TestRunnerDialog", () => {
             error: "boom",
             results: [
               {
-                test_uuid: "test-1",
+                test_case_id: "test-1",
                 name: "Passed One",
-                status: "passed",
                 passed: true,
               },
               {
-                test_uuid: "test-2",
+                test_case_id: "test-2",
                 name: "Errored One",
-                status: "failed",
                 passed: false,
                 error: "boom",
               },
@@ -1057,7 +1046,7 @@ describe("TestRunnerDialog", () => {
             status: "in_progress",
             results: [
               {
-                test_uuid: "test-1",
+                test_case_id: "test-1",
                 name: "Test One",
                 status: "running",
                 passed: null,
@@ -1097,19 +1086,16 @@ describe("TestRunnerDialog", () => {
             jsonResponse({
               task_id: "task-label",
               status: "completed",
-              name: "Label Run",
               results: [
                 {
-                  test_uuid: "test-1",
+                  test_case_id: "test-1",
                   name: "Test One",
-                  status: "passed",
                   passed: true,
                   test_case: { evaluation: { type: "response" } },
                 },
                 {
-                  test_uuid: "test-2",
+                  test_case_id: "test-2",
                   name: "Tool Test",
-                  status: "passed",
                   passed: true,
                   test_case: { evaluation: { type: "tool_call" } },
                 },
@@ -1129,8 +1115,10 @@ describe("TestRunnerDialog", () => {
           taskId="task-label"
         />,
       );
+      // Wait for the finished run's tabs, not the heading: the heading is the
+      // same words for every run, so it is on screen before the results land.
       await waitFor(() =>
-        expect(screen.getByText("Label Run")).toBeInTheDocument(),
+        expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
       );
     }
 
@@ -1156,12 +1144,10 @@ describe("TestRunnerDialog", () => {
             jsonResponse({
               task_id: "task-toolonly",
               status: "completed",
-              name: "Tool Only Run",
               results: [
                 {
-                  test_uuid: "test-2",
+                  test_case_id: "test-2",
                   name: "Tool Test",
-                  status: "passed",
                   passed: true,
                   test_case: { evaluation: { type: "tool_call" } },
                 },
@@ -1181,7 +1167,7 @@ describe("TestRunnerDialog", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Tool Only Run")).toBeInTheDocument(),
+        expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
       );
       expect(
         screen.queryByRole("button", { name: "Submit for labelling" }),
@@ -1217,5 +1203,93 @@ describe("TestRunnerDialog", () => {
       // Should not throw when building CSV rows from the current results.
       await user.click(screen.getByRole("button", { name: "Export" }));
     });
+  });
+});
+
+describe("tests that produced no answer", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    (global.fetch as any) = jest.fn();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  function mockRun(payload: Record<string, unknown>) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-gaps")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-gaps", status: "done", ...payload }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-gaps"
+      />,
+    );
+  }
+
+  it("passes the run's own gap counts to the summary", async () => {
+    mockRun({
+      unanswered_tests: 2,
+      stopped_early: true,
+      results: [{ test_case_id: "t-1", name: "Test One", passed: true }],
+    });
+    expect(await screen.findByTestId("summary-gaps")).toHaveTextContent(
+      JSON.stringify({ unanswered: 2, stoppedEarly: true }),
+    );
+  });
+
+  it("keeps a test that produced no answer out of the failed count", async () => {
+    // Both rows come back as `passed: false`; only the flag separates them, so
+    // the pass rate is 1 of 2, not 1 of 3.
+    mockRun({
+      results: [
+        { test_case_id: "t-1", name: "Passed", passed: true },
+        { test_case_id: "t-2", name: "Wrong", passed: false },
+        {
+          test_case_id: "t-3",
+          name: "Never answered",
+          passed: false,
+          unanswered: true,
+          reasoning: "Agent returned HTTP 500",
+        },
+      ],
+    });
+    expect(await screen.findByTestId("summary-panel")).toHaveTextContent(
+      "summary 1/2",
+    );
+  });
+
+  it("marks the row as one that produced no answer for the outputs panel", async () => {
+    mockRun({
+      results: [
+        {
+          test_case_id: "t-3",
+          name: "Never answered",
+          passed: false,
+          unanswered: true,
+          reasoning: "Agent returned HTTP 500",
+        },
+      ],
+    });
+    await screen.findByRole("button", { name: "Results" });
+    await setupUser().click(screen.getByRole("button", { name: "Results" }));
+    expect(screen.getByTestId("unanswered-t-3")).toHaveTextContent("true");
   });
 });

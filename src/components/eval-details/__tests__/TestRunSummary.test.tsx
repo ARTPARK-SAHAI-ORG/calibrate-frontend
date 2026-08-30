@@ -362,3 +362,29 @@ describe("TestRunSummary", () => {
     expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   });
 });
+
+describe("tests that could not be run", () => {
+  it("says nothing when every test was scored", () => {
+    render(<TestRunSummary passed={9} total={10} />);
+    expect(screen.queryByText(/could not be run/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/stopped before it started every test/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("warns that the pass rate does not cover the tests that never ran", () => {
+    render(<TestRunSummary passed={9} total={10} unanswered={3} />);
+    expect(
+      screen.getByText(
+        "3 of 13 tests could not be run, so the pass rate below covers only the 10 that were scored.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the run gave up before starting every test", () => {
+    render(<TestRunSummary passed={9} total={10} stoppedEarly />);
+    expect(
+      screen.getByText("This run stopped before it started every test."),
+    ).toBeInTheDocument();
+  });
+});

@@ -12,7 +12,7 @@ import {
   type RunTypeFilter,
 } from "@/hooks";
 import {
-  getUnitTestBreakdown,
+  getRunBreakdown,
   isRunErrored,
   isRunInProgress,
   runDisplayName,
@@ -62,7 +62,6 @@ const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
  */
 export function runTestCount(run: AgentRun): number | null {
   if (typeof run.total_tests === "number") return run.total_tests;
-  if (run.results && run.results.length > 0) return run.results.length;
   const firstModel = run.model_results?.[0];
   if (typeof firstModel?.total_tests === "number") return firstModel.total_tests;
   if (firstModel?.test_results) return firstModel.test_results.length;
@@ -108,11 +107,11 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
-  // A run whose tests errored reads better as "N Success / N Fail / N Error"
-  // than as a single blanket Error, so prefer the per-test tally when there is
-  // one.
+  // A run where some tests produced no answer reads better as
+  // "N Success / N Fail / N Not run" than as a single blanket Error, so prefer
+  // the tally when the run reports one.
   const breakdown =
-    run.type === "llm-unit-test" ? getUnitTestBreakdown(run.results) : null;
+    run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
 
   if (!breakdown) {
     return isRunErrored(run) ? (
@@ -146,11 +145,11 @@ function RunResult({ run }: { run: AgentRun }) {
           {breakdown.failed} Fail
         </span>
       )}
-      {breakdown.errored > 0 && (
+      {breakdown.unanswered > 0 && (
         <span
           className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
         >
-          {breakdown.errored} Error
+          {breakdown.unanswered} Not run
         </span>
       )}
     </>

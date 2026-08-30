@@ -84,52 +84,58 @@ export function runDisplayName(
   return trimmed.replace(/^Run\b/, "Evaluation run");
 }
 
-/**
- * Minimal per-test result shape needed to categorise a run. Both the agent
- * Tests tab and the /tests Runs table have richer local `TestRunResult` types;
- * those are structurally compatible with this.
- */
-export type UnitTestResultLike = {
-  passed: boolean | null;
-  status?: string;
-  error?: string | null;
+/** A test row, trimmed to what the shared rule needs. */
+export type TestRowLike = {
+  unanswered?: boolean | null;
 };
 
 /**
- * Bucket a unit-test run's per-test results into passed / failed / errored.
+ * Did this test produce no answer at all — the agent timed out, returned an
+ * error, or the judge could not be reached?
  *
- * Genuine failures come back with `passed: false` (evaluation ran and the test
- * did not pass); errored tests never reached evaluation, so they surface with
- * no verdict (`passed: null`) — or, on the detail endpoint, an explicit
- * `error` / `status: "error"`. The runs-list payload omits the `error` field,
- * so the `passed == null` signal is what separates errored from failed here.
+ * The backend says so outright, and nothing else is a signal. A test that
+ * produced no answer comes back with `passed: false`, so a verdict of false
+ * cannot be read as "the answer was wrong"; and a missing verdict means only
+ * that the test has not finished yet.
  *
- * Only meaningful for terminal runs (callers gate out pending/queued/
- * in_progress first), so a null verdict means errored, not "still running".
- * Returns `null` when the run has no usable per-test results.
+ * This is the one rule. The runs list, the run window and the model
+ * comparison panel all use it, so no two screens can count differently.
  */
-export function getUnitTestBreakdown(
-  results: UnitTestResultLike[] | null | undefined,
-): { passed: number; failed: number; errored: number } | null {
-  if (!results || results.length === 0) return null;
-  const isPassed = (r: UnitTestResultLike) =>
-    r.passed === true || r.status === "passed";
-  const isErrored = (r: UnitTestResultLike) =>
-    !!r.error ||
-    r.status === "error" ||
-    r.passed === null ||
-    r.passed === undefined;
-  const passed = results.filter((r) => isPassed(r)).length;
-  const errored = results.filter((r) => !isPassed(r) && isErrored(r)).length;
-  const failed = results.length - passed - errored;
-  return { passed, failed, errored };
+export function isUnanswered(row: TestRowLike): boolean {
+  return row.unanswered === true;
+}
+
+/** A finished run, trimmed to the counts the buckets need. */
+export type RunCountsLike = {
+  total_tests?: number | null;
+  passed?: number | null;
+  unanswered_tests?: number | null;
+};
+
+/**
+ * Split a finished run into tests that passed, tests answered wrongly, and
+ * tests that produced no answer.
+ *
+ * Read off the run's own counts rather than its rows: the runs list carries
+ * the counts but not the rows behind them. Only meaningful for a finished run
+ * (callers rule out pending / queued / in progress first). Returns null when
+ * the run reports no tests.
+ */
+export function getRunBreakdown(
+  run: RunCountsLike,
+): { passed: number; failed: number; unanswered: number } | null {
+  const total = run.total_tests ?? 0;
+  if (total <= 0) return null;
+  const passed = Math.max(run.passed ?? 0, 0);
+  const unanswered = Math.max(run.unanswered_tests ?? 0, 0);
+  const failed = Math.max(total - passed - unanswered, 0);
+  return { passed, failed, unanswered };
 }
 
 /** A run row as the runs list returns it, trimmed to what the buckets need. */
 export type RunStatusLike = {
   status: string;
   failed?: number | null;
-  error?: boolean;
 };
 
 /** The run has not finished yet. */
@@ -143,14 +149,13 @@ export function isRunInProgress(run: RunStatusLike): boolean {
 
 /** The run itself broke, so it has no results to read. */
 export function isRunErrored(run: RunStatusLike): boolean {
-  return run.status === "failed" || !!run.error;
+  return run.status === "failed";
 }
 
 /** The run finished and every test in it passed. */
 export function isRunAllPassed(run: RunStatusLike): boolean {
   return (
     run.status === "done" &&
-    !run.error &&
     (run.failed === null || run.failed === undefined || run.failed === 0)
   );
 }
@@ -159,7 +164,6 @@ export function isRunAllPassed(run: RunStatusLike): boolean {
 export function isRunAnyFailed(run: RunStatusLike): boolean {
   return (
     run.status === "done" &&
-    !run.error &&
     run.failed !== null &&
     run.failed !== undefined &&
     run.failed > 0

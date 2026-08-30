@@ -40,7 +40,7 @@ export type ExportBenchmarkRow = {
 function statusLabel(status: string): string {
   if (status === "passed") return "passed";
   if (status === "failed") return "failed";
-  if (status === "error") return "error";
+  if (status === "error") return "not run";
   return status;
 }
 

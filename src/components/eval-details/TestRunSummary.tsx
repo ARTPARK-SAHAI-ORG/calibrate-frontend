@@ -21,8 +21,14 @@ import {
 type TestRunSummaryProps = {
   /** Tests that passed evaluation. */
   passed: number;
-  /** Total tests scored (excludes errored tests; the pass-rate denominator). */
+  /** Total tests scored (excludes tests that produced no answer; the
+   * pass-rate denominator). */
   total: number;
+  /** How many tests produced no answer. Above zero, a note says the pass rate
+   * does not cover them. */
+  unanswered?: number;
+  /** True when the run gave up before it started every test. */
+  stoppedEarly?: boolean;
   /** Aggregate per-test latency block (`{p50,p95,p99,count}`; legacy runs
    * carry `{mean,min,max,count}`). Null for eval-only runs or before metrics
    * land. */
@@ -184,6 +190,8 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
 export function TestRunSummary({
   passed,
   total,
+  unanswered = 0,
+  stoppedEarly = false,
   latency,
   cost,
   tokens,
@@ -227,6 +235,19 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
+        {(unanswered > 0 || stoppedEarly) && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-foreground space-y-1">
+            {unanswered > 0 && (
+              <p>
+                {unanswered} of {unanswered + total} tests could not be run, so
+                the pass rate below covers only the {total} that were scored.
+              </p>
+            )}
+            {stoppedEarly && (
+              <p>This run stopped before it started every test.</p>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Pass rate"

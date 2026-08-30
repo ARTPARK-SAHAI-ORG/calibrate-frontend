@@ -64,11 +64,9 @@ const unitRun: AgentRun = {
   total_tests: 3,
   passed: 1,
   failed: 1,
-  results: [
-    { passed: true },
-    { passed: false },
-    { passed: null, status: "error", error: "boom" },
-  ],
+  // One passed, one wrong answer, one that produced no answer. The counts are
+  // what the list carries; it does not send the cases behind them.
+  unanswered_tests: 1,
 };
 
 const benchmarkRun: AgentRun = {
@@ -131,9 +129,10 @@ beforeEach(() => {
 });
 
 describe("run counts", () => {
-  it("reads the test count from the run, its results, then the first model", () => {
+  it("reads the test count from the run, then the first model", () => {
     expect(runTestCount({ ...unitRun, total_tests: 7 })).toBe(7);
-    expect(runTestCount({ ...unitRun, total_tests: null })).toBe(3);
+    // The list carries the count, never the cases behind it.
+    expect(runTestCount({ ...unitRun, total_tests: null })).toBeNull();
     expect(
       runTestCount({
         ...benchmarkRun,
@@ -150,7 +149,6 @@ describe("run counts", () => {
       runTestCount({
         ...benchmarkRun,
         total_tests: null,
-        results: null,
         model_results: [{ model: "a", total_tests: 4 }],
       }),
     ).toBe(4);
@@ -161,7 +159,6 @@ describe("run counts", () => {
       runTestCount({
         ...benchmarkRun,
         total_tests: null,
-        results: null,
         model_results: [{ model: "a" }],
       }),
     ).toBeNull();
@@ -288,7 +285,7 @@ describe("RunsTabContent", () => {
   });
 
   it("shows a dash when the run does not say how many tests it covered", async () => {
-    state.runs = [{ ...benchmarkRun, total_tests: null, results: null }];
+    state.runs = [{ ...benchmarkRun, total_tests: null }];
     renderTab();
     await screen.findAllByText("Complete");
     const firstRow = document.querySelector("tbody tr") as HTMLElement;
@@ -300,11 +297,11 @@ describe("RunsTabContent", () => {
     renderTab();
     expect((await screen.findAllByText("1 Success")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1 Error").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
   });
 
   it("shows Running while a run has not finished", async () => {
-    state.runs = [{ ...unitRun, status: "in_progress", results: null }];
+    state.runs = [{ ...unitRun, status: "in_progress" }];
     renderTab();
     expect((await screen.findAllByText("Running")).length).toBeGreaterThan(0);
   });

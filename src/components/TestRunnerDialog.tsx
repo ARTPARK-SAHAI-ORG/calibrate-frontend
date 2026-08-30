@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { isUnanswered } from "@/lib/testTypes";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -41,7 +42,6 @@ import {
   isTerminalRunStatus,
   UnauthorizedError,
   type TestCaseResult,
-  type ChatMessage,
   type TestRunStatusResponse,
 } from "@/lib/testRunApi";
 import {
@@ -61,15 +61,16 @@ type Row = {
   testUuid?: string;
   name: string;
   status: "passed" | "failed" | "running";
-  chatHistory?: ChatMessage[];
+  /** The test produced no answer, so `status` is not a verdict on the agent. */
+  unanswered: boolean;
   output?: TestCaseOutput;
   testCase?: TestCaseData;
   /** Effective custom inputs the agent received (defaults + overrides). */
   inputs?: Record<string, unknown>;
+  /** The judge's reasoning, or — when `unanswered` — why the test could not
+   * be run. */
   reasoning?: string;
-  evaluation?: TestCaseResult["evaluation"];
   judgeResults?: JudgeResult[] | null;
-  error?: string;
 };
 
 type TestRunnerDialogProps = {
@@ -180,7 +181,7 @@ export function TestRunnerDialog({
           // benchmark dialog). Polling has stopped by now, so this fires once
           // on completion and will not fight a later manual tab switch. Skip on
           // failure since there is no useful summary to show.
-          if (result.status !== "failed" && !result.error) {
+          if (result.status !== "failed") {
             setActiveTab("summary");
           }
         }
@@ -218,35 +219,26 @@ export function TestRunnerDialog({
 
   const rows: Row[] = useMemo(() => {
     const results = run?.results ?? [];
-    const runFailed = run?.status === "failed";
     return results.map((r: TestCaseResult, i): Row => {
-      let status: Row["status"];
-      if (r.passed === null || r.passed === undefined) {
-        status = "running";
-      } else {
-        status =
-          r.passed === true || r.status === "passed" ? "passed" : "failed";
-      }
-      // A run-level failure ends any case the backend left mid-flight.
-      const error =
-        r.error ?? (runFailed && status === "running" ? run?.error : undefined);
-      if (error && status === "running") status = "failed";
+      // A missing verdict means the test has not finished. A test that
+      // produced no answer says so itself and comes back with `passed: false`.
+      const status: Row["status"] =
+        r.passed === null || r.passed === undefined
+          ? "running"
+          : r.passed === true
+            ? "passed"
+            : "failed";
       return {
-        id: r.test_uuid ?? `idx-${i}`,
-        testUuid: r.test_uuid,
+        id: r.test_case_id ?? `idx-${i}`,
+        testUuid: r.test_case_id,
         name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
         status,
-        chatHistory: r.chat_history,
+        unanswered: isUnanswered(r),
         output: r.output ?? undefined,
         testCase: r.test_case ?? undefined,
         inputs: r.inputs ?? undefined,
         reasoning: r.reasoning,
         judgeResults: r.judge_results ?? null,
-        evaluation:
-          status !== "running"
-            ? (r.evaluation ?? { passed: status === "passed" })
-            : undefined,
-        error,
       };
     });
   }, [run]);
@@ -263,7 +255,6 @@ export function TestRunnerDialog({
     () => (Array.isArray(run?.test_uuids) ? run.test_uuids : []),
     [run],
   );
-  const runName = run?.name ?? null;
 
   // Auto-open the first completed test when nothing is selected. Covers both
   // - live runs: as soon as one test transitions to passed/failed (and the
@@ -284,16 +275,20 @@ export function TestRunnerDialog({
   }, [rows, selectedTestUuid]);
 
   const passedTests = rows.filter((r) => r.status === "passed");
-  // Errored tests carry an `error` and are surfaced as their own category in
-  // the list; keep them out of the "failed" count so the header matches.
-  const failedTests = rows.filter((r) => r.status === "failed" && !r.error);
+  // Tests that produced no answer are their own category in the list; keep
+  // them out of the "failed" count so the header matches.
+  const failedTests = rows.filter((r) => r.status === "failed" && !r.unanswered);
+  // How many produced no answer, and whether the run gave up before starting
+  // every test. Both come off the run itself rather than being counted here.
+  const unansweredCount = run?.unanswered_tests ?? 0;
+  const stoppedEarly = run?.stopped_early === true;
   // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
   // the test case's evaluation type.
   const toolCall = toolCallPassFail(
     rows.map((r) => ({
       toolCall: r.testCase?.evaluation?.type === "tool_call",
       passed: r.status === "passed",
-      failed: r.status === "failed" && !r.error,
+      failed: r.status === "failed" && !r.unanswered,
     })),
   );
   const hasLabellingEligibleTests = rows.some((r) =>
@@ -352,7 +347,7 @@ export function TestRunnerDialog({
   // row errored, or the run died before any case started (zero rows, and
   // `[].every` is true). A run-level `error` alone is not enough, since cases
   // that already produced results must stay visible.
-  const isOverallError = runStatus === "failed" && rows.every((r) => !!r.error);
+  const isOverallError = runStatus === "failed" && rows.every((r) => r.unanswered);
 
   if (!isOpen) return null;
 
@@ -375,7 +370,7 @@ export function TestRunnerDialog({
                   </span>
                 )}
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                  {runName ?? "Evaluation run"}
+                  {"Evaluation run"}
                 </h2>
                 {runStatus === "done" &&
                   onNewRun &&
@@ -409,12 +404,12 @@ export function TestRunnerDialog({
             {runStatus === "done" && rows.length > 0 && (
               <div className="hidden md:block">
                 <ExportResultsButton
-                  filename={`${runName ?? "test-run"}-${agentName}`}
+                  filename={`test-run-${agentName}`}
                   getRows={() =>
                     buildTestRunCsv(
                       rows.map((r) => ({
                         name: r.name,
-                        status: r.status,
+                        status: r.unanswered ? "error" : r.status,
                         output: r.output,
                         testCase: r.testCase,
                         reasoning: r.reasoning,
@@ -553,6 +548,8 @@ export function TestRunnerDialog({
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
+                  unanswered={unansweredCount}
+                  stoppedEarly={stoppedEarly}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}
                   tokens={run?.total_tokens ?? null}
@@ -578,13 +575,12 @@ export function TestRunnerDialog({
                     id: r.id,
                     name: r.name,
                     status: r.status,
+                    unanswered: r.unanswered,
                     output: r.output,
                     testCase: r.testCase,
                     inputs: r.inputs,
                     reasoning: r.reasoning,
-                    evaluation: r.evaluation,
                     judgeResults: r.judgeResults,
-                    error: r.error,
                   }))}
                   selectedId={selectedTestUuid}
                   onSelect={setSelectedTestUuid}
@@ -613,7 +609,6 @@ export function TestRunnerDialog({
         source={{
           type: "test_run",
           runUuid: taskId,
-          runName: runName ?? undefined,
           results: rows
             .filter((r) => labellingSelectedIds.has(r.id))
             .map((r) => ({
@@ -632,10 +627,7 @@ export function TestRunnerDialog({
               reasoning: r.reasoning,
               output: r.output ?? null,
               test_case: r.testCase ?? null,
-              chat_history: r.chatHistory,
-              evaluation: r.evaluation,
               judge_results: r.judgeResults,
-              error: r.error,
             })),
           evaluators: runEvaluators,
         }}
