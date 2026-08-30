@@ -1,5 +1,6 @@
 ## August 2026
 
+- The evaluations table now resizes its columns to fit what is in them, and every run results page uses the same Results tab name instead of some calling it Outputs ([#481](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/481))
 - On a labelling task's overview, tool call correctness now only shows a card once it actually has a score, so it no longer looks like the other evaluators are missing from the task ([#494](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/494))
 - You can now submit traces where the agent only called a tool and gave no reply for labelling, instead of being told to unpick them first ([#421](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/421))
 - Labelling tasks, evaluators, and bulk upload screens now call this item type "Single agent response" instead of "Agent response" so it matches the agent type it describes ([#489](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/489))
