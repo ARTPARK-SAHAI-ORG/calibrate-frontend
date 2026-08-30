@@ -184,6 +184,27 @@ describe("EvaluatorPicker prompt column", () => {
     );
   });
 
+  it("previews the first evaluator even when the list arrives after it opens", () => {
+    const { rerender } = render(
+      <EvaluatorPicker
+        evaluators={[]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        emptyMessage="Nothing to add"
+      />,
+    );
+    rerender(
+      <EvaluatorPicker
+        evaluators={[evaluator({ uuid: "ev-1", name: "First" })]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-1",
+    );
+  });
+
   it("shows nothing when there is nothing to offer", () => {
     render(
       <EvaluatorPicker

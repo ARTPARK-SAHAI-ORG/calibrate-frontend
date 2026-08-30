@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
 import { PickerRow } from "@/components/ui/PickerRow";
 import { EmptyState } from "@/components/ui";
@@ -63,20 +63,26 @@ export function EvaluatorPicker({
     // where they are the only kind that works, such as simulation setup.
     (ev) => allowConversationType || ev.evaluator_type !== "conversation",
   );
-  // The evaluator whose prompt is on show. Defaults to the first one that is
-  // already selected (so opening the picker shows what it will actually add),
-  // falling back to the first evaluator in the list when nothing is selected
-  // yet. Only the initial value — from then on, the reader's own clicks (or
-  // the parent naming one below) drive it.
-  const [previewUuid, setPreviewUuid] = useState<string | null>(() => {
-    const firstSelected = offerable.find((ev) => selectedIds.has(ev.uuid));
-    return firstSelected?.uuid ?? offerable[0]?.uuid ?? null;
-  });
+  // Nothing picked yet, which is not the same as nothing to show: until the
+  // reader clicks a row (or the parent names one), the first already-selected
+  // evaluator is on show, falling back to the first in the list. Worked out
+  // on every render rather than once at the start, so a list that arrives
+  // after this opens still gets a preview.
+  const [pickedUuid, setPickedUuid] = useState<string | null>(null);
   // A parent that names an evaluator (one just created) opens it on the right.
   // Clicking another row afterwards still wins, until the parent names a new one.
   useEffect(() => {
-    if (previewUuidProp) setPreviewUuid(previewUuidProp);
+    if (previewUuidProp) setPickedUuid(previewUuidProp);
   }, [previewUuidProp]);
+  // Settled once, the first time there is anything to show, so ticking a box
+  // afterwards does not move the prompt on the right.
+  const firstShown = useRef<string | null>(null);
+  if (firstShown.current === null && offerable.length > 0) {
+    firstShown.current =
+      offerable.find((ev) => selectedIds.has(ev.uuid))?.uuid ??
+      offerable[0].uuid;
+  }
+  const previewUuid = pickedUuid ?? firstShown.current;
 
   const q = search.trim().toLowerCase();
   const filteredEvaluators = offerable.filter((ev) => {
@@ -100,7 +106,7 @@ export function EvaluatorPicker({
       checked={selectedIds.has(ev.uuid)}
       onToggle={() => onToggle(ev.uuid)}
       isPreviewed={previewUuid === ev.uuid}
-      onPreview={() => setPreviewUuid(ev.uuid)}
+      onPreview={() => setPickedUuid(ev.uuid)}
       name={ev.name}
       description={ev.description}
     />

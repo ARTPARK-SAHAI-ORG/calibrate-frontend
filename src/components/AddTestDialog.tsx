@@ -19,6 +19,7 @@ import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
+import { toast } from "sonner";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
@@ -1552,8 +1553,7 @@ export function AddTestDialog({
     tool: AvailableTool,
   ): Array<{ name: string; value: string; group?: string }> => {
     const isWebhook = tool.config?.type === "webhook";
-    let allParams: Array<{ name: string; value: string; group?: string }> =
-      [];
+    let allParams: Array<{ name: string; value: string; group?: string }> = [];
 
     if (isWebhook && tool.config?.webhook) {
       const webhook = tool.config.webhook;
@@ -5479,9 +5479,7 @@ export function AddTestDialog({
                                                   addToolCallMessage(
                                                     tool.uuid,
                                                     tool.name,
-                                                    computeToolCallParams(
-                                                      tool,
-                                                    ),
+                                                    computeToolCallParams(tool),
                                                     tool.config?.type ===
                                                       "webhook",
                                                   );
@@ -5780,6 +5778,9 @@ export function AddTestDialog({
             );
           } catch (err) {
             reportError("Error adding the new tool to the agent", err);
+            toast.error(
+              `"${tool.name}" was created but could not be added to this agent.`,
+            );
           }
         }}
       />
@@ -5809,6 +5810,9 @@ export function AddTestDialog({
             );
           } catch (err) {
             reportError("Error adding the new tool to the agent", err);
+            toast.error(
+              `"${tool.name}" was created but could not be added to this agent.`,
+            );
           }
         }}
       />

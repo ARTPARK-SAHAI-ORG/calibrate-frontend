@@ -9,6 +9,7 @@ import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
+import { toast } from "sonner";
 
 type ToolData = {
   uuid: string;
@@ -43,6 +44,12 @@ export function ToolsTabContent({
   setEndConversationEnabled,
 }: ToolsTabContentProps) {
   const accessToken = useAccessToken();
+  // The workspace list, kept up to date here after a tool is written from
+  // this tab: the prop is fetched once when the agent page loads and never
+  // again, so without this a second Create tool would compare against a list
+  // missing the first one and take the wrong tool for the new one.
+  const [ownTools, setOwnTools] = useState<ToolData[] | null>(null);
+  const workspaceTools = ownTools ?? allTools;
   const [toolsSearchQuery, setToolsSearchQuery] = useState("");
   const [createToolOpen, setCreateToolOpen] = useState(false);
   const [addToolDialogOpen, setAddToolDialogOpen] = useState(false);
@@ -55,7 +62,9 @@ export function ToolsTabContent({
 
   const openEditTool = (tool: ToolData) => {
     setEditToolUuid(tool.uuid);
-    setEditToolType(tool.config?.type === "webhook" ? "webhook" : "structured_output");
+    setEditToolType(
+      tool.config?.type === "webhook" ? "webhook" : "structured_output",
+    );
   };
 
   const filteredTools = agentTools.filter(
@@ -64,7 +73,7 @@ export function ToolsTabContent({
       ((tool.description || tool.config?.description) &&
         (tool.description || tool.config?.description)
           .toLowerCase()
-          .includes(toolsSearchQuery.toLowerCase()))
+          .includes(toolsSearchQuery.toLowerCase())),
   );
 
   // The header's own Add tool / Create tool buttons repeat the empty-state
@@ -188,7 +197,7 @@ export function ToolsTabContent({
               <div className="flex items-center gap-2 md:gap-3">
                 {/* Nothing in the workspace to pick from yet, so offering
                     "Add tool" would only open a picker with nothing in it. */}
-                {allTools.length > 0 && (
+                {workspaceTools.length > 0 && (
                   <button
                     onClick={() => setAddToolDialogOpen(true)}
                     className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
@@ -354,7 +363,7 @@ export function ToolsTabContent({
         onClose={() => setAddToolDialogOpen(false)}
         agentUuid={agentUuid}
         agentTools={agentTools}
-        allTools={allTools}
+        allTools={workspaceTools}
         allToolsLoading={allToolsLoading}
         onToolsAdded={(tools) => setAgentTools((prev) => [...prev, ...tools])}
       />
@@ -365,14 +374,22 @@ export function ToolsTabContent({
         isOpen={createToolOpen}
         onClose={() => setCreateToolOpen(false)}
         accessToken={accessToken ?? undefined}
-        knownTools={allTools}
-        onCreated={async (tool) => {
+        knownTools={workspaceTools}
+        onCreated={async (tool, updatedTools) => {
           setCreateToolOpen(false);
+          setOwnTools(updatedTools);
           try {
-            await attachToolsToAgent(agentUuid, [tool.uuid], accessToken ?? undefined);
+            await attachToolsToAgent(
+              agentUuid,
+              [tool.uuid],
+              accessToken ?? undefined,
+            );
             setAgentTools((prev) => [...prev, tool]);
           } catch (err) {
             reportError("Error adding the new tool to the agent", err);
+            toast.error(
+              `"${tool.name}" was created but could not be added to this agent. Add it with Add tool.`,
+            );
           }
         }}
       />

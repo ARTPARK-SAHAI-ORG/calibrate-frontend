@@ -220,6 +220,9 @@ export function RunEvaluatorsPanel({
       <AddEvaluatorsDialog
         isOpen={addDialogOpen}
         availableEvaluators={unselected}
+        // Deleted from the workspace, so re-read the library rather than
+        // leaving a row that opens nothing.
+        onEvaluatorDeleted={onRefresh}
         description="Choose evaluators from your library to use in this run"
         allowConversationType={evaluatorType === "conversation"}
         onClose={() => setAddDialogOpen(false)}

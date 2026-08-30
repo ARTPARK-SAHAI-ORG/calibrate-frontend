@@ -62,6 +62,11 @@ jest.mock("../../tools/CreateToolFlow", () => ({
   },
 }));
 
+const toastErrorMock = jest.fn();
+jest.mock("sonner", () => ({
+  toast: { error: (...args: unknown[]) => toastErrorMock(...args) },
+}));
+
 const attachToolsToAgentMock = jest.fn();
 jest.mock("../../../lib/agentTools", () => ({
   attachToolsToAgent: (...args: unknown[]) => attachToolsToAgentMock(...args),
@@ -112,6 +117,14 @@ function renderComponent(
   return { ...render(<ToolsTabContent {...props} />), props };
 }
 
+const SECOND_CREATED_TOOL = {
+  uuid: "tool-newer",
+  name: "Made after",
+  config: {},
+  created_at: "2024-01-02",
+  updated_at: "2024-01-02",
+};
+
 describe("ToolsTabContent", () => {
   beforeEach(() => {
     addToolProps = null;
@@ -120,6 +133,7 @@ describe("ToolsTabContent", () => {
     editToolProps = null;
     attachToolsToAgentMock.mockReset();
     attachToolsToAgentMock.mockResolvedValue(undefined);
+    toastErrorMock.mockReset();
     reportErrorMock.mockReset();
   });
 
@@ -432,5 +446,46 @@ describe("ToolsTabContent", () => {
       await waitFor(() => expect(reportErrorMock).toHaveBeenCalled());
       expect(setAgentTools).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("ToolsTabContent creating a tool", () => {
+  it("knows which tool is new the second time round", async () => {
+    const user = setupUser();
+    renderComponent({ agentTools: [], allTools: [] });
+
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+    await user.click(screen.getByText("Finish creating"));
+    await waitFor(() =>
+      expect(attachToolsToAgentMock).toHaveBeenCalledWith(
+        "agent-1",
+        ["tool-new"],
+        "test-token",
+      ),
+    );
+
+    // The workspace list the tab was given is never re-fetched, so without
+    // keeping the fresh one the second create would compare against a list
+    // missing the first tool and take that one for the new one.
+    expect(createToolProps.knownTools.map((t: { uuid: string }) => t.uuid)).toEqual([
+      "tool-new",
+    ]);
+  });
+
+  it("says so when the new tool could not be added to the agent", async () => {
+    const user = setupUser();
+    attachToolsToAgentMock.mockRejectedValue(new Error("Backend is down"));
+    const setAgentTools = jest.fn();
+    renderComponent({ agentTools: [], allTools: [], setAgentTools });
+
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+    await user.click(screen.getByText("Finish creating"));
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        expect.stringContaining("Freshly made"),
+      ),
+    );
+    expect(setAgentTools).not.toHaveBeenCalled();
   });
 });

@@ -35,6 +35,40 @@ function renderPicker(
 }
 
 describe("ToolLibraryPicker", () => {
+  it("previews the first tool even when the list arrives after it opens", () => {
+    const { rerender } = render(
+      <ToolLibraryPicker
+        tools={[]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        isLoading
+      />,
+    );
+    rerender(
+      <ToolLibraryPicker
+        tools={[toolA, toolB]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        isLoading={false}
+      />,
+    );
+    // The name shows twice: on its row, and as the preview's heading.
+    expect(screen.getAllByText("Weather lookup").length).toBe(2);
+  });
+
+  it("moves the preview on when the tool it was showing is deleted", () => {
+    const { rerender } = renderPicker();
+    expect(screen.getAllByText("Weather lookup").length).toBe(2);
+    rerender(
+      <ToolLibraryPicker
+        tools={[toolB]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getAllByText("Book flight").length).toBe(2);
+  });
+
   it("draws no line between rows, the same as the evaluator picker", () => {
     const { container } = render(
       <ToolLibraryPicker

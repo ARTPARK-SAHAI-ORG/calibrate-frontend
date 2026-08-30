@@ -47,17 +47,22 @@ export function ToolLibraryPicker({
   onDeleteTool,
 }: ToolLibraryPickerProps) {
   const [search, setSearch] = useState("");
-  // Preview the first tool as soon as the list has something to show, so the
-  // right column is never empty on open. Only the initial value — the reader
-  // picking a different row from then on is what drives it, not search.
-  const [previewUuid, setPreviewUuid] = useState<string | null>(
-    () => tools[0]?.uuid ?? null,
-  );
+  // Nothing picked yet, which is not the same as nothing to show: until the
+  // reader clicks a row (or the parent names one), the first tool is the one
+  // on the right. Worked out on every render rather than once at the start,
+  // so a list that arrives after this opens still gets a preview.
+  const [pickedUuid, setPickedUuid] = useState<string | null>(null);
   // A parent that names a tool (one just created) opens it on the right.
   // Clicking another row afterwards still wins, until the parent names a new one.
   useEffect(() => {
-    if (previewUuidProp) setPreviewUuid(previewUuidProp);
+    if (previewUuidProp) setPickedUuid(previewUuidProp);
   }, [previewUuidProp]);
+  // The first tool stands in until a row is clicked, and again if the tool
+  // that was on show is deleted from here.
+  const previewUuid =
+    (pickedUuid && tools.some((t) => t.uuid === pickedUuid)
+      ? pickedUuid
+      : tools[0]?.uuid) ?? null;
 
   const q = search.trim().toLowerCase();
   const filteredTools = tools.filter((tool) => {
@@ -174,7 +179,7 @@ export function ToolLibraryPicker({
                   checked={selectedIds.has(tool.uuid)}
                   onToggle={() => onToggle(tool.uuid)}
                   isPreviewed={previewUuid === tool.uuid}
-                  onPreview={() => setPreviewUuid(tool.uuid)}
+                  onPreview={() => setPickedUuid(tool.uuid)}
                   name={tool.name}
                   description={description}
                   badge={
