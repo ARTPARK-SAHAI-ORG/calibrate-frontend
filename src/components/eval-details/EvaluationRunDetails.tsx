@@ -74,32 +74,6 @@ export function findFirstEvaluatorRuns<T extends ProviderEvaluatorRunsLike>(
     .find((er): er is EvaluatorRunLike[] => Array.isArray(er) && er.length > 0);
 }
 
-export function evaluatorColumnsFromRuns<T extends { key: string }>(
-  runs: EvaluatorRunLike[],
-): Array<
-  T & {
-    label: string;
-    outputType: EvaluatorOutputType;
-    scoreField: string;
-    reasoningField: string;
-  }
-> {
-  return runs.map((run) => ({
-    key: run.metric_key,
-    label: run.name ?? run.metric_key,
-    outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
-    scoreField: run.metric_key,
-    reasoningField: `${run.metric_key}_reasoning`,
-  })) as Array<
-    T & {
-      label: string;
-      outputType: EvaluatorOutputType;
-      scoreField: string;
-      reasoningField: string;
-    }
-  >;
-}
-
 export function evaluatorDescriptionMapFromRuns(
   runs: EvaluatorRunLike[] | undefined,
 ): Map<string, string> {

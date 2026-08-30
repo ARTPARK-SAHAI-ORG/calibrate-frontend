@@ -1,5 +1,6 @@
 import {
   deriveEvaluatorColumns,
+  publicEvaluatorColumnArgs,
   STT_RESERVED_METRIC_KEYS,
   TTS_RESERVED_METRIC_KEYS,
   type ProviderForColumns,
@@ -495,5 +496,95 @@ describe("deriveEvaluatorColumns", () => {
       });
       expect(result[0].label).toBe("LLM Judge");
     });
+  });
+});
+
+describe("publicEvaluatorColumnArgs", () => {
+  const defaultEvaluator = {
+    uuid: "u-default",
+    name: "Transcript accuracy",
+    output_type: "rating" as const,
+  };
+
+  it("labels the legacy single-judge column with the run's default evaluator", () => {
+    const [col] = deriveEvaluatorColumns({
+      providerResults: [{ results: [{ llm_judge_score: "4" }] }],
+      reservedMetricKeys: STT_RESERVED_METRIC_KEYS,
+      ...publicEvaluatorColumnArgs(defaultEvaluator),
+    });
+    expect(col).toEqual({
+      key: "llm_judge",
+      label: "Transcript accuracy",
+      outputType: "rating",
+      scoreField: "llm_judge_score",
+      reasoningField: "llm_judge_reasoning",
+    });
+  });
+
+  it("falls back to Evaluator when the share link has no default evaluator", () => {
+    const [col] = deriveEvaluatorColumns({
+      providerResults: [{ results: [{ llm_judge_score: "true" }] }],
+      reservedMetricKeys: STT_RESERVED_METRIC_KEYS,
+      ...publicEvaluatorColumnArgs(null),
+    });
+    expect(col.label).toBe("Evaluator");
+    expect(col.outputType).toBe("binary");
+  });
+
+  it("gives a share link the same evaluator_runs columns the signed-in page gets", () => {
+    const providerResults: ProviderForColumns[] = [
+      {
+        evaluator_runs: [
+          {
+            evaluator_uuid: "u1",
+            metric_key: "clarity",
+            name: "Clarity",
+            output_type: "rating",
+            aggregate: { type: "rating", scale_min: 1, scale_max: 5 },
+          },
+        ],
+      },
+    ];
+    const publicColumns = deriveEvaluatorColumns({
+      providerResults,
+      reservedMetricKeys: TTS_RESERVED_METRIC_KEYS,
+      ...publicEvaluatorColumnArgs(defaultEvaluator),
+    });
+    const signedInColumns = deriveEvaluatorColumns({
+      providerResults,
+      aboutEvaluators: [{ uuid: "u1", name: "Clarity", outputType: "rating" }],
+      reservedMetricKeys: TTS_RESERVED_METRIC_KEYS,
+      singleJudgeFallback: { defaultLabel: "Evaluator" },
+    });
+    expect(publicColumns).toEqual(signedInColumns);
+    // The rating scale reaches the share link too, so its leaderboard chart
+    // uses the same axis as the signed-in one.
+    expect(publicColumns[0]).toMatchObject({
+      evaluatorUuid: "u1",
+      scaleMin: 1,
+      scaleMax: 5,
+    });
+  });
+
+  it("gives a share link the legacy `_info` columns instead of one judge column", () => {
+    const columns = deriveEvaluatorColumns({
+      providerResults: [
+        {
+          metrics: { wer: 0.1, tone_info: { type: "rating" } },
+          results: [{ llm_judge_score: "true" }],
+        },
+      ],
+      reservedMetricKeys: STT_RESERVED_METRIC_KEYS,
+      ...publicEvaluatorColumnArgs(defaultEvaluator),
+    });
+    expect(columns).toEqual([
+      {
+        key: "tone",
+        label: "tone",
+        outputType: "rating",
+        scoreField: "tone_score",
+        reasoningField: "tone_reasoning",
+      },
+    ]);
   });
 });

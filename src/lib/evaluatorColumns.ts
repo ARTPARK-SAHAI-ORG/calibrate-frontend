@@ -1,7 +1,8 @@
 /**
- * Shared evaluator-column derivation for the STT and TTS detail pages.
+ * Shared evaluator-column derivation for the STT and TTS evaluation pages,
+ * both the signed-in ones and the public share links.
  *
- * Both pages need to derive a set of evaluator columns from the response
+ * All four pages need to derive a set of evaluator columns from the response
  * payload, used by the per-row results table, the per-provider metrics
  * card, and the leaderboard. There are four shapes the backend has emitted
  * over time — we walk them in priority order:
@@ -26,7 +27,9 @@
  *
  * The only difference between STT and TTS callers is which metric keys are
  * reserved (and therefore skipped in branches 2a/2b): WER & friends for
- * STT, TTFB & friends for TTS.
+ * STT, TTFB & friends for TTS. A public share link knows one evaluator, the
+ * run's default, instead of the whole list; `publicEvaluatorColumnArgs` below
+ * turns that into the arguments this function takes.
  */
 
 export type EvaluatorColumnOutputType = "binary" | "rating";
@@ -243,3 +246,41 @@ export const TTS_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   // Per-provider cost block — a built-in metric, not a user evaluator.
   "cost",
 ]);
+
+/**
+ * The public share pages know only one evaluator: the run's default, from the
+ * token-scoped defaults endpoint, in place of the signed-in pages' full
+ * evaluator list. This turns that single evaluator into the two arguments
+ * `deriveEvaluatorColumns` takes for labelling, so both readers go through the
+ * same derivation.
+ */
+export function publicEvaluatorColumnArgs(
+  defaultEvaluator: {
+    uuid: string;
+    name: string;
+    output_type: EvaluatorColumnOutputType;
+  } | null,
+): {
+  aboutEvaluators: AboutEvaluatorLite[];
+  singleJudgeFallback: SingleJudgeFallback;
+} {
+  return {
+    aboutEvaluators: defaultEvaluator
+      ? [
+          {
+            uuid: defaultEvaluator.uuid,
+            name: defaultEvaluator.name,
+            outputType: defaultEvaluator.output_type,
+          },
+        ]
+      : [],
+    // The label and output type below are only reached when the share link
+    // has no default evaluator; otherwise they come from the one entry in
+    // `aboutEvaluators` above.
+    singleJudgeFallback: {
+      defaultEvaluatorUuid: defaultEvaluator?.uuid,
+      defaultLabel: "Evaluator",
+      defaultOutputType: "binary",
+    },
+  };
+}
