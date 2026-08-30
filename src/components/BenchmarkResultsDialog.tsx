@@ -21,9 +21,16 @@ import {
   type BenchmarkModelResult,
 } from "./eval-details";
 import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
-import { StatusBadge, RerunIconButton, ResultTabs } from "@/components/ui";
+import {
+  StatusBadge,
+  RerunIconButton,
+  ResultTabs,
+  StopRunButton,
+  RunStateMark,
+} from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { modelComparisonName } from "@/lib/testTypes";
+import { abortRunOrNotify } from "@/lib/testRunApi";
+import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -60,6 +67,8 @@ type BenchmarkStatusResponse = {
   error?: string;
   is_public?: boolean;
   share_token?: string | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
 };
 
 type BenchmarkResultsDialogProps = {
@@ -141,6 +150,9 @@ export function BenchmarkResultsDialog({
   // The test uuids this benchmark executed, from the status response. Drives
   // the rerun subset; empty on legacy benchmarks that predate the snapshot.
   const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
+  // Someone stopped this run before it finished. The results already collected
+  // are kept; the models and tests not reached were never run.
+  const [wasStopped, setWasStopped] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const {
     selected: labellingSelectedKeys,
@@ -247,6 +259,7 @@ export function BenchmarkResultsDialog({
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
         setRunTestUuids([]);
+        setWasStopped(false);
         setError(null);
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
@@ -333,6 +346,24 @@ export function BenchmarkResultsDialog({
     });
   }, [isOpen, models, modelResults]);
 
+  // Stop a run that is still going, then read it back so the window shows the
+  // stopped state at once. The poll that follows sees a finished run and stops
+  // polling on its own.
+  const stopBenchmark = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!currentTaskId) return;
+    if (!backendUrl) {
+      toast.error("Cannot stop the run: the backend URL is not configured.");
+      return;
+    }
+    const stopped = await abortRunOrNotify(
+      backendUrl,
+      backendAccessToken,
+      currentTaskId,
+    );
+    if (stopped) await pollBenchmarkStatus(currentTaskId, backendUrl);
+  };
+
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
     try {
       const response = await fetch(
@@ -351,6 +382,7 @@ export function BenchmarkResultsDialog({
 
       // Update task status for display
       setTaskStatus(result.status);
+      setWasStopped(isRunStopped(result));
 
       // Capture name and share state from backend
       if (result.name) setRunName(result.name);
@@ -612,6 +644,11 @@ export function BenchmarkResultsDialog({
         <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              {isDone && !isInitialLoading && (
+                <RunStateMark
+                  state={wasStopped ? "stopped" : error ? "error" : "finished"}
+                />
+              )}
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {modelComparisonName(runName)}
               </h2>
@@ -623,6 +660,9 @@ export function BenchmarkResultsDialog({
               )}
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
+              )}
+              {!isDone && !isInitialLoading && currentTaskId && (
+                <StopRunButton onStop={stopBenchmark} className="shrink-0" />
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">
@@ -798,6 +838,7 @@ export function BenchmarkResultsDialog({
                   filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
                   benchmarkScoreLabel={benchmarkScoreLabel}
                   onReviewUnanswered={() => setActiveTab("outputs")}
+                  runStopped={wasStopped}
                 />
               </div>
             )}
@@ -835,6 +876,7 @@ export function BenchmarkResultsDialog({
             {/* Outputs Tab - Show during progress and when outputs tab is active when done */}
             {(!isDone || activeTab === "outputs") && (
               <BenchmarkOutputsPanel
+                runStopped={wasStopped}
                 modelResults={providersToDisplay}
                 expandedModels={expandedProviders}
                 onToggleModel={toggleProvider}

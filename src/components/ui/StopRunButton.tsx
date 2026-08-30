@@ -1,0 +1,64 @@
+"use client";
+
+import { useState } from "react";
+import { SpinnerIcon } from "@/components/icons";
+
+type StopRunButtonProps = {
+  /** Stops the run. The button stays disabled until this settles. */
+  onStop: () => void | Promise<unknown>;
+  className?: string;
+};
+
+/**
+ * "Stop" control for a run that is still going: a test run, a model
+ * comparison, or a simulation run. One component so all three look and behave
+ * the same, and so a second click cannot send a second stop.
+ *
+ * Stopping keeps the results already collected, so there is no confirmation
+ * step in front of it. `onStop` reports its own failures; this button only
+ * owns the in-flight state.
+ */
+export function StopRunButton({ onStop, className }: StopRunButtonProps) {
+  const [isStopping, setIsStopping] = useState(false);
+
+  const handleClick = async () => {
+    if (isStopping) return;
+    setIsStopping(true);
+    try {
+      await onStop();
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={isStopping}
+      aria-busy={isStopping}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+        className ?? ""
+      }`}
+    >
+      {isStopping ? (
+        <SpinnerIcon className="w-3 h-3 animate-spin" />
+      ) : (
+        <svg
+          className="w-3 h-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"
+          />
+        </svg>
+      )}
+      {isStopping ? "Stopping..." : "Stop"}
+    </button>
+  );
+}

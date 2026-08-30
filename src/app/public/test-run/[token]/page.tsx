@@ -30,7 +30,8 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
-import { isUnanswered } from "@/lib/testTypes";
+import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
+import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
@@ -60,6 +61,8 @@ type TestRunStatusResponse = {
   unanswered_tests?: number;
   /** True when the run gave up before it started every test. */
   stopped_early?: boolean;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
@@ -71,7 +74,11 @@ type TestRunStatusResponse = {
   error?: string;
 };
 
-function getStatus(r: TestCaseResult): "passed" | "failed" {
+function getStatus(
+  r: TestCaseResult,
+  runStopped: boolean,
+): "passed" | "failed" | "not_run" {
+  if (isNotRun(r, runStopped)) return "not_run";
   return r.passed === true ? "passed" : "failed";
 }
 
@@ -139,24 +146,29 @@ export default function PublicTestRunPage() {
     );
 
   const results = data.results ?? [];
-  const passed = results.filter((r) => getStatus(r) === "passed").length;
+  // Someone stopped this run before it finished, so the tests it never started
+  // are neither passes nor failures.
+  const wasStopped = isRunStopped(data);
+  const passed = results.filter((r) => getStatus(r, wasStopped) === "passed")
+    .length;
   // A test that produced no answer was never scored; keep it out of the
   // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
-    (r) => getStatus(r) === "failed" && !isUnanswered(r),
+    (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
   ).length;
   // Tool-call pass/fail split for the Summary tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: r.test_case?.evaluation?.type === "tool_call",
-      passed: getStatus(r) === "passed",
-      failed: getStatus(r) === "failed" && !isUnanswered(r),
+      passed: getStatus(r, wasStopped) === "passed",
+      failed: getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
     })),
   );
 
   return (
     <PublicPageLayout
       title="LLM component test"
+      pills={wasStopped ? <StoppedRunPill /> : undefined}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">
@@ -187,7 +199,9 @@ export default function PublicTestRunPage() {
                   buildTestRunCsv(
                     results.map((r) => ({
                       name: r.name || r.test_case?.name || r.test_name,
-                      status: isUnanswered(r) ? "error" : getStatus(r),
+                      status: isUnanswered(r)
+                        ? "error"
+                        : getStatus(r, wasStopped),
                       output: r.output,
                       testCase: r.test_case,
                       reasoning: r.reasoning,
@@ -211,6 +225,8 @@ export default function PublicTestRunPage() {
             total={passed + failed}
             unanswered={data.unanswered_tests ?? 0}
             stoppedEarly={data.stopped_early === true}
+            stopped={data.aborted === true}
+            runTotalTests={data.total_tests ?? results.length}
             onReviewUnanswered={() => setActiveTab("outputs")}
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
@@ -243,7 +259,7 @@ export default function PublicTestRunPage() {
                 id: `test-${i}`,
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
-                status: getStatus(r),
+                status: getStatus(r, wasStopped),
                 unanswered: isUnanswered(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,

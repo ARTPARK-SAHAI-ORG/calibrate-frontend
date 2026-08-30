@@ -22,6 +22,8 @@ export type AgentRun = {
   failed: number | null;
   /** How many of the run's tests produced no answer. */
   unanswered_tests?: number | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean | null;
   /**
    * The evaluators that judged this run, no duplicates. "Tool call" is added
    * last when the run included a tool-call test, and carries no id because it

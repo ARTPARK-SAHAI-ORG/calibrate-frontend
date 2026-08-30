@@ -5,6 +5,8 @@ import {
   getRunBreakdown,
   modelComparisonName,
   runDisplayName,
+  isRunStopped,
+  isNotRun,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -118,5 +120,73 @@ describe("runDisplayName", () => {
   it("names a run the backend has not named yet", () => {
     expect(runDisplayName("llm-unit-test", "")).toBe("Evaluation run");
     expect(runDisplayName("llm-benchmark", null)).toBe("Model comparison");
+  });
+});
+
+describe("isRunStopped", () => {
+  it("is true only when the backend says the run was stopped", () => {
+    expect(isRunStopped({ status: "done", aborted: true })).toBe(true);
+  });
+
+  it("is false for a run that finished on its own", () => {
+    expect(isRunStopped({ status: "done" })).toBe(false);
+    expect(isRunStopped({ status: "done", aborted: false })).toBe(false);
+    expect(isRunStopped({ status: "done", aborted: null })).toBe(false);
+  });
+
+  it("does not read a failed run as a stopped one", () => {
+    expect(isRunStopped({ status: "failed" })).toBe(false);
+  });
+});
+
+describe("isNotRun", () => {
+  it("reads the backend's own flag", () => {
+    expect(isNotRun({ not_run: true }, false)).toBe(true);
+  });
+
+  it("counts a test with no verdict on a stopped run as never run", () => {
+    // The run is finished, so nothing more is coming for that test.
+    expect(isNotRun({ passed: null }, true)).toBe(true);
+    expect(isNotRun({}, true)).toBe(true);
+  });
+
+  it("leaves a test with no verdict alone while the run is still going", () => {
+    expect(isNotRun({ passed: null }, false)).toBe(false);
+  });
+
+  it("does not touch a test that answered, stopped run or not", () => {
+    expect(isNotRun({ passed: false }, true)).toBe(false);
+    expect(isNotRun({ passed: true }, true)).toBe(false);
+  });
+});
+
+describe("getRunBreakdown on a stopped run", () => {
+  it("counts the tests it never started as not run, never as failures", () => {
+    // 10 tests linked, stopped after 3 passed and 1 failed.
+    expect(
+      getRunBreakdown({
+        total_tests: 10,
+        passed: 3,
+        failed: 1,
+        aborted: true,
+      }),
+    ).toEqual({ passed: 3, failed: 1, unanswered: 6 });
+  });
+
+  it("counts every test as not run when the run says nothing yet", () => {
+    expect(
+      getRunBreakdown({
+        total_tests: 10,
+        passed: null,
+        failed: null,
+        aborted: true,
+      }),
+    ).toEqual({ passed: 0, failed: 0, unanswered: 10 });
+  });
+
+  it("still works failures out from the total on a run that was not stopped", () => {
+    expect(
+      getRunBreakdown({ total_tests: 10, passed: 3, unanswered_tests: 1 }),
+    ).toEqual({ passed: 3, failed: 6, unanswered: 1 });
   });
 });

@@ -1,6 +1,12 @@
 "use client";
 import { reportError } from "@/lib/reportError";
-import { isUnanswered } from "@/lib/testTypes";
+import {
+  isNotRun,
+  isRunStopped,
+  isUnanswered,
+  runStateOf,
+  stoppedRunSentence,
+} from "@/lib/testTypes";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -17,7 +23,12 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RerunIconButton, ResultTabs } from "@/components/ui";
+import {
+  RerunIconButton,
+  ResultTabs,
+  RunStateMark,
+  StopRunButton,
+} from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -37,6 +48,7 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
+  abortRunOrNotify,
   startTestRunOrNotify,
   fetchTestRun,
   isTerminalRunStatus,
@@ -60,7 +72,7 @@ type Row = {
   /** Present only when the backend sent one. Required to rerun this test. */
   testUuid?: string;
   name: string;
-  status: "passed" | "failed" | "running";
+  status: "passed" | "failed" | "running" | "not_run";
   /** The test produced no answer, so `status` is not a verdict on the agent. */
   unanswered: boolean;
   output?: TestCaseOutput;
@@ -219,11 +231,15 @@ export function TestRunnerDialog({
 
   const rows: Row[] = useMemo(() => {
     const results = run?.results ?? [];
+    const runStopped = run ? isRunStopped(run) : false;
     return results.map((r: TestCaseResult, i): Row => {
-      // A missing verdict means the test has not finished. A test that
-      // produced no answer says so itself and comes back with `passed: false`.
-      const status: Row["status"] =
-        r.passed === null || r.passed === undefined
+      // A missing verdict means the test has not finished — unless the run was
+      // stopped, in which case it never started and nothing more is coming. A
+      // test that produced no answer says so itself and comes back with
+      // `passed: false`.
+      const status: Row["status"] = isNotRun(r, runStopped)
+        ? "not_run"
+        : r.passed === null || r.passed === undefined
           ? "running"
           : r.passed === true
             ? "passed"
@@ -282,6 +298,9 @@ export function TestRunnerDialog({
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
   const stoppedEarly = run?.stopped_early === true;
+  // Someone stopped this run before it finished. The tests already answered
+  // are kept; the rest were never started.
+  const wasStopped = run ? isRunStopped(run) : false;
   // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
   // the test case's evaluation type.
   const toolCall = toolCallPassFail(
@@ -321,6 +340,28 @@ export function TestRunnerDialog({
       ),
     [rows, evaluatorsByUuid],
   );
+
+  // Stop a run that is still going, then read it back, since the stop itself
+  // only answers with the run's id and status. The check that follows sees a
+  // finished run and stops checking on its own.
+  const stopRun = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) {
+      toast.error("Cannot stop the run: the backend URL is not configured.");
+      return;
+    }
+    const stopped = await abortRunOrNotify(
+      backendUrl,
+      backendAccessToken,
+      taskId,
+    );
+    if (!stopped) return;
+    try {
+      setRun(await fetchTestRun(backendUrl, backendAccessToken, taskId));
+    } catch (error) {
+      reportError("Error reading a stopped test run:", error);
+    }
+  };
 
   // Start a fresh run of the same tests and hand it to the parent, which
   // re-points `taskId` so this dialog loads it.
@@ -371,6 +412,12 @@ export function TestRunnerDialog({
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
                   </span>
                 )}
+                {run &&
+                  !isLoading &&
+                  (() => {
+                    const state = runStateOf(run);
+                    return state ? <RunStateMark state={state} /> : null;
+                  })()}
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {"Evaluation run"}
                 </h2>
@@ -383,6 +430,9 @@ export function TestRunnerDialog({
                       className="shrink-0"
                     />
                   )}
+                {!isFinished && !isLoading && (
+                  <StopRunButton onStop={stopRun} className="shrink-0" />
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {agentName}
@@ -527,6 +577,8 @@ export function TestRunnerDialog({
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
                   stoppedEarly={stoppedEarly}
+                  stopped={wasStopped}
+                  runTotalTests={run?.total_tests ?? rows.length}
                   onReviewUnanswered={() => setActiveTab("outputs")}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}
@@ -565,6 +617,11 @@ export function TestRunnerDialog({
                   onClearSelection={() => setSelectedTestUuid(null)}
                   onNavChange={setNav}
                   evaluatorsByUuid={evaluatorsByUuid}
+                  emptyMessage={
+                    wasStopped
+                      ? stoppedRunSentence(0, run?.total_tests ?? null)
+                      : "No tests to show"
+                  }
                   legacyDefaultEvaluator={defaultNextReplyEvaluator}
                   labellingSelection={
                     showLabelling ? labellingSelectedIds : undefined

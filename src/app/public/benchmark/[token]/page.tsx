@@ -18,6 +18,8 @@ import {
 } from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { StoppedRunPill } from "@/components/ui";
+import { isRunStopped } from "@/lib/testTypes";
 import { ResultTabs } from "@/components/ui";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
@@ -29,6 +31,8 @@ type BenchmarkStatusResponse = {
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
   error?: string;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
 };
 
 export default function PublicBenchmarkPage() {
@@ -113,7 +117,11 @@ export default function PublicBenchmarkPage() {
   };
 
   return (
-    <PublicPageLayout title="LLM benchmark" contentClassName="max-w-[92rem]">
+    <PublicPageLayout
+      title="LLM benchmark"
+      pills={isRunStopped(data) ? <StoppedRunPill /> : undefined}
+      contentClassName="max-w-[92rem]"
+    >
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
@@ -169,6 +177,7 @@ export default function PublicBenchmarkPage() {
             filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
             benchmarkScoreLabel={benchmarkScoreLabel}
             onReviewUnanswered={() => setActiveTab("outputs")}
+            runStopped={isRunStopped(data)}
           />
         )}
 
@@ -197,6 +206,7 @@ export default function PublicBenchmarkPage() {
         {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
+              runStopped={isRunStopped(data)}
               modelResults={data.model_results}
               expandedModels={expandedModels}
               onToggleModel={toggleModel}
