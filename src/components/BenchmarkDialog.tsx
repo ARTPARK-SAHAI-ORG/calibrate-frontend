@@ -56,6 +56,22 @@ type BenchmarkDialogProps = {
   benchmarkProvider?: string;
 };
 
+type ModelVerifications = Record<
+  string,
+  { verified: boolean; verified_at: string; error: string | null }
+>;
+
+/** The saved model checks worth showing on a fresh open: the ones that passed.
+ *  A past failure is not carried into a new window. */
+function keepVerified(saved?: ModelVerifications): ModelVerifications {
+  if (!saved) return {};
+  const verified: ModelVerifications = {};
+  for (const [id, entry] of Object.entries(saved)) {
+    if (entry.verified) verified[id] = entry;
+  }
+  return verified;
+}
+
 export function BenchmarkDialog({
   isOpen,
   onClose,
@@ -92,14 +108,7 @@ export function BenchmarkDialog({
       string,
       { verified: boolean; verified_at: string; error: string | null }
     >
-  >(() => {
-    if (!initialBenchmarkModelsVerified) return {};
-    const verified: typeof initialBenchmarkModelsVerified = {};
-    for (const [id, entry] of Object.entries(initialBenchmarkModelsVerified)) {
-      if (entry.verified) verified[id] = entry;
-    }
-    return verified;
-  });
+  >(() => keepVerified(initialBenchmarkModelsVerified));
   const [modelVerifyStatus, setModelVerifyStatus] = useState<
     Record<string, ModelVerificationStatus>
   >({});
@@ -119,6 +128,12 @@ export function BenchmarkDialog({
     setSelectedModels([null]);
     setShowResults(false);
     setModelVerifyStatus({});
+    // A check that failed belongs to the models that were picked this time, so
+    // it goes with them. Without this the next open still shows the failure
+    // beside a model nobody has picked yet.
+    setBenchmarkModelsVerified(keepVerified(initialBenchmarkModelsVerified));
+    setModelSampleResponses({});
+    setExpandedModelError(null);
     setConfirmOpen(false);
     setVerifyDialogOpen(false);
     setVerifyMessages(null);
@@ -338,6 +353,10 @@ export function BenchmarkDialog({
       const existing = benchmarkModelsVerified[m.id];
       return existing && !existing.verified;
     });
+  // The checks only have something to say once a model is picked, so a window
+  // that is still empty gives the whole width to the picker.
+  const showStatusColumn =
+    agentType === "connection" && selectedModels.some((m) => m !== null);
   const maxModels = 5;
   const canAddMore = selectedModels.length < maxModels;
 
@@ -347,7 +366,7 @@ export function BenchmarkDialog({
     const liveStatus = modelVerifyStatus[modelId];
     if (liveStatus === "verifying") {
       return (
-        <span className="text-xs text-muted-foreground flex items-center gap-1">
+        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
           <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
@@ -371,7 +390,7 @@ export function BenchmarkDialog({
     const existing = benchmarkModelsVerified[modelId];
     if (!existing) {
       return (
-        <span className="text-xs text-muted-foreground flex items-center gap-1">
+        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 inline-block" />
           not checked
         </span>
@@ -379,7 +398,7 @@ export function BenchmarkDialog({
     }
     if (existing.verified) {
       return (
-        <span className="text-xs text-green-600 flex items-center gap-1">
+        <span className="text-xs text-green-600 flex items-center gap-1 shrink-0">
           <svg
             className="w-3 h-3"
             fill="none"
@@ -400,7 +419,7 @@ export function BenchmarkDialog({
     const isExpanded = expandedModelError === modelId;
     const hasDetails = existing.error || modelSampleResponses[modelId];
     return (
-      <span className="text-xs text-red-500 flex items-center gap-1">
+      <span className="text-xs text-red-500 flex items-center gap-1 shrink-0">
         <svg
           className="w-3 h-3"
           fill="none"
@@ -426,7 +445,7 @@ export function BenchmarkDialog({
             aria-expanded={isExpanded}
             className="flex items-center gap-0.5 rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
           >
-            {isExpanded ? "Hide" : "See why"}
+            See why
             <svg
               className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`}
               fill="none"
@@ -470,7 +489,7 @@ export function BenchmarkDialog({
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 pb-6 pt-1 space-y-4">
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label className="block text-sm font-medium text-foreground mb-3">
               Select Models
             </label>
 
@@ -495,13 +514,13 @@ export function BenchmarkDialog({
                       <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
                     {/* Verification badge for connections, once a model is
-                        picked. Fixed width, so a row saying "not checked" and
-                        a row offering "See why" leave the model picker beside
-                        them the same size. A row with no model yet has nothing
-                        to say, so its picker runs the full width. */}
-                    {agentType === "connection" && selectedModel && (
-                      <div className="w-24 shrink-0 flex items-center">
-                        {getModelVerificationBadge(selectedModel.id)}
+                        picked. A fixed width keeps every picker the same size
+                        whatever its row says, and the badge sits at the end of
+                        it, next to the delete button. */}
+                    {showStatusColumn && (
+                      <div className="w-24 shrink-0 flex items-center justify-end">
+                        {selectedModel &&
+                          getModelVerificationBadge(selectedModel.id)}
                       </div>
                     )}
                   </div>

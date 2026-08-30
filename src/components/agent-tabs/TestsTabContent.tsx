@@ -2458,23 +2458,27 @@ export function TestsTabContent({
         }}
       />
 
-      {/* Benchmark Dialog */}
-      <BenchmarkDialog
-        isOpen={benchmarkDialogOpen}
-        onClose={() => {
-          setBenchmarkDialogOpen(false);
-          setBenchmarkTests([]);
-        }}
-        agentUuid={agentUuid}
-        agentName={agentName}
-        agentNature={agentNature}
-        tests={benchmarkTests}
-        totalTests={linkedTestsTotal}
-        onBenchmarkCreated={() => onRunStarted?.()}
-        agentType={agentType}
-        benchmarkModelsVerified={benchmarkModelsVerified}
-        benchmarkProvider={benchmarkProvider}
-      />
+      {/* Benchmark Dialog. Rendered only while it is open, so every open starts
+          from scratch: the models picked and the checks that failed last time
+          belong to that window, not to the next one. */}
+      {benchmarkDialogOpen && (
+        <BenchmarkDialog
+          isOpen
+          onClose={() => {
+            setBenchmarkDialogOpen(false);
+            setBenchmarkTests([]);
+          }}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          agentNature={agentNature}
+          tests={benchmarkTests}
+          totalTests={linkedTestsTotal}
+          onBenchmarkCreated={() => onRunStarted?.()}
+          agentType={agentType}
+          benchmarkModelsVerified={benchmarkModelsVerified}
+          benchmarkProvider={benchmarkProvider}
+        />
+      )}
 
       {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
           test subset, skipping the model picker. */}
