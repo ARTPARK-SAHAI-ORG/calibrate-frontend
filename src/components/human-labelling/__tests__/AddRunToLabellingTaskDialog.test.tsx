@@ -2,12 +2,15 @@ import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   AddRunToLabellingTaskDialog,
   buildItemsFromSource,
+  isLabellableOutput,
   isLabellableTrace,
   isLabellingEligibleRaw,
+  isToolCallOutput,
   isToolCallTest,
   isToolCallTrace,
   itemNounForSource,
   targetTaskTypeForSource,
+  traceOutputFacts,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
 
@@ -671,6 +674,54 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items).toHaveLength(0);
     expect(result.skippedCount).toBe(2);
   });
+
+  it.each([
+    {
+      hasResponse: true,
+      hasToolCalls: false,
+      labellable: true,
+      toolCall: false,
+    },
+    {
+      hasResponse: false,
+      hasToolCalls: true,
+      labellable: true,
+      toolCall: true,
+    },
+    {
+      hasResponse: true,
+      hasToolCalls: true,
+      labellable: true,
+      toolCall: false,
+    },
+    {
+      hasResponse: false,
+      hasToolCalls: false,
+      labellable: false,
+      toolCall: false,
+    },
+  ])(
+    "decides reply=$hasResponse call=$hasToolCalls the same for the list and the dialog",
+    ({ hasResponse, hasToolCalls, labellable, toolCall }) => {
+      const facts = { hasResponse, hasToolCalls };
+      expect(isLabellableOutput(facts)).toBe(labellable);
+      expect(isToolCallOutput(facts)).toBe(toolCall);
+      // The traces list reads these two facts off a row, the dialog reads them
+      // off the fetched trace. Same facts in, same answer out, which is what
+      // stops the button's count and the dialog disagreeing.
+      const t = {
+        name: "t",
+        input: "hi",
+        output: {
+          response: hasResponse ? "hello" : "",
+          tool_calls: hasToolCalls ? [{ tool: "book" }] : [],
+        },
+      };
+      expect(traceOutputFacts(t)).toEqual(facts);
+      expect(isLabellableTrace(t)).toBe(labellable);
+      expect(isToolCallTrace(t)).toBe(toolCall);
+    },
+  );
 
   it("builds a general trace that only called a tool as a tool-call item", () => {
     const source: AddRunToLabellingTaskSource = {

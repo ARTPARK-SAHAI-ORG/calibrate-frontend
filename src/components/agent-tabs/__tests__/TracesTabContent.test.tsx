@@ -82,6 +82,9 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
 // The stub prints what the dialog was handed, so the mapping from traces to
 // labelling items is exercised rather than assumed.
 jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
+  // The rule deciding what a trace can be labelled as is shared with this
+  // tab, so it has to stay real; only the dialog itself is stood in for.
+  ...jest.requireActual("../../human-labelling/AddRunToLabellingTaskDialog"),
   AddRunToLabellingTaskDialog: ({
     isOpen,
     source,
@@ -1303,12 +1306,12 @@ describe("TracesTabContent", () => {
       expect(screen.getByTestId("labelling-payload")).toHaveTextContent(
         "lookup",
       );
-      expect(
-        screen.getByTestId("labelling-evaluator-uuids").textContent,
-      ).toBe("");
+      expect(screen.getByTestId("labelling-evaluator-uuids").textContent).toBe(
+        "",
+      );
     });
 
-    it("leaves a tool-call-only trace out of a mixed selection", async () => {
+    it("takes both a reply and a tool-call-only trace from a mixed selection", async () => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(
         tracesResult([
@@ -1324,17 +1327,16 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
 
       await user.click(screen.getByLabelText("Select all traces"));
-      // Only the trace that replied is labellable here (the response flow);
-      // the tool-call-only one is left out, so the count is 1.
-      await user.click(screen.getByText("Submit for labelling (1)"));
+      // Both can be labelled, so neither is dropped and the count is 2. The
+      // evaluator step still runs, because the reply needs a judge picked.
+      await user.click(screen.getByText("Submit for labelling (2)"));
       await user.click(screen.getByText("choose evaluators"));
 
       await waitFor(() =>
         expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
       );
-      // Only the reply trace is fetched and submitted.
       expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-1");
-      expect(fetchTrace).not.toHaveBeenCalledWith("test-token", "trace-2");
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-2");
     });
 
     it("labels a trace that both replied and called a tool as a response", async () => {

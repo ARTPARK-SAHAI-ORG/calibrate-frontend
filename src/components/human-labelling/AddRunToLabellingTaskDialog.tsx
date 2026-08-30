@@ -168,29 +168,56 @@ export function targetTaskTypeForSource(
   }
 }
 
-// True when a trace's output is a tool call and nothing else. Such a trace is
-// built as a tool-call item (a person marks it correct or wrong) rather than a
-// response item. A trace that also replied is a response item, and its call
-// rides along in the conversation.
-export function isToolCallTrace(t: TraceLabellingItem): boolean {
-  const hasResponse =
-    typeof t.output?.response === "string" &&
-    t.output.response.trim().length > 0;
-  return (
-    !hasResponse &&
-    Array.isArray(t.output?.tool_calls) &&
-    t.output.tool_calls.length > 0
-  );
+/** The only two things about a trace's output that decide how it is labelled.
+ * The traces list has them as a preview and a count, this dialog has them as
+ * the fetched output; both boil down to the same pair. */
+export type TraceOutputFacts = {
+  hasResponse: boolean;
+  hasToolCalls: boolean;
+};
+
+/** True when the output is a tool call and nothing else. Such a trace is built
+ * as a tool-call item (a person marks it correct or wrong) rather than a
+ * response item. A trace that also replied is a response item, and its call
+ * rides along in the conversation. */
+export function isToolCallOutput({
+  hasResponse,
+  hasToolCalls,
+}: TraceOutputFacts): boolean {
+  return !hasResponse && hasToolCalls;
 }
 
-/** Whether a conversational trace can be labelled at all. It can if it either
- * replied or called a tool; both become items in an `llm` task. A trace that
- * did neither has nothing to show an annotator. */
+/** Whether a trace can be labelled at all. It can if it either replied or
+ * called a tool; both become items in the same task. A trace that did neither
+ * has nothing to show an annotator.
+ *
+ * The traces list and this dialog both decide through here, so the count on
+ * the "Submit for labelling" button and what the dialog actually builds
+ * cannot drift apart. */
+export function isLabellableOutput({
+  hasResponse,
+  hasToolCalls,
+}: TraceOutputFacts): boolean {
+  return hasResponse || hasToolCalls;
+}
+
+/** The two facts, read off a trace this dialog has already fetched. */
+export function traceOutputFacts(t: TraceLabellingItem): TraceOutputFacts {
+  return {
+    hasResponse:
+      typeof t.output?.response === "string" &&
+      t.output.response.trim().length > 0,
+    hasToolCalls:
+      Array.isArray(t.output?.tool_calls) && t.output.tool_calls.length > 0,
+  };
+}
+
+export function isToolCallTrace(t: TraceLabellingItem): boolean {
+  return isToolCallOutput(traceOutputFacts(t));
+}
+
 export function isLabellableTrace(t: TraceLabellingItem): boolean {
-  const hasResponse =
-    typeof t.output?.response === "string" &&
-    t.output.response.trim().length > 0;
-  return hasResponse || isToolCallTrace(t);
+  return isLabellableOutput(traceOutputFacts(t));
 }
 
 /** Singular / plural noun for the items being submitted, per source kind. */

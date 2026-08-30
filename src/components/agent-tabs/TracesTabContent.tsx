@@ -11,8 +11,11 @@ import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabelli
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import {
   AddRunToLabellingTaskDialog,
+  isLabellableOutput,
+  isToolCallOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
+  type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
@@ -59,6 +62,16 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
  * The Traces tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
+/** The two facts the labelling rule needs, read off a list row. The row
+ * carries a preview of the reply and a count of the calls, not the output
+ * itself, so this is where that shape is turned into the shared one. */
+function traceRowOutputFacts(trace: TraceSummary): TraceOutputFacts {
+  return {
+    hasResponse: !!trace.response_preview?.trim(),
+    hasToolCalls: trace.tool_call_count > 0,
+  };
+}
+
 export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
@@ -184,19 +197,21 @@ export function TracesTabContent({
         ? "general"
         : "response";
 
-  // A selection where every trace only made tool calls skips the evaluator
-  // step: a person marks each call correct or wrong, so there is no AI judge
-  // to pick. Any trace with a reply forces the response flow, where the
-  // tool-call-only traces are left out.
-  const labellingIsToolCallOnly =
-    selectedTraces.length > 0 &&
-    selectedTraces.every(
-      (trace) => !trace.response_preview?.trim() && trace.tool_call_count > 0,
-    );
-  const labellableTraces = labellingIsToolCallOnly
-    ? selectedTraces
-    : selectedTraces.filter((trace) => !!trace.response_preview?.trim());
+  // What a row can be labelled as is decided by the same rule the labelling
+  // dialog uses, fed from the preview and the count the list row carries. Both
+  // sides deciding through one rule is what keeps the count on the button and
+  // what the dialog builds in step with each other.
+  const labellableTraces = selectedTraces.filter((trace) =>
+    isLabellableOutput(traceRowOutputFacts(trace)),
+  );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
+  // A selection that is nothing but tool calls skips the evaluator step: a
+  // person marks each call correct or wrong, so there is no AI judge to pick.
+  const labellingIsToolCallOnly =
+    labellableTraces.length > 0 &&
+    labellableTraces.every((trace) =>
+      isToolCallOutput(traceRowOutputFacts(trace)),
+    );
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
