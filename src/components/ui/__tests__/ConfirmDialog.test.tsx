@@ -39,10 +39,4 @@ describe("ConfirmDialog", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(props.onClose).toHaveBeenCalled();
   });
-
-  it("disables both buttons while confirming", () => {
-    render(<ConfirmDialog {...props} isConfirming confirmText="Start" />);
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Start/ })).toBeDisabled();
-  });
 });

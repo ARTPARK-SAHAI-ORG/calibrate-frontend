@@ -11,8 +11,6 @@ type ConfirmDialogProps = {
   title: string;
   message?: string;
   confirmText?: string;
-  cancelText?: string;
-  isConfirming?: boolean;
   /** Optional summary rendered between the message and the buttons. */
   children?: React.ReactNode;
 };
@@ -26,8 +24,6 @@ export function ConfirmDialog({
   title,
   message,
   confirmText = "Confirm",
-  cancelText = "Cancel",
-  isConfirming = false,
   children,
 }: ConfirmDialogProps) {
   useHideFloatingButton(isOpen);
@@ -47,20 +43,10 @@ export function ConfirmDialog({
         )}
         {children && <div className="mb-5">{children}</div>}
         <div className="flex items-center justify-end gap-2 md:gap-3">
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={onClose}
-            disabled={isConfirming}
-          >
-            {cancelText}
+          <Button variant="secondary" size="md" onClick={onClose}>
+            Cancel
           </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={onConfirm}
-            isLoading={isConfirming}
-          >
+          <Button variant="primary" size="md" onClick={onConfirm}>
             {confirmText}
           </Button>
         </div>
