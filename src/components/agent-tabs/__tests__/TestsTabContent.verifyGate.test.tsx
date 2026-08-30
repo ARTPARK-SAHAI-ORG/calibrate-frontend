@@ -132,6 +132,7 @@ describe("TestsTabContent verify-before-run gate", () => {
 
     await waitFor(() => expect(runAllButton()).toBeInTheDocument());
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     // No run was started; the window is shown instead.
     expect(runPosts).toBe(0);
@@ -155,6 +156,7 @@ describe("TestsTabContent verify-before-run gate", () => {
 
     await waitFor(() => expect(runAllButton()).toBeInTheDocument());
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await user.click(screen.getByRole("button", { name: "pass-verify" }));
 
     expect(onConnectionVerified).toHaveBeenCalledTimes(1);
@@ -179,6 +181,7 @@ describe("TestsTabContent verify-before-run gate", () => {
 
     await waitFor(() => expect(runAllButton()).toBeInTheDocument());
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await user.click(screen.getByRole("button", { name: "go-settings" }));
 
     expect(onGoToConnectionSettings).toHaveBeenCalledTimes(1);
@@ -198,6 +201,7 @@ describe("TestsTabContent verify-before-run gate", () => {
 
     await waitFor(() => expect(runAllButton()).toBeInTheDocument());
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:task-99",

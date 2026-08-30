@@ -110,7 +110,9 @@ async function createUnattachedLlmEvaluator(
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
+  await page
+    .getByPlaceholder("e.g. Gives the correct vaccination schedule")
+    .fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({
@@ -231,6 +233,8 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     // Click Run all — for an unverified connection agent this opens the verify
     // dialog rather than starting a run.
     await page.getByRole("button", { name: /Run all/ }).click();
+    // Confirmation step before a run of every linked test.
+    await page.getByRole("button", { name: "Start the run" }).click();
 
     await expect(
       page.getByRole("heading", { name: "Verify connection", exact: true }),
@@ -313,6 +317,8 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     await createNextReplyTestOnAgent(page, testName, evaluatorName);
 
     await page.getByRole("button", { name: /Run all/ }).click();
+    // Confirmation step before a run of every linked test.
+    await page.getByRole("button", { name: "Start the run" }).click();
 
     await expect(
       page.getByRole("heading", { name: "Verify connection", exact: true }),

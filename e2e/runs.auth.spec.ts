@@ -75,7 +75,9 @@ async function createUnattachedLlmEvaluator(
     timeout: 20000,
   });
 
-  await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(name);
+  await page
+    .getByPlaceholder("e.g. Gives the correct vaccination schedule")
+    .fill(name);
   await page.getByRole("button", { name: "Create evaluator" }).click();
 
   await expect(page.getByRole("link", { name: `Open ${name}` })).toBeVisible({
@@ -198,6 +200,8 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // and starts the run (POST /agent-tests/agent/{uuid}/run), then polls
     // GET /agent-tests/run/{taskId} every 3s until the status is terminal.
     await page.getByRole("button", { name: /Run all/ }).click();
+    // Confirmation step before a run of every linked test.
+    await page.getByRole("button", { name: "Start the run" }).click();
 
     // Results tabs (Summary / Results) render ONLY once runStatus === "done".
     // Fake backend completes near-instantly; allow for the POST + first poll.
@@ -242,6 +246,8 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
 
     // Seed one completed run from the Tests tab, then close the dialog.
     await page.getByRole("button", { name: /Run all/ }).click();
+    // Confirmation step before a run of every linked test.
+    await page.getByRole("button", { name: "Start the run" }).click();
     await expect(
       page.getByRole("button", { name: "Summary", exact: true }),
     ).toBeVisible({ timeout: 30000 });
@@ -316,6 +322,8 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
 
     // A model is selected → "Run comparison" is enabled. Run the benchmark.
     await page.getByRole("button", { name: "Run comparison" }).click();
+    // Summary of what is about to run.
+    await page.getByRole("button", { name: "Start the comparison" }).click();
 
     // BenchmarkResultsDialog polls GET /agent-tests/benchmark/{taskId}; the
     // Leaderboard / Results tabs render only once the run is done.

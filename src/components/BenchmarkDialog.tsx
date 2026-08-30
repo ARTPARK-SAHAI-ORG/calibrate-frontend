@@ -14,7 +14,7 @@ import {
   PlusIcon,
   PlayIcon,
 } from "@/components/icons";
-import { Button } from "@/components/ui";
+import { Button, ConfirmDialog } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import {
   VerifyRequestPreviewDialog,
@@ -104,6 +104,7 @@ export function BenchmarkDialog({
     Record<string, ModelVerificationStatus>
   >({});
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(
     null,
@@ -118,6 +119,7 @@ export function BenchmarkDialog({
     setSelectedModels([null]);
     setShowResults(false);
     setModelVerifyStatus({});
+    setConfirmOpen(false);
     setVerifyDialogOpen(false);
     setVerifyMessages(null);
     setPendingVerifyAction(null);
@@ -203,6 +205,7 @@ export function BenchmarkDialog({
   };
 
   const handleRunBenchmark = async () => {
+    setConfirmOpen(false);
     if (agentType === "connection") {
       const modelsToVerify = selectedModels
         .filter((m): m is LLMModel => m !== null)
@@ -316,7 +319,16 @@ export function BenchmarkDialog({
     }));
   };
 
-  const canRunBenchmark = selectedModels.some((m) => m !== null);
+  const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
+  // a check with each model it has not been verified with yet, so the question
+  // says so before the reader agrees to it.
+  const needsVerification =
+    agentType === "connection" &&
+    chosenModels.some((m) => !benchmarkModelsVerified[m.id]?.verified);
+  // Empty `tests` means every linked test; `totalTests` is how many that is.
+  const benchmarkTestCount = tests.length > 0 ? tests.length : totalTests;
+  const canRunBenchmark = chosenModels.length > 0;
   const isVerifying = Object.values(modelVerifyStatus).some(
     (s) => s === "verifying",
   );
@@ -571,7 +583,7 @@ export function BenchmarkDialog({
           <Button
             variant="primary"
             size="md"
-            onClick={handleRunBenchmark}
+            onClick={() => setConfirmOpen(true)}
             disabled={!canRunBenchmark || isVerifying}
             className="flex items-center gap-2"
           >
@@ -607,6 +619,23 @@ export function BenchmarkDialog({
         totalTests={tests.length > 0 ? tests.length : totalTests}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
         onBenchmarkCreated={onBenchmarkCreated}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleRunBenchmark}
+        title="Compare the models"
+        message={`${
+          needsVerification
+            ? "Your agent's connection is checked with each model first. Once it works, this"
+            : "This"
+        } will start the comparison on ${
+          benchmarkTestCount === undefined
+            ? "every test linked to this agent"
+            : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`
+        } with ${chosenModels.map((m) => m.name).join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
+        confirmText="Start the comparison"
       />
 
       <VerifyRequestPreviewDialog

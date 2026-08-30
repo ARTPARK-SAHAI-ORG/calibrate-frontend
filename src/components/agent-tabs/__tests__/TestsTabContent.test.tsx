@@ -614,12 +614,42 @@ describe("TestsTabContent — paging", () => {
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
   });
 
+  it("does not mention a connection check when there is nothing to verify", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByText("Run all tests"));
+    expect(
+      screen.queryByText(/connection is checked first/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks before running every linked test, and cancelling runs nothing", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByText("Run all tests"));
+    expect(
+      screen.getByText("Run every test on this agent"),
+    ).toBeInTheDocument();
+    expect(runPostCall()).toBeFalsy();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByText("Run every test on this agent"),
+    ).not.toBeInTheDocument();
+    expect(runPostCall()).toBeFalsy();
+  });
+
   it("runs every linked test from Run all, not just the page", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     // No list of test ids at all means "every test linked to this agent".
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
@@ -766,9 +796,7 @@ describe("TestsTabContent — paging", () => {
     expect(screen.getByText(/tests selected/)).toHaveTextContent(
       "9 tests selected",
     );
-    expect(
-      screen.queryByText("Select all 12 tests"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Select all 12 tests")).not.toBeInTheDocument();
   });
 
   it("asks the backend for the chosen type and keeps the count honest", async () => {
@@ -946,6 +974,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await screen.findByTestId("test-runner-dialog");
     // Run-all-linked sends an empty body; the backend reads the link table.
     expect(JSON.parse(runPostCall()[1].body)).toEqual({});
@@ -958,6 +987,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await screen.findByTestId("test-runner-dialog");
     expect(setRunIdParamMock).toHaveBeenCalledWith("task-new");
 
@@ -1003,6 +1033,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
@@ -1014,6 +1045,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() =>
       expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
     );
@@ -1127,6 +1159,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(runAllButton()).toBeDisabled());
     expect(runAllButton().querySelector(".animate-spin")).toBeInTheDocument();
     runTestButtons().forEach((btn) => expect(btn).toBeDisabled());
@@ -1175,6 +1208,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(runAllButton());
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(runAllButton()).toBeDisabled());
 
     await release();
@@ -1627,6 +1661,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await screen.findByTestId("test-runner-dialog");
     // The parent takes the reader to the Evaluations tab from here.
     await act(async () => {
@@ -1643,6 +1678,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     // The runs list lives in the Runs tab now, so this tab only opens the
     // window on the new run and lets the parent refresh that tab.
     await screen.findByTestId("test-runner-dialog");
@@ -1663,6 +1699,9 @@ describe("TestsTabContent — connection agent", () => {
     // No longer disabled — clicking now prompts to verify the connection first.
     expect(runAll).toBeEnabled();
     await user.click(runAll);
+    // The question says the connection check comes first.
+    expect(screen.getByText(/connection is checked first/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
   });
 });
