@@ -424,7 +424,7 @@ export function BenchmarkDialog({
               setExpandedModelError(isExpanded ? null : modelId);
             }}
             aria-expanded={isExpanded}
-            className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
+            className="flex items-center gap-0.5 rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
           >
             {isExpanded ? "Hide" : "See why"}
             <svg
@@ -468,9 +468,9 @@ export function BenchmarkDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-1 space-y-4">
           <div className="space-y-3">
-            <label className="text-sm font-medium text-foreground mb-2">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Select Models
             </label>
 
@@ -500,7 +500,7 @@ export function BenchmarkDialog({
                         them the same size. A row with no model yet has nothing
                         to say, so its picker runs the full width. */}
                     {agentType === "connection" && selectedModel && (
-                      <div className="w-28 shrink-0 flex items-center">
+                      <div className="w-24 shrink-0 flex items-center">
                         {getModelVerificationBadge(selectedModel.id)}
                       </div>
                     )}
