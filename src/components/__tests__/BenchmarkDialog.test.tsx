@@ -328,6 +328,10 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
     await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    // The question says the connection check with each model comes first.
+    expect(
+      screen.getByText(/connection is checked with each model first/),
+    ).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "Start the comparison" }),
     );
@@ -721,6 +725,9 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.getByText(/This will start the comparison on 2 tests with GPT-4o/),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/connection is checked with each model first/),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
     ).not.toBeInTheDocument();

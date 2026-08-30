@@ -2409,7 +2409,11 @@ export function TestsTabContent({
           void launchTestRun(agentTests, true, "all");
         }}
         title="Run every test on this agent"
-        message={`This will start the evaluation on ${linkedTestsTotal} ${linkedTestsTotal === 1 ? "test" : "tests"}. Each test calls your agent, evaluates its response against the evaluation criteria and reports the metrics.`}
+        message={`${
+          isConnectionUnverified
+            ? "Your agent's connection is checked first. Once it works, this"
+            : "This"
+        } will start the evaluation on ${linkedTestsTotal} ${linkedTestsTotal === 1 ? "test" : "tests"}. Each test calls your agent, evaluates its response against the evaluation criteria and reports the metrics.`}
         confirmText="Start the run"
       />
 

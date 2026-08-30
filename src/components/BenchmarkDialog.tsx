@@ -320,6 +320,12 @@ export function BenchmarkDialog({
   };
 
   const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
+  // a check with each model it has not been verified with yet, so the question
+  // says so before the reader agrees to it.
+  const needsVerification =
+    agentType === "connection" &&
+    chosenModels.some((m) => !benchmarkModelsVerified[m.id]?.verified);
   // Empty `tests` means every linked test; `totalTests` is how many that is.
   const benchmarkTestCount = tests.length > 0 ? tests.length : totalTests;
   const canRunBenchmark = chosenModels.length > 0;
@@ -620,7 +626,11 @@ export function BenchmarkDialog({
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleRunBenchmark}
         title="Compare the models"
-        message={`This will start the comparison on ${
+        message={`${
+          needsVerification
+            ? "Your agent's connection is checked with each model first. Once it works, this"
+            : "This"
+        } will start the comparison on ${
           benchmarkTestCount === undefined
             ? "every test linked to this agent"
             : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`

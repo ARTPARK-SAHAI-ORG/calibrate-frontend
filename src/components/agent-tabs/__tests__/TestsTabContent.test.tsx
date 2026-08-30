@@ -614,6 +614,17 @@ describe("TestsTabContent — paging", () => {
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
   });
 
+  it("does not mention a connection check when there is nothing to verify", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByText("Run all tests"));
+    expect(
+      screen.queryByText(/connection is checked first/),
+    ).not.toBeInTheDocument();
+  });
+
   it("asks before running every linked test, and cancelling runs nothing", async () => {
     const user = setupUser();
     renderComponent();
@@ -785,9 +796,7 @@ describe("TestsTabContent — paging", () => {
     expect(screen.getByText(/tests selected/)).toHaveTextContent(
       "9 tests selected",
     );
-    expect(
-      screen.queryByText("Select all 12 tests"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Select all 12 tests")).not.toBeInTheDocument();
   });
 
   it("asks the backend for the chosen type and keeps the count honest", async () => {
@@ -1690,6 +1699,8 @@ describe("TestsTabContent — connection agent", () => {
     // No longer disabled — clicking now prompts to verify the connection first.
     expect(runAll).toBeEnabled();
     await user.click(runAll);
+    // The question says the connection check comes first.
+    expect(screen.getByText(/connection is checked first/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start the run" }));
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
   });
