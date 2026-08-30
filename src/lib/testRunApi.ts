@@ -68,7 +68,9 @@ export type TestRunStatusResponse = {
    * same tests. Absent on runs created before the backend started snapshotting
    * it — the Rerun button is hidden in that case. */
   test_uuids?: string[];
-  error?: string;
+  /** True when the run itself broke. `status` says the same thing; nothing
+   * reads this. */
+  error?: boolean;
   is_public?: boolean;
   share_token?: string | null;
 };

@@ -419,7 +419,18 @@ describe("tests that could not be run", () => {
   it("says when the run gave up before starting every test", () => {
     render(<TestRunSummary passed={9} total={10} stoppedEarly />);
     expect(
-      screen.getByText("This run stopped before it started every test."),
+      screen.getByText(/The run stopped before it started every test\./),
     ).toBeInTheDocument();
+  });
+
+  it("says none could be run rather than counting them all", () => {
+    // 14 of 14 read as a sum the reader has to do; say it plainly instead,
+    // and keep the stopped-early clause in the same sentence.
+    render(<TestRunSummary passed={0} total={0} unanswered={14} stoppedEarly />);
+    const note = screen.getByText(/None of the tests could be run\./);
+    expect(note).toHaveTextContent(
+      "None of the tests could be run. The run stopped before it started every test.",
+    );
+    expect(screen.queryByText(/14 of 14/)).not.toBeInTheDocument();
   });
 });

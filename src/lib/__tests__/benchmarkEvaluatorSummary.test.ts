@@ -1,4 +1,5 @@
 import {
+  benchmarkAnsweredPassFail,
   benchmarkToolCallPassFail,
   benchmarkRatingEvaluatorCaption,
   benchmarkEvaluatorColumnKey,
@@ -34,13 +35,13 @@ describe("benchmarkToolCallPassFail", () => {
     expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 0, total: 0 });
   });
 
-  it("skips tool_call tests with an error", () => {
+  it("skips tool_call tests that produced no answer", () => {
     const model: BenchmarkModelLike = {
       model: "m",
       test_results: [
         {
-          passed: true,
-          error: "boom",
+          passed: false,
+          unanswered: true,
           test_case: { evaluation: { type: "tool_call" } },
         },
       ],
@@ -633,5 +634,39 @@ describe("hasBenchmarkTopPicks", () => {
   it("is false when there is no leaderboard summary", () => {
     expect(hasBenchmarkTopPicks(undefined, models)).toBe(false);
     expect(hasBenchmarkTopPicks([], models)).toBe(false);
+  });
+});
+
+describe("benchmarkAnsweredPassFail", () => {
+  it("returns null when the model carries no cases", () => {
+    expect(benchmarkAnsweredPassFail({ model: "m" })).toBeNull();
+    expect(
+      benchmarkAnsweredPassFail({ model: "m", test_results: [] }),
+    ).toBeNull();
+  });
+
+  it("counts the tests that answered apart from the ones that did not", () => {
+    // Every row here is `passed: false` except the first, so only the flag
+    // separates a wrong answer from a test that never answered.
+    expect(
+      benchmarkAnsweredPassFail({
+        model: "m",
+        test_results: [
+          { passed: true },
+          { passed: false },
+          { passed: false, unanswered: true },
+          { passed: false, unanswered: true },
+        ],
+      }),
+    ).toEqual({ passed: 1, answered: 2, unanswered: 2 });
+  });
+
+  it("leaves a test that has not finished out of every count", () => {
+    expect(
+      benchmarkAnsweredPassFail({
+        model: "m",
+        test_results: [{ passed: true }, { passed: null }],
+      }),
+    ).toEqual({ passed: 1, answered: 1, unanswered: 0 });
   });
 });

@@ -297,8 +297,10 @@ export function TestRunnerDialog({
   // The row checkboxes exist only to feed the "Submit for labelling" button,
   // so they appear exactly when it does — never on a run with nothing that
   // can be labelled.
+  // The run is finished either way; a failed one still has rows to read.
+  const isFinished = runStatus === "done" || runStatus === "failed";
   const showLabelling =
-    runStatus === "done" && rows.length > 0 && hasLabellingEligibleTests;
+    isFinished && rows.length > 0 && hasLabellingEligibleTests;
 
   // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
   // backend `evaluator_summary` block (only benchmarks do), so aggregate it
@@ -343,11 +345,11 @@ export function TestRunnerDialog({
     }
   };
 
-  // Show the error card only when the failed run left NO usable result: every
-  // row errored, or the run died before any case started (zero rows, and
-  // `[].every` is true). A run-level `error` alone is not enough, since cases
+  // Show the error card only when the failed run left NO rows at all. When it
+  // has rows, every one of them carries its own reason, and the summary is
+  // where the reader learns the run stopped early — an error card would hide
   // that already produced results must stay visible.
-  const isOverallError = runStatus === "failed" && rows.every((r) => r.unanswered);
+  const isOverallError = runStatus === "failed" && rows.length === 0;
 
   if (!isOpen) return null;
 
@@ -372,7 +374,7 @@ export function TestRunnerDialog({
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {"Evaluation run"}
                 </h2>
-                {runStatus === "done" &&
+                {isFinished &&
                   onNewRun &&
                   runTestUuids.length > 0 && (
                     <RerunIconButton
@@ -401,7 +403,7 @@ export function TestRunnerDialog({
           {/* Right: action buttons + close */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Export results — only shown when run is done */}
-            {runStatus === "done" && rows.length > 0 && (
+            {isFinished && rows.length > 0 && (
               <div className="hidden md:block">
                 <ExportResultsButton
                   filename={`test-run-${agentName}`}
@@ -444,7 +446,7 @@ export function TestRunnerDialog({
               </div>
             )}
             {/* Share button — only shown when run is done */}
-            {runStatus === "done" && backendAccessToken && (
+            {isFinished && backendAccessToken && (
               <div className="hidden md:block">
                 <ShareButton
                   entityType="test-run"
@@ -501,7 +503,7 @@ export function TestRunnerDialog({
           /* Content */
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Tab nav - only once the run is done (mirrors the benchmark dialog) */}
-            {runStatus === "done" && (
+            {isFinished && (
               <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
                 <div className="flex gap-3 md:gap-4 lg:gap-6">
                   <button
@@ -540,7 +542,7 @@ export function TestRunnerDialog({
               </div>
             )}
 
-            {runStatus === "done" && activeTab === "summary" ? (
+            {isFinished && activeTab === "summary" ? (
               <div
                 className="flex-1 overflow-hidden"
                 data-tour="test-run-summary"
@@ -559,7 +561,7 @@ export function TestRunnerDialog({
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>
-            ) : runStatus === "done" && activeTab === "about" ? (
+            ) : isFinished && activeTab === "about" ? (
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <LLMEvaluationAbout
                   showToolCalls={toolCall.total > 0}

@@ -247,17 +247,20 @@ export function TestRunSummary({
         {(unanswered > 0 || stoppedEarly) && (
           <div className="mb-4 flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
             <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <div className="space-y-1">
+            <p>
+              {unanswered > 0 &&
+                (total === 0
+                  ? "None of the tests could be run. "
+                  : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
+              {stoppedEarly && "The run stopped before it started every test. "}
               {unanswered > 0 && (
-                <p>
-                  {unanswered} of {unanswered + total} tests could not be run
-                  and were ignored for calculating the metrics. Review the tests
-                  that could not be run in the{" "}
+                <>
+                  Review the tests that could not be run in the{" "}
                   {onReviewUnanswered ? (
                     <button
                       type="button"
                       onClick={onReviewUnanswered}
-                      className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+                      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
                     >
                       {resultsTabLabel} tab
                     </button>
@@ -265,12 +268,9 @@ export function TestRunSummary({
                     <span className="font-medium">{resultsTabLabel} tab</span>
                   )}
                   .
-                </p>
+                </>
               )}
-              {stoppedEarly && (
-                <p>This run stopped before it started every test.</p>
-              )}
-            </div>
+            </p>
           </div>
         )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

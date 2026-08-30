@@ -15,7 +15,7 @@ Write the behaviour into the test's input:
     SAY: the next vaccination is at 14 weeks   answers with that exact text
     WRONG                                      answers something off-topic
     ERROR                                      returns HTTP 500, no answer
-    TIMEOUT                                    never answers, until it is cut off
+    TIMEOUT                                    never answers, then drops the call
     EMPTY                                      returns 200 with no answer in it
     TOOL: get_schedule {"child_age_weeks": 14} answers with that tool call
 
@@ -38,6 +38,7 @@ it. The backend calls this from its own process, so keep both on this machine.
 """
 
 import json
+import os
 import re
 import sys
 import time
@@ -47,8 +48,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 MODE = "input"
 MODES = ("input", "ok", "error", "timeout")
 
-# Long enough that any sensible request timeout gives up first.
-HANG_SECONDS = 600
+# How long a TIMEOUT call is held open before the connection is dropped. Long
+# enough to look like an agent that has stopped responding, short enough that a
+# run is not left waiting on it. Raise it with DUMMY_HANG_SECONDS=600 to watch
+# a real request timeout instead.
+HANG_SECONDS = int(os.environ.get("DUMMY_HANG_SECONDS", "45"))
 
 PLAIN_ANSWER = "Namaste. Aapki beti ka agla vaccination 14 weeks pe hai."
 OFF_TOPIC_ANSWER = "I do not know anything about that. Please call the office."
@@ -167,8 +171,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if reply is None:
             # Hold the connection open and answer nothing, which is what a real
-            # agent that has stopped responding looks like.
+            # agent that has stopped responding looks like, then drop it so the
+            # run is not left waiting on this call for ever.
             time.sleep(HANG_SECONDS)
+            self.close_connection = True
             return
 
         self.reply(status, with_metrics(reply, started) if status == 200 else reply)

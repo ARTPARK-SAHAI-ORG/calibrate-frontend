@@ -803,7 +803,7 @@ describe("TestRunnerDialog", () => {
     );
   });
 
-  it("shows the overall error state when the whole run errors", async () => {
+  it("shows a failed run's rows and tabs rather than a bare error card", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -813,13 +813,16 @@ describe("TestRunnerDialog", () => {
           jsonResponse({
             task_id: "task-err",
             status: "failed",
-            error: "boom",
+            error: true,
+            unanswered_tests: 1,
+            stopped_early: true,
             results: [
               {
                 test_case_id: "test-1",
+                name: "Broken test",
                 passed: false,
                 unanswered: true,
-                reasoning: "boom",
+                reasoning: "Agent returned HTTP 500",
               },
             ],
           }),
@@ -838,11 +841,19 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
+    // Every row carries its own reason, so hiding them behind one error card
+    // told the reader nothing. The summary is also the only place that says
+    // the run stopped before it started every test.
     await waitFor(() =>
-      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
+      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
     );
-    // A failed run must not jump to the summary tab.
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    // A failed run still must not jump to the summary tab on its own.
     expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
+    await setupUser().click(screen.getByRole("button", { name: "Summary" }));
+    expect(screen.getByTestId("summary-gaps")).toHaveTextContent(
+      JSON.stringify({ unanswered: 1, stoppedEarly: true }),
+    );
   });
 
   it("shows the overall error state when the run fails before any case ran", async () => {
