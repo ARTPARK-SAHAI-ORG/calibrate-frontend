@@ -8,6 +8,7 @@ const usePageErrorStateMock = jest.fn();
 const useVerifyConnectionMock = jest.fn();
 const useOpenRouterModelsMock = jest.fn();
 const findModelInProvidersMock = jest.fn();
+const useAgentHasRunsMock = jest.fn();
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
@@ -16,6 +17,7 @@ jest.mock("../../hooks", () => ({
   useVerifyConnection: () => useVerifyConnectionMock(),
   useOpenRouterModels: () => useOpenRouterModelsMock(),
   findModelInProviders: (...args: any[]) => findModelInProvidersMock(...args),
+  useAgentHasRuns: (...args: any[]) => useAgentHasRunsMock(...args),
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -241,6 +243,10 @@ beforeEach(() => {
   useVerifyConnectionMock.mockReturnValue({ ...defaultVerify });
   useOpenRouterModelsMock.mockReturnValue({ providers: [] });
   findModelInProvidersMock.mockReturnValue(null);
+  useAgentHasRunsMock.mockReturnValue({
+    hasRuns: true,
+    markHasRuns: jest.fn(),
+  });
   (signOut as jest.Mock).mockClear();
   jest.useRealTimers();
 });
@@ -285,6 +291,38 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Traces")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+  });
+
+  it("hides Evaluations and opens a connection agent on Tests when nothing has been run", async () => {
+    useAgentHasRunsMock.mockReturnValue({
+      hasRuns: false,
+      markHasRuns: jest.fn(),
+    });
+    mockFetchSequenceForAgent(connectionAgent);
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Evaluations")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("tests-tab-content")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("runs-tab-content")).not.toBeInTheDocument();
+  });
+
+  it("hides Evaluations on a build agent when nothing has been run", async () => {
+    useAgentHasRunsMock.mockReturnValue({
+      hasRuns: false,
+      markHasRuns: jest.fn(),
+    });
+    mockFetchSequenceForAgent(buildAgent);
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Evaluations")).not.toBeInTheDocument();
   });
 
   it("puts Tools right after Connection, before Settings, for a connection agent", async () => {
