@@ -10,10 +10,6 @@ import type { EvaluatorResultStat } from "@/components/human-labelling/Agreement
  * A finished evaluation run counts as well, because the agreement figures
  * only cover the evaluator's live version and a run on an older version
  * still has scores the user can open.
- *
- * A card that stays on screen with nothing in it counts too. Tool call
- * correctness keeps one, so a task made only of tool call items has an
- * overview to show from the day it is created.
  */
 export function hasTaskOverviewData(
   agreement: {
@@ -50,28 +46,20 @@ export function hasTaskOverviewData(
 /**
  * The cards under "Evaluator scores" on the task overview.
  *
- * An evaluator with no score to show normally has no card: it has never run,
- * and an empty card would read as a failure rather than an absence. Tool call
- * correctness is the exception. It is always on the task the reader is
- * looking at, so its card stays on screen and shows nothing until the tool
- * call results are carried across.
+ * An evaluator with no score to show has no card: it has never run, and an
+ * empty card would read as a failure rather than an absence.
  */
 export function taskEvaluatorScoreCards<
   T extends { evaluator_id: string; name: string },
 >(
   evaluators: readonly T[],
   stats: Record<string, EvaluatorResultStat | null>,
-  toolCallEvaluatorIds: ReadonlySet<string>,
-): { evaluatorId: string; name: string; stat: EvaluatorResultStat | null }[] {
+): { evaluatorId: string; name: string; stat: EvaluatorResultStat }[] {
   return evaluators
-    .filter(
-      (ev) =>
-        stats[ev.evaluator_id] != null ||
-        toolCallEvaluatorIds.has(ev.evaluator_id),
-    )
+    .filter((ev) => stats[ev.evaluator_id] != null)
     .map((ev) => ({
       evaluatorId: ev.evaluator_id,
       name: ev.name,
-      stat: stats[ev.evaluator_id] ?? null,
+      stat: stats[ev.evaluator_id]!,
     }));
 }

@@ -123,34 +123,26 @@ describe("taskEvaluatorScoreCards", () => {
   ];
 
   it("leaves out an evaluator that has no score", () => {
-    const cards = taskEvaluatorScoreCards(
-      evaluators,
-      { "ev-1": stat, "ev-2": null },
-      new Set(),
-    );
+    const cards = taskEvaluatorScoreCards(evaluators, {
+      "ev-1": stat,
+      "ev-2": null,
+    });
     expect(cards).toEqual([{ evaluatorId: "ev-1", name: "Correctness", stat }]);
   });
 
-  it("keeps an empty card for tool call correctness", () => {
-    const cards = taskEvaluatorScoreCards(
-      evaluators,
-      { "ev-1": stat },
-      new Set(["tc-1"]),
-    );
-    expect(cards).toEqual([
-      { evaluatorId: "ev-1", name: "Correctness", stat },
-      { evaluatorId: "tc-1", name: "Tool call correctness", stat: null },
-    ]);
+  it("leaves out tool call correctness until it has a score", () => {
+    const cards = taskEvaluatorScoreCards(evaluators, { "ev-1": stat });
+    expect(cards).toEqual([{ evaluatorId: "ev-1", name: "Correctness", stat }]);
   });
 
   it("shows the tool call score once there is one", () => {
-    const cards = taskEvaluatorScoreCards(
-      evaluators,
-      { "tc-1": stat },
-      new Set(["tc-1"]),
-    );
+    const cards = taskEvaluatorScoreCards(evaluators, { "tc-1": stat });
     expect(cards).toEqual([
       { evaluatorId: "tc-1", name: "Tool call correctness", stat },
     ]);
+  });
+
+  it("has no cards when nothing has run", () => {
+    expect(taskEvaluatorScoreCards(evaluators, {})).toEqual([]);
   });
 });
