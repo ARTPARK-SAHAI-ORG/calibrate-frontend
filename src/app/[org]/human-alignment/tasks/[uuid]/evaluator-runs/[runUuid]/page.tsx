@@ -9,6 +9,8 @@ import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
+import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
+import { exceedsEvalLimit } from "@/constants/limits";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
@@ -582,7 +584,20 @@ export default function EvaluatorRunDetailPage() {
                   <Tooltip content="Run again on the same items" position="bottom">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!accessToken) return;
+                        // Evaluators aren't picked yet, so this can only
+                        // check the item count on its own — but that's
+                        // already the run's floor (one evaluator minimum).
+                        const itemCount =
+                          rerunItemIds.length ||
+                          job?.details?.item_count ||
+                          task?.items?.length ||
+                          0;
+                        const maxRows = await getMaxRowsPerEval(accessToken);
+                        if (exceedsEvalLimit(itemCount, maxRows, "items")) {
+                          return;
+                        }
                         setRerunError(null);
                         setRerunOpen(true);
                       }}

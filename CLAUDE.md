@@ -171,7 +171,7 @@ Where it lives today, and what counts as one unit of work:
 - **Model comparisons** — `runBenchmark` in `BenchmarkResultsDialog`, counted as tests times models, since every test is run once per model. Over the limit it hands the reader back to the model picker (`onGoBack`), or closes when there is no picker.
 - **Evaluators over labelling items** — `evaluatorRunLimitMessage` in `src/lib/evaluatorRunLimit.ts`, counted as items times evaluators. Shared by the Run button on a task and Re-run on a finished run; returns the line to show under the button.
 - **Speech evaluations** — `SpeechToTextEvaluation` / `TextToSpeechEvaluation`, counted in rows. The editors already limit rows typed or uploaded; the check before the POST is what catches a saved dataset, which never passed through an editor. Providers do NOT multiply the count here.
-- **Simulations** — `handleLaunch` rechecks `LIMITS.SIMULATION_MAX_PERSONAS` and `LIMITS.SIMULATION_MAX_SCENARIOS`, so a configuration saved before a limit changed cannot launch unchecked.
+- **Simulations** are picker-only: `LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS` are enforced when a persona or scenario is ticked, and launch does not recheck them.
 
 ## Conventions worth knowing
 

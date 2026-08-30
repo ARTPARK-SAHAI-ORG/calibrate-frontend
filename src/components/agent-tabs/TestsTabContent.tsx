@@ -15,6 +15,8 @@ import {
   fetchAllAgentTests,
   unlinkTestsFromAgent,
 } from "@/lib/agentTestsApi";
+import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
+import { exceedsEvalLimit } from "@/constants/limits";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
@@ -1614,7 +1616,14 @@ export function TestsTabContent({
             <div>
               <button
                 data-tour="tests-run-all"
-                onClick={() => {
+                onClick={async () => {
+                  // Check the count the moment the button is clicked, before
+                  // opening the confirm dialog — the count is already known,
+                  // no reason to make the reader confirm a run that can't start.
+                  const maxRows = await getMaxRowsPerEval(backendAccessToken);
+                  if (exceedsEvalLimit(linkedTestsTotal, maxRows, "tests")) {
+                    return;
+                  }
                   setRunAllConfirmOpen(true);
                 }}
                 disabled={startingRun !== null}
@@ -1660,7 +1669,14 @@ export function TestsTabContent({
               isBenchmarkDisabled={
                 isBenchmarkDisabled && !canEnableBenchmarkHere
               }
-              onClick={() => {
+              onClick={async () => {
+                // Comparing against even one model already runs every
+                // linked test once, so the test count alone can rule a
+                // run out before the model picker even opens.
+                const maxRows = await getMaxRowsPerEval(backendAccessToken);
+                if (exceedsEvalLimit(linkedTestsTotal, maxRows, "tests")) {
+                  return;
+                }
                 // No tests named means every test linked to the agent.
                 setBenchmarkTests([]);
                 if (canEnableBenchmarkHere) {
@@ -1869,6 +1885,12 @@ export function TestsTabContent({
                       isBenchmarkDisabled && !canEnableBenchmarkHere
                     }
                     onClick={async () => {
+                      // `selectedTestCount` is already known — check it before
+                      // resolving the selection or opening any dialog.
+                      const maxRows = await getMaxRowsPerEval(backendAccessToken);
+                      if (exceedsEvalLimit(selectedTestCount, maxRows, "tests")) {
+                        return;
+                      }
                       const { tests, allLinked } =
                         await selectedTestsForAction();
                       // No tests named means every test linked to the agent.
@@ -1886,6 +1908,15 @@ export function TestsTabContent({
                   <div>
                     <button
                       onClick={async () => {
+                        // `selectedTestCount` is already known — check it
+                        // before resolving the selection.
+                        const maxRows =
+                          await getMaxRowsPerEval(backendAccessToken);
+                        if (
+                          exceedsEvalLimit(selectedTestCount, maxRows, "tests")
+                        ) {
+                          return;
+                        }
                         const { tests, allLinked } =
                           await selectedTestsForAction();
                         if (!allLinked && tests.length === 0) return;

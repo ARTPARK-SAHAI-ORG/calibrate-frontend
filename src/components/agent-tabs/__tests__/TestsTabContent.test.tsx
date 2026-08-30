@@ -714,11 +714,35 @@ describe("TestsTabContent — paging", () => {
     await user.click(screen.getByRole("button", { name: "Tool Call" }));
     await screen.findAllByText("Weather tool test");
 
-    // One test matches the filter, but Run all runs all 13.
+    // One test matches the filter, but Run all runs all 13 — blocked before
+    // the confirm dialog even opens.
     await user.click(screen.getByText("Run all tests"));
-    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(
+      screen.queryByText("Run every test on this agent"),
+    ).not.toBeInTheDocument();
     expect(runPostCall()).toBeFalsy();
+  });
+
+  it("blocks the bulk Run button before resolving the selection when it exceeds the limit", async () => {
+    getMaxRowsPerEvalMock.mockResolvedValue(1);
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    // Select-all-matching-under-a-filter resolves the selection with a real
+    // fetch — asserting that fetch never fires proves the count was checked
+    // before the selection was resolved, not just before the run POST.
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await screen.findByText("Showing 1–10 of 12 tests");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+    await user.click(screen.getByText("Run"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
   });
 
   it("offers every test once the whole page is ticked, and counts them all", async () => {
@@ -1064,8 +1088,10 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
-    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(
+      screen.queryByText("Run every test on this agent"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect(
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
@@ -1661,6 +1687,33 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await user.click(screen.getByTestId("compare-bulk"));
     await screen.findByTestId("benchmark-dialog");
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
+  });
+
+  it("blocks header Compare models before opening the picker when linked tests exceed the limit", async () => {
+    getMaxRowsPerEvalMock.mockResolvedValue(1);
+    state.agentTests = [responseTest, toolCallTest];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
+  });
+
+  it("blocks bulk Compare models before resolving the selection when it exceeds the limit", async () => {
+    getMaxRowsPerEvalMock.mockResolvedValue(1);
+    state.agentTests = [responseTest, toolCallTest];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const rowCheckboxes = screen.getAllByTitle("Select test");
+    await user.click(rowCheckboxes[0]);
+    await user.click(rowCheckboxes[1]);
+    await user.click(screen.getByTestId("compare-bulk"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
   });
 
   it("tells the parent when the run window is closed", async () => {
