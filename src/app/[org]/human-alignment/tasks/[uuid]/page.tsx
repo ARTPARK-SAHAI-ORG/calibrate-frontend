@@ -2102,6 +2102,10 @@ function LabellingTaskPageInner() {
     selections: { evaluator_id: string; evaluator_version_id: string }[],
   ) => {
     if (!accessToken || !uuid || startingRun) return;
+    // Set before the limit check's own network round trip, not after — a
+    // second click landing during that await would otherwise still see
+    // `startingRun` as false and start a second run.
+    setStartingRun(true);
     const ids = runDialogItemUuids;
     const selectAll = runDialogSelectAll;
     // "Select all" covers every item the current search matches.
@@ -2113,9 +2117,9 @@ function LabellingTaskPageInner() {
     );
     if (overLimit) {
       setRunDialogSubmitError(overLimit);
+      setStartingRun(false);
       return;
     }
-    setStartingRun(true);
     setRunDialogSubmitError(null);
     try {
       const body: Record<string, unknown> = { evaluators: selections };
