@@ -711,13 +711,33 @@ export function buildItemsFromSource(
       if (source.agentNature === "general") {
         for (const t of source.traces) {
           const input = typeof t.input === "string" ? t.input : "";
-          const output = t.output?.response ?? "";
-          if (!input.trim() || !output.trim()) {
+          if (!input.trim() || !isLabellableTrace(t)) {
             skippedCount += 1;
             continue;
           }
+          // A trace that only called a tool becomes a tool-call item here too,
+          // holding the call beside the input that produced it. There is no
+          // expected call to compare against, so a person judges it on its own.
+          if (isToolCallTrace(t)) {
+            items.push(
+              buildToolCallItem({
+                test_case: {
+                  name: t.name,
+                  input,
+                  evaluation: { type: "tool_call", tool_calls: [] },
+                },
+                output: t.output as { tool_calls?: ToolCallOutput[] },
+              }),
+            );
+            continue;
+          }
           items.push({
-            payload: { name: t.name, input, output, evaluator_variables: {} },
+            payload: {
+              name: t.name,
+              input,
+              output: t.output?.response ?? "",
+              evaluator_variables: {},
+            },
           });
         }
         for (const ev of source.evaluators ?? []) {

@@ -672,6 +672,75 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.skippedCount).toBe(2);
   });
 
+  it("builds a general trace that only called a tool as a tool-call item", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        {
+          name: "Books an appointment",
+          input: "book me in",
+          output: {
+            response: "",
+            tool_calls: [
+              { tool: "book_appointment", arguments: { day: "Monday" } },
+            ],
+          },
+        },
+      ],
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    expect(isToolCallTrace(source.traces[0])).toBe(true);
+    expect(targetTaskTypeForSource(source)).toBe("llm-general");
+    const result = buildItemsFromSource(source);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(0);
+    const p = result.items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Books an appointment");
+    // A single agent response agent has no conversation, so the one input it
+    // was given sits beside the call it made.
+    expect(p.input).toBe("book me in");
+    expect(p.chat_history).toBeUndefined();
+    expect(p.actual_tool_calls).toEqual([
+      { tool: "book_appointment", arguments: { day: "Monday" } },
+    ]);
+    // A trace has no expected calls to compare against.
+    expect(p.expected_tool_calls).toEqual([]);
+  });
+
+  it("builds general reply traces and tool-call traces into the same task", () => {
+    const result = buildItemsFromSource({
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        {
+          name: "Replied",
+          input: "when is the next vaccination?",
+          output: { response: "At 14 weeks." },
+        },
+        {
+          name: "Only tool call",
+          input: "book me in",
+          output: {
+            response: "",
+            tool_calls: [{ tool: "book", arguments: {} }],
+          },
+        },
+      ],
+    });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
+    expect(result.items[0].payload.output).toBe("At 14 weeks.");
+    expect(result.items[0].payload.actual_tool_calls).toBeUndefined();
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: {} },
+    ]);
+  });
+
   it("appends output tool calls to chat_history for a trace that also replied", () => {
     // A trace WITH a text reply is a response item; the call rides along in
     // the conversation, because the reply is what gets labelled.
