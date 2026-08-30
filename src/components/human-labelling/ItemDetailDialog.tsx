@@ -551,7 +551,7 @@ export function ItemDetailDialog({
               its controls are absent, so paging does not move the title and
               the previous/next arrows up and down. */}
           <div className="min-h-11 flex items-center gap-2 shrink-0">
-            {loading && summary && (
+            {loading && (
               <svg
                 className="w-4 h-4 animate-spin text-muted-foreground"
                 fill="none"
