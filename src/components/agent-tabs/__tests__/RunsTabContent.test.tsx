@@ -303,6 +303,20 @@ describe("RunsTabContent", () => {
     expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
   });
 
+  it("says a run was stopped, alongside what it managed to do", async () => {
+    state.runs = [{ ...unitRun, aborted: true }];
+    renderTab();
+    expect((await screen.findAllByText("Stopped")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 Success").length).toBeGreaterThan(0);
+  });
+
+  it("says a stopped model comparison was stopped rather than complete", async () => {
+    state.runs = [{ ...benchmarkRun, aborted: true }];
+    renderTab();
+    expect((await screen.findAllByText("Stopped")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+  });
+
   it("shows Running while a run has not finished", async () => {
     state.runs = [{ ...unitRun, status: "in_progress" }];
     renderTab();

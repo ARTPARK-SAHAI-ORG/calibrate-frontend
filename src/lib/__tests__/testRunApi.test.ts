@@ -1,6 +1,8 @@
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import {
+  abortRun,
+  abortRunOrNotify,
   startTestRun,
   startTestRunOrNotify,
   fetchTestRun,
@@ -167,6 +169,90 @@ describe("testRunApi", () => {
       await expect(
         fetchTestRun(BACKEND_URL, TOKEN, "task-1"),
       ).rejects.not.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe("abortRun", () => {
+    it("posts to the run's own abort path", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-1", status: "done", aborted: true }),
+      );
+
+      const run = await abortRun(BACKEND_URL, TOKEN, "task-1", "run");
+
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe(`${BACKEND_URL}/agent-tests/run/task-1/abort`);
+      expect(init.method).toBe("POST");
+      expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+      expect(run.aborted).toBe(true);
+    });
+
+    it("posts to the benchmark path for a model comparison", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-2", status: "done", aborted: true }),
+      );
+
+      await abortRun(BACKEND_URL, TOKEN, "task-2", "benchmark");
+
+      const [url] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe(`${BACKEND_URL}/agent-tests/benchmark/task-2/abort`);
+    });
+
+    it("throws UnauthorizedError on a 401", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+      await expect(
+        abortRun(BACKEND_URL, TOKEN, "task-1", "run"),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+
+    it("throws a plain Error on other non-ok responses", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 500),
+      );
+      await expect(
+        abortRun(BACKEND_URL, TOKEN, "task-1", "run"),
+      ).rejects.toThrow("Failed to stop the run");
+    });
+  });
+
+  describe("abortRunOrNotify", () => {
+    it("returns the stopped run", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-1", status: "done", aborted: true }),
+      );
+
+      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
+
+      expect(run?.aborted).toBe(true);
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("signs the user out on a 401 and returns null", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+
+      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
+
+      expect(run).toBeNull();
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("shows one message and returns null on any other failure", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 500),
+      );
+
+      const run = await abortRunOrNotify(BACKEND_URL, TOKEN, "task-1", "run");
+
+      expect(run).toBeNull();
+      expect(signOut).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not stop the run. Please try again.",
+      );
     });
   });
 

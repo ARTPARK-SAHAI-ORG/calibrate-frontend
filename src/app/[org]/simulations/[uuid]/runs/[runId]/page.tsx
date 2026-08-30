@@ -6,7 +6,12 @@ import { useParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
-import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
+import {
+  Breadcrumbs,
+  NotFoundState,
+  StopRunButton,
+  type Crumb,
+} from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
@@ -79,7 +84,6 @@ export default function SimulationRunPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { errorCode, captureResponse } = usePageErrorState();
-  const [isAborting, setIsAborting] = useState(false);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
 
@@ -432,10 +436,9 @@ export default function SimulationRunPage() {
   };
 
   const abortSimulation = async () => {
-    if (!backendAccessToken || isAborting) return;
+    if (!backendAccessToken) return;
 
     try {
-      setIsAborting(true);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
 
@@ -464,8 +467,6 @@ export default function SimulationRunPage() {
       setRunData(data);
     } catch (err) {
       reportError("Error aborting simulation:", err);
-    } finally {
-      setIsAborting(false);
     }
   };
 
@@ -602,48 +603,7 @@ export default function SimulationRunPage() {
               )}
               {(runData.status.toLowerCase() === "in_progress" ||
                 runData.status.toLowerCase() === "queued") && (
-                <button
-                  onClick={abortSimulation}
-                  disabled={isAborting}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAborting ? (
-                    <svg
-                      className="w-3 h-3 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"
-                      />
-                    </svg>
-                  )}
-                  {isAborting ? "Stopping..." : "Stop"}
-                </button>
+                <StopRunButton onStop={abortSimulation} />
               )}
             </div>
 

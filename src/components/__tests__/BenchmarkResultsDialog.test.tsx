@@ -99,6 +99,9 @@ jest.mock("../ui", () => ({
       {props.tooltip ?? "Rerun"}
     </button>
   ),
+  StopRunButton: (props: any) => (
+    <button onClick={() => props.onStop()}>Stop</button>
+  ),
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -525,6 +528,96 @@ describe("BenchmarkResultsDialog", () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(
       callsBeforeClose,
     );
+  });
+
+  describe("stopping a model comparison", () => {
+    it("stops the run, then shows it as stopped", async () => {
+      let stopped = false;
+      (global.fetch as jest.Mock).mockImplementation(
+        (url: string, init?: any) => {
+          if (url.endsWith("/agent-tests/benchmark/task-stop/abort")) {
+            expect(init?.method).toBe("POST");
+            stopped = true;
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-stop",
+                status: "done",
+                aborted: true,
+                model_results: [],
+              }),
+            );
+          }
+          if (url.endsWith("/agent-tests/benchmark/task-stop")) {
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-stop",
+                status: stopped ? "done" : "in_progress",
+                aborted: stopped || undefined,
+                model_results: [],
+              }),
+            );
+          }
+          return Promise.reject(new Error(`Unexpected fetch ${url}`));
+        },
+      );
+
+      const user = setupUser();
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          taskId="task-stop"
+        />,
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Stop" }));
+
+      await waitFor(() =>
+        expect(
+          (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+            String(url).endsWith("/agent-tests/benchmark/task-stop/abort"),
+          ),
+        ).toBe(true),
+      );
+
+      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Stop" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("has no Stop once the run has finished", async () => {
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.endsWith("/agent-tests/benchmark/task-done")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-done",
+              status: "done",
+              model_results: [],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          taskId="task-done"
+        />,
+      );
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Stop" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Stopped")).not.toBeInTheDocument();
+    });
   });
 
   it("does not re-POST a new benchmark when the access token refreshes mid-run", async () => {

@@ -50,6 +50,9 @@ export type TestRunStatusResponse = {
   unanswered_tests?: number;
   /** True when the run gave up before it started every test. */
   stopped_early?: boolean;
+  /** True when someone stopped the run before it finished. The tests already
+   * answered are kept; the rest were never started. */
+  aborted?: boolean;
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block. Each entry pins the version the
    * run executed against and carries name, description, output_config,
@@ -156,6 +159,58 @@ export async function fetchTestRun(
   if (!response.ok) throw new Error("Failed to fetch test run");
 
   return response.json();
+}
+
+/**
+ * Stop a run that is still going, and return its state as the backend left it.
+ *
+ * `kind` picks the run: `"run"` for a plain test run, `"benchmark"` for one
+ * that tried the tests against several models. Both come back in the same
+ * shape their own GET returns, already carrying `aborted: true`, so the caller
+ * can show the stopped run without waiting for the next poll.
+ */
+export async function abortRun(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  kind: "run" | "benchmark",
+): Promise<TestRunStatusResponse> {
+  const response = await fetch(
+    `${backendUrl}/agent-tests/${kind}/${taskId}/abort`,
+    {
+      method: "POST",
+      headers: getDefaultHeaders(accessToken),
+    },
+  );
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to stop the run");
+
+  return response.json();
+}
+
+/**
+ * `abortRun` plus the failure handling every caller needs: sign out on a 401,
+ * otherwise report the error and show one toast. Returns the stopped run, or
+ * null when it could not be stopped.
+ */
+export async function abortRunOrNotify(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  kind: "run" | "benchmark",
+): Promise<TestRunStatusResponse | null> {
+  try {
+    return await abortRun(backendUrl, accessToken, taskId, kind);
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      await signOut({ callbackUrl: "/login" });
+      return null;
+    }
+    reportError("Error stopping test run:", error);
+    toast.error("Could not stop the run. Please try again.");
+    return null;
+  }
 }
 
 /** Whether a run status means the backend is finished with it. */

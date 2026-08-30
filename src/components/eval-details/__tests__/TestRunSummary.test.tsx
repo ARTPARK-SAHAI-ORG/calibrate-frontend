@@ -415,6 +415,25 @@ describe("tests that could not be run", () => {
     ).toBeInTheDocument();
   });
 
+  it("says when someone stopped the run", () => {
+    render(<TestRunSummary passed={4} total={5} stopped />);
+    expect(
+      screen.getByText(/This run was stopped before it finished\./),
+    ).toBeInTheDocument();
+  });
+
+  it("says a stopped run was stopped, not that it gave up on its own", () => {
+    // A stopped run also reports that it never started every test. Saying
+    // both reads as two separate things having gone wrong.
+    render(<TestRunSummary passed={4} total={5} stopped stoppedEarly />);
+    expect(
+      screen.getByText(/This run was stopped before it finished\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/The run stopped before it started every test\./),
+    ).not.toBeInTheDocument();
+  });
+
   it("says none could be run rather than counting them all", () => {
     // 14 of 14 read as a sum the reader has to do; say it plainly instead,
     // and keep the stopped-early clause in the same sentence.

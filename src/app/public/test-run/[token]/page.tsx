@@ -60,6 +60,8 @@ type TestRunStatusResponse = {
   unanswered_tests?: number;
   /** True when the run gave up before it started every test. */
   stopped_early?: boolean;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
@@ -211,6 +213,7 @@ export default function PublicTestRunPage() {
             total={passed + failed}
             unanswered={data.unanswered_tests ?? 0}
             stoppedEarly={data.stopped_early === true}
+            stopped={data.aborted === true}
             onReviewUnanswered={() => setActiveTab("outputs")}
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}

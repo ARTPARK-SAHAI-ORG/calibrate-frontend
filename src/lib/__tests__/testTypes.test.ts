@@ -5,6 +5,7 @@ import {
   getRunBreakdown,
   modelComparisonName,
   runDisplayName,
+  isRunStopped,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -118,5 +119,21 @@ describe("runDisplayName", () => {
   it("names a run the backend has not named yet", () => {
     expect(runDisplayName("llm-unit-test", "")).toBe("Evaluation run");
     expect(runDisplayName("llm-benchmark", null)).toBe("Model comparison");
+  });
+});
+
+describe("isRunStopped", () => {
+  it("is true only when the backend says the run was stopped", () => {
+    expect(isRunStopped({ status: "done", aborted: true })).toBe(true);
+  });
+
+  it("is false for a run that finished on its own", () => {
+    expect(isRunStopped({ status: "done" })).toBe(false);
+    expect(isRunStopped({ status: "done", aborted: false })).toBe(false);
+    expect(isRunStopped({ status: "done", aborted: null })).toBe(false);
+  });
+
+  it("does not read a failed run as a stopped one", () => {
+    expect(isRunStopped({ status: "failed" })).toBe(false);
   });
 });

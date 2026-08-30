@@ -31,6 +31,8 @@ type TestRunSummaryProps = {
   unanswered?: number;
   /** True when the run gave up before it started every test. */
   stoppedEarly?: boolean;
+  /** True when someone stopped the run before it finished. */
+  stopped?: boolean;
   /** Opens the tab listing every test, so the ones that could not be run can
    * be read. Without it the note names the tab but does not link to it. */
   onReviewUnanswered?: () => void;
@@ -199,6 +201,7 @@ export function TestRunSummary({
   total,
   unanswered = 0,
   stoppedEarly = false,
+  stopped = false,
   onReviewUnanswered,
   latency,
   cost,
@@ -243,7 +246,7 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        {(unanswered > 0 || stoppedEarly) && (
+        {(unanswered > 0 || stoppedEarly || stopped) && (
           <div className="mb-4 flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
             <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <p>
@@ -251,7 +254,10 @@ export function TestRunSummary({
                 (total === 0
                   ? "None of the tests could be run. "
                   : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
-              {stoppedEarly && "The run stopped before it started every test. "}
+              {stopped && "This run was stopped before it finished. "}
+              {stoppedEarly &&
+                !stopped &&
+                "The run stopped before it started every test. "}
               {unanswered > 0 && (
                 <>
                   Review the tests that could not be run in the{" "}

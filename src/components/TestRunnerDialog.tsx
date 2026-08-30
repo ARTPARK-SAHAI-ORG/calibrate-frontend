@@ -1,6 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
-import { isUnanswered } from "@/lib/testTypes";
+import { isRunStopped, isUnanswered } from "@/lib/testTypes";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RerunIconButton, ResultTabs } from "@/components/ui";
+import { RerunIconButton, ResultTabs, StopRunButton } from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -37,6 +37,7 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
+  abortRunOrNotify,
   startTestRunOrNotify,
   fetchTestRun,
   isTerminalRunStatus,
@@ -282,6 +283,9 @@ export function TestRunnerDialog({
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
   const stoppedEarly = run?.stopped_early === true;
+  // Someone stopped this run before it finished. The tests already answered
+  // are kept; the rest were never started.
+  const wasStopped = run ? isRunStopped(run) : false;
   // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
   // the test case's evaluation type.
   const toolCall = toolCallPassFail(
@@ -321,6 +325,24 @@ export function TestRunnerDialog({
       ),
     [rows, evaluatorsByUuid],
   );
+
+  // Stop a run that is still going. The backend hands back the run as it left
+  // it, so the window shows the stopped state at once instead of waiting for
+  // the next poll (which then sees a finished run and stops polling).
+  const stopRun = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) {
+      toast.error("Cannot stop the run: the backend URL is not configured.");
+      return;
+    }
+    const stopped = await abortRunOrNotify(
+      backendUrl,
+      backendAccessToken,
+      taskId,
+      "run",
+    );
+    if (stopped) setRun(stopped);
+  };
 
   // Start a fresh run of the same tests and hand it to the parent, which
   // re-points `taskId` so this dialog loads it.
@@ -383,6 +405,9 @@ export function TestRunnerDialog({
                       className="shrink-0"
                     />
                   )}
+                {!isFinished && !isLoading && (
+                  <StopRunButton onStop={stopRun} className="shrink-0" />
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {agentName}
@@ -527,6 +552,7 @@ export function TestRunnerDialog({
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
                   stoppedEarly={stoppedEarly}
+                  stopped={wasStopped}
                   onReviewUnanswered={() => setActiveTab("outputs")}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}

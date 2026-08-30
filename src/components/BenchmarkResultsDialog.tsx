@@ -21,9 +21,15 @@ import {
   type BenchmarkModelResult,
 } from "./eval-details";
 import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
-import { StatusBadge, RerunIconButton, ResultTabs } from "@/components/ui";
+import {
+  StatusBadge,
+  RerunIconButton,
+  ResultTabs,
+  StopRunButton,
+} from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { modelComparisonName } from "@/lib/testTypes";
+import { abortRunOrNotify } from "@/lib/testRunApi";
+import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -60,6 +66,8 @@ type BenchmarkStatusResponse = {
   error?: string;
   is_public?: boolean;
   share_token?: string | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
 };
 
 type BenchmarkResultsDialogProps = {
@@ -141,6 +149,9 @@ export function BenchmarkResultsDialog({
   // The test uuids this benchmark executed, from the status response. Drives
   // the rerun subset; empty on legacy benchmarks that predate the snapshot.
   const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
+  // Someone stopped this run before it finished. The results already collected
+  // are kept; the models and tests not reached were never run.
+  const [wasStopped, setWasStopped] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const {
     selected: labellingSelectedKeys,
@@ -333,6 +344,24 @@ export function BenchmarkResultsDialog({
     });
   }, [isOpen, models, modelResults]);
 
+  // Stop a run that is still going, then read it back so the window shows the
+  // stopped state at once. The poll that follows sees a finished run and stops
+  // polling on its own.
+  const stopBenchmark = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!currentTaskId || !backendUrl) {
+      toast.error("Cannot stop the run: the backend URL is not configured.");
+      return;
+    }
+    const stopped = await abortRunOrNotify(
+      backendUrl,
+      backendAccessToken,
+      currentTaskId,
+      "benchmark",
+    );
+    if (stopped) await pollBenchmarkStatus(currentTaskId, backendUrl);
+  };
+
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
     try {
       const response = await fetch(
@@ -351,6 +380,7 @@ export function BenchmarkResultsDialog({
 
       // Update task status for display
       setTaskStatus(result.status);
+      setWasStopped(isRunStopped(result));
 
       // Capture name and share state from backend
       if (result.name) setRunName(result.name);
@@ -623,6 +653,14 @@ export function BenchmarkResultsDialog({
               )}
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
+              )}
+              {!isDone && !isInitialLoading && currentTaskId && (
+                <StopRunButton onStop={stopBenchmark} className="shrink-0" />
+              )}
+              {isDone && wasStopped && (
+                <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                  Stopped
+                </span>
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">

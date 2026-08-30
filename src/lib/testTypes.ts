@@ -136,7 +136,20 @@ export function getRunBreakdown(
 export type RunStatusLike = {
   status: string;
   failed?: number | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean | null;
 };
+
+/**
+ * Was this run stopped by someone before it finished?
+ *
+ * The backend says so outright. This is the one rule: the runs list, the run
+ * window and the model comparison window all use it, so no two screens can
+ * disagree about whether a run was stopped or simply ended.
+ */
+export function isRunStopped(run: RunStatusLike): boolean {
+  return run.aborted === true;
+}
 
 /** The run has not finished yet. */
 export function isRunInProgress(run: RunStatusLike): boolean {

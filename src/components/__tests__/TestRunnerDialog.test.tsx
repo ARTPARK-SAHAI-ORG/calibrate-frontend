@@ -43,6 +43,7 @@ jest.mock("../eval-details", () => ({
     total,
     unanswered,
     stoppedEarly,
+    stopped,
     onReviewUnanswered,
   }: any) => (
     <div data-testid="summary-panel">
@@ -50,6 +51,7 @@ jest.mock("../eval-details", () => ({
       <span data-testid="summary-gaps">
         {JSON.stringify({ unanswered, stoppedEarly })}
       </span>
+      <span data-testid="summary-stopped">{String(stopped === true)}</span>
       <button onClick={onReviewUnanswered}>review-unanswered</button>
     </div>
   ),
@@ -1329,5 +1331,109 @@ describe("tests that produced no answer", () => {
     await screen.findByRole("button", { name: "Results" });
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByTestId("unanswered-t-3")).toHaveTextContent("true");
+  });
+
+  describe("stopping a run", () => {
+    /** A run still going, then the same run once it has been stopped. */
+    function mockRunThenStop() {
+      let stopped = false;
+      (global.fetch as jest.Mock).mockImplementation(
+        (url: string, init?: any) => {
+          if (url.includes("/evaluators?include_defaults=true")) {
+            return Promise.resolve(jsonResponse([]));
+          }
+          if (url.endsWith("/agent-tests/run/task-stop/abort")) {
+            expect(init?.method).toBe("POST");
+            stopped = true;
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-stop",
+                status: "done",
+                aborted: true,
+                total_tests: 2,
+                passed: 1,
+                results: [
+                  { test_case_id: "t-1", name: "Test One", passed: true },
+                ],
+              }),
+            );
+          }
+          if (url.endsWith("/agent-tests/run/task-stop")) {
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-stop",
+                status: stopped ? "done" : "in_progress",
+                aborted: stopped || undefined,
+                results: [
+                  { test_case_id: "t-1", name: "Test One", passed: true },
+                  { test_case_id: "t-2", name: "Test Two", passed: null },
+                ],
+              }),
+            );
+          }
+          return Promise.reject(new Error(`Unexpected fetch ${url}`));
+        },
+      );
+    }
+
+    function renderDialog() {
+      return render(
+        <TestRunnerDialog
+          isOpen
+          onClose={jest.fn()}
+          agentUuid="agent-1"
+          agentName="My Agent"
+          taskId="task-stop"
+        />,
+      );
+    }
+
+    it("offers Stop only while the run is still going", async () => {
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes("/evaluators?include_defaults=true")) {
+          return Promise.resolve(jsonResponse([]));
+        }
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-stop",
+            status: "done",
+            results: [{ test_case_id: "t-1", name: "Test One", passed: true }],
+          }),
+        );
+      });
+
+      renderDialog();
+
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("button", { name: "Stop" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("stops the run and says so in the summary", async () => {
+      mockRunThenStop();
+      const user = setupUser();
+      renderDialog();
+
+      const stopButton = await screen.findByRole("button", { name: "Stop" });
+      await user.click(stopButton);
+
+      await waitFor(() =>
+        expect(
+          (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+            String(url).endsWith("/agent-tests/run/task-stop/abort"),
+          ),
+        ).toBe(true),
+      );
+
+      // The run is finished now, so the tabs are there to read it.
+      await user.click(await screen.findByRole("button", { name: "Summary" }));
+      expect(screen.getByTestId("summary-stopped")).toHaveTextContent("true");
+      expect(
+        screen.queryByRole("button", { name: "Stop" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

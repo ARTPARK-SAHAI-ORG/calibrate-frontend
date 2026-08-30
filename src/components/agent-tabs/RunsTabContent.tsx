@@ -15,6 +15,7 @@ import {
   getRunBreakdown,
   isRunErrored,
   isRunInProgress,
+  isRunStopped,
   runDisplayName,
 } from "@/lib/testTypes";
 import { ServerPaginatedListBar } from "@/components/ui";
@@ -110,6 +111,16 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
+  // A run someone stopped says so first: the tally that follows covers only
+  // the tests it reached, so on its own it would read as the whole run.
+  const stoppedPill = isRunStopped(run) ? (
+    <span
+      className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+    >
+      Stopped
+    </span>
+  ) : null;
+
   // A run where some tests produced no answer reads better as
   // "N Success / N Fail / N Not run" than as a single blanket Error, so prefer
   // the tally when the run reports one.
@@ -117,6 +128,7 @@ function RunResult({ run }: { run: AgentRun }) {
     run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
 
   if (!breakdown) {
+    if (stoppedPill) return stoppedPill;
     return isRunErrored(run) ? (
       <span
         className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
@@ -134,6 +146,7 @@ function RunResult({ run }: { run: AgentRun }) {
 
   return (
     <>
+      {stoppedPill}
       {breakdown.passed > 0 && (
         <span
           className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
