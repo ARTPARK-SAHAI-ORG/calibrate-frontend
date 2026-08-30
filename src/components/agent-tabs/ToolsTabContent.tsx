@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { AddToolDialog } from "./AddToolDialog";
+import { AddToolDialog as EditToolDialog } from "@/components/AddToolDialog";
 import { DeleteToolDialog } from "./DeleteToolDialog";
 import { InbuiltToolsPanel } from "./InbuiltToolsPanel";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
@@ -47,6 +48,15 @@ export function ToolsTabContent({
   const [addToolDialogOpen, setAddToolDialogOpen] = useState(false);
   const [deleteToolDialogOpen, setDeleteToolDialogOpen] = useState(false);
   const [toolToDelete, setToolToDelete] = useState<ToolData | null>(null);
+  const [editToolUuid, setEditToolUuid] = useState<string | null>(null);
+  const [editToolType, setEditToolType] = useState<
+    "webhook" | "structured_output"
+  >("structured_output");
+
+  const openEditTool = (tool: ToolData) => {
+    setEditToolUuid(tool.uuid);
+    setEditToolType(tool.config?.type === "webhook" ? "webhook" : "structured_output");
+  };
 
   const filteredTools = agentTools.filter(
     (tool) =>
@@ -176,12 +186,16 @@ export function ToolsTabContent({
                   : "No tools have been added to this agent yet"}
               </p>
               <div className="flex items-center gap-2 md:gap-3">
-                <button
-                  onClick={() => setAddToolDialogOpen(true)}
-                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Add tool
-                </button>
+                {/* Nothing in the workspace to pick from yet, so offering
+                    "Add tool" would only open a picker with nothing in it. */}
+                {allTools.length > 0 && (
+                  <button
+                    onClick={() => setAddToolDialogOpen(true)}
+                    className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Add tool
+                  </button>
+                )}
                 <button
                   onClick={() => setCreateToolOpen(true)}
                   className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
@@ -198,7 +212,7 @@ export function ToolsTabContent({
               {/* Desktop Table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-[1fr_120px_2fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[1fr_150px_1.5fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
                   </div>
@@ -214,7 +228,8 @@ export function ToolsTabContent({
                 {filteredTools.map((tool) => (
                   <div
                     key={tool.uuid}
-                    className="grid grid-cols-[1fr_120px_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                    onClick={() => openEditTool(tool)}
+                    className="grid grid-cols-[1fr_150px_1.5fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     {/* Name Column */}
                     <div className="flex items-center">
@@ -232,14 +247,21 @@ export function ToolsTabContent({
                     </div>
                     {/* Description Column */}
                     <div className="flex items-center">
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {tool.description || tool.config?.description || "—"}
-                      </p>
+                      {tool.description || tool.config?.description ? (
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {tool.description || tool.config?.description}
+                        </p>
+                      ) : (
+                        <span className="text-sm text-muted-foreground/70">
+                          No description
+                        </span>
+                      )}
                     </div>
                     {/* Delete Button */}
                     <div className="flex items-center">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setToolToDelete(tool);
                           setDeleteToolDialogOpen(true);
                         }}
@@ -269,7 +291,8 @@ export function ToolsTabContent({
                 {filteredTools.map((tool) => (
                   <div
                     key={tool.uuid}
-                    className="border border-border rounded-xl p-4 bg-background"
+                    onClick={() => openEditTool(tool)}
+                    className="border border-border rounded-xl p-4 bg-background cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -288,7 +311,8 @@ export function ToolsTabContent({
                         )}
                       </div>
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setToolToDelete(tool);
                           setDeleteToolDialogOpen(true);
                         }}
@@ -350,6 +374,24 @@ export function ToolsTabContent({
           } catch (err) {
             reportError("Error adding the new tool to the agent", err);
           }
+        }}
+      />
+
+      {/* Editing a tool clicked from the list. Same builder the workspace
+          Tools page uses; the update lands in the workspace, so reflect it
+          back onto this agent's own copy of the tool by uuid. */}
+      <EditToolDialog
+        isOpen={editToolUuid !== null}
+        onClose={() => setEditToolUuid(null)}
+        toolType={editToolType}
+        editingToolUuid={editToolUuid}
+        backendAccessToken={accessToken ?? undefined}
+        onToolsUpdated={(updatedTools) => {
+          const updated = updatedTools.find((t) => t.uuid === editToolUuid);
+          if (!updated) return;
+          setAgentTools((prev) =>
+            prev.map((t) => (t.uuid === updated.uuid ? updated : t)),
+          );
         }}
       />
 

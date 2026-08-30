@@ -131,14 +131,15 @@ describe("AppLayout", () => {
     expect(personasLink).toHaveAttribute("href", "/personas");
   });
 
-  it("links both Evaluators entries to their own page", () => {
+  it("links the one remaining Evaluators entry to the Scenarios one", () => {
     renderLayout();
-    // One under Agents (judges for an agent's replies), one under Scenarios
-    // (judges for simulated conversations), in sidebar order.
+    // The one under Agents (judges for an agent's replies) was removed from
+    // the sidebar; the page itself is still reachable by address. Only the
+    // one under Scenarios (judges for simulated conversations) is left.
     const hrefs = screen
       .getAllByText("Evaluators")
       .map((label) => label.closest("a")?.getAttribute("href"));
-    expect(hrefs).toEqual(["/agent-evaluators", "/simulation-evaluators"]);
+    expect(hrefs).toEqual(["/simulation-evaluators"]);
   });
 
   it("opens the learning resources page from Tutorials", () => {

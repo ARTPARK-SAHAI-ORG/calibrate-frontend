@@ -132,6 +132,29 @@ describe("EvaluatorPromptPreview", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("offers Delete when onDelete is passed and the evaluator is not locked", async () => {
+    const user = setupUser();
+    const onDelete = jest.fn();
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" onDelete={onDelete} />);
+    await screen.findByText("Judge whether the reply is concise.");
+
+    await user.click(screen.getByTitle("Delete evaluator"));
+    expect(onDelete).toHaveBeenCalledWith("e1");
+  });
+
+  it("hides Delete on a locked evaluator, even with onDelete passed", async () => {
+    mockFetch.mockResolvedValue({ ...DETAIL, is_protected: true });
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" onDelete={jest.fn()} />);
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(screen.queryByTitle("Delete evaluator")).not.toBeInTheDocument();
+  });
+
+  it("hides Delete when onDelete is not passed", async () => {
+    render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
+    await screen.findByText("Judge whether the reply is concise.");
+    expect(screen.queryByTitle("Delete evaluator")).not.toBeInTheDocument();
+  });
+
   it("asks for each evaluator once, even when the reader comes back to it", async () => {
     const other = {
       ...DETAIL,

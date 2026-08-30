@@ -47,9 +47,11 @@ describe("ToolLibraryPicker", () => {
 
   it("lists each tool's name, type and description", () => {
     renderPicker();
-    expect(screen.getByText("Weather lookup")).toBeInTheDocument();
-    expect(screen.getByText("Gets the weather")).toBeInTheDocument();
-    expect(screen.getByText("Structured Output")).toBeInTheDocument();
+    // The first tool (Weather lookup) also previews by default, so its name
+    // and description show twice — once in the row, once in the preview.
+    expect(screen.getAllByText("Weather lookup").length).toBe(2);
+    expect(screen.getAllByText("Gets the weather").length).toBe(2);
+    expect(screen.getAllByText("Structured Output").length).toBe(2);
     expect(screen.getByText("Book flight")).toBeInTheDocument();
     expect(screen.getByText("Books a flight")).toBeInTheDocument();
     expect(screen.getByText("Webhook")).toBeInTheDocument();
@@ -60,8 +62,12 @@ describe("ToolLibraryPicker", () => {
     renderPicker();
 
     await user.type(screen.getByPlaceholderText("Search tools"), "weather");
-    expect(screen.getByText("Weather lookup")).toBeInTheDocument();
-    expect(screen.queryByText("Book flight")).not.toBeInTheDocument();
+    // Row presence, not text presence — Weather lookup's name legitimately
+    // still shows in the preview column too, since it stays previewed.
+    expect(screen.getByLabelText("Select Weather lookup")).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Select Book flight"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a no-match message and no results when search matches nothing", async () => {
@@ -70,7 +76,9 @@ describe("ToolLibraryPicker", () => {
 
     await user.type(screen.getByPlaceholderText("Search tools"), "zzzznotool");
     expect(screen.getByText("No tools match your search")).toBeInTheDocument();
-    expect(screen.queryByText("Weather lookup")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Select Weather lookup"),
+    ).not.toBeInTheDocument();
   });
 
   it("calls onToggle from the checkbox, not from clicking the name", async () => {
@@ -81,24 +89,26 @@ describe("ToolLibraryPicker", () => {
     expect(onToggle).toHaveBeenCalledWith("tool-a");
 
     onToggle.mockClear();
-    await user.click(screen.getByText("Weather lookup"));
+    // Weather lookup is already previewed by default; click Book flight's
+    // row instead so this exercises a real name click, not a no-op re-click.
+    await user.click(screen.getByText("Book flight"));
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it("shows a placeholder in the preview column until a tool is clicked", async () => {
+  it("previews the first tool by default, without selecting its checkbox, and switches on click", async () => {
     const user = setupUser();
     renderPicker();
 
-    expect(
-      screen.getByText("Select a tool to see its details"),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByText("Weather lookup"));
+    // Name shows once in the row and again in the preview heading.
+    expect(screen.getAllByText("Weather lookup").length).toBe(2);
     expect(
       screen.queryByText("Select a tool to see its details"),
     ).not.toBeInTheDocument();
-    // Name shows once in the row and again in the preview heading.
-    expect(screen.getAllByText("Weather lookup").length).toBe(2);
+    expect(screen.getByLabelText("Select Weather lookup")).not.toBeChecked();
+
+    await user.click(screen.getByText("Book flight"));
+    expect(screen.getAllByText("Book flight").length).toBe(2);
+    expect(screen.getByLabelText("Select Book flight")).not.toBeChecked();
   });
 
   it("checkbox reflects selectedIds", () => {

@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { useAccessToken } from "@/hooks";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { deleteEvaluator } from "@/lib/evaluatorApi";
+import { reportError } from "@/lib/reportError";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 type AddEvaluatorsDialogProps = {
@@ -21,6 +25,11 @@ type AddEvaluatorsDialogProps = {
    * to add. The dialog closes itself first; the parent opens its create flow.
    */
   onCreateEvaluator?: () => void;
+  /**
+   * Called after a permanent delete from the preview panel succeeds, so the
+   * parent can drop it from its own evaluators list too.
+   */
+  onEvaluatorDeleted?: (evaluatorUuid: string) => void;
 };
 
 export function AddEvaluatorsDialog({
@@ -31,13 +40,18 @@ export function AddEvaluatorsDialog({
   description = "Choose evaluators from your library to add to this agent",
   allowConversationType = false,
   onCreateEvaluator,
+  onEvaluatorDeleted,
 }: AddEvaluatorsDialogProps) {
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(isOpen);
+  const accessToken = useAccessToken();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EvaluatorData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Reset transient state each time the dialog opens so a re-open starts fresh.
   useEffect(() => {
@@ -70,6 +84,29 @@ export function AddEvaluatorsDialog({
 
   const handleClose = () => {
     if (!saving) onClose();
+  };
+
+  const confirmDeleteEvaluator = async () => {
+    if (!deleteTarget || !accessToken) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+      await deleteEvaluator(deleteTarget.uuid, accessToken);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.uuid);
+        return next;
+      });
+      onEvaluatorDeleted?.(deleteTarget.uuid);
+      setDeleteTarget(null);
+    } catch (err) {
+      reportError("Error deleting evaluator:", err);
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete evaluator",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleAdd = async () => {
@@ -157,8 +194,34 @@ export function AddEvaluatorsDialog({
             }
             allowConversationType={allowConversationType}
             fillHeight
+            onDeleteEvaluator={(uuid) => {
+              const target = availableEvaluators.find((e) => e.uuid === uuid);
+              if (target) setDeleteTarget(target);
+            }}
           />
         </div>
+
+        {/* Deleting an evaluator from its own preview panel — permanent, from
+            the whole workspace, not just this agent. */}
+        <DeleteConfirmationDialog
+          isOpen={deleteTarget !== null}
+          onClose={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          onConfirm={confirmDeleteEvaluator}
+          title="Delete evaluator"
+          message={`Are you sure you want to permanently delete "${deleteTarget?.name}"? This removes it from the whole workspace, not just this agent.`}
+          confirmText="Delete"
+          isDeleting={isDeleting}
+          extraContent={
+            deleteError && (
+              <p role="alert" className="text-sm text-red-500">
+                {deleteError}
+              </p>
+            )
+          }
+        />
 
         {/* Footer — only when there is something to add. */}
         {hasAnythingToAdd && (

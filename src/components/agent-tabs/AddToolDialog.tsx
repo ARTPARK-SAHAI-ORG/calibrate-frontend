@@ -6,6 +6,10 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ToolLibraryPicker } from "@/components/tools/ToolLibraryPicker";
+import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { AddToolDialog as EditToolDialog } from "@/components/AddToolDialog";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { deleteTool } from "@/lib/toolsApi";
 import type { ToolData } from "@/components/AddToolDialog";
 
 type AddToolDialogProps = {
@@ -32,12 +36,55 @@ export function AddToolDialog({
 
   const backendAccessToken = useAccessToken();
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
+  // Seeded from the prop, then kept up to date locally when a tool is made
+  // from inside this dialog — the workspace-wide list the parent fetched
+  // won't itself refresh until the next full load. Resets fresh on every
+  // open, since the dialog fully unmounts on close.
+  const [localAllTools, setLocalAllTools] = useState<ToolData[]>(allTools);
+  const [createToolOpen, setCreateToolOpen] = useState(false);
+  const [previewUuid, setPreviewUuid] = useState<string | null>(null);
+  // Editing the previewed tool, from its own edit/delete buttons.
+  const [editToolUuid, setEditToolUuid] = useState<string | null>(null);
+  const [editToolType, setEditToolType] = useState<
+    "webhook" | "structured_output"
+  >("structured_output");
+  const [deleteTarget, setDeleteTarget] = useState<ToolData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setSelectedTools(new Set());
     onClose();
+  };
+
+  const openEditTool = (tool: ToolData) => {
+    setEditToolUuid(tool.uuid);
+    setEditToolType(tool.config?.type === "webhook" ? "webhook" : "structured_output");
+  };
+
+  const confirmDeleteTool = async () => {
+    if (!deleteTarget || !backendAccessToken) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+      await deleteTool(deleteTarget.uuid, backendAccessToken);
+      setLocalAllTools((prev) => prev.filter((t) => t.uuid !== deleteTarget.uuid));
+      setSelectedTools((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.uuid);
+        return next;
+      });
+      setDeleteTarget(null);
+    } catch (err) {
+      reportError("Error deleting tool:", err);
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete tool",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const toggleTool = (uuid: string) => {
@@ -84,7 +131,7 @@ export function AddToolDialog({
       }
 
       // Get added tools data
-      const addedTools = allTools.filter((tool) =>
+      const addedTools = localAllTools.filter((tool) =>
         toolUuidsToAdd.includes(tool.uuid)
       );
       onToolsAdded(addedTools);
@@ -98,7 +145,7 @@ export function AddToolDialog({
 
   // Filter out tools already added to the agent
   const agentToolUuids = new Set(agentTools.map((t) => t.uuid));
-  const baseAvailableTools = allTools.filter(
+  const baseAvailableTools = localAllTools.filter(
     (tool) => !agentToolUuids.has(tool.uuid)
   );
 
@@ -142,8 +189,76 @@ export function AddToolDialog({
             onToggle={toggleTool}
             isLoading={allToolsLoading}
             emptyMessage="All available tools have been added to this agent"
+            emptyAction={
+              <button
+                type="button"
+                onClick={() => setCreateToolOpen(true)}
+                className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Create tool
+              </button>
+            }
+            previewUuid={previewUuid}
+            onEditTool={openEditTool}
+            onDeleteTool={setDeleteTarget}
           />
         </div>
+
+        {/* Making a tool from inside this dialog, when there is nothing
+            left to pick. It comes back here with the new tool selected and
+            previewed, ready to be added along with anything else picked. */}
+        <CreateToolFlow
+          isOpen={createToolOpen}
+          onClose={() => setCreateToolOpen(false)}
+          accessToken={backendAccessToken ?? undefined}
+          knownTools={localAllTools}
+          onCreated={(tool, updatedTools) => {
+            setCreateToolOpen(false);
+            setLocalAllTools(updatedTools);
+            setSelectedTools((prev) => new Set(prev).add(tool.uuid));
+            setPreviewUuid(tool.uuid);
+          }}
+        />
+
+        {/* Editing a tool from its own preview panel. Same builder the
+            workspace Tools page uses; the update comes back to this same
+            dialog with fresh data by uuid. */}
+        <EditToolDialog
+          isOpen={editToolUuid !== null}
+          onClose={() => setEditToolUuid(null)}
+          toolType={editToolType}
+          editingToolUuid={editToolUuid}
+          backendAccessToken={backendAccessToken ?? undefined}
+          onToolsUpdated={(updatedTools) => {
+            const updated = updatedTools.find((t) => t.uuid === editToolUuid);
+            if (!updated) return;
+            setLocalAllTools((prev) =>
+              prev.map((t) => (t.uuid === updated.uuid ? updated : t)),
+            );
+          }}
+        />
+
+        {/* Deleting a tool from its own preview panel — permanent, from the
+            whole workspace, not just this agent. */}
+        <DeleteConfirmationDialog
+          isOpen={deleteTarget !== null}
+          onClose={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          onConfirm={confirmDeleteTool}
+          title="Delete tool"
+          message={`Are you sure you want to permanently delete "${deleteTarget?.name}"? This removes it from the whole workspace, not just this agent.`}
+          confirmText="Delete"
+          isDeleting={isDeleting}
+          extraContent={
+            deleteError && (
+              <p role="alert" className="text-sm text-red-500">
+                {deleteError}
+              </p>
+            )
+          }
+        />
 
         {/* Footer - only shown when tools are selected */}
         {selectedTools.size > 0 && (

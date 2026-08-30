@@ -1,6 +1,65 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { AddEvaluatorsDialog } from "../AddEvaluatorsDialog";
+import { deleteEvaluator } from "@/lib/evaluatorApi";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
+
+// The prompt column asks the backend for the evaluator it is showing, which is
+// not what these tests are about. Stand in for it with the one control they do
+// need: the Delete button it offers on the evaluator being previewed.
+jest.mock("../../evaluators/EvaluatorPromptPreview", () => ({
+  EvaluatorPromptPreview: ({
+    evaluatorUuid,
+    onDelete,
+  }: {
+    evaluatorUuid: string | null;
+    onDelete?: (uuid: string) => void;
+  }) =>
+    onDelete && evaluatorUuid ? (
+      <button onClick={() => onDelete(evaluatorUuid)}>Delete previewed</button>
+    ) : (
+      <div />
+    ),
+}));
+
+jest.mock("../../DeleteConfirmationDialog", () => ({
+  DeleteConfirmationDialog: ({
+    isOpen,
+    message,
+    onConfirm,
+    extraContent,
+  }: {
+    isOpen: boolean;
+    message: string;
+    onConfirm: () => void;
+    extraContent?: React.ReactNode;
+  }) =>
+    isOpen ? (
+      <div>
+        <p>{message}</p>
+        <button onClick={onConfirm}>Confirm delete</button>
+        {extraContent}
+      </div>
+    ) : null,
+}));
+
+jest.mock("../../../lib/evaluatorApi", () => ({
+  ...jest.requireActual("../../../lib/evaluatorApi"),
+  deleteEvaluator: jest.fn(),
+}));
+
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+const deleteEvaluatorMock = deleteEvaluator as jest.Mock;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  deleteEvaluatorMock.mockResolvedValue(undefined);
+  localStorage.setItem("access_token", "test-token");
+});
+
+afterEach(() => {
+  localStorage.clear();
+});
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
   uuid: over.uuid ?? "ev-1",
@@ -215,6 +274,73 @@ describe("AddEvaluatorsDialog", () => {
       "Backend is down",
     );
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleting an evaluator from the preview panel", () => {
+  const renderWithTwo = (props: Record<string, unknown> = {}) =>
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={jest.fn()}
+        onAdd={jest.fn()}
+        availableEvaluators={[
+          evaluator({ uuid: "ev-a", name: "Tone check" }),
+          evaluator({ uuid: "ev-b", name: "Policy fit" }),
+        ]}
+        {...props}
+      />,
+    );
+
+  it("asks first, naming the evaluator and saying it goes from the workspace", async () => {
+    const user = setupUser();
+    renderWithTwo();
+
+    await user.click(screen.getByRole("button", { name: "Delete previewed" }));
+
+    expect(
+      screen.getByText(
+        'Are you sure you want to permanently delete "Tone check"? This removes it from the whole workspace, not just this agent.',
+      ),
+    ).toBeInTheDocument();
+    expect(deleteEvaluatorMock).not.toHaveBeenCalled();
+  });
+
+  it("deletes it, unticks it, and tells the parent", async () => {
+    const user = setupUser();
+    const onEvaluatorDeleted = jest.fn();
+    renderWithTwo({ onEvaluatorDeleted });
+
+    await user.click(screen.getByLabelText("Select Tone check"));
+    expect(screen.getByRole("button", { name: "Add (1)" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Delete previewed" }));
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() =>
+      expect(deleteEvaluatorMock).toHaveBeenCalledWith("ev-a", "test-token"),
+    );
+    expect(onEvaluatorDeleted).toHaveBeenCalledWith("ev-a");
+    // The count drops back: a deleted evaluator cannot still be on its way in.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add" })).toBeDisabled(),
+    );
+  });
+
+  it("reports a failed delete and keeps the dialog open", async () => {
+    const user = setupUser();
+    const onEvaluatorDeleted = jest.fn();
+    deleteEvaluatorMock.mockRejectedValue(new Error("Backend is down"));
+    renderWithTwo({ onEvaluatorDeleted });
+
+    await user.click(screen.getByRole("button", { name: "Delete previewed" }));
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Backend is down",
+    );
+    expect(onEvaluatorDeleted).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Select Tone check")).toBeInTheDocument();
   });
 });
 

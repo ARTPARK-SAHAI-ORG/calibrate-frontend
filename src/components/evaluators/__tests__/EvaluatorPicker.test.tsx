@@ -44,6 +44,32 @@ const setup = (
 };
 
 describe("EvaluatorPicker", () => {
+  it("keeps every row and section label in the list itself, so the lines between rows are drawn", () => {
+    const { container } = render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "a", name: "Tone check" }),
+          evaluator({ uuid: "b", name: "Policy fit" }),
+          evaluator({ uuid: "c", name: "Correctness", is_default: true }),
+        ]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+      />,
+    );
+
+    // The list draws its dividing lines between its own children. A section
+    // that wrapped its rows in a box would hide every line inside it, which is
+    // what made this list look unlike the tool one.
+    const list = container.querySelector(".divide-y") as HTMLElement;
+    expect(Array.from(list.children).map((el) => el.textContent)).toEqual([
+      "My evaluators",
+      "Tone checkDescription",
+      "Policy fitDescription",
+      "Default",
+      "CorrectnessDescription",
+    ]);
+  });
+
   it("renders a row per evaluator with its name and description", () => {
     setup({
       evaluators: [
@@ -171,7 +197,7 @@ describe("EvaluatorPicker", () => {
 });
 
 describe("EvaluatorPicker prompt column", () => {
-  it("shows nothing until a row is clicked", () => {
+  it("previews the first evaluator by default, with nothing selected", () => {
     render(
       <EvaluatorPicker
         evaluators={[evaluator()]}
@@ -180,7 +206,53 @@ describe("EvaluatorPicker prompt column", () => {
       />,
     );
     expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
-      "preview:none",
+      "preview:ev-1",
+    );
+  });
+
+  it("shows nothing when there is nothing to offer", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[]}
+        selectedIds={new Set()}
+        onToggle={jest.fn()}
+        emptyMessage="Nothing to add"
+      />,
+    );
+    expect(screen.queryByTestId("prompt-preview")).not.toBeInTheDocument();
+  });
+
+  it("previews the first already-selected evaluator, not just the first in the list", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "ev-1", name: "First" }),
+          evaluator({ uuid: "ev-2", name: "Second" }),
+          evaluator({ uuid: "ev-3", name: "Third" }),
+        ]}
+        selectedIds={new Set(["ev-3"])}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-3",
+    );
+  });
+
+  it("picks the first selected one in list order when more than one is selected", () => {
+    render(
+      <EvaluatorPicker
+        evaluators={[
+          evaluator({ uuid: "ev-1", name: "First" }),
+          evaluator({ uuid: "ev-2", name: "Second" }),
+          evaluator({ uuid: "ev-3", name: "Third" }),
+        ]}
+        selectedIds={new Set(["ev-2", "ev-3"])}
+        onToggle={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-2",
     );
   });
 
@@ -213,10 +285,14 @@ describe("EvaluatorPicker prompt column", () => {
       />,
     );
 
+    // Already previewed by default (the only evaluator in the list).
+    expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
+      "preview:ev-9",
+    );
     await user.click(screen.getByLabelText("Select Conciseness"));
     expect(onToggle).toHaveBeenCalledWith("ev-9");
     expect(screen.getByTestId("prompt-preview")).toHaveTextContent(
-      "preview:none",
+      "preview:ev-9",
     );
   });
 });

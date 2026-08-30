@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
+import { PickerRow } from "@/components/ui/PickerRow";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 
@@ -34,6 +35,8 @@ type EvaluatorPickerProps = {
    * flex child with a real height (`flex-1 min-h-0`).
    */
   fillHeight?: boolean;
+  /** Permanently deletes the previewed evaluator. Omit to hide the button. */
+  onDeleteEvaluator?: (evaluatorUuid: string) => void;
 };
 
 /**
@@ -50,10 +53,24 @@ export function EvaluatorPicker({
   previewUuid: previewUuidProp,
   fillHeight = false,
   allowConversationType = false,
+  onDeleteEvaluator,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
-  // The evaluator whose prompt is on show. Null until one is clicked.
-  const [previewUuid, setPreviewUuid] = useState<string | null>(null);
+  // Everything this picker could offer, before the reader's own search.
+  const offerable = evaluators.filter(
+    // Full-conversation evaluators are hidden unless the caller is a place
+    // where they are the only kind that works, such as simulation setup.
+    (ev) => allowConversationType || ev.evaluator_type !== "conversation",
+  );
+  // The evaluator whose prompt is on show. Defaults to the first one that is
+  // already selected (so opening the picker shows what it will actually add),
+  // falling back to the first evaluator in the list when nothing is selected
+  // yet. Only the initial value — from then on, the reader's own clicks (or
+  // the parent naming one below) drive it.
+  const [previewUuid, setPreviewUuid] = useState<string | null>(() => {
+    const firstSelected = offerable.find((ev) => selectedIds.has(ev.uuid));
+    return firstSelected?.uuid ?? offerable[0]?.uuid ?? null;
+  });
   // A parent that names an evaluator (one just created) opens it on the right.
   // Clicking another row afterwards still wins, until the parent names a new one.
   useEffect(() => {
@@ -61,12 +78,6 @@ export function EvaluatorPicker({
   }, [previewUuidProp]);
 
   const q = search.trim().toLowerCase();
-  // Everything this picker could offer, before the reader's own search.
-  const offerable = evaluators.filter(
-    // Full-conversation evaluators are hidden unless the caller is a place
-    // where they are the only kind that works, such as simulation setup.
-    (ev) => allowConversationType || ev.evaluator_type !== "conversation",
-  );
   const filteredEvaluators = offerable.filter((ev) => {
     if (!q) return true;
     return (
@@ -79,47 +90,29 @@ export function EvaluatorPicker({
   const showSections =
     defaultEvaluators.length > 0 && customEvaluators.length > 0;
 
-  const renderEvaluatorRow = (ev: EvaluatorData) => {
-    const checked = selectedIds.has(ev.uuid);
-    return (
-      <div
-        key={ev.uuid}
-        className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
-          previewUuid === ev.uuid
-            ? "bg-muted/60 border-l-2 border-foreground/40 pl-[calc(0.75rem-2px)]"
-            : "hover:bg-muted/30"
-        }`}
-      >
-        {/* The box is centred against the name's own line, so it sits the
-            same way whether or not a description follows underneath. */}
-        <span className="flex h-5 items-center flex-shrink-0">
-          <input
-            type="checkbox"
-            aria-label={`Select ${ev.name}`}
-            checked={checked}
-            onChange={() => onToggle(ev.uuid)}
-            className="w-4 h-4 cursor-pointer accent-foreground"
-          />
-        </span>
-        {/* The body opens the prompt on the right rather than ticking the box,
-            so an evaluator can be read before it is added. */}
-        <button
-          type="button"
-          onClick={() => setPreviewUuid(ev.uuid)}
-          className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
-        >
-          {/* Name only: what it judges and how it scores are in the prompt
-              on the right. */}
-          <span className="text-sm font-medium text-foreground">{ev.name}</span>
-          {ev.description && (
-            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-              {ev.description}
-            </div>
-          )}
-        </button>
-      </div>
-    );
-  };
+  const renderEvaluatorRow = (ev: EvaluatorData) => (
+    // Name only: what it judges and how it scores are in the prompt on the
+    // right, so no badge here.
+    <PickerRow
+      key={ev.uuid}
+      ariaLabel={`Select ${ev.name}`}
+      checked={selectedIds.has(ev.uuid)}
+      onToggle={() => onToggle(ev.uuid)}
+      isPreviewed={previewUuid === ev.uuid}
+      onPreview={() => setPreviewUuid(ev.uuid)}
+      name={ev.name}
+      description={ev.description}
+    />
+  );
+
+  const renderSectionLabel = (label: string) => (
+    <div
+      key={label}
+      className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+    >
+      {label}
+    </div>
+  );
 
   const renderEvaluatorList = () => {
     if (filteredEvaluators.length === 0) {
@@ -134,20 +127,15 @@ export function EvaluatorPicker({
       return filteredEvaluators.map(renderEvaluatorRow);
     }
 
+    // Flat, not one wrapper per section: the list draws its dividing lines
+    // between its own children, so a wrapper would swallow every line between
+    // the rows inside it and this list would stop matching the tool picker.
     return (
       <>
-        <div>
-          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            My evaluators
-          </div>
-          {customEvaluators.map(renderEvaluatorRow)}
-        </div>
-        <div>
-          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Default
-          </div>
-          {defaultEvaluators.map(renderEvaluatorRow)}
-        </div>
+        {renderSectionLabel("My evaluators")}
+        {customEvaluators.map(renderEvaluatorRow)}
+        {renderSectionLabel("Default")}
+        {defaultEvaluators.map(renderEvaluatorRow)}
       </>
     );
   };
@@ -225,7 +213,10 @@ export function EvaluatorPicker({
             : "md:h-[35.25rem] max-h-[60vh]"
         }`}
       >
-        <EvaluatorPromptPreview evaluatorUuid={previewUuid} />
+        <EvaluatorPromptPreview
+          evaluatorUuid={previewUuid}
+          onDelete={onDeleteEvaluator}
+        />
       </div>
     </div>
   );

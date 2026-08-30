@@ -27,6 +27,16 @@ jest.mock("../DeleteToolDialog", () => ({
   },
 }));
 
+// The top-level builder, reused here in edit mode when a row is clicked —
+// distinct from the "../AddToolDialog" picker mocked above.
+let editToolProps: any = null;
+jest.mock("../../AddToolDialog", () => ({
+  AddToolDialog: (props: any) => {
+    editToolProps = props;
+    return props.isOpen ? <div data-testid="edit-tool-dialog" /> : null;
+  },
+}));
+
 // CreateToolFlow is separately tested. Stubbed to a button that reports the
 // tool it "created" and the full list, the same shape the real flow reports.
 let createToolProps: any = null;
@@ -107,6 +117,7 @@ describe("ToolsTabContent", () => {
     addToolProps = null;
     deleteToolProps = null;
     createToolProps = null;
+    editToolProps = null;
     attachToolsToAgentMock.mockReset();
     attachToolsToAgentMock.mockResolvedValue(undefined);
     reportErrorMock.mockReset();
@@ -166,6 +177,26 @@ describe("ToolsTabContent", () => {
     expect(createButton.className).not.toContain("bg-foreground");
   });
 
+  it("still offers Add tool when the workspace has tools, even if none are on this agent yet", () => {
+    // Distinct from the workspace-is-empty case below: here there is
+    // something to pick from, so the button belongs.
+    renderComponent({ agentTools: [], allTools: [toolA, toolB] });
+    expect(
+      screen.getByRole("button", { name: "Add tool" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides Add tool when the workspace has no tools at all yet", () => {
+    renderComponent({ agentTools: [], allTools: [] });
+    expect(
+      screen.queryByRole("button", { name: "Add tool" }),
+    ).not.toBeInTheDocument();
+    // Create tool is still how you make the first one.
+    expect(
+      screen.getByRole("button", { name: "Create tool" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows a no-match message and opens the add dialog from the empty state when search matches nothing", async () => {
     const user = setupUser();
     renderComponent();
@@ -197,10 +228,10 @@ describe("ToolsTabContent", () => {
     expect(screen.getAllByText("Structured Output").length).toBeGreaterThan(0);
   });
 
-  it("shows description fallback to config.description, and em-dash when neither present", () => {
+  it("shows description fallback to config.description, and a plain note when neither present", () => {
     renderComponent({ agentTools: [toolB, toolNoDescription] });
     expect(screen.getAllByText("Books calendar events").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No description").length).toBeGreaterThan(0);
   });
 
   it("filters the tools list by search query on name", async () => {
@@ -285,6 +316,56 @@ describe("ToolsTabContent", () => {
     expect(setAgentTools).toHaveBeenCalledTimes(1);
     const updater = setAgentTools.mock.calls[0][0];
     expect(updater([toolA, toolB])).toEqual([toolB]);
+  });
+
+  it("opens the edit dialog for a tool clicked from the desktop table", async () => {
+    const user = setupUser();
+    renderComponent();
+    const [desktopName] = screen.getAllByText("Weather lookup");
+    await user.click(desktopName);
+
+    expect(editToolProps.isOpen).toBe(true);
+    expect(editToolProps.editingToolUuid).toBe("tool-a");
+    expect(editToolProps.toolType).toBe("webhook");
+  });
+
+  it("opens the edit dialog for a tool clicked from the mobile card, with its type", async () => {
+    const user = setupUser();
+    renderComponent();
+    const [, mobileName] = screen.getAllByText("Calendar booking");
+    await user.click(mobileName);
+
+    expect(editToolProps.isOpen).toBe(true);
+    expect(editToolProps.editingToolUuid).toBe("tool-b");
+    // toolB has no config.type — defaults to structured_output, same as the
+    // Type column's own fallback.
+    expect(editToolProps.toolType).toBe("structured_output");
+  });
+
+  it("does not open the edit dialog when the delete button on a row is clicked", async () => {
+    const user = setupUser();
+    renderComponent();
+    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    await user.click(deleteButtons[0]);
+
+    expect(editToolProps.isOpen).toBe(false);
+    expect(deleteToolProps.isOpen).toBe(true);
+  });
+
+  it("syncs the edited tool back into the agent's list by uuid", async () => {
+    const user = setupUser();
+    const setAgentTools = jest.fn();
+    renderComponent({ setAgentTools });
+    const [desktopName] = screen.getAllByText("Weather lookup");
+    await user.click(desktopName);
+
+    const renamed = { ...toolA, name: "Weather (renamed)" };
+    act(() => {
+      editToolProps.onToolsUpdated([renamed, toolB]);
+    });
+    expect(setAgentTools).toHaveBeenCalledTimes(1);
+    const updater = setAgentTools.mock.calls[0][0];
+    expect(updater([toolA, toolB])).toEqual([renamed, toolB]);
   });
 
   it("clears the selected tool and closes the dialog via DeleteToolDialog onClose", async () => {
