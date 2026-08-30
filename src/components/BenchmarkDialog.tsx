@@ -14,7 +14,7 @@ import {
   PlusIcon,
   PlayIcon,
 } from "@/components/icons";
-import { Button } from "@/components/ui";
+import { Button, ConfirmDialog } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import {
   VerifyRequestPreviewDialog,
@@ -104,6 +104,7 @@ export function BenchmarkDialog({
     Record<string, ModelVerificationStatus>
   >({});
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(
     null,
@@ -118,6 +119,7 @@ export function BenchmarkDialog({
     setSelectedModels([null]);
     setShowResults(false);
     setModelVerifyStatus({});
+    setConfirmOpen(false);
     setVerifyDialogOpen(false);
     setVerifyMessages(null);
     setPendingVerifyAction(null);
@@ -203,6 +205,7 @@ export function BenchmarkDialog({
   };
 
   const handleRunBenchmark = async () => {
+    setConfirmOpen(false);
     if (agentType === "connection") {
       const modelsToVerify = selectedModels
         .filter((m): m is LLMModel => m !== null)
@@ -316,7 +319,10 @@ export function BenchmarkDialog({
     }));
   };
 
-  const canRunBenchmark = selectedModels.some((m) => m !== null);
+  const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // Empty `tests` means every linked test; `totalTests` is how many that is.
+  const benchmarkTestCount = tests.length > 0 ? tests.length : totalTests;
+  const canRunBenchmark = chosenModels.length > 0;
   const isVerifying = Object.values(modelVerifyStatus).some(
     (s) => s === "verifying",
   );
@@ -571,7 +577,7 @@ export function BenchmarkDialog({
           <Button
             variant="primary"
             size="md"
-            onClick={handleRunBenchmark}
+            onClick={() => setConfirmOpen(true)}
             disabled={!canRunBenchmark || isVerifying}
             className="flex items-center gap-2"
           >
@@ -608,6 +614,47 @@ export function BenchmarkDialog({
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
         onBenchmarkCreated={onBenchmarkCreated}
       />
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleRunBenchmark}
+        title="Start the comparison"
+        message="This is what is about to run."
+        confirmText="Start the comparison"
+      >
+        <dl
+          data-testid="benchmark-summary"
+          className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-2"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-muted-foreground">Agent</dt>
+            <dd className="text-foreground text-right">{agentName}</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-muted-foreground">Tests</dt>
+            <dd className="text-foreground text-right">
+              {benchmarkTestCount === undefined
+                ? "Every test linked to this agent"
+                : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}${tests.length === 0 ? " (every test linked to this agent)" : ""}`}
+            </dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-muted-foreground">Models</dt>
+            <dd className="text-foreground text-right">
+              {chosenModels.map((m) => m.name).join(", ")}
+            </dd>
+          </div>
+          {benchmarkTestCount !== undefined && (
+            <div className="flex items-start justify-between gap-4">
+              <dt className="text-muted-foreground">Answers to generate</dt>
+              <dd className="text-foreground text-right">
+                {benchmarkTestCount * chosenModels.length}
+              </dd>
+            </div>
+          )}
+        </dl>
+      </ConfirmDialog>
 
       <VerifyRequestPreviewDialog
         agentNature={agentNature}

@@ -22,3 +22,4 @@ export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
 export { DialogNavHeader } from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
 export { SegmentedFilter, type SegmentedFilterOption } from "./SegmentedFilter";
+export { ConfirmDialog } from "./ConfirmDialog";

@@ -16,7 +16,7 @@ import {
   fetchAllAgentTests,
   unlinkTestsFromAgent,
 } from "@/lib/agentTestsApi";
-import { ServerPaginatedListBar } from "@/components/ui";
+import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
   type SearchMode,
@@ -406,6 +406,7 @@ export function TestsTabContent({
   } | null>(null);
 
   // Benchmark dialog state
+  const [runAllConfirmOpen, setRunAllConfirmOpen] = useState(false);
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
   // The tests the benchmark dialog compares the models on: the ticked rows
   // for the "Compare" bulk action, and nothing for the header's "Compare
@@ -1606,7 +1607,7 @@ export function TestsTabContent({
                     );
                     return;
                   }
-                  void launchTestRun(agentTests, true, "all");
+                  setRunAllConfirmOpen(true);
                 }}
                 disabled={startingRun !== null}
                 aria-busy={startingRun === "all"}
@@ -2398,6 +2399,19 @@ export function TestsTabContent({
           }}
         />
       )}
+
+      {/* Confirm before starting a run of every linked test. */}
+      <ConfirmDialog
+        isOpen={runAllConfirmOpen}
+        onClose={() => setRunAllConfirmOpen(false)}
+        onConfirm={() => {
+          setRunAllConfirmOpen(false);
+          void launchTestRun(agentTests, true, "all");
+        }}
+        title="Run every test on this agent"
+        message={`This runs ${linkedTestsTotal} ${linkedTestsTotal === 1 ? "test" : "tests"} against ${agentName}. Each test calls your agent and the evaluators that judge it.`}
+        confirmText="Start the run"
+      />
 
       {/* Benchmark Dialog */}
       <BenchmarkDialog
