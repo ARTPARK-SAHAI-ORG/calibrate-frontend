@@ -372,12 +372,47 @@ describe("tests that could not be run", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("warns that the pass rate does not cover the tests that never ran", () => {
+  it("says how many were left out of the metrics, and names the tab to read them in", () => {
     render(<TestRunSummary passed={9} total={10} unanswered={3} />);
     expect(
       screen.getByText(
-        "3 of 13 tests could not be run, so the pass rate below covers only the 10 that were scored.",
+        /3 of 13 tests could not be run and were ignored for calculating the metrics/,
       ),
+    ).toBeInTheDocument();
+    // No handler given, so the tab is named but not clickable.
+    expect(
+      screen.queryByRole("button", { name: "Results tab" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the tab listing the tests when the note's link is clicked", async () => {
+    const onReviewUnanswered = jest.fn();
+    render(
+      <TestRunSummary
+        passed={9}
+        total={10}
+        unanswered={3}
+        onReviewUnanswered={onReviewUnanswered}
+      />,
+    );
+    await setupUser().click(
+      screen.getByRole("button", { name: "Results tab" }),
+    );
+    expect(onReviewUnanswered).toHaveBeenCalled();
+  });
+
+  it("names the tab whatever the surface calls it", () => {
+    render(
+      <TestRunSummary
+        passed={9}
+        total={10}
+        unanswered={3}
+        onReviewUnanswered={jest.fn()}
+        resultsTabLabel="Outputs"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Outputs tab" }),
     ).toBeInTheDocument();
   });
 

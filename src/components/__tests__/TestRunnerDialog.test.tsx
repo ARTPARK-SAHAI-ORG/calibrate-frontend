@@ -38,12 +38,19 @@ jest.mock("../eval-details", () => ({
       <div data-testid="selected-id">{selectedId}</div>
     </div>
   ),
-  TestRunSummary: ({ passed, total, unanswered, stoppedEarly }: any) => (
+  TestRunSummary: ({
+    passed,
+    total,
+    unanswered,
+    stoppedEarly,
+    onReviewUnanswered,
+  }: any) => (
     <div data-testid="summary-panel">
       summary {passed}/{total}
       <span data-testid="summary-gaps">
         {JSON.stringify({ unanswered, stoppedEarly })}
       </span>
+      <button onClick={onReviewUnanswered}>review-unanswered</button>
     </div>
   ),
   LLMEvaluationAbout: (props: any) => (
@@ -1274,6 +1281,26 @@ describe("tests that produced no answer", () => {
     expect(await screen.findByTestId("summary-panel")).toHaveTextContent(
       "summary 1/2",
     );
+  });
+
+  it("opens the results tab from the summary's link", async () => {
+    mockRun({
+      unanswered_tests: 1,
+      results: [
+        {
+          test_case_id: "t-3",
+          name: "Never answered",
+          passed: false,
+          unanswered: true,
+          reasoning: "Agent returned HTTP 500",
+        },
+      ],
+    });
+    // The run lands on Summary when it finishes; the link is what takes the
+    // reader to the tests themselves.
+    await screen.findByTestId("summary-panel");
+    await setupUser().click(screen.getByText("review-unanswered"));
+    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
   });
 
   it("marks the row as one that produced no answer for the outputs panel", async () => {

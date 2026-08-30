@@ -550,6 +550,7 @@ export function TestRunnerDialog({
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
                   stoppedEarly={stoppedEarly}
+                  onReviewUnanswered={() => setActiveTab("outputs")}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}
                   tokens={run?.total_tokens ?? null}

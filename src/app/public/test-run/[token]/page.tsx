@@ -214,6 +214,8 @@ export default function PublicTestRunPage() {
             total={passed + failed}
             unanswered={data.unanswered_tests ?? 0}
             stoppedEarly={data.stopped_early === true}
+            onReviewUnanswered={() => setActiveTab("outputs")}
+            resultsTabLabel="Outputs"
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
