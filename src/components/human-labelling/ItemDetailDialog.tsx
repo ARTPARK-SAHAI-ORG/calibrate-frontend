@@ -547,7 +547,10 @@ export function ItemDetailDialog({
             hasNext={hasNext}
             position={position}
           />
-          <div className="flex items-center gap-2 shrink-0">
+          {/* min-h-11 keeps the header the same height while an item loads and
+              its controls are absent, so paging does not move the title and
+              the previous/next arrows up and down. */}
+          <div className="min-h-11 flex items-center gap-2 shrink-0">
             {loading && summary && (
               <svg
                 className="w-4 h-4 animate-spin text-muted-foreground"
