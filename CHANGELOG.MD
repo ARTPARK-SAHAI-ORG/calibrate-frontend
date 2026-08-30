@@ -1,5 +1,6 @@
 ## August 2026
 
+- On a simulation run, an evaluator that did not score anything now shows a dash instead of wrongly showing as failed ([#498](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/498))
 - Compare models on a connection agent that has not turned on benchmarking now asks for the model provider and opens the comparison instead of just sending you to the Connection tab, and a failed model row now says "See why" instead of a plain arrow ([#482](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/482))
 - On a shared results link the evaluator columns, scores and the rating chart's scale now show correctly instead of a single generic column or a wrong 0 to 1 scale ([#496](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/496))
 - The evaluations table now resizes its columns to fit what is in them, and every run results page uses the same Results tab name instead of some calling it Outputs ([#481](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/481))
