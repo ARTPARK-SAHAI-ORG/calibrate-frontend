@@ -26,7 +26,7 @@ import {
   RerunIconButton,
   ResultTabs,
   StopRunButton,
-  StoppedRunPill,
+  RunStateMark,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { abortRunOrNotify } from "@/lib/testRunApi";
@@ -644,6 +644,11 @@ export function BenchmarkResultsDialog({
         <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              {isDone && !isInitialLoading && (
+                <RunStateMark
+                  state={wasStopped ? "stopped" : error ? "error" : "finished"}
+                />
+              )}
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {modelComparisonName(runName)}
               </h2>
@@ -659,7 +664,6 @@ export function BenchmarkResultsDialog({
               {!isDone && !isInitialLoading && currentTaskId && (
                 <StopRunButton onStop={stopBenchmark} className="shrink-0" />
               )}
-              {isDone && wasStopped && <StoppedRunPill />}
             </div>
             <p className="text-xs text-muted-foreground truncate">
               {agentName}
@@ -834,6 +838,7 @@ export function BenchmarkResultsDialog({
                   filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
                   benchmarkScoreLabel={benchmarkScoreLabel}
                   onReviewUnanswered={() => setActiveTab("outputs")}
+                  runStopped={wasStopped}
                 />
               </div>
             )}
@@ -871,6 +876,7 @@ export function BenchmarkResultsDialog({
             {/* Outputs Tab - Show during progress and when outputs tab is active when done */}
             {(!isDone || activeTab === "outputs") && (
               <BenchmarkOutputsPanel
+                runStopped={wasStopped}
                 modelResults={providersToDisplay}
                 expandedModels={expandedProviders}
                 onToggleModel={toggleProvider}

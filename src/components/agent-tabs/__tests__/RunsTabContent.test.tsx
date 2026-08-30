@@ -317,17 +317,59 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    expect((await screen.findAllByText("Stopped")).length).toBeGreaterThan(0);
+    // The mark sits with the run's name, not among the result pills.
+    expect(
+      (await screen.findAllByLabelText("Someone stopped this run before it finished")).length,
+    ).toBeGreaterThan(0);
     expect(screen.getAllByText("3 Success").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
     expect(screen.getAllByText("6 Not run").length).toBeGreaterThan(0);
   });
 
+  it("marks each run by how the run itself went", async () => {
+    state.runs = [
+      unitRun,
+      { ...benchmarkRun, uuid: "run-going", status: "in_progress" },
+      { ...benchmarkRun, uuid: "run-broke", status: "failed" },
+      { ...unitRun, uuid: "run-stopped", aborted: true },
+    ];
+    renderTab();
+    // Desktop table and mobile cards both render, so each mark appears twice.
+    expect((await screen.findAllByLabelText("Ran every test")).length).toBe(2);
+    expect(
+      screen.getAllByLabelText(
+        "Someone stopped this run before it finished",
+      ).length,
+    ).toBe(2);
+    expect(
+      screen.getAllByLabelText("This run broke before it could finish").length,
+    ).toBe(2);
+    // A run still going says so in the results instead.
+    expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
+  });
+
+  it("says there are no results when the run was stopped before any test ran", async () => {
+    state.runs = [{ ...unitRun, aborted: true, total_tests: null }];
+    renderTab();
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+  });
+
   it("says a stopped model comparison was stopped rather than complete", async () => {
     state.runs = [{ ...benchmarkRun, aborted: true }];
     renderTab();
-    expect((await screen.findAllByText("Stopped")).length).toBeGreaterThan(0);
+    expect(
+      (
+        await screen.findAllByLabelText(
+          "Someone stopped this run before it finished",
+        )
+      ).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+    // It carries no counts, so the results cell says so in words, the way the
+    // models cell says "Default", rather than being left blank.
+    const firstRow = document.querySelector("tbody tr") as HTMLElement;
+    expect(firstRow.querySelectorAll("td")[1].textContent).toBe("No results");
   });
 
   it("shows Running while a run has not finished", async () => {

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
-import { WarningTriangleIcon } from "@/components/icons";
+import { RunNote } from "./RunNote";
+import { stoppedRunSentence } from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
@@ -33,6 +34,9 @@ type TestRunSummaryProps = {
   stoppedEarly?: boolean;
   /** True when someone stopped the run before it finished. */
   stopped?: boolean;
+  /** How many tests the run set out to do. On a stopped run it is what the
+   * tests that did run are counted against. */
+  runTotalTests?: number | null;
   /** Opens the tab listing every test, so the ones that could not be run can
    * be read. Without it the note names the tab but does not link to it. */
   onReviewUnanswered?: () => void;
@@ -202,6 +206,7 @@ export function TestRunSummary({
   unanswered = 0,
   stoppedEarly = false,
   stopped = false,
+  runTotalTests = null,
   onReviewUnanswered,
   latency,
   cost,
@@ -243,18 +248,22 @@ export function TestRunSummary({
       ? `${formatTokens(tokens.min)} – ${formatTokens(tokens.max)}`
       : undefined;
 
+  // How many tests ran covers the ones that were scored plus the ones that
+  // were tried and gave no answer; the rest were never started. The wording
+  // itself is shared with the model comparison's leaderboard.
+  const stoppedSentence = stoppedRunSentence(total + unanswered, runTotalTests);
+
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
         {(unanswered > 0 || stoppedEarly || stopped) && (
-          <div className="mb-4 flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
-            <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <p>
+          <div className="mb-4">
+            <RunNote>
               {unanswered > 0 &&
                 (total === 0
                   ? "None of the tests could be run. "
                   : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
-              {stopped && "This run was stopped before it finished. "}
+              {stopped && `${stoppedSentence}${unanswered > 0 ? ". " : ""}`}
               {stoppedEarly &&
                 !stopped &&
                 "The run stopped before it started every test. "}
@@ -275,7 +284,7 @@ export function TestRunSummary({
                   .
                 </>
               )}
-            </p>
+            </RunNote>
           </div>
         )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

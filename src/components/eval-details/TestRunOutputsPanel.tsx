@@ -55,6 +55,8 @@ type TestRunOutputsPanelProps = {
   enableEvaluatorLinks?: boolean;
   /** Default correctness evaluator used for legacy next-reply criteria. */
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
+  /** What to say when the run has no tests to list at all. */
+  emptyMessage?: string;
   /** Reports Previous/Next navigation state so a parent (the dialog header)
    * can render the pager. Must be a stable callback (e.g. a useState setter). */
   onNavChange?: (nav: PagerNav) => void;
@@ -81,6 +83,7 @@ export function TestRunOutputsPanel({
   evaluatorsByUuid,
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
+  emptyMessage = "No tests to show",
   onNavChange,
   labellingSelection,
   onToggleLabellingSelection,
@@ -251,6 +254,11 @@ export function TestRunOutputsPanel({
           {groups.length === 0 && query && (
             <div className="p-4 text-sm text-muted-foreground">
               No tests match &ldquo;{searchQuery}&rdquo;
+            </div>
+          )}
+          {results.length === 0 && !query && (
+            <div className="p-4 text-sm text-muted-foreground">
+              {emptyMessage}
             </div>
           )}
           {groups.map((group) => {

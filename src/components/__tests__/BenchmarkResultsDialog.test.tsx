@@ -102,7 +102,7 @@ jest.mock("../ui", () => ({
   StopRunButton: (props: any) => (
     <button onClick={() => props.onStop()}>Stop</button>
   ),
-  StoppedRunPill: () => <span>Stopped</span>,
+  RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -582,7 +582,9 @@ describe("BenchmarkResultsDialog", () => {
         ).toBe(true),
       );
 
-      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+      expect(await screen.findByTestId("run-mark")).toHaveTextContent(
+        "stopped",
+      );
       expect(
         screen.queryByRole("button", { name: "Stop" }),
       ).not.toBeInTheDocument();
@@ -617,7 +619,7 @@ describe("BenchmarkResultsDialog", () => {
           screen.queryByRole("button", { name: "Stop" }),
         ).not.toBeInTheDocument(),
       );
-      expect(screen.queryByText("Stopped")).not.toBeInTheDocument();
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("finished");
     });
   });
 

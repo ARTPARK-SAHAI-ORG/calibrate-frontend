@@ -175,3 +175,37 @@ describe("BenchmarkCombinedLeaderboard", () => {
     expect(container.querySelector(".my-custom-class")).toBeInTheDocument();
   });
 });
+
+describe("a run someone stopped", () => {
+  it("says how far the run got, in the same amber note the run window uses", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 6,
+            test_results: [{ passed: true }, { passed: false }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        runStopped
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped after 2 of 6 tests ran/),
+    ).toBeInTheDocument();
+  });
+
+  it("says why there is nothing to compare", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[]}
+        filename="x"
+        runStopped
+      />,
+    );
+    expect(
+      screen.getByText("This run was stopped before any test ran"),
+    ).toBeInTheDocument();
+  });
+});

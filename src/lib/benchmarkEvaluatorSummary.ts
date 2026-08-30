@@ -57,6 +57,9 @@ export type BenchmarkModelLike = {
   /** Per-test results, used to derive the tool-call pass-rate column/chart.
    * Optional — older callers / payloads may omit it. */
   test_results?: BenchmarkToolCallTestLike[] | null;
+  /** How many tests this model was given. Used to say how far a stopped run
+   * got. Optional — older payloads may omit it. */
+  total_tests?: number | null;
 };
 
 /**

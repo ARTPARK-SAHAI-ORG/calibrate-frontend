@@ -568,3 +568,19 @@ describe("TestRunOutputsPanel", () => {
     });
   });
 });
+
+describe("a run with no tests to list", () => {
+  it("says why the list is empty", () => {
+    render(
+      <TestRunOutputsPanel
+        results={[]}
+        selectedId={null}
+        onSelect={jest.fn()}
+        emptyMessage="This run was stopped before any test ran"
+      />,
+    );
+    expect(
+      screen.getByText("This run was stopped before any test ran"),
+    ).toBeInTheDocument();
+  });
+});

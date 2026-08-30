@@ -177,6 +177,7 @@ export default function PublicBenchmarkPage() {
             filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
             benchmarkScoreLabel={benchmarkScoreLabel}
             onReviewUnanswered={() => setActiveTab("outputs")}
+            runStopped={isRunStopped(data)}
           />
         )}
 
@@ -205,6 +206,7 @@ export default function PublicBenchmarkPage() {
         {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
+              runStopped={isRunStopped(data)}
               modelResults={data.model_results}
               expandedModels={expandedModels}
               onToggleModel={toggleModel}

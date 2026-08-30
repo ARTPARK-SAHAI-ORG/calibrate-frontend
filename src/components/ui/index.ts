@@ -19,6 +19,7 @@ export { DuplicateIconButton } from "./DuplicateIconButton";
 export { RerunIconButton } from "./RerunIconButton";
 export { StopRunButton } from "./StopRunButton";
 export { StoppedRunPill } from "./StoppedRunPill";
+export { RunStateMark } from "./RunStateMark";
 export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
 export { DialogNavHeader } from "./DialogNavHeader";

@@ -2,7 +2,8 @@
 
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
-import { WarningTriangleIcon } from "@/components/icons";
+import { RunNote } from "./RunNote";
+import { stoppedRunSentence } from "@/lib/testTypes";
 import {
   benchmarkAnsweredPassFail,
   benchmarkRatingEvaluatorCaption,
@@ -32,6 +33,8 @@ type BenchmarkCombinedLeaderboardProps = {
   /** Opens the tab listing every test, so the ones that could not be run can
    * be read. Without it the note names the tab but does not link to it. */
   onReviewUnanswered?: () => void;
+  /** True when someone stopped the run before it finished. */
+  runStopped?: boolean;
 };
 
 /**
@@ -74,17 +77,55 @@ function UnansweredNote({
   );
 
   return (
-    <div className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
-      <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-      <p>
-        {!sameForEveryModel
+    <RunNote>
+      {!sameForEveryModel
           ? "Some tests could not be run and were ignored for calculating the metrics. "
           : answered === 0
             ? "None of the tests could be run. "
             : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
-        Review the tests that could not be run in the {tab}.
-      </p>
-    </div>
+      Review the tests that could not be run in the {tab}.
+    </RunNote>
+  );
+}
+
+/**
+ * The note above the table when someone stopped the run. Says how far it got,
+ * counted across every model, the same way the run window's summary says it.
+ */
+function StoppedNote({
+  modelResults,
+  onReviewUnanswered,
+}: {
+  modelResults: BenchmarkModelLike[];
+  onReviewUnanswered?: () => void;
+}) {
+  let ran = 0;
+  let total = 0;
+  for (const model of modelResults) {
+    const counts = benchmarkAnsweredPassFail(model);
+    if (counts) ran += counts.answered + counts.unanswered;
+    total += model.total_tests ?? model.test_results?.length ?? 0;
+  }
+
+  const tab = onReviewUnanswered ? (
+    <button
+      type="button"
+      onClick={onReviewUnanswered}
+      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+    >
+      {RESULT_TAB_LABELS.outputs} tab
+    </button>
+  ) : (
+    <span className="font-medium">{RESULT_TAB_LABELS.outputs} tab</span>
+  );
+
+  // The same sentence the run window's summary says, counted across every
+  // model rather than over one run's tests.
+  return (
+    <RunNote>
+      {stoppedRunSentence(ran, total)}
+      {ran > 0 ? <>. The tests that did run are in the {tab}.</> : null}
+    </RunNote>
   );
 }
 
@@ -204,6 +245,7 @@ export function BenchmarkCombinedLeaderboard({
   benchmarkScoreLabel = "Test pass rate (%)",
   className,
   onReviewUnanswered,
+  runStopped = false,
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -224,6 +266,16 @@ export function BenchmarkCombinedLeaderboard({
   );
 
   if (!payload || payload.rows.length === 0) {
+    if (runStopped) {
+      return (
+        <div className={className}>
+          <StoppedNote
+            modelResults={modelResults}
+            onReviewUnanswered={onReviewUnanswered}
+          />
+        </div>
+      );
+    }
     return (
       <div className="text-center py-12">
         <p className="text-sm text-muted-foreground">No leaderboard data available</p>
@@ -233,6 +285,12 @@ export function BenchmarkCombinedLeaderboard({
 
   return (
     <div className="space-y-4">
+      {runStopped && (
+        <StoppedNote
+          modelResults={modelResults}
+          onReviewUnanswered={onReviewUnanswered}
+        />
+      )}
       <UnansweredNote
         modelResults={modelResults}
         onReviewUnanswered={onReviewUnanswered}

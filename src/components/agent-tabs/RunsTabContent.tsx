@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   useAccessToken,
@@ -17,8 +17,9 @@ import {
   isRunInProgress,
   isRunStopped,
   runDisplayName,
+  runStateOf,
 } from "@/lib/testTypes";
-import { ServerPaginatedListBar } from "@/components/ui";
+import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
 import {
   EvaluatorPillList,
   NamePillList,
@@ -79,6 +80,24 @@ export function runModels(run: AgentRun): string[] {
     .filter(Boolean);
 }
 
+/** One run's name, with the mark for how the run itself went. */
+function RunName({ run }: { run: AgentRun }) {
+  const state = runStateOf(run);
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {state && <RunStateMark state={state} />}
+      <span className="truncate text-sm font-medium text-foreground">
+        {runDisplayName(run.type, run.name)}
+      </span>
+    </span>
+  );
+}
+
+/** What the results cell says when the run has no results to show. */
+function RunResultPlaceholder() {
+  return <span className="text-sm text-muted-foreground/70">No results</span>;
+}
+
 const PILL_CLASS =
   "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
 
@@ -111,16 +130,6 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
-  // A run someone stopped says so first: the tally that follows covers only
-  // the tests it reached, so on its own it would read as the whole run.
-  const stoppedPill = isRunStopped(run) ? (
-    <span
-      className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
-    >
-      Stopped
-    </span>
-  ) : null;
-
   // A run where some tests produced no answer reads better as
   // "N Success / N Fail / N Not run" than as a single blanket Error, so prefer
   // the tally when the run reports one.
@@ -128,7 +137,11 @@ function RunResult({ run }: { run: AgentRun }) {
     run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
 
   if (!breakdown) {
-    if (stoppedPill) return stoppedPill;
+    // A stopped run has nothing to tally: it never got to a test, or it is a
+    // model comparison, which carries no counts either way. Say so in the same
+    // words the models cell says "Default", rather than calling it complete or
+    // leaving the reader with a blank.
+    if (isRunStopped(run)) return <RunResultPlaceholder />;
     return isRunErrored(run) ? (
       <span
         className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
@@ -146,7 +159,6 @@ function RunResult({ run }: { run: AgentRun }) {
 
   return (
     <>
-      {stoppedPill}
       {breakdown.passed > 0 && (
         <span
           className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
@@ -482,7 +494,9 @@ export function RunsTabContent({
             <table className="w-full table-fixed">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-44">
+                  {/* Wide enough for the longest name plus its mark, e.g.
+                      "Model comparison 999", without cutting it short. */}
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-60">
                     Run
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -510,9 +524,7 @@ export function RunsTabContent({
                     className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     <td className="px-4 py-3">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        {runDisplayName(run.type, run.name)}
-                      </span>
+                      <RunName run={run} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
@@ -546,9 +558,7 @@ export function RunsTabContent({
                 className="border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                    {runDisplayName(run.type, run.name)}
-                  </span>
+                  <RunName run={run} />
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                     {countCell(runTestCount(run))} tests
                   </span>

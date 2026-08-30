@@ -81,6 +81,9 @@ type BenchmarkOutputsPanelProps = {
   showControls?: boolean;
   /** Show spinner for running tests */
   showRunningSpinner?: boolean;
+  /** True when someone stopped the run before it finished. Tests it never
+   * started are named as not run instead of being left spinning. */
+  runStopped?: boolean;
   height?: string;
   /** Top-level evaluators[] keyed by uuid. Threaded down into the
    * per-evaluator cards as the source of truth for name, description,
@@ -108,9 +111,13 @@ export function benchmarkLabellingKey(model: string, testIndex: number): string 
 // the rendered rows so they always agree.
 function benchmarkTestStatus(
   tr: BenchmarkTestResult,
-): "error" | "running" | "passed" | "failed" {
+  runStopped = false,
+): "error" | "running" | "passed" | "failed" | "not_run" {
   if (isUnanswered(tr)) return "error";
-  if (tr.passed === null) return "running";
+  // On a stopped run a test with no verdict never started: the run is over, so
+  // nothing more is coming for it.
+  if (tr.passed === null || tr.passed === undefined)
+    return runStopped ? "not_run" : "running";
   return tr.passed ? "passed" : "failed";
 }
 
@@ -143,6 +150,7 @@ function collectModelLabellingKeys(
   testNames: string[],
   statusFilter: "all" | "passed" | "failed" | "errored",
   searchQuery: string,
+  runStopped = false,
 ): string[] {
   const query = searchQuery.trim().toLowerCase();
   const resultsCount = modelResult.test_results?.length ?? 0;
@@ -155,7 +163,7 @@ function collectModelLabellingKeys(
     // A test that would always be skipped on submission is not tickable and
     // must not be swept up by a select-all either.
     if (!isLabellingEligibleRaw(testResult)) continue;
-    const status = benchmarkTestStatus(testResult);
+    const status = benchmarkTestStatus(testResult, runStopped);
     const testName = benchmarkTestName(testResult, index, testNames);
     if (!matchesBenchmarkFilters(status, testName, statusFilter, query)) continue;
     keys.push(benchmarkLabellingKey(modelResult.model, index));
@@ -175,6 +183,7 @@ export function BenchmarkOutputsPanel({
   formatModelName = (n) => n,
   showControls = true,
   showRunningSpinner = false,
+  runStopped = false,
   height,
   evaluatorsByUuid,
   enableEvaluatorLinks = true,
@@ -216,14 +225,14 @@ export function BenchmarkOutputsPanel({
     let errored = 0;
     for (const m of modelResults) {
       for (const tr of m.test_results ?? []) {
-        const status = benchmarkTestStatus(tr);
+        const status = benchmarkTestStatus(tr, runStopped);
         if (status === "passed") passed++;
         else if (status === "failed") failed++;
         else if (status === "error") errored++;
       }
     }
     return { passed, failed, errored };
-  }, [modelResults]);
+  }, [modelResults, runStopped]);
   const distinctStatuses =
     (statusCounts.passed > 0 ? 1 : 0) +
     (statusCounts.failed > 0 ? 1 : 0) +
@@ -281,14 +290,14 @@ export function BenchmarkOutputsPanel({
     const out: { model: string; testIndex: number }[] = [];
     for (const m of modelResults) {
       (m.test_results ?? []).forEach((tr, index) => {
-        const status = benchmarkTestStatus(tr);
+        const status = benchmarkTestStatus(tr, runStopped);
         const name = benchmarkTestName(tr, index, testNames);
         if (!matchesBenchmarkFilters(status, name, statusFilter, q)) return;
         out.push({ model: m.model, testIndex: index });
       });
     }
     return out;
-  }, [modelResults, statusFilter, searchQuery, testNames]);
+  }, [modelResults, statusFilter, searchQuery, testNames, runStopped]);
   const currentTestIndex = selectedTest
     ? orderedTests.findIndex(
         (t) =>
@@ -524,6 +533,7 @@ export function BenchmarkOutputsPanel({
                 searchQuery={searchQuery}
                 formatModelName={formatModelName}
                 showRunningSpinner={showRunningSpinner}
+                runStopped={runStopped}
                 selectedRowRef={selectedRowRef}
                 labellingSelection={labellingSelection}
                 onToggleLabellingSelection={onToggleLabellingSelection}
@@ -564,6 +574,12 @@ export function BenchmarkOutputsPanel({
           {selectedTestResult ? (
             isUnanswered(selectedTestResult) ? (
               <TestCouldNotRunNotice reason={selectedTestResult.reasoning} />
+            ) : selectedTestResult.passed === null && runStopped ? (
+              <div className="flex items-center justify-center h-full p-6">
+                <p className="text-muted-foreground text-center">
+                  This test was not run. The run was stopped before it got here.
+                </p>
+              </div>
             ) : selectedTestResult.passed === null && showRunningSpinner ? (
               <div className="flex items-center justify-center h-full">
                 <div className="flex items-center gap-3">
@@ -641,6 +657,7 @@ function ModelSection({
   searchQuery,
   formatModelName,
   showRunningSpinner = false,
+  runStopped = false,
   selectedRowRef,
   labellingSelection,
   onToggleLabellingSelection,
@@ -657,19 +674,24 @@ function ModelSection({
   searchQuery: string;
   formatModelName: (name: string) => string;
   showRunningSpinner?: boolean;
+  runStopped?: boolean;
   selectedRowRef: React.RefObject<HTMLDivElement | null>;
   labellingSelection?: Set<string>;
   onToggleLabellingSelection?: (key: string) => void;
   onLabellingBulkToggle?: (ids: string[]) => void;
   showLabellingCheckboxes?: boolean;
 }) {
-  const isProcessing = modelResult.success === null;
+  // A model the run never got through is not still working once the run has
+  // been stopped: nothing more is coming for it.
+  const isProcessing = modelResult.success === null && !runStopped;
+  const stoppedUnfinished = modelResult.success === null && runStopped;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
   // Rows land one by one while the model runs, so count the ones that already
   // have a verdict (or errored) for the live "x of y done" header.
-  const finishedCount = (modelResult.test_results ?? []).filter(
-    (t) => t && benchmarkTestStatus(t) !== "running",
-  ).length;
+  const finishedCount = (modelResult.test_results ?? []).filter((t) => {
+    const status = t && benchmarkTestStatus(t, runStopped);
+    return status && status !== "running" && status !== "not_run";
+  }).length;
   const passedCount = modelResult.passed ?? 0;
   const erroredCount = (modelResult.test_results ?? []).filter(
     (t) => t && isUnanswered(t),
@@ -726,6 +748,11 @@ function ModelSection({
               {finishedCount} of {expectedCount} done
             </div>
           )}
+          {stoppedUnfinished && (
+            <div className="text-xs text-amber-600 dark:text-amber-500 flex-shrink-0 ml-4">
+              Stopped after {finishedCount} of {expectedCount}
+            </div>
+          )}
           {!isProcessing && modelResult.success !== null && (
             <div className="flex items-center gap-2 text-xs flex-shrink-0 ml-4">
               {(statusFilter === "all" || statusFilter === "passed") && (
@@ -764,7 +791,11 @@ function ModelSection({
             if (expectedCount === 0 && !hasResults) {
               return (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {isProcessing ? "Processing..." : "No test results"}
+                  {isProcessing
+                    ? "Processing..."
+                    : stoppedUnfinished
+                      ? "The run was stopped before this model was tried."
+                      : "No test results"}
                 </div>
               );
             }
@@ -775,12 +806,17 @@ function ModelSection({
                   const testResult = modelResult.test_results?.[index];
                   const hasResult = !!testResult;
 
-                  // Skip placeholder rows for completed benchmarks — only show running placeholders during in-progress
-                  if (!hasResult && !showRunningSpinner) return null;
+                  // Skip placeholder rows for completed benchmarks — only show
+                  // running placeholders during in-progress, and the tests a
+                  // stopped run never got to.
+                  if (!hasResult && !showRunningSpinner && !runStopped)
+                    return null;
 
                   const status = hasResult
-                    ? benchmarkTestStatus(testResult)
-                    : "running";
+                    ? benchmarkTestStatus(testResult, runStopped)
+                    : runStopped
+                      ? "not_run"
+                      : "running";
                   const testName = benchmarkTestName(testResult, index, testNames);
 
                   if (!matchesBenchmarkFilters(status, testName, statusFilter, query))
@@ -831,7 +867,17 @@ function ModelSection({
                           onClick={() => onTestSelect(index)}
                           className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
                         >
-                          <StatusIcon status={status as "running" | "passed" | "failed" | "error"} />
+                          <StatusIcon
+                            status={
+                              status === "not_run"
+                                ? "queued"
+                                : (status as
+                                    | "running"
+                                    | "passed"
+                                    | "failed"
+                                    | "error")
+                            }
+                          />
                           <span className="text-sm text-foreground truncate">{testName}</span>
                         </button>
                       </div>
@@ -840,7 +886,7 @@ function ModelSection({
 
                   return (
                     <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg">
-                      <StatusIcon status="running" />
+                      <StatusIcon status={runStopped ? "queued" : "running"} />
                       <span className="text-sm text-foreground truncate">{testName}</span>
                     </div>
                   );

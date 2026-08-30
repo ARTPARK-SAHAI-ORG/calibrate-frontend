@@ -183,6 +183,41 @@ export function isRunStopped(run: { aborted?: boolean | null }): boolean {
   return run.aborted === true;
 }
 
+/**
+ * What a stopped run says about itself: how many of its tests ran before it
+ * was stopped, out of how many it set out to do.
+ *
+ * The ONE wording. The run window's summary and the model comparison's
+ * leaderboard both say it, so it lives here and neither writes its own. No
+ * full stop: a caller that follows it with another sentence adds one.
+ */
+export function stoppedRunSentence(
+  testsRun: number,
+  totalTests: number | null,
+): string {
+  if (testsRun === 0) return "This run was stopped before any test ran";
+  if (totalTests && totalTests > 0)
+    return `This run was stopped after ${testsRun} of ${totalTests} tests ran`;
+  return "This run was stopped before it finished";
+}
+
+/**
+ * How a run itself went, as opposed to how its tests went. Null while the run
+ * is still going, which the run says where its results would be.
+ */
+export type RunState = "finished" | "stopped" | "error";
+
+/**
+ * Which of those a run is. The one rule, so the list of runs and the window
+ * that opens from it cannot disagree.
+ */
+export function runStateOf(run: RunStatusLike): RunState | null {
+  if (isRunStopped(run)) return "stopped";
+  if (isRunErrored(run)) return "error";
+  if (isRunInProgress(run)) return null;
+  return "finished";
+}
+
 /** The run has not finished yet. */
 export function isRunInProgress(run: RunStatusLike): boolean {
   return (

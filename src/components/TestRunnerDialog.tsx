@@ -1,6 +1,12 @@
 "use client";
 import { reportError } from "@/lib/reportError";
-import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
+import {
+  isNotRun,
+  isRunStopped,
+  isUnanswered,
+  runStateOf,
+  stoppedRunSentence,
+} from "@/lib/testTypes";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -17,7 +23,12 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RerunIconButton, ResultTabs, StopRunButton } from "@/components/ui";
+import {
+  RerunIconButton,
+  ResultTabs,
+  RunStateMark,
+  StopRunButton,
+} from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -401,6 +412,12 @@ export function TestRunnerDialog({
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
                   </span>
                 )}
+                {run &&
+                  !isLoading &&
+                  (() => {
+                    const state = runStateOf(run);
+                    return state ? <RunStateMark state={state} /> : null;
+                  })()}
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {"Evaluation run"}
                 </h2>
@@ -561,6 +578,7 @@ export function TestRunnerDialog({
                   unanswered={unansweredCount}
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
+                  runTotalTests={run?.total_tests ?? rows.length}
                   onReviewUnanswered={() => setActiveTab("outputs")}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}
@@ -599,6 +617,11 @@ export function TestRunnerDialog({
                   onClearSelection={() => setSelectedTestUuid(null)}
                   onNavChange={setNav}
                   evaluatorsByUuid={evaluatorsByUuid}
+                  emptyMessage={
+                    wasStopped
+                      ? stoppedRunSentence(0, run?.total_tests ?? null)
+                      : "No tests to show"
+                  }
                   legacyDefaultEvaluator={defaultNextReplyEvaluator}
                   labellingSelection={
                     showLabelling ? labellingSelectedIds : undefined
