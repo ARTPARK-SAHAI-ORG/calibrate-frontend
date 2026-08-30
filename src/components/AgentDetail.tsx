@@ -26,6 +26,7 @@ import {
   findModelInProviders,
   useVerifyConnection,
   usePageErrorState,
+  useAgentHasRuns,
 } from "@/hooks";
 import {
   SpinnerIcon,
@@ -155,6 +156,12 @@ export function AgentDetail({
   };
 
   const { providers: llmProviders } = useOpenRouterModels();
+  // The Evaluations tab is hidden until this agent has at least one run:
+  // an empty tab tells the reader nothing.
+  const { hasRuns, markHasRuns } = useAgentHasRuns(
+    agentUuid,
+    backendAccessToken,
+  );
 
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -183,6 +190,14 @@ export function AgentDetail({
   // opened earlier (kept mounted-but-hidden for keep-alive).
   const shouldRenderTab = (tab: TabType) =>
     activeTab === tab || visitedTabs.has(tab);
+
+  // Nothing has been run yet, so the Evaluations tab is gone: land on the
+  // first tab that is still there.
+  useEffect(() => {
+    if (hasRuns === false && activeTab === "runs" && agent) {
+      performTabSwitch(agent.type === "connection" ? "tests" : "agent");
+    }
+  }, [hasRuns, activeTab, agent]);
 
   // Bumped when the Traces tab turns traces into tests, so the Tests tab shows
   // them even when it was already open earlier in this visit.
@@ -1185,8 +1200,9 @@ export function AgentDetail({
         className="hide-scrollbar flex items-center gap-3 md:gap-4 lg:gap-6 border-b border-border overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {(agent.type === "connection" ? connectionTabs : calibrateTabs).map(
-          (tab) => (
+        {(agent.type === "connection" ? connectionTabs : calibrateTabs)
+          .filter((tab) => tab !== "runs" || hasRuns !== false)
+          .map((tab) => (
             <button
               key={tab}
               data-tour={`agent-tab-${tab}`}
@@ -1199,8 +1215,7 @@ export function AgentDetail({
             >
               {tabLabels[tab]}
             </button>
-          ),
-        )}
+          ))}
       </div>
 
       {/* Tab Content Container — the outer wrapper's `space-y` already sets
@@ -1327,10 +1342,14 @@ export function AgentDetail({
                 }))
               }
               onGoToConnectionSettings={() => performTabSwitch("connection")}
-              onRunStarted={() => setRunsReloadKey((k) => k + 1)}
+              onRunStarted={() => {
+                markHasRuns();
+                setRunsReloadKey((k) => k + 1);
+              }}
               // Closing the run window lands on Evaluations, where that run is
               // listed, rather than back on the tests that started it.
               onRunWindowClosed={() => {
+                markHasRuns();
                 setRunsReloadKey((k) => k + 1);
                 performTabSwitch("runs");
               }}
@@ -1342,7 +1361,7 @@ export function AgentDetail({
         )}
 
         {/* Runs Tab Content */}
-        {shouldRenderTab("runs") && (
+        {hasRuns !== false && shouldRenderTab("runs") && (
           <div className={activeTab === "runs" ? undefined : "hidden"}>
             <RunsTabContent
               key={runsReloadKey}

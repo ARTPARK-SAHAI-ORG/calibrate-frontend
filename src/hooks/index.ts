@@ -21,6 +21,7 @@ export {
   type RunResultFilter,
   type RunTypeFilter,
 } from "./useAgentRuns";
+export { useAgentHasRuns } from "./useAgentHasRuns";
 export { usePageSize, PAGE_SIZE_OPTIONS } from "./usePageSize";
 export { useTraceDeletion } from "./useTraceDeletion";
 export { useDialogUrlParam } from "./useDialogUrlParam";
