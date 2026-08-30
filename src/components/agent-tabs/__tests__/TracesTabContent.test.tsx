@@ -82,6 +82,9 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
 // The stub prints what the dialog was handed, so the mapping from traces to
 // labelling items is exercised rather than assumed.
 jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
+  // The rule deciding what a trace can be labelled as is shared with this
+  // tab, so it has to stay real; only the dialog itself is stood in for.
+  ...jest.requireActual("../../human-labelling/AddRunToLabellingTaskDialog"),
   AddRunToLabellingTaskDialog: ({
     isOpen,
     source,
@@ -1273,24 +1276,42 @@ describe("TracesTabContent", () => {
       );
     });
 
-    it("refuses a selection that only made tool calls", async () => {
+    it("submits a tool-call-only selection straight to a tool-call task, skipping evaluators", async () => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(
         tracesResult([trace({ response_preview: null, tool_call_count: 1 })]),
       );
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
+        detail({
+          uuid,
+          output: {
+            response: null,
+            tool_calls: [{ tool: "lookup", arguments: { q: "x" } }],
+          },
+        }),
+      );
       render(<TracesTabContent {...tabProps} />);
 
       await user.click(screen.getAllByLabelText("Select trace")[0]);
-      // No count, because there is nothing here an annotator can score.
-      await user.click(screen.getByText("Submit for labelling"));
+      await user.click(screen.getByText("Submit for labelling (1)"));
 
-      expect(toast.error).toHaveBeenCalledWith(
-        "Traces that made tool calls cannot be labelled yet. Unpick them and try again.",
-      );
+      // No evaluator step for a tool-call task, and no error.
       expect(screen.queryByTestId("labelling-evaluators")).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
+      );
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-1");
+      // The tool call is carried through, and no evaluators are attached.
+      expect(screen.getByTestId("labelling-payload")).toHaveTextContent(
+        "lookup",
+      );
+      expect(screen.getByTestId("labelling-evaluator-uuids").textContent).toBe(
+        "",
+      );
     });
 
-    it("stops the whole submission when one selected trace made a tool call", async () => {
+    it("takes both a reply and a tool-call-only trace from a mixed selection", async () => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(
         tracesResult([
@@ -1306,17 +1327,19 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
 
       await user.click(screen.getByLabelText("Select all traces"));
-      // Nothing is quietly left behind: the reader is told and nothing is sent.
-      await user.click(screen.getByText("Submit for labelling"));
+      // Both can be labelled, so neither is dropped and the count is 2. The
+      // evaluator step still runs, because the reply needs a judge picked.
+      await user.click(screen.getByText("Submit for labelling (2)"));
+      await user.click(screen.getByText("choose evaluators"));
 
-      expect(toast.error).toHaveBeenCalledWith(
-        "Traces that made tool calls cannot be labelled yet. Unpick them and try again.",
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
       );
-      expect(screen.queryByTestId("labelling-evaluators")).toBeNull();
-      expect(fetchTrace).not.toHaveBeenCalled();
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-1");
+      expect(fetchTrace).toHaveBeenCalledWith("test-token", "trace-2");
     });
 
-    it("stops it for a trace that both replied and called a tool", async () => {
+    it("labels a trace that both replied and called a tool as a response", async () => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(
         tracesResult([trace({ tool_call_count: 1 })]),
@@ -1324,12 +1347,14 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
 
       await user.click(screen.getAllByLabelText("Select trace")[0]);
-      await user.click(screen.getByText("Submit for labelling"));
+      // It replied, so it is labellable as a response — not blocked.
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      await user.click(screen.getByText("choose evaluators"));
 
-      expect(toast.error).toHaveBeenCalledWith(
-        "Traces that made tool calls cannot be labelled yet. Unpick them and try again.",
+      await waitFor(() =>
+        expect(screen.getByTestId("labelling-task")).toBeInTheDocument(),
       );
-      expect(screen.queryByTestId("labelling-evaluators")).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
     });
 
     it("asks for evaluators, then hands the full traces to the task dialog", async () => {

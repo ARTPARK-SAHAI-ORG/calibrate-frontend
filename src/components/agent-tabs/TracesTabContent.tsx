@@ -11,8 +11,11 @@ import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabelli
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import {
   AddRunToLabellingTaskDialog,
+  isLabellableOutput,
+  isToolCallOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
+  type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
@@ -59,6 +62,16 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
  * The Traces tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
+/** The two facts the labelling rule needs, read off a list row. The row
+ * carries a preview of the reply and a count of the calls, not the output
+ * itself, so this is where that shape is turned into the shared one. */
+function traceRowOutputFacts(trace: TraceSummary): TraceOutputFacts {
+  return {
+    hasResponse: !!trace.response_preview?.trim(),
+    hasToolCalls: trace.tool_call_count > 0,
+  };
+}
+
 export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
@@ -184,17 +197,21 @@ export function TracesTabContent({
         ? "general"
         : "response";
 
-  // Annotators score what the agent said, and a tool call is not that, so a
-  // trace carrying one cannot go for labelling. One in the selection stops the
-  // whole submission rather than being dropped without saying so.
-  const hasToolCallTrace = selectedTraces.some(
-    (trace) => trace.tool_call_count > 0,
+  // What a row can be labelled as is decided by the same rule the labelling
+  // dialog uses, fed from the preview and the count the list row carries. Both
+  // sides deciding through one rule is what keeps the count on the button and
+  // what the dialog builds in step with each other.
+  const labellableTraces = selectedTraces.filter((trace) =>
+    isLabellableOutput(traceRowOutputFacts(trace)),
   );
-  const labellableUuids = hasToolCallTrace
-    ? []
-    : selectedTraces
-        .filter((trace) => !!trace.response_preview?.trim())
-        .map((trace) => trace.uuid);
+  const labellableUuids = labellableTraces.map((trace) => trace.uuid);
+  // A selection that is nothing but tool calls skips the evaluator step: a
+  // person marks each call correct or wrong, so there is no AI judge to pick.
+  const labellingIsToolCallOnly =
+    labellableTraces.length > 0 &&
+    labellableTraces.every((trace) =>
+      isToolCallOutput(traceRowOutputFacts(trace)),
+    );
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -616,13 +633,13 @@ export function TracesTabContent({
                       emptyMessage={
                         everyTraceMatching
                           ? "Labelling works on the traces you tick. Untick the whole list and pick the ones to send."
-                          : selected.size === 0
-                            ? "Select at least one trace to submit for labelling."
-                            : hasToolCallTrace
-                              ? "Traces that made tool calls cannot be labelled yet. Unpick them and try again."
-                              : "Labelling traces that only made tool calls is not supported yet."
+                          : "Select at least one trace to submit for labelling."
                       }
-                      onOpen={() => setEvaluatorStepOpen(true)}
+                      onOpen={() =>
+                        labellingIsToolCallOnly
+                          ? prepareLabelling([])
+                          : setEvaluatorStepOpen(true)
+                      }
                       className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                     />
                   )}

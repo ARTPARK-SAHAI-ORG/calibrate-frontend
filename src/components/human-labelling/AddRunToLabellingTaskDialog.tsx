@@ -168,6 +168,58 @@ export function targetTaskTypeForSource(
   }
 }
 
+/** The only two things about a trace's output that decide how it is labelled.
+ * The traces list has them as a preview and a count, this dialog has them as
+ * the fetched output; both boil down to the same pair. */
+export type TraceOutputFacts = {
+  hasResponse: boolean;
+  hasToolCalls: boolean;
+};
+
+/** True when the output is a tool call and nothing else. Such a trace is built
+ * as a tool-call item (a person marks it correct or wrong) rather than a
+ * response item. A trace that also replied is a response item, and its call
+ * rides along in the conversation. */
+export function isToolCallOutput({
+  hasResponse,
+  hasToolCalls,
+}: TraceOutputFacts): boolean {
+  return !hasResponse && hasToolCalls;
+}
+
+/** Whether a trace can be labelled at all. It can if it either replied or
+ * called a tool; both become items in the same task. A trace that did neither
+ * has nothing to show an annotator.
+ *
+ * The traces list and this dialog both decide through here, so the count on
+ * the "Submit for labelling" button and what the dialog actually builds
+ * cannot drift apart. */
+export function isLabellableOutput({
+  hasResponse,
+  hasToolCalls,
+}: TraceOutputFacts): boolean {
+  return hasResponse || hasToolCalls;
+}
+
+/** The two facts, read off a trace this dialog has already fetched. */
+export function traceOutputFacts(t: TraceLabellingItem): TraceOutputFacts {
+  return {
+    hasResponse:
+      typeof t.output?.response === "string" &&
+      t.output.response.trim().length > 0,
+    hasToolCalls:
+      Array.isArray(t.output?.tool_calls) && t.output.tool_calls.length > 0,
+  };
+}
+
+export function isToolCallTrace(t: TraceLabellingItem): boolean {
+  return isToolCallOutput(traceOutputFacts(t));
+}
+
+export function isLabellableTrace(t: TraceLabellingItem): boolean {
+  return isLabellableOutput(traceOutputFacts(t));
+}
+
 /** Singular / plural noun for the items being submitted, per source kind. */
 export function itemNounForSource(source: AddRunToLabellingTaskSource): {
   one: string;
@@ -686,13 +738,33 @@ export function buildItemsFromSource(
       if (source.agentNature === "general") {
         for (const t of source.traces) {
           const input = typeof t.input === "string" ? t.input : "";
-          const output = t.output?.response ?? "";
-          if (!input.trim() || !output.trim()) {
+          if (!input.trim() || !isLabellableTrace(t)) {
             skippedCount += 1;
             continue;
           }
+          // A trace that only called a tool becomes a tool-call item here too,
+          // holding the call beside the input that produced it. There is no
+          // expected call to compare against, so a person judges it on its own.
+          if (isToolCallTrace(t)) {
+            items.push(
+              buildToolCallItem({
+                test_case: {
+                  name: t.name,
+                  input,
+                  evaluation: { type: "tool_call", tool_calls: [] },
+                },
+                output: t.output as { tool_calls?: ToolCallOutput[] },
+              }),
+            );
+            continue;
+          }
           items.push({
-            payload: { name: t.name, input, output, evaluator_variables: {} },
+            payload: {
+              name: t.name,
+              input,
+              output: t.output?.response ?? "",
+              evaluator_variables: {},
+            },
           });
         }
         for (const ev of source.evaluators ?? []) {
@@ -705,7 +777,28 @@ export function buildItemsFromSource(
           toolCallEvaluatorUuids,
         };
       }
+      // Conversational traces all go to an `llm` task: a trace that replied
+      // becomes a response item, a trace that only called a tool becomes a
+      // tool-call item. A trace has no expected calls, so that side stays
+      // empty and a person judges the call on its own.
       for (const t of source.traces) {
+        if (!isLabellableTrace(t)) {
+          skippedCount += 1;
+          continue;
+        }
+        if (isToolCallTrace(t)) {
+          items.push(
+            buildToolCallItem({
+              test_case: {
+                name: t.name,
+                history: t.input as TestCaseHistory[],
+                evaluation: { type: "tool_call", tool_calls: [] },
+              },
+              output: t.output as { tool_calls?: ToolCallOutput[] },
+            }),
+          );
+          continue;
+        }
         const built = buildOneItem({
           test_case: {
             name: t.name,

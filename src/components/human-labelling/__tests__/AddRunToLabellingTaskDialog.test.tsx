@@ -2,10 +2,15 @@ import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   AddRunToLabellingTaskDialog,
   buildItemsFromSource,
+  isLabellableOutput,
+  isLabellableTrace,
   isLabellingEligibleRaw,
+  isToolCallOutput,
   isToolCallTest,
+  isToolCallTrace,
   itemNounForSource,
   targetTaskTypeForSource,
+  traceOutputFacts,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
 
@@ -670,7 +675,126 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.skippedCount).toBe(2);
   });
 
-  it("appends a trace's output tool calls to chat_history as the final turns", () => {
+  it.each([
+    {
+      hasResponse: true,
+      hasToolCalls: false,
+      labellable: true,
+      toolCall: false,
+    },
+    {
+      hasResponse: false,
+      hasToolCalls: true,
+      labellable: true,
+      toolCall: true,
+    },
+    {
+      hasResponse: true,
+      hasToolCalls: true,
+      labellable: true,
+      toolCall: false,
+    },
+    {
+      hasResponse: false,
+      hasToolCalls: false,
+      labellable: false,
+      toolCall: false,
+    },
+  ])(
+    "decides reply=$hasResponse call=$hasToolCalls the same for the list and the dialog",
+    ({ hasResponse, hasToolCalls, labellable, toolCall }) => {
+      const facts = { hasResponse, hasToolCalls };
+      expect(isLabellableOutput(facts)).toBe(labellable);
+      expect(isToolCallOutput(facts)).toBe(toolCall);
+      // The traces list reads these two facts off a row, the dialog reads them
+      // off the fetched trace. Same facts in, same answer out, which is what
+      // stops the button's count and the dialog disagreeing.
+      const t = {
+        name: "t",
+        input: "hi",
+        output: {
+          response: hasResponse ? "hello" : "",
+          tool_calls: hasToolCalls ? [{ tool: "book" }] : [],
+        },
+      };
+      expect(traceOutputFacts(t)).toEqual(facts);
+      expect(isLabellableTrace(t)).toBe(labellable);
+      expect(isToolCallTrace(t)).toBe(toolCall);
+    },
+  );
+
+  it("builds a general trace that only called a tool as a tool-call item", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        {
+          name: "Books an appointment",
+          input: "book me in",
+          output: {
+            response: "",
+            tool_calls: [
+              { tool: "book_appointment", arguments: { day: "Monday" } },
+            ],
+          },
+        },
+      ],
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    expect(isToolCallTrace(source.traces[0])).toBe(true);
+    expect(targetTaskTypeForSource(source)).toBe("llm-general");
+    const result = buildItemsFromSource(source);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(0);
+    const p = result.items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Books an appointment");
+    // A single agent response agent has no conversation, so the one input it
+    // was given sits beside the call it made.
+    expect(p.input).toBe("book me in");
+    expect(p.chat_history).toBeUndefined();
+    expect(p.actual_tool_calls).toEqual([
+      { tool: "book_appointment", arguments: { day: "Monday" } },
+    ]);
+    // A trace has no expected calls to compare against.
+    expect(p.expected_tool_calls).toEqual([]);
+  });
+
+  it("builds general reply traces and tool-call traces into the same task", () => {
+    const result = buildItemsFromSource({
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      agentNature: "general",
+      traces: [
+        {
+          name: "Replied",
+          input: "when is the next vaccination?",
+          output: { response: "At 14 weeks." },
+        },
+        {
+          name: "Only tool call",
+          input: "book me in",
+          output: {
+            response: "",
+            tool_calls: [{ tool: "book", arguments: {} }],
+          },
+        },
+      ],
+    });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
+    expect(result.items[0].payload.output).toBe("At 14 weeks.");
+    expect(result.items[0].payload.actual_tool_calls).toBeUndefined();
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: {} },
+    ]);
+  });
+
+  it("appends output tool calls to chat_history for a trace that also replied", () => {
+    // A trace WITH a text reply is a response item; the call rides along in
+    // the conversation, because the reply is what gets labelled.
     const source: AddRunToLabellingTaskSource = {
       type: "traces",
       agentUuid: "agent-uuid-1",
@@ -679,7 +803,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
           name: "Books an appointment",
           input: [{ role: "user", content: "book me in" }],
           output: {
-            response: "",
+            response: "Booked!",
             tool_calls: [
               {
                 tool: "book_appointment",
@@ -713,6 +837,92 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       role: "tool",
       content: JSON.stringify({ ok: true }),
     });
+    expect(result.items[0].payload.agent_response).toBe("Booked!");
+  });
+
+  it("builds a trace that only called a tool as a tool-call item", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Books an appointment",
+          input: [{ role: "user", content: "book me in" }],
+          output: {
+            response: "",
+            tool_calls: [
+              { tool: "book_appointment", arguments: { day: "Monday" } },
+            ],
+          },
+        },
+      ],
+      evaluators: [{ uuid: "trace-ev-1", name: "Helpfulness" }],
+    };
+    expect(isToolCallTrace(source.traces[0])).toBe(true);
+    expect(isLabellableTrace(source.traces[0])).toBe(true);
+    expect(targetTaskTypeForSource(source)).toBe("llm");
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.skippedCount).toBe(0);
+    const p = result.items[0].payload as Record<string, unknown>;
+    expect(p.name).toBe("Books an appointment");
+    // The conversation stops before the call; the call itself is the thing
+    // being judged, so it sits in actual_tool_calls.
+    expect(p.chat_history).toEqual([{ role: "user", content: "book me in" }]);
+    expect(p.actual_tool_calls).toEqual([
+      { tool: "book_appointment", arguments: { day: "Monday" } },
+    ]);
+    // A trace has no expected calls to compare against.
+    expect(p.expected_tool_calls).toEqual([]);
+  });
+
+  it("builds reply traces and tool-call traces into the same llm task", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Replied",
+          input: [{ role: "user", content: "hi" }],
+          output: { response: "hello!" },
+        },
+        {
+          name: "Only tool call",
+          input: [{ role: "user", content: "book" }],
+          output: {
+            response: "",
+            tool_calls: [{ tool: "book", arguments: {} }],
+          },
+        },
+      ],
+    };
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(2);
+    expect(result.skippedCount).toBe(0);
+    expect(result.items[0].payload.name).toBe("Replied");
+    expect(result.items[0].payload.agent_response).toBe("hello!");
+    expect(result.items[1].payload.name).toBe("Only tool call");
+    expect(result.items[1].payload.actual_tool_calls).toEqual([
+      { tool: "book", arguments: {} },
+    ]);
+  });
+
+  it("skips a trace that neither replied nor called a tool", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "traces",
+      agentUuid: "agent-uuid-1",
+      traces: [
+        {
+          name: "Nothing happened",
+          input: [{ role: "user", content: "hi" }],
+          output: { response: "   ", tool_calls: [] },
+        },
+      ],
+    };
+    expect(isLabellableTrace(source.traces[0])).toBe(false);
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(0);
+    expect(result.skippedCount).toBe(1);
   });
 });
 
