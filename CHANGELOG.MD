@@ -1,5 +1,6 @@
 ## August 2026
 
+- the workspace size limit for a run now applies everywhere a run can be started, including reruns and saved datasets, not only the two buttons that checked it before ([#390](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/390))
 - You can now stop a test run or model comparison while it is still going and keep the results it already collected, and past runs show whether they finished, were stopped, or broke ([#492](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/492))
 - On a simulation run, an evaluator that did not score anything now shows a dash instead of wrongly showing as failed ([#498](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/498))
 - Compare models on a connection agent that has not turned on benchmarking now asks for the model provider and opens the comparison instead of just sending you to the Connection tab, and a failed model row now says "See why" instead of a plain arrow ([#482](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/482))
