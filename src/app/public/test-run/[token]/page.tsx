@@ -22,6 +22,7 @@ import {
   evaluatorSummaryToAbout,
 } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { ResultTabs } from "@/components/ui";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   buildEvaluatorSummaryFromResults,
@@ -162,15 +163,11 @@ export default function PublicTestRunPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["summary", "outputs", "about"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                {tab}
-              </button>
-            ))}
+            <ResultTabs
+              tabs={["summary", "outputs", "about"]}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+            />
           </div>
           {activeTab === "outputs" && nav && selectedId && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

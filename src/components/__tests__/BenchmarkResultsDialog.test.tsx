@@ -89,6 +89,8 @@ jest.mock("../eval-details", () => {
 
 jest.mock("../ui", () => ({
   __esModule: true,
+  // The real tab bar, so this dialog's tab names are the shared ones.
+  ResultTabs: jest.requireActual("../ui/ResultTabs").ResultTabs,
   StatusBadge: (props: any) => (
     <span data-testid="status-badge">{props.status}</span>
   ),

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
+import { ResultTabs } from "@/components/ui";
 import {
   STTEvaluationAbout,
   STTEvaluationLeaderboard,
@@ -286,26 +287,16 @@ export default function PublicSTTPage() {
             )}
             {/* Tab Nav */}
             <div className="flex gap-2 border-b border-border">
-              {(
-                [
-                  { id: "leaderboard", label: "Leaderboard" },
-                  ...(showTopPicks
-                    ? [{ id: "top-picks", label: "Model selection" }]
-                    : []),
-                  { id: "outputs", label: "Outputs" },
-                  { id: "about", label: "About" },
-                ] as { id: typeof activeTab; label: string }[]
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                    activeTab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+              <ResultTabs
+                tabs={[
+                  "leaderboard",
+                  ...(showTopPicks ? (["top-picks"] as const) : []),
+                  "outputs",
+                  "about",
+                ]}
+                activeTab={activeTab}
+                onChange={setActiveTab}
+              />
             </div>
 
             {/* Leaderboard Tab */}

@@ -21,7 +21,7 @@ import {
   type BenchmarkModelResult,
 } from "./eval-details";
 import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
-import { StatusBadge, RerunIconButton } from "@/components/ui";
+import { StatusBadge, RerunIconButton, ResultTabs } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { modelComparisonName } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -771,48 +771,17 @@ export function BenchmarkResultsDialog({
         {!isInitialLoading && !error && isDone && (
           <div className="border-b border-border -mx-4 md:mx-0 px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar">
             <div className="flex gap-3 md:gap-4 lg:gap-6">
-              <button
-                onClick={() => setActiveTab("leaderboard")}
-                className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                  activeTab === "leaderboard"
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Leaderboard
-              </button>
-              {showTopPicks && (
-                <button
-                  onClick={() => setActiveTab("top-picks")}
-                  className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                    activeTab === "top-picks"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Model selection
-                </button>
-              )}
-              <button
-                onClick={() => setActiveTab("outputs")}
-                className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                  activeTab === "outputs"
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Results
-              </button>
-              <button
-                onClick={() => setActiveTab("about")}
-                className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                  activeTab === "about"
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                About
-              </button>
+              <ResultTabs
+                tabs={[
+                  "leaderboard",
+                  ...(showTopPicks ? (["top-picks"] as const) : []),
+                  "outputs",
+                  "about",
+                ]}
+                activeTab={activeTab}
+                onChange={setActiveTab}
+                size="window"
+              />
             </div>
           </div>
         )}
