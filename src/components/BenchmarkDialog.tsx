@@ -514,11 +514,11 @@ export function BenchmarkDialog({
                       <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
                     {/* Verification badge for connections, once a model is
-                        picked. A fixed width keeps every picker the same size
-                        whatever its row says, and the badge sits at the end of
-                        it, next to the delete button. */}
+                        picked. It sits right after the picker, and is as wide
+                        as the longest wording so every picker is the same size
+                        and none of them stops short. */}
                     {showStatusColumn && (
-                      <div className="w-24 shrink-0 flex items-center justify-end">
+                      <div className="min-w-20 shrink-0 flex items-center">
                         {selectedModel &&
                           getModelVerificationBadge(selectedModel.id)}
                       </div>
