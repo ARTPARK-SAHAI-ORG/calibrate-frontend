@@ -1,5 +1,6 @@
 ## August 2026
 
+- Labelling tasks, evaluators, and bulk upload screens now call this item type "Single agent response" instead of "Agent response" so it matches the agent type it describes ([#489](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/489))
 - Running all tests or comparing models now asks you to confirm first, showing which agent, how many tests, and for a comparison which models will run ([#484](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/484))
 - The top bar of a labelling item no longer changes size when you move between items or switch the live versions only button off ([#486](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/486))
 - A test run now shows a test that could not be run, such as one that timed out or could not reach the judge, as could not be run instead of counting it as a wrong answer ([#475](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/475))
