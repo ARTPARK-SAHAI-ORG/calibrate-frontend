@@ -2,7 +2,9 @@
 
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
+import { WarningTriangleIcon } from "@/components/icons";
 import {
+  benchmarkAnsweredPassFail,
   benchmarkRatingEvaluatorCaption,
   buildBenchmarkCombinedLeaderboardPayload,
   type BenchmarkCombinedLeaderboardPayload,
@@ -26,7 +28,68 @@ type BenchmarkCombinedLeaderboardProps = {
   filename: string;
   benchmarkScoreLabel?: string;
   className?: string;
+  /** Opens the tab listing every test, so the ones that could not be run can
+   * be read. Without it the note names the tab but does not link to it. */
+  onReviewUnanswered?: () => void;
+  /** What that tab is called here. Both surfaces call it Results today. */
+  resultsTabLabel?: string;
 };
+
+/**
+ * The note above the table when some tests produced no answer. Says how many
+ * were left out, since the pass rate covers only the tests each model
+ * answered. When the models did not all lose the same tests, it says so
+ * without a count rather than picking one model's number.
+ */
+function UnansweredNote({
+  modelResults,
+  onReviewUnanswered,
+  resultsTabLabel,
+}: {
+  modelResults: BenchmarkModelLike[];
+  onReviewUnanswered?: () => void;
+  resultsTabLabel: string;
+}) {
+  const perModel = modelResults
+    .map((m) => benchmarkAnsweredPassFail(m))
+    .filter((c) => c !== null);
+  if (perModel.length === 0) return null;
+  const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
+  if (totalUnanswered === 0) return null;
+
+  const sameForEveryModel = perModel.every(
+    (c) =>
+      c.unanswered === perModel[0].unanswered &&
+      c.answered === perModel[0].answered,
+  );
+  const { unanswered, answered } = perModel[0];
+
+  const tab = onReviewUnanswered ? (
+    <button
+      type="button"
+      onClick={onReviewUnanswered}
+      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+    >
+      {resultsTabLabel} tab
+    </button>
+  ) : (
+    <span className="font-medium">{resultsTabLabel} tab</span>
+  );
+
+  return (
+    <div className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
+      <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+      <p>
+        {!sameForEveryModel
+          ? "Some tests could not be run and were ignored for calculating the metrics. "
+          : answered === 0
+            ? "None of the tests could be run. "
+            : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
+        Review the tests that could not be run in the {tab}.
+      </p>
+    </div>
+  );
+}
 
 function columnsFromPayload(
   payload: BenchmarkCombinedLeaderboardPayload,
@@ -143,6 +206,8 @@ export function BenchmarkCombinedLeaderboard({
   filename,
   benchmarkScoreLabel = "Test pass rate (%)",
   className,
+  onReviewUnanswered,
+  resultsTabLabel = "Results",
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -171,14 +236,21 @@ export function BenchmarkCombinedLeaderboard({
   }
 
   return (
-    <LeaderboardTab
-      className={className}
-      columns={columns}
-      data={payload.rows}
-      charts={payload.chartRows}
-      filename={filename}
-      getLabel={(key) => formatModelName(key)}
-      nameKey="model"
-    />
+    <div className="space-y-4">
+      <UnansweredNote
+        modelResults={modelResults}
+        onReviewUnanswered={onReviewUnanswered}
+        resultsTabLabel={resultsTabLabel}
+      />
+      <LeaderboardTab
+        className={className}
+        columns={columns}
+        data={payload.rows}
+        charts={payload.chartRows}
+        filename={filename}
+        getLabel={(key) => formatModelName(key)}
+        nameKey="model"
+      />
+    </div>
   );
 }

@@ -29,28 +29,24 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
+import { isUnanswered } from "@/lib/testTypes";
 
 type TestCaseResult = {
-  test_uuid?: string;
+  test_case_id?: string;
   test_name?: string;
   name?: string;
-  status?: "passed" | "failed" | "error";
+  /** null / absent means the test has not finished. It never means the test
+   * produced no answer — read `unanswered` for that. */
   passed?: boolean | null;
+  /** True when the test produced no answer. `reasoning` then holds why. */
+  unanswered?: boolean;
   reasoning?: string;
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
-  chat_history?: { role: string; content: string }[];
-  evaluation?: {
-    passed: boolean;
-    message?: string;
-    details?: Record<string, any>;
-  };
   judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD) / total tokens. */
+  /** Per-case agent latency (ms) / cost (USD). */
   latency_ms?: number | null;
   cost?: number | null;
-  total_tokens?: number | null;
-  error?: string;
 };
 
 type TestRunStatusResponse = {
@@ -59,6 +55,10 @@ type TestRunStatusResponse = {
   total_tests?: number;
   passed?: number;
   failed?: number;
+  /** How many of the tests produced no answer. */
+  unanswered_tests?: number;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
@@ -71,8 +71,7 @@ type TestRunStatusResponse = {
 };
 
 function getStatus(r: TestCaseResult): "passed" | "failed" {
-  if (r.passed === true || r.status === "passed") return "passed";
-  return "failed";
+  return r.passed === true ? "passed" : "failed";
 }
 
 export default function PublicTestRunPage() {
@@ -140,17 +139,17 @@ export default function PublicTestRunPage() {
 
   const results = data.results ?? [];
   const passed = results.filter((r) => getStatus(r) === "passed").length;
-  // Errored tests carry an `error`; keep them out of the pass-rate denominator
-  // so the rate matches the scored tests.
+  // A test that produced no answer was never scored; keep it out of the
+  // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
-    (r) => getStatus(r) === "failed" && !r.error,
+    (r) => getStatus(r) === "failed" && !isUnanswered(r),
   ).length;
   // Tool-call pass/fail split for the Summary tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: r.test_case?.evaluation?.type === "tool_call",
       passed: getStatus(r) === "passed",
-      failed: getStatus(r) === "failed" && !r.error,
+      failed: getStatus(r) === "failed" && !isUnanswered(r),
     })),
   );
 
@@ -191,7 +190,7 @@ export default function PublicTestRunPage() {
                   buildTestRunCsv(
                     results.map((r) => ({
                       name: r.name || r.test_case?.name || r.test_name,
-                      status: getStatus(r),
+                      status: isUnanswered(r) ? "error" : getStatus(r),
                       output: r.output,
                       testCase: r.test_case,
                       reasoning: r.reasoning,
@@ -213,6 +212,10 @@ export default function PublicTestRunPage() {
           <TestRunSummary
             passed={passed}
             total={passed + failed}
+            unanswered={data.unanswered_tests ?? 0}
+            stoppedEarly={data.stopped_early === true}
+            onReviewUnanswered={() => setActiveTab("outputs")}
+            resultsTabLabel="Outputs"
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
@@ -245,14 +248,11 @@ export default function PublicTestRunPage() {
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
                 status: getStatus(r),
+                unanswered: isUnanswered(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,
                 reasoning: r.reasoning,
-                evaluation: r.evaluation ?? {
-                  passed: getStatus(r) === "passed",
-                },
                 judgeResults: r.judge_results ?? null,
-                error: r.error,
               }))}
               selectedId={selectedId}
               onSelect={setSelectedId}

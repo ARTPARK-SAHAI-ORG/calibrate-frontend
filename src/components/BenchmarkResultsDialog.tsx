@@ -828,6 +828,7 @@ export function BenchmarkResultsDialog({
                   modelResults={modelResults}
                   filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
                   benchmarkScoreLabel={benchmarkScoreLabel}
+                  onReviewUnanswered={() => setActiveTab("outputs")}
                 />
               </div>
             )}

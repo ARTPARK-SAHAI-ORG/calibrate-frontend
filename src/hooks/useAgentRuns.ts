@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
-import { isRunInProgress, type UnitTestResultLike } from "@/lib/testTypes";
+import { isRunInProgress } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 /**
@@ -20,8 +20,8 @@ export type AgentRun = {
   total_tests: number | null;
   passed: number | null;
   failed: number | null;
-  error?: boolean;
-  results?: UnitTestResultLike[] | null;
+  /** How many of the run's tests produced no answer. */
+  unanswered_tests?: number | null;
   /**
    * The evaluators that judged this run, no duplicates. "Tool call" is added
    * last when the run included a tool-call test, and carries no id because it
@@ -287,7 +287,8 @@ export function useAgentRuns({
                       total_tests: result.total_tests ?? r.total_tests,
                       passed: result.passed ?? r.passed,
                       failed: result.failed ?? r.failed,
-                      results: result.results ?? r.results,
+                      unanswered_tests:
+                        result.unanswered_tests ?? r.unanswered_tests,
                       updated_at: result.updated_at ?? r.updated_at,
                     }
                   : {

@@ -48,7 +48,9 @@ describe("buildTestRunCsv", () => {
       { status: "error" },
     ];
     const { rows } = buildTestRunCsv(results);
-    expect(rows.map((r) => r.status)).toEqual(["passed", "failed", "error"]);
+    // A test that produced no answer exports as "not run", not "error", so
+    // the spreadsheet does not read it as a wrong answer.
+    expect(rows.map((r) => r.status)).toEqual(["passed", "failed", "not run"]);
   });
 
   it("serializes conversation history to JSON, empty string when absent", () => {

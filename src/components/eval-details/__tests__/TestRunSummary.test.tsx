@@ -362,3 +362,75 @@ describe("TestRunSummary", () => {
     expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
   });
 });
+
+describe("tests that could not be run", () => {
+  it("says nothing when every test was scored", () => {
+    render(<TestRunSummary passed={9} total={10} />);
+    expect(screen.queryByText(/could not be run/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/stopped before it started every test/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says how many were left out of the metrics, and names the tab to read them in", () => {
+    render(<TestRunSummary passed={9} total={10} unanswered={3} />);
+    expect(
+      screen.getByText(
+        /3 of 13 tests could not be run and were ignored for calculating the metrics/,
+      ),
+    ).toBeInTheDocument();
+    // No handler given, so the tab is named but not clickable.
+    expect(
+      screen.queryByRole("button", { name: "Results tab" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the tab listing the tests when the note's link is clicked", async () => {
+    const onReviewUnanswered = jest.fn();
+    render(
+      <TestRunSummary
+        passed={9}
+        total={10}
+        unanswered={3}
+        onReviewUnanswered={onReviewUnanswered}
+      />,
+    );
+    await setupUser().click(
+      screen.getByRole("button", { name: "Results tab" }),
+    );
+    expect(onReviewUnanswered).toHaveBeenCalled();
+  });
+
+  it("names the tab whatever the surface calls it", () => {
+    render(
+      <TestRunSummary
+        passed={9}
+        total={10}
+        unanswered={3}
+        onReviewUnanswered={jest.fn()}
+        resultsTabLabel="Outputs"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Outputs tab" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the run gave up before starting every test", () => {
+    render(<TestRunSummary passed={9} total={10} stoppedEarly />);
+    expect(
+      screen.getByText(/The run stopped before it started every test\./),
+    ).toBeInTheDocument();
+  });
+
+  it("says none could be run rather than counting them all", () => {
+    // 14 of 14 read as a sum the reader has to do; say it plainly instead,
+    // and keep the stopped-early clause in the same sentence.
+    render(<TestRunSummary passed={0} total={0} unanswered={14} stoppedEarly />);
+    const note = screen.getByText(/None of the tests could be run\./);
+    expect(note).toHaveTextContent(
+      "None of the tests could be run. The run stopped before it started every test.",
+    );
+    expect(screen.queryByText(/14 of 14/)).not.toBeInTheDocument();
+  });
+});

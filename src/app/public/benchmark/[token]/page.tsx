@@ -171,6 +171,7 @@ export default function PublicBenchmarkPage() {
             modelResults={data.model_results ?? []}
             filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
             benchmarkScoreLabel={benchmarkScoreLabel}
+            onReviewUnanswered={() => setActiveTab("outputs")}
           />
         )}
 

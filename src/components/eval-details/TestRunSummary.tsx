@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { WarningTriangleIcon } from "@/components/icons";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   formatLatencyMs,
@@ -21,8 +22,20 @@ import {
 type TestRunSummaryProps = {
   /** Tests that passed evaluation. */
   passed: number;
-  /** Total tests scored (excludes errored tests; the pass-rate denominator). */
+  /** Total tests scored (excludes tests that produced no answer; the
+   * pass-rate denominator). */
   total: number;
+  /** How many tests produced no answer. Above zero, a note says the pass rate
+   * does not cover them. */
+  unanswered?: number;
+  /** True when the run gave up before it started every test. */
+  stoppedEarly?: boolean;
+  /** Opens the tab listing every test, so the ones that could not be run can
+   * be read. Without it the note names the tab but does not link to it. */
+  onReviewUnanswered?: () => void;
+  /** What that tab is called here: the run window says Results, the shared
+   * page says Outputs. */
+  resultsTabLabel?: string;
   /** Aggregate per-test latency block (`{p50,p95,p99,count}`; legacy runs
    * carry `{mean,min,max,count}`). Null for eval-only runs or before metrics
    * land. */
@@ -184,6 +197,10 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
 export function TestRunSummary({
   passed,
   total,
+  unanswered = 0,
+  stoppedEarly = false,
+  onReviewUnanswered,
+  resultsTabLabel = "Results",
   latency,
   cost,
   tokens,
@@ -227,6 +244,35 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
+        {(unanswered > 0 || stoppedEarly) && (
+          <div className="mb-4 flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
+            <WarningTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p>
+              {unanswered > 0 &&
+                (total === 0
+                  ? "None of the tests could be run. "
+                  : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
+              {stoppedEarly && "The run stopped before it started every test. "}
+              {unanswered > 0 && (
+                <>
+                  Review the tests that could not be run in the{" "}
+                  {onReviewUnanswered ? (
+                    <button
+                      type="button"
+                      onClick={onReviewUnanswered}
+                      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+                    >
+                      {resultsTabLabel} tab
+                    </button>
+                  ) : (
+                    <span className="font-medium">{resultsTabLabel} tab</span>
+                  )}
+                  .
+                </>
+              )}
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Pass rate"

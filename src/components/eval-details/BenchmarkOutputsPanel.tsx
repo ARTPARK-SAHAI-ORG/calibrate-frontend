@@ -9,6 +9,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  TestCouldNotRunNotice,
   ResizeHandle,
   isTypingTarget,
   scrollRowByPage,
@@ -20,6 +21,7 @@ import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSum
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { isUnanswered } from "@/lib/testTypes";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -31,17 +33,18 @@ export type BenchmarkTestResult = {
    * merged with this case's per-test overrides. Absent when the agent has no
    * custom fields. */
   inputs?: Record<string, unknown>;
-  /** Set when the test errored out (neither passed nor failed evaluation). */
-  error?: string;
+  /** True when the test produced no answer: the agent timed out or returned
+   * an error, or the judge could not be reached. `reasoning` then holds why,
+   * and `passed: false` on such a row is not a verdict on the agent. */
+  unanswered?: boolean;
   /** Per-evaluator verdicts for response (next-reply) tests. Null for
    * tool-call tests; legacy rows omit the field and fall back to the
    * legacy single-reasoning UI. */
   judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD) / total tokens. Null while
-   * running, for eval-only runs, and — for cost — the `openai` provider. */
+  /** Per-case agent latency (ms) / cost (USD). Null while running, for
+   * eval-only runs, and — for cost — the `openai` provider. */
   latency_ms?: number | null;
   cost?: number | null;
-  total_tokens?: number | null;
 };
 
 export type BenchmarkModelResult = {
@@ -106,7 +109,7 @@ export function benchmarkLabellingKey(model: string, testIndex: number): string 
 function benchmarkTestStatus(
   tr: BenchmarkTestResult,
 ): "error" | "running" | "passed" | "failed" {
-  if (tr.error) return "error";
+  if (isUnanswered(tr)) return "error";
   if (tr.passed === null) return "running";
   return tr.passed ? "passed" : "failed";
 }
@@ -500,7 +503,7 @@ export function BenchmarkOutputsPanel({
                       : "bg-amber-100/50 text-amber-700/60 dark:bg-amber-500/10 dark:text-amber-400/60 hover:bg-amber-100 hover:dark:bg-amber-500/20"
                   }`}
                 >
-                  Errored
+                  Not run
                 </button>
               )}
             </div>
@@ -559,20 +562,8 @@ export function BenchmarkOutputsPanel({
 
         <div className="flex-1 overflow-y-auto">
           {selectedTestResult ? (
-            selectedTestResult.error ? (
-              <div className="p-4 md:p-6">
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                    <span className="font-medium text-red-500">Something went wrong</span>
-                  </div>
-                  <p className="text-sm text-red-400">
-                    This test errored out before it could be evaluated. Please reach out to us if this issue persists.
-                  </p>
-                </div>
-              </div>
+            isUnanswered(selectedTestResult) ? (
+              <TestCouldNotRunNotice reason={selectedTestResult.reasoning} />
             ) : selectedTestResult.passed === null && showRunningSpinner ? (
               <div className="flex items-center justify-center h-full">
                 <div className="flex items-center gap-3">
@@ -605,7 +596,7 @@ export function BenchmarkOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedTestResult && !selectedTestResult.error && selectedTestResult.passed !== null && (
+      {selectedTestResult && !isUnanswered(selectedTestResult) && selectedTestResult.passed !== null && (
         <>
           <ResizeHandle
             onMouseDown={verdictPanel.startDrag}
@@ -680,9 +671,12 @@ function ModelSection({
     (t) => t && benchmarkTestStatus(t) !== "running",
   ).length;
   const passedCount = modelResult.passed ?? 0;
-  const erroredCount = (modelResult.test_results ?? []).filter((t) => t?.error).length;
-  // Errored tests may be lumped into the API's `failed` count — subtract them
-  // so the header buckets line up with the categorised rows below.
+  const erroredCount = (modelResult.test_results ?? []).filter(
+    (t) => t && isUnanswered(t),
+  ).length;
+  // A test that produced no answer comes back with `passed: false`, so the
+  // API's `failed` count includes it — subtract those so the header buckets
+  // line up with the categorised rows below.
   const failedCount = Math.max((modelResult.failed ?? 0) - erroredCount, 0);
   const totalTests = modelResult.total_tests ?? testNames.length;
   // How many rows this model will end up with: the same rule the test list
@@ -741,7 +735,7 @@ function ModelSection({
                 <span className="text-red-500">{failedCount} failed</span>
               )}
               {(statusFilter === "all" || statusFilter === "errored") && erroredCount > 0 && (
-                <span className="text-amber-500">{erroredCount} errored</span>
+                <span className="text-amber-500">{erroredCount} not run</span>
               )}
             </div>
           )}

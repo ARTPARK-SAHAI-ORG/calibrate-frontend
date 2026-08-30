@@ -127,7 +127,9 @@ describe("RunsTabContent run deep-link", () => {
     renderTab();
 
     // Desktop table and mobile cards both render, so take the first row.
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    // A finished run now shows its tally. "Complete" is left for a run that
+    // reports no tests at all.
+    await user.click((await screen.findAllByText("1 Success"))[0]);
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:run-7",
     );

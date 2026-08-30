@@ -1,6 +1,8 @@
 import {
   testTypeLabel,
-  getUnitTestBreakdown,
+  isUnanswered,
+  type TestRowLike,
+  getRunBreakdown,
   modelComparisonName,
   runDisplayName,
 } from "../testTypes";
@@ -37,58 +39,53 @@ describe("testTypeLabel", () => {
   });
 });
 
-describe("getUnitTestBreakdown", () => {
-  it("returns null for null/undefined/empty results", () => {
-    expect(getUnitTestBreakdown(null)).toBeNull();
-    expect(getUnitTestBreakdown(undefined)).toBeNull();
-    expect(getUnitTestBreakdown([])).toBeNull();
+describe("isUnanswered", () => {
+  it("is true only when the backend says the test produced no answer", () => {
+    expect(isUnanswered({ unanswered: true })).toBe(true);
+    expect(isUnanswered({ unanswered: false })).toBe(false);
+    expect(isUnanswered({})).toBe(false);
+    expect(isUnanswered({ unanswered: null })).toBe(false);
   });
 
-  it("counts passed via passed:true", () => {
-    const result = getUnitTestBreakdown([{ passed: true }]);
-    expect(result).toEqual({ passed: 1, failed: 0, errored: 0 });
+  it("does not read a failed verdict as a test that never answered", () => {
+    // The whole point of the flag: from calibrate 0.0.74 a test that produced
+    // no answer comes back as `passed: false`, exactly like a wrong answer.
+    expect(isUnanswered({ passed: false } as TestRowLike)).toBe(false);
   });
 
-  it("counts passed via status: passed", () => {
-    const result = getUnitTestBreakdown([{ passed: null, status: "passed" }]);
-    expect(result).toEqual({ passed: 1, failed: 0, errored: 0 });
+  it("does not read a missing verdict as a test that never answered", () => {
+    // This was the old rule, and it is the bug this flag exists to correct: no
+    // verdict now means only that the test has not finished.
+    expect(isUnanswered({ passed: null } as TestRowLike)).toBe(false);
+    expect(isUnanswered({ passed: undefined } as TestRowLike)).toBe(false);
+  });
+});
+
+describe("getRunBreakdown", () => {
+  it("returns null when the run reports no tests", () => {
+    expect(getRunBreakdown({})).toBeNull();
+    expect(getRunBreakdown({ total_tests: 0 })).toBeNull();
+    expect(getRunBreakdown({ total_tests: null })).toBeNull();
   });
 
-  it("counts errored via error field", () => {
-    const result = getUnitTestBreakdown([
-      { passed: false, error: "boom" },
-    ]);
-    expect(result).toEqual({ passed: 0, failed: 0, errored: 1 });
+  it("splits the run into passed, wrong answers, and tests that never ran", () => {
+    expect(
+      getRunBreakdown({ total_tests: 10, passed: 6, unanswered_tests: 3 }),
+    ).toEqual({ passed: 6, failed: 1, unanswered: 3 });
   });
 
-  it("counts errored via status: error", () => {
-    const result = getUnitTestBreakdown([{ passed: false, status: "error" }]);
-    expect(result).toEqual({ passed: 0, failed: 0, errored: 1 });
+  it("treats a run with no unanswered count as having none", () => {
+    expect(getRunBreakdown({ total_tests: 4, passed: 3 })).toEqual({
+      passed: 3,
+      failed: 1,
+      unanswered: 0,
+    });
   });
 
-  it("counts errored via passed: null", () => {
-    const result = getUnitTestBreakdown([{ passed: null }]);
-    expect(result).toEqual({ passed: 0, failed: 0, errored: 1 });
-  });
-
-  it("counts errored via passed: undefined", () => {
-    const result = getUnitTestBreakdown([{ passed: undefined as unknown as boolean }]);
-    expect(result).toEqual({ passed: 0, failed: 0, errored: 1 });
-  });
-
-  it("counts genuine failure (passed:false, no error signal)", () => {
-    const result = getUnitTestBreakdown([{ passed: false, status: "failed" }]);
-    expect(result).toEqual({ passed: 0, failed: 1, errored: 0 });
-  });
-
-  it("mixes passed, failed, and errored", () => {
-    const result = getUnitTestBreakdown([
-      { passed: true },
-      { passed: false, status: "failed" },
-      { passed: null },
-      { passed: false, error: "oops" },
-    ]);
-    expect(result).toEqual({ passed: 1, failed: 1, errored: 2 });
+  it("never reports a negative number of wrong answers", () => {
+    expect(
+      getRunBreakdown({ total_tests: 2, passed: 2, unanswered_tests: 1 }),
+    ).toEqual({ passed: 2, failed: 0, unanswered: 1 });
   });
 });
 

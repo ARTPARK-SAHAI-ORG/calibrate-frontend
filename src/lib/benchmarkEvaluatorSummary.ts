@@ -12,6 +12,7 @@ import {
   formatPercent,
   formatRating,
 } from "@/lib/llmMetrics";
+import { isUnanswered } from "./testTypes";
 
 export type BenchmarkEvaluatorSummaryBinary = {
   metric_key: string;
@@ -45,7 +46,8 @@ export type BenchmarkEvaluatorSummaryEntry =
 /** Minimal per-test shape needed to derive the tool-call pass-rate split. */
 export type BenchmarkToolCallTestLike = {
   passed?: boolean | null;
-  error?: string;
+  /** True when the test produced no answer, so it was never judged. */
+  unanswered?: boolean;
   test_case?: { evaluation?: { type?: string } | null } | null;
 };
 
@@ -58,10 +60,37 @@ export type BenchmarkModelLike = {
 };
 
 /**
+ * How many of a model's tests produced no answer, and how many it was given.
+ * The backend's leaderboard row counts a test that never answered as a
+ * failure, so the pass rate on screen is worked out from these instead.
+ */
+export function benchmarkAnsweredPassFail(model: BenchmarkModelLike): {
+  passed: number;
+  answered: number;
+  unanswered: number;
+} | null {
+  const results = model.test_results;
+  if (!results || results.length === 0) return null;
+  let passed = 0;
+  let answered = 0;
+  let unanswered = 0;
+  for (const tr of results) {
+    if (isUnanswered(tr)) {
+      unanswered++;
+      continue;
+    }
+    if (tr.passed === null || tr.passed === undefined) continue;
+    answered++;
+    if (tr.passed) passed++;
+  }
+  return { passed, answered, unanswered };
+}
+
+/**
  * Pass/total for the tool-call subset of a model's tests. A test counts toward
- * the total only when it's a tool-call test that finished scoring (not errored,
- * not still running). Returns `{passed: 0, total: 0}` when the model has no
- * tool-call tests or no `test_results`.
+ * the total only when it's a tool-call test that finished scoring (it answered,
+ * and it is not still running). Returns `{passed: 0, total: 0}` when the model
+ * has no tool-call tests or no `test_results`.
  */
 export function benchmarkToolCallPassFail(model: BenchmarkModelLike): {
   passed: number;
@@ -71,7 +100,7 @@ export function benchmarkToolCallPassFail(model: BenchmarkModelLike): {
   let total = 0;
   for (const tr of model.test_results ?? []) {
     if (tr.test_case?.evaluation?.type !== "tool_call") continue;
-    if (tr.error) continue;
+    if (isUnanswered(tr)) continue;
     if (tr.passed === null || tr.passed === undefined) continue;
     total++;
     if (tr.passed) passed++;
@@ -300,10 +329,23 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     const row: Record<string, unknown> = { model };
 
     if (lbRow) {
-      row.passed = lbRow.passed;
-      row.total = lbRow.total;
-      const pr = parseFloat(lbRow.pass_rate);
-      row.pass_rate = Number.isFinite(pr) ? pr : undefined;
+      // The backend counts a test that never answered as a failure. Work the
+      // pass rate out from the cases instead, so it covers only the tests the
+      // model actually answered, and matches the single-run summary.
+      const answered = mr ? benchmarkAnsweredPassFail(mr) : null;
+      if (answered && answered.unanswered > 0) {
+        row.passed = String(answered.passed);
+        row.total = String(answered.answered);
+        row.pass_rate =
+          answered.answered > 0
+            ? (answered.passed / answered.answered) * 100
+            : undefined;
+      } else {
+        row.passed = lbRow.passed;
+        row.total = lbRow.total;
+        const pr = parseFloat(lbRow.pass_rate);
+        row.pass_rate = Number.isFinite(pr) ? pr : undefined;
+      }
       // p50 is the new headline latency; fall back to the legacy mean column
       // for runs generated before the percentile switch.
       const latency = toFiniteNumber(lbRow.latency_p50 ?? lbRow.latency_ms);

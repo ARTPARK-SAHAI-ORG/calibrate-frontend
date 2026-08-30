@@ -9,6 +9,7 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  TestCouldNotRunNotice,
   ResizeHandle,
   isTypingTarget,
   scrollRowByPage,
@@ -18,16 +19,18 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { isUnanswered } from "@/lib/testTypes";
 
 export type TestRunResult = {
   id: string;
   name: string;
   status: "passed" | "failed" | "running" | "pending" | "queued";
+  /** The test produced no answer, so `status` is not a verdict on the agent. */
+  unanswered?: boolean;
   output?: TestCaseOutput;
   testCase?: TestCaseData;
+  /** The judge's reasoning, or — when `unanswered` — why it could not run. */
   reasoning?: string;
-  evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
-  error?: string;
   /** Effective custom inputs the agent received for this case: the agent's
    * default_inputs merged with the per-case overrides. Absent when the agent
    * has no custom fields. */
@@ -102,9 +105,9 @@ export function TestRunOutputsPanel({
     });
   };
 
-  // A test that surfaced an `error` neither passed nor failed evaluation —
-  // it errored out. Bucket those separately from genuine evaluation failures.
-  const isErrored = (r: TestRunResult) => !!r.error;
+  // A test that produced no answer was never judged. Bucket those separately
+  // from genuine wrong answers, which the same `status` would otherwise hide.
+  const isErrored = (r: TestRunResult) => isUnanswered(r);
   const isLabellingEligible = (r: TestRunResult) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null });
   // Only a finished test that can actually be submitted is tickable. A test
@@ -136,7 +139,7 @@ export function TestRunOutputsPanel({
 
   const groups: StatusGroup[] = [
     { key: "failed", label: "Failed", dotColor: "bg-red-500", items: filteredResults.filter((r) => r.status === "failed" && !isErrored(r)) },
-    { key: "errored", label: "Errored", dotColor: "bg-amber-500", items: filteredResults.filter((r) => isErrored(r)) },
+    { key: "errored", label: "Could not be run", dotColor: "bg-amber-500", items: filteredResults.filter((r) => isErrored(r)) },
     { key: "passed", label: "Passed", dotColor: "bg-green-500", items: filteredResults.filter((r) => r.status === "passed") },
     { key: "queued", label: "Queued", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "queued") },
     { key: "running", label: "Running", dotColor: "bg-yellow-500 animate-pulse", items: filteredResults.filter((r) => r.status === "running") },
@@ -468,22 +471,8 @@ function TestResultDetail({
     );
   }
 
-  if (result.error) {
-    return (
-      <div className="p-4 md:p-6">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            <span className="font-medium text-red-500">Something went wrong</span>
-          </div>
-          <p className="text-sm text-red-400">
-            We&apos;re looking into it. Please reach out to us if this issue persists.
-          </p>
-        </div>
-      </div>
-    );
+  if (isUnanswered(result)) {
+    return <TestCouldNotRunNotice reason={result.reasoning} />;
   }
 
   return (
@@ -491,7 +480,7 @@ function TestResultDetail({
       history={result.testCase?.history || []}
       input={result.testCase?.input}
       output={result.output}
-      passed={result.evaluation?.passed ?? false}
+      passed={result.status === "passed"}
       reasoning={result.reasoning}
       evaluation={result.testCase?.evaluation}
       judgeResults={result.judgeResults}

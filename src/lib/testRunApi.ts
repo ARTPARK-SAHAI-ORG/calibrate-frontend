@@ -10,19 +10,19 @@ import type {
   TestRunEvaluator,
 } from "@/components/test-results/shared";
 
-export type ChatMessage = {
-  role: "user" | "agent" | "tool";
-  content: string;
-  tool_name?: string;
-  tool_args?: Record<string, unknown>;
-};
-
 export type TestCaseResult = {
-  test_uuid?: string;
+  /** The test this row ran. */
+  test_case_id?: string;
   test_name?: string;
   name?: string; // Test name from in-progress API response
-  status?: "passed" | "failed" | "error";
-  passed?: boolean | null; // null means test is still running
+  /** null / absent means the test has not finished yet. It never means the
+   * test produced no answer — read `unanswered` for that. */
+  passed?: boolean | null;
+  /** True when the test produced no answer: the agent timed out or returned
+   * an error, or the judge could not be reached. `reasoning` then holds why,
+   * and `passed: false` on such a row is not a verdict on the agent. */
+  unanswered?: boolean;
+  /** The judge's reasoning, or — when `unanswered` is true — the error. */
   reasoning?: string;
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
@@ -30,31 +30,26 @@ export type TestCaseResult = {
    * merged with this case's per-test overrides. Absent when the agent has no
    * custom fields. */
   inputs?: Record<string, unknown> | null;
-  chat_history?: ChatMessage[];
-  evaluation?: {
-    passed: boolean;
-    message?: string;
-    details?: Record<string, unknown>;
-  };
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD) / total tokens. Lifted to the
-   * top level by the backend (not inside `output`). Null while the case is
-   * running, for eval-only runs, and — for cost — the `openai` provider. */
+  /** Per-case agent latency (ms) / cost (USD). Lifted to the top level by the
+   * backend (not inside `output`). Null while the case is running, for
+   * eval-only runs, and — for cost — the `openai` provider. */
   latency_ms?: number | null;
   cost?: number | null;
-  total_tokens?: number | null;
-  error?: string;
 };
 
 export type TestRunStatusResponse = {
   task_id: string;
-  name?: string;
   status: string;
   total_tests?: number;
   passed?: number;
   failed?: number;
+  /** How many of the tests produced no answer. */
+  unanswered_tests?: number;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block. Each entry pins the version the
    * run executed against and carries name, description, output_config,
@@ -73,7 +68,9 @@ export type TestRunStatusResponse = {
    * same tests. Absent on runs created before the backend started snapshotting
    * it — the Rerun button is hidden in that case. */
   test_uuids?: string[];
-  error?: string;
+  /** True when the run itself broke. `status` says the same thing; nothing
+   * reads this. */
+  error?: boolean;
   is_public?: boolean;
   share_token?: string | null;
 };
