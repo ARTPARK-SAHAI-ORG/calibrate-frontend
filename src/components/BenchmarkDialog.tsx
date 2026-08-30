@@ -619,42 +619,14 @@ export function BenchmarkDialog({
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleRunBenchmark}
-        title="Start the comparison"
-        message="This is what is about to run."
+        title="Compare the models"
+        message={`This will start the comparison on ${
+          benchmarkTestCount === undefined
+            ? "every test linked to this agent"
+            : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`
+        } with ${chosenModels.map((m) => m.name).join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
         confirmText="Start the comparison"
-      >
-        <dl
-          data-testid="benchmark-summary"
-          className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-2"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-muted-foreground">Agent</dt>
-            <dd className="text-foreground text-right">{agentName}</dd>
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-muted-foreground">Tests</dt>
-            <dd className="text-foreground text-right">
-              {benchmarkTestCount === undefined
-                ? "Every test linked to this agent"
-                : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}${tests.length === 0 ? " (every test linked to this agent)" : ""}`}
-            </dd>
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-muted-foreground">Models</dt>
-            <dd className="text-foreground text-right">
-              {chosenModels.map((m) => m.name).join(", ")}
-            </dd>
-          </div>
-          {benchmarkTestCount !== undefined && (
-            <div className="flex items-start justify-between gap-4">
-              <dt className="text-muted-foreground">Answers to generate</dt>
-              <dd className="text-foreground text-right">
-                {benchmarkTestCount * chosenModels.length}
-              </dd>
-            </div>
-          )}
-        </dl>
-      </ConfirmDialog>
+      />
 
       <VerifyRequestPreviewDialog
         agentNature={agentNature}
