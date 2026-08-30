@@ -118,6 +118,30 @@ describe("SimulationResultsTable", () => {
     expect(table().getByText("Fail")).toBeInTheDocument();
   });
 
+  it("puts the judge's reasoning behind a circle next to every score, table and phone card alike", async () => {
+    const user = setupUser();
+    render(
+      <SimulationResultsTable
+        simulations={[
+          makeSim({
+            evaluation_results: [
+              { name: "accuracy", value: 1, reasoning: "the caller got an answer" },
+              { name: "safety", value: 0, reasoning: "" },
+            ],
+          }),
+        ]}
+        metricKeys={["accuracy", "safety"]}
+        onSelectSimulation={jest.fn()}
+      />,
+    );
+    // One circle in the table and one in the phone card, for the scored
+    // evaluator only: the other one gave no reasoning.
+    const icons = document.querySelectorAll("svg.w-3\\.5");
+    expect(icons).toHaveLength(2);
+    await user.hover(icons[0].parentElement!);
+    expect(await screen.findByText("the caller got an answer")).toBeInTheDocument();
+  });
+
   it("coerces string '1' value to Pass for binary metrics", () => {
     render(
       <SimulationResultsTable

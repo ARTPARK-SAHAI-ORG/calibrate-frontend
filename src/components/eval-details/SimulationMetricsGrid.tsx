@@ -131,7 +131,14 @@ export function SimulationMetricsGrid({
 
   if (regularMetrics.length === 0 && latencyMetrics.length === 0) return null;
 
+  // A tab is only offered when it has cards to show: a run whose numbers
+  // carry no timings should not hand the reader a Latency tab that opens on
+  // an empty screen.
   const isTextType = type === "text";
+  const showLatency = !isTextType && latencyMetrics.length > 0;
+  const showTabs = showLatency && regularMetrics.length > 0;
+  const latencyOnScreen = showLatency && (!showTabs || activeTab === "latency");
+  const performanceOnScreen = regularMetrics.length > 0 && (!showTabs || activeTab === "performance");
   const descriptionIcon = (
     <svg
       className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -152,7 +159,7 @@ export function SimulationMetricsGrid({
   return (
     <div>
       <h2 className="text-base md:text-lg font-semibold mb-3">Overall Metrics</h2>
-      {!isTextType && (
+      {showTabs && (
         <div className="flex gap-2 border-b border-border mb-4">
           <button
             onClick={() => setActiveTab("performance")}
@@ -172,7 +179,7 @@ export function SimulationMetricsGrid({
           </button>
         </div>
       )}
-      {(isTextType || activeTab === "performance") && regularMetrics.length > 0 && (
+      {performanceOnScreen && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {regularMetrics.map(([key, metric]) => {
             const evaluatorUuid = evaluatorUuidByName?.[key];
@@ -230,7 +237,7 @@ export function SimulationMetricsGrid({
           })}
         </div>
       )}
-      {!isTextType && activeTab === "latency" && latencyMetrics.length > 0 && (
+      {latencyOnScreen && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {latencyMetrics.map(([key, metric]) => {
             const tooltip = latencyMetricTooltip(key);

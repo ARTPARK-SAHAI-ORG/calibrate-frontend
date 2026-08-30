@@ -144,14 +144,23 @@ describe("SimulationMetricsGrid", () => {
     expect(screen.getByText("2.50s")).toBeInTheDocument();
   });
 
-  it("does not render the latency panel content when there are no latency metrics", async () => {
-    const user = setupUser();
+  it("offers no Latency tab when the run has no timings, and still shows the scores", () => {
     const metrics = {
       accuracy: { mean: 0.9, std: 0, values: [] },
     };
     render(<SimulationMetricsGrid metrics={metrics} type="voice" />);
-    await user.click(screen.getByText("Latency"));
-    expect(screen.queryByText("accuracy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Latency")).not.toBeInTheDocument();
+    expect(screen.queryByText("Performance")).not.toBeInTheDocument();
+    expect(screen.getByText("accuracy")).toBeInTheDocument();
+  });
+
+  it("shows the timings with no tabs when the run has only those", () => {
+    const metrics = {
+      "llm/ttft": { mean: 0.25, std: 0, values: [] },
+    };
+    render(<SimulationMetricsGrid metrics={metrics} type="voice" />);
+    expect(screen.queryByText("Performance")).not.toBeInTheDocument();
+    expect(screen.getByText("250ms")).toBeInTheDocument();
   });
 
   it("renders evaluator cards as buttons with description tooltip, and opens the evaluator preview on click", async () => {

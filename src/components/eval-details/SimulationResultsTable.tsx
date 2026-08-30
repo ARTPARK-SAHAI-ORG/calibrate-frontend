@@ -193,21 +193,14 @@ function MetricValue({
   const className = compact
     ? badge.className.replace("px-2.5 py-1 rounded-md", "px-2 py-0.5 rounded")
     : badge.className;
-  if (!reasoning) return <span className={className}>{badge.text}</span>;
-  // On a phone the score sits next to an icon to hover, since the table's
-  // wider cell is not there to hover.
-  if (compact) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <span className={className}>{badge.text}</span>
-        <Tooltip content={reasoning}>{infoIcon}</Tooltip>
-      </div>
-    );
-  }
+  // The judge's reasoning always sits behind the same small circle next to
+  // the score, on both pages and on a phone, so a reader learns one place to
+  // look for why a score is what it is.
   return (
-    <Tooltip content={reasoning}>
+    <div className="flex items-center gap-1.5">
       <span className={className}>{badge.text}</span>
-    </Tooltip>
+      {reasoning && <Tooltip content={reasoning}>{infoIcon}</Tooltip>}
+    </div>
   );
 }
 
