@@ -113,10 +113,7 @@ const CORRECTNESS_NAME = "Correctness";
 // The evaluator name goes into a card's description HTML, so escape it (names are
 // user-authored). driver.js renders the description as raw HTML.
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // Anchors (kept here so component `data-tour` attributes and steps stay in sync).
@@ -447,12 +444,15 @@ function tickCheckbox(cb: HTMLInputElement | undefined): void {
   row.style.borderRadius = "8px";
   row.style.transition = "background-color 0.15s ease";
   row.style.backgroundColor = "color-mix(in srgb, #22c55e 20%, transparent)";
-  row.style.boxShadow = "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
+  row.style.boxShadow =
+    "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
 }
 
 /** Tick an evaluator in the picker, matched by the exact name from the plan. */
 async function pickEvaluatorByName(name: string): Promise<void> {
-  const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
+  const dialog = await waitForElement(A.addEvaluatorsDialog, {
+    timeout: 10000,
+  });
   if (!dialog) return;
   tickCheckbox(chooseEvaluatorCheckbox(dialog as HTMLElement, name));
 }
@@ -513,7 +513,9 @@ function expandFailedReasoning(): void {
 /** Open the previously-failing phone-number test result in the outputs list. */
 function openPhoneNumberResult(): void {
   const rows = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('[data-tour="run-result-row"]'),
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-tour="run-result-row"]',
+    ),
   );
   const target =
     rows.find((r) => /phone number/i.test(r.textContent ?? "")) ?? rows[0];
@@ -636,10 +638,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       if (attached) {
         attachedStep.anchor = evaluatorCardAnchor(attached);
         attachedStep.title = "Already added for you";
-        attachedStep.description =
-          `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
-            attached,
-          )}</strong> is already here: does the answer get it right?`;
+        attachedStep.description = `This tab holds every evaluator added to your agent. <strong>${escapeHtml(
+          attached,
+        )}</strong> is already here: does the answer get it right?`;
         return;
       }
       // Nothing is attached. Drop the anchor so the card sits in the middle
@@ -902,6 +903,8 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       timeout: 12000,
       action: async () => {
         await clickElement(A.testsRunAll);
+        // Running every test asks for a confirmation first.
+        await clickByText("Start the run", { timeout: 8000 });
       },
     },
     {
@@ -1020,6 +1023,8 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       },
       action: async () => {
         await clickElement(A.testsRunAll);
+        // Running every test asks for a confirmation first.
+        await clickByText("Start the run", { timeout: 8000 });
       },
     },
     {
