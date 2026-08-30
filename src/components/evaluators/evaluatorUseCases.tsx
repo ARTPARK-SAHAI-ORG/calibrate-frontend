@@ -33,7 +33,7 @@ export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
   },
   {
     value: "llm-general",
-    title: "Agent response",
+    title: "Single agent response",
     description: "Judge the output of an LLM given a text input",
     group: "text",
   },
