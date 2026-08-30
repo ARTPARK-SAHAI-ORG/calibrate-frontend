@@ -167,13 +167,14 @@ describe("run counts", () => {
   it("names no model for a plain run and every model for a comparison", () => {
     expect(runModels(unitRun)).toEqual([]);
     expect(runModels(benchmarkRun)).toEqual(["a", "b"]);
-    // The backend stores a model with "__" where the name has a "/".
+    // The backend stores a model with "__" where the name has a "/", and the
+    // company that makes it is left off.
     expect(
       runModels({
         ...benchmarkRun,
         model_results: [{ model: "google__gemini-2.5-flash" }],
       }),
-    ).toEqual(["google/gemini-2.5-flash"]);
+    ).toEqual(["gemini-2.5-flash"]);
   });
 });
 
@@ -218,7 +219,9 @@ describe("RunsTabContent", () => {
     // A plain run used the agent's own model, so there is nothing to name.
     expect(cells[0]?.[3]).toBe("Default");
     expect(cells[1]?.[2]).toBe("4");
-    expect(cells[1]?.[3]).toBe("ab");
+    // One model, then how many more, so a run with several does not widen the
+    // column for every other row.
+    expect(cells[1]?.[3]).toBe("a+1");
     // No Test or Benchmark label anywhere.
     expect(screen.queryByText("Benchmark")).not.toBeInTheDocument();
   });

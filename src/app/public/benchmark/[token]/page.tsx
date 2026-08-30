@@ -18,6 +18,7 @@ import {
 } from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { ResultTabs } from "@/components/ui";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
 type BenchmarkStatusResponse = {
@@ -117,15 +118,11 @@ export default function PublicBenchmarkPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                {{ leaderboard: "Leaderboard", "top-picks": "Model selection", outputs: "Results", about: "About" }[tab]}
-              </button>
-            ))}
+            <ResultTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+            />
           </div>
           {activeTab === "outputs" && nav && selectedTest && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

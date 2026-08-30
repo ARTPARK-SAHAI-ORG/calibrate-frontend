@@ -89,7 +89,7 @@ function NamePill({
 }
 
 /**
- * Fixed-width evaluators cell: shows up to 2 pills (each opens how that
+ * Fixed-width evaluators cell: shows up to `maxVisible` pills (each opens how that
  * evaluator judges in a preview), and folds the rest into a "+N" chip whose
  * tooltip lists the remaining evaluators as the same pills on hover. One
  * instance renders per table row, so the preview modal is owned here rather
@@ -98,8 +98,15 @@ function NamePill({
  */
 export function EvaluatorPillList({
   evaluators,
+  maxVisible = 2,
 }: {
   evaluators: EvaluatorPillItem[];
+  /**
+   * How many names the cell shows when they all fit. Above that it always
+   * keeps one pill fewer, to leave room for the "+N" chip, and never fewer
+   * than one.
+   */
+  maxVisible?: number;
 }) {
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
@@ -109,9 +116,10 @@ export function EvaluatorPillList({
   if (evaluators.length === 0) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
-  const visible =
-    evaluators.length <= 2 ? evaluators : evaluators.slice(0, 1);
-  const rest = evaluators.length <= 2 ? [] : evaluators.slice(1);
+  const fits = evaluators.length <= maxVisible;
+  const shown = Math.max(1, maxVisible - 1);
+  const visible = fits ? evaluators : evaluators.slice(0, shown);
+  const rest = fits ? [] : evaluators.slice(shown);
   return (
     <div className="flex items-center gap-1 min-w-0">
       {visible.map((ev, index) => (
@@ -183,6 +191,17 @@ export function EvaluatorPillList({
  * table row stays one line high whatever it holds. Used for the models a run
  * tried.
  */
-export function NamePillList({ names }: { names: string[] }) {
-  return <EvaluatorPillList evaluators={names.map((name) => ({ name }))} />;
+export function NamePillList({
+  names,
+  maxVisible,
+}: {
+  names: string[];
+  maxVisible?: number;
+}) {
+  return (
+    <EvaluatorPillList
+      evaluators={names.map((name) => ({ name }))}
+      maxVisible={maxVisible}
+    />
+  );
 }

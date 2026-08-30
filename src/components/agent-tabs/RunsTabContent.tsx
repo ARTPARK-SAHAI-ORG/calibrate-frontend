@@ -68,10 +68,13 @@ export function runTestCount(run: AgentRun): number | null {
   return null;
 }
 
-/** The models a run tried the tests against, as the run stored them. */
+/**
+ * The models a run tried the tests against, named the way a person says them:
+ * the model on its own, without the company that makes it.
+ */
 export function runModels(run: AgentRun): string[] {
   return (run.model_results ?? [])
-    .map((m) => m.model?.replace(/__/g, "/") ?? "")
+    .map((m) => m.model?.replace(/__/g, "/").split("/").pop() ?? "")
     .filter(Boolean);
 }
 
@@ -193,7 +196,7 @@ function RunModels({ run }: { run: AgentRun }) {
   const models = runModels(run);
   if (models.length === 0)
     return <span className="text-sm text-muted-foreground/70">Default</span>;
-  return <NamePillList names={models} />;
+  return <NamePillList names={models} maxVisible={1} />;
 }
 
 /**
@@ -463,7 +466,7 @@ export function RunsTabContent({
 
           {/* Desktop table */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-44">

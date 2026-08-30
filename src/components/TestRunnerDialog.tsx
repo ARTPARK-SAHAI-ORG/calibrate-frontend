@@ -17,7 +17,7 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RerunIconButton } from "@/components/ui";
+import { RerunIconButton, ResultTabs } from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -506,38 +506,13 @@ export function TestRunnerDialog({
             {isFinished && (
               <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
                 <div className="flex gap-3 md:gap-4 lg:gap-6">
-                  <button
-                    data-tour="run-tab-summary"
-                    onClick={() => setActiveTab("summary")}
-                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                      activeTab === "summary"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Summary
-                  </button>
-                  <button
-                    data-tour="run-tab-outputs"
-                    onClick={() => setActiveTab("outputs")}
-                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                      activeTab === "outputs"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Results
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("about")}
-                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                      activeTab === "about"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    About
-                  </button>
+                  <ResultTabs
+                    tabs={["summary", "outputs", "about"]}
+                    activeTab={activeTab}
+                    onChange={setActiveTab}
+                    size="window"
+                    tourPrefix="run-tab"
+                  />
                 </div>
               </div>
             )}

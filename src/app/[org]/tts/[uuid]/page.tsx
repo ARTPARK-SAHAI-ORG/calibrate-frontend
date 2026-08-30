@@ -14,6 +14,7 @@ import {
   StatusBadge,
   NotFoundState,
   RetryIcon,
+  ResultTabs,
 } from "@/components/ui";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -894,34 +895,20 @@ export default function TTSEvaluationDetailPage() {
                   {/* Tab Navigation */}
                   <div className="flex gap-2 border-b border-border">
                     {/* Only show Leaderboard and About tabs once leaderboard data is available */}
-                    {canShowLeaderboard && (
-                      <button
-                        onClick={() => handleTabChange("leaderboard")}
-                        className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                          displayedActiveTab === "leaderboard"
-                            ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Leaderboard
-                      </button>
-                    )}
-                    {canShowTopPicks && (
-                      <button
-                        onClick={() => handleTabChange("top-picks")}
-                        className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                          displayedActiveTab === "top-picks"
-                            ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Model selection
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        handleTabChange("outputs");
+                    <ResultTabs
+                      tabs={[
+                        ...(canShowLeaderboard
+                          ? (["leaderboard"] as const)
+                          : []),
+                        ...(canShowTopPicks ? (["top-picks"] as const) : []),
+                        "outputs",
+                        ...(canShowLeaderboard ? (["about"] as const) : []),
+                      ]}
+                      activeTab={displayedActiveTab}
+                      onChange={(tab) => {
+                        handleTabChange(tab);
                         if (
+                          tab === "outputs" &&
                           !activeProviderTab &&
                           evaluationResult?.provider_results &&
                           evaluationResult.provider_results.length > 0
@@ -931,26 +918,7 @@ export default function TTSEvaluationDetailPage() {
                           );
                         }
                       }}
-                      className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                        displayedActiveTab === "outputs"
-                          ? "border-foreground text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Outputs
-                    </button>
-                    {canShowLeaderboard && (
-                      <button
-                        onClick={() => handleTabChange("about")}
-                        className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                          displayedActiveTab === "about"
-                            ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        About
-                      </button>
-                    )}
+                    />
                   </div>
 
                   {/* About Tab */}
