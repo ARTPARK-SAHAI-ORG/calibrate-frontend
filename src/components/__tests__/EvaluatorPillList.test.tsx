@@ -365,3 +365,20 @@ describe("two items sharing a name", () => {
     warn.mockRestore();
   });
 });
+
+describe("a cell with room for one name", () => {
+  it("keeps the first name and folds the rest into the +N chip", () => {
+    render(<NamePillList names={["a", "b"]} maxVisible={1} />);
+
+    expect(screen.getByText("a")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.queryByText("b")).not.toBeInTheDocument();
+  });
+
+  it("shows a lone name on its own", () => {
+    render(<NamePillList names={["a"]} maxVisible={1} />);
+
+    expect(screen.getByText("a")).toBeInTheDocument();
+    expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+});
