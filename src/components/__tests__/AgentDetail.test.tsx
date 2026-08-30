@@ -35,6 +35,12 @@ jest.mock("../agent-tabs", () => ({
   ),
   AgentConnectionTabContent: (props: any) => (
     <div data-testid="connection-tab-content">
+      <span data-testid="connection-supports-benchmark">
+        {String(props.connectionConfig.supports_benchmark)}
+      </span>
+      <span data-testid="connection-benchmark-provider">
+        {String(props.connectionConfig.benchmark_provider)}
+      </span>
       <input
         aria-label="agent-url"
         value={props.agentUrl}
@@ -79,6 +85,9 @@ jest.mock("../agent-tabs", () => ({
       TestsTabContent-{props.agentType}-{props.agentNature}
       <button onClick={() => props.onAgentDefaultsAttached?.()}>
         AttachDefaultEvaluator
+      </button>
+      <button onClick={() => props.onEnableBenchmark?.("google")}>
+        EnableBenchmarkFromTests
       </button>
     </div>
   ),
@@ -426,7 +435,11 @@ describe("AgentDetail", () => {
   });
 
   it("passes the agent's nature down to the Tests and Evaluators tabs", async () => {
-    const generalAgent = { ...buildAgent, uuid: "agent-3", interaction_type: "general" };
+    const generalAgent = {
+      ...buildAgent,
+      uuid: "agent-3",
+      interaction_type: "general",
+    };
     mockFetchSequenceForAgent(generalAgent);
     const user = setupUser();
     render(<AgentDetail agentUuid={generalAgent.uuid} />);
@@ -1337,5 +1350,47 @@ describe("AgentDetail", () => {
     expect(
       screen.getByDisplayValue("Copy of Build Agent2"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("AgentDetail — turning benchmarking on from the Tests tab", () => {
+  it("saves the picked provider and shows it on the Connection tab", async () => {
+    mockFetchSequenceForAgent({
+      ...connectionAgent,
+      config: {
+        ...connectionAgent.config,
+        connection_verified: true,
+        supports_benchmark: false,
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("Tests"));
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(connectionAgent),
+    );
+    await user.click(screen.getByText("EnableBenchmarkFromTests"));
+
+    await waitFor(() => {
+      const put = (global.fetch as jest.Mock).mock.calls.find(
+        (c: any[]) => c[1]?.method === "PUT",
+      );
+      expect(put).toBeTruthy();
+      const body = JSON.parse(put![1].body);
+      expect(body.config.supports_benchmark).toBe(true);
+      expect(body.config.benchmark_provider).toBe("google");
+    });
+
+    await user.click(screen.getByText("Connection"));
+    expect(
+      screen.getByTestId("connection-supports-benchmark"),
+    ).toHaveTextContent("true");
+    expect(
+      screen.getByTestId("connection-benchmark-provider"),
+    ).toHaveTextContent("google");
   });
 });

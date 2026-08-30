@@ -422,9 +422,10 @@ export function BenchmarkDialog({
               e.stopPropagation();
               setExpandedModelError(isExpanded ? null : modelId);
             }}
-            className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title="View details"
+            aria-expanded={isExpanded}
+            className="flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-medium text-red-500 underline underline-offset-2 hover:text-red-600 transition-colors cursor-pointer"
           >
+            {isExpanded ? "Hide" : "See why"}
             <svg
               className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`}
               fill="none"

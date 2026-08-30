@@ -212,7 +212,11 @@ jest.mock("../../BenchmarkResultsDialog", () => ({
 jest.mock("../CompareModelsButton", () => ({
   __esModule: true,
   CompareModelsButton: (props: any) => (
-    <button data-testid={`compare-${props.size}`} onClick={props.onClick}>
+    <button
+      data-testid={`compare-${props.size}`}
+      disabled={props.isConnectionUnverified || props.isBenchmarkDisabled}
+      onClick={props.onClick}
+    >
       Compare-{props.size}
     </button>
   ),
@@ -1703,5 +1707,41 @@ describe("TestsTabContent — connection agent", () => {
     expect(screen.getByText(/connection is checked first/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start the run" }));
     expect(screen.getByText("Verify connection")).toBeInTheDocument();
+  });
+});
+
+describe("TestsTabContent — turning benchmarking on from Compare models", () => {
+  it("asks for the provider, saves it, then opens the benchmark window", async () => {
+    const user = setupUser();
+    const onEnableBenchmark = jest.fn();
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: true,
+      supportsBenchmark: false,
+      onEnableBenchmark,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    // The provider question, not the benchmark window.
+    expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
+    await user.selectOptions(screen.getByLabelText("Model provider"), "google");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(onEnableBenchmark).toHaveBeenCalledWith("google");
+    await screen.findByTestId("benchmark-dialog");
+  });
+
+  it("keeps Compare models disabled when there is no way to turn benchmarking on", async () => {
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: true,
+      supportsBenchmark: false,
+    });
+    await screen.findAllByText("Greeting test");
+
+    expect(screen.getByTestId("compare-header")).toBeDisabled();
   });
 });

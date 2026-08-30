@@ -402,12 +402,12 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
 
     // expand detail
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.getByText(/"foo": "bar"/)).toBeInTheDocument();
 
     // collapse again
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /hide/i }));
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
 
@@ -452,7 +452,7 @@ describe("BenchmarkDialog", () => {
     await waitFor(() => {
       expect(screen.getByText("failed")).toBeInTheDocument();
     });
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("network down")).toBeInTheDocument();
   });
 
@@ -474,7 +474,7 @@ describe("BenchmarkDialog", () => {
     });
     expect(global.fetch).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTitle("View details"));
+    await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("BACKEND_URL not set")).toBeInTheDocument();
 
     process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";

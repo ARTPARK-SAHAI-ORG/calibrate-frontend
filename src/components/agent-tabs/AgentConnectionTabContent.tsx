@@ -16,6 +16,10 @@ import {
   type InputRow,
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
+import {
+  BENCHMARK_PROVIDERS,
+  DEFAULT_BENCHMARK_PROVIDER,
+} from "@/components/agent-tabs/benchmarkProviders";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -330,7 +334,8 @@ export function AgentConnectionTabContent({
 }`;
 
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
-  const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";
+  const benchmarkProvider =
+    connectionConfig.benchmark_provider || DEFAULT_BENCHMARK_PROVIDER;
 
   const exampleModelByProvider: Record<string, string> = {
     openrouter: "openai/gpt-4.1",
@@ -355,7 +360,7 @@ export function AgentConnectionTabContent({
       ...connectionConfig,
       supports_benchmark: !supportsBenchmark,
       benchmark_provider: !supportsBenchmark
-        ? connectionConfig.benchmark_provider || "openrouter"
+        ? connectionConfig.benchmark_provider || DEFAULT_BENCHMARK_PROVIDER
         : connectionConfig.benchmark_provider,
     });
   };
@@ -558,17 +563,11 @@ export function AgentConnectionTabContent({
                   onChange={(e) => handleProviderChange(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  <option value="openrouter">OpenRouter (all providers)</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                  <option value="meta-llama">Meta</option>
-                  <option value="mistralai">Mistral</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="x-ai">xAI</option>
-                  <option value="cohere">Cohere</option>
-                  <option value="qwen">Qwen</option>
-                  <option value="ai21">AI21</option>
+                  {BENCHMARK_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
                 </select>
                 <svg
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
