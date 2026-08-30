@@ -494,13 +494,14 @@ export function BenchmarkDialog({
                       </span>
                       <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
-                    {/* Verification badge for connections. Fixed width, so a
-                        row saying "not checked" and a row offering "See why"
-                        leave the model picker beside them the same size. */}
-                    {agentType === "connection" && (
+                    {/* Verification badge for connections, once a model is
+                        picked. Fixed width, so a row saying "not checked" and
+                        a row offering "See why" leave the model picker beside
+                        them the same size. A row with no model yet has nothing
+                        to say, so its picker runs the full width. */}
+                    {agentType === "connection" && selectedModel && (
                       <div className="w-28 shrink-0 flex items-center">
-                        {selectedModel &&
-                          getModelVerificationBadge(selectedModel.id)}
+                        {getModelVerificationBadge(selectedModel.id)}
                       </div>
                     )}
                   </div>
