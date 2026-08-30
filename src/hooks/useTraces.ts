@@ -1,11 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
+import {
+  fetchTraces,
+  NO_TRACE_FILTERS,
+  TraceFilterValues,
+  TraceOutputFilter,
+  TraceSummary,
+} from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
-/** Shared empty default, so a caller with no labels does not hand the hook a
- *  new array on every render. */
+/** Shared empty default, so a caller with no labels or metadata keys does not
+ *  hand the hook a new array on every render. */
 const EMPTY_LABELS: string[] = [];
 
 type UseTracesArgs = {
@@ -20,6 +26,13 @@ type UseTracesArgs = {
   outputType?: TraceOutputFilter;
   /** Keep only traces carrying any of these labels. Empty keeps everything. */
   labels?: string[];
+  /** Keep only traces whose input contains this text. Blank keeps everything. */
+  inputContains?: string;
+  /** Keep only traces whose output contains this text. Blank keeps everything. */
+  outputContains?: string;
+  /** Keep only traces carrying any of these metadata keys. Empty keeps
+   *  everything. */
+  metadataKeys?: string[];
 };
 
 /**
@@ -35,10 +48,14 @@ export function useTraces({
   q = "",
   outputType = "all",
   labels = EMPTY_LABELS,
+  inputContains = "",
+  outputContains = "",
+  metadataKeys = EMPTY_LABELS,
 }: UseTracesArgs) {
   // A new array on every render would restart the fetch forever, so the
   // effects and the fetch key on the labels' text rather than the array.
   const labelKey = labels.join("\u0000");
+  const metadataKeyKey = metadataKeys.join("\u0000");
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -53,20 +70,27 @@ export function useTraces({
   // search loads, and callers need it to tell "this agent has no traces" from
   // "this search found none".
   const [loadedQ, setLoadedQ] = useState("");
-  // The output filter the rows on screen came from. Like `loadedQ`, it lags
-  // `outputType` while a new filter loads, because the value in state changes
-  // before the fetch for it resolves.
-  const [loadedOutputType, setLoadedOutputType] =
-    useState<TraceOutputFilter>("all");
-  // The labels the rows on screen came from, lagging `labels` the same way.
-  const [loadedLabels, setLoadedLabels] = useState<string[]>([]);
+  // The filters the rows on screen came from. Like `loadedQ`, they lag the
+  // arguments while a new filter loads, because the values in state change
+  // before the fetch for them resolves.
+  const [loadedFilters, setLoadedFilters] =
+    useState<TraceFilterValues>(NO_TRACE_FILTERS);
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize, q, outputType, labelKey]);
+  }, [
+    agentId,
+    pageSize,
+    q,
+    outputType,
+    labelKey,
+    inputContains,
+    outputContains,
+    metadataKeyKey,
+  ]);
 
   const load = useCallback(
     async (targetOffset: number): Promise<number> => {
@@ -82,14 +106,22 @@ export function useTraces({
           q,
           outputType,
           labels,
+          inputContains,
+          outputContains,
+          metadataKeys,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
         setTotal(nextTotal);
         setLoadedQ(q);
-        setLoadedOutputType(outputType);
-        setLoadedLabels(labels);
+        setLoadedFilters({
+          outputType,
+          labels,
+          inputContains,
+          outputContains,
+          metadataKeys,
+        });
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -106,7 +138,17 @@ export function useTraces({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accessToken, pageSize, agentId, q, outputType, labelKey],
+    [
+      accessToken,
+      pageSize,
+      agentId,
+      q,
+      outputType,
+      labelKey,
+      inputContains,
+      outputContains,
+      metadataKeyKey,
+    ],
   );
 
   useEffect(() => {
@@ -151,8 +193,7 @@ export function useTraces({
     items,
     total,
     loadedQ,
-    loadedOutputType,
-    loadedLabels,
+    loadedFilters,
     offset,
     setOffset,
     loadedOffset,

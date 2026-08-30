@@ -106,6 +106,17 @@ export type TraceListParams = {
   /** Keep only traces carrying any of these labels, matched exactly and
    *  case-sensitively. An empty list is left off here. */
   labels?: string[];
+  /** Keep only traces whose input contains this text, case-insensitively.
+   *  Narrower than `q`, which also matches the reply, the ids and the
+   *  metadata. Blank is left off here. */
+  inputContains?: string;
+  /** Keep only traces whose output contains this text, case-insensitively.
+   *  Matches the reply and the tool calls. Blank is left off here. */
+  outputContains?: string;
+  /** Keep only traces carrying any of these metadata keys, matched exactly.
+   *  Values are not matched; the search box covers those. An empty list is
+   *  left off here. */
+  metadataKeys?: string[];
 };
 
 /**
@@ -116,7 +127,17 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q, outputType, labels }: TraceListParams,
+  {
+    limit,
+    offset,
+    agentId,
+    q,
+    outputType,
+    labels,
+    inputContains,
+    outputContains,
+    metadataKeys,
+  }: TraceListParams,
 ): Promise<Paginated<TraceSummary>> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
@@ -127,6 +148,13 @@ export async function fetchTraces(
     params.set("output_type", outputType);
   }
   for (const label of labels ?? []) params.append("labels", label);
+  if (inputContains?.trim()) {
+    params.set("input_contains", inputContains.trim());
+  }
+  if (outputContains?.trim()) {
+    params.set("output_contains", outputContains.trim());
+  }
+  for (const key of metadataKeys ?? []) params.append("metadata_key", key);
   return apiGet<Paginated<TraceSummary>>(
     `/traces?${params.toString()}`,
     accessToken,
@@ -155,6 +183,22 @@ export async function fetchTraceLabels(
     accessToken,
   );
   return Array.isArray(data) ? data : (data.labels ?? []);
+}
+
+/**
+ * The metadata keys this agent's traces carry, so the filter can offer them.
+ * Like the labels, one page of rows is never the whole set, so they come from
+ * the backend rather than the traces on screen.
+ */
+export async function fetchTraceMetadataKeys(
+  accessToken: string,
+  agentId: string,
+): Promise<string[]> {
+  const data = await apiGet<{ keys?: string[] } | string[]>(
+    `/traces/metadata-keys?agent_id=${encodeURIComponent(agentId)}`,
+    accessToken,
+  );
+  return Array.isArray(data) ? data : (data.keys ?? []);
 }
 
 /**
@@ -188,11 +232,40 @@ export type ConvertTestType = "response" | "tool_call" | "general";
 /** The list the reader is looking at, when they asked for every trace in it
  *  rather than the ones they ticked. The backend re-reads the same rows, so a
  *  page they never loaded is included and a stale tick cannot slip through. */
-export type TraceFilters = {
+/** Everything the filter dialog sets, all of it always present so the dialog
+ *  can hold one of these as its state. `TraceFilters` below adds the agent and
+ *  the search text, which come from the tab rather than the dialog. */
+export type TraceFilterValues = {
+  outputType: TraceOutputFilter;
+  labels: string[];
+  metadataKeys: string[];
+  inputContains: string;
+  outputContains: string;
+};
+
+/** Nothing filtered: the starting point, and what Clear all goes back to. */
+export const NO_TRACE_FILTERS: TraceFilterValues = {
+  outputType: "all",
+  labels: [],
+  metadataKeys: [],
+  inputContains: "",
+  outputContains: "",
+};
+
+/** How many filters are set, for the count on the filter button. */
+export function countTraceFilters(filters: TraceFilterValues): number {
+  return (
+    (filters.outputType !== "all" ? 1 : 0) +
+    (filters.labels.length > 0 ? 1 : 0) +
+    (filters.metadataKeys.length > 0 ? 1 : 0) +
+    (filters.inputContains.trim() !== "" ? 1 : 0) +
+    (filters.outputContains.trim() !== "" ? 1 : 0)
+  );
+}
+
+export type TraceFilters = Partial<TraceFilterValues> & {
   agentId: string;
   q?: string;
-  outputType?: TraceOutputFilter;
-  labels?: string[];
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -206,6 +279,13 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
     body.output_type = filters.outputType;
   }
   if (filters.labels?.length) body.labels = filters.labels;
+  if (filters.inputContains?.trim()) {
+    body.input_contains = filters.inputContains.trim();
+  }
+  if (filters.outputContains?.trim()) {
+    body.output_contains = filters.outputContains.trim();
+  }
+  if (filters.metadataKeys?.length) body.metadata_key = filters.metadataKeys;
   return body;
 }
 
