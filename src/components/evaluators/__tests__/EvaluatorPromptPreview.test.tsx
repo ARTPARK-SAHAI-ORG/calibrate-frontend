@@ -123,7 +123,7 @@ describe("EvaluatorPromptPreview", () => {
     ).toBeInTheDocument();
   });
 
-  it("names the evaluator at the top, with Edit opening its page in a new tab", async () => {
+  it("names the evaluator at the top, with Edit opening its edit form in a new tab", async () => {
     render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     await screen.findByText("Judge whether the reply is concise.");
 
@@ -131,7 +131,7 @@ describe("EvaluatorPromptPreview", () => {
       screen.getByRole("heading", { name: "Conciseness" }),
     ).toBeInTheDocument();
     const edit = screen.getByRole("link", { name: "Edit evaluator" });
-    expect(edit).toHaveAttribute("href", "/evaluators/e1");
+    expect(edit).toHaveAttribute("href", "/evaluators/e1?edit=1");
     expect(edit).toHaveAttribute("target", "_blank");
   });
 
