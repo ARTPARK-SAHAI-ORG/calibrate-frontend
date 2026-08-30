@@ -4,8 +4,11 @@ import { setupUser } from "@/test-utils";
 import {
   SimulationMetricsGrid,
   formatMetricCardValue,
+  latencyMetricTooltip,
+  formatLatency,
   type MetricData,
 } from "../SimulationMetricsGrid";
+import type { SimulationResult } from "../SimulationResultsTable";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 
 jest.mock("../../../hooks", () => ({
@@ -142,14 +145,23 @@ describe("SimulationMetricsGrid", () => {
     expect(screen.getByText("2.50s")).toBeInTheDocument();
   });
 
-  it("does not render the latency panel content when there are no latency metrics", async () => {
-    const user = setupUser();
+  it("offers no Latency tab when the run has no timings, and still shows the scores", () => {
     const metrics = {
       accuracy: { mean: 0.9, std: 0, values: [] },
     };
     render(<SimulationMetricsGrid metrics={metrics} type="voice" />);
-    await user.click(screen.getByText("Latency"));
-    expect(screen.queryByText("accuracy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Latency")).not.toBeInTheDocument();
+    expect(screen.queryByText("Performance")).not.toBeInTheDocument();
+    expect(screen.getByText("accuracy")).toBeInTheDocument();
+  });
+
+  it("shows the timings with no tabs when the run has only those", () => {
+    const metrics = {
+      "llm/ttft": { mean: 0.25, std: 0, values: [] },
+    };
+    render(<SimulationMetricsGrid metrics={metrics} type="voice" />);
+    expect(screen.queryByText("Performance")).not.toBeInTheDocument();
+    expect(screen.getByText("250ms")).toBeInTheDocument();
   });
 
   it("renders evaluator cards as buttons with description tooltip, and opens the evaluator preview on click", async () => {
@@ -187,5 +199,167 @@ describe("SimulationMetricsGrid", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("accuracy")).toBeInTheDocument();
+  });
+});
+
+describe("latencyMetricTooltip", () => {
+  it("spells out the part of the call and what was timed", () => {
+    expect(latencyMetricTooltip("stt/ttft")).toBe("Time to first byte for speech to text");
+    expect(latencyMetricTooltip("llm/processing_time")).toBe("Processing time for language model");
+    expect(latencyMetricTooltip("tts/ttft")).toBe("Time to first byte for text to speech");
+  });
+
+  it("uses the raw name for a part it does not know", () => {
+    expect(latencyMetricTooltip("webhook/ttft")).toBe("Time to first byte for webhook");
+  });
+
+  it("is empty for anything that is not a timing", () => {
+    expect(latencyMetricTooltip("stt/accuracy")).toBe("");
+  });
+});
+
+describe("SimulationMetricsGrid latency from the simulations", () => {
+  const simulationWith = (value: number): SimulationResult => ({
+    simulation_name: `sim-${value}`,
+    persona: { label: "P", characteristics: "", gender: "f", language: "en" },
+    scenario: { name: "S", description: "" },
+    evaluation_results: [{ name: "llm/ttft", value, reasoning: "" }],
+    transcript: [],
+  });
+
+  it("averages the latency from each simulation when the run carries none of its own", async () => {
+    const user = setupUser();
+    render(
+      <SimulationMetricsGrid
+        metrics={{ accuracy: { mean: 0.9, std: 0, values: [] } }}
+        type="voice"
+        simulations={[simulationWith(0.2), simulationWith(0.4)]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    expect(screen.getByText("llm/ttft")).toBeInTheDocument();
+    expect(screen.getByText("300ms")).toBeInTheDocument();
+  });
+
+  it("reads a timing sent as text, which is what the backend does", async () => {
+    const user = setupUser();
+    const asText = {
+      ...simulationWith(0),
+      evaluation_results: [
+        { name: "llm/ttft", value: "2.0643304586410522" as unknown as number, reasoning: "" },
+      ],
+    };
+    render(
+      <SimulationMetricsGrid
+        metrics={{ accuracy: { mean: 0.9, std: 0, values: [] } }}
+        type="voice"
+        simulations={[asText]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    expect(screen.getByText("2.06s")).toBeInTheDocument();
+  });
+
+  it("leaves out a simulation that reported no timing rather than counting it as zero", async () => {
+    const user = setupUser();
+    const missing = {
+      ...simulationWith(0),
+      evaluation_results: [
+        { name: "llm/ttft", value: null as unknown as number, reasoning: "" },
+      ],
+    };
+    render(
+      <SimulationMetricsGrid
+        metrics={{ accuracy: { mean: 0.9, std: 0, values: [] } }}
+        type="voice"
+        simulations={[simulationWith(2), missing]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    // The average of the one real timing, not of 2 and 0.
+    expect(screen.getByText("2.00s")).toBeInTheDocument();
+  });
+
+  it("shows nothing at all for a text run whose only saved numbers are timings", () => {
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{ "llm/ttft": { mean: 0.25, std: 0, values: [] } }}
+        type="text"
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("prefers the run's own latency numbers over the per-simulation ones", async () => {
+    const user = setupUser();
+    render(
+      <SimulationMetricsGrid
+        metrics={{
+          accuracy: { mean: 0.9, std: 0, values: [] },
+          "llm/ttft": { mean: 2.5, std: 0, values: [] },
+        }}
+        type="voice"
+        simulations={[simulationWith(0.2)]}
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    expect(screen.getByText("2.50s")).toBeInTheDocument();
+    expect(screen.queryByText("200ms")).not.toBeInTheDocument();
+  });
+
+  it("shows nothing at all for a text run whose simulations carry timings", () => {
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{}}
+        type="text"
+        simulations={[simulationWith(0.2)]}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("explains the built-in speech-to-text score, which has no description of its own", async () => {
+    const user = setupUser();
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{ stt_llm_judge: { mean: 0.9, std: 0, values: [] } }}
+        type="text"
+      />,
+    );
+    await user.hover(container.querySelector("svg[aria-hidden]")!.parentElement!);
+    expect(
+      await screen.findByText(/speech to text accuracy for the text spoken by the simulated user/),
+    ).toBeInTheDocument();
+  });
+
+  it("says what a latency card timed when the reader hovers it", async () => {
+    const user = setupUser();
+    const { container } = render(
+      <SimulationMetricsGrid
+        metrics={{
+          accuracy: { mean: 0.9, std: 0, values: [] },
+          "llm/ttft": { mean: 0.3, std: 0, values: [] },
+        }}
+        type="voice"
+      />,
+    );
+    await user.click(screen.getByText("Latency"));
+    await user.hover(container.querySelector("svg[aria-hidden]")!.parentElement!);
+    expect(await screen.findByText("Time to first byte for language model")).toBeInTheDocument();
+  });
+});
+
+describe("formatLatency", () => {
+  it("shows under a second in milliseconds and above it in seconds", () => {
+    expect(formatLatency(0.0337)).toBe("34ms");
+    expect(formatLatency(1.923)).toBe("1.92s");
+  });
+
+  it("reads a timing sent as text", () => {
+    expect(formatLatency("0.25" as unknown as number)).toBe("250ms");
+  });
+
+  it("shows a dash rather than NaN when the timing makes no sense", () => {
+    expect(formatLatency("n/a" as unknown as number)).toBe("—");
   });
 });

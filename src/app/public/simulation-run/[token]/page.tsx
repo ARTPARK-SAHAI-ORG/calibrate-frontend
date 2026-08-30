@@ -121,6 +121,7 @@ export default function PublicSimulationRunPage() {
           metrics={data.metrics}
           type={data.type}
           evaluatorDescriptionByName={evaluatorDescriptionByName}
+          simulations={data.simulation_results}
         />
 
         {data.simulation_results.length > 0 && (

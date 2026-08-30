@@ -28,6 +28,7 @@ describe("eval-details barrel", () => {
       "SimulationMetricsGrid",
       "LATENCY_KEYS",
       "SimulationResultsTable",
+      "isSimulationLabellable",
       "SimulationTranscriptDialog",
     ];
     for (const name of expected) {

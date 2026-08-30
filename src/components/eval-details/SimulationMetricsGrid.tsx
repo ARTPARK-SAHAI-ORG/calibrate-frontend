@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import type { SimulationResult } from "./SimulationResultsTable";
 
 // `MetricData` represents one entry in `runData.metrics`. Newer simulation
 // runs include `type` (`"binary" | "rating"`) plus rating bounds
@@ -27,9 +28,70 @@ type SimulationMetricsGridProps = {
   evaluatorUuidByName?: Record<string, string>;
   /** Optional metric-name → snapshotted evaluator description map. */
   evaluatorDescriptionByName?: Record<string, string>;
+  /**
+   * The run's per-simulation results. Only used to work out the latency
+   * cards for older runs whose `metrics` carry no latency entries; the
+   * numbers are averaged from each simulation's own results.
+   */
+  simulations?: SimulationResult[];
 };
 
 const LATENCY_KEYS = ["stt/ttft", "llm/ttft", "tts/ttft", "stt/processing_time", "llm/processing_time", "tts/processing_time"];
+
+// Plain-words hover text for a latency card, e.g. "llm/ttft".
+export function latencyMetricTooltip(metricKey: string): string {
+  const [component, metricType] = metricKey.split("/");
+  const componentName =
+    component === "stt"
+      ? "speech to text"
+      : component === "llm"
+      ? "language model"
+      : component === "tts"
+      ? "text to speech"
+      : component;
+  if (metricType === "ttft") return `Time to first byte for ${componentName}`;
+  if (metricType === "processing_time") return `Processing time for ${componentName}`;
+  return "";
+}
+
+// A timing under a second reads better in milliseconds. `mean` is coerced
+// because the backend sends these numbers as text on some responses.
+export function formatLatency(mean: number): string {
+  const value = Number(mean);
+  if (!Number.isFinite(value)) return "—";
+  return value < 1 ? `${(value * 1000).toFixed(0)}ms` : `${value.toFixed(2)}s`;
+}
+
+// Speech-to-text accuracy is a built-in score rather than an evaluator the
+// user wrote, so it carries no description of its own.
+const STT_JUDGE_DESCRIPTION =
+  "This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent";
+
+// Average each latency number across the run's simulations. Used only when
+// `metrics` has no latency entries of its own.
+function latencyMetricsFromSimulations(simulations: SimulationResult[]): Array<[string, MetricData]> {
+  const out: Array<[string, MetricData]> = [];
+  for (const key of LATENCY_KEYS) {
+    const values: number[] = [];
+    for (const sim of simulations) {
+      const found = sim.evaluation_results?.find((r) => r.name === key);
+      // The timings arrive as text on some responses ("2.0643304586410522"),
+      // so read every value as a number rather than trusting its type. A
+      // simulation that reported no timing is left out rather than counted
+      // as zero, which would drag the average down: `Number(null)` is 0.
+      // Typed as a number, but the backend sends text (and sometimes
+      // nothing) here, so the check has to look at the real value.
+      const raw: unknown = found?.value;
+      if (raw === null || raw === undefined || raw === "") continue;
+      const value = Number(raw);
+      if (Number.isFinite(value)) values.push(value);
+    }
+    if (values.length > 0) {
+      out.push([key, { mean: values.reduce((a, b) => a + b, 0) / values.length, std: 0, values }]);
+    }
+  }
+  return out;
+}
 
 // Display formatter for the headline scalar on each metric card. Binary
 // metrics show pass count / total (the user expects "pass/fail"-style
@@ -59,6 +121,7 @@ export function SimulationMetricsGrid({
   type,
   evaluatorUuidByName,
   evaluatorDescriptionByName,
+  simulations,
 }: SimulationMetricsGridProps) {
   const [activeTab, setActiveTab] = useState<"performance" | "latency">("performance");
   // The evaluator whose prompt is on show, opened from a metric card's name.
@@ -70,16 +133,30 @@ export function SimulationMetricsGrid({
   if (!metrics) return null;
 
   const regularMetrics: Array<[string, MetricData]> = [];
-  const latencyMetrics: Array<[string, MetricData]> = [];
+  let latencyMetrics: Array<[string, MetricData]> = [];
   Object.entries(metrics).forEach(([key, metric]) => {
     if (!metric) return;
     if (LATENCY_KEYS.includes(key)) latencyMetrics.push([key, metric]);
     else regularMetrics.push([key, metric]);
   });
+  // Only a voice run shows latency at all, so there is nothing to work out
+  // for a text one: filling this in would leave a text run with a heading
+  // and nothing under it.
+  if (type === "voice" && latencyMetrics.length === 0 && simulations?.length) {
+    latencyMetrics = latencyMetricsFromSimulations(simulations);
+  }
 
-  if (regularMetrics.length === 0 && latencyMetrics.length === 0) return null;
-
+  // A tab is only offered when it has cards to show: a run whose numbers
+  // carry no timings should not hand the reader a Latency tab that opens on
+  // an empty screen.
   const isTextType = type === "text";
+  const showLatency = !isTextType && latencyMetrics.length > 0;
+  const showTabs = showLatency && regularMetrics.length > 0;
+  // Nothing to draw at all, so not even the heading: a text run whose saved
+  // numbers are only timings would otherwise leave an empty block.
+  if (regularMetrics.length === 0 && !showLatency) return null;
+  const latencyOnScreen = showLatency && (!showTabs || activeTab === "latency");
+  const performanceOnScreen = regularMetrics.length > 0 && (!showTabs || activeTab === "performance");
   const descriptionIcon = (
     <svg
       className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -100,7 +177,7 @@ export function SimulationMetricsGrid({
   return (
     <div>
       <h2 className="text-base md:text-lg font-semibold mb-3">Overall Metrics</h2>
-      {!isTextType && (
+      {showTabs && (
         <div className="flex gap-2 border-b border-border mb-4">
           <button
             onClick={() => setActiveTab("performance")}
@@ -120,11 +197,13 @@ export function SimulationMetricsGrid({
           </button>
         </div>
       )}
-      {(isTextType || activeTab === "performance") && regularMetrics.length > 0 && (
+      {performanceOnScreen && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {regularMetrics.map(([key, metric]) => {
             const evaluatorUuid = evaluatorUuidByName?.[key];
-            const description = evaluatorDescriptionByName?.[key];
+            const description =
+              evaluatorDescriptionByName?.[key] ??
+              (key === "stt_llm_judge" || key === "stt_llm_judge_score" ? STT_JUDGE_DESCRIPTION : undefined);
             // When an evaluator uuid is available, the entire card
             // becomes a button that opens a preview of how that
             // evaluator judges (with hover-highlight + arrow icon) so
@@ -176,16 +255,22 @@ export function SimulationMetricsGrid({
           })}
         </div>
       )}
-      {!isTextType && activeTab === "latency" && latencyMetrics.length > 0 && (
+      {latencyOnScreen && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {latencyMetrics.map(([key, metric]) => (
-            <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
-              <div className="text-[12px] text-muted-foreground mb-1">{key}</div>
-              <div className="text-[18px] font-semibold text-foreground">
-                {metric.mean < 1 ? `${(metric.mean * 1000).toFixed(0)}ms` : `${metric.mean.toFixed(2)}s`}
+          {latencyMetrics.map(([key, metric]) => {
+            const tooltip = latencyMetricTooltip(key);
+            return (
+              <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
+                <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
+                  {key}
+                  {tooltip && <Tooltip content={tooltip}>{descriptionIcon}</Tooltip>}
+                </div>
+                <div className="text-[18px] font-semibold text-foreground">
+                  {formatLatency(metric.mean)}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       <EvaluatorPreviewModal

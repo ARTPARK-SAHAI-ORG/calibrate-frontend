@@ -1,26 +1,25 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
-import { Tooltip } from "@/components/Tooltip";
-import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
-import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
 import { ShareButton } from "@/components/ShareButton";
-import { LabellingRowCheckbox } from "@/components/test-results/shared";
+import {
+  SimulationMetricsGrid,
+  SimulationResultsTable,
+  SimulationTranscriptDialog,
+  isSimulationLabellable,
+  LATENCY_KEYS,
+  type MetricData,
+  type SimulationResult,
+} from "@/components/eval-details";
 import {
   AddRunToLabellingTaskDialog,
   type ConversationLabellingResult,
@@ -32,65 +31,10 @@ import {
   SubmitForLabellingButton,
 } from "@/components/human-labelling/labellingSubmit";
 
-// `type`, `scale_min`, `scale_max` are present on newer runs (per the
-// evaluator migration). Older runs only carry `mean`/`std`/`values` — we
-// fall back to legacy Pass/Fail + percent rendering when `type` is
-// absent.
-type MetricData = {
-  mean: number;
-  std: number;
-  values: number[];
-  type?: "binary" | "rating" | string;
-  scale_min?: number;
-  scale_max?: number;
-};
-
 type RunEvaluator = {
   evaluator_uuid: string;
   name: string;
   description?: string | null;
-};
-
-type Persona = {
-  label: string;
-  characteristics: string;
-  gender: string;
-  language: string;
-};
-
-type Scenario = {
-  name: string;
-  description: string;
-};
-
-type EvaluationResult = {
-  name: string;
-  value: number;
-  reasoning: string;
-  description?: string | null;
-  // `evaluator_uuid` is added on newer runs and is the rename-safe key
-  // for routing. `name` is still the CSV column name from run time and
-  // can drift from `RunData.evaluators[].name` after an evaluator is
-  // renamed.
-  evaluator_uuid?: string;
-};
-
-type TranscriptEntry = {
-  role: string;
-  content?: string;
-  tool_calls?: any[];
-  tool_call_id?: string;
-};
-
-type SimulationResult = {
-  simulation_name: string;
-  aborted?: boolean;
-  persona: Persona;
-  scenario: Scenario;
-  evaluation_results: EvaluationResult[] | null;
-  transcript?: TranscriptEntry[] | null;
-  audio_urls?: string[];
-  conversation_wav_url?: string;
 };
 
 type RunData = {
@@ -127,7 +71,7 @@ export default function SimulationRunPage() {
   const [simulationName, setSimulationName] = useState<string | null>(null);
   // Map of evaluator name → uuid pulled from the parent simulation's
   // config (`GET /simulations/{uuid}` → `data.evaluators[]`). Used as a
-  // fallback for the overview-card link affordance when the run
+  // fallback for the metric card's preview affordance when the run
   // response itself doesn't include the new top-level `evaluators`
   // field or per-row `evaluator_uuid`s (older runs / partial backends).
   const [simulationEvaluatorUuidByName, setSimulationEvaluatorUuidByName] =
@@ -210,45 +154,6 @@ export default function SimulationRunPage() {
     return currentSim;
   }, [selectedSimulationKey, runData?.simulation_results]);
 
-  const selectedVoiceAudioLayout = useMemo(
-    () => getVoiceSimulationAudioLayout(selectedSimulation?.audio_urls),
-    [selectedSimulation?.audio_urls],
-  );
-
-  const [activeMetricsTab, setActiveMetricsTab] = useState<
-    "results" | "performance" | "latency"
-  >("performance");
-
-  // The evaluator whose prompt is on show, opened from a metric card's name.
-  const [previewEvaluator, setPreviewEvaluator] = useState<{
-    uuid: string;
-    name: string;
-  } | null>(null);
-
-  // Set default tab based on screen size: "results" for mobile, "performance" for desktop
-  useEffect(() => {
-    const isMobile = window.innerWidth < 768;
-    setActiveMetricsTab(isMobile ? "results" : "performance");
-  }, []);
-
-  // Ref for transcript container to auto-scroll
-  const transcriptContainerRef = useRef<HTMLDivElement>(null);
-  // Track previous transcript length to only scroll on new messages
-  const prevTranscriptLengthRef = useRef<number>(0);
-
-  // Auto-scroll transcript to bottom only when new messages are added
-  useEffect(() => {
-    const currentLength = selectedSimulation?.transcript?.length ?? 0;
-    if (
-      transcriptContainerRef.current &&
-      currentLength > prevTranscriptLengthRef.current
-    ) {
-      transcriptContainerRef.current.scrollTop =
-        transcriptContainerRef.current.scrollHeight;
-    }
-    prevTranscriptLengthRef.current = currentLength;
-  }, [selectedSimulation?.transcript?.length]);
-
   // Fetch simulation name for page title
   useEffect(() => {
     const fetchSimulationName = async () => {
@@ -270,7 +175,7 @@ export default function SimulationRunPage() {
           const data = await response.json();
           setSimulationName(data.name);
           // Pull evaluator UUIDs from the simulation config so the run
-          // page can still render evaluator links even when the run
+          // page can still open an evaluator preview even when the run
           // response itself doesn't include `evaluators` / per-row
           // `evaluator_uuid` (e.g. older runs).
           if (Array.isArray(data?.evaluators)) {
@@ -387,46 +292,8 @@ export default function SimulationRunPage() {
     }
   };
 
-  const getPassFailStatus = (mean: number) => {
-    return mean === 1 ? "Pass" : "Fail";
-  };
-
-  const getPassFailClass = (mean: number) => {
-    return mean === 1
-      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
-  };
-
-  const getEvaluationResult = (
-    simulation: SimulationResult,
-    metricName: string
-  ) => {
-    if (!simulation.evaluation_results) return null;
-    // Handle mapping: stt_llm_judge metric key maps to stt_llm_judge_score evaluation result
-    const evaluationName =
-      metricName === "stt_llm_judge" ? "stt_llm_judge_score" : metricName;
-    const result = simulation.evaluation_results.find(
-      (r) => r.name === evaluationName || r.name === metricName
-    );
-    return result?.value ?? 0;
-  };
-
-  const getEvaluationReasoning = (
-    simulation: SimulationResult,
-    metricName: string
-  ) => {
-    if (!simulation.evaluation_results) return "";
-    // Handle mapping: stt_llm_judge metric key maps to stt_llm_judge_score evaluation result
-    const evaluationName =
-      metricName === "stt_llm_judge" ? "stt_llm_judge_score" : metricName;
-    const result = simulation.evaluation_results.find(
-      (r) => r.name === evaluationName || r.name === metricName
-    );
-    return result?.reasoning ?? "";
-  };
-
-  // Map of metric name → evaluator UUID, used to render evaluator-card
-  // labels as links to `/evaluators/{uuid}`. Resolution priority:
+  // Map of metric name → evaluator UUID, used to turn a metric card into a
+  // preview of how that evaluator judges. Resolution priority:
   //   1. `runData.evaluators[]` (top-level, newer runs) — rename-safe
   //      live `name` keyed to a stable `evaluator_uuid`.
   //   2. `simulation_results[i].evaluation_results[].evaluator_uuid` —
@@ -455,8 +322,10 @@ export default function SimulationRunPage() {
         }
       }
     }
-    for (const [name, uuid] of Object.entries(simulationEvaluatorUuidByName)) {
-      if (!(name in map)) map[name] = uuid;
+    for (const [name, evaluatorUuid] of Object.entries(
+      simulationEvaluatorUuidByName
+    )) {
+      if (!(name in map)) map[name] = evaluatorUuid;
     }
     return map;
   }, [runData, simulationEvaluatorUuidByName]);
@@ -471,32 +340,20 @@ export default function SimulationRunPage() {
     toggle: toggleSimLabelling,
     bulkToggle: bulkToggleSimLabelling,
   } = useLabellingSelection();
-  const simLabellingKeyByRef = useMemo(() => {
-    const m = new Map<SimulationResult, string>();
-    (runData?.simulation_results ?? []).forEach((s, i) => m.set(s, String(i)));
-    return m;
-  }, [runData]);
-  const isSimLabellingEligible = useCallback((sim: SimulationResult) => {
-    if (sim.aborted) return false;
-    return (sim.transcript ?? []).some((t) => t.role !== "end_reason");
-  }, []);
-  const simLabellingKey = useCallback(
-    (sim: SimulationResult) => simLabellingKeyByRef.get(sim) ?? "",
-    [simLabellingKeyByRef],
-  );
   const eligibleSimKeys = useMemo(
     () =>
-      (runData?.simulation_results ?? [])
-        .filter(isSimLabellingEligible)
-        .map((s) => simLabellingKey(s)),
-    [runData, isSimLabellingEligible, simLabellingKey],
+      (runData?.simulation_results ?? []).reduce<string[]>((acc, sim, i) => {
+        if (isSimulationLabellable(sim)) acc.push(String(i));
+        return acc;
+      }, []),
+    [runData]
   );
   const conversationLabellingResults: ConversationLabellingResult[] = useMemo(() => {
     const out: ConversationLabellingResult[] = [];
     const suffix = runId.slice(0, 8);
-    for (const sim of runData?.simulation_results ?? []) {
-      if (!isSimLabellingEligible(sim)) continue;
-      if (!simLabellingSelected.has(simLabellingKey(sim))) continue;
+    (runData?.simulation_results ?? []).forEach((sim, index) => {
+      if (!isSimulationLabellable(sim)) return;
+      if (!simLabellingSelected.has(String(index))) return;
       const transcript = (sim.transcript ?? []).filter(
         (t) => t.role !== "end_reason",
       );
@@ -505,20 +362,14 @@ export default function SimulationRunPage() {
         [sim.persona?.label, sim.scenario?.name].filter(Boolean).join(" / ") ||
         "Simulation";
       out.push({ name: `${baseName} — ${suffix}`, transcript });
-    }
+    });
     return out;
-  }, [
-    runData,
-    runId,
-    simLabellingSelected,
-    isSimLabellingEligible,
-    simLabellingKey,
-  ]);
+  }, [runData, runId, simLabellingSelected]);
   const conversationLabellingEvaluators: SourceEvaluatorRef[] = useMemo(
     () =>
       dedupeSourceEvaluators(
-        Object.entries(evaluatorUuidByName).map(([name, uuid]) => ({
-          uuid,
+        Object.entries(evaluatorUuidByName).map(([name, evaluatorUuid]) => ({
+          uuid: evaluatorUuid,
           name,
         })),
       ),
@@ -552,103 +403,20 @@ export default function SimulationRunPage() {
     return map;
   }, [runData]);
 
-  // Per-row formatter for an individual evaluation result. Returns a JSX
-  // node so the caller can drop it straight into the table cell. Rules:
-  //  - rating  → numeric `value/max` (or just value if no scale_max)
-  //  - binary  → green Pass / red Fail badge
-  //  - default → legacy Pass/Fail (keeps older runs without `type`
-  //              behaving as before)
-  // `stt_llm_judge_score` is intentionally handled by the caller before
-  // this since it has its own percent display.
-  const formatRowMetricValue = useCallback(
-    (metricKey: string, value: number) => {
-      const info = runData?.metrics?.[metricKey];
-      // Defensively coerce `value` to a number — the API has been
-      // observed to emit numeric fields as strings, in which case
-      // `value.toFixed(...)` would throw "is not a function" and
-      // `value === 1` would always be false (e.g. `"1" === 1`).
-      const numericValue = Number(value);
-      const safeNumeric = Number.isFinite(numericValue) ? numericValue : NaN;
-      if (info?.type === "rating") {
-        const rounded = Number.isFinite(safeNumeric)
-          ? parseFloat(safeNumeric.toFixed(2))
-          : value;
-        const display =
-          typeof info.scale_max === "number"
-            ? `${rounded}/${info.scale_max}`
-            : `${rounded}`;
-        return {
-          text: display,
-          className:
-            "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-foreground",
-        };
-      }
-      const passed = safeNumeric === 1;
-      return {
-        text: passed ? "Pass" : "Fail",
-        className: `inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-          passed
-            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-            : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-        }`,
-      };
-    },
-    [runData]
-  );
-
-  // Aggregate (overview-card) formatter. Binary aggregates show pass
-  // count / total, rating aggregates show mean / scale_max, and
-  // anything else falls through to the legacy percent rendering.
-  const formatOverviewMetricValue = useCallback((metric: MetricData) => {
-    // Coerce numerics defensively — `mean` and `values[]` may come back as
-    // strings on some responses (decimal columns serialized as strings),
-    // which would break `mean.toFixed(...)`.
-    const numericMean = Number(metric.mean);
-    const safeMean = Number.isFinite(numericMean) ? numericMean : 0;
-    if (metric.type === "rating" && typeof metric.scale_max === "number") {
-      return `${parseFloat(safeMean.toFixed(2))}/${metric.scale_max}`;
+  // Table columns: every metric except the latency ones, which have their
+  // own tab in the metric cards above.
+  const displayMetricKeys = useMemo(() => {
+    if (runData?.metrics) {
+      return Object.keys(runData.metrics).filter((k) => !LATENCY_KEYS.includes(k));
     }
-    // Binary and legacy/typeless metrics both render as a percentage of
-    // the mean — same display as before the typed-evaluator migration so
-    // existing dashboards keep their familiar look.
-    return `${Math.round(safeMean * 100)}%`;
-  }, []);
-
-  // Check if a simulation row is still processing (has transcript but no evaluation results) - yellow spinner
-  const isSimulationProcessing = (simulation: SimulationResult) => {
-    if (simulation.aborted) return false;
-    return (
-      (simulation.transcript?.length ?? 0) > 0 && !simulation.evaluation_results
-    );
-  };
-
-  // Check if a simulation row is waiting (no transcript and no evaluation results) - gray spinner
-  const isSimulationWaiting = (simulation: SimulationResult) => {
-    if (simulation.aborted) return false;
-    return (
-      (simulation.transcript?.length ?? 0) === 0 &&
-      !simulation.evaluation_results
-    );
-  };
-
-  const getLatencyMetricTooltip = (metricKey: string): string => {
-    const [component, metricType] = metricKey.split("/");
-    const componentName =
-      component === "stt"
-        ? "speech to text"
-        : component === "llm"
-        ? "language model"
-        : component === "tts"
-        ? "text to speech"
-        : component;
-
-    if (metricType === "ttft") {
-      return `Time to first byte for ${componentName}`;
-    } else if (metricType === "processing_time") {
-      return `Processing time for ${componentName}`;
-    }
-    return "";
-  };
+    const keys = new Set<string>();
+    (runData?.simulation_results ?? []).forEach((sim) => {
+      sim.evaluation_results?.forEach((r) => {
+        if (!LATENCY_KEYS.includes(r.name)) keys.add(r.name);
+      });
+    });
+    return Array.from(keys);
+  }, [runData]);
 
   const openTranscriptDialog = (simulation: SimulationResult) => {
     // Use simulation_name as unique key to keep dialog in sync with polling updates
@@ -701,24 +469,6 @@ export default function SimulationRunPage() {
     }
   };
 
-  const getAudioUrlForEntry = (
-    entry: TranscriptEntry,
-    entryIndex: number,
-    audioUrls: string[] | undefined,
-    filteredTranscript: TranscriptEntry[]
-  ): string | null => {
-    if (!audioUrls || !runData || runData.type !== "voice") {
-      return null;
-    }
-    return getVoiceSimulationAudioUrlForEntry(
-      entry,
-      entryIndex,
-      audioUrls,
-      filteredTranscript,
-      selectedVoiceAudioLayout,
-    );
-  };
-
   const crumbs: Crumb[] = [
     { label: "Simulations", href: "/simulations" },
     {
@@ -761,6 +511,9 @@ export default function SimulationRunPage() {
     if (errorCode) return notFoundHeader;
     return customHeader;
   };
+
+  const isDone = runData?.status.toLowerCase() === "done";
+  const showSimCheckboxes = isDone && eligibleSimKeys.length > 0;
 
   return (
     <AppLayout
@@ -826,7 +579,7 @@ export default function SimulationRunPage() {
               >
                 {runData.type}
               </span>
-              {runData.status.toLowerCase() === "done" && backendAccessToken && (
+              {isDone && backendAccessToken && (
                 <ShareButton
                   entityType="simulation-run"
                   entityId={runId}
@@ -839,15 +592,14 @@ export default function SimulationRunPage() {
                   human-alignment (conversation) task for labelling. Tick rows
                   in the results table first. Desktop-only, matching
                   TestRunnerDialog. */}
-              {runData.status.toLowerCase() === "done" &&
-                eligibleSimKeys.length > 0 && (
-                  <SubmitForLabellingButton
-                    count={conversationLabellingResults.length}
-                    emptyMessage="Select one or more simulations to submit for labelling"
-                    onOpen={() => setAddToTaskOpen(true)}
-                    className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                  />
-                )}
+              {showSimCheckboxes && (
+                <SubmitForLabellingButton
+                  count={conversationLabellingResults.length}
+                  emptyMessage="Select one or more simulations to submit for labelling"
+                  onOpen={() => setAddToTaskOpen(true)}
+                  className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                />
+              )}
               {(runData.status.toLowerCase() === "in_progress" ||
                 runData.status.toLowerCase() === "queued") && (
                 <button
@@ -920,1301 +672,43 @@ export default function SimulationRunPage() {
             )}
 
             {/* Overall Metrics - only show when simulation is done */}
-            {runData.status.toLowerCase() === "done" &&
-              runData.metrics &&
-              (() => {
-                // Separate metrics into regular and latency metrics
-                const latencyKeys = [
-                  "stt/ttft",
-                  "llm/ttft",
-                  "tts/ttft",
-                  "stt/processing_time",
-                  "llm/processing_time",
-                  "tts/processing_time",
-                ];
+            {isDone && (
+              <SimulationMetricsGrid
+                metrics={runData.metrics}
+                type={runData.type}
+                evaluatorUuidByName={evaluatorUuidByName}
+                evaluatorDescriptionByName={evaluatorDescriptionByName}
+                simulations={runData.simulation_results}
+              />
+            )}
 
-                const regularMetrics: Array<[string, MetricData]> = [];
-                const latencyMetrics: Array<[string, MetricData]> = [];
-
-                Object.entries(runData.metrics).forEach(([key, metric]) => {
-                  if (latencyKeys.includes(key)) {
-                    latencyMetrics.push([key, metric as MetricData]);
-                  } else {
-                    regularMetrics.push([key, metric as MetricData]);
-                  }
-                });
-
-                // Calculate latency metrics from evaluation_results if not in metrics
-                if (runData.simulation_results && latencyMetrics.length === 0) {
-                  const latencyValues: Record<string, number[]> = {};
-                  latencyKeys.forEach((key) => {
-                    latencyValues[key] = [];
-                  });
-
-                  runData.simulation_results.forEach((simulation) => {
-                    if (simulation.evaluation_results) {
-                      latencyKeys.forEach((key) => {
-                        const result = simulation.evaluation_results!.find(
-                          (r) => r.name === key
-                        );
-                        if (result && typeof result.value === "number") {
-                          latencyValues[key].push(result.value);
-                        }
-                      });
-                    }
-                  });
-
-                  latencyKeys.forEach((key) => {
-                    if (latencyValues[key].length > 0) {
-                      const mean =
-                        latencyValues[key].reduce((a, b) => a + b, 0) /
-                        latencyValues[key].length;
-                      latencyMetrics.push([
-                        key,
-                        {
-                          mean,
-                          std: 0,
-                          values: latencyValues[key],
-                        },
-                      ]);
-                    }
-                  });
+            {runData.simulation_results?.length > 0 && (
+              <SimulationResultsTable
+                simulations={runData.simulation_results}
+                metricKeys={displayMetricKeys}
+                metricInfo={runData.metrics ?? undefined}
+                onSelectSimulation={openTranscriptDialog}
+                labellingSelection={simLabellingSelected}
+                onToggleLabellingSelection={
+                  showSimCheckboxes ? toggleSimLabelling : undefined
                 }
-
-                const isTextType = runData.type === "text";
-
-                return (
-                  <div>
-                    <h2 className="hidden md:block text-base md:text-lg font-semibold mb-3 md:mb-4">
-                      Overall Metrics
-                    </h2>
-
-                    {/* Tab Navigation - 3 tabs for mobile (Results, Performance, Latency), 2 tabs for desktop (Performance, Latency) - only show for non-text types */}
-                    {!isTextType && (
-                      <div className="flex gap-2 border-b border-border mb-4">
-                        {/* Results tab - mobile only */}
-                        <button
-                          onClick={() => setActiveMetricsTab("results")}
-                          className={`md:hidden px-3 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
-                            activeMetricsTab === "results"
-                              ? "border-foreground text-foreground"
-                              : "border-transparent text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          Results
-                        </button>
-                        <button
-                          onClick={() => setActiveMetricsTab("performance")}
-                          className={`px-3 md:px-4 py-2 text-xs md:text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                            activeMetricsTab === "performance"
-                              ? "border-foreground text-foreground"
-                              : "border-transparent text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          Performance
-                        </button>
-                        <button
-                          onClick={() => setActiveMetricsTab("latency")}
-                          className={`px-3 md:px-4 py-2 text-xs md:text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                            activeMetricsTab === "latency"
-                              ? "border-foreground text-foreground"
-                              : "border-transparent text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          Latency
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Performance Tab Content - show for text type or when performance tab is active */}
-                    {((isTextType && regularMetrics.length > 0) ||
-                      (!isTextType &&
-                        activeMetricsTab === "performance" &&
-                        regularMetrics.length > 0)) && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {regularMetrics.map(([key, metric]) => {
-                          const evaluatorUuid = evaluatorUuidByName[key];
-                          const evaluatorDescription =
-                            evaluatorDescriptionByName[key] ||
-                            (key === "stt_llm_judge" ||
-                            key === "stt_llm_judge_score"
-                              ? "This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"
-                              : "");
-                          // When we have an evaluator UUID, the entire
-                          // card becomes a button that opens a preview
-                          // of how that evaluator judges (hover-highlight
-                          // + arrow icon). Built-in keys like
-                          // `stt_llm_judge` aren't user evaluators and
-                          // render as plain divs.
-                          const cardInner = (
-                            <>
-                              <div className="mb-1 flex items-center gap-1.5">
-                                <span className="text-[12px] text-muted-foreground">
-                                  {key}
-                                </span>
-                                {evaluatorDescription && (
-                                  <Tooltip content={evaluatorDescription}>
-                                    <svg
-                                      className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                                      />
-                                    </svg>
-                                  </Tooltip>
-                                )}
-                                {evaluatorUuid && (
-                                  <svg
-                                    className="ml-auto w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                    aria-hidden="true"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                                    />
-                                  </svg>
-                                )}
-                              </div>
-                              <div className="text-[18px] font-semibold text-foreground">
-                                {formatOverviewMetricValue(metric)}
-                              </div>
-                            </>
-                          );
-                          if (evaluatorUuid) {
-                            return (
-                              <button
-                                type="button"
-                                key={key}
-                                onClick={() =>
-                                  setPreviewEvaluator({ uuid: evaluatorUuid, name: key })
-                                }
-                                className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
-                              >
-                                {cardInner}
-                              </button>
-                            );
-                          }
-                          return (
-                            <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
-                              {cardInner}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Latency Tab Content - only show for non-text types */}
-                    {!isTextType &&
-                      activeMetricsTab === "latency" &&
-                      latencyMetrics.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {latencyMetrics.map(([key, metric]) => {
-                            const mean = metric.mean;
-                            const tooltipContent = getLatencyMetricTooltip(key);
-                            return (
-                              <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
-                                <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
-                                  {key}
-                                  {tooltipContent && (
-                                    <Tooltip content={tooltipContent}>
-                                      <svg
-                                        className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                                        />
-                                      </svg>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                                <div className="text-[18px] font-semibold text-foreground">
-                                  {mean < 1
-                                    ? `${(mean * 1000).toFixed(0)}ms`
-                                    : `${mean.toFixed(2)}s`}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                  </div>
-                );
-              })()}
-
-            {/* Simulation Results Table - show in Results tab on mobile, always show on desktop */}
-            {runData.simulation_results &&
-              runData.simulation_results.length > 0 &&
-              (() => {
-                // On mobile (voice type with metrics): only show when Results tab is active
-                // On desktop: always show
-                // For text type: always show (no tabs)
-                const isTextType = runData.type === "text";
-                const shouldShow =
-                  isTextType ||
-                  !runData.metrics ||
-                  activeMetricsTab === "results";
-
-                if (!shouldShow && window.innerWidth < 768) {
-                  return null;
+                onLabellingBulkToggle={bulkToggleSimLabelling}
+                labellingKeyForRow={
+                  showSimCheckboxes ? (_sim, index) => String(index) : undefined
                 }
-
-                // Latency metrics to exclude from the table (shown in latency tab)
-                const latencyMetricKeys = [
-                  "stt/ttft",
-                  "llm/ttft",
-                  "tts/ttft",
-                  "stt/processing_time",
-                  "llm/processing_time",
-                  "tts/processing_time",
-                ];
-
-                // Get metric keys - either from runData.metrics or derive from simulation_results
-                let displayMetricKeys: string[] = [];
-                if (runData.metrics) {
-                  displayMetricKeys = Object.keys(runData.metrics).filter(
-                    (key) => !latencyMetricKeys.includes(key)
-                  );
-                } else {
-                  // Derive from simulation_results' evaluation_results
-                  const metricSet = new Set<string>();
-                  runData.simulation_results.forEach((sim) => {
-                    if (sim.evaluation_results) {
-                      sim.evaluation_results.forEach((result) => {
-                        if (!latencyMetricKeys.includes(result.name)) {
-                          metricSet.add(result.name);
-                        }
-                      });
-                    }
-                  });
-                  displayMetricKeys = Array.from(metricSet);
-                }
-
-                const showSimCheckboxes =
-                  runData.status.toLowerCase() === "done" &&
-                  eligibleSimKeys.length > 0;
-                const simAllSelected =
-                  eligibleSimKeys.length > 0 &&
-                  eligibleSimKeys.every((k) => simLabellingSelected.has(k));
-
-                return (
-                  <>
-                    <div className="flex items-baseline gap-3 mb-3 md:mb-4">
-                      <h2 className="hidden md:block text-base md:text-lg font-semibold">
-                        Simulation Results
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {runData.simulation_results.length}{" "}
-                        {runData.simulation_results.length === 1 ? "simulation" : "simulations"}
-                      </p>
-                    </div>
-
-                    {/* Desktop Table View */}
-                    <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full table-fixed">
-                          <thead className="bg-background border-t border-border">
-                            <tr>
-                              {showSimCheckboxes && (
-                                <th className="w-10 px-2 py-3 text-left">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      bulkToggleSimLabelling(eligibleSimKeys)
-                                    }
-                                    title={
-                                      simAllSelected
-                                        ? "Deselect all"
-                                        : "Select all"
-                                    }
-                                    aria-label={
-                                      simAllSelected
-                                        ? "Deselect all"
-                                        : "Select all"
-                                    }
-                                    className="cursor-pointer"
-                                  >
-                                    <LabellingRowCheckbox
-                                      checked={simAllSelected}
-                                    />
-                                  </button>
-                                </th>
-                              )}
-                              <th className="w-10 px-2 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"></th>
-                              <th className="w-44 px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Persona
-                              </th>
-                              <th className="w-44 px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                Scenario
-                              </th>
-                              {displayMetricKeys.map((metricKey) => (
-                                <th
-                                  key={metricKey}
-                                  className="w-36 px-3 py-3 text-left text-xs font-medium text-muted-foreground tracking-wider"
-                                >
-                                  <div className="overflow-x-auto max-w-full">
-                                    <div className="whitespace-nowrap">
-                                      {metricKey}
-                                    </div>
-                                  </div>
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {[...runData.simulation_results]
-                              .sort((a, b) => {
-                                // Sort order: 1) has transcript (completed or processing), 2) waiting (no transcript)
-                                // Within has transcript: completed first, then processing
-                                const aHasTranscript =
-                                  (a.transcript?.length ?? 0) > 0;
-                                const bHasTranscript =
-                                  (b.transcript?.length ?? 0) > 0;
-                                const aHasResults = !!a.evaluation_results;
-                                const bHasResults = !!b.evaluation_results;
-
-                                // Priority: completed (3) > processing (2) > waiting (1)
-                                const getPriority = (
-                                  hasTranscript: boolean,
-                                  hasResults: boolean
-                                ) => {
-                                  if (hasResults) return 3; // completed
-                                  if (hasTranscript) return 2; // processing (yellow spinner)
-                                  return 1; // waiting (gray spinner)
-                                };
-
-                                return (
-                                  getPriority(bHasTranscript, bHasResults) -
-                                  getPriority(aHasTranscript, aHasResults)
-                                );
-                              })
-                              .map((simulation, index) => {
-                                const isProcessing =
-                                  isSimulationProcessing(simulation);
-                                const isWaiting =
-                                  isSimulationWaiting(simulation);
-                                const simEligible =
-                                  isSimLabellingEligible(simulation);
-                                const simKey = simLabellingKey(simulation);
-                                return (
-                                  <tr
-                                    key={index}
-                                    className="hover:bg-muted/30 transition-colors"
-                                  >
-                                    {showSimCheckboxes && (
-                                      <td className="px-2 py-4 whitespace-nowrap">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            simEligible &&
-                                            toggleSimLabelling(simKey)
-                                          }
-                                          disabled={!simEligible}
-                                          title={
-                                            simEligible
-                                              ? "Select for labelling"
-                                              : "Aborted or empty runs can't be labelled"
-                                          }
-                                          aria-label="Select for labelling"
-                                          className="cursor-pointer disabled:cursor-not-allowed"
-                                        >
-                                          <LabellingRowCheckbox
-                                            checked={
-                                              simLabellingSelected.has(simKey) &&
-                                              simEligible
-                                            }
-                                            disabled={!simEligible}
-                                          />
-                                        </button>
-                                      </td>
-                                    )}
-                                    <td className="px-4 py-4 whitespace-nowrap">
-                                      <div className="relative w-6 h-6 flex items-center justify-center">
-                                        {/* Spinner ring around the play button */}
-                                        {isProcessing && (
-                                          <svg
-                                            className="absolute inset-0 w-6 h-6 animate-spin text-yellow-500"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <circle
-                                              className="opacity-25"
-                                              cx="12"
-                                              cy="12"
-                                              r="10"
-                                              stroke="currentColor"
-                                              strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                              className="opacity-75"
-                                              fill="currentColor"
-                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                          </svg>
-                                        )}
-                                        {isWaiting && (
-                                          <svg
-                                            className="absolute inset-0 w-6 h-6 animate-spin text-gray-500"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <circle
-                                              className="opacity-25"
-                                              cx="12"
-                                              cy="12"
-                                              r="10"
-                                              stroke="currentColor"
-                                              strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                              className="opacity-75"
-                                              fill="currentColor"
-                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                          </svg>
-                                        )}
-                                        {/* Play button in center */}
-                                        {(simulation.transcript?.length ?? 0) >
-                                          0 && (
-                                          <button
-                                            onClick={() =>
-                                              openTranscriptDialog(simulation)
-                                            }
-                                            className="relative z-10 flex items-center justify-center w-4 h-4 cursor-pointer"
-                                          >
-                                            <svg
-                                              className={`w-4 h-4 ${
-                                                simulation.aborted
-                                                  ? "text-red-500"
-                                                  : "text-foreground"
-                                              }`}
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                              strokeWidth={2}
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                              />
-                                            </svg>
-                                          </button>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-3 py-4 text-sm text-foreground">
-                                      <div className="overflow-x-auto max-w-full">
-                                        <div className="whitespace-nowrap">
-                                          {simulation.persona.label}
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="px-3 py-4 text-sm text-foreground">
-                                      <div className="overflow-x-auto max-w-full">
-                                        <div className="whitespace-nowrap">
-                                          {simulation.scenario.name}
-                                        </div>
-                                      </div>
-                                    </td>
-                                    {displayMetricKeys.map((metricKey) => {
-                                      const value = getEvaluationResult(
-                                        simulation,
-                                        metricKey
-                                      );
-                                      const isSttLlmJudge =
-                                        metricKey === "stt_llm_judge" ||
-                                        metricKey === "stt_llm_judge_score";
-                                      const reasoning = getEvaluationReasoning(
-                                        simulation,
-                                        metricKey
-                                      );
-
-                                      // If evaluation_results is null, show spinner (metrics still processing) or N/A for aborted
-                                      if (value === null) {
-                                        return (
-                                          <td
-                                            key={metricKey}
-                                            className="px-3 py-4 whitespace-nowrap"
-                                          >
-                                            <div className="flex justify-center">
-                                              {simulation.aborted ? (
-                                                <span className="text-xs text-muted-foreground">
-                                                  N/A
-                                                </span>
-                                              ) : (
-                                                <svg
-                                                  className={`w-5 h-5 flex-shrink-0 animate-spin ${
-                                                    isProcessing
-                                                      ? "text-yellow-500"
-                                                      : "text-gray-500"
-                                                  }`}
-                                                  fill="none"
-                                                  viewBox="0 0 24 24"
-                                                >
-                                                  <circle
-                                                    className="opacity-25"
-                                                    cx="12"
-                                                    cy="12"
-                                                    r="10"
-                                                    stroke="currentColor"
-                                                    strokeWidth="4"
-                                                  ></circle>
-                                                  <path
-                                                    className="opacity-75"
-                                                    fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                                  ></path>
-                                                </svg>
-                                              )}
-                                            </div>
-                                          </td>
-                                        );
-                                      }
-
-                                      // For stt_llm_judge, show percentage
-                                      if (isSttLlmJudge) {
-                                        const percentage = parseFloat(
-                                          (value * 100).toFixed(2)
-                                        );
-                                        return (
-                                          <td
-                                            key={metricKey}
-                                            className="px-3 py-4 whitespace-nowrap"
-                                          >
-                                            <div className="flex justify-center">
-                                              {reasoning ? (
-                                                <Tooltip content={reasoning}>
-                                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-foreground">
-                                                    {percentage}%
-                                                  </span>
-                                                </Tooltip>
-                                              ) : (
-                                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-foreground">
-                                                  {percentage}%
-                                                </span>
-                                              )}
-                                            </div>
-                                          </td>
-                                        );
-                                      }
-
-                                      // Rating evaluators render as
-                                      // value/max; binary (and legacy
-                                      // typeless) render as Pass/Fail.
-                                      const rowDisplay = formatRowMetricValue(
-                                        metricKey,
-                                        value
-                                      );
-                                      return (
-                                        <td
-                                          key={metricKey}
-                                          className="px-3 py-4 whitespace-nowrap"
-                                        >
-                                          <div className="flex justify-center">
-                                            {reasoning ? (
-                                              <Tooltip content={reasoning}>
-                                                <span className={rowDisplay.className}>
-                                                  {rowDisplay.text}
-                                                </span>
-                                              </Tooltip>
-                                            ) : (
-                                              <span className={rowDisplay.className}>
-                                                {rowDisplay.text}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                );
-                              })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Mobile Card View */}
-                    <div className="md:hidden space-y-4">
-                      {[...runData.simulation_results]
-                        .sort((a, b) => {
-                          const aHasTranscript =
-                            (a.transcript?.length ?? 0) > 0;
-                          const bHasTranscript =
-                            (b.transcript?.length ?? 0) > 0;
-                          const aHasResults = !!a.evaluation_results;
-                          const bHasResults = !!b.evaluation_results;
-
-                          const getPriority = (
-                            hasTranscript: boolean,
-                            hasResults: boolean
-                          ) => {
-                            if (hasResults) return 3;
-                            if (hasTranscript) return 2;
-                            return 1;
-                          };
-
-                          return (
-                            getPriority(bHasTranscript, bHasResults) -
-                            getPriority(aHasTranscript, aHasResults)
-                          );
-                        })
-                        .map((simulation, index) => {
-                          const isProcessing =
-                            isSimulationProcessing(simulation);
-                          const isWaiting = isSimulationWaiting(simulation);
-                          const hasTranscript =
-                            (simulation.transcript?.length ?? 0) > 0;
-
-                          return (
-                            <div
-                              key={index}
-                              className="border border-border rounded-xl overflow-hidden bg-background"
-                            >
-                              <div className="p-5">
-                                {/* Labelling checkboxes are desktop-only — the
-                                    "Submit for labelling" button is hidden on
-                                    mobile, so selecting here would be a dead
-                                    end. */}
-                                {/* Persona and Scenario with Labels */}
-                                <div className="space-y-3 mb-4 pb-4 border-b border-border/50">
-                                  <div>
-                                    <div className="text-xs text-muted-foreground mb-1">
-                                      Persona
-                                    </div>
-                                    <div className="text-sm font-medium text-foreground">
-                                      {simulation.persona.label}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-muted-foreground mb-1">
-                                      Scenario
-                                    </div>
-                                    <div className="text-sm font-medium text-foreground">
-                                      {simulation.scenario.name}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Metrics Section */}
-                                {displayMetricKeys.length > 0 && (
-                                  <div className="mb-4">
-                                    <div className="text-xs font-semibold text-foreground mb-3">
-                                      Metrics
-                                    </div>
-                                    <div className="space-y-3">
-                                      {displayMetricKeys.map((metricKey) => {
-                                        const value = getEvaluationResult(
-                                          simulation,
-                                          metricKey
-                                        );
-                                        const isSttLlmJudge =
-                                          metricKey === "stt_llm_judge" ||
-                                          metricKey === "stt_llm_judge_score";
-                                        const reasoning =
-                                          getEvaluationReasoning(
-                                            simulation,
-                                            metricKey
-                                          );
-
-                                        return (
-                                          <div
-                                            key={metricKey}
-                                            className="flex items-center justify-between py-2 border-b border-border/50 last:border-b-0"
-                                          >
-                                            <div className="min-w-0 pr-3">
-                                              <span className="text-xs text-muted-foreground">
-                                                {metricKey}
-                                              </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                              {value === null ? (
-                                                simulation.aborted ? (
-                                                  <span className="text-xs text-muted-foreground">
-                                                    N/A
-                                                  </span>
-                                                ) : (
-                                                  <svg
-                                                    className={`w-4 h-4 flex-shrink-0 animate-spin ${
-                                                      isProcessing
-                                                        ? "text-yellow-500"
-                                                        : "text-gray-500"
-                                                    }`}
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                  >
-                                                    <circle
-                                                      className="opacity-25"
-                                                      cx="12"
-                                                      cy="12"
-                                                      r="10"
-                                                      stroke="currentColor"
-                                                      strokeWidth="4"
-                                                    ></circle>
-                                                    <path
-                                                      className="opacity-75"
-                                                      fill="currentColor"
-                                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                                    ></path>
-                                                  </svg>
-                                                )
-                                              ) : isSttLlmJudge ? (
-                                                <span className="text-sm font-medium text-foreground">
-                                                  {parseFloat(
-                                                    (value * 100).toFixed(2)
-                                                  )}
-                                                  %
-                                                </span>
-                                              ) : (
-                                                (() => {
-                                                  const rowDisplay =
-                                                    formatRowMetricValue(
-                                                      metricKey,
-                                                      value
-                                                    );
-                                                  const compactClass = rowDisplay.className.replace(
-                                                    "px-2.5 py-1 rounded-md",
-                                                    "px-2 py-0.5 rounded"
-                                                  );
-                                                  return (
-                                                    <div className="flex items-center gap-1.5">
-                                                      <span className={compactClass}>
-                                                        {rowDisplay.text}
-                                                      </span>
-                                                      {reasoning && (
-                                                        <Tooltip
-                                                          content={reasoning}
-                                                        >
-                                                          <svg
-                                                            className="w-3.5 h-3.5 text-muted-foreground cursor-pointer"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            strokeWidth={2}
-                                                          >
-                                                            <path
-                                                              strokeLinecap="round"
-                                                              strokeLinejoin="round"
-                                                              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                                                            />
-                                                          </svg>
-                                                        </Tooltip>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })()
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Transcript Button */}
-                                {hasTranscript && (
-                                  <button
-                                    onClick={() =>
-                                      openTranscriptDialog(simulation)
-                                    }
-                                    className={`w-full h-9 flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity ${
-                                      simulation.aborted
-                                        ? "bg-red-500/10 border border-red-500/30 text-red-500"
-                                        : "bg-foreground text-background"
-                                    }`}
-                                  >
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                      />
-                                    </svg>
-                                    {isProcessing
-                                      ? "Processing..."
-                                      : "View Transcript"}
-                                  </button>
-                                )}
-                                {/* Aborted indicator for simulations without transcript */}
-                                {simulation.aborted && !hasTranscript && (
-                                  <div className="w-full h-9 flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-red-500/10 border border-red-500/30 text-red-500">
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                                      />
-                                    </svg>
-                                    Simulation aborted by user
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </>
-                );
-              })()}
+              />
+            )}
           </div>
         ) : null}
       </div>
 
-      {/* Transcript Dialog */}
-      {transcriptDialogOpen && selectedSimulation && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={closeTranscriptDialog}
-          />
-          {/* Sidebar - full width on mobile, 40% on desktop */}
-          <div className="relative w-full md:w-[40%] md:min-w-[500px] bg-background border-l border-border flex flex-col h-full shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 md:px-6 py-4">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-5 h-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-                  />
-                </svg>
-                <h2 className="text-base md:text-lg font-semibold">
-                  Transcript
-                </h2>
-              </div>
-              <button
-                onClick={closeTranscriptDialog}
-                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Full Conversation Audio Player - show for voice runs with conversation_wav_url */}
-            {selectedSimulation.conversation_wav_url && (
-              <div className="px-4 md:px-6 pb-4 border-b border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-foreground">
-                    Hear the full conversation
-                  </span>
-                </div>
-                <audio
-                  key={selectedSimulation.conversation_wav_url}
-                  controls
-                  className="w-full h-10"
-                  src={selectedSimulation.conversation_wav_url}
-                  onError={refreshRunData}
-                >
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
-            )}
-
-            {/* Content */}
-            <div
-              ref={transcriptContainerRef}
-              className="flex-1 overflow-y-auto p-4 md:p-6"
-            >
-              <div className="space-y-4">
-                {(() => {
-                  const fullTranscript = selectedSimulation.transcript ?? [];
-                  // Filter out end_reason, but keep tool messages that are webhook_response
-                  const filteredTranscript = fullTranscript.filter((entry) => {
-                    if (entry.role === "end_reason") return false;
-                    if (entry.role === "tool") {
-                      // Only include tool messages that are webhook_response
-                      try {
-                        const parsed = JSON.parse(entry.content || "");
-                        return parsed?.type === "webhook_response";
-                      } catch {
-                        return false;
-                      }
-                    }
-                    return true;
-                  });
-                  // Check if conversation ended due to max turns
-                  const lastEntry = fullTranscript[fullTranscript.length - 1];
-                  const endedDueToMaxTurns =
-                    lastEntry?.role === "end_reason" &&
-                    lastEntry?.content === "max_turns";
-
-                  if (filteredTranscript.length === 0) {
-                    return (
-                      <div className="flex items-center justify-center py-8">
-                        <p className="text-sm text-muted-foreground">
-                          No transcript available yet
-                        </p>
-                      </div>
-                    );
-                  }
-                  return filteredTranscript.map((entry, index) => {
-                    const audioUrl = getAudioUrlForEntry(
-                      entry,
-                      index,
-                      selectedSimulation.audio_urls,
-                      filteredTranscript
-                    );
-                    return (
-                      <div
-                        key={index}
-                        className={`space-y-2 ${
-                          entry.role === "user" ? "flex flex-col items-end" : ""
-                        }`}
-                      >
-                        {/* Message Header - show for assistant messages */}
-                        {entry.role === "assistant" && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">
-                              {entry.tool_calls ? "Agent Tool Call" : "Agent"}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Audio Player - show for voice runs, below Agent header for assistant messages */}
-                        {audioUrl && (
-                          <div
-                            className={
-                              entry.role === "user"
-                                ? "w-full md:w-1/2"
-                                : "w-full md:w-1/2"
-                            }
-                          >
-                            <audio
-                              key={audioUrl}
-                              controls
-                              className="w-full h-8 mb-2"
-                              src={audioUrl}
-                              onError={refreshRunData}
-                            >
-                              Your browser does not support the audio element.
-                            </audio>
-                          </div>
-                        )}
-
-                        {/* User Message */}
-                        {entry.role === "user" && entry.content && (
-                          <div className="w-full md:w-1/2">
-                            <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-muted border border-border whitespace-pre-wrap">
-                              {entry.content}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Assistant Message (text response) */}
-                        {entry.role === "assistant" &&
-                          entry.content &&
-                          !entry.tool_calls && (
-                            <div className="w-full md:w-1/2">
-                              <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-accent border border-border whitespace-pre-wrap">
-                                {entry.content}
-                              </div>
-                            </div>
-                          )}
-
-                        {/* Tool Call Display */}
-                        {entry.role === "assistant" && entry.tool_calls && (
-                          <div className="w-full md:w-1/2">
-                            {entry.tool_calls.map((toolCall, toolIndex) => {
-                              let parsedArgs: Record<string, any> = {};
-                              try {
-                                parsedArgs = JSON.parse(
-                                  toolCall.function.arguments
-                                );
-                              } catch {
-                                parsedArgs = {};
-                              }
-
-                              // Helper to format parameter value
-                              const formatValue = (val: any): string => {
-                                if (val === null) return "null";
-                                if (val === undefined) return "undefined";
-                                if (typeof val === "object") {
-                                  try {
-                                    return JSON.stringify(val, null, 2);
-                                  } catch {
-                                    return String(val);
-                                  }
-                                }
-                                return String(val);
-                              };
-
-                              return (
-                                <div
-                                  key={toolIndex}
-                                  className="bg-muted border border-border rounded-2xl p-4 mb-2"
-                                >
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg
-                                      className="w-4 h-4 text-muted-foreground"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={1.5}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                                      />
-                                    </svg>
-                                    <span className="text-sm font-medium text-foreground">
-                                      {toolCall.function.name}
-                                    </span>
-                                  </div>
-                                  {Object.keys(parsedArgs).filter(
-                                    (k) => k !== "headers"
-                                  ).length > 0 && (
-                                    <div className="space-y-3 mt-3">
-                                      {Object.entries(parsedArgs)
-                                        .filter(([key]) => key !== "headers")
-                                        .map(([key, value], paramIndex) => {
-                                          const displayValue =
-                                            formatValue(value);
-                                          const isMultiLine =
-                                            displayValue.includes("\n");
-                                          return (
-                                            <div key={paramIndex}>
-                                              <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                {key}
-                                              </label>
-                                              <div
-                                                className={`px-3 py-2 bg-background border border-border rounded-lg text-sm text-muted-foreground whitespace-pre-wrap break-all ${
-                                                  isMultiLine
-                                                    ? "font-mono text-xs"
-                                                    : ""
-                                                }`}
-                                              >
-                                                {displayValue}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Tool Response Display (webhook_response) */}
-                        {entry.role === "tool" &&
-                          entry.content &&
-                          (() => {
-                            // Try to parse content as JSON
-                            let parsed: any = null;
-                            try {
-                              parsed = JSON.parse(entry.content);
-                            } catch {
-                              return null; // Not valid JSON, don't render
-                            }
-
-                            // Check if it's a webhook_response
-                            if (parsed?.type !== "webhook_response") {
-                              return null;
-                            }
-
-                            const response = parsed.response;
-                            if (!response || typeof response !== "object") {
-                              return null;
-                            }
-
-                            // Check if response has error status
-                            const isError = parsed.status === "error";
-
-                            // Format response as pretty JSON
-                            const jsonString = JSON.stringify(
-                              response,
-                              null,
-                              2
-                            );
-
-                            return (
-                              <div className="w-full md:w-1/2">
-                                <div className="flex items-center gap-2 mb-2">
-                                  {isError ? (
-                                    <>
-                                      <svg
-                                        className="w-4 h-4 text-red-500"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                        />
-                                      </svg>
-                                      <span className="text-sm font-medium text-red-500">
-                                        Tool Response Error
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-sm font-medium text-foreground">
-                                      Agent Tool Response
-                                    </span>
-                                  )}
-                                </div>
-                                <div
-                                  className={`bg-muted rounded-2xl p-4 border ${
-                                    isError ? "border-red-500" : "border-border"
-                                  }`}
-                                >
-                                  <pre
-                                    className={`text-sm font-mono whitespace-pre-wrap break-all ${
-                                      isError
-                                        ? "text-red-400"
-                                        : "text-foreground"
-                                    }`}
-                                  >
-                                    {jsonString}
-                                  </pre>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                      </div>
-                    );
-                  });
-                })()}
-                {/* Show max turns reached note */}
-                {(() => {
-                  const fullTranscript = selectedSimulation.transcript ?? [];
-                  const lastEntry = fullTranscript[fullTranscript.length - 1];
-                  const endedDueToMaxTurns =
-                    lastEntry?.role === "end_reason" &&
-                    lastEntry?.content === "max_turns";
-                  if (endedDueToMaxTurns) {
-                    return (
-                      <div className="flex items-center justify-center py-4 mt-2">
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                          <svg
-                            className="w-4 h-4 shrink-0 text-amber-900 dark:text-amber-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                            />
-                          </svg>
-                          <span className="text-sm font-medium text-foreground">
-                            Maximum number of assistant turns reached
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                {/* Show simulation aborted by user note */}
-                {selectedSimulation.aborted && (
-                  <div className="flex items-center justify-center py-4 mt-2">
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
-                      <svg
-                        className="w-4 h-4 text-red-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                        />
-                      </svg>
-                      <span className="text-sm text-red-500">
-                        Simulation aborted by user
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {/* Show spinner at bottom while metrics are being fetched */}
-                {!selectedSimulation.aborted &&
-                  !selectedSimulation.evaluation_results &&
-                  (selectedSimulation.transcript?.length ?? 0) > 0 && (
-                    <div className="flex items-center justify-center py-4">
-                      <svg
-                        className="w-5 h-5 animate-spin text-yellow-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                    </div>
-                  )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {transcriptDialogOpen && selectedSimulation && runData && (
+        <SimulationTranscriptDialog
+          simulation={selectedSimulation}
+          runType={runData.type}
+          onClose={closeTranscriptDialog}
+          onAudioError={refreshRunData}
+        />
       )}
 
       <AddRunToLabellingTaskDialog
@@ -2227,12 +721,6 @@ export default function SimulationRunPage() {
           results: conversationLabellingResults,
           evaluators: conversationLabellingEvaluators,
         }}
-      />
-
-      <EvaluatorPreviewModal
-        evaluatorUuid={previewEvaluator?.uuid ?? null}
-        evaluatorName={previewEvaluator?.name}
-        onClose={() => setPreviewEvaluator(null)}
       />
     </AppLayout>
   );

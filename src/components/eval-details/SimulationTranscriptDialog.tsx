@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import type { SimulationResult } from "./SimulationResultsTable";
 import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
 
@@ -27,6 +27,21 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
   });
   const lastEntry = fullTranscript[fullTranscript.length - 1];
   const endedDueToMaxTurns = lastEntry?.role === "end_reason" && lastEntry?.content === "max_turns";
+  // A simulation that is still talking keeps sending new turns while this is
+  // open, so follow the conversation down. Only on new turns, so the reader
+  // can scroll back up and stay there.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const previousTurnCount = useRef(0);
+  const turnCount = filteredTranscript.length;
+  useEffect(() => {
+    if (contentRef.current && turnCount > previousTurnCount.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+    previousTurnCount.current = turnCount;
+  }, [turnCount]);
+  // The conversation is over but the evaluators have not scored it yet.
+  const awaitingScores =
+    !simulation.aborted && !simulation.evaluation_results && fullTranscript.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -60,7 +75,7 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
         )}
 
         {/* Transcript content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="space-y-4">
             {filteredTranscript.length === 0 ? (
               <div className="flex items-center justify-center py-8">
@@ -205,6 +220,19 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
                   </svg>
                   <span className="text-sm text-red-500">Simulation aborted by user</span>
                 </div>
+              </div>
+            )}
+
+            {awaitingScores && (
+              <div className="flex items-center justify-center py-4" data-testid="awaiting-scores">
+                <svg className="w-5 h-5 animate-spin text-yellow-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
               </div>
             )}
           </div>
