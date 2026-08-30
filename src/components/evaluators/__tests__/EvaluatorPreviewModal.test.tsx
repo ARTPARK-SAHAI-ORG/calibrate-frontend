@@ -77,7 +77,7 @@ describe("EvaluatorPreviewModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("links to the evaluator's own page in a new tab", async () => {
+  it("opens the evaluator's edit form in a new tab", async () => {
     render(
       <EvaluatorPreviewModal
         evaluatorUuid="e1"
@@ -85,8 +85,8 @@ describe("EvaluatorPreviewModal", () => {
         onClose={jest.fn()}
       />,
     );
-    const link = screen.getByRole("link", { name: "View more" });
-    expect(link).toHaveAttribute("href", "/evaluators/e1");
+    const link = screen.getByRole("link", { name: "Edit" });
+    expect(link).toHaveAttribute("href", "/evaluators/e1?edit=1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });

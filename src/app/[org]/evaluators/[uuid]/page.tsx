@@ -1,7 +1,14 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import {
@@ -571,6 +578,17 @@ function EvaluatorDetailPageInner() {
     setNewVersionVariableDescriptions(seededDescriptions);
     setNewVersionOpen(true);
   };
+
+  // `?edit=1` (the Edit button in the evaluator preview window) lands here
+  // with the Edit form already open, once the evaluator has loaded.
+  const editParamHandled = useRef(false);
+  useEffect(() => {
+    if (editParamHandled.current) return;
+    if (!evaluator || searchParams.get("edit") !== "1") return;
+    editParamHandled.current = true;
+    openNewVersionDialog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluator, searchParams]);
 
   const createNewVersion = async () => {
     if (!backendAccessToken || !uuid || !evaluator) return;
