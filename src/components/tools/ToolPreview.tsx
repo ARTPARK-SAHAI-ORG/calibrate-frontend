@@ -3,6 +3,7 @@
 import type { ToolData } from "@/components/AddToolDialog";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { EditIcon } from "@/components/icons";
+import { ToolTypePill } from "./ToolTypePill";
 import { DeleteIconButton } from "@/components/ui";
 
 /**
@@ -78,10 +79,12 @@ export function ToolPreview({
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Configuration
         </h4>
-        <Field
-          label="Type"
-          value={isWebhook ? "Webhook" : "Structured Output"}
-        />
+        <div>
+          <span className="text-xs text-muted-foreground">Type</span>
+          <div className="mt-1">
+            <ToolTypePill configType={tool.config?.type} />
+          </div>
+        </div>
         {description && <Field label="Description" value={description} />}
         {isWebhook && webhook && (
           <div>

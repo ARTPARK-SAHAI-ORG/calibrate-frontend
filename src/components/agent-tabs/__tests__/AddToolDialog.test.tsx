@@ -158,6 +158,17 @@ describe("AddToolDialog", () => {
     expect(screen.getByText("Books calendar events")).toBeInTheDocument();
   });
 
+  it("offers Create tool while there are still tools to pick", async () => {
+    const user = setupUser();
+    renderComponent();
+
+    // Not only on the empty screen: a tool can be written without first
+    // adding everything the workspace already has.
+    expect(screen.getByLabelText("Select Weather lookup")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+    expect(createToolFlowProps.isOpen).toBe(true);
+  });
+
   it("shows empty state when all tools are already added", () => {
     renderComponent({ allTools: [alreadyAdded], agentTools: [alreadyAdded] });
     expect(
@@ -203,6 +214,18 @@ describe("AddToolDialog", () => {
     expect(screen.getByLabelText("Select Weather lookup")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Select Calendar booking"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("All available tools have been added to this agent"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says the workspace has no tools, rather than that they are all added", () => {
+    renderComponent({ allTools: [], agentTools: [] });
+    expect(
+      screen.getByText(
+        "Your workspace has no tools yet. Create one and it is added to this agent.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("All available tools have been added to this agent"),
@@ -417,8 +440,7 @@ describe("AddToolDialog", () => {
     await user.type(screen.getByPlaceholderText("Search tools"), "weather");
     await user.click(screen.getByLabelText("Select Weather lookup"));
 
-    const closeButton = screen.getAllByRole("button")[0];
-    await user.click(closeButton);
+    await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

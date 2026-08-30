@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { ToolPreview } from "./ToolPreview";
 import { PickerRow } from "@/components/ui/PickerRow";
 import { EmptyState } from "@/components/ui";
+import { ToolTypePill } from "./ToolTypePill";
 import type { ToolData } from "@/components/AddToolDialog";
 
 type ToolLibraryPickerProps = {
@@ -166,10 +167,6 @@ export function ToolLibraryPicker({
             </div>
           ) : (
             filteredTools.map((tool) => {
-              const type =
-                tool.config?.type === "webhook"
-                  ? "Webhook"
-                  : "Structured Output";
               const description =
                 tool.description || tool.config?.description || "";
               return (
@@ -182,11 +179,7 @@ export function ToolLibraryPicker({
                   onPreview={() => setPickedUuid(tool.uuid)}
                   name={tool.name}
                   description={description}
-                  badge={
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                      {type}
-                    </span>
-                  }
+                  badge={<ToolTypePill configType={tool.config?.type} />}
                 />
               );
             })

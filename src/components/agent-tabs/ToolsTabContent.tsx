@@ -6,6 +6,7 @@ import { AddToolDialog as EditToolDialog } from "@/components/AddToolDialog";
 import { DeleteToolDialog } from "./DeleteToolDialog";
 import { InbuiltToolsPanel } from "./InbuiltToolsPanel";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { ToolTypePill } from "@/components/tools/ToolTypePill";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
@@ -248,11 +249,7 @@ export function ToolsTabContent({
                     </div>
                     {/* Type Column */}
                     <div className="flex items-center">
-                      <p className="text-sm text-muted-foreground">
-                        {tool.config?.type === "webhook"
-                          ? "Webhook"
-                          : "Structured Output"}
-                      </p>
+                      <ToolTypePill configType={tool.config?.type} />
                     </div>
                     {/* Description Column */}
                     <div className="flex items-center">
@@ -308,11 +305,9 @@ export function ToolsTabContent({
                         <h4 className="text-sm font-medium text-foreground truncate">
                           {tool.name}
                         </h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {tool.config?.type === "webhook"
-                            ? "Webhook"
-                            : "Structured Output"}
-                        </p>
+                        <div className="mt-1">
+                          <ToolTypePill configType={tool.config?.type} />
+                        </div>
                         {(tool.description || tool.config?.description) && (
                           <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
                             {tool.description || tool.config?.description}

@@ -68,7 +68,9 @@ export function AddToolDialog({
 
   const openEditTool = (tool: ToolData) => {
     setEditToolUuid(tool.uuid);
-    setEditToolType(tool.config?.type === "webhook" ? "webhook" : "structured_output");
+    setEditToolType(
+      tool.config?.type === "webhook" ? "webhook" : "structured_output",
+    );
   };
 
   const confirmDeleteTool = async () => {
@@ -77,7 +79,9 @@ export function AddToolDialog({
       setIsDeleting(true);
       setDeleteError(null);
       await deleteTool(deleteTarget.uuid, backendAccessToken);
-      setLocalAllTools((prev) => prev.filter((t) => t.uuid !== deleteTarget.uuid));
+      setLocalAllTools((prev) =>
+        prev.filter((t) => t.uuid !== deleteTarget.uuid),
+      );
       setSelectedTools((prev) => {
         const next = new Set(prev);
         next.delete(deleteTarget.uuid);
@@ -139,7 +143,7 @@ export function AddToolDialog({
 
       // Get added tools data
       const addedTools = localAllTools.filter((tool) =>
-        toolUuidsToAdd.includes(tool.uuid)
+        toolUuidsToAdd.includes(tool.uuid),
       );
       onToolsAdded(addedTools);
 
@@ -153,7 +157,7 @@ export function AddToolDialog({
   // Filter out tools already added to the agent
   const agentToolUuids = new Set(agentTools.map((t) => t.uuid));
   const baseAvailableTools = localAllTools.filter(
-    (tool) => !agentToolUuids.has(tool.uuid)
+    (tool) => !agentToolUuids.has(tool.uuid),
   );
 
   return (
@@ -168,24 +172,39 @@ export function AddToolDialog({
         {/* Dialog Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-base font-semibold">Add Tools</h2>
-          <button
-            onClick={handleClose}
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center gap-2">
+            {/* The same offer the empty picker makes, kept in reach once
+                there is a list to read. The empty picker makes it itself, so
+                this would only say the same thing twice. */}
+            {baseAvailableTools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCreateToolOpen(true)}
+                className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Create tool
+              </button>
+            )}
+            <button
+              onClick={handleClose}
+              aria-label="Close"
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Tools List + Preview */}
@@ -195,7 +214,14 @@ export function AddToolDialog({
             selectedIds={selectedTools}
             onToggle={toggleTool}
             isLoading={allToolsLoading}
-            emptyMessage="All available tools have been added to this agent"
+            emptyMessage={
+              // Two different situations, and saying the wrong one is
+              // confusing: nothing in the workspace at all, or everything in
+              // it already on this agent.
+              localAllTools.length === 0
+                ? "Your workspace has no tools yet. Create one and it is added to this agent."
+                : "All available tools have been added to this agent"
+            }
             emptyAction={
               <button
                 type="button"

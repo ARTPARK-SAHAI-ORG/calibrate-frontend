@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { INBUILT_TOOLS, getInbuiltToolIcon } from "@/constants/inbuilt-tools";
+import { ToolTypePill } from "@/components/tools/ToolTypePill";
 
 export type AvailableTool = {
   uuid: string;
@@ -149,7 +150,6 @@ export function ToolPicker({
             )}
             {filteredTools.map((tool) => {
               const params = getToolParams(tool);
-              const toolType = tool.config?.type === "webhook" ? "Webhook" : "Structured Output";
               return (
                 <button
                   key={tool.uuid}
@@ -171,7 +171,10 @@ export function ToolPicker({
                   </svg>
                   <div className="text-left">
                     <p className="text-sm font-medium">{tool.name}</p>
-                    <p className="text-xs text-muted-foreground">{toolType}</p>
+                    <ToolTypePill
+                      configType={tool.config?.type}
+                      className="mt-0.5"
+                    />
                   </div>
                 </button>
               );
