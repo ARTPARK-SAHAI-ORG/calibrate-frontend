@@ -18,15 +18,10 @@ describe("ConfirmDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the title, message and extra summary", () => {
-    render(
-      <ConfirmDialog {...props}>
-        <p>2 models</p>
-      </ConfirmDialog>,
-    );
+  it("shows the title and the message", () => {
+    render(<ConfirmDialog {...props} />);
     expect(screen.getByText(props.title)).toBeInTheDocument();
     expect(screen.getByText(props.message)).toBeInTheDocument();
-    expect(screen.getByText("2 models")).toBeInTheDocument();
   });
 
   it("calls onConfirm and onClose from their buttons", async () => {

@@ -11,8 +11,6 @@ type ConfirmDialogProps = {
   title: string;
   message?: string;
   confirmText?: string;
-  /** Optional summary rendered between the message and the buttons. */
-  children?: React.ReactNode;
 };
 
 /** Plain "are you sure" step for an action that is not destructive, e.g.
@@ -24,7 +22,6 @@ export function ConfirmDialog({
   title,
   message,
   confirmText = "Confirm",
-  children,
 }: ConfirmDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -41,7 +38,6 @@ export function ConfirmDialog({
             {message}
           </p>
         )}
-        {children && <div className="mb-5">{children}</div>}
         <div className="flex items-center justify-end gap-2 md:gap-3">
           <Button variant="secondary" size="md" onClick={onClose}>
             Cancel
