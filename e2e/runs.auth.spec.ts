@@ -270,7 +270,10 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     const firstRunId = new URL(page.url()).searchParams.get("runId");
 
     // Rerun. The URL's runId must change to the freshly created run.
-    await page.getByRole("button", { name: "Rerun" }).click();
+    // `exact` matters: without it the name is matched as a substring, and the
+    // evaluator card on this screen is a button whose name ends in "Rerun
+    // Evaluator <timestamp>", so two buttons match and the click fails.
+    await page.getByRole("button", { name: "Rerun", exact: true }).click();
     await expect(async () => {
       const current = new URL(page.url()).searchParams.get("runId");
       expect(current).toBeTruthy();
