@@ -199,6 +199,25 @@ export function PlusIcon({ className }: IconProps) {
   );
 }
 
+// Filter Icon (funnel) — opens the filter dialog on a list
+export function FilterIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 5h16l-6.2 7.3v5.4l-3.6 2v-7.4L4 5z"
+      />
+    </svg>
+  );
+}
+
 // Chevron Down Icon
 export function ChevronDownIcon({ className }: IconProps) {
   return (

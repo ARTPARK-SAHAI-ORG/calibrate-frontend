@@ -1,11 +1,12 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { useTraceLabels } from "@/hooks/useTraceLabels";
-import { fetchTraceLabels } from "@/lib/tracesApi";
+import { useTraceLabels, useTraceMetadataKeys } from "@/hooks/useTraceLabels";
+import { fetchTraceLabels, fetchTraceMetadataKeys } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraceLabels: jest.fn(),
+  fetchTraceMetadataKeys: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -13,10 +14,12 @@ jest.mock("../../lib/reportError", () => ({
 }));
 
 const mockFetchTraceLabels = fetchTraceLabels as jest.Mock;
+const mockFetchTraceMetadataKeys = fetchTraceMetadataKeys as jest.Mock;
 const mockReportError = reportError as jest.Mock;
 
 beforeEach(() => {
   mockFetchTraceLabels.mockReset();
+  mockFetchTraceMetadataKeys.mockReset();
   mockReportError.mockReset();
 });
 
@@ -105,5 +108,42 @@ describe("useTraceLabels", () => {
     act(() => result.current.refetch());
 
     await waitFor(() => expect(result.current.labels).toEqual(["production"]));
+  });
+});
+
+describe("useTraceMetadataKeys", () => {
+  it("loads the agent's metadata keys", async () => {
+    mockFetchTraceMetadataKeys.mockResolvedValue(["clinic_id", "channel"]);
+
+    const { result } = renderHook(() => useTraceMetadataKeys("tok", "ag-1"));
+
+    await waitFor(() =>
+      expect(result.current.keys).toEqual(["clinic_id", "channel"]),
+    );
+    expect(mockFetchTraceMetadataKeys).toHaveBeenCalledWith("tok", "ag-1");
+  });
+
+  it("gives an empty list when the keys cannot be read", async () => {
+    mockFetchTraceMetadataKeys.mockRejectedValue(new Error("nope"));
+
+    const { result } = renderHook(() => useTraceMetadataKeys("tok", "ag-1"));
+
+    await waitFor(() => expect(mockReportError).toHaveBeenCalled());
+    expect(result.current.keys).toEqual([]);
+  });
+
+  it("asks again when told to", async () => {
+    mockFetchTraceMetadataKeys.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useTraceMetadataKeys("tok", "ag-1"));
+    await waitFor(() =>
+      expect(mockFetchTraceMetadataKeys).toHaveBeenCalledTimes(1),
+    );
+
+    act(() => result.current.refetch());
+
+    await waitFor(() =>
+      expect(mockFetchTraceMetadataKeys).toHaveBeenCalledTimes(2),
+    );
   });
 });

@@ -2,6 +2,9 @@ import {
   fetchTraces,
   fetchTrace,
   fetchTraceLabels,
+  fetchTraceMetadataKeys,
+  countTraceFilters,
+  NO_TRACE_FILTERS,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -79,6 +82,62 @@ describe("fetchTraces", () => {
     expect(
       new URLSearchParams(mockApiGet.mock.calls[2][0].split("?")[1]).has(
         "output_type",
+      ),
+    ).toBe(false);
+  });
+
+  it("sends the trimmed input and output text, and leaves blanks off", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      inputContains: "  polio  ",
+      outputContains: "14 weeks",
+    });
+    const set = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(set.get("input_contains")).toBe("polio");
+    expect(set.get("output_contains")).toBe("14 weeks");
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      inputContains: "   ",
+      outputContains: "",
+    });
+    const blank = new URLSearchParams(
+      mockApiGet.mock.calls[1][0].split("?")[1],
+    );
+    expect(blank.has("input_contains")).toBe(false);
+    expect(blank.has("output_contains")).toBe(false);
+  });
+
+  it("repeats the metadata key for each one picked, and sends none for an empty list", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      metadataKeys: ["clinic_id", "channel"],
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).getAll(
+        "metadata_key",
+      ),
+    ).toEqual(["clinic_id", "channel"]);
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      metadataKeys: [],
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has(
+        "metadata_key",
       ),
     ).toBe(false);
   });
@@ -357,6 +416,47 @@ describe("fetchTraceLabels", () => {
   });
 });
 
+describe("fetchTraceMetadataKeys", () => {
+  it("asks for one agent's metadata keys and reads them out of the response", async () => {
+    mockApiGet.mockResolvedValue({ keys: ["clinic_id", "channel"] });
+
+    expect(await fetchTraceMetadataKeys("tok", "ag 1")).toEqual([
+      "clinic_id",
+      "channel",
+    ]);
+    expect(mockApiGet.mock.calls[0][0]).toBe(
+      "/traces/metadata-keys?agent_id=ag%201",
+    );
+    expect(mockApiGet.mock.calls[0][1]).toBe("tok");
+  });
+
+  it("reads a bare list, and an empty one when there are no keys", async () => {
+    mockApiGet.mockResolvedValue(["clinic_id"]);
+    expect(await fetchTraceMetadataKeys("tok", "ag-1")).toEqual(["clinic_id"]);
+
+    mockApiGet.mockResolvedValue({});
+    expect(await fetchTraceMetadataKeys("tok", "ag-1")).toEqual([]);
+  });
+});
+
+describe("countTraceFilters", () => {
+  it("counts nothing when nothing is set", () => {
+    expect(countTraceFilters(NO_TRACE_FILTERS)).toBe(0);
+  });
+
+  it("counts each filter once, and ignores text that is only spaces", () => {
+    expect(
+      countTraceFilters({
+        outputType: "tool_call",
+        labels: ["production"],
+        metadataKeys: ["clinic_id"],
+        inputContains: "polio",
+        outputContains: "   ",
+      }),
+    ).toBe(4);
+  });
+});
+
 describe("selectAllBody", () => {
   it("carries the agent, the search text and the output type", () => {
     expect(
@@ -371,6 +471,34 @@ describe("selectAllBody", () => {
       q: "refund",
       output_type: "tool_call",
     });
+  });
+
+  it("carries the input, output and metadata-key filters, trimmed", () => {
+    expect(
+      selectAllBody({
+        agentId: "ag-1",
+        inputContains: "  polio  ",
+        outputContains: "14 weeks",
+        metadataKeys: ["clinic_id"],
+      }),
+    ).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      input_contains: "polio",
+      output_contains: "14 weeks",
+      metadata_key: ["clinic_id"],
+    });
+  });
+
+  it("leaves the input, output and metadata-key filters out when they are empty", () => {
+    expect(
+      selectAllBody({
+        agentId: "ag-1",
+        inputContains: "   ",
+        outputContains: "",
+        metadataKeys: [],
+      }),
+    ).toEqual({ select_all: true, agent_id: "ag-1" });
   });
 
   it("carries the picked labels, and leaves them out when none are picked", () => {

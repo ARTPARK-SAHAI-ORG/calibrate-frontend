@@ -43,6 +43,9 @@ describe("useTraces", () => {
       q: "",
       outputType: "all",
       labels: [],
+      inputContains: "",
+      outputContains: "",
+      metadataKeys: [],
     });
   });
 
@@ -83,7 +86,9 @@ describe("useTraces", () => {
         useTraces({ accessToken: "tok", agentId: "ag-1", outputType }),
       { initialProps: { outputType: "all" as TraceOutputFilter } },
     );
-    await waitFor(() => expect(result.current.loadedOutputType).toBe("all"));
+    await waitFor(() =>
+      expect(result.current.loadedFilters.outputType).toBe("all"),
+    );
 
     mockFetchTraces.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -92,12 +97,12 @@ describe("useTraces", () => {
     );
     rerender({ outputType: "tool_call" });
     // The new filter is in flight, so the rows are still the old ones.
-    expect(result.current.loadedOutputType).toBe("all");
+    expect(result.current.loadedFilters.outputType).toBe("all");
 
     await act(async () => {
       resolvePage(page([], 0));
     });
-    expect(result.current.loadedOutputType).toBe("tool_call");
+    expect(result.current.loadedFilters.outputType).toBe("tool_call");
   });
 
   it("sends the search text and returns to the first page when it changes", async () => {
@@ -401,6 +406,9 @@ describe("useTraces", () => {
         q: "",
         outputType: "all",
         labels: ["production"],
+        inputContains: "",
+        outputContains: "",
+        metadataKeys: [],
       }),
     );
   });
@@ -429,7 +437,7 @@ describe("useTraces", () => {
     );
 
     await waitFor(() =>
-      expect(result.current.loadedLabels).toEqual(["staging"]),
+      expect(result.current.loadedFilters.labels).toEqual(["staging"]),
     );
   });
 });
