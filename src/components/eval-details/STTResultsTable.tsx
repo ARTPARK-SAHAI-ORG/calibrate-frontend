@@ -7,11 +7,9 @@ import {
   LabellingSelectCell,
   LABELLING_CHECKBOX_COL_WIDTH,
 } from "./labellingSelectionColumn";
-import {
-  EvaluatorScoreCell,
-  readEvaluatorCell,
-} from "./EvaluatorScoreCell";
+import { EvaluatorScoreCell, readEvaluatorCell } from "./EvaluatorScoreCell";
 import { SARVAM_METRIC_FIELDS, type SarvamMetricField } from "./sarvamMetrics";
+import { SortableTh, useTableSort } from "./tableSort";
 
 // Per-row results table for STT. Two modes:
 //
@@ -150,7 +148,8 @@ function fmtMetric(v: number | string | undefined | null): string {
 // Whether a per-row latency (TTFS) value is a usable finite number.
 function hasRowTtfs(v: unknown): boolean {
   if (typeof v === "number") return Number.isFinite(v);
-  if (typeof v === "string" && v.trim() !== "") return !Number.isNaN(parseFloat(v));
+  if (typeof v === "string" && v.trim() !== "")
+    return !Number.isNaN(parseFloat(v));
   return false;
 }
 
@@ -199,8 +198,18 @@ function MetricValueWithReasoning({
           className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
           aria-label={`View ${label} reasoning`}
         >
-          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-3.5 h-3.5 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </button>
       </Tooltip>
@@ -232,7 +241,19 @@ function renderSarvamValue(field: SarvamMetricField, row: STTResultRow) {
   );
 }
 
-export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "Evaluator", evaluatorColumns, tableRef, labellingSelection, onToggleLabellingSelection, onLabellingBulkToggle, labellingKeyForRow, labellingRowEligible }: STTResultsTableProps) {
+export function STTResultsTable({
+  results,
+  showMetrics = true,
+  showSimilarity = true,
+  judgeLabel = "Evaluator",
+  evaluatorColumns,
+  tableRef,
+  labellingSelection,
+  onToggleLabellingSelection,
+  onLabellingBulkToggle,
+  labellingKeyForRow,
+  labellingRowEligible,
+}: STTResultsTableProps) {
   const hasAudio = results.some((r) => !!r.audio_url);
   // Sarvam LLM-judge columns render only for the metrics the run actually
   // carries (Sarvam judges were on). Older runs / judges-off runs show none.
@@ -252,7 +273,15 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   const hasTtfs = results.some((r) => hasRowTtfs(r.ttfs));
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
-  const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
+  const useDynamic =
+    Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
+
+  // The legacy single-evaluator column only earns its place when a row
+  // actually carries a score. A run with no evaluators used to show an
+  // "Evaluator" column of dashes. Mirrors the per-evaluator filtering below.
+  const hasLegacyJudge = results.some(
+    (r) => r.llm_judge_score != null && String(r.llm_judge_score).trim() !== "",
+  );
 
   // Drop evaluator columns that no row has a value for. STT evaluations can now
   // run with no evaluators, and older payloads may carry an evaluator with only
@@ -268,6 +297,31 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
         }),
       )
     : [];
+
+  // Click-to-sort column headers. `sortRows` keeps each row's original
+  // position, which is what the ID column shows and what the labelling
+  // checkboxes are keyed by, so sorting never moves a selection to a
+  // different row.
+  const { sort, toggleSort, sortRows } = useTableSort();
+  const sortValue = (row: STTResultRow, key: string, index: number) => {
+    if (key === "id") return index;
+    if (key === "gt") return row.gt;
+    if (key === "pred") return row.pred;
+    if (key === "wer") return row.wer;
+    if (key === "cer") return row.cer;
+    if (key === "semantic_wer") return row.semantic_wer;
+    if (key === "string_similarity") return row.string_similarity;
+    if (key === "ttfs") return row.ttfs;
+    if (key === "llm_judge") return row.llm_judge_score;
+    if (key.startsWith("evaluator:")) {
+      const col = visibleEvaluatorColumns.find(
+        (c) => `evaluator:${c.key}` === key,
+      );
+      return col ? readEvaluatorCell(row, col).score : undefined;
+    }
+    return readSarvamValue(row, key);
+  };
+  const orderedResults = sortRows(results, sortValue);
 
   // Labelling checkbox column (opt-in). Eligibility defaults to "row has
   // ground truth". The shared hook owns the derived state so this table and
@@ -301,8 +355,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
       total += sarvamFields.reduce((sum, f) => sum + f.width, 0);
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
       if (hasTtfs) total += STT_COL_WIDTHS.latency;
-      if (useDynamic) total += visibleEvaluatorColumns.length * STT_COL_WIDTHS.evaluator;
-      else total += STT_COL_WIDTHS.llmJudge;
+      if (useDynamic)
+        total += visibleEvaluatorColumns.length * STT_COL_WIDTHS.evaluator;
+      else if (hasLegacyJudge) total += STT_COL_WIDTHS.llmJudge;
     }
     return total;
   })();
@@ -310,9 +365,15 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   return (
     <>
       {/* Desktop: Table layout */}
-      <div className="hidden md:block border rounded-xl overflow-hidden" ref={tableRef}>
+      <div
+        className="hidden md:block border rounded-xl overflow-hidden"
+        ref={tableRef}
+      >
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed" style={{ minWidth: `${tableMinWidth}px` }}>
+          <table
+            className="w-full table-fixed"
+            style={{ minWidth: `${tableMinWidth}px` }}
+          >
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 {showCheckboxes && (
@@ -322,75 +383,170 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     onBulkToggle={onLabellingBulkToggle}
                   />
                 )}
-                <th style={{ width: STT_COL_WIDTHS.id }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">ID</th>
+                <SortableTh
+                  label="ID"
+                  sortKey="id"
+                  sort={sort}
+                  onToggle={toggleSort}
+                  style={{ width: STT_COL_WIDTHS.id }}
+                  className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                />
                 {hasAudio && (
-                  <th style={{ width: STT_COL_WIDTHS.audio }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Audio</th>
+                  <th
+                    style={{ width: STT_COL_WIDTHS.audio }}
+                    className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                  >
+                    Audio
+                  </th>
                 )}
-                <th style={{ width: STT_COL_WIDTHS.text }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Ground Truth</th>
-                <th style={{ width: STT_COL_WIDTHS.text }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Prediction</th>
+                <SortableTh
+                  label="Ground Truth"
+                  sortKey="gt"
+                  sort={sort}
+                  onToggle={toggleSort}
+                  style={{ width: STT_COL_WIDTHS.text }}
+                  className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                />
+                <SortableTh
+                  label="Prediction"
+                  sortKey="pred"
+                  sort={sort}
+                  onToggle={toggleSort}
+                  style={{ width: STT_COL_WIDTHS.text }}
+                  className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                />
                 {showMetrics && (
                   <>
-                    <th style={{ width: STT_COL_WIDTHS.wer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">WER</th>
-                    <th style={{ width: STT_COL_WIDTHS.cer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">CER</th>
+                    <SortableTh
+                      label="WER"
+                      sortKey="wer"
+                      sort={sort}
+                      onToggle={toggleSort}
+                      style={{ width: STT_COL_WIDTHS.wer }}
+                      className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                    />
+                    <SortableTh
+                      label="CER"
+                      sortKey="cer"
+                      sort={sort}
+                      onToggle={toggleSort}
+                      style={{ width: STT_COL_WIDTHS.cer }}
+                      className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                    />
                     {hasSemanticWer && (
-                      <th style={{ width: STT_COL_WIDTHS.semanticWer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Semantic WER</th>
+                      <SortableTh
+                        label="Semantic WER"
+                        sortKey="semantic_wer"
+                        sort={sort}
+                        onToggle={toggleSort}
+                        style={{ width: STT_COL_WIDTHS.semanticWer }}
+                        className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                      />
                     )}
                     {sarvamFields.map((f) => (
-                      <th key={f.key} style={{ width: f.width }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">{f.label}</th>
+                      <SortableTh
+                        key={f.key}
+                        label={f.label}
+                        sortKey={f.key}
+                        sort={sort}
+                        onToggle={toggleSort}
+                        style={{ width: f.width }}
+                        className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                      />
                     ))}
                     {showSimilarity && (
-                      <th style={{ width: STT_COL_WIDTHS.similarity }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Similarity</th>
+                      <SortableTh
+                        label="Similarity"
+                        sortKey="string_similarity"
+                        sort={sort}
+                        onToggle={toggleSort}
+                        style={{ width: STT_COL_WIDTHS.similarity }}
+                        className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                      />
                     )}
                     {hasTtfs && (
-                      <th style={{ width: STT_COL_WIDTHS.latency }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Latency (s)</th>
+                      <SortableTh
+                        label="Latency (s)"
+                        sortKey="ttfs"
+                        sort={sort}
+                        onToggle={toggleSort}
+                        style={{ width: STT_COL_WIDTHS.latency }}
+                        className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                      />
                     )}
                     {useDynamic
                       ? visibleEvaluatorColumns.map((col) => (
-                          <th key={col.key} style={{ width: STT_COL_WIDTHS.evaluator }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">
-                            {col.label}
-                          </th>
+                          <SortableTh
+                            key={col.key}
+                            label={col.label}
+                            sortKey={`evaluator:${col.key}`}
+                            sort={sort}
+                            onToggle={toggleSort}
+                            style={{ width: STT_COL_WIDTHS.evaluator }}
+                            className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                          />
                         ))
-                      : (
-                          <th style={{ width: STT_COL_WIDTHS.llmJudge }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">{judgeLabel}</th>
+                      : hasLegacyJudge && (
+                          <SortableTh
+                            label={judgeLabel}
+                            sortKey="llm_judge"
+                            sort={sort}
+                            onToggle={toggleSort}
+                            style={{ width: STT_COL_WIDTHS.llmJudge }}
+                            className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
+                          />
                         )}
                   </>
                 )}
               </tr>
             </thead>
             <tbody>
-              {results.map((result, index) => {
-                const isEmptyPrediction = !result.pred || result.pred.trim() === "";
+              {orderedResults.map(({ row: result, index }) => {
+                const isEmptyPrediction =
+                  !result.pred || result.pred.trim() === "";
                 return (
                   <tr
                     key={index}
                     data-row-index={index}
                     className={`border-b border-border last:border-b-0 ${isEmptyPrediction ? "bg-red-500/10" : ""}`}
                   >
-                    {showCheckboxes && (() => {
-                      const key = labellingKeyForRow!(result, index);
-                      return (
-                        <LabellingSelectCell
-                          eligible={rowEligible(result, index)}
-                          checked={labellingSelection?.has(key) ?? false}
-                          onToggle={() => onToggleLabellingSelection!(key)}
-                          disabledTitle="Rows without ground truth can't be labelled"
-                        />
-                      );
-                    })()}
-                    <td className="px-3 py-3 text-[13px] text-foreground">{index + 1}</td>
+                    {showCheckboxes &&
+                      (() => {
+                        const key = labellingKeyForRow!(result, index);
+                        return (
+                          <LabellingSelectCell
+                            eligible={rowEligible(result, index)}
+                            checked={labellingSelection?.has(key) ?? false}
+                            onToggle={() => onToggleLabellingSelection!(key)}
+                            disabledTitle="Rows without ground truth can't be labelled"
+                          />
+                        );
+                      })()}
+                    <td className="px-3 py-3 text-[13px] text-foreground">
+                      {index + 1}
+                    </td>
                     {hasAudio && (
                       <td className="px-3 py-3">
                         {result.audio_url ? (
-                          <LazyAudioPlayer src={result.audio_url} className="w-full max-w-[160px]" />
+                          <LazyAudioPlayer
+                            src={result.audio_url}
+                            className="w-full max-w-[160px]"
+                          />
                         ) : (
-                          <span className="text-[13px] text-muted-foreground">&mdash;</span>
+                          <span className="text-[13px] text-muted-foreground">
+                            &mdash;
+                          </span>
                         )}
                       </td>
                     )}
-                    <td className="px-3 py-3 text-[13px] text-foreground break-words">{result.gt}</td>
+                    <td className="px-3 py-3 text-[13px] text-foreground break-words">
+                      {result.gt}
+                    </td>
                     <td className="px-3 py-3 text-[13px] break-words">
                       {isEmptyPrediction ? (
-                        <span className="text-muted-foreground">No transcript generated</span>
+                        <span className="text-muted-foreground">
+                          No transcript generated
+                        </span>
                       ) : (
                         <span className="text-foreground">{result.pred}</span>
                       )}
@@ -398,10 +554,14 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     {showMetrics && (
                       <>
                         <td className="px-4 py-3 text-[13px] text-foreground">
-                          {result.wer != null ? parseFloat(parseFloat(result.wer).toFixed(4)) : "-"}
+                          {result.wer != null
+                            ? parseFloat(parseFloat(result.wer).toFixed(4))
+                            : "-"}
                         </td>
                         <td className="px-4 py-3 text-[13px] text-foreground">
-                          {result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}
+                          {result.cer != null
+                            ? parseFloat(parseFloat(result.cer).toFixed(4))
+                            : "-"}
                         </td>
                         {hasSemanticWer && (
                           <td className="px-4 py-3 text-[13px] text-foreground">
@@ -413,13 +573,22 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                           </td>
                         )}
                         {sarvamFields.map((f) => (
-                          <td key={f.key} className="px-4 py-3 text-[13px] text-foreground">
+                          <td
+                            key={f.key}
+                            className="px-4 py-3 text-[13px] text-foreground"
+                          >
                             {renderSarvamValue(f, result)}
                           </td>
                         ))}
                         {showSimilarity && (
                           <td className="px-4 py-3 text-[13px] text-foreground">
-                            {result.string_similarity != null ? parseFloat(parseFloat(result.string_similarity).toFixed(4)) : "-"}
+                            {result.string_similarity != null
+                              ? parseFloat(
+                                  parseFloat(result.string_similarity).toFixed(
+                                    4,
+                                  ),
+                                )
+                              : "-"}
                           </td>
                         )}
                         {hasTtfs && (
@@ -427,28 +596,31 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                             {fmtMetric(result.ttfs)}
                           </td>
                         )}
-                        {useDynamic ? (
-                          visibleEvaluatorColumns.map((col) => (
-                            <td key={col.key} className="px-4 py-3">
-                              {(() => {
-                                const cell = readEvaluatorCell(result, col);
-                                return (
-                                  <EvaluatorScoreCell
-                                    score={cell.score}
-                                    reasoning={cell.reasoning}
-                                    error={cell.error}
-                                    outputType={col.outputType}
-                                    scaleMax={col.scaleMax}
-                                  />
-                                );
-                              })()}
-                            </td>
-                          ))
-                        ) : (
-                          <td className="px-4 py-3">
-                            <LLMJudgeBadge score={result.llm_judge_score} reasoning={result.llm_judge_reasoning} />
-                          </td>
-                        )}
+                        {useDynamic
+                          ? visibleEvaluatorColumns.map((col) => (
+                              <td key={col.key} className="px-4 py-3">
+                                {(() => {
+                                  const cell = readEvaluatorCell(result, col);
+                                  return (
+                                    <EvaluatorScoreCell
+                                      score={cell.score}
+                                      reasoning={cell.reasoning}
+                                      error={cell.error}
+                                      outputType={col.outputType}
+                                      scaleMax={col.scaleMax}
+                                    />
+                                  );
+                                })()}
+                              </td>
+                            ))
+                          : hasLegacyJudge && (
+                              <td className="px-4 py-3">
+                                <LLMJudgeBadge
+                                  score={result.llm_judge_score}
+                                  reasoning={result.llm_judge_reasoning}
+                                />
+                              </td>
+                            )}
                       </>
                     )}
                   </tr>
@@ -466,8 +638,11 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
           // Header pill on mobile: in legacy mode shows the single LLM-judge
           // pass/fail; in dynamic mode it's omitted (each evaluator surfaces
           // its own pill / value below the metrics block instead).
-          const legacyScoreStr = String(result.llm_judge_score || "").toLowerCase();
-          const legacyPassed = legacyScoreStr === "true" || legacyScoreStr === "1";
+          const legacyScoreStr = String(
+            result.llm_judge_score || "",
+          ).toLowerCase();
+          const legacyPassed =
+            legacyScoreStr === "true" || legacyScoreStr === "1";
           return (
             <div
               key={index}
@@ -478,51 +653,84 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                 {/* Labelling checkboxes are desktop-only — the "Submit for
                     labelling" button is hidden on mobile, so selecting here
                     would be a dead end. */}
-                <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
+                <span className="text-[12px] text-muted-foreground font-medium">
+                  #{index + 1}
+                </span>
                 {showMetrics && !useDynamic && result.llm_judge_score && (
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                    legacyPassed
-                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                      legacyPassed
+                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+                    }`}
+                  >
                     {legacyPassed ? "Pass" : "Fail"}
                   </span>
                 )}
               </div>
               {result.audio_url && (
                 <div>
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Audio</span>
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Audio
+                  </span>
                   <div className="mt-1">
-                    <LazyAudioPlayer src={result.audio_url} className="w-full" />
+                    <LazyAudioPlayer
+                      src={result.audio_url}
+                      className="w-full"
+                    />
                   </div>
                 </div>
               )}
               <div>
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Ground Truth</span>
-                <p className="text-[13px] text-foreground mt-0.5">{result.gt}</p>
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Ground Truth
+                </span>
+                <p className="text-[13px] text-foreground mt-0.5">
+                  {result.gt}
+                </p>
               </div>
               <div>
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Prediction</span>
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Prediction
+                </span>
                 {isEmptyPrediction ? (
-                  <p className="text-[13px] text-muted-foreground mt-0.5">No transcript generated</p>
+                  <p className="text-[13px] text-muted-foreground mt-0.5">
+                    No transcript generated
+                  </p>
                 ) : (
-                  <p className="text-[13px] text-foreground mt-0.5">{result.pred}</p>
+                  <p className="text-[13px] text-foreground mt-0.5">
+                    {result.pred}
+                  </p>
                 )}
               </div>
               {showMetrics && (
                 <div className="space-y-2 pt-1 border-t border-border">
                   <div className="flex gap-4 flex-wrap">
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">WER</span>
-                      <p className="text-[13px] text-foreground">{result.wer != null ? parseFloat(parseFloat(result.wer).toFixed(4)) : "-"}</p>
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                        WER
+                      </span>
+                      <p className="text-[13px] text-foreground">
+                        {result.wer != null
+                          ? parseFloat(parseFloat(result.wer).toFixed(4))
+                          : "-"}
+                      </p>
                     </div>
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">CER</span>
-                      <p className="text-[13px] text-foreground">{result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}</p>
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                        CER
+                      </span>
+                      <p className="text-[13px] text-foreground">
+                        {result.cer != null
+                          ? parseFloat(parseFloat(result.cer).toFixed(4))
+                          : "-"}
+                      </p>
                     </div>
                     {hasSemanticWer && (
                       <div>
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Semantic WER</span>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                          Semantic WER
+                        </span>
                         {/* div (not p) — the reasoning tooltip renders a block
                             wrapper, which can't nest inside a <p>. */}
                         <div className="text-[13px] text-foreground">
@@ -536,47 +744,81 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     )}
                     {sarvamFields.map((f) => (
                       <div key={f.key}>
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{f.label}</span>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                          {f.label}
+                        </span>
                         {/* div (not p) — the LLM-WER tooltip renders a block
                             wrapper, which can't nest inside a <p>. */}
-                        <div className="text-[13px] text-foreground">{renderSarvamValue(f, result)}</div>
+                        <div className="text-[13px] text-foreground">
+                          {renderSarvamValue(f, result)}
+                        </div>
                       </div>
                     ))}
                     {showSimilarity && (
                       <div>
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Similarity</span>
-                        <p className="text-[13px] text-foreground">{result.string_similarity != null ? parseFloat(parseFloat(result.string_similarity).toFixed(4)) : "-"}</p>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                          Similarity
+                        </span>
+                        <p className="text-[13px] text-foreground">
+                          {result.string_similarity != null
+                            ? parseFloat(
+                                parseFloat(result.string_similarity).toFixed(4),
+                              )
+                            : "-"}
+                        </p>
                       </div>
                     )}
                     {hasTtfs && (
                       <div>
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Latency (s)</span>
-                        <p className="text-[13px] text-foreground">{fmtMetric(result.ttfs)}</p>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                          Latency (s)
+                        </span>
+                        <p className="text-[13px] text-foreground">
+                          {fmtMetric(result.ttfs)}
+                        </p>
                       </div>
                     )}
                   </div>
                   {useDynamic
                     ? visibleEvaluatorColumns.map((col) => {
-                        const { score, reasoning, error } = readEvaluatorCell(result, col);
+                        const { score, reasoning, error } = readEvaluatorCell(
+                          result,
+                          col,
+                        );
                         if (!score && !reasoning && !error) return null;
                         return (
                           <div key={col.key}>
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{col.label}</span>
-                              <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} scaleMax={col.scaleMax} hideTooltipButton />
+                              <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                                {col.label}
+                              </span>
+                              <EvaluatorScoreCell
+                                score={score}
+                                reasoning={reasoning}
+                                error={error}
+                                outputType={col.outputType}
+                                scaleMax={col.scaleMax}
+                                hideTooltipButton
+                              />
                             </div>
                             {reasoning && (
-                              <p className="text-[12px] text-muted-foreground mt-0.5">{reasoning}</p>
+                              <p className="text-[12px] text-muted-foreground mt-0.5">
+                                {reasoning}
+                              </p>
                             )}
                           </div>
                         );
                       })
-                    : (result.llm_judge_reasoning && (
+                    : result.llm_judge_reasoning && (
                         <div>
-                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{judgeLabel} Reasoning</span>
-                          <p className="text-[12px] text-muted-foreground mt-0.5">{result.llm_judge_reasoning}</p>
+                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                            {judgeLabel} Reasoning
+                          </span>
+                          <p className="text-[12px] text-muted-foreground mt-0.5">
+                            {result.llm_judge_reasoning}
+                          </p>
                         </div>
-                      ))}
+                      )}
                 </div>
               )}
             </div>
@@ -587,8 +829,15 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   );
 }
 
-function LLMJudgeBadge({ score, reasoning }: { score?: string; reasoning?: string }) {
-  if (!score) return <span className="text-muted-foreground text-[12px]">-</span>;
+function LLMJudgeBadge({
+  score,
+  reasoning,
+}: {
+  score?: string;
+  reasoning?: string;
+}) {
+  if (!score)
+    return <span className="text-muted-foreground text-[12px]">-</span>;
 
   const scoreStr = String(score).toLowerCase();
   const passed = scoreStr === "true" || scoreStr === "1";
@@ -596,17 +845,33 @@ function LLMJudgeBadge({ score, reasoning }: { score?: string; reasoning?: strin
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-        passed
-          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-          : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-      }`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+          passed
+            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+            : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+        }`}
+      >
         {passed ? "Pass" : "Fail"}
       </span>
       <Tooltip content={tooltipContent}>
-        <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View reasoning">
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <button
+          type="button"
+          className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+          aria-label="View reasoning"
+        >
+          <svg
+            className="w-4 h-4 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </button>
       </Tooltip>

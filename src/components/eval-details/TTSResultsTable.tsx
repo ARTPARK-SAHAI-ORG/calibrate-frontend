@@ -7,10 +7,8 @@ import {
   LabellingSelectCell,
   LABELLING_CHECKBOX_COL_WIDTH,
 } from "./labellingSelectionColumn";
-import {
-  EvaluatorScoreCell,
-  readEvaluatorCell,
-} from "./EvaluatorScoreCell";
+import { EvaluatorScoreCell, readEvaluatorCell } from "./EvaluatorScoreCell";
+import { SortableTh, useTableSort } from "./tableSort";
 
 // Per-row results table for TTS. Two modes:
 //
@@ -106,10 +104,47 @@ const TTS_COL_WIDTHS = {
   evaluator: 140,
 } as const;
 
-export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Evaluator", evaluatorColumns, labellingSelection, onToggleLabellingSelection, onLabellingBulkToggle, labellingKeyForRow, labellingRowEligible }: TTSResultsTableProps) {
+export function TTSResultsTable({
+  results,
+  showMetrics = true,
+  judgeLabel = "Evaluator",
+  evaluatorColumns,
+  labellingSelection,
+  onToggleLabellingSelection,
+  onLabellingBulkToggle,
+  labellingKeyForRow,
+  labellingRowEligible,
+}: TTSResultsTableProps) {
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
-  const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
+  const useDynamic =
+    Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
+
+  // The legacy single-evaluator column only earns its place when a row
+  // actually carries a score. A run with no evaluators used to show an
+  // "Evaluator" column of dashes. Matches STTResultsTable.
+  const hasLegacyJudge = results.some(
+    (r) => r.llm_judge_score != null && String(r.llm_judge_score).trim() !== "",
+  );
+
+  // Click-to-sort column headers. `sortRows` keeps each row's original
+  // position, which is what the ID column shows and what the labelling
+  // checkboxes are keyed by, so sorting never moves a selection to a
+  // different row.
+  const { sort, toggleSort, sortRows } = useTableSort();
+  const sortValue = (row: TTSResultRow, key: string, index: number) => {
+    if (key === "id") return index;
+    if (key === "text") return row.text;
+    if (key === "llm_judge") return row.llm_judge_score;
+    if (key.startsWith("evaluator:")) {
+      const col = (evaluatorColumns ?? []).find(
+        (c) => `evaluator:${c.key}` === key,
+      );
+      return col ? readEvaluatorCell(row, col).score : undefined;
+    }
+    return undefined;
+  };
+  const orderedResults = sortRows(results, sortValue);
 
   // Labelling checkbox column (opt-in). Eligibility defaults to "row has a
   // synthesized clip". The shared hook owns the derived state so this table
@@ -132,7 +167,13 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
   // Without this the `table-fixed w-full` layout would shrink each column to
   // fit the container — which is what we explicitly don't want when there
   // are several evaluators.
-  const evaluatorColCount = showMetrics ? (useDynamic ? evaluatorColumns!.length : 1) : 0;
+  const evaluatorColCount = showMetrics
+    ? useDynamic
+      ? evaluatorColumns!.length
+      : hasLegacyJudge
+        ? 1
+        : 0
+    : 0;
   const tableMinWidth =
     (showCheckboxes ? LABELLING_CHECKBOX_COL_WIDTH : 0) +
     TTS_COL_WIDTHS.id +
@@ -145,7 +186,10 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
       {/* Desktop: Table layout */}
       <div className="hidden md:block border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed" style={{ minWidth: `${tableMinWidth}px` }}>
+          <table
+            className="w-full table-fixed"
+            style={{ minWidth: `${tableMinWidth}px` }}
+          >
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 {showCheckboxes && (
@@ -155,63 +199,107 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
                     onBulkToggle={onLabellingBulkToggle}
                   />
                 )}
-                <th style={{ width: TTS_COL_WIDTHS.id }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">ID</th>
-                <th style={{ width: TTS_COL_WIDTHS.text }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">Text</th>
-                <th style={{ width: TTS_COL_WIDTHS.audio }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">Audio</th>
-                {showMetrics && (
-                  useDynamic
+                <SortableTh
+                  label="ID"
+                  sortKey="id"
+                  sort={sort}
+                  onToggle={toggleSort}
+                  style={{ width: TTS_COL_WIDTHS.id }}
+                  className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
+                />
+                <SortableTh
+                  label="Text"
+                  sortKey="text"
+                  sort={sort}
+                  onToggle={toggleSort}
+                  style={{ width: TTS_COL_WIDTHS.text }}
+                  className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
+                />
+                <th
+                  style={{ width: TTS_COL_WIDTHS.audio }}
+                  className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
+                >
+                  Audio
+                </th>
+                {showMetrics &&
+                  (useDynamic
                     ? evaluatorColumns!.map((col) => (
-                        <th key={col.key} style={{ width: TTS_COL_WIDTHS.evaluator }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                          {col.label}
-                        </th>
+                        <SortableTh
+                          key={col.key}
+                          label={col.label}
+                          sortKey={`evaluator:${col.key}`}
+                          sort={sort}
+                          onToggle={toggleSort}
+                          style={{ width: TTS_COL_WIDTHS.evaluator }}
+                          className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
+                        />
                       ))
-                    : (
-                        <th style={{ width: TTS_COL_WIDTHS.evaluator }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">{judgeLabel}</th>
-                      )
-                )}
+                    : hasLegacyJudge && (
+                        <SortableTh
+                          label={judgeLabel}
+                          sortKey="llm_judge"
+                          sort={sort}
+                          onToggle={toggleSort}
+                          style={{ width: TTS_COL_WIDTHS.evaluator }}
+                          className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
+                        />
+                      ))}
               </tr>
             </thead>
             <tbody>
-              {results.map((result, index) => (
-                <tr key={index} className="border-b border-border last:border-b-0">
-                  {showCheckboxes && (() => {
-                    const key = labellingKeyForRow!(result, index);
-                    return (
-                      <LabellingSelectCell
-                        eligible={rowEligible(result, index)}
-                        checked={labellingSelection?.has(key) ?? false}
-                        onToggle={() => onToggleLabellingSelection!(key)}
-                        disabledTitle="Rows without synthesized audio can't be labelled"
-                      />
-                    );
-                  })()}
-                  <td className="px-4 py-3 text-[13px] text-foreground">{index + 1}</td>
-                  <td className="px-4 py-3 text-[13px] text-foreground break-words">{result.text}</td>
+              {orderedResults.map(({ row: result, index }) => (
+                <tr
+                  key={index}
+                  className="border-b border-border last:border-b-0"
+                >
+                  {showCheckboxes &&
+                    (() => {
+                      const key = labellingKeyForRow!(result, index);
+                      return (
+                        <LabellingSelectCell
+                          eligible={rowEligible(result, index)}
+                          checked={labellingSelection?.has(key) ?? false}
+                          onToggle={() => onToggleLabellingSelection!(key)}
+                          disabledTitle="Rows without synthesized audio can't be labelled"
+                        />
+                      );
+                    })()}
                   <td className="px-4 py-3 text-[13px] text-foreground">
-                    <LazyAudioPlayer src={result.audio_path} className="w-full" />
+                    {index + 1}
                   </td>
-                  {showMetrics && (
-                    useDynamic ? (
-                      evaluatorColumns!.map((col) => {
-                        const cell = readEvaluatorCell(result, col);
-                        return (
-                          <td key={col.key} className="px-4 py-3">
-                            <EvaluatorScoreCell
-                              score={cell.score}
-                              reasoning={cell.reasoning}
-                              error={cell.error}
-                              outputType={col.outputType}
-                              scaleMax={col.scaleMax}
+                  <td className="px-4 py-3 text-[13px] text-foreground break-words">
+                    {result.text}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-foreground">
+                    <LazyAudioPlayer
+                      src={result.audio_path}
+                      className="w-full"
+                    />
+                  </td>
+                  {showMetrics &&
+                    (useDynamic
+                      ? evaluatorColumns!.map((col) => {
+                          const cell = readEvaluatorCell(result, col);
+                          return (
+                            <td key={col.key} className="px-4 py-3">
+                              <EvaluatorScoreCell
+                                score={cell.score}
+                                reasoning={cell.reasoning}
+                                error={cell.error}
+                                outputType={col.outputType}
+                                scaleMax={col.scaleMax}
+                              />
+                            </td>
+                          );
+                        })
+                      : hasLegacyJudge && (
+                          <td className="px-4 py-3">
+                            <LLMJudgeBadge
+                              score={result.llm_judge_score}
+                              reasoning={result.llm_judge_reasoning}
                             />
                           </td>
-                        );
-                      })
-                    ) : (
-                      <td className="px-4 py-3">
-                        <LLMJudgeBadge score={result.llm_judge_score} reasoning={result.llm_judge_reasoning} />
-                      </td>
-                    )
-                  )}
+                        ))}
                 </tr>
               ))}
             </tbody>
@@ -225,57 +313,96 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
           // Header pill on mobile: in legacy mode shows the single LLM-judge
           // pass/fail; in dynamic mode it's omitted (each evaluator surfaces
           // its own pill / value below the metrics block instead).
-          const legacyScoreStr = String(result.llm_judge_score || "").toLowerCase();
-          const legacyPassed = legacyScoreStr === "true" || legacyScoreStr === "1";
+          const legacyScoreStr = String(
+            result.llm_judge_score || "",
+          ).toLowerCase();
+          const legacyPassed =
+            legacyScoreStr === "true" || legacyScoreStr === "1";
           return (
-            <div key={index} className="border border-border rounded-xl p-4 space-y-3">
+            <div
+              key={index}
+              className="border border-border rounded-xl p-4 space-y-3"
+            >
               <div className="flex items-center justify-between">
                 {/* Labelling checkboxes are desktop-only — the "Submit for
                     labelling" button is hidden on mobile, so selecting here
                     would be a dead end. */}
-                <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
+                <span className="text-[12px] text-muted-foreground font-medium">
+                  #{index + 1}
+                </span>
                 {showMetrics && !useDynamic && result.llm_judge_score && (
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                    legacyPassed
-                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                      legacyPassed
+                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+                    }`}
+                  >
                     {legacyPassed ? "Pass" : "Fail"}
                   </span>
                 )}
               </div>
               <div>
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Text</span>
-                <p className="text-[13px] text-foreground mt-0.5">{result.text}</p>
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Text
+                </span>
+                <p className="text-[13px] text-foreground mt-0.5">
+                  {result.text}
+                </p>
               </div>
               <div>
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Audio</span>
-                <LazyAudioPlayer src={result.audio_path} className="w-full mt-1" />
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Audio
+                </span>
+                <LazyAudioPlayer
+                  src={result.audio_path}
+                  className="w-full mt-1"
+                />
               </div>
-              {showMetrics && (
-                useDynamic
+              {showMetrics &&
+                (useDynamic
                   ? evaluatorColumns!.map((col) => {
-                      const { score, reasoning, error } = readEvaluatorCell(result, col);
+                      const { score, reasoning, error } = readEvaluatorCell(
+                        result,
+                        col,
+                      );
                       if (!score && !reasoning && !error) return null;
                       return (
-                        <div key={col.key} className="pt-1 border-t border-border">
+                        <div
+                          key={col.key}
+                          className="pt-1 border-t border-border"
+                        >
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{col.label}</span>
-                            <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} scaleMax={col.scaleMax} hideTooltipButton />
+                            <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                              {col.label}
+                            </span>
+                            <EvaluatorScoreCell
+                              score={score}
+                              reasoning={reasoning}
+                              error={error}
+                              outputType={col.outputType}
+                              scaleMax={col.scaleMax}
+                              hideTooltipButton
+                            />
                           </div>
                           {reasoning && (
-                            <p className="text-[12px] text-muted-foreground mt-0.5">{reasoning}</p>
+                            <p className="text-[12px] text-muted-foreground mt-0.5">
+                              {reasoning}
+                            </p>
                           )}
                         </div>
                       );
                     })
-                  : (result.llm_judge_reasoning && (
+                  : result.llm_judge_reasoning && (
                       <div className="pt-1 border-t border-border">
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{judgeLabel} Reasoning</span>
-                        <p className="text-[12px] text-muted-foreground mt-0.5">{result.llm_judge_reasoning}</p>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                          {judgeLabel} Reasoning
+                        </span>
+                        <p className="text-[12px] text-muted-foreground mt-0.5">
+                          {result.llm_judge_reasoning}
+                        </p>
                       </div>
-                    ))
-              )}
+                    ))}
             </div>
           );
         })}
@@ -284,8 +411,15 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
   );
 }
 
-function LLMJudgeBadge({ score, reasoning }: { score?: string; reasoning?: string }) {
-  if (!score) return <span className="text-muted-foreground text-[12px]">-</span>;
+function LLMJudgeBadge({
+  score,
+  reasoning,
+}: {
+  score?: string;
+  reasoning?: string;
+}) {
+  if (!score)
+    return <span className="text-muted-foreground text-[12px]">-</span>;
 
   const scoreStr = String(score).toLowerCase();
   const passed = scoreStr === "true" || scoreStr === "1";
@@ -293,17 +427,33 @@ function LLMJudgeBadge({ score, reasoning }: { score?: string; reasoning?: strin
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-        passed
-          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-          : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-      }`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+          passed
+            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+            : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+        }`}
+      >
         {passed ? "Pass" : "Fail"}
       </span>
       <Tooltip content={tooltipContent}>
-        <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View reasoning">
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <button
+          type="button"
+          className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+          aria-label="View reasoning"
+        >
+          <svg
+            className="w-4 h-4 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </button>
       </Tooltip>
