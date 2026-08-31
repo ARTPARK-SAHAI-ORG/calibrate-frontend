@@ -108,6 +108,56 @@ describe("EditableRunName", () => {
     expect(JSON.parse(init.body)).toEqual({ name: null });
   });
 
+  it("saves with the Save button", async () => {
+    const user = setupUser();
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse({ task_id: "task-1", name: "Nightly models" }),
+    );
+    const onRenamed = jest.fn();
+
+    render(
+      <EditableRunName
+        taskId="task-1"
+        type="llm-benchmark"
+        name="Benchmark 2"
+        onRenamed={onRenamed}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    expect(screen.getByText("Rename the model comparison")).toBeInTheDocument();
+    await user.clear(screen.getByLabelText("Run name"));
+    await user.type(screen.getByLabelText("Run name"), "Nightly models");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(onRenamed).toHaveBeenCalledWith("Nightly models"),
+    );
+    expect(screen.queryByLabelText("Run name")).not.toBeInTheDocument();
+  });
+
+  it("closes without saving when Cancel is clicked", async () => {
+    const user = setupUser();
+    const onRenamed = jest.fn();
+
+    render(
+      <EditableRunName
+        taskId="task-1"
+        type="llm-unit-test"
+        name="Run 3"
+        onRenamed={onRenamed}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    await user.type(screen.getByLabelText("Run name"), " and more");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByLabelText("Run name")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(onRenamed).not.toHaveBeenCalled();
+  });
+
   it("leaves the name alone on Escape", async () => {
     const user = setupUser();
     const onRenamed = jest.fn();
@@ -179,6 +229,8 @@ describe("EditableRunName", () => {
       ),
     );
     expect(onRenamed).not.toHaveBeenCalled();
+    // The box stays up with the typed name in it, so it can be sent again.
+    expect(screen.getByLabelText("Run name")).toHaveValue("New name");
   });
 
   it("signs the user out when the session has expired", async () => {
