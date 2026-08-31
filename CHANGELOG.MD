@@ -1,5 +1,6 @@
 ## August 2026
 
+- Deleting a test no longer warns that it will be removed from other agents, since a test only ever belongs to the one agent it is on ([#516](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/516))
 - Deleting a test from an agent's Tests tab now removes that test from the whole workspace, not just from that agent ([#512](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/512))
 - You can now rename a test run or model comparison so it is easy to find again later ([#511](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/511))
 - You can now click a column heading on a speech-to-text or text-to-speech results table to sort the rows by that column ([#503](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/503))
