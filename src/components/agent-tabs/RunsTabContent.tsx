@@ -25,7 +25,6 @@ import {
   EvaluatorPillList,
   NamePillList,
 } from "@/components/EvaluatorPillList";
-import { ResizeHandle } from "@/components/test-results/shared";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -506,10 +505,15 @@ export function RunsTabContent({
                     className="relative text-left px-4 py-3 text-sm font-medium text-muted-foreground"
                   >
                     Run
-                    <ResizeHandle
+                    {/* Nothing to see until you reach for it: the edge takes
+                        a drag, and only then does it show. A visible line
+                        here read as a border the table did not need. */}
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize the Run column"
                       onMouseDown={runColumn.startDrag}
-                      label="Resize the Run column"
-                      className="absolute right-0 top-0 h-full"
+                      className="hidden md:block absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-accent active:bg-accent transition-colors"
                     />
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">

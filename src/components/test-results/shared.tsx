@@ -1283,12 +1283,9 @@ export function TestDetailView({
 export function ResizeHandle({
   onMouseDown,
   label,
-  className = "",
 }: {
   onMouseDown: (e: React.MouseEvent) => void;
   label: string;
-  /** Extra classes, for a handle that sits somewhere other than a flex row. */
-  className?: string;
 }) {
   return (
     <div
@@ -1296,7 +1293,7 @@ export function ResizeHandle({
       aria-orientation="vertical"
       aria-label={label}
       onMouseDown={onMouseDown}
-      className={`hidden md:block w-1 shrink-0 cursor-col-resize bg-border hover:bg-accent active:bg-accent transition-colors ${className}`}
+      className="hidden md:block w-1 shrink-0 cursor-col-resize bg-border hover:bg-accent active:bg-accent transition-colors"
     />
   );
 }
