@@ -274,6 +274,9 @@ export function BenchmarkResultsDialog({
         setActiveTab("outputs");
         setIsPublic(false);
         setShareToken(null);
+        // Cleared with the rest, or the run opened next reads the previous
+        // run's name until its first reply lands.
+        setRunName(null);
         setCurrentTaskId(taskId ?? null);
 
         if (taskId) {
