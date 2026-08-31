@@ -260,9 +260,6 @@ export default function DatasetDetailPage() {
                       </svg>
                     </button>
                   </Tooltip>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground uppercase">
-                    {dataset.dataset_type}
-                  </span>
                 </div>
                 <p className="text-muted-foreground text-sm mt-1">
                   {dataset.item_count} item{dataset.item_count !== 1 ? "s" : ""}
