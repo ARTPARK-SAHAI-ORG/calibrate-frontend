@@ -13,7 +13,6 @@ import {
 import {
   fetchAgentTestsPage,
   fetchAllAgentTests,
-  unlinkTestsFromAgent,
 } from "@/lib/agentTestsApi";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
@@ -366,14 +365,6 @@ export function TestsTabContent({
   const [testToDelete, setTestToDelete] = useState<TestData | null>(null);
   const [testsToDeleteBulk, setTestsToDeleteBulk] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  /**
-   * "remove": detach test from this agent only
-   * (POST /agent-tests/bulk-unlink).
-   * "permanent": delete the test record itself (DELETE /tests/{uuid}); affects all agents.
-   */
-  const [deleteMode, setDeleteMode] = useState<"remove" | "permanent">(
-    "remove",
-  );
 
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
@@ -1283,26 +1274,19 @@ export function TestsTabContent({
   };
 
   // Open delete confirmation dialog (single)
-  const openDeleteDialog = (
-    test: TestData,
-    mode: "remove" | "permanent" = "remove",
-  ) => {
+  const openDeleteDialog = (test: TestData) => {
     setTestToDelete(test);
     setTestsToDeleteBulk([]);
-    setDeleteMode(mode);
     setDeleteDialogOpen(true);
   };
 
   // Open bulk delete confirmation dialog
-  const openBulkDeleteDialog = async (
-    mode: "remove" | "permanent" = "remove",
-  ) => {
+  const openBulkDeleteDialog = async () => {
     if (selectedTestCount === 0) return;
     const uuids = await selectedTestUuidsForRemoval();
     if (uuids.length === 0) return;
     setTestToDelete(null);
     setTestsToDeleteBulk(uuids);
-    setDeleteMode(mode);
     setDeleteDialogOpen(true);
   };
 
@@ -1312,12 +1296,11 @@ export function TestsTabContent({
       setDeleteDialogOpen(false);
       setTestToDelete(null);
       setTestsToDeleteBulk([]);
-      setDeleteMode("remove");
     }
   };
 
-  // Remove test(s) from agent OR delete them permanently from the user's
-  // entire test library, depending on `deleteMode`.
+  // Delete the test(s) from the workspace. This tab has no detach-only
+  // action: deleting a test here takes it off every agent that uses it.
   const handleRemoveTest = async () => {
     const uuidsToRemove =
       testsToDeleteBulk.length > 0
@@ -1334,68 +1317,50 @@ export function TestsTabContent({
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      // Track which uuids the backend actually deleted in permanent mode —
-      // tests not owned by the caller are skipped server-side.
-      let actuallyDeleted: string[] = uuidsToRemove;
-
-      if (deleteMode === "permanent") {
-        // Single bulk call: handles 1 or many uuids; backend soft-deletes the
-        // test rows and cascades to every agent_tests link.
-        const response = await fetch(
-          `${backendUrl}/agent-tests/bulk-delete-tests`,
-          {
-            method: "POST",
-            headers: {
-              ...getDefaultHeaders(backendAccessToken),
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              agent_uuid: agentUuid,
-              test_uuids: uuidsToRemove,
-            }),
+      // Single bulk call: handles 1 or many uuids; backend soft-deletes the
+      // test rows and cascades to every agent_tests link.
+      const response = await fetch(
+        `${backendUrl}/agent-tests/bulk-delete-tests`,
+        {
+          method: "POST",
+          headers: {
+            ...getDefaultHeaders(backendAccessToken),
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            agent_uuid: agentUuid,
+            test_uuids: uuidsToRemove,
+          }),
+        },
+      );
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to delete test(s)");
-        }
-
-        const data: {
-          deleted_count: number;
-          deleted_test_uuids?: string[];
-        } = await response.json();
-        actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
-      } else {
-        // One call for the whole selection, however many were ticked.
-        await unlinkTestsFromAgent(
-          backendAccessToken as string,
-          agentUuid,
-          uuidsToRemove,
-        );
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error("Failed to delete test(s)");
+      }
+
+      const data: {
+        deleted_count: number;
+        deleted_test_uuids?: string[];
+      } = await response.json();
+      // Tests not owned by the caller are skipped server-side, so only the
+      // ones the backend names have gone.
+      const actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
 
       const removedSet = new Set(actuallyDeleted);
       handleTestsRemoved(actuallyDeleted.length);
-      // When deleting permanently, also drop the test from the "all tests"
-      // dropdown so it doesn't reappear as available to add.
-      if (deleteMode === "permanent") {
-        setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
-      }
+      // Also drop the test from the "add an existing test" list so it does
+      // not reappear as available to add.
+      setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
       setSelectedTestUuids(new Set());
       setSelectAllMatching(false);
       closeDeleteDialog();
     } catch (err) {
-      reportError(
-        deleteMode === "permanent"
-          ? "Error deleting test(s):"
-          : "Error removing test(s) from agent:",
-        err,
-      );
+      reportError("Error deleting test(s):", err);
     } finally {
       setIsDeleting(false);
     }
@@ -1880,11 +1845,11 @@ export function TestsTabContent({
                     Clear
                   </button>
                   <button
-                    onClick={() => void openBulkDeleteDialog("remove")}
-                    title="Detach from this agent only — the test stays in your library"
+                    onClick={() => void openBulkDeleteDialog()}
+                    title="Delete from your workspace, including every other agent that uses it"
                     className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
                   >
-                    Remove
+                    Delete
                   </button>
                   <CompareModelsButton
                     size="bulk"
@@ -2169,13 +2134,13 @@ export function TestsTabContent({
                               </svg>
                             </button>
                           </div>
-                          {/* Delete Button — opens a dialog whose checkbox upgrades the
-                          remove-from-agent action to a permanent library delete. */}
+                          {/* Delete Button — deletes the test from the
+                          workspace, not just off this agent. */}
                           <div className="flex items-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openDeleteDialog(test, "remove");
+                                openDeleteDialog(test);
                               }}
                               className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                               title="Delete test"
@@ -2290,7 +2255,7 @@ export function TestsTabContent({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openDeleteDialog(test, "remove");
+                                openDeleteDialog(test);
                               }}
                               className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                               title="Delete test"
@@ -2328,27 +2293,15 @@ export function TestsTabContent({
         }
         onClose={closeDeleteDialog}
         onConfirm={handleRemoveTest}
-        title={
-          deleteMode === "permanent"
-            ? testsToDeleteBulk.length > 0
-              ? "Delete tests permanently"
-              : "Delete test"
-            : testsToDeleteBulk.length > 0
-              ? "Remove tests"
-              : "Remove test"
-        }
+        title={testsToDeleteBulk.length > 0 ? "Delete tests" : "Delete test"}
         message={
-          deleteMode === "permanent"
-            ? testsToDeleteBulk.length > 0
-              ? `Are you sure you want to permanently delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from your library? This will remove them from every agent and cannot be undone.`
-              : `Permanently deleting this test will remove it from every agent that uses it and cannot be undone.`
-            : testsToDeleteBulk.length > 0
-              ? `Are you sure you want to remove ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from this agent?`
-              : `Are you sure you want to remove this test from this agent? It will stay in your test library and on any other agents that use it.`
+          testsToDeleteBulk.length > 0
+            ? `Are you sure you want to delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""}? They will be taken off every agent that uses them, and this cannot be undone.`
+            : `Are you sure you want to delete this test? It will be taken off every agent that uses it, and this cannot be undone.`
         }
         // Keep confirmText a single word — the dialog auto-suffixes "ing..." while
         // submitting by stripping a trailing 'e', which only works on one-token labels.
-        confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
+        confirmText="Delete"
         isDeleting={isDeleting}
       />
 

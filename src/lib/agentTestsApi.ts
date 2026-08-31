@@ -81,6 +81,10 @@ export async function fetchAgentTestsPage(
  * Take several tests off an agent in one call. The tests stay in the library
  * and on every other agent. A test that was never linked is not an error; it
  * simply is not counted.
+ *
+ * ponytail: no caller today — the agent Tests tab deletes instead of
+ * detaching. Kept because that default is meant to be revisited; delete this
+ * if detaching does not come back.
  */
 export async function unlinkTestsFromAgent(
   accessToken: string,
