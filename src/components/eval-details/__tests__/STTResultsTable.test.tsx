@@ -122,13 +122,15 @@ describe("STTResultsTable", () => {
     await user.click(screen.getByRole("button", { name: /Ascending/ }));
     expect(desktopRows()).toEqual(["first", "second"]);
 
-    // The rows are now largest first, so one more click on the WER heading
-    // puts them back in the order the run produced them, and the direction
-    // button goes away with it.
-    await user.click(screen.getByRole("button", { name: /WER/ }));
+    // The X next to the picker puts the rows back in the order the run
+    // produced them, and takes the direction button with it.
+    await user.click(screen.getByRole("button", { name: "Clear the metric" }));
     expect(desktopRows()).toEqual(["first", "second"]);
     expect(
       screen.queryByRole("button", { name: /Ascending|Descending/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Clear the metric" }),
     ).not.toBeInTheDocument();
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Tooltip } from "@/components/Tooltip";
 
 // Click-to-sort column headers, shared by the STT and TTS per-row results
 // tables so the two can't drift. Clicking a header sorts smallest first,
@@ -134,6 +135,30 @@ export function SortByControl({
           </svg>
         </div>
       </label>
+      {sort && (
+        <Tooltip content="Clear the metric and go back to the order the rows were run in">
+          <button
+            type="button"
+            aria-label="Clear the metric"
+            onClick={() => onChange(null)}
+            className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer inline-flex items-center justify-center"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </Tooltip>
+      )}
       {sort && (
         <button
           type="button"
