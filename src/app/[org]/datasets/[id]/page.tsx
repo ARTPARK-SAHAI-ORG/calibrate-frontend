@@ -36,9 +36,15 @@ export default function DatasetDetailPage() {
   const [dataset, setDataset] = useState<DatasetDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureError } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureError,
+  } = usePageErrorState();
   const [isSaving, setIsSaving] = useState(false);
+  // True while a zip's clips are still going up. Those rows have nothing to
+  // save yet, so Save waits for them.
+  const [isUploadingRows, setIsUploadingRows] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
   const sttEditorRef = useRef<STTDatasetEditorHandle | null>(null);
@@ -118,9 +124,12 @@ export default function DatasetDetailPage() {
       if (newRowsPayload.length > 0) {
         await addDatasetItems(accessToken, dataset.uuid, newRowsPayload);
       }
+      // Read the dataset back BEFORE clearing the editor. Clearing first
+      // takes the just-added rows off screen and leaves a gap until the
+      // refreshed list arrives.
+      await fetchDataset();
       editorRef.current?.clearDirtyUpdates();
       editorRef.current?.clearNewRows();
-      await fetchDataset();
       const parts: string[] = [];
       if (dirtyUpdates.length > 0)
         parts.push(
@@ -163,11 +172,29 @@ export default function DatasetDetailPage() {
 
         {errorCode ? (
           <NotFoundState errorCode={errorCode} />
-        ) : isLoading ? (
+        ) : isLoading && !dataset ? (
+          // Only the first load takes over the page. Refreshing after a save
+          // keeps the rows on screen: the spinner in the Save button already
+          // says the work is happening.
           <div className="flex items-center justify-center gap-3 py-8">
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
             </svg>
           </div>
         ) : error ? (
@@ -201,13 +228,17 @@ export default function DatasetDetailPage() {
                 {hasPendingChanges && (
                   <button
                     onClick={handleSave}
-                    disabled={isSaving}
+                    disabled={isSaving || isUploadingRows}
                     className="h-9 px-4 rounded-md text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm inline-flex items-center justify-center gap-2"
                   >
-                    {isSaving && (
+                    {(isSaving || isUploadingRows) && (
                       <SpinnerIcon className="w-4 h-4 animate-spin" />
                     )}
-                    {isSaving ? "Saving..." : "Save"}
+                    {isUploadingRows
+                      ? "Uploading..."
+                      : isSaving
+                        ? "Saving..."
+                        : "Save"}
                   </button>
                 )}
                 {dataset.item_count > 0 && !hasPendingChanges ? (
@@ -258,6 +289,7 @@ export default function DatasetDetailPage() {
                 )}
                 onDeleteSavedItem={handleDeleteItem}
                 onHasPendingChangesChange={setHasPendingChanges}
+                onUploadingChange={setIsUploadingRows}
                 maxRowsPerEval={maxRowsPerEval}
               />
             ) : (
