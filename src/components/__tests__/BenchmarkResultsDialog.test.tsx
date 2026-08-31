@@ -103,6 +103,8 @@ jest.mock("../ui", () => ({
     <button onClick={() => props.onStop()}>Stop</button>
   ),
   RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
+  // The real rename box, so renaming a run is exercised end to end here.
+  RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -481,9 +483,9 @@ describe("BenchmarkResultsDialog", () => {
       expect(screen.getByText("Model comparison 3")).toBeInTheDocument(),
     );
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.clear(screen.getByLabelText("Run name"));
+    await user.clear(screen.getByLabelText("Name"));
     await user.type(
-      screen.getByLabelText("Run name"),
+      screen.getByLabelText("Name"),
       "Nightly models{Enter}",
     );
 

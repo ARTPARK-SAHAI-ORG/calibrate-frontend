@@ -1556,9 +1556,9 @@ describe("tests that produced no answer", () => {
       );
 
       await user.click(await screen.findByRole("button", { name: "Rename" }));
-      await user.clear(screen.getByLabelText("Run name"));
+      await user.clear(screen.getByLabelText("Name"));
       await user.type(
-        screen.getByLabelText("Run name"),
+        screen.getByLabelText("Name"),
         "Regression before v2{Enter}",
       );
 

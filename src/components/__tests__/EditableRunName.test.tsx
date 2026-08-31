@@ -14,11 +14,6 @@ jest.mock("next-auth/react", () => ({
   signOut: (...args: unknown[]) => signOutMock(...args),
 }));
 
-const toastErrorMock = jest.fn();
-jest.mock("sonner", () => ({
-  toast: { error: (...args: unknown[]) => toastErrorMock(...args) },
-}));
-
 jest.mock("../../lib/reportError", () => ({
   reportError: jest.fn(),
 }));
@@ -69,7 +64,7 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    const input = screen.getByLabelText("Run name");
+    const input = screen.getByLabelText("Name");
     expect(input).toHaveValue("Evaluation run 3");
     await user.clear(input);
     await user.type(input, "Regression before v2{Enter}");
@@ -100,8 +95,8 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.clear(screen.getByLabelText("Run name"));
-    await user.type(screen.getByLabelText("Run name"), "{Enter}");
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "{Enter}");
 
     await waitFor(() => expect(onRenamed).toHaveBeenCalledWith("Benchmark 2"));
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
@@ -126,14 +121,14 @@ describe("EditableRunName", () => {
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
     expect(screen.getByText("Rename the run")).toBeInTheDocument();
-    await user.clear(screen.getByLabelText("Run name"));
-    await user.type(screen.getByLabelText("Run name"), "Nightly models");
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Nightly models");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(onRenamed).toHaveBeenCalledWith("Nightly models"),
     );
-    expect(screen.queryByLabelText("Run name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
   });
 
   it("sends the rename once when Enter is pressed twice", async () => {
@@ -157,11 +152,8 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.clear(screen.getByLabelText("Run name"));
-    await user.type(
-      screen.getByLabelText("Run name"),
-      "New name{Enter}{Enter}",
-    );
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "New name{Enter}{Enter}");
 
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
     await act(async () => {
@@ -184,10 +176,10 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.type(screen.getByLabelText("Run name"), " and more");
+    await user.type(screen.getByLabelText("Name"), " and more");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByLabelText("Run name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
     expect(onRenamed).not.toHaveBeenCalled();
   });
@@ -206,10 +198,7 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.type(
-      screen.getByLabelText("Run name"),
-      "Something else{Escape}",
-    );
+    await user.type(screen.getByLabelText("Name"), "Something else{Escape}");
 
     await waitFor(() =>
       expect(screen.getByText("Evaluation run 3")).toBeInTheDocument(),
@@ -231,7 +220,7 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.type(screen.getByLabelText("Run name"), "{Enter}");
+    await user.type(screen.getByLabelText("Name"), "{Enter}");
 
     await waitFor(() =>
       expect(screen.getByText("Evaluation run 3")).toBeInTheDocument(),
@@ -239,7 +228,7 @@ describe("EditableRunName", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("shows one message when the rename fails", async () => {
+  it("shows one message under the box when the rename fails", async () => {
     const user = setupUser();
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 404));
     const onRenamed = jest.fn();
@@ -254,17 +243,15 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.clear(screen.getByLabelText("Run name"));
-    await user.type(screen.getByLabelText("Run name"), "New name{Enter}");
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "New name{Enter}");
 
-    await waitFor(() =>
-      expect(toastErrorMock).toHaveBeenCalledWith(
-        "Could not rename the run. Please try again.",
-      ),
-    );
+    expect(
+      await screen.findByText("Could not rename the run. Please try again."),
+    ).toBeInTheDocument();
     expect(onRenamed).not.toHaveBeenCalled();
     // The box stays up with the typed name in it, so it can be sent again.
-    expect(screen.getByLabelText("Run name")).toHaveValue("New name");
+    expect(screen.getByLabelText("Name")).toHaveValue("New name");
   });
 
   it("signs the user out when the session has expired", async () => {
@@ -281,8 +268,8 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    await user.clear(screen.getByLabelText("Run name"));
-    await user.type(screen.getByLabelText("Run name"), "New name{Enter}");
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "New name{Enter}");
 
     await waitFor(() =>
       expect(signOutMock).toHaveBeenCalledWith({ callbackUrl: "/login" }),

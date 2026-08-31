@@ -67,6 +67,18 @@ describe("RenameDialog", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  it("can be cleared when the caller allows an empty name", async () => {
+    const user = setupUser();
+    props.onRename.mockResolvedValue(undefined);
+    render(<RenameDialog {...props} allowEmpty />);
+
+    await user.clear(screen.getByLabelText("Name"));
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(props.onRename).toHaveBeenCalledWith(""));
+  });
+
   it("saves on Enter and closes on Escape", async () => {
     const user = setupUser();
     props.onRename.mockResolvedValue(undefined);

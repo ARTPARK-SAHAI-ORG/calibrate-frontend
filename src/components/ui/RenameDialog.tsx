@@ -11,6 +11,11 @@ type RenameDialogProps = {
   /** The name as it stands. Reset every time the box opens. */
   initialName: string;
   maxLength?: number;
+  /**
+   * Allow saving an empty box, for a thing that has a name to fall back on
+   * when it has none of its own (a run goes back to "Run 3").
+   */
+  allowEmpty?: boolean;
   onClose: () => void;
   /**
    * Save the new name. Return a message to show under the box when it could
@@ -25,6 +30,7 @@ export function RenameDialog({
   title,
   initialName,
   maxLength = 50,
+  allowEmpty = false,
   onClose,
   onRename,
 }: RenameDialogProps) {
@@ -44,7 +50,7 @@ export function RenameDialog({
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed || isSaving) return;
+    if ((!trimmed && !allowEmpty) || isSaving) return;
     if (trimmed === initialName) {
       onClose();
       return;
@@ -99,7 +105,7 @@ export function RenameDialog({
             variant="primary"
             size="md"
             onClick={save}
-            disabled={!name.trim()}
+            disabled={!allowEmpty && !name.trim()}
             isLoading={isSaving}
             loadingText="Saving..."
           >
