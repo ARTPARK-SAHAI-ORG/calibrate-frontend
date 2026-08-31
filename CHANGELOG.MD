@@ -1,5 +1,6 @@
 ## August 2026
 
+- You can now rename a test run or model comparison so it is easy to find again later ([#511](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/511))
 - You can now click a column heading on a speech-to-text or text-to-speech results table to sort the rows by that column ([#503](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/503))
 - the workspace size limit for a run now applies everywhere a run can be started, including reruns and saved datasets, not only the two buttons that checked it before ([#390](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/390))
 - You can now stop a test run or model comparison while it is still going and keep the results it already collected, and past runs show whether they finished, were stopped, or broke ([#492](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/492))
