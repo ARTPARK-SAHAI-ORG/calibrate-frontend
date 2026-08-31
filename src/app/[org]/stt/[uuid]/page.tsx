@@ -49,7 +49,10 @@ import {
 } from "@/components/human-labelling/labellingSubmit";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
-import { ExportResultsButton, ExportColumn } from "@/components/ExportResultsButton";
+import {
+  ExportResultsButton,
+  ExportColumn,
+} from "@/components/ExportResultsButton";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -784,8 +787,8 @@ export default function STTEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Header row: language / dataset / status / Share / Retry,
-                all left-aligned. */}
+            {/* Header row: language / dataset / status on the left, the
+                action buttons on the right. */}
             <div className="flex items-center gap-3 flex-wrap">
               {evaluationResult.language && (
                 <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
@@ -816,134 +819,137 @@ export default function STTEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {/* Export per-row results to CSV. Placed before Share so the
-                  Export ↔ Share button order matches TestRunnerDialog /
-                  BenchmarkResultsDialog. One row per (provider, row);
-                  columns: reference / predicted text, WER, and one column
-                  per attached evaluator (binary → "true"/"false", rating →
-                  raw numeric score). Built at click time so it reflects
-                  the latest state if the user re-runs the page. */}
-              {evaluationResult.status === "done" &&
-                (evaluationResult.provider_results ?? []).some(
-                  (pr) => (pr.results?.length ?? 0) > 0,
-                ) && (
-                  <ExportResultsButton
-                    filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
-                    getRows={() => {
-                      const columns: ExportColumn[] = [
-                        { key: "provider", header: "Provider" },
-                        { key: "reference_text", header: "Reference text" },
-                        { key: "predicted_text", header: "Predicted text" },
-                        { key: "wer", header: "WER" },
-                        { key: "cer", header: "CER" },
-                        // Semantic WER, only when the run computed it.
-                        ...(hasSemanticWer
-                          ? [{ key: "semantic_wer", header: "Semantic WER" }]
-                          : []),
-                        // Sarvam LLM metrics, only when the run computed them.
-                        ...(hasSarvamMetrics
-                          ? SARVAM_METRIC_FIELDS.map((f) => ({
-                              key: f.csvKey,
-                              header: f.label,
-                            }))
-                          : []),
-                        ...evaluatorColumns.map((c) => ({
-                          key: c.key,
-                          header: c.label,
-                        })),
-                      ];
-                      const rows: Record<string, unknown>[] = [];
-                      for (const pr of evaluationResult.provider_results ??
-                        []) {
-                        for (const r of pr.results ?? []) {
-                          const row: Record<string, unknown> = {
-                            provider: getProviderLabel(pr.provider),
-                            reference_text: r.gt,
-                            predicted_text: r.pred,
-                            wer: r.wer,
-                            cer: r.cer,
-                            ...(hasSemanticWer
-                              ? { semantic_wer: r.semantic_wer ?? "" }
-                              : {}),
-                            ...(hasSarvamMetrics
-                              ? Object.fromEntries(
-                                  SARVAM_METRIC_FIELDS.map((f) => [
-                                    f.csvKey,
-                                    r[f.key] ?? "",
-                                  ]),
-                                )
-                              : {}),
-                          };
-                          // Read via `readEvaluatorCell` so the refreshed
-                          // `evaluator_outputs[<uuid>]` shape is preferred
-                          // over the legacy flat scoreField. Matches what
-                          // STTResultsTable renders on screen.
-                          for (const c of evaluatorColumns) {
-                            const { score, error } = readEvaluatorCell(
-                              r as unknown as Record<string, unknown>,
-                              c,
-                            );
-                            if (error || score === undefined) {
-                              row[c.key] = "";
-                              continue;
+              {/* Actions, pushed to the right of the labels. */}
+              <div className="flex items-center gap-3 flex-wrap ml-auto">
+                {/* Export per-row results to CSV. Placed before Share so the
+                    Export ↔ Share button order matches TestRunnerDialog /
+                    BenchmarkResultsDialog. One row per (provider, row);
+                    columns: reference / predicted text, WER, and one column
+                    per attached evaluator (binary → "true"/"false", rating →
+                    raw numeric score). Built at click time so it reflects
+                    the latest state if the user re-runs the page. */}
+                {evaluationResult.status === "done" &&
+                  (evaluationResult.provider_results ?? []).some(
+                    (pr) => (pr.results?.length ?? 0) > 0,
+                  ) && (
+                    <ExportResultsButton
+                      filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
+                      getRows={() => {
+                        const columns: ExportColumn[] = [
+                          { key: "provider", header: "Provider" },
+                          { key: "reference_text", header: "Reference text" },
+                          { key: "predicted_text", header: "Predicted text" },
+                          { key: "wer", header: "WER" },
+                          { key: "cer", header: "CER" },
+                          // Semantic WER, only when the run computed it.
+                          ...(hasSemanticWer
+                            ? [{ key: "semantic_wer", header: "Semantic WER" }]
+                            : []),
+                          // Sarvam LLM metrics, only when the run computed them.
+                          ...(hasSarvamMetrics
+                            ? SARVAM_METRIC_FIELDS.map((f) => ({
+                                key: f.csvKey,
+                                header: f.label,
+                              }))
+                            : []),
+                          ...evaluatorColumns.map((c) => ({
+                            key: c.key,
+                            header: c.label,
+                          })),
+                        ];
+                        const rows: Record<string, unknown>[] = [];
+                        for (const pr of evaluationResult.provider_results ??
+                          []) {
+                          for (const r of pr.results ?? []) {
+                            const row: Record<string, unknown> = {
+                              provider: getProviderLabel(pr.provider),
+                              reference_text: r.gt,
+                              predicted_text: r.pred,
+                              wer: r.wer,
+                              cer: r.cer,
+                              ...(hasSemanticWer
+                                ? { semantic_wer: r.semantic_wer ?? "" }
+                                : {}),
+                              ...(hasSarvamMetrics
+                                ? Object.fromEntries(
+                                    SARVAM_METRIC_FIELDS.map((f) => [
+                                      f.csvKey,
+                                      r[f.key] ?? "",
+                                    ]),
+                                  )
+                                : {}),
+                            };
+                            // Read via `readEvaluatorCell` so the refreshed
+                            // `evaluator_outputs[<uuid>]` shape is preferred
+                            // over the legacy flat scoreField. Matches what
+                            // STTResultsTable renders on screen.
+                            for (const c of evaluatorColumns) {
+                              const { score, error } = readEvaluatorCell(
+                                r as unknown as Record<string, unknown>,
+                                c,
+                              );
+                              if (error || score === undefined) {
+                                row[c.key] = "";
+                                continue;
+                              }
+                              if (c.outputType === "binary") {
+                                // Mirrors EvaluatorScoreCell: lowercase the
+                                // raw string before comparing so judges that
+                                // emit "True"/"TRUE" still register as Pass.
+                                const norm = score.toLowerCase();
+                                row[c.key] =
+                                  norm === "true" || norm === "1"
+                                    ? "true"
+                                    : "false";
+                              } else {
+                                const n = parseFloat(score);
+                                row[c.key] = Number.isFinite(n) ? n : score;
+                              }
                             }
-                            if (c.outputType === "binary") {
-                              // Mirrors EvaluatorScoreCell: lowercase the
-                              // raw string before comparing so judges that
-                              // emit "True"/"TRUE" still register as Pass.
-                              const norm = score.toLowerCase();
-                              row[c.key] =
-                                norm === "true" || norm === "1"
-                                  ? "true"
-                                  : "false";
-                            } else {
-                              const n = parseFloat(score);
-                              row[c.key] = Number.isFinite(n) ? n : score;
-                            }
+                            rows.push(row);
                           }
-                          rows.push(row);
                         }
-                      }
-                      return { columns, rows };
-                    }}
+                        return { columns, rows };
+                      }}
+                    />
+                  )}
+                {/* Sharing only makes sense once the run is complete — earlier
+                    state changes too quickly and a shared link would render
+                    partial results. */}
+                {evaluationResult.status === "done" && backendAccessToken && (
+                  <ShareButton
+                    entityType="stt"
+                    entityId={taskId}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={evaluationResult.is_public ?? false}
+                    initialShareToken={evaluationResult.share_token ?? null}
                   />
                 )}
-              {/* Sharing only makes sense once the run is complete — earlier
-                  state changes too quickly and a shared link would render
-                  partial results. */}
-              {evaluationResult.status === "done" && backendAccessToken && (
-                <ShareButton
-                  entityType="stt"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
-              {/* Send the selected per-row transcripts to a human-alignment
-                  (STT) task for labelling. Tick rows in the Outputs table
-                  first. Desktop-only, matching TestRunnerDialog. */}
-              {evaluationResult.status === "done" &&
-                sttLabellingEligibleCount > 0 && (
-                  <SubmitForLabellingButton
-                    count={sttLabellingRows.length}
-                    emptyMessage="Select one or more rows to submit for labelling"
-                    onOpen={() => setAddToTaskOpen(true)}
-                  />
-                )}
-              {evaluationResult.status === "failed" &&
-                backendAccessToken &&
-                evaluationResult.dataset_id && (
-                  <button
-                    onClick={handleRetry}
-                    disabled={retrying}
-                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <RetryIcon />
-                    {retrying ? "Retrying…" : "Retry"}
-                  </button>
-                )}
+                {/* Send the selected per-row transcripts to a human-alignment
+                    (STT) task for labelling. Tick rows in the Outputs table
+                    first. Desktop-only, matching TestRunnerDialog. */}
+                {evaluationResult.status === "done" &&
+                  sttLabellingEligibleCount > 0 && (
+                    <SubmitForLabellingButton
+                      count={sttLabellingRows.length}
+                      emptyMessage="Select one or more rows to submit for labelling"
+                      onOpen={() => setAddToTaskOpen(true)}
+                    />
+                  )}
+                {evaluationResult.status === "failed" &&
+                  backendAccessToken &&
+                  evaluationResult.dataset_id && (
+                    <button
+                      onClick={handleRetry}
+                      disabled={retrying}
+                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RetryIcon />
+                      {retrying ? "Retrying…" : "Retry"}
+                    </button>
+                  )}
+              </div>
             </div>
 
             {retryError && (

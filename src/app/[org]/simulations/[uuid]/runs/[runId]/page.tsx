@@ -1,7 +1,13 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { useAccessToken, usePageErrorState } from "@/hooks";
@@ -136,7 +142,7 @@ export default function SimulationRunPage() {
     }
 
     const currentSim = runData.simulation_results.find(
-      (sim) => sim.simulation_name === selectedSimulationKey
+      (sim) => sim.simulation_name === selectedSimulationKey,
     );
 
     if (!currentSim) {
@@ -327,7 +333,7 @@ export default function SimulationRunPage() {
       }
     }
     for (const [name, evaluatorUuid] of Object.entries(
-      simulationEvaluatorUuidByName
+      simulationEvaluatorUuidByName,
     )) {
       if (!(name in map)) map[name] = evaluatorUuid;
     }
@@ -350,25 +356,28 @@ export default function SimulationRunPage() {
         if (isSimulationLabellable(sim)) acc.push(String(i));
         return acc;
       }, []),
-    [runData]
+    [runData],
   );
-  const conversationLabellingResults: ConversationLabellingResult[] = useMemo(() => {
-    const out: ConversationLabellingResult[] = [];
-    const suffix = runId.slice(0, 8);
-    (runData?.simulation_results ?? []).forEach((sim, index) => {
-      if (!isSimulationLabellable(sim)) return;
-      if (!simLabellingSelected.has(String(index))) return;
-      const transcript = (sim.transcript ?? []).filter(
-        (t) => t.role !== "end_reason",
-      );
-      const baseName =
-        sim.simulation_name ||
-        [sim.persona?.label, sim.scenario?.name].filter(Boolean).join(" / ") ||
-        "Simulation";
-      out.push({ name: `${baseName} — ${suffix}`, transcript });
-    });
-    return out;
-  }, [runData, runId, simLabellingSelected]);
+  const conversationLabellingResults: ConversationLabellingResult[] =
+    useMemo(() => {
+      const out: ConversationLabellingResult[] = [];
+      const suffix = runId.slice(0, 8);
+      (runData?.simulation_results ?? []).forEach((sim, index) => {
+        if (!isSimulationLabellable(sim)) return;
+        if (!simLabellingSelected.has(String(index))) return;
+        const transcript = (sim.transcript ?? []).filter(
+          (t) => t.role !== "end_reason",
+        );
+        const baseName =
+          sim.simulation_name ||
+          [sim.persona?.label, sim.scenario?.name]
+            .filter(Boolean)
+            .join(" / ") ||
+          "Simulation";
+        out.push({ name: `${baseName} — ${suffix}`, transcript });
+      });
+      return out;
+    }, [runData, runId, simLabellingSelected]);
   const conversationLabellingEvaluators: SourceEvaluatorRef[] = useMemo(
     () =>
       dedupeSourceEvaluators(
@@ -411,7 +420,9 @@ export default function SimulationRunPage() {
   // own tab in the metric cards above.
   const displayMetricKeys = useMemo(() => {
     if (runData?.metrics) {
-      return Object.keys(runData.metrics).filter((k) => !LATENCY_KEYS.includes(k));
+      return Object.keys(runData.metrics).filter(
+        (k) => !LATENCY_KEYS.includes(k),
+      );
     }
     const keys = new Set<string>();
     (runData?.simulation_results ?? []).forEach((sim) => {
@@ -450,7 +461,7 @@ export default function SimulationRunPage() {
             accept: "application/json",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -485,7 +496,11 @@ export default function SimulationRunPage() {
       <Breadcrumbs items={crumbs} />
       {(runData?.status.toLowerCase() === "in_progress" ||
         runData?.status.toLowerCase() === "queued") && (
-        <svg className="w-5 h-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+        <svg
+          className="w-5 h-5 animate-spin flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
           <circle
             className="opacity-25"
             cx="12"
@@ -568,43 +583,46 @@ export default function SimulationRunPage() {
             <div className="flex items-center gap-2">
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
-                  runData.status
+                  runData.status,
                 )}`}
               >
                 {formatStatus(runData.status)}
               </span>
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(
-                  runData.type
+                  runData.type,
                 )}`}
               >
                 {runData.type}
               </span>
-              {isDone && backendAccessToken && (
-                <ShareButton
-                  entityType="simulation-run"
-                  entityId={runId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={runData.is_public ?? false}
-                  initialShareToken={runData.share_token ?? null}
-                />
-              )}
-              {/* Send the selected simulation transcripts to a
-                  human-alignment (conversation) task for labelling. Tick rows
-                  in the results table first. Desktop-only, matching
-                  TestRunnerDialog. */}
-              {showSimCheckboxes && (
-                <SubmitForLabellingButton
-                  count={conversationLabellingResults.length}
-                  emptyMessage="Select one or more simulations to submit for labelling"
-                  onOpen={() => setAddToTaskOpen(true)}
-                  className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                />
-              )}
-              {(runData.status.toLowerCase() === "in_progress" ||
-                runData.status.toLowerCase() === "queued") && (
-                <StopRunButton onStop={abortSimulation} />
-              )}
+              {/* Actions, pushed to the right of the labels. */}
+              <div className="flex items-center gap-2 flex-wrap ml-auto">
+                {isDone && backendAccessToken && (
+                  <ShareButton
+                    entityType="simulation-run"
+                    entityId={runId}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={runData.is_public ?? false}
+                    initialShareToken={runData.share_token ?? null}
+                  />
+                )}
+                {/* Send the selected simulation transcripts to a
+                    human-alignment (conversation) task for labelling. Tick rows
+                    in the results table first. Desktop-only, matching
+                    TestRunnerDialog. */}
+                {showSimCheckboxes && (
+                  <SubmitForLabellingButton
+                    count={conversationLabellingResults.length}
+                    emptyMessage="Select one or more simulations to submit for labelling"
+                    onOpen={() => setAddToTaskOpen(true)}
+                    className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                  />
+                )}
+                {(runData.status.toLowerCase() === "in_progress" ||
+                  runData.status.toLowerCase() === "queued") && (
+                  <StopRunButton onStop={abortSimulation} />
+                )}
+              </div>
             </div>
 
             {/* Error Message - show when simulation has failed */}

@@ -65,7 +65,10 @@ class FakeAudio {
 // ── fetch mocking (presigned URL + S3 PUT) ──────────────────────────────────
 let presignedStatus = 200;
 let presignedOk = true;
-let presignedBody: any = { presigned_url: "https://s3.test/put", s3_path: "s3/audio.wav" };
+let presignedBody: any = {
+  presigned_url: "https://s3.test/put",
+  s3_path: "s3/audio.wav",
+};
 let putOk = true;
 
 function makeFile(name = "sample.wav", content = "x", type = "audio/wav") {
@@ -87,7 +90,9 @@ function makeItem(overrides: Partial<DatasetItem> = {}): DatasetItem {
   };
 }
 
-function Harness(props: Partial<React.ComponentProps<typeof STTDatasetEditor>>) {
+function Harness(
+  props: Partial<React.ComponentProps<typeof STTDatasetEditor>>,
+) {
   const ref = React.useRef<STTDatasetEditorHandle>(null);
   (Harness as any).ref = ref;
   return <STTDatasetEditor accessToken="tok" {...props} ref={ref} />;
@@ -104,14 +109,13 @@ function rowFileInputs(container: HTMLElement) {
   return all.filter((el) => el.id !== "zip-upload-editor");
 }
 
-async function uploadWav(
-  container: HTMLElement,
-  file: File,
-  index = 0,
-) {
+async function uploadWav(container: HTMLElement, file: File, index = 0) {
   const input = rowFileInputs(container)[index];
   await act(async () => {
-    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    Object.defineProperty(input, "files", {
+      value: [file],
+      configurable: true,
+    });
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 0));
     await new Promise((r) => setTimeout(r, 0));
@@ -124,7 +128,10 @@ beforeEach(() => {
   mockAudioError = false;
   presignedStatus = 200;
   presignedOk = true;
-  presignedBody = { presigned_url: "https://s3.test/put", s3_path: "s3/audio.wav" };
+  presignedBody = {
+    presigned_url: "https://s3.test/put",
+    s3_path: "s3/audio.wav",
+  };
   putOk = true;
 
   (global as any).Audio = FakeAudio;
@@ -182,7 +189,10 @@ describe("STTDatasetEditor", () => {
     const input = rowFileInputs(container)[0];
     const badFile = makeFile("clip.mp3", "x", "audio/mp3");
     await act(async () => {
-      Object.defineProperty(input, "files", { value: [badFile], configurable: true });
+      Object.defineProperty(input, "files", {
+        value: [badFile],
+        configurable: true,
+      });
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(window.alert).toHaveBeenCalledWith("Please select a .wav file only");
@@ -413,7 +423,9 @@ describe("STTDatasetEditor", () => {
     // that are not "Add another sample" / "Replace" / upload buttons.
     const deleteButtons = screen
       .getAllByRole("button")
-      .filter((b) => b.className.includes("hover:bg-accent") && b.textContent === "");
+      .filter(
+        (b) => b.className.includes("hover:bg-accent") && b.textContent === "",
+      );
     await user.click(deleteButtons[0]);
 
     expect(screen.getByText("Clear row")).toBeInTheDocument();
@@ -421,9 +433,11 @@ describe("STTDatasetEditor", () => {
 
     await waitFor(() =>
       expect(
-        (screen.getAllByPlaceholderText(
-          "Enter reference transcription",
-        )[0] as HTMLInputElement).value,
+        (
+          screen.getAllByPlaceholderText(
+            "Enter reference transcription",
+          )[0] as HTMLInputElement
+        ).value,
       ).toBe(""),
     );
   });
@@ -440,14 +454,18 @@ describe("STTDatasetEditor", () => {
 
     const deleteButtons = screen
       .getAllByRole("button")
-      .filter((b) => b.className.includes("hover:bg-accent") && b.textContent === "");
+      .filter(
+        (b) => b.className.includes("hover:bg-accent") && b.textContent === "",
+      );
     await user.click(deleteButtons[0]);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(
-      (screen.getAllByPlaceholderText(
-        "Enter reference transcription",
-      )[0] as HTMLInputElement).value,
+      (
+        screen.getAllByPlaceholderText(
+          "Enter reference transcription",
+        )[0] as HTMLInputElement
+      ).value,
     ).toBe("some text");
   });
 
@@ -498,7 +516,11 @@ describe("STTDatasetEditor", () => {
     (global as any).fetch = jest.fn(async (url: string) => {
       if (typeof url === "string" && url.includes("/presigned-url")) {
         await held;
-        return { status: presignedStatus, ok: presignedOk, json: async () => presignedBody };
+        return {
+          status: presignedStatus,
+          ok: presignedOk,
+          json: async () => presignedBody,
+        };
       }
       return { ok: putOk };
     });
@@ -534,7 +556,9 @@ describe("STTDatasetEditor", () => {
 
     const deleteButtons = screen
       .getAllByRole("button")
-      .filter((b) => b.className.includes("hover:bg-accent") && b.textContent === "");
+      .filter(
+        (b) => b.className.includes("hover:bg-accent") && b.textContent === "",
+      );
     await user.click(deleteButtons[0]);
 
     expect(screen.getByText("Clear row")).toBeInTheDocument();
@@ -560,10 +584,16 @@ describe("STTDatasetEditor", () => {
     it("renders a playable audio element for http audio_path and a filename badge otherwise", () => {
       const savedItems = [
         makeItem({ uuid: "a", audio_path: "https://cdn.test/a.wav" }),
-        makeItem({ uuid: "b", audio_path: "s3://internal/b.wav", text: "Second" }),
+        makeItem({
+          uuid: "b",
+          audio_path: "s3://internal/b.wav",
+          text: "Second",
+        }),
       ];
       render(<Harness savedItems={savedItems} />);
-      expect(screen.getAllByRole("button", { name: "Play" }).length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByRole("button", { name: "Play" }).length,
+      ).toBeGreaterThan(0);
       expect(screen.getAllByText("b.wav").length).toBeGreaterThan(0);
     });
 
@@ -591,17 +621,49 @@ describe("STTDatasetEditor", () => {
       await waitFor(() => expect(getHandle().getDirtyUpdates()).toEqual([]));
     });
 
-    it("blocks deleting the last saved item with a toast", async () => {
+    const savedDeleteButtons = () =>
+      screen.queryAllByRole("button", { name: "Delete this item" });
+
+    it("counts the rows that are typed but not saved", async () => {
       const user = setupUser();
+      const onUnsavedRowCountChange = jest.fn();
+      render(
+        <Harness
+          savedItems={[makeItem({ uuid: "a" }), makeItem({ uuid: "b" })]}
+          onDeleteSavedItem={jest.fn()}
+          onUnsavedRowCountChange={onUnsavedRowCountChange}
+        />,
+      );
+      expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(0);
+
+      await user.type(
+        screen.getAllByPlaceholderText("Enter reference transcription")[0],
+        "a new line",
+      );
+      expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(1);
+    });
+
+    it("offers no delete on the last saved item, which cannot be deleted", () => {
       const savedItems = [makeItem({ uuid: "a" })];
       render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+      expect(savedDeleteButtons()).toHaveLength(0);
+    });
 
-      await user.click(screen.getAllByRole("button", { name: "" }).filter(
-        (b) => b.className.includes("hover:bg-accent"),
-      )[0]);
-      expect(toast.error).toHaveBeenCalledWith(
-        "Dataset must have at least 2 items.",
+    it("takes the delete off saved rows while there is unsaved work", async () => {
+      const user = setupUser();
+      const savedItems = [
+        makeItem({ uuid: "a" }),
+        makeItem({ uuid: "b", text: "Second" }),
+      ];
+      render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+      expect(savedDeleteButtons().length).toBeGreaterThan(0);
+
+      // Typing in the new row at the bottom is unsaved work.
+      await user.type(
+        screen.getAllByPlaceholderText("Enter reference transcription")[0],
+        "a new line",
       );
+      expect(savedDeleteButtons()).toHaveLength(0);
     });
 
     it("deletes a saved item through the confirmation dialog", async () => {
@@ -612,14 +674,16 @@ describe("STTDatasetEditor", () => {
         makeItem({ uuid: "b", text: "Second" }),
       ];
       render(
-        <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
+        <Harness
+          savedItems={savedItems}
+          onDeleteSavedItem={onDeleteSavedItem}
+        />,
       );
 
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter((b) => b.className.includes("hover:bg-accent") && !b.className.includes("border"));
-      await user.click(deleteBtns[0]);
-      expect(screen.getByText("Remove this item from the dataset?")).toBeInTheDocument();
+      await user.click(savedDeleteButtons()[0]);
+      expect(
+        screen.getByText("Remove this item from the dataset?"),
+      ).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Remove" }));
 
       await waitFor(() => expect(onDeleteSavedItem).toHaveBeenCalledWith("a"));
@@ -630,12 +694,12 @@ describe("STTDatasetEditor", () => {
       const onDeleteSavedItem = jest.fn().mockRejectedValue(new Error("boom"));
       const savedItems = [makeItem({ uuid: "a" }), makeItem({ uuid: "b" })];
       render(
-        <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
+        <Harness
+          savedItems={savedItems}
+          onDeleteSavedItem={onDeleteSavedItem}
+        />,
       );
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter((b) => b.className.includes("hover:bg-accent") && !b.className.includes("border"));
-      await user.click(deleteBtns[0]);
+      await user.click(savedDeleteButtons()[0]);
       await user.click(screen.getByRole("button", { name: "Remove" }));
 
       await waitFor(() =>
@@ -650,12 +714,12 @@ describe("STTDatasetEditor", () => {
       const onDeleteSavedItem = jest.fn();
       const savedItems = [makeItem({ uuid: "a" }), makeItem({ uuid: "b" })];
       render(
-        <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
+        <Harness
+          savedItems={savedItems}
+          onDeleteSavedItem={onDeleteSavedItem}
+        />,
       );
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter((b) => b.className.includes("hover:bg-accent") && !b.className.includes("border"));
-      await user.click(deleteBtns[0]);
+      await user.click(savedDeleteButtons()[0]);
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(onDeleteSavedItem).not.toHaveBeenCalled();
     });
@@ -729,7 +793,9 @@ describe("STTDatasetEditor", () => {
 
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining("must have a header and at least one data row"),
+          expect.stringContaining(
+            "must have a header and at least one data row",
+          ),
         ),
       );
     });
@@ -781,14 +847,38 @@ describe("STTDatasetEditor", () => {
           screen.getAllByPlaceholderText("Enter reference transcription"),
         ).toHaveLength(4),
       );
-      expect(screen.getAllByDisplayValue("First line").length).toBeGreaterThan(0);
-      expect(screen.getAllByDisplayValue("Second line").length).toBeGreaterThan(0);
+      expect(screen.getAllByDisplayValue("First line").length).toBeGreaterThan(
+        0,
+      );
+      expect(screen.getAllByDisplayValue("Second line").length).toBeGreaterThan(
+        0,
+      );
 
       await waitFor(() =>
         expect(global.fetch).toHaveBeenCalledWith(
           "http://backend.test/presigned-url",
           expect.objectContaining({ method: "POST" }),
         ),
+      );
+    });
+
+    it("reports it is uploading while the ZIP is read and the clips go up", async () => {
+      const onUploadingChange = jest.fn();
+      const { container } = render(
+        <Harness onUploadingChange={onUploadingChange} />,
+      );
+      onUploadingChange.mockClear();
+
+      const file = await buildZip({
+        csv: "audio_file,text\nsample_1.wav,First line",
+        files: { "audios/sample_1.wav": "fakewavbytes" },
+      });
+      await uploadZip(container, file);
+
+      // True while the clips were going up, false once they had all landed.
+      expect(onUploadingChange).toHaveBeenCalledWith(true);
+      await waitFor(() =>
+        expect(onUploadingChange).toHaveBeenLastCalledWith(false),
       );
     });
 
@@ -891,14 +981,19 @@ describe("STTDatasetEditor", () => {
             .length,
         ).toBeGreaterThan(0),
       );
-      expect(screen.getAllByDisplayValue("First line").length).toBeGreaterThan(0);
+      expect(screen.getAllByDisplayValue("First line").length).toBeGreaterThan(
+        0,
+      );
     });
 
     it("does nothing when no ZIP file is selected", async () => {
       const { container } = render(<Harness />);
       const input = await zipInput(container);
       await act(async () => {
-        Object.defineProperty(input, "files", { value: [], configurable: true });
+        Object.defineProperty(input, "files", {
+          value: [],
+          configurable: true,
+        });
         input.dispatchEvent(new Event("change", { bubbles: true }));
       });
       expect(toast.error).not.toHaveBeenCalled();

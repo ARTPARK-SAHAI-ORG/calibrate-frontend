@@ -1,6 +1,10 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
-import { STTResultsTable, type STTResultRow, type STTEvaluatorColumn } from "../STTResultsTable";
+import { render, screen, setupUser } from "@/test-utils";
+import {
+  STTResultsTable,
+  type STTResultRow,
+  type STTEvaluatorColumn,
+} from "../STTResultsTable";
 
 const baseRow: STTResultRow = {
   id: "1",
@@ -31,7 +35,11 @@ describe("STTResultsTable", () => {
   });
 
   it("shows audio column when a row has audio_url", () => {
-    render(<STTResultsTable results={[{ ...baseRow, audio_url: "https://example.com/a.wav" }]} />);
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, audio_url: "https://example.com/a.wav" }]}
+      />,
+    );
     expect(screen.getAllByText("Audio").length).toBeGreaterThan(0);
   });
 
@@ -49,27 +57,133 @@ describe("STTResultsTable", () => {
 
   it("shows empty-prediction fallback text and highlight when pred is blank/whitespace", () => {
     render(<STTResultsTable results={[{ ...baseRow, pred: "   " }]} />);
-    expect(screen.getAllByText("No transcript generated").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("No transcript generated").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("sorts the rows by a column when its header is clicked", async () => {
+    const user = setupUser();
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, gt: "first", wer: "0.9" },
+          { ...baseRow, gt: "second", wer: "0.1" },
+        ]}
+      />,
+    );
+    const werHeaderButton = screen.getByRole("button", { name: /WER/ });
+    // Desktop table only; the mobile cards keep the run's own order.
+    const desktopRows = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelectorAll("td")[1].textContent,
+      );
+
+    expect(desktopRows()).toEqual(["first", "second"]);
+    await user.click(werHeaderButton);
+    expect(desktopRows()).toEqual(["second", "first"]);
+    await user.click(werHeaderButton);
+    expect(desktopRows()).toEqual(["first", "second"]);
+  });
+
+  it("keeps a row's own number when sorting moves it", async () => {
+    const user = setupUser();
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, gt: "first", wer: "0.9" },
+          { ...baseRow, gt: "second", wer: "0.1" },
+        ]}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /WER/ }));
+    const topRow = document.querySelectorAll("tbody tr")[0];
+    expect(topRow.querySelectorAll("td")[0].textContent).toBe("2");
+  });
+
+  it("sorts from the Sort by picker above the table", async () => {
+    const user = setupUser();
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, gt: "first", wer: "0.9" },
+          { ...baseRow, gt: "second", wer: "0.1" },
+        ]}
+      />,
+    );
+    const desktopRows = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelectorAll("td")[1].textContent,
+      );
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "wer");
+    expect(desktopRows()).toEqual(["second", "first"]);
+
+    await user.click(screen.getByRole("button", { name: /Ascending/ }));
+    expect(desktopRows()).toEqual(["first", "second"]);
+
+    // The X next to the picker puts the rows back in the order the run
+    // produced them, and takes the direction button with it.
+    await user.click(screen.getByRole("button", { name: "Clear the metric" }));
+    expect(desktopRows()).toEqual(["first", "second"]);
+    expect(
+      screen.queryByRole("button", { name: /Ascending|Descending/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Clear the metric" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers only the measured columns in the Sort by picker", () => {
+    render(<STTResultsTable results={[baseRow]} showSimilarity={false} />);
+    const options = Array.from(
+      screen.getByLabelText("Sort by").querySelectorAll("option"),
+    ).map((o) => o.textContent);
+    // Only the measured columns; ID, audio, ground truth and prediction are
+    // not something to sort by.
+    expect(options).toEqual(["Pick a metric", "WER", "CER", "Evaluator"]);
   });
 
   it("renders Fail badge when llm_judge_score is falsy string", () => {
-    render(<STTResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />);
+    render(
+      <STTResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />,
+    );
     expect(screen.getAllByText("Fail").length).toBeGreaterThan(0);
   });
 
-  it("renders dash for missing llm_judge_score in legacy mode", () => {
-    render(<STTResultsTable results={[{ ...baseRow, llm_judge_score: undefined, llm_judge_reasoning: undefined }]} />);
-    // no llm_judge_score -> dash '-' rendered by LLMJudgeBadge in desktop, mobile omits pill
-    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  it("hides the evaluator column when no row was scored", () => {
+    render(
+      <STTResultsTable
+        results={[
+          {
+            ...baseRow,
+            llm_judge_score: undefined,
+            llm_judge_reasoning: undefined,
+          },
+        ]}
+      />,
+    );
+    // A run with no evaluators used to show an "Evaluator" column of dashes.
+    expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
   });
 
   it("falls back to 'Score: X' tooltip text when llm_judge_reasoning is missing", () => {
-    render(<STTResultsTable results={[{ ...baseRow, llm_judge_reasoning: undefined }]} />);
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, llm_judge_reasoning: undefined }]}
+      />,
+    );
     expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
   });
 
   it("renders dash for null wer/similarity", () => {
-    render(<STTResultsTable results={[{ ...baseRow, wer: undefined as any, string_similarity: undefined }]} />);
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, wer: undefined as any, string_similarity: undefined },
+        ]}
+      />,
+    );
     expect(screen.getAllByText("-").length).toBeGreaterThan(0);
   });
 
@@ -107,8 +221,21 @@ describe("STTResultsTable", () => {
 
   it("renders dynamic evaluator columns (binary + rating) from legacy flat fields", () => {
     const cols: STTEvaluatorColumn[] = [
-      { key: "semantic_match", label: "Semantic Match", outputType: "binary", scoreField: "semantic_match_score", reasoningField: "semantic_match_reasoning" },
-      { key: "quality", label: "Quality", outputType: "rating", scoreField: "quality_score", reasoningField: "quality_reasoning", scaleMax: 5 },
+      {
+        key: "semantic_match",
+        label: "Semantic Match",
+        outputType: "binary",
+        scoreField: "semantic_match_score",
+        reasoningField: "semantic_match_reasoning",
+      },
+      {
+        key: "quality",
+        label: "Quality",
+        outputType: "rating",
+        scoreField: "quality_score",
+        reasoningField: "quality_reasoning",
+        scaleMax: 5,
+      },
     ];
     render(
       <STTResultsTable
@@ -133,7 +260,12 @@ describe("STTResultsTable", () => {
 
   it("reads dynamic evaluator via evaluator_outputs uuid path and shows error badge", () => {
     const cols: STTEvaluatorColumn[] = [
-      { key: "ev1", label: "Ev1", outputType: "binary", evaluatorUuid: "uuid-1" },
+      {
+        key: "ev1",
+        label: "Ev1",
+        outputType: "binary",
+        evaluatorUuid: "uuid-1",
+      },
     ];
     render(
       <STTResultsTable
@@ -161,8 +293,18 @@ describe("STTResultsTable", () => {
 
   it("keeps evaluator columns that have a value in at least one row", () => {
     const cols: STTEvaluatorColumn[] = [
-      { key: "ev3", label: "Ev3", outputType: "binary", scoreField: "ev3_score" },
-      { key: "ev4", label: "Ev4", outputType: "binary", scoreField: "ev4_score" },
+      {
+        key: "ev3",
+        label: "Ev3",
+        outputType: "binary",
+        scoreField: "ev3_score",
+      },
+      {
+        key: "ev4",
+        label: "Ev4",
+        outputType: "binary",
+        scoreField: "ev4_score",
+      },
     ];
     render(
       <STTResultsTable
@@ -185,7 +327,8 @@ describe("STTResultsTable", () => {
             sarvam_llm_cer: 0.0321,
             sarvam_intent_score: 1,
             sarvam_entity_score: 0.8333,
-            sarvam_llm_wer_reasoning: '[{"segment":"foo","verdict":"equivalent"}]',
+            sarvam_llm_wer_reasoning:
+              '[{"segment":"foo","verdict":"equivalent"}]',
             sarvam_intent_reasoning: "Meaning preserved.",
             sarvam_entity_reasoning: "One entity slightly off.",
           },
@@ -239,7 +382,9 @@ describe("STTResultsTable", () => {
   it("renders only the Sarvam columns that are present (intent/entity without llm-wer/cer)", () => {
     render(
       <STTResultsTable
-        results={[{ ...baseRow, sarvam_intent_score: 0.5, sarvam_entity_score: 1 }]}
+        results={[
+          { ...baseRow, sarvam_intent_score: 0.5, sarvam_entity_score: 1 },
+        ]}
       />,
     );
     expect(screen.getAllByText("Intent Score").length).toBeGreaterThan(0);
@@ -249,9 +394,7 @@ describe("STTResultsTable", () => {
 
   it("accepts Sarvam metrics as stringified numbers", () => {
     render(
-      <STTResultsTable
-        results={[{ ...baseRow, sarvam_llm_wer: "0.5" }]}
-      />,
+      <STTResultsTable results={[{ ...baseRow, sarvam_llm_wer: "0.5" }]} />,
     );
     expect(screen.getAllByText("LLM-WER").length).toBeGreaterThan(0);
     // No reasoning provided → no tooltip trigger.
@@ -414,7 +557,10 @@ describe("STTResultsTable", () => {
 
     it("hides the Latency column when showMetrics=false", () => {
       render(
-        <STTResultsTable results={[{ ...baseRow, ttfs: 0.42 }]} showMetrics={false} />,
+        <STTResultsTable
+          results={[{ ...baseRow, ttfs: 0.42 }]}
+          showMetrics={false}
+        />,
       );
       expect(screen.queryByText("Latency (s)")).not.toBeInTheDocument();
     });

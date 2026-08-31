@@ -714,8 +714,8 @@ export default function TTSEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Header row: language / dataset / status / Share / Retry,
-                all left-aligned. */}
+            {/* Header row: language / dataset / status on the left, the
+                action buttons on the right. */}
             <div className="flex items-center gap-3 flex-wrap">
               {evaluationResult.language && (
                 <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
@@ -746,140 +746,145 @@ export default function TTSEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {/* Export per-row results as a zip containing `results.csv`
-                  (row id, audio_name, evaluator scores — same convention
-                  as the STT CSV) and an `audios/` folder of every
-                  synthesized clip. Each audio is named
-                  `<provider>_<row>.<ext>` so the audio_name CSV column
-                  points directly at the file inside the zip. Placed
-                  before Share so the Export ↔ Share ordering matches
-                  TestRunnerDialog / BenchmarkResultsDialog / STT. */}
-              {evaluationResult.status === "done" &&
-                (evaluationResult.provider_results ?? []).some(
-                  (pr) => (pr.results?.length ?? 0) > 0,
-                ) && (
-                  <ExportZipButton
-                    filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
-                    getContents={() => {
-                      const columns: ExportColumn[] = [
-                        { key: "provider", header: "Provider" },
-                        { key: "audio_name", header: "Audio name" },
-                        { key: "text", header: "Text" },
-                        ...evaluatorColumns.map((c) => ({
-                          key: c.key,
-                          header: c.label,
-                        })),
-                      ];
-                      const rows: Record<string, unknown>[] = [];
-                      const files: { path: string; url: string }[] = [];
-                      for (const pr of evaluationResult.provider_results ??
-                        []) {
-                        for (const r of pr.results ?? []) {
-                          // audio_path is rendered as <audio src=...> on the
-                          // page, so it's already a fetchable URL. Use the
-                          // path's extension if present; fall back to `.wav`
-                          // (the backend's default container) when the URL
-                          // has no extension or has querystring noise.
-                          const ext = (() => {
-                            try {
-                              const u = new URL(
-                                r.audio_path,
-                                window.location.origin,
+              {/* Actions, pushed to the right of the labels. */}
+              <div className="flex items-center gap-3 flex-wrap ml-auto">
+                {/* Export per-row results as a zip containing `results.csv`
+                    (row id, audio_name, evaluator scores — same convention
+                    as the STT CSV) and an `audios/` folder of every
+                    synthesized clip. Each audio is named
+                    `<provider>_<row>.<ext>` so the audio_name CSV column
+                    points directly at the file inside the zip. Placed
+                    before Share so the Export ↔ Share ordering matches
+                    TestRunnerDialog / BenchmarkResultsDialog / STT. */}
+                {evaluationResult.status === "done" &&
+                  (evaluationResult.provider_results ?? []).some(
+                    (pr) => (pr.results?.length ?? 0) > 0,
+                  ) && (
+                    <ExportZipButton
+                      filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
+                      getContents={() => {
+                        const columns: ExportColumn[] = [
+                          { key: "provider", header: "Provider" },
+                          { key: "audio_name", header: "Audio name" },
+                          { key: "text", header: "Text" },
+                          ...evaluatorColumns.map((c) => ({
+                            key: c.key,
+                            header: c.label,
+                          })),
+                        ];
+                        const rows: Record<string, unknown>[] = [];
+                        const files: { path: string; url: string }[] = [];
+                        for (const pr of evaluationResult.provider_results ??
+                          []) {
+                          for (const r of pr.results ?? []) {
+                            // audio_path is rendered as <audio src=...> on the
+                            // page, so it's already a fetchable URL. Use the
+                            // path's extension if present; fall back to `.wav`
+                            // (the backend's default container) when the URL
+                            // has no extension or has querystring noise.
+                            const ext = (() => {
+                              try {
+                                const u = new URL(
+                                  r.audio_path,
+                                  window.location.origin,
+                                );
+                                const m = u.pathname.match(/\.([a-z0-9]+)$/i);
+                                return m ? m[1].toLowerCase() : "wav";
+                              } catch {
+                                const m = r.audio_path.match(
+                                  /\.([a-z0-9]+)(?:\?|$)/i,
+                                );
+                                return m ? m[1].toLowerCase() : "wav";
+                              }
+                            })();
+                            const audioName = r.audio_path
+                              ? `${pr.provider}_${r.id}.${ext}`
+                              : "";
+                            const row: Record<string, unknown> = {
+                              provider: getProviderLabel(pr.provider),
+                              audio_name: audioName,
+                              text: r.text,
+                            };
+                            // Read via `readEvaluatorCell` so the refreshed
+                            // `evaluator_outputs[<uuid>]` shape is preferred
+                            // over the legacy flat scoreField. Matches what
+                            // TTSResultsTable renders on screen.
+                            for (const c of evaluatorColumns) {
+                              const { score, error } = readEvaluatorCell(
+                                r as unknown as Record<string, unknown>,
+                                c,
                               );
-                              const m = u.pathname.match(/\.([a-z0-9]+)$/i);
-                              return m ? m[1].toLowerCase() : "wav";
-                            } catch {
-                              const m = r.audio_path.match(/\.([a-z0-9]+)(?:\?|$)/i);
-                              return m ? m[1].toLowerCase() : "wav";
+                              if (error || score === undefined) {
+                                row[c.key] = "";
+                                continue;
+                              }
+                              if (c.outputType === "binary") {
+                                // Mirrors EvaluatorScoreCell: lowercase the
+                                // raw string before comparing so judges that
+                                // emit "True"/"TRUE" still register as Pass.
+                                const norm = score.toLowerCase();
+                                row[c.key] =
+                                  norm === "true" || norm === "1"
+                                    ? "true"
+                                    : "false";
+                              } else {
+                                const n = parseFloat(score);
+                                row[c.key] = Number.isFinite(n) ? n : score;
+                              }
                             }
-                          })();
-                          const audioName = r.audio_path
-                            ? `${pr.provider}_${r.id}.${ext}`
-                            : "";
-                          const row: Record<string, unknown> = {
-                            provider: getProviderLabel(pr.provider),
-                            audio_name: audioName,
-                            text: r.text,
-                          };
-                          // Read via `readEvaluatorCell` so the refreshed
-                          // `evaluator_outputs[<uuid>]` shape is preferred
-                          // over the legacy flat scoreField. Matches what
-                          // TTSResultsTable renders on screen.
-                          for (const c of evaluatorColumns) {
-                            const { score, error } = readEvaluatorCell(
-                              r as unknown as Record<string, unknown>,
-                              c,
-                            );
-                            if (error || score === undefined) {
-                              row[c.key] = "";
-                              continue;
+                            rows.push(row);
+                            if (audioName && r.audio_path) {
+                              files.push({
+                                path: `audios/${audioName}`,
+                                url: r.audio_path,
+                              });
                             }
-                            if (c.outputType === "binary") {
-                              // Mirrors EvaluatorScoreCell: lowercase the
-                              // raw string before comparing so judges that
-                              // emit "True"/"TRUE" still register as Pass.
-                              const norm = score.toLowerCase();
-                              row[c.key] =
-                                norm === "true" || norm === "1"
-                                  ? "true"
-                                  : "false";
-                            } else {
-                              const n = parseFloat(score);
-                              row[c.key] = Number.isFinite(n) ? n : score;
-                            }
-                          }
-                          rows.push(row);
-                          if (audioName && r.audio_path) {
-                            files.push({
-                              path: `audios/${audioName}`,
-                              url: r.audio_path,
-                            });
                           }
                         }
-                      }
-                      return {
-                        csv: { columns, rows },
-                        files,
-                      };
-                    }}
+                        return {
+                          csv: { columns, rows },
+                          files,
+                        };
+                      }}
+                    />
+                  )}
+                {/* Sharing only makes sense once the run is complete — earlier
+                    state changes too quickly and a shared link would render
+                    partial results. */}
+                {evaluationResult.status === "done" && backendAccessToken && (
+                  <ShareButton
+                    entityType="tts"
+                    entityId={taskId}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={evaluationResult.is_public ?? false}
+                    initialShareToken={evaluationResult.share_token ?? null}
                   />
                 )}
-              {/* Sharing only makes sense once the run is complete — earlier
-                  state changes too quickly and a shared link would render
-                  partial results. */}
-              {evaluationResult.status === "done" && backendAccessToken && (
-                <ShareButton
-                  entityType="tts"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
-              {/* Send the selected per-row (text, audio) pairs to a
-                  human-alignment (TTS) task for labelling. Tick rows in the
-                  Outputs table first. Desktop-only, matching STT. */}
-              {evaluationResult.status === "done" &&
-                ttsLabellingEligibleCount > 0 && (
-                  <SubmitForLabellingButton
-                    count={ttsLabellingRows.length}
-                    emptyMessage="Select one or more rows to submit for labelling"
-                    onOpen={() => setAddToTaskOpen(true)}
-                  />
-                )}
-              {evaluationResult.status === "failed" &&
-                backendAccessToken &&
-                evaluationResult.dataset_id && (
-                  <button
-                    onClick={handleRetry}
-                    disabled={retrying}
-                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <RetryIcon />
-                    {retrying ? "Retrying…" : "Retry"}
-                  </button>
-                )}
+                {/* Send the selected per-row (text, audio) pairs to a
+                    human-alignment (TTS) task for labelling. Tick rows in the
+                    Outputs table first. Desktop-only, matching STT. */}
+                {evaluationResult.status === "done" &&
+                  ttsLabellingEligibleCount > 0 && (
+                    <SubmitForLabellingButton
+                      count={ttsLabellingRows.length}
+                      emptyMessage="Select one or more rows to submit for labelling"
+                      onOpen={() => setAddToTaskOpen(true)}
+                    />
+                  )}
+                {evaluationResult.status === "failed" &&
+                  backendAccessToken &&
+                  evaluationResult.dataset_id && (
+                    <button
+                      onClick={handleRetry}
+                      disabled={retrying}
+                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RetryIcon />
+                      {retrying ? "Retrying…" : "Retry"}
+                    </button>
+                  )}
+              </div>
             </div>
 
             {retryError && (
