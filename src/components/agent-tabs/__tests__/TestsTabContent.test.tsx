@@ -326,30 +326,16 @@ function installFetch() {
         state.startRunInit,
       );
     }
-    if (url.includes("/agent-tests/bulk-unlink")) {
+    if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
-      if (!state.bulkUnlinkInit) {
-        // The tab re-asks for the page after a removal, so the fake backend
+      if (!state.bulkDeleteInit) {
+        // The tab re-asks for the page after a delete, so the fake backend
         // has to actually drop the rows.
         const removed = new Set<string>(body.test_uuids);
         state.agentTests = state.agentTests.filter(
           (t: any) => !removed.has(t.uuid),
         );
       }
-      return jsonResponse(
-        state.bulkUnlink ?? {
-          deleted_count: body.test_uuids.length,
-          message: "unlinked",
-        },
-        state.bulkUnlinkInit,
-      );
-    }
-    if (url.includes("/agent-tests/bulk-delete-tests")) {
-      const body = JSON.parse(opts.body);
-      const removed = new Set<string>(body.test_uuids);
-      state.agentTests = state.agentTests.filter(
-        (t: any) => !removed.has(t.uuid),
-      );
       return jsonResponse(
         state.bulkDelete ?? {
           deleted_count: body.test_uuids.length,
@@ -761,6 +747,27 @@ describe("TestsTabContent — paging", () => {
     );
   });
 
+  it("says so when the list of tests to delete cannot be read", async () => {
+    // Choosing every matching test asks the backend for their ids, so that
+    // read can fail on its own. The click must not be swallowed.
+    state.allAgentTestsInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Delete"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("removes every test, not only the page, once all are selected", async () => {
     const user = setupUser();
     renderComponent();
@@ -768,16 +775,16 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByText("Delete"));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
     await waitFor(() => {
-      const unlink = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      const deleted = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
       );
-      expect(unlink).toBeTruthy();
-      expect(JSON.parse(unlink![1].body).test_uuids).toHaveLength(12);
+      expect(deleted).toBeTruthy();
+      expect(JSON.parse(deleted![1].body).test_uuids).toHaveLength(12);
     });
   });
 
@@ -910,9 +917,9 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByTitle("Select all"));
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
-    expect(screen.getByText("Remove")).toBeInTheDocument();
-    // Deleting from the library is hidden for now; Remove detaches only.
-    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
+    // One removal action only: it deletes, it does not just detach.
+    expect(screen.queryByText("Remove")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Clear"));
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
@@ -1392,53 +1399,59 @@ describe("TestsTabContent — delete flows", () => {
     state.agentTests = [responseTest, toolCallTest];
   });
 
-  it("removes a single test from the agent (POST /agent-tests/bulk-unlink)", async () => {
+  it("deletes a single test from the workspace (POST /agent-tests/bulk-delete-tests)", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getAllByTitle("Delete test")[0]);
     await screen.findByTestId("delete-dialog");
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
+    expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
+    expect(screen.getByTestId("delete-message")).toHaveTextContent(
+      "taken off every agent that uses it",
+    );
     await user.click(screen.getByText("ConfirmDelete"));
 
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
     );
-    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
     );
-    expect(unlinkCalls).toHaveLength(1);
-    expect(unlinkCalls[0][1].method).toBe("POST");
-    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+    expect(deleteCalls).toHaveLength(1);
+    expect(deleteCalls[0][1].method).toBe("POST");
+    expect(JSON.parse(deleteCalls[0][1].body)).toEqual({
       agent_uuid: "agent-1",
       test_uuids: [responseTest.uuid],
     });
+    // Nothing on this tab only takes a test off the agent any more.
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      ),
+    ).toHaveLength(0);
   });
 
-  it("does not offer to delete a single test from the library", async () => {
+  it("does not offer a keep-in-the-library choice on a delete", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getAllByTitle("Delete test")[0]);
     await screen.findByTestId("delete-dialog");
-    // The window only takes the test off this agent now: no checkbox to turn
-    // it into a permanent library delete.
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
   });
 
-  it("bulk-removes selected tests", async () => {
+  it("bulk-deletes selected tests", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByText("Delete"));
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
-      "Remove tests",
+      "Delete tests",
     );
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1447,24 +1460,24 @@ describe("TestsTabContent — delete flows", () => {
     );
 
     // One call for the whole selection, not one per test.
-    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
     );
-    expect(unlinkCalls).toHaveLength(1);
-    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+    expect(deleteCalls).toHaveLength(1);
+    expect(JSON.parse(deleteCalls[0][1].body)).toEqual({
       agent_uuid: "agent-1",
       test_uuids: [responseTest.uuid, toolCallTest.uuid],
     });
   });
 
-  it("keeps the tests on screen when the unlink call fails", async () => {
-    state.bulkUnlinkInit = { ok: false, status: 500 };
+  it("keeps the tests on screen when the delete call fails", async () => {
+    state.bulkDeleteInit = { ok: false, status: 500 };
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByText("Delete"));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1473,11 +1486,31 @@ describe("TestsTabContent — delete flows", () => {
     await waitFor(() =>
       expect(
         (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
-          String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+          String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
         ),
       ).toHaveLength(1),
     );
     expect(screen.getByTestId("delete-dialog")).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
+    // ...and the window says what happened rather than looking unchanged.
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not delete these tests. Please try again.",
+    );
+  });
+
+  it("says so in the window when deleting one test fails", async () => {
+    state.bulkDeleteInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not delete this test. Please try again.",
+    );
     expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
   });
 
