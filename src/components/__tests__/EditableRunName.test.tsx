@@ -125,7 +125,7 @@ describe("EditableRunName", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    expect(screen.getByText("Rename the model comparison")).toBeInTheDocument();
+    expect(screen.getByText("Rename the run")).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Run name"));
     await user.type(screen.getByLabelText("Run name"), "Nightly models");
     await user.click(screen.getByRole("button", { name: "Save" }));

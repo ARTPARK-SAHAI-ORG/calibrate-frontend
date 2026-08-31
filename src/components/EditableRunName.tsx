@@ -104,9 +104,7 @@ export function EditableRunName({
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
-              {type === "llm-benchmark"
-                ? "Rename the model comparison"
-                : "Rename the evaluation run"}
+              Rename the run
             </h2>
             <input
               type="text"
