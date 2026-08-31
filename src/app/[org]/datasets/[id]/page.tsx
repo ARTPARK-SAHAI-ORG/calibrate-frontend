@@ -235,14 +235,31 @@ export default function DatasetDetailPage() {
             <div className="sticky top-0 z-10 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 -mt-4 md:-mt-6 pt-4 md:pt-6 pb-3 bg-background border-b border-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setIsRenaming(true)}
-                    title="Rename the dataset"
-                    className="text-xl md:text-2xl font-semibold text-left cursor-pointer hover:opacity-70 transition-opacity"
-                  >
+                  <h1 className="text-xl md:text-2xl font-semibold">
                     {dataset.name}
-                  </button>
+                  </h1>
+                  {/* Same pencil as the evaluator page's header. */}
+                  <Tooltip content="Rename the dataset" position="top">
+                    <button
+                      onClick={() => setIsRenaming(true)}
+                      aria-label="Rename the dataset"
+                      className="w-9 h-9 flex items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
+                        />
+                      </svg>
+                    </button>
+                  </Tooltip>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground uppercase">
                     {dataset.dataset_type}
                   </span>
@@ -268,7 +285,7 @@ export default function DatasetDetailPage() {
                         : "Save"}
                   </button>
                 )}
-                {dataset.item_count > 0 && !hasPendingChanges ? (
+                {dataset.item_count === 0 ? null : !hasPendingChanges ? (
                   <button
                     type="button"
                     onClick={() =>
@@ -282,11 +299,7 @@ export default function DatasetDetailPage() {
                   </button>
                 ) : (
                   <Tooltip
-                    content={
-                      hasPendingChanges
-                        ? "Save your changes before starting an evaluation."
-                        : "Add at least one row to run an evaluation."
-                    }
+                    content="Save your changes before starting an evaluation."
                     position="top"
                     className="flex-shrink-0"
                   >
@@ -362,7 +375,7 @@ export default function DatasetDetailPage() {
         onClose={stay}
         onConfirm={leave}
         title="Leave without saving?"
-        message="Your changes will be lost."
+        message="Your changes will be lost"
         confirmText="Leave"
       />
     </AppLayout>
