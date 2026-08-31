@@ -621,19 +621,30 @@ describe("STTDatasetEditor", () => {
       await waitFor(() => expect(getHandle().getDirtyUpdates()).toEqual([]));
     });
 
-    it("blocks deleting the last saved item with a toast", async () => {
-      const user = setupUser();
+    const savedDeleteButtons = () =>
+      screen.queryAllByRole("button", { name: "Delete this item" });
+
+    it("offers no delete on the last saved item, which cannot be deleted", () => {
       const savedItems = [makeItem({ uuid: "a" })];
       render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+      expect(savedDeleteButtons()).toHaveLength(0);
+    });
 
-      await user.click(
-        screen
-          .getAllByRole("button", { name: "" })
-          .filter((b) => b.className.includes("hover:bg-accent"))[0],
+    it("takes the delete off saved rows while there is unsaved work", async () => {
+      const user = setupUser();
+      const savedItems = [
+        makeItem({ uuid: "a" }),
+        makeItem({ uuid: "b", text: "Second" }),
+      ];
+      render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+      expect(savedDeleteButtons().length).toBeGreaterThan(0);
+
+      // Typing in the new row at the bottom is unsaved work.
+      await user.type(
+        screen.getAllByPlaceholderText("Enter reference transcription")[0],
+        "a new line",
       );
-      expect(toast.error).toHaveBeenCalledWith(
-        "Dataset must have at least 2 items.",
-      );
+      expect(savedDeleteButtons()).toHaveLength(0);
     });
 
     it("deletes a saved item through the confirmation dialog", async () => {
@@ -650,14 +661,7 @@ describe("STTDatasetEditor", () => {
         />,
       );
 
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter(
-          (b) =>
-            b.className.includes("hover:bg-accent") &&
-            !b.className.includes("border"),
-        );
-      await user.click(deleteBtns[0]);
+      await user.click(savedDeleteButtons()[0]);
       expect(
         screen.getByText("Remove this item from the dataset?"),
       ).toBeInTheDocument();
@@ -676,14 +680,7 @@ describe("STTDatasetEditor", () => {
           onDeleteSavedItem={onDeleteSavedItem}
         />,
       );
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter(
-          (b) =>
-            b.className.includes("hover:bg-accent") &&
-            !b.className.includes("border"),
-        );
-      await user.click(deleteBtns[0]);
+      await user.click(savedDeleteButtons()[0]);
       await user.click(screen.getByRole("button", { name: "Remove" }));
 
       await waitFor(() =>
@@ -703,14 +700,7 @@ describe("STTDatasetEditor", () => {
           onDeleteSavedItem={onDeleteSavedItem}
         />,
       );
-      const deleteBtns = screen
-        .getAllByRole("button", { name: "" })
-        .filter(
-          (b) =>
-            b.className.includes("hover:bg-accent") &&
-            !b.className.includes("border"),
-        );
-      await user.click(deleteBtns[0]);
+      await user.click(savedDeleteButtons()[0]);
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(onDeleteSavedItem).not.toHaveBeenCalled();
     });

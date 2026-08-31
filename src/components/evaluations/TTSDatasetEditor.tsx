@@ -71,16 +71,19 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Notify parent when there are pending changes
-    useEffect(() => {
-      const hasNewRows = newRows.some((r) => r.text.trim());
-      const hasDirty = savedItems.some(
+    // Changes the reader has made but not saved: an edited line, or a new row
+    // with anything in it.
+    const hasPendingChanges =
+      newRows.some((r) => r.text.trim()) ||
+      savedItems.some(
         (item) =>
           editedTexts[item.uuid] !== undefined &&
           editedTexts[item.uuid] !== item.text,
       );
-      onHasPendingChangesChange?.(hasNewRows || hasDirty);
-    }, [newRows, editedTexts, savedItems, onHasPendingChangesChange]);
+
+    useEffect(() => {
+      onHasPendingChangesChange?.(hasPendingChanges);
+    }, [hasPendingChanges, onHasPendingChangesChange]);
 
     // ── Imperative handle ──────────────────────────────────────────────────
 
@@ -111,7 +114,9 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
 
     const addRow = () => {
       if (newRows.length >= maxRowsPerEval) {
-        showLimitToast(`You can only add up to ${maxRowsPerEval} rows at a time.`);
+        showLimitToast(
+          `You can only add up to ${maxRowsPerEval} rows at a time.`,
+        );
         return;
       }
       const invalidIds = new Set<string>();
@@ -132,9 +137,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
     };
 
     const handleTextChange = (id: string, text: string) => {
-      setNewRows((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, text } : r)),
-      );
+      setNewRows((prev) => prev.map((r) => (r.id === id ? { ...r, text } : r)));
       if (text.trim()) {
         setInvalidRowIds((prev) => {
           const s = new Set(prev);
@@ -181,9 +184,14 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
           let current = "";
           let inQuotes = false;
           for (const char of lines[i]) {
-            if (char === '"') { inQuotes = !inQuotes; }
-            else if (char === "," && !inQuotes) { cols.push(current.trim()); current = ""; }
-            else { current += char; }
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === "," && !inQuotes) {
+              cols.push(current.trim());
+              current = "";
+            } else {
+              current += char;
+            }
           }
           cols.push(current.trim());
           const text = cols[textIdx]?.trim();
@@ -197,7 +205,9 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
           (r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH,
         );
         if (longRow) {
-          showLimitToast(`Text must be ${LIMITS.TTS_MAX_TEXT_LENGTH} characters or less.`);
+          showLimitToast(
+            `Text must be ${LIMITS.TTS_MAX_TEXT_LENGTH} characters or less.`,
+          );
           return;
         }
         if (parsed.length > 0) {
@@ -240,7 +250,9 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
               onChange={(e) => onDatasetNameChange?.(e.target.value)}
               placeholder="e.g. English TTS test set"
               className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
-                datasetNameInvalid ? "border-red-500 bg-red-500/10" : "border-border"
+                datasetNameInvalid
+                  ? "border-red-500 bg-red-500/10"
+                  : "border-border"
               }`}
             />
           </div>
@@ -267,23 +279,33 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
                   }
                   className="flex-1 h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30"
                 />
-                {onDeleteSavedItem && (
-                  <button
-                    title="Delete item"
-                    onClick={() => {
-                      if (savedItems.length <= 1) {
-                        toast.error("Dataset must have at least 2 items.");
-                        return;
-                      }
-                      setDeleteSavedId(item.uuid);
-                    }}
-                    className="flex-shrink-0 p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  </button>
-                )}
+                {/* Deleting a saved row happens on the server straight away.
+                    That cannot be offered next to unsaved work, and a dataset
+                    cannot be emptied, so the last remaining row keeps no
+                    button either. */}
+                {onDeleteSavedItem &&
+                  !hasPendingChanges &&
+                  savedItems.length > 1 && (
+                    <button
+                      title="Delete item"
+                      onClick={() => setDeleteSavedId(item.uuid)}
+                      className="flex-shrink-0 p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                        />
+                      </svg>
+                    </button>
+                  )}
               </div>
             );
           })}
@@ -320,8 +342,18 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
                     }}
                     className="flex-shrink-0 p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                      />
                     </svg>
                   </button>
                 )}
@@ -334,8 +366,18 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
             onClick={addRow}
             className="w-full h-10 px-4 text-[12px] font-medium border-t border-dashed border-border bg-muted/10 hover:bg-muted/30 transition-colors flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
             </svg>
             Add another row
           </button>
@@ -345,14 +387,27 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
         <div className="border border-border rounded-xl p-4 md:p-5 bg-muted/10">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              <svg
+                className="w-4 h-4 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                />
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-[13px] font-medium text-foreground mb-1">Upload CSV</h3>
+              <h3 className="text-[13px] font-medium text-foreground mb-1">
+                Upload CSV
+              </h3>
               <p className="text-[12px] text-muted-foreground mb-3">
-                Upload a CSV with a <code className="font-mono">text</code> column
+                Upload a CSV with a <code className="font-mono">text</code>{" "}
+                column
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -367,8 +422,18 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
                   htmlFor="tts-csv-upload"
                   className="h-8 px-3 rounded-md text-[12px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                    />
                   </svg>
                   Choose CSV
                 </label>
