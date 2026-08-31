@@ -24,6 +24,7 @@ import {
 } from "@/components/evaluations/TTSDatasetEditor";
 import { toast } from "sonner";
 import { Tooltip } from "@/components/Tooltip";
+import { SpinnerIcon } from "@/components/icons";
 
 export default function DatasetDetailPage() {
   const router = useRouter();
@@ -201,8 +202,11 @@ export default function DatasetDetailPage() {
                   <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="h-9 px-4 rounded-md text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    className="h-9 px-4 rounded-md text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm inline-flex items-center justify-center gap-2"
                   >
+                    {isSaving && (
+                      <SpinnerIcon className="w-4 h-4 animate-spin" />
+                    )}
                     {isSaving ? "Saving..." : "Save"}
                   </button>
                 )}
