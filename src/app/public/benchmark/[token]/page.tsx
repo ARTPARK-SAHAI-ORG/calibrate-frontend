@@ -19,13 +19,15 @@ import {
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { StoppedRunPill } from "@/components/ui";
-import { isRunStopped } from "@/lib/testTypes";
+import { isRunStopped, modelComparisonName } from "@/lib/testTypes";
 import { ResultTabs } from "@/components/ui";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
 type BenchmarkStatusResponse = {
   task_id: string;
   status: string;
+  /** What the run is called. Absent on a backend that predates naming. */
+  name?: string | null;
   model_results?: BenchmarkModelResult[];
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
@@ -118,7 +120,7 @@ export default function PublicBenchmarkPage() {
 
   return (
     <PublicPageLayout
-      title="LLM benchmark"
+      title={data.name ? modelComparisonName(data.name) : "LLM benchmark"}
       pills={isRunStopped(data) ? <StoppedRunPill /> : undefined}
       contentClassName="max-w-[92rem]"
     >

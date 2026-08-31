@@ -31,6 +31,7 @@ import {
 import { getDefaultHeaders } from "@/lib/api";
 import { abortRunOrNotify } from "@/lib/testRunApi";
 import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
+import { EditableRunName } from "@/components/EditableRunName";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -98,6 +99,9 @@ type BenchmarkResultsDialogProps = {
     testUuids: string[],
     testNames: string[],
   ) => void;
+  /** Called after the run is renamed, with the name as it now reads, so the
+   * list behind this window shows it too. */
+  onRenamed?: (name: string) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -113,6 +117,7 @@ export function BenchmarkResultsDialog({
   taskId,
   onBenchmarkCreated,
   onRerun,
+  onRenamed,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -665,9 +670,21 @@ export function BenchmarkResultsDialog({
                   state={wasStopped ? "stopped" : error ? "error" : "finished"}
                 />
               )}
-              <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                {modelComparisonName(runName)}
-              </h2>
+              {currentTaskId ? (
+                <EditableRunName
+                  taskId={currentTaskId}
+                  type="llm-benchmark"
+                  name={runName}
+                  onRenamed={(name) => {
+                    setRunName(name);
+                    onRenamed?.(name);
+                  }}
+                />
+              ) : (
+                <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+                  {modelComparisonName(runName)}
+                </h2>
+              )}
               {showRerunButton && handleRerunClick && (
                 <RerunIconButton
                   onClick={handleRerunClick}

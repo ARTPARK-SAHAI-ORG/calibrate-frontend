@@ -30,7 +30,12 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
-import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
+import {
+  isNotRun,
+  isRunStopped,
+  isUnanswered,
+  runDisplayName,
+} from "@/lib/testTypes";
 import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
@@ -54,6 +59,8 @@ type TestCaseResult = {
 type TestRunStatusResponse = {
   task_id: string;
   status: string;
+  /** What the run is called. Absent on a backend that predates naming. */
+  name?: string | null;
   total_tests?: number;
   passed?: number;
   failed?: number;
@@ -167,7 +174,11 @@ export default function PublicTestRunPage() {
 
   return (
     <PublicPageLayout
-      title="LLM component test"
+      title={
+        data.name
+          ? runDisplayName("llm-unit-test", data.name)
+          : "LLM component test"
+      }
       pills={wasStopped ? <StoppedRunPill /> : undefined}
       contentClassName="max-w-[92rem]"
     >

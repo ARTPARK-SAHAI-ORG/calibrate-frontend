@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   abortRun,
   abortRunOrNotify,
+  renameRun,
   startTestRun,
   startTestRunOrNotify,
   fetchTestRun,
@@ -218,6 +219,59 @@ describe("testRunApi", () => {
       await expect(
         fetchTestRun(BACKEND_URL, TOKEN, "task-1"),
       ).rejects.not.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe("renameRun", () => {
+    it("sends the trimmed name and returns the name as it now reads", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-1", name: "Regression before v2" }),
+      );
+
+      const name = await renameRun(
+        BACKEND_URL,
+        TOKEN,
+        "task-1",
+        "  Regression before v2  ",
+      );
+
+      expect(name).toBe("Regression before v2");
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe(`${BACKEND_URL}/agent-tests/run/task-1/name`);
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(init.body)).toEqual({ name: "Regression before v2" });
+    });
+
+    it("sends null for an empty name and returns the automatic one", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-1", name: "Run 3" }),
+      );
+
+      const name = await renameRun(BACKEND_URL, TOKEN, "task-1", "   ");
+
+      expect(name).toBe("Run 3");
+      const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(JSON.parse(init.body)).toEqual({ name: null });
+    });
+
+    it("throws UnauthorizedError on a 401", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+
+      await expect(
+        renameRun(BACKEND_URL, TOKEN, "task-1", "New name"),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+
+    it("throws when the run is not found", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 404),
+      );
+
+      await expect(
+        renameRun(BACKEND_URL, TOKEN, "task-1", "New name"),
+      ).rejects.toThrow("Failed to rename the run");
     });
   });
 
