@@ -657,10 +657,10 @@ describe("the Run column width", () => {
     renderTab();
     await screen.findAllByText("1 Success");
     const header = screen.getByRole("columnheader", { name: /Run/ });
-    const handle = screen.getByRole("separator", {
-      name: "Resize the Run column",
-    });
+    const handle = screen.getByTestId("run-column-resize");
     expect(header).toHaveStyle({ width: "240px" });
+    // The heading itself reads as "Run", with nothing about the drag edge.
+    expect(header).toHaveAccessibleName("Run");
 
     act(() => {
       handle.dispatchEvent(

@@ -508,10 +508,12 @@ export function RunsTabContent({
                     {/* Nothing to see until you reach for it: the edge takes
                         a drag, and only then does it show. A visible line
                         here read as a border the table did not need. */}
+                    {/* Hidden from a screen reader, which reads a heading's
+                        whole contents: a label here made the column announce
+                        itself as "Run Resize the Run column". */}
                     <div
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label="Resize the Run column"
+                      aria-hidden="true"
+                      data-testid="run-column-resize"
                       onMouseDown={runColumn.startDrag}
                       className="hidden md:block absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-accent active:bg-accent transition-colors"
                     />
