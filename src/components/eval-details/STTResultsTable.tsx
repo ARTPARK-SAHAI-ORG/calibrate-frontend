@@ -9,7 +9,7 @@ import {
 } from "./labellingSelectionColumn";
 import { EvaluatorScoreCell, readEvaluatorCell } from "./EvaluatorScoreCell";
 import { SARVAM_METRIC_FIELDS, type SarvamMetricField } from "./sarvamMetrics";
-import { SortableTh, useTableSort } from "./tableSort";
+import { SortableTh, SortByControl, useTableSort } from "./tableSort";
 
 // Per-row results table for STT. Two modes:
 //
@@ -302,7 +302,7 @@ export function STTResultsTable({
   // position, which is what the ID column shows and what the labelling
   // checkboxes are keyed by, so sorting never moves a selection to a
   // different row.
-  const { sort, toggleSort, sortRows } = useTableSort();
+  const { sort, setSort, toggleSort, sortRows } = useTableSort();
   const sortValue = (row: STTResultRow, key: string, index: number) => {
     if (key === "id") return index;
     if (key === "gt") return row.gt;
@@ -322,6 +322,35 @@ export function STTResultsTable({
     return readSarvamValue(row, key);
   };
   const orderedResults = sortRows(results, sortValue);
+  // The picker offers exactly the columns the table is showing, in the order
+  // they appear across it. Audio is left out: there is nothing to order it by.
+  const sortableColumns = [
+    { key: "id", label: "ID" },
+    { key: "gt", label: "Ground Truth" },
+    { key: "pred", label: "Prediction" },
+    ...(showMetrics
+      ? [
+          { key: "wer", label: "WER" },
+          { key: "cer", label: "CER" },
+          ...(hasSemanticWer
+            ? [{ key: "semantic_wer", label: "Semantic WER" }]
+            : []),
+          ...sarvamFields.map((f) => ({ key: f.key, label: f.label })),
+          ...(showSimilarity
+            ? [{ key: "string_similarity", label: "Similarity" }]
+            : []),
+          ...(hasTtfs ? [{ key: "ttfs", label: "Latency (s)" }] : []),
+          ...(useDynamic
+            ? visibleEvaluatorColumns.map((col) => ({
+                key: `evaluator:${col.key}`,
+                label: col.label,
+              }))
+            : hasLegacyJudge
+              ? [{ key: "llm_judge", label: judgeLabel }]
+              : []),
+        ]
+      : []),
+  ];
 
   // Labelling checkbox column (opt-in). Eligibility defaults to "row has
   // ground truth". The shared hook owns the derived state so this table and
@@ -364,6 +393,8 @@ export function STTResultsTable({
 
   return (
     <>
+      <SortByControl columns={sortableColumns} sort={sort} onChange={setSort} />
+
       {/* Desktop: Table layout */}
       <div
         className="hidden md:block border rounded-xl overflow-hidden"
@@ -633,7 +664,7 @@ export function STTResultsTable({
 
       {/* Mobile: Card layout */}
       <div className="md:hidden space-y-3">
-        {results.map((result, index) => {
+        {orderedResults.map(({ row: result, index }) => {
           const isEmptyPrediction = !result.pred || result.pred.trim() === "";
           // Header pill on mobile: in legacy mode shows the single LLM-judge
           // pass/fail; in dynamic mode it's omitted (each evaluator surfaces

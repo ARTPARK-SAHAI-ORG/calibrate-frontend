@@ -101,6 +101,50 @@ describe("STTResultsTable", () => {
     expect(topRow.querySelectorAll("td")[0].textContent).toBe("2");
   });
 
+  it("sorts from the Sort by picker above the table", async () => {
+    const user = setupUser();
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, gt: "first", wer: "0.9" },
+          { ...baseRow, gt: "second", wer: "0.1" },
+        ]}
+      />,
+    );
+    const desktopRows = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelectorAll("td")[1].textContent,
+      );
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "wer");
+    expect(desktopRows()).toEqual(["second", "first"]);
+
+    await user.click(screen.getByRole("button", { name: /Reverse the order/ }));
+    expect(desktopRows()).toEqual(["first", "second"]);
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "");
+    expect(desktopRows()).toEqual(["first", "second"]);
+    expect(
+      screen.queryByRole("button", { name: /Reverse the order/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers only the columns the table is showing in the Sort by picker", () => {
+    render(<STTResultsTable results={[baseRow]} showSimilarity={false} />);
+    const options = Array.from(
+      screen.getByLabelText("Sort by").querySelectorAll("option"),
+    ).map((o) => o.textContent);
+    expect(options).toEqual([
+      "The order they were run",
+      "ID",
+      "Ground Truth",
+      "Prediction",
+      "WER",
+      "CER",
+      "Evaluator",
+    ]);
+  });
+
   it("renders Fail badge when llm_judge_score is falsy string", () => {
     render(
       <STTResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />,

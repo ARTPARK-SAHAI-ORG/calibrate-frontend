@@ -52,6 +52,28 @@ describe("TTSResultsTable", () => {
     ).toBe("2");
   });
 
+  it("sorts from the Sort by picker above the table", async () => {
+    const user = setupUser();
+    render(
+      <TTSResultsTable
+        results={[
+          { ...baseRow, text: "second" },
+          { ...baseRow, text: "first" },
+        ]}
+      />,
+    );
+    const desktopRows = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelectorAll("td")[1].textContent,
+      );
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "text");
+    expect(desktopRows()).toEqual(["first", "second"]);
+
+    await user.click(screen.getByRole("button", { name: /Reverse the order/ }));
+    expect(desktopRows()).toEqual(["second", "first"]);
+  });
+
   it("renders Fail badge for a falsy legacy score", () => {
     render(
       <TTSResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />,

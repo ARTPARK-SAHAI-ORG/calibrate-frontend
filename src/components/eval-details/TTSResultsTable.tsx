@@ -8,7 +8,7 @@ import {
   LABELLING_CHECKBOX_COL_WIDTH,
 } from "./labellingSelectionColumn";
 import { EvaluatorScoreCell, readEvaluatorCell } from "./EvaluatorScoreCell";
-import { SortableTh, useTableSort } from "./tableSort";
+import { SortableTh, SortByControl, useTableSort } from "./tableSort";
 
 // Per-row results table for TTS. Two modes:
 //
@@ -131,7 +131,7 @@ export function TTSResultsTable({
   // position, which is what the ID column shows and what the labelling
   // checkboxes are keyed by, so sorting never moves a selection to a
   // different row.
-  const { sort, toggleSort, sortRows } = useTableSort();
+  const { sort, setSort, toggleSort, sortRows } = useTableSort();
   const sortValue = (row: TTSResultRow, key: string, index: number) => {
     if (key === "id") return index;
     if (key === "text") return row.text;
@@ -145,6 +145,22 @@ export function TTSResultsTable({
     return undefined;
   };
   const orderedResults = sortRows(results, sortValue);
+  // The picker offers exactly the columns the table is showing, in the order
+  // they appear across it. Audio is left out: there is nothing to order it by.
+  const sortableColumns = [
+    { key: "id", label: "ID" },
+    { key: "text", label: "Text" },
+    ...(showMetrics
+      ? useDynamic
+        ? evaluatorColumns!.map((col) => ({
+            key: `evaluator:${col.key}`,
+            label: col.label,
+          }))
+        : hasLegacyJudge
+          ? [{ key: "llm_judge", label: judgeLabel }]
+          : []
+      : []),
+  ];
 
   // Labelling checkbox column (opt-in). Eligibility defaults to "row has a
   // synthesized clip". The shared hook owns the derived state so this table
@@ -183,6 +199,8 @@ export function TTSResultsTable({
 
   return (
     <>
+      <SortByControl columns={sortableColumns} sort={sort} onChange={setSort} />
+
       {/* Desktop: Table layout */}
       <div className="hidden md:block border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -309,7 +327,7 @@ export function TTSResultsTable({
 
       {/* Mobile: Card layout */}
       <div className="md:hidden space-y-3">
-        {results.map((result, index) => {
+        {orderedResults.map(({ row: result, index }) => {
           // Header pill on mobile: in legacy mode shows the single LLM-judge
           // pass/fail; in dynamic mode it's omitted (each evaluator surfaces
           // its own pill / value below the metrics block instead).
