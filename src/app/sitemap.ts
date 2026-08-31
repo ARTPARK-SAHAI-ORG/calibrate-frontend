@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { POSTS } from "@/lib/blogPosts";
-import { SITE_URL } from "@/lib/site";
+import { CANONICAL_SITE_URL } from "@/lib/site";
 
 /** The pages worth finding that are not blog posts. */
 export const PAGES = ["/", "/learn", "/changelog", "/blog"];
@@ -26,9 +26,9 @@ export const BEHIND_SIGN_IN = ["[org]"];
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    ...PAGES.map((path) => ({ url: `${SITE_URL}${path}` })),
+    ...PAGES.map((path) => ({ url: `${CANONICAL_SITE_URL}${path}` })),
     ...POSTS.map((post) => ({
-      url: `${SITE_URL}/blog/${post.slug}`,
+      url: `${CANONICAL_SITE_URL}/blog/${post.slug}`,
       lastModified: post.date,
     })),
   ];

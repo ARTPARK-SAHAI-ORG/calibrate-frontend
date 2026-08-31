@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/site";
+import { IS_CANONICAL_SITE, SITE_URL } from "@/lib/site";
 
 /**
  * The first thing a search engine reads. Anything not listed here is open to
@@ -16,6 +16,14 @@ import { SITE_URL } from "@/lib/site";
  * shape of the app for nothing.
  */
 export default function robots(): MetadataRoute.Robots {
+  // Anyone can run this app on their own domain, and our own preview builds
+  // answer on throwaway addresses. Both serve a full copy of the blog. Left
+  // open, a copy competes with the real site for the same words and can win,
+  // so nothing on a copy is offered to a crawler and no sitemap is named.
+  if (!IS_CANONICAL_SITE) {
+    return { rules: { userAgent: "*", disallow: "/" } };
+  }
+
   return {
     rules: {
       userAgent: "*",

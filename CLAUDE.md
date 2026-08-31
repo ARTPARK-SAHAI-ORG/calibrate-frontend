@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Hit a block, say so immediately.** Anything outside the work that stops you — a git lock file, a port already in use, a missing `node_modules` in a fresh worktree, a dev server that will not start, a crashed background process — gets reported the moment you hit it, in one line, with what you need. One obvious retry is allowed. After that, stop and ask: do not try workarounds, and never delete, kill, or reset something to get past it without permission.
 
+> **Check it before you call it a risk.** Never end a report with a setting, a
+> server value, or a deploy detail for the user to go and confirm. Check it
+> yourself first: the site is public, so `curl https://calibrate.artpark.ai/...`
+> reads the live canonical link, the live `robots.txt`, or whatever else you
+> were about to ask about. If your change did not touch it and it was already
+> working in production, it is not a risk and does not belong in the report, the
+> commit message, or the pull request at all. No hypothetical failure sources.
+
 > **Abstract every fix; never patch just the one instance.** When the user points at a problem, don't fix only the exact line they quoted. Work out the underlying rule and apply it consistently to _every_ place it's relevant across your changes and the surrounding code. Then verify the whole set (grep/audit), don't eyeball one case. A fix that isn't generalized is incomplete and will read as sloppy, naive logic.
 
 ## Project
@@ -220,6 +228,25 @@ the changelog did this for months.
 The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) holds
 the list of pages against `PAGES` in the sitemap and fails when a page's preview
 address is not its own, or when two pages hand out the same words.
+
+### Only the hosted site is offered to search
+
+The code is open, so anyone can serve every blog post from their own domain,
+and our preview builds do the same on throwaway addresses. A search engine
+treats two identical pages as rivals and shows one, so a copy left open can
+take the credit for our writing.
+
+`CANONICAL_SITE_URL` in [src/lib/site.ts](src/lib/site.ts) is the real site,
+written out rather than read from the environment. Canonical links, `og:url`,
+the sitemap and the article facts a post hands Google are all built from it, so
+every copy points the credit back here. `IS_CANONICAL_SITE` is false whenever
+`NEXT_PUBLIC_APP_URL` names anything else: [robots.ts](src/app/robots.ts) then
+blocks every crawler and [layout.tsx](src/app/layout.tsx) adds `noindex`, which
+is the half that actually keeps a copy out.
+
+`SITE_URL` is still this build's own address and stays that way: it is what
+`metadataBase` and the robots.txt sitemap line need. Never write a public
+page's address from it.
 
 ### The picture a shared link shows
 
