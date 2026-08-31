@@ -52,6 +52,9 @@ export function EditableRunName({
   };
 
   const save = async () => {
+    // Enter is not held back the way the buttons are, so a second press while
+    // the first is still going would send the rename twice.
+    if (isSaving) return;
     const trimmed = draft.trim();
     // Nothing typed that differs from what is already on screen: no request,
     // so opening and closing the box cannot quietly store the name the app

@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, setupUser } from "@/test-utils";
-import { waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { EditableRunName } from "../EditableRunName";
 
 const useAccessTokenMock = jest.fn(() => "test-token");
@@ -134,6 +134,40 @@ describe("EditableRunName", () => {
       expect(onRenamed).toHaveBeenCalledWith("Nightly models"),
     );
     expect(screen.queryByLabelText("Run name")).not.toBeInTheDocument();
+  });
+
+  it("sends the rename once when Enter is pressed twice", async () => {
+    const user = setupUser();
+    let release: (value: unknown) => void = () => {};
+    (global.fetch as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const onRenamed = jest.fn();
+
+    render(
+      <EditableRunName
+        taskId="task-1"
+        type="llm-unit-test"
+        name="Run 3"
+        onRenamed={onRenamed}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    await user.clear(screen.getByLabelText("Run name"));
+    await user.type(
+      screen.getByLabelText("Run name"),
+      "New name{Enter}{Enter}",
+    );
+
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+    await act(async () => {
+      release(jsonResponse({ task_id: "task-1", name: "New name" }));
+    });
+    expect(onRenamed).toHaveBeenCalledTimes(1);
   });
 
   it("closes without saving when Cancel is clicked", async () => {
