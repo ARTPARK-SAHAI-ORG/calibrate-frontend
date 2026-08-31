@@ -1867,7 +1867,7 @@ export function TestsTabContent({
                   </button>
                   <button
                     onClick={() => void openBulkDeleteDialog()}
-                    title="Delete from your workspace, including every other agent that uses it"
+                    title="Delete the selected tests"
                     className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
                   >
                     Delete
@@ -2317,8 +2317,8 @@ export function TestsTabContent({
         title={testsToDeleteBulk.length > 0 ? "Delete tests" : "Delete test"}
         message={
           testsToDeleteBulk.length > 0
-            ? `Are you sure you want to delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""}? They will be taken off every agent that uses them, and this cannot be undone.`
-            : `Are you sure you want to delete this test? It will be taken off every agent that uses it, and this cannot be undone.`
+            ? `Are you sure you want to delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""}? This cannot be undone.`
+            : `Are you sure you want to delete this test? This cannot be undone.`
         }
         // Keep confirmText a single word — the dialog auto-suffixes "ing..." while
         // submitting by stripping a trailing 'e', which only works on one-token labels.

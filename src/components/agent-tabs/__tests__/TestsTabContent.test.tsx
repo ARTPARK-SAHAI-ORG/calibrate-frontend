@@ -1408,7 +1408,11 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
     expect(screen.getByTestId("delete-message")).toHaveTextContent(
-      "taken off every agent that uses it",
+      "Are you sure you want to delete this test? This cannot be undone.",
+    );
+    // A test belongs to one agent, so the window must not talk about others.
+    expect(screen.getByTestId("delete-message")).not.toHaveTextContent(
+      /every agent/i,
     );
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1452,6 +1456,9 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
       "Delete tests",
+    );
+    expect(screen.getByTestId("delete-message")).toHaveTextContent(
+      "Are you sure you want to delete 2 tests? This cannot be undone.",
     );
     await user.click(screen.getByText("ConfirmDelete"));
 
