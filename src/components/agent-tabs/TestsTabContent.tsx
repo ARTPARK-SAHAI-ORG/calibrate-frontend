@@ -10,10 +10,7 @@ import {
   useDialogUrlParam,
   usePageSize,
 } from "@/hooks";
-import {
-  fetchAgentTestsPage,
-  fetchAllAgentTests,
-} from "@/lib/agentTestsApi";
+import { fetchAgentTestsPage, fetchAllAgentTests } from "@/lib/agentTestsApi";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
@@ -365,6 +362,9 @@ export function TestsTabContent({
   const [testToDelete, setTestToDelete] = useState<TestData | null>(null);
   const [testsToDeleteBulk, setTestsToDeleteBulk] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Shown inside the confirmation window when the delete itself fails, so the
+  // reader is not left looking at an unchanged window.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
@@ -1277,16 +1277,30 @@ export function TestsTabContent({
   const openDeleteDialog = (test: TestData) => {
     setTestToDelete(test);
     setTestsToDeleteBulk([]);
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
   // Open bulk delete confirmation dialog
   const openBulkDeleteDialog = async () => {
     if (selectedTestCount === 0) return;
-    const uuids = await selectedTestUuidsForRemoval();
+    // When the reader chose every matching test, the ids come from the server
+    // rather than the rows on screen, so this step can fail on its own.
+    // Without the catch the click would open nothing and say nothing.
+    let uuids: string[];
+    try {
+      uuids = await selectedTestUuidsForRemoval();
+    } catch (err) {
+      reportError("Error reading which tests to delete:", err);
+      toast.error(
+        "Could not get the list of tests to delete. Please try again.",
+      );
+      return;
+    }
     if (uuids.length === 0) return;
     setTestToDelete(null);
     setTestsToDeleteBulk(uuids);
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
@@ -1296,6 +1310,7 @@ export function TestsTabContent({
       setDeleteDialogOpen(false);
       setTestToDelete(null);
       setTestsToDeleteBulk([]);
+      setDeleteError(null);
     }
   };
 
@@ -1312,6 +1327,7 @@ export function TestsTabContent({
 
     try {
       setIsDeleting(true);
+      setDeleteError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -1361,6 +1377,11 @@ export function TestsTabContent({
       closeDeleteDialog();
     } catch (err) {
       reportError("Error deleting test(s):", err);
+      setDeleteError(
+        uuidsToRemove.length > 1
+          ? "Could not delete these tests. Please try again."
+          : "Could not delete this test. Please try again.",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -2303,6 +2324,13 @@ export function TestsTabContent({
         // submitting by stripping a trailing 'e', which only works on one-token labels.
         confirmText="Delete"
         isDeleting={isDeleting}
+        extraContent={
+          deleteError ? (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {deleteError}
+            </p>
+          ) : null
+        }
       />
 
       {/* Create/edit test dialog. In create mode, submits via POST

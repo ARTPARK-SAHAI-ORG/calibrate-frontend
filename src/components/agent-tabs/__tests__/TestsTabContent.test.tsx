@@ -747,6 +747,27 @@ describe("TestsTabContent — paging", () => {
     );
   });
 
+  it("says so when the list of tests to delete cannot be read", async () => {
+    // Choosing every matching test asks the backend for their ids, so that
+    // read can fail on its own. The click must not be swallowed.
+    state.allAgentTestsInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByText("Delete"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("removes every test, not only the page, once all are selected", async () => {
     const user = setupUser();
     renderComponent();
@@ -1470,6 +1491,26 @@ describe("TestsTabContent — delete flows", () => {
       ).toHaveLength(1),
     );
     expect(screen.getByTestId("delete-dialog")).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
+    // ...and the window says what happened rather than looking unchanged.
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not delete these tests. Please try again.",
+    );
+  });
+
+  it("says so in the window when deleting one test fails", async () => {
+    state.bulkDeleteInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not delete this test. Please try again.",
+    );
     expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
   });
 
