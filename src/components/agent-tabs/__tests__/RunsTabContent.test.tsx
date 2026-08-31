@@ -651,3 +651,33 @@ describe("RunsTabContent", () => {
     ).toBeGreaterThan(0);
   }, 10000);
 });
+
+describe("the Run column width", () => {
+  it("gets wider when its edge is dragged right, and stops at the widest", async () => {
+    renderTab();
+    await screen.findAllByText("1 Success");
+    const header = screen.getByRole("columnheader", { name: /Run/ });
+    const handle = screen.getByRole("separator", {
+      name: "Resize the Run column",
+    });
+    expect(header).toHaveStyle({ width: "240px" });
+
+    act(() => {
+      handle.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, clientX: 100 }),
+      );
+      document.dispatchEvent(
+        new MouseEvent("mousemove", { bubbles: true, clientX: 160 }),
+      );
+    });
+    expect(header).toHaveStyle({ width: "300px" });
+
+    act(() => {
+      document.dispatchEvent(
+        new MouseEvent("mousemove", { bubbles: true, clientX: 9999 }),
+      );
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    expect(header).toHaveStyle({ width: "560px" });
+  }, 10000);
+});

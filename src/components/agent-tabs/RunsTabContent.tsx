@@ -7,6 +7,7 @@ import {
   useAgentRuns,
   useDialogUrlParam,
   usePageSize,
+  useResizableWidth,
   type AgentRun,
   type RunResultFilter,
   type RunTypeFilter,
@@ -24,6 +25,7 @@ import {
   EvaluatorPillList,
   NamePillList,
 } from "@/components/EvaluatorPillList";
+import { ResizeHandle } from "@/components/test-results/shared";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -365,6 +367,11 @@ export function RunsTabContent({
 
   const benchmarkRerun = useBenchmarkRerun();
 
+  // The Run column starts at the width that fits the longest automatic name
+  // ("Model comparison 999"), and can be dragged wider for runs people have
+  // renamed to something longer.
+  const runColumn = useResizableWidth(240, 140, 560);
+
   // Whichever run is open asks for itself, so the list stops asking for it.
   useEffect(() => {
     setPollSkip(openTestRunId ?? openBenchmarkRun?.uuid ?? null);
@@ -494,10 +501,16 @@ export function RunsTabContent({
             <table className="w-full table-fixed">
               <thead className="bg-muted/30">
                 <tr>
-                  {/* Wide enough for the longest name plus its mark, e.g.
-                      "Model comparison 999", without cutting it short. */}
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-60">
+                  <th
+                    style={{ width: runColumn.width }}
+                    className="relative text-left px-4 py-3 text-sm font-medium text-muted-foreground"
+                  >
                     Run
+                    <ResizeHandle
+                      onMouseDown={runColumn.startDrag}
+                      label="Resize the Run column"
+                      className="absolute right-0 top-0 h-full"
+                    />
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Result
