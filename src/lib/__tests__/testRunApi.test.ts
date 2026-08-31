@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import {
   abortRun,
   abortRunOrNotify,
+  deleteRun,
+  deleteRunOrNotify,
   renameRun,
   startTestRun,
   startTestRunOrNotify,
@@ -345,6 +347,76 @@ describe("testRunApi", () => {
       expect(signOut).not.toHaveBeenCalled();
       expect(toast.error).toHaveBeenCalledWith(
         "Could not stop the run. Please try again.",
+      );
+    });
+  });
+
+  describe("deleteRun", () => {
+    it("deletes through the one job route, for a run and a comparison alike", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ message: "Agent test job deleted successfully" }),
+      );
+
+      await deleteRun(BACKEND_URL, TOKEN, "task-1");
+
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe(`${BACKEND_URL}/agent-tests/job/task-1`);
+      expect(init.method).toBe("DELETE");
+      expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    });
+
+    it("throws UnauthorizedError on a 401", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+      await expect(
+        deleteRun(BACKEND_URL, TOKEN, "task-1"),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+
+    it("throws a plain Error when the run is already gone", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ detail: "Job not found" }, false, 404),
+      );
+      await expect(deleteRun(BACKEND_URL, TOKEN, "task-1")).rejects.toThrow(
+        "Failed to delete the run",
+      );
+    });
+  });
+
+  describe("deleteRunOrNotify", () => {
+    it("says the run was deleted", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}));
+
+      await expect(
+        deleteRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(true);
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("signs the user out on a 401 and says it did not delete", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+
+      await expect(
+        deleteRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(false);
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("shows one message on any other failure", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 500),
+      );
+
+      await expect(
+        deleteRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
+      ).resolves.toBe(false);
+      expect(signOut).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not delete the evaluation. Please try again.",
       );
     });
   });
