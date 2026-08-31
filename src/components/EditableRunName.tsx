@@ -123,11 +123,8 @@ export function EditableRunName({
                   close();
                 }
               }}
-              className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-2"
+              className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
             />
-            <p className="text-xs text-muted-foreground mb-4">
-              Leave it empty to go back to the automatic name.
-            </p>
             <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
                 type="button"
