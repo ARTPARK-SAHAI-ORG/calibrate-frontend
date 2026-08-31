@@ -3,12 +3,24 @@ import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "@/lib/nav";
-import { useAccessToken, useMaxRowsPerEval, usePageErrorState } from "@/hooks";
+import {
+  useAccessToken,
+  useMaxRowsPerEval,
+  usePageErrorState,
+  useUnsavedChangesPrompt,
+} from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { Breadcrumbs, NotFoundState, type Crumb } from "@/components/ui";
+import {
+  Breadcrumbs,
+  ConfirmDialog,
+  NotFoundState,
+  RenameDialog,
+  type Crumb,
+} from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   getDataset,
+  renameDataset,
   deleteDatasetItem,
   updateDatasetItem,
   addDatasetItems,
@@ -46,6 +58,10 @@ export default function DatasetDetailPage() {
   // save yet, so Save waits for them.
   const [isUploadingRows, setIsUploadingRows] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  // Changes live only in the editor until Save, so leaving the page loses them.
+  const { guard, isPrompting, stay, leave } =
+    useUnsavedChangesPrompt(hasPendingChanges);
 
   const sttEditorRef = useRef<STTDatasetEditorHandle | null>(null);
   const ttsEditorRef = useRef<TTSDatasetEditorHandle | null>(null);
@@ -155,13 +171,18 @@ export default function DatasetDetailPage() {
       href: `/${datasetType}`,
     },
     { label: "Datasets", href: `/${datasetType}?tab=datasets` },
-    { label: dataset?.name ?? "Dataset" },
+    {
+      label: dataset?.name ?? "Dataset",
+      ...(dataset
+        ? { onClick: () => setIsRenaming(true), title: "Rename the dataset" }
+        : {}),
+    },
   ];
 
   return (
     <AppLayout
       activeItem={datasetType}
-      onItemChange={(itemId) => router.push(`/${itemId}`)}
+      onItemChange={(itemId) => guard(() => router.push(`/${itemId}`))}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
       customHeader={<Breadcrumbs items={crumbs} />}
@@ -209,13 +230,19 @@ export default function DatasetDetailPage() {
           </div>
         ) : dataset ? (
           <>
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            {/* Header. Stays put while the rows scroll under it, so the Save
+                button is always in reach on a long dataset. */}
+            <div className="sticky top-0 z-10 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 -mt-4 md:-mt-6 pt-4 md:pt-6 pb-3 bg-background border-b border-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl md:text-2xl font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setIsRenaming(true)}
+                    title="Rename the dataset"
+                    className="text-xl md:text-2xl font-semibold text-left cursor-pointer hover:opacity-70 transition-opacity"
+                  >
                     {dataset.name}
-                  </h1>
+                  </button>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground uppercase">
                     {dataset.dataset_type}
                   </span>
@@ -306,6 +333,38 @@ export default function DatasetDetailPage() {
           </>
         ) : null}
       </div>
+
+      <RenameDialog
+        isOpen={isRenaming}
+        title="Rename the dataset"
+        initialName={dataset?.name ?? ""}
+        onClose={() => setIsRenaming(false)}
+        onRename={async (name) => {
+          if (!accessToken || !dataset) return;
+          try {
+            await renameDataset(accessToken, dataset.uuid, name);
+            setDataset((prev) => (prev ? { ...prev, name } : prev));
+            toast.success("Dataset renamed.");
+          } catch (err) {
+            // The backend refuses a name another dataset in this workspace
+            // already has.
+            if (err instanceof Error && err.message.includes("409")) {
+              return "A dataset with this name already exists.";
+            }
+            reportError("Failed to rename dataset:", err);
+            return "Could not rename the dataset. Please try again.";
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={isPrompting}
+        onClose={stay}
+        onConfirm={leave}
+        title="Leave without saving?"
+        message="Your changes will be lost."
+        confirmText="Leave"
+      />
     </AppLayout>
   );
 }
