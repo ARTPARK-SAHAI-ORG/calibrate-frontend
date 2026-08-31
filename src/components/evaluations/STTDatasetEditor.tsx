@@ -56,6 +56,8 @@ type Props = {
   onDeleteSavedItem?: (uuid: string) => Promise<void>;
   /** Called when pending changes (new rows or dirty transcripts) appear/disappear */
   onHasPendingChangesChange?: (has: boolean) => void;
+  /** Called with how many new rows are waiting to be saved. */
+  onUnsavedRowCountChange?: (count: number) => void;
   /** Called while audio is still being uploaded — reading a zip, or any row
    *  whose clip has not landed yet. Rows without an uploaded clip cannot be
    *  saved or run, so whatever consumes them must wait. */
@@ -83,6 +85,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       savedItems = [],
       onDeleteSavedItem,
       onHasPendingChangesChange,
+      onUnsavedRowCountChange,
       onUploadingChange,
       showDatasetName = false,
       datasetName = "",
@@ -109,6 +112,12 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
     const zipInputRef = useRef<HTMLInputElement>(null);
 
+    // Rows the reader has started but not saved. They are not in the dataset
+    // yet, so the page counts them separately from its item count.
+    const unsavedRowCount = newRows.filter(
+      (r) => r.s3Path || r.audioFile || r.text.trim(),
+    ).length;
+
     // Changes the reader has made but not saved: an edited transcript, or a
     // new row with anything in it.
     const hasPendingChanges =
@@ -116,11 +125,15 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         (item) =>
           editedTexts[item.uuid] !== undefined &&
           editedTexts[item.uuid] !== item.text,
-      ) || newRows.some((r) => r.s3Path || r.audioFile || r.text.trim());
+      ) || unsavedRowCount > 0;
 
     useEffect(() => {
       onHasPendingChangesChange?.(hasPendingChanges);
     }, [hasPendingChanges, onHasPendingChangesChange]);
+
+    useEffect(() => {
+      onUnsavedRowCountChange?.(unsavedRowCount);
+    }, [unsavedRowCount, onUnsavedRowCountChange]);
 
     // Tell the parent while audio is still going up: reading a zip, or any row
     // whose clip has not landed. A zip of a thousand clips takes minutes, and

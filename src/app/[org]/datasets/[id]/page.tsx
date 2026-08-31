@@ -59,6 +59,9 @@ export default function DatasetDetailPage() {
   const [isUploadingRows, setIsUploadingRows] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  // Rows typed but not saved. They are not in the dataset yet, so they are
+  // counted next to the item count rather than added into it.
+  const [unsavedRowCount, setUnsavedRowCount] = useState(0);
   // Changes live only in the editor until Save, so leaving the page loses them.
   const { guard, isPrompting, stay, leave } =
     useUnsavedChangesPrompt(hasPendingChanges);
@@ -263,6 +266,7 @@ export default function DatasetDetailPage() {
                 </div>
                 <p className="text-muted-foreground text-sm mt-1">
                   {dataset.item_count} item{dataset.item_count !== 1 ? "s" : ""}
+                  {unsavedRowCount > 0 && `, ${unsavedRowCount} not saved yet`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -326,6 +330,7 @@ export default function DatasetDetailPage() {
                 )}
                 onDeleteSavedItem={handleDeleteItem}
                 onHasPendingChangesChange={setHasPendingChanges}
+                onUnsavedRowCountChange={setUnsavedRowCount}
                 onUploadingChange={setIsUploadingRows}
                 maxRowsPerEval={maxRowsPerEval}
               />
@@ -337,6 +342,7 @@ export default function DatasetDetailPage() {
                 )}
                 onDeleteSavedItem={handleDeleteItem}
                 onHasPendingChangesChange={setHasPendingChanges}
+                onUnsavedRowCountChange={setUnsavedRowCount}
                 maxRowsPerEval={maxRowsPerEval}
               />
             )}

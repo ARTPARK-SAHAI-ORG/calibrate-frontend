@@ -624,6 +624,25 @@ describe("STTDatasetEditor", () => {
     const savedDeleteButtons = () =>
       screen.queryAllByRole("button", { name: "Delete this item" });
 
+    it("counts the rows that are typed but not saved", async () => {
+      const user = setupUser();
+      const onUnsavedRowCountChange = jest.fn();
+      render(
+        <Harness
+          savedItems={[makeItem({ uuid: "a" }), makeItem({ uuid: "b" })]}
+          onDeleteSavedItem={jest.fn()}
+          onUnsavedRowCountChange={onUnsavedRowCountChange}
+        />,
+      );
+      expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(0);
+
+      await user.type(
+        screen.getAllByPlaceholderText("Enter reference transcription")[0],
+        "a new line",
+      );
+      expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(1);
+    });
+
     it("offers no delete on the last saved item, which cannot be deleted", () => {
       const savedItems = [makeItem({ uuid: "a" })];
       render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);

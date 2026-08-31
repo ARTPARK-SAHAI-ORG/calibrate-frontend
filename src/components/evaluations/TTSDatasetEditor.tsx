@@ -37,6 +37,8 @@ type Props = {
   onDeleteSavedItem?: (uuid: string) => Promise<void>;
   /** Called when pending changes (new rows or dirty transcripts) appear/disappear */
   onHasPendingChangesChange?: (has: boolean) => void;
+  /** Called with how many new rows are waiting to be saved. */
+  onUnsavedRowCountChange?: (count: number) => void;
   /** Show the dataset name input at the top */
   showDatasetName?: boolean;
   datasetName?: string;
@@ -54,6 +56,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
       savedItems = [],
       onDeleteSavedItem,
       onHasPendingChangesChange,
+      onUnsavedRowCountChange,
       showDatasetName = false,
       datasetName = "",
       onDatasetNameChange,
@@ -71,10 +74,14 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Rows the reader has started but not saved. They are not in the dataset
+    // yet, so the page counts them separately from its item count.
+    const unsavedRowCount = newRows.filter((r) => r.text.trim()).length;
+
     // Changes the reader has made but not saved: an edited line, or a new row
     // with anything in it.
     const hasPendingChanges =
-      newRows.some((r) => r.text.trim()) ||
+      unsavedRowCount > 0 ||
       savedItems.some(
         (item) =>
           editedTexts[item.uuid] !== undefined &&
@@ -84,6 +91,10 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
     useEffect(() => {
       onHasPendingChangesChange?.(hasPendingChanges);
     }, [hasPendingChanges, onHasPendingChangesChange]);
+
+    useEffect(() => {
+      onUnsavedRowCountChange?.(unsavedRowCount);
+    }, [unsavedRowCount, onUnsavedRowCountChange]);
 
     // ── Imperative handle ──────────────────────────────────────────────────
 
