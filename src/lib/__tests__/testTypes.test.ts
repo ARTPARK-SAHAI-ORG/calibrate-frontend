@@ -104,6 +104,12 @@ describe("modelComparisonName", () => {
   it("leaves a name of its own alone", () => {
     expect(modelComparisonName("Nightly sweep")).toBe("Nightly sweep");
   });
+
+  it("leaves a typed name that starts with Benchmark alone", () => {
+    expect(modelComparisonName("Benchmark before v2")).toBe(
+      "Benchmark before v2",
+    );
+  });
 });
 
 describe("runDisplayName", () => {
@@ -120,6 +126,15 @@ describe("runDisplayName", () => {
   it("names a run the backend has not named yet", () => {
     expect(runDisplayName("llm-unit-test", "")).toBe("Evaluation run");
     expect(runDisplayName("llm-benchmark", null)).toBe("Model comparison");
+  });
+
+  it("leaves a typed name alone, including one that starts with Run", () => {
+    expect(runDisplayName("llm-unit-test", "Regression before v2")).toBe(
+      "Regression before v2",
+    );
+    expect(runDisplayName("llm-unit-test", "Run before the fix")).toBe(
+      "Run before the fix",
+    );
   });
 });
 

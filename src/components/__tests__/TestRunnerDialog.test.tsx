@@ -1493,4 +1493,79 @@ describe("tests that produced no answer", () => {
       ).not.toBeInTheDocument();
     });
   });
+  describe("naming the run", () => {
+    function mockRun(name: string | null) {
+      (global.fetch as jest.Mock).mockImplementation(
+        (url: string, init?: any) => {
+          if (url.includes("/evaluators?include_defaults=true")) {
+            return Promise.resolve(jsonResponse([]));
+          }
+          if (url.endsWith("/agent-tests/run/task-name/name")) {
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-name",
+                name: JSON.parse(init.body).name,
+              }),
+            );
+          }
+          if (url.endsWith("/agent-tests/run/task-name")) {
+            return Promise.resolve(
+              jsonResponse({
+                task_id: "task-name",
+                status: "completed",
+                name,
+                results: [
+                  { test_case_id: "test-1", name: "Test One", passed: true },
+                ],
+              }),
+            );
+          }
+          return Promise.reject(new Error(`Unexpected fetch ${url}`));
+        },
+      );
+    }
+
+    it("shows the run's own name", async () => {
+      mockRun("Run 4");
+      render(
+        <TestRunnerDialog
+          isOpen
+          onClose={jest.fn()}
+          agentUuid="agent-1"
+          agentName="My Agent"
+          taskId="task-name"
+        />,
+      );
+
+      expect(await screen.findByText("Evaluation run 4")).toBeInTheDocument();
+    });
+
+    it("puts a new name on screen and tells the parent about it", async () => {
+      mockRun("Run 4");
+      const onRenamed = jest.fn();
+      const user = setupUser();
+      render(
+        <TestRunnerDialog
+          isOpen
+          onClose={jest.fn()}
+          agentUuid="agent-1"
+          agentName="My Agent"
+          taskId="task-name"
+          onRenamed={onRenamed}
+        />,
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Rename" }));
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(
+        screen.getByLabelText("Name"),
+        "Regression before v2{Enter}",
+      );
+
+      expect(
+        await screen.findByText("Regression before v2"),
+      ).toBeInTheDocument();
+      expect(onRenamed).toHaveBeenCalledWith("Regression before v2");
+    });
+  });
 });

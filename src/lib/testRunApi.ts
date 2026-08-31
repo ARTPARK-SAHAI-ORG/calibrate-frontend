@@ -46,6 +46,8 @@ export type TestCaseResult = {
 export type TestRunStatusResponse = {
   task_id: string;
   status: string;
+  /** What the run is called. The automatic "Run 3" unless someone renamed it. */
+  name?: string | null;
   total_tests?: number;
   passed?: number;
   failed?: number;
@@ -171,6 +173,34 @@ export async function fetchTestRun(
   if (!response.ok) throw new Error("Failed to fetch test run");
 
   return response.json();
+}
+
+/**
+ * Rename a run, or clear the name back to the automatic one by passing an
+ * empty string. One route covers a plain evaluation run and a model
+ * comparison alike. Returns the name as it now reads, which for a cleared
+ * name is the automatic one the backend gives back (e.g. "Run 3").
+ */
+export async function renameRun(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  name: string,
+): Promise<string> {
+  const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}/name`, {
+    method: "PATCH",
+    headers: {
+      ...getDefaultHeaders(accessToken),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: name.trim() || null }),
+  });
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to rename the run");
+
+  const result: { name?: string | null } = await response.json();
+  return result.name ?? "";
 }
 
 /**

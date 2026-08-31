@@ -592,6 +592,7 @@ export function RunsTabContent({
             void refetch();
             openTestRun(taskId);
           }}
+          onRenamed={() => void refetch()}
         />
       )}
 
@@ -605,6 +606,7 @@ export function RunsTabContent({
           testNames={[]}
           models={[]}
           taskId={openBenchmarkRun.uuid}
+          onRenamed={() => void refetch()}
           onRerun={(models, testUuids, testNames) => {
             closeBenchmarkRun();
             benchmarkRerun.start({

@@ -103,6 +103,8 @@ jest.mock("../ui", () => ({
     <button onClick={() => props.onStop()}>Stop</button>
   ),
   RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
+  // The real rename box, so renaming a run is exercised end to end here.
+  RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -377,6 +379,118 @@ describe("BenchmarkResultsDialog", () => {
         String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
       ),
     ).toBe(false);
+  });
+
+  it("does not keep the previous run's name when the window opens another run", async () => {
+    let holdSecond: (value: any) => void = () => {};
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.endsWith("/agent-tests/benchmark/task-first")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-first",
+            status: "completed",
+            name: "Regression before v2",
+            model_results: [],
+          }),
+        );
+      }
+      if (url.endsWith("/agent-tests/benchmark/task-second")) {
+        return new Promise((resolve) => {
+          holdSecond = resolve;
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const { rerender } = render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-first"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Regression before v2")).toBeInTheDocument(),
+    );
+
+    // The same window is pointed at another run, whose reply has not arrived.
+    rerender(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-second"
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Regression before v2"),
+      ).not.toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      holdSecond(
+        jsonResponse({
+          task_id: "task-second",
+          status: "completed",
+          name: "Benchmark 2",
+          model_results: [],
+        }),
+      );
+    });
+    expect(await screen.findByText("Model comparison 2")).toBeInTheDocument();
+  });
+
+  it("renames a model comparison and tells the parent the new name", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (url: string, init?: any) => {
+        if (url.endsWith("/agent-tests/run/task-existing/name")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-existing",
+              name: JSON.parse(init.body).name,
+            }),
+          );
+        }
+        if (url.endsWith("/agent-tests/benchmark/task-existing")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-existing",
+              status: "completed",
+              name: "Benchmark 3",
+              model_results: [],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      },
+    );
+    const onRenamed = jest.fn();
+    const user = setupUser();
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-existing"
+        onRenamed={onRenamed}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Model comparison 3")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(
+      screen.getByLabelText("Name"),
+      "Nightly models{Enter}",
+    );
+
+    expect(await screen.findByText("Nightly models")).toBeInTheDocument();
+    expect(onRenamed).toHaveBeenCalledWith("Nightly models");
   });
 
   it("does not fetch and clears initial loading when models is empty and no taskId", async () => {

@@ -56,6 +56,7 @@ import {
   type TestCaseResult,
   type TestRunStatusResponse,
 } from "@/lib/testRunApi";
+import { EditableRunName } from "@/components/EditableRunName";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -94,6 +95,9 @@ type TestRunnerDialogProps = {
   /** Called after the user starts a fresh run from this dialog. The parent
    * re-points `taskId` at the new run, which this dialog then loads. */
   onNewRun?: (taskId: string, testUuids: string[]) => void;
+  /** Called after the run is renamed, with the name as it now reads, so the
+   * list behind this window shows it too. */
+  onRenamed?: (name: string) => void;
 };
 
 export function TestRunnerDialog({
@@ -103,6 +107,7 @@ export function TestRunnerDialog({
   agentName,
   taskId,
   onNewRun,
+  onRenamed,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -418,9 +423,15 @@ export function TestRunnerDialog({
                     const state = runStateOf(run);
                     return state ? <RunStateMark state={state} /> : null;
                   })()}
-                <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                  {"Evaluation run"}
-                </h2>
+                <EditableRunName
+                  taskId={taskId}
+                  type="llm-unit-test"
+                  name={run?.name}
+                  onRenamed={(name) => {
+                    setRun((prev) => (prev ? { ...prev, name } : prev));
+                    onRenamed?.(name);
+                  }}
+                />
                 {isFinished &&
                   onNewRun &&
                   runTestUuids.length > 0 && (

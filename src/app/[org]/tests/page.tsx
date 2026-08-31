@@ -479,6 +479,14 @@ function LLMPageInner() {
     };
   }, [activeTab, backendAccessToken]);
 
+  /** Put a renamed run's new name on its row, so the list behind the run
+   * window reads the same as the window. */
+  const renameRunInList = (uuid: string, name: string) => {
+    setAllRuns((prev) =>
+      prev.map((run) => (run.uuid === uuid ? { ...run, name } : run)),
+    );
+  };
+
   const handleRunClick = (run: AllRun) => {
     if (run.type === "llm-unit-test") {
       setOpenTestRun({
@@ -2031,6 +2039,7 @@ function LLMPageInner() {
           agentUuid={openTestRun.agentUuid}
           agentName={openTestRun.agentName}
           taskId={openTestRun.taskId}
+          onRenamed={(name) => renameRunInList(openTestRun.taskId, name)}
           onNewRun={(taskId, testUuids) => {
             prependOptimisticTestRun(
               taskId,
@@ -2069,6 +2078,7 @@ function LLMPageInner() {
           testNames={[]}
           models={[]}
           taskId={selectedRun.uuid}
+          onRenamed={(name) => renameRunInList(selectedRun.uuid, name)}
           onRerun={(models, testUuids, testNames) =>
             handleRerunBenchmark(
               selectedRun.agent_id,
