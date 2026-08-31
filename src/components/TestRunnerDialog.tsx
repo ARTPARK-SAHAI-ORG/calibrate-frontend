@@ -423,15 +423,20 @@ export function TestRunnerDialog({
                     const state = runStateOf(run);
                     return state ? <RunStateMark state={state} /> : null;
                   })()}
-                <EditableRunName
-                  taskId={taskId}
-                  type="llm-unit-test"
-                  name={run?.name}
-                  onRenamed={(name) => {
-                    setRun((prev) => (prev ? { ...prev, name } : prev));
-                    onRenamed?.(name);
-                  }}
-                />
+                {/* The name and its pencil wait for the run itself: an
+                    unloaded run would show the automatic name, which is not
+                    necessarily the name this run carries. */}
+                {!(isLoading && !run) && (
+                  <EditableRunName
+                    taskId={taskId}
+                    type="llm-unit-test"
+                    name={run?.name}
+                    onRenamed={(name) => {
+                      setRun((prev) => (prev ? { ...prev, name } : prev));
+                      onRenamed?.(name);
+                    }}
+                  />
+                )}
                 {isFinished &&
                   onNewRun &&
                   runTestUuids.length > 0 && (

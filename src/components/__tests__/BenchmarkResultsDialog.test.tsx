@@ -428,6 +428,12 @@ describe("BenchmarkResultsDialog", () => {
         screen.queryByText("Regression before v2"),
       ).not.toBeInTheDocument(),
     );
+    // Nothing stands in for the name while the run is on its way: no automatic
+    // name, no rename pencil.
+    expect(screen.queryByText("Model comparison")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       holdSecond(

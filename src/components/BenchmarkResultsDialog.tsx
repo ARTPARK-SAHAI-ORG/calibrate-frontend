@@ -673,7 +673,10 @@ export function BenchmarkResultsDialog({
                   state={wasStopped ? "stopped" : error ? "error" : "finished"}
                 />
               )}
-              {currentTaskId ? (
+              {/* The name and its pencil wait for the run itself: an unloaded
+                  run would show the automatic name, which is not necessarily
+                  the name this run carries. */}
+              {isInitialLoading ? null : currentTaskId ? (
                 <EditableRunName
                   taskId={currentTaskId}
                   type="llm-benchmark"

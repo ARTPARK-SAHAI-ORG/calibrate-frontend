@@ -180,9 +180,14 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
-    // Loading: spinner shown, no outputs panel yet.
+    // Loading: spinner shown, no outputs panel yet. The run's name and its
+    // rename pencil stay away until the run itself has arrived.
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       resolveRun(
@@ -203,6 +208,7 @@ describe("TestRunnerDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
+    expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
@@ -1003,7 +1009,10 @@ describe("TestRunnerDialog", () => {
         taskId="task-noenv"
       />,
     );
-    expect(await screen.findByText("Evaluation run")).toBeInTheDocument();
+    // Nothing is fetched, so the run never arrives and the window stays on its
+    // loading state: the agent name, no run name.
+    expect(await screen.findByText("My Agent")).toBeInTheDocument();
+    expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
