@@ -132,9 +132,7 @@ export function TTSResultsTable({
   // checkboxes are keyed by, so sorting never moves a selection to a
   // different row.
   const { sort, setSort, toggleSort, sortRows } = useTableSort();
-  const sortValue = (row: TTSResultRow, key: string, index: number) => {
-    if (key === "id") return index;
-    if (key === "text") return row.text;
+  const sortValue = (row: TTSResultRow, key: string) => {
     if (key === "llm_judge") return row.llm_judge_score;
     if (key.startsWith("evaluator:")) {
       const col = (evaluatorColumns ?? []).find(
@@ -145,11 +143,10 @@ export function TTSResultsTable({
     return undefined;
   };
   const orderedResults = sortRows(results, sortValue);
-  // The picker offers exactly the columns the table is showing, in the order
-  // they appear across it. Audio is left out: there is nothing to order it by.
+  // Only the measured columns can be sorted. A Text-to-Speech run measures
+  // nothing but its evaluators, so with no evaluators there is nothing to sort
+  // by and the picker hides itself.
   const sortableColumns = [
-    { key: "id", label: "ID" },
-    { key: "text", label: "Text" },
     ...(showMetrics
       ? useDynamic
         ? evaluatorColumns!.map((col) => ({
@@ -217,22 +214,18 @@ export function TTSResultsTable({
                     onBulkToggle={onLabellingBulkToggle}
                   />
                 )}
-                <SortableTh
-                  label="ID"
-                  sortKey="id"
-                  sort={sort}
-                  onToggle={toggleSort}
+                <th
                   style={{ width: TTS_COL_WIDTHS.id }}
                   className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
-                />
-                <SortableTh
-                  label="Text"
-                  sortKey="text"
-                  sort={sort}
-                  onToggle={toggleSort}
+                >
+                  ID
+                </th>
+                <th
                   style={{ width: TTS_COL_WIDTHS.text }}
                   className="px-4 py-3 text-left text-[12px] font-medium text-foreground"
-                />
+                >
+                  Text
+                </th>
                 <th
                   style={{ width: TTS_COL_WIDTHS.audio }}
                   className="px-4 py-3 text-left text-[12px] font-medium text-foreground"

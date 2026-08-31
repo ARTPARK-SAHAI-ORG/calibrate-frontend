@@ -106,7 +106,12 @@ export function SortByControl({
             }
             className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option value="">The order they were run</option>
+            {/* Until a metric is picked the rows stay in the order the run
+                produced them. Hidden from the list: it is a starting state,
+                not something to choose. */}
+            <option value="" disabled hidden>
+              Pick a metric
+            </option>
             {columns.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
@@ -143,7 +148,7 @@ export function SortByControl({
           <span aria-hidden className="text-[9px] leading-none">
             {sort.dir === "asc" ? "▲" : "▼"}
           </span>
-          Reverse the order
+          {sort.dir === "asc" ? "Ascending" : "Descending"}
         </button>
       )}
     </div>

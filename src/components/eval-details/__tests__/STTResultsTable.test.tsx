@@ -119,30 +119,27 @@ describe("STTResultsTable", () => {
     await user.selectOptions(screen.getByLabelText("Sort by"), "wer");
     expect(desktopRows()).toEqual(["second", "first"]);
 
-    await user.click(screen.getByRole("button", { name: /Reverse the order/ }));
+    await user.click(screen.getByRole("button", { name: /Ascending/ }));
     expect(desktopRows()).toEqual(["first", "second"]);
 
-    await user.selectOptions(screen.getByLabelText("Sort by"), "");
+    // The rows are now largest first, so one more click on the WER heading
+    // puts them back in the order the run produced them, and the direction
+    // button goes away with it.
+    await user.click(screen.getByRole("button", { name: /WER/ }));
     expect(desktopRows()).toEqual(["first", "second"]);
     expect(
-      screen.queryByRole("button", { name: /Reverse the order/ }),
+      screen.queryByRole("button", { name: /Ascending|Descending/ }),
     ).not.toBeInTheDocument();
   });
 
-  it("offers only the columns the table is showing in the Sort by picker", () => {
+  it("offers only the measured columns in the Sort by picker", () => {
     render(<STTResultsTable results={[baseRow]} showSimilarity={false} />);
     const options = Array.from(
       screen.getByLabelText("Sort by").querySelectorAll("option"),
     ).map((o) => o.textContent);
-    expect(options).toEqual([
-      "The order they were run",
-      "ID",
-      "Ground Truth",
-      "Prediction",
-      "WER",
-      "CER",
-      "Evaluator",
-    ]);
+    // Only the measured columns; ID, audio, ground truth and prediction are
+    // not something to sort by.
+    expect(options).toEqual(["Pick a metric", "WER", "CER", "Evaluator"]);
   });
 
   it("renders Fail badge when llm_judge_score is falsy string", () => {

@@ -25,53 +25,62 @@ describe("TTSResultsTable", () => {
     expect(screen.getAllByText("hello world").length).toBeGreaterThan(0);
   });
 
-  it("sorts the rows by a column when its header is clicked", async () => {
+  it("sorts the rows by an evaluator score, from the heading or the picker", async () => {
     const user = setupUser();
+    const cols: TTSEvaluatorColumn[] = [
+      {
+        key: "quality",
+        label: "Quality",
+        outputType: "rating",
+        scoreField: "quality_score",
+        reasoningField: "quality_reasoning",
+        scaleMax: 5,
+      },
+    ];
     render(
       <TTSResultsTable
         results={[
-          { ...baseRow, text: "second" },
-          { ...baseRow, text: "first" },
+          { ...baseRow, text: "second", quality_score: "5" },
+          { ...baseRow, text: "first", quality_score: "1" },
         ]}
+        evaluatorColumns={cols}
       />,
     );
-    const textHeaderButton = screen.getByRole("button", { name: /Text/ });
-    // Desktop table only; the mobile cards keep the run's own order.
     const desktopRows = () =>
       Array.from(document.querySelectorAll("tbody tr")).map(
         (tr) => tr.querySelectorAll("td")[1].textContent,
       );
 
     expect(desktopRows()).toEqual(["second", "first"]);
-    await user.click(textHeaderButton);
+    await user.click(screen.getByRole("button", { name: /Quality/ }));
     expect(desktopRows()).toEqual(["first", "second"]);
+
+    await user.selectOptions(
+      screen.getByLabelText("Sort by"),
+      "evaluator:quality",
+    );
+    await user.click(screen.getByRole("button", { name: /Ascending/ }));
+    expect(desktopRows()).toEqual(["second", "first"]);
     // The row keeps the number it had before the sort moved it.
     expect(
       document.querySelectorAll("tbody tr")[0].querySelectorAll("td")[0]
         .textContent,
-    ).toBe("2");
+    ).toBe("1");
   });
 
-  it("sorts from the Sort by picker above the table", async () => {
-    const user = setupUser();
+  it("hides the Sort by picker when the run measured nothing", () => {
     render(
       <TTSResultsTable
         results={[
-          { ...baseRow, text: "second" },
-          { ...baseRow, text: "first" },
+          {
+            ...baseRow,
+            llm_judge_score: undefined,
+            llm_judge_reasoning: undefined,
+          },
         ]}
       />,
     );
-    const desktopRows = () =>
-      Array.from(document.querySelectorAll("tbody tr")).map(
-        (tr) => tr.querySelectorAll("td")[1].textContent,
-      );
-
-    await user.selectOptions(screen.getByLabelText("Sort by"), "text");
-    expect(desktopRows()).toEqual(["first", "second"]);
-
-    await user.click(screen.getByRole("button", { name: /Reverse the order/ }));
-    expect(desktopRows()).toEqual(["second", "first"]);
+    expect(screen.queryByLabelText("Sort by")).not.toBeInTheDocument();
   });
 
   it("renders Fail badge for a falsy legacy score", () => {

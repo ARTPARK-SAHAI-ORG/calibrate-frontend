@@ -303,10 +303,7 @@ export function STTResultsTable({
   // checkboxes are keyed by, so sorting never moves a selection to a
   // different row.
   const { sort, setSort, toggleSort, sortRows } = useTableSort();
-  const sortValue = (row: STTResultRow, key: string, index: number) => {
-    if (key === "id") return index;
-    if (key === "gt") return row.gt;
-    if (key === "pred") return row.pred;
+  const sortValue = (row: STTResultRow, key: string) => {
     if (key === "wer") return row.wer;
     if (key === "cer") return row.cer;
     if (key === "semantic_wer") return row.semantic_wer;
@@ -322,12 +319,10 @@ export function STTResultsTable({
     return readSarvamValue(row, key);
   };
   const orderedResults = sortRows(results, sortValue);
-  // The picker offers exactly the columns the table is showing, in the order
-  // they appear across it. Audio is left out: there is nothing to order it by.
+  // Only the measured columns can be sorted, in the order they appear across
+  // the table. Sorting the ID, audio, ground truth or prediction columns tells
+  // the reader nothing about the run.
   const sortableColumns = [
-    { key: "id", label: "ID" },
-    { key: "gt", label: "Ground Truth" },
-    { key: "pred", label: "Prediction" },
     ...(showMetrics
       ? [
           { key: "wer", label: "WER" },
@@ -414,14 +409,12 @@ export function STTResultsTable({
                     onBulkToggle={onLabellingBulkToggle}
                   />
                 )}
-                <SortableTh
-                  label="ID"
-                  sortKey="id"
-                  sort={sort}
-                  onToggle={toggleSort}
+                <th
                   style={{ width: STT_COL_WIDTHS.id }}
                   className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
-                />
+                >
+                  ID
+                </th>
                 {hasAudio && (
                   <th
                     style={{ width: STT_COL_WIDTHS.audio }}
@@ -430,22 +423,18 @@ export function STTResultsTable({
                     Audio
                   </th>
                 )}
-                <SortableTh
-                  label="Ground Truth"
-                  sortKey="gt"
-                  sort={sort}
-                  onToggle={toggleSort}
+                <th
                   style={{ width: STT_COL_WIDTHS.text }}
                   className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
-                />
-                <SortableTh
-                  label="Prediction"
-                  sortKey="pred"
-                  sort={sort}
-                  onToggle={toggleSort}
+                >
+                  Ground Truth
+                </th>
+                <th
                   style={{ width: STT_COL_WIDTHS.text }}
                   className="px-3 py-3 text-left text-[12px] font-medium text-foreground"
-                />
+                >
+                  Prediction
+                </th>
                 {showMetrics && (
                   <>
                     <SortableTh
