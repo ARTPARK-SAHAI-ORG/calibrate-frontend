@@ -10,7 +10,7 @@ describe("StopRunButton", () => {
     await user.click(screen.getByRole("button", { name: "Stop" }));
     // Nothing is stopped yet: the question is on screen.
     expect(onStop).not.toHaveBeenCalled();
-    expect(screen.getByText("Stop this run?")).toBeInTheDocument();
+    expect(screen.getByText("Are you sure you want to stop this run?")).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: "Stop" })[1]);
     expect(onStop).toHaveBeenCalledTimes(1);
@@ -25,7 +25,7 @@ describe("StopRunButton", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onStop).not.toHaveBeenCalled();
-    expect(screen.queryByText("Stop this run?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Are you sure you want to stop this run?")).not.toBeInTheDocument();
   });
 
   it("names what is being stopped", async () => {
@@ -33,7 +33,7 @@ describe("StopRunButton", () => {
     render(<StopRunButton onStop={jest.fn()} noun="model comparison" />);
 
     await user.click(screen.getByRole("button", { name: "Stop" }));
-    expect(screen.getByText("Stop this model comparison?")).toBeInTheDocument();
+    expect(screen.getByText("Are you sure you want to stop this model comparison?")).toBeInTheDocument();
   });
 
   it("cannot send a second stop while the first is still going", async () => {

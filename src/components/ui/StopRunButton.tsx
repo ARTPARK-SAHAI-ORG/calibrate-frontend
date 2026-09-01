@@ -73,8 +73,8 @@ export function StopRunButton({
 
       <ConfirmDialog
         isOpen={isAsking}
-        title={`Stop this ${noun}?`}
-        message={`The results collected so far are kept. The ${noun} cannot be picked up again from where it stopped.`}
+        title={`Are you sure you want to stop this ${noun}?`}
+        message="This action cannot be undone."
         confirmText="Stop"
         onClose={() => setIsAsking(false)}
         onConfirm={stop}
