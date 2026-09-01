@@ -203,25 +203,29 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // Confirmation step before a run of every linked test.
     await page.getByRole("button", { name: "Start the run" }).click();
 
+    // The run window sits over the agent page, which has a Tests tab of its
+    // own, so every tab click below is scoped to the window.
+    const runWindow = page.locator("div.fixed.inset-0.z-50");
+
     // The tabs (Results / Tests) render ONLY once runStatus === "done".
     // Fake backend completes near-instantly; allow for the POST + first poll.
     await expect(
-      page.getByRole("button", { name: "Results", exact: true }),
+      runWindow.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
     // Results tab: a Pass rate card. Every fake verdict passes → 100% pass rate
     // (asserted on the percentage, which is robust to the test-case count).
-    await expect(page.getByText("Pass rate").first()).toBeVisible({
+    await expect(runWindow.getByText("Pass rate").first()).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText("100%").first()).toBeVisible({
+    await expect(runWindow.getByText("100%").first()).toBeVisible({
       timeout: 15000,
     });
 
     // Tests tab: the per-test results group the passing test under a
     // "Passed (n)" heading (test-results/shared StatusIcon + grouping).
-    await page.getByRole("button", { name: "Tests", exact: true }).click();
-    await expect(page.getByText(/Passed \(\d+\)/).first()).toBeVisible({
+    await runWindow.getByRole("button", { name: "Tests", exact: true }).click();
+    await expect(runWindow.getByText(/Passed \(\d+\)/).first()).toBeVisible({
       timeout: 15000,
     });
 
