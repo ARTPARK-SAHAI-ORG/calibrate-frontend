@@ -1,3 +1,7 @@
+## September 2026
+
+- You can now drag the Run column wider on an agent's Evaluations tab to read long run names in full ([#518](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/518))
+
 ## August 2026
 
 - Deleting a test no longer warns that it will be removed from other agents, since a test only ever belongs to the one agent it is on ([#516](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/516))
