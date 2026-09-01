@@ -72,6 +72,20 @@ Reference docs:
 
 - [Architecture diagram](https://docs.google.com/presentation/d/e/2PACX-1vQMXtGLWFnT6pGuYLS-P8GU6iHVVRFHYksgntIpcs-OzNp9DrPdq7ra38eYrCBxe8Y--6ZhK8Z-fyD8/pub?start=false&loop=false&delayms=3000)
 
+## Citation
+
+If you use Calibrate in your work, please cite it:
+
+```bibtex
+@software{calibrate2026,
+  author = {Dalmia, Aman and Doshi, Jigar},
+  title  = {Calibrate: An open-source framework for evaluating AI agents},
+  year   = {2026},
+  url    = {https://calibrate.artpark.ai},
+  note   = {Source code: \url{https://github.com/ARTPARK-SAHAI-ORG}}
+}
+```
+
 ## License
 
 This work is licensed under a
