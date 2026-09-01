@@ -258,8 +258,11 @@ export function isTerminalRunStatus(status: string): boolean {
 
 /**
  * Delete a run and the results it produced. One route covers a plain
- * evaluation run and a model comparison alike; a run still going is stopped
- * as part of deleting it.
+ * evaluation run and a model comparison alike.
+ *
+ * Only call this for a run that has finished. Deleting a run still going
+ * removes the record but does not stop the run: the backend holds no handle
+ * on the work, so it keeps going with nowhere left to report to.
  */
 export async function deleteRun(
   backendUrl: string,

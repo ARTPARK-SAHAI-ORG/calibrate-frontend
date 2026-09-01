@@ -240,6 +240,27 @@ of the wide banner. The words are what a screen reader says in place of it.
 - A page in `PAGES`: pass `image` to `pageMetadata()` and put the file under `public/share/`. A blog post: set `image` on the post and put the file under `public/blog/`.
 - Every picture is 1200 by 630 and under 300 KB. The test in [src/app/**tests**/seo.test.ts](src/app/__tests__/seo.test.ts) reads the file's own header and its weight, so a picture of another size cannot ship quietly, and neither can one exported at full quality by mistake. WhatsApp stops showing a heavy picture with no warning: the link simply appears as bare text.
 
+### The screen changes only after the request has finished
+
+Anything that stands for work in progress stays on screen until that work is
+done: a confirmation dialog, a loading button, a disabled form. Close it, or
+hand the reader back the page, only after the request has answered and
+whatever it changed has been read back.
+
+Closing first looks fast and reads as broken. Deleting a run used to close the
+confirmation the moment the delete answered, while the list was still being
+re-read, so the row the reader had just deleted sat there for another second.
+The reader clicks it again, or thinks the delete failed.
+
+- Await the re-read, not just the delete. `handleDeleted` in `useAgentRuns` and
+  `useTraces` return promises for this, and `useBulkDeletion` awaits its
+  `onDeleted` before it closes the dialog.
+- A list held in the browser can be pruned in place instead, which is instant
+  and needs no re-read. A server-paginated list has to be asked again, and that
+  is the case this rule is about.
+- The same holds for anything a reader can act on twice: keep the button in its
+  loading state until the call returns, rather than releasing it early.
+
 ### Breadcrumbs, not back buttons
 
 Every page you reach from a list shows the trail of pages leading to it in the

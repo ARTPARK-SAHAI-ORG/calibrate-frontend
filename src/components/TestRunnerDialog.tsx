@@ -413,8 +413,8 @@ export function TestRunnerDialog({
                     className="relative flex h-2.5 w-2.5 shrink-0"
                     title="Run in progress"
                   >
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 dark:bg-yellow-400" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
                   </span>
                 )}
                 {run &&

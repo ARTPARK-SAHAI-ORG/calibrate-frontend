@@ -110,7 +110,9 @@ const PILL_CLASS =
 function RunResult({ run }: { run: AgentRun }) {
   if (isRunInProgress(run)) {
     return (
-      <span className={`${PILL_CLASS} bg-yellow-500/20 text-yellow-500`}>
+      <span
+        className={`${PILL_CLASS} bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-500`}
+      >
         <svg
           className="w-3 h-3 animate-spin mr-1"
           fill="none"
@@ -420,10 +422,16 @@ export function RunsTabContent({
       backendAccessToken,
       runToDelete.uuid,
     );
+    if (!deleted) {
+      setIsDeleting(false);
+      return;
+    }
+    // Read the list back before closing, so the row is gone the moment the
+    // confirmation does. Closing first left the deleted run on screen for as
+    // long as the list took to answer.
+    await handleDeleted();
     setIsDeleting(false);
-    if (!deleted) return;
     setRunToDelete(null);
-    handleDeleted();
   };
 
   // Whichever run is open asks for itself, so the list stops asking for it.

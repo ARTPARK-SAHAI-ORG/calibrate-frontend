@@ -94,11 +94,18 @@ let state: {
   total?: number;
   pollUnit?: unknown;
   deleteOk?: boolean;
+  /** Holds the next runs request until this resolves. */
+  holdList?: Promise<void>;
 };
 
 function installFetch() {
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+      if (state.holdList) {
+        const hold = state.holdList;
+        state.holdList = undefined;
+        await hold;
+      }
       const around = new URL(url).searchParams.get("around");
       if (around && !state.runs.some((r) => r.uuid === around)) {
         return jsonResponse({}, false, 404);
@@ -704,6 +711,37 @@ describe("RunsTabContent", () => {
         ).toBe(true),
       );
       await screen.findByText("No evaluations yet");
+    });
+
+    it("keeps the confirmation open until the list has been read back", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      // Hold the list request that follows the delete, so the moment between
+      // the delete answering and the fresh list arriving can be looked at.
+      let releaseList: () => void = () => {};
+      state.holdList = new Promise<void>((resolve) => {
+        releaseList = resolve;
+      });
+
+      await user.click(deleteButtons()[0]);
+      state.runs = [];
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      // The delete has answered, the list has not: the confirmation is still
+      // up, saying so, and the row is still the old one.
+      await screen.findByText("Deleting...");
+      expect(
+        screen.getByText(/Are you sure you want to delete/),
+      ).toBeInTheDocument();
+
+      releaseList();
+      await screen.findByText("No evaluations yet");
+      expect(
+        screen.queryByText(/Are you sure you want to delete/),
+      ).not.toBeInTheDocument();
     });
 
     it("keeps the run listed when the delete fails", async () => {

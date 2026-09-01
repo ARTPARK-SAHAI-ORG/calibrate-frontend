@@ -11,7 +11,7 @@ type UseTraceDeletionArgs = {
   /** The currently visible page of traces — drives the "select all" toggle. */
   traces: TraceSummary[];
   /** Called with the deleted uuids so the page can re-sync its list. */
-  onDeleted: (uuids: string[]) => void;
+  onDeleted: (uuids: string[]) => void | Promise<void>;
   /** Backend JWT used for the delete requests. */
   accessToken: string | null;
   /** Set when the reader asked for every trace the list matches, not only the
