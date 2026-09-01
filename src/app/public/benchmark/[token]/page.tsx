@@ -64,8 +64,8 @@ export default function PublicBenchmarkPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "leaderboard" | "top-picks" | "outputs" | "about"
-  >("leaderboard");
+    "summary" | "top-picks" | "tests" | "about"
+  >("summary");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
@@ -187,10 +187,10 @@ export default function PublicBenchmarkPage() {
     data.model_results ?? [],
     benchmarkScoreLabel,
   );
-  const tabs: ("leaderboard" | "top-picks" | "outputs" | "about")[] = [
-    "leaderboard",
+  const tabs: ("summary" | "top-picks" | "tests" | "about")[] = [
+    "summary",
     ...(showTopPicks ? (["top-picks"] as const) : []),
-    "outputs",
+    "tests",
     "about",
   ];
 
@@ -229,7 +229,7 @@ export default function PublicBenchmarkPage() {
               onChange={setActiveTab}
             />
           </div>
-          {activeTab === "outputs" && nav && selectedTest && (
+          {activeTab === "tests" && nav && selectedTest && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -266,14 +266,14 @@ export default function PublicBenchmarkPage() {
           )}
         </div>
 
-        {/* Leaderboard Tab */}
-        {activeTab === "leaderboard" && (
+        {/* Results tab */}
+        {activeTab === "summary" && (
           <BenchmarkCombinedLeaderboard
             leaderboardSummary={data.leaderboard_summary}
             modelResults={data.model_results ?? []}
             filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
             benchmarkScoreLabel={benchmarkScoreLabel}
-            onReviewUnanswered={() => setActiveTab("outputs")}
+            onReviewUnanswered={() => setActiveTab("tests")}
             runStopped={isRunStopped(data)}
           />
         )}
@@ -300,7 +300,7 @@ export default function PublicBenchmarkPage() {
         )}
 
         {/* Results Tab */}
-        {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
+        {activeTab === "tests" && data.model_results && data.model_results.length > 0 && (
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
               runStopped={isRunStopped(data)}

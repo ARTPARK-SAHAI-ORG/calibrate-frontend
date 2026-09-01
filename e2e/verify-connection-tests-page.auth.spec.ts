@@ -214,9 +214,9 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     await expect(
       page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
-    // No run started: the run window's Summary tab is absent.
+    // No run started: the run window's Results tab is absent.
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toHaveCount(0);
 
     // Run the check against the real backend — example.com is unreachable, so
@@ -297,7 +297,7 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     ).toBeVisible({ timeout: 15000 });
 
     // Passing check → dialog closes and the run starts. The run window's
-    // Summary tab appears once the mocked run completes; the mocked verdict
+    // The Results tab appears once the mocked run completes; the mocked verdict
     // passes → 100% pass rate. Scope the Verify click to the dialog.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
       has: page.getByRole("heading", {
@@ -308,7 +308,7 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     await verifyDialog.getByRole("button", { name: "Verify" }).click();
 
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
     await expect(page.getByText("100%").first()).toBeVisible({
       timeout: 15000,

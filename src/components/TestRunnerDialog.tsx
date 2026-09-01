@@ -169,9 +169,9 @@ export function TestRunnerDialog({
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
     useState<DefaultEvaluatorSummary | null>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to
-  // the Summary tab on completion (mirrors the benchmark dialog).
-  const [activeTab, setActiveTab] = useState<"summary" | "outputs" | "about">(
-    "outputs",
+  // the Results tab on completion (mirrors the benchmark dialog).
+  const [activeTab, setActiveTab] = useState<"summary" | "tests" | "about">(
+    "tests",
   );
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   // Tests read in full, keyed by test id. The run itself is read without each
@@ -238,7 +238,7 @@ export function TestRunnerDialog({
     setRun(cached ?? null);
     setIsLoading(!cached);
     setSelectedTestUuid(null);
-    setActiveTab("outputs");
+    setActiveTab("tests");
     setOpenedCases({});
     setLoadingCaseId(null);
     setToolCallEvaluatorUuid(null);
@@ -267,7 +267,7 @@ export function TestRunnerDialog({
         setRun(result);
         if (isTerminalRunStatus(result.status)) {
           stop();
-          // Land on the Summary tab when the run finishes cleanly (mirrors the
+          // Land on the Results tab when the run finishes cleanly (mirrors the
           // benchmark dialog). Polling has stopped by now, so this fires once
           // on completion and will not fight a later manual tab switch. Skip on
           // failure since there is no useful summary to show.
@@ -357,7 +357,7 @@ export function TestRunnerDialog({
   // Someone stopped this run before it finished. The tests already answered
   // are kept; the rest were never started.
   const wasStopped = run ? isRunStopped(run) : false;
-  // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
+  // Tool-call pass/fail split for the Results tab's dedicated card. Keyed off
   // the kind of test the row itself reports.
   const toolCall = toolCallPassFail(
     rows.map((r) => ({
@@ -377,7 +377,7 @@ export function TestRunnerDialog({
   const showLabelling =
     isFinished && rows.length > 0 && hasLabellingEligibleTests;
 
-  // Per-evaluator totals for the Summary tab. The run counts these itself, so
+  // Per-evaluator totals for the Results tab. The run counts these itself, so
   // nothing here has to add up each case's verdicts.
   const evaluatorSummary = useMemo(
     () => runEvaluatorSummary(run?.evaluator_summary),
@@ -642,8 +642,8 @@ export function TestRunnerDialog({
               )}
             </div>
           </div>
-          {/* Previous/Next pager - centered, desktop only. Outputs tab only. */}
-          {activeTab === "outputs" && nav && selectedTestUuid && (
+          {/* Previous/Next pager - centered, desktop only. Tests tab only. */}
+          {activeTab === "tests" && nav && selectedTestUuid && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -693,7 +693,7 @@ export function TestRunnerDialog({
                   disabled={isPreparingLabelling}
                   onClick={async () => {
                     if (activeTab === "summary") {
-                      setActiveTab("outputs");
+                      setActiveTab("tests");
                     }
                     if (labellingSelectedIds.size === 0) {
                       toast.error(
@@ -790,7 +790,7 @@ export function TestRunnerDialog({
               <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
                 <div className="flex gap-3 md:gap-4 lg:gap-6">
                   <ResultTabs
-                    tabs={["summary", "outputs", "about"]}
+                    tabs={["summary", "tests", "about"]}
                     activeTab={activeTab}
                     onChange={setActiveTab}
                     size="window"
@@ -812,7 +812,7 @@ export function TestRunnerDialog({
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
                   runTotalTests={run?.total_tests ?? rows.length}
-                  onReviewUnanswered={() => setActiveTab("outputs")}
+                  onReviewUnanswered={() => setActiveTab("tests")}
                   latency={run?.latency_ms ?? null}
                   cost={run?.cost ?? null}
                   tokens={run?.total_tokens ?? null}
