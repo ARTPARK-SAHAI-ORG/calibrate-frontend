@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import {
@@ -73,6 +73,9 @@ export default function PublicBenchmarkPage() {
    * different answer for every model. `null` means the read failed, so it is
    * not asked for again and the page keeps what the light reply gave it. */
   const [openCases, setOpenCases] = useState<Record<string, BenchmarkRow | null>>({});
+  /** The `model|test` whose answer is being read, so the detail pane can say
+   * so. The row keeps its own verdict, so it stays in its group. */
+  const [loadingCaseKey, setLoadingCaseKey] = useState<string | null>(null);
 
   useEffect(() => { document.title = "LLM benchmark | Calibrate"; }, []);
 
@@ -122,9 +125,15 @@ export default function PublicBenchmarkPage() {
     const testCaseId = row ? rowTestUuid(row) : null;
     if (!testCaseId) return;
     const key = `${selectedTest.model}|${testCaseId}`;
-    if (key in openCases) return;
+    // Already read: clear the mark rather than returning under it, or moving
+    // to a test already read would leave the previous one marked for good.
+    if (key in openCases) {
+      setLoadingCaseKey(null);
+      return;
+    }
 
     let cancelled = false;
+    setLoadingCaseKey(key);
     fetch(
       `${backendUrl}/public/benchmark/${token}/results/${testCaseId}?model=${encodeURIComponent(selectedTest.model)}`,
       { headers: { accept: "application/json" } },
@@ -139,11 +148,34 @@ export default function PublicBenchmarkPage() {
       .catch((err) => {
         reportError("Error loading the test case:", err);
         if (!cancelled) setOpenCases((prev) => ({ ...prev, [key]: null }));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCaseKey(null);
       });
     return () => {
       cancelled = true;
     };
   }, [selectedTest, data, token, openCases]);
+
+  // The rows as the panel draws them: a test already read filled in from its
+  // own read, the one being read marked as loading. Without this the answer
+  // was fetched and never shown.
+  const modelResultsToDisplay: BenchmarkModelRows[] = useMemo(
+    () =>
+      (data?.model_results ?? []).map((model) => ({
+        ...model,
+        test_results:
+          model.test_results?.map((row) => {
+            const uuid = rowTestUuid(row);
+            const key = uuid ? `${model.model}|${uuid}` : null;
+            const full = key ? openCases[key] : null;
+            return full
+              ? { ...row, ...full }
+              : { ...row, loading: key !== null && key === loadingCaseKey };
+          }) ?? null,
+      })),
+    [data, openCases, loadingCaseKey],
+  );
 
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
@@ -272,7 +304,7 @@ export default function PublicBenchmarkPage() {
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
               runStopped={isRunStopped(data)}
-              modelResults={data.model_results}
+              modelResults={modelResultsToDisplay}
               expandedModels={expandedModels}
               onToggleModel={toggleModel}
               onSetExpandedModels={setExpandedModels}

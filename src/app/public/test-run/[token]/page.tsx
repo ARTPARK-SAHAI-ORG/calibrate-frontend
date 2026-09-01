@@ -121,6 +121,9 @@ export default function PublicTestRunPage() {
   );
   // Cases read in full, keyed by test id, so reopening one costs nothing.
   const [cases, setCases] = useState<Record<string, TestCaseResult>>({});
+  /** The test whose answer is being read, so the detail pane can say so. The
+   * row keeps its own verdict, so it stays in its group. */
+  const [loadingCaseId, setLoadingCaseId] = useState<string | null>(null);
   const requestedCases = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -133,8 +136,12 @@ export default function PublicTestRunPage() {
     async (testCaseId: string) => {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
-      if (requestedCases.current.has(testCaseId)) return;
+      if (requestedCases.current.has(testCaseId)) {
+        setLoadingCaseId(null);
+        return;
+      }
       requestedCases.current.add(testCaseId);
+      setLoadingCaseId(testCaseId);
       try {
         const res = await fetch(
           `${backendUrl}/public/test-run/${token}/results/${testCaseId}`,
@@ -142,13 +149,16 @@ export default function PublicTestRunPage() {
         );
         if (!res.ok) {
           requestedCases.current.delete(testCaseId);
+          setLoadingCaseId(null);
           return;
         }
         const full: TestCaseResult = await res.json();
         setCases((prev) => ({ ...prev, [testCaseId]: full }));
+        setLoadingCaseId(null);
       } catch {
         // The rest of the page stays up; the row keeps what the run gave it.
         requestedCases.current.delete(testCaseId);
+        setLoadingCaseId(null);
       }
     },
     [token],
@@ -220,11 +230,12 @@ export default function PublicTestRunPage() {
 
   const results = data.results ?? [];
   // Each row with whatever has been read in full laid over it.
-  const merged = results.map((r) =>
-    rowTestUuid(r) && cases[rowTestUuid(r) as string]
-      ? { ...r, ...cases[rowTestUuid(r) as string] }
-      : r,
-  );
+  const merged = results.map((r) => {
+    const uuid = rowTestUuid(r);
+    const full = uuid ? cases[uuid] : undefined;
+    if (full) return { ...r, ...full, loading: false };
+    return { ...r, loading: uuid !== null && uuid === loadingCaseId };
+  });
   // Someone stopped this run before it finished, so the tests it never started
   // are neither passes nor failures.
   const wasStopped = isRunStopped(data);
@@ -363,6 +374,7 @@ export default function PublicTestRunPage() {
                 reasoning: r.reasoning,
                 inputs: r.inputs ?? undefined,
                 judgeResults: r.judge_results ?? null,
+                loading: r.loading,
               }))}
               selectedId={selectedId}
               onSelect={setSelectedId}

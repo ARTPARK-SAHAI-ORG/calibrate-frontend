@@ -26,6 +26,7 @@ jest.mock("../eval-details", () => ({
             {r.inputs ? JSON.stringify(r.inputs) : ""}
           </span>
           <span data-testid={`unanswered-${r.id}`}>{String(r.unanswered)}</span>
+          <span data-testid={`loading-${r.id}`}>{String(!!r.loading)}</span>
           {onToggleLabellingSelection && (
             <button
               aria-label={`toggle-labelling-${r.id}`}
@@ -1896,5 +1897,99 @@ describe("reading a run light, and one test in full", () => {
 
     await user.click(screen.getByRole("button", { name: "Export" }));
     await waitFor(() => expect(fullReads()).toHaveLength(1));
+  });
+});
+
+// A row's verdict is what puts it in a group, so reading its answer must not
+// touch it. Marking the row "running" while it loaded moved it out of Passed
+// and changed that group's count on every click.
+describe("a test loading its answer", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  let release: (value: unknown) => void;
+  const run = {
+    task_id: "task-load",
+    status: "completed",
+    results: [
+      { test_uuid: "t1", name: "Alpha", passed: true, test_type: "response" },
+      { test_uuid: "t2", name: "Beta", passed: true, test_type: "response" },
+    ],
+  };
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    clearTestRunCache();
+    (global.fetch as any) = jest.fn((url: string) => {
+      if (String(url).includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (String(url).includes("/results/t1")) {
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      if (String(url).includes("/results/t2")) {
+        return Promise.resolve(
+          jsonResponse({ test_uuid: "t2", name: "Beta", passed: true }),
+        );
+      }
+      if (isRunDetail(url, "task-load")) return Promise.resolve(jsonResponse(run));
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const openOnResults = async (user: ReturnType<typeof setupUser>) => {
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-load"
+      />,
+    );
+    await screen.findByTestId("summary-panel");
+    await user.click(screen.getByRole("button", { name: "Results" }));
+    await screen.findByTestId("outputs-panel");
+  };
+
+  it("keeps the row's own verdict, so it stays in its group", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+    // Alpha opens on its own and its answer is still on its way.
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("true"),
+    );
+    expect(screen.getByText("Alpha:passed")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha:running")).not.toBeInTheDocument();
+    release(jsonResponse({ test_uuid: "t1", name: "Alpha", passed: true }));
+  });
+
+  it("stops marking a test as loading once the reader moves to one already read", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("true"),
+    );
+
+    // Beta lands, so it is held. Going back to it must not leave Alpha marked.
+    await user.click(screen.getByText("Beta:passed"));
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t2")).toHaveTextContent("false"),
+    );
+    await user.click(screen.getByText("Alpha:passed"));
+    await user.click(screen.getByText("Beta:passed"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("false"),
+    );
+    release(jsonResponse({ test_uuid: "t1", name: "Alpha", passed: true }));
   });
 });

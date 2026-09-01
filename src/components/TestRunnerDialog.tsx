@@ -85,6 +85,8 @@ type Row = {
    * be run. */
   reasoning?: string;
   judgeResults?: JudgeResult[] | null;
+  /** This test's answer is being read. */
+  loading?: boolean;
   /** What kind of test this row ran: "response", "general", "tool_call" or
    * "conversation". Null on a run old enough to say neither. */
   testType: string | null;
@@ -426,15 +428,25 @@ export function TestRunnerDialog({
   // Read the test the reader opened in full: its conversation, the agent's
   // reply and each evaluator's verdict, none of which come with the run.
   useEffect(() => {
-    if (!selectedTestUuid) return;
-    const row = rows.find((r) => r.id === selectedTestUuid);
-    // A run old enough to send no test ids has nothing to ask for, and a test
-    // still going or never started has no result yet.
-    if (!row?.testUuid) return;
-    if (row.status === "running" || row.status === "not_run") return;
-    if (openedCases[row.testUuid]) return;
+    const row = selectedTestUuid
+      ? rows.find((r) => r.id === selectedTestUuid)
+      : undefined;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl || !backendAccessToken) return;
+    // Nothing to read: no test open, a run old enough to send no test ids, a
+    // test still going or never started, or one already read. Clear the mark
+    // rather than returning under it — moving to a test already read used to
+    // leave the previous one marked as loading with nothing left to clear it.
+    if (
+      !row?.testUuid ||
+      row.status === "running" ||
+      row.status === "not_run" ||
+      openedCases[row.testUuid] ||
+      !backendUrl ||
+      !backendAccessToken
+    ) {
+      setLoadingCaseId(null);
+      return;
+    }
 
     const testUuid = row.testUuid;
     let cancelled = false;
@@ -481,9 +493,7 @@ export function TestRunnerDialog({
         const testCase =
           r.testCase ??
           (r.testType ? { evaluation: { type: r.testType } } : undefined);
-        return r.id === loadingCaseId
-          ? { ...r, testCase, status: "running" as const }
-          : { ...r, testCase };
+        return { ...r, testCase, loading: r.id === loadingCaseId };
       }),
     [rows, openedCases, loadingCaseId],
   );
@@ -834,6 +844,7 @@ export function TestRunnerDialog({
                     inputs: r.inputs,
                     reasoning: r.reasoning,
                     judgeResults: r.judgeResults,
+                    loading: r.loading,
                   }))}
                   selectedId={selectedTestUuid}
                   onSelect={setSelectedTestUuid}

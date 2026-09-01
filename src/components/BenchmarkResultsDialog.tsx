@@ -184,6 +184,9 @@ export function BenchmarkResultsDialog({
   const [openCases, setOpenCases] = useState<
     Record<string, TestCaseResult | null>
   >({});
+  /** The `model|test` whose answer is being read, so the detail pane can say
+   * so. The row keeps its own verdict, so it stays in its group. */
+  const [loadingCaseKey, setLoadingCaseKey] = useState<string | null>(null);
   /** The tests the reader picked, in full, once "Submit for labelling" has
    * fetched them. */
   const [labellingRows, setLabellingRows] = useState<BenchmarkModelRows[]>([]);
@@ -432,9 +435,15 @@ export function BenchmarkResultsDialog({
     const testCaseId = row ? rowTestUuid(row) : null;
     if (!testCaseId) return;
     const key = `${selectedTest.model}|${testCaseId}`;
-    if (key in openCases) return;
+    // Already read: clear the mark rather than returning under it, or moving
+    // to a test already read would leave the previous one marked for good.
+    if (key in openCases) {
+      setLoadingCaseKey(null);
+      return;
+    }
 
     let cancelled = false;
+    setLoadingCaseKey(key);
     fetchTestCase(
       backendUrl,
       backendAccessToken,
@@ -448,6 +457,9 @@ export function BenchmarkResultsDialog({
       .catch((err) => {
         reportError("Error loading the test case:", err);
         if (!cancelled) setOpenCases((prev) => ({ ...prev, [key]: null }));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCaseKey(null);
       });
     return () => {
       cancelled = true;
@@ -714,7 +726,8 @@ export function BenchmarkResultsDialog({
     test_results:
       model.test_results?.map((row) => {
         const rowUuid = rowTestUuid(row);
-        const full = rowUuid ? openCases[`${model.model}|${rowUuid}`] : null;
+        const key = rowUuid ? `${model.model}|${rowUuid}` : null;
+        const full = key ? openCases[key] : null;
         return full
           ? {
               ...row,
@@ -723,7 +736,7 @@ export function BenchmarkResultsDialog({
               judge_results: full.judge_results,
               inputs: full.inputs ?? undefined,
             }
-          : row;
+          : { ...row, loading: key !== null && key === loadingCaseKey };
       }) ?? null,
   }));
 
