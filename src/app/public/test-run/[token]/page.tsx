@@ -26,6 +26,7 @@ import { ResultTabs } from "@/components/ui";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
+  rowTestUuid,
   runEvaluatorSummary,
   toolCallEvaluatorUuidFromRows,
   toolCallPassFail,
@@ -42,6 +43,9 @@ import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
+  /** The uuid of the test this row ran. Absent on a run answered before the
+   * backend started stamping it, which is why `rowTestUuid` falls back. */
+  test_uuid?: string | null;
   test_name?: string;
   name?: string;
   /** null / absent means the test has not finished. It never means the test
@@ -188,7 +192,8 @@ export default function PublicTestRunPage() {
   useEffect(() => {
     if (!selectedId) return;
     const row = (data?.results ?? [])[Number(selectedId.replace("test-", ""))];
-    if (row?.test_case_id) fetchCase(row.test_case_id);
+    const uuid = row ? rowTestUuid(row) : null;
+    if (uuid) fetchCase(uuid);
   }, [selectedId, data, fetchCase]);
 
   // ponytail: the id of the evaluator that judged the tool-call tests is only
@@ -196,7 +201,8 @@ export default function PublicTestRunPage() {
   // tool-call case in full. Drop this once the run itself names it.
   useEffect(() => {
     const row = (data?.results ?? []).find(isToolCallRow);
-    if (row?.test_case_id) fetchCase(row.test_case_id);
+    const uuid = row ? rowTestUuid(row) : null;
+    if (uuid) fetchCase(uuid);
   }, [data, fetchCase]);
 
   if (isLoading)
@@ -215,8 +221,8 @@ export default function PublicTestRunPage() {
   const results = data.results ?? [];
   // Each row with whatever has been read in full laid over it.
   const merged = results.map((r) =>
-    r.test_case_id && cases[r.test_case_id]
-      ? { ...r, ...cases[r.test_case_id] }
+    rowTestUuid(r) && cases[rowTestUuid(r) as string]
+      ? { ...r, ...cases[rowTestUuid(r) as string] }
       : r,
   );
   // Someone stopped this run before it finished, so the tests it never started

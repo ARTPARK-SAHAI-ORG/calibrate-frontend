@@ -4,6 +4,7 @@ import {
   runEvaluatorSummary,
   rowTestType,
   isToolCallRow,
+  rowTestUuid,
 } from "@/lib/testRunSummary";
 import type { JudgeResult, TestRunEvaluator } from "@/components/test-results/shared";
 import type {
@@ -363,5 +364,27 @@ describe("isToolCallRow", () => {
 
   it("is false when neither says", () => {
     expect(isToolCallRow({})).toBe(false);
+  });
+});
+
+// Calibrate replaces the id it is sent with the test's name, so `test_case_id`
+// holds a name on some runs. `test_uuid` is the test's real id.
+describe("rowTestUuid", () => {
+  it("uses the test's own id when the row carries one", () => {
+    expect(
+      rowTestUuid({ test_uuid: "uuid-1", test_case_id: "v4_ex__pruned__p1" }),
+    ).toBe("uuid-1");
+  });
+
+  it("falls back to test_case_id on a run that stamped no id", () => {
+    expect(rowTestUuid({ test_case_id: "case-9" })).toBe("case-9");
+    expect(rowTestUuid({ test_uuid: null, test_case_id: "case-9" })).toBe(
+      "case-9",
+    );
+  });
+
+  it("says nothing when the row identifies no test", () => {
+    expect(rowTestUuid({})).toBeNull();
+    expect(rowTestUuid({ test_uuid: null })).toBeNull();
   });
 });

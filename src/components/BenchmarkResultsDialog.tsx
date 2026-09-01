@@ -49,6 +49,7 @@ import { useLabellingSelection } from "@/components/human-labelling/useLabelling
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
+import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -64,6 +65,7 @@ import {
  * say what kind of test it was. */
 type BenchmarkRow = BenchmarkTestResult & {
   test_case_id?: string;
+  test_uuid?: string | null;
   test_type?: string | null;
 };
 
@@ -427,7 +429,7 @@ export function BenchmarkResultsDialog({
       return;
     const row = modelResults.find((m) => m.model === selectedTest.model)
       ?.test_results?.[selectedTest.testIndex];
-    const testCaseId = row?.test_case_id;
+    const testCaseId = row ? rowTestUuid(row) : null;
     if (!testCaseId) return;
     const key = `${selectedTest.model}|${testCaseId}`;
     if (key in openCases) return;
@@ -711,9 +713,8 @@ export function BenchmarkResultsDialog({
     ...model,
     test_results:
       model.test_results?.map((row) => {
-        const full = row.test_case_id
-          ? openCases[`${model.model}|${row.test_case_id}`]
-          : null;
+        const rowUuid = rowTestUuid(row);
+        const full = rowUuid ? openCases[`${model.model}|${rowUuid}`] : null;
         return full
           ? {
               ...row,

@@ -1725,7 +1725,10 @@ describe("reading a run light, and one test in full", () => {
     failed: 0,
     results: [
       {
-        test_case_id: "test-1",
+        // Calibrate replaces the id it is sent with the test's name, so this
+        // row carries a name here and the test's real id in `test_uuid`.
+        test_case_id: "v4_ex__pruned__p1__district",
+        test_uuid: "test-1",
         name: "First test",
         passed: true,
         test_type: "response",

@@ -15,6 +15,7 @@ import type {
   BenchmarkTestResult,
 } from "@/components/eval-details";
 import { reportError } from "@/lib/reportError";
+import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   buildBenchmarkCombinedLeaderboardPayload,
   hasBenchmarkTopPicks,
@@ -30,7 +31,12 @@ import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 /** One test's row as the light reply sends it: the conversation, the reply and
  * the judges' reasoning are left out, and `test_case_id` is there to read that
  * one case in full. */
-type BenchmarkRow = BenchmarkTestResult & { test_case_id?: string };
+type BenchmarkRow = BenchmarkTestResult & {
+  test_case_id?: string;
+  /** The uuid of the test this row ran. Absent on a run answered before the
+   * backend started stamping it, which is why `rowTestUuid` falls back. */
+  test_uuid?: string | null;
+};
 
 type BenchmarkModelRows = Omit<BenchmarkModelResult, "test_results"> & {
   test_results: BenchmarkRow[] | null;
@@ -113,7 +119,7 @@ export default function PublicBenchmarkPage() {
     if (!selectedTest || !backendUrl) return;
     const row = data?.model_results?.find((m) => m.model === selectedTest.model)
       ?.test_results?.[selectedTest.testIndex];
-    const testCaseId = row?.test_case_id;
+    const testCaseId = row ? rowTestUuid(row) : null;
     if (!testCaseId) return;
     const key = `${selectedTest.model}|${testCaseId}`;
     if (key in openCases) return;

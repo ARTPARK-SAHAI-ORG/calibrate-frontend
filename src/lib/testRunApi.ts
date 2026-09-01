@@ -13,8 +13,13 @@ import type {
 } from "@/components/test-results/shared";
 
 export type TestCaseResult = {
-  /** The test this row ran. */
+  /** The test this row ran. Read it through `rowTestUuid`, never straight:
+   * older runs put the test's name here rather than its id. */
   test_case_id?: string;
+  /** The uuid of the test this row ran. Sent on every case; absent on a run
+   * answered before the backend started stamping it, which is why
+   * `rowTestUuid` falls back to `test_case_id`. */
+  test_uuid?: string | null;
   test_name?: string;
   name?: string; // Test name from in-progress API response
   /** null / absent means the test has not finished yet. It never means the

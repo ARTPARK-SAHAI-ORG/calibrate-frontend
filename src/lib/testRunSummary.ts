@@ -197,3 +197,18 @@ export function isToolCallRow(row: {
 }): boolean {
   return rowTestType(row) === "tool_call";
 }
+
+/**
+ * Which test a row ran, as the id to ask the backend for that one case.
+ *
+ * The backend stamps `test_uuid` on every case. A run answered before it did
+ * has only `test_case_id`, which holds the test's id on some runs and its
+ * name on others, so it is the fallback rather than the answer. This is the
+ * ONE rule for the question; never read either field straight.
+ */
+export function rowTestUuid(row: {
+  test_uuid?: string | null;
+  test_case_id?: string | null;
+}): string | null {
+  return row.test_uuid ?? row.test_case_id ?? null;
+}

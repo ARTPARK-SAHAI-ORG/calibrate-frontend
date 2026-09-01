@@ -42,6 +42,7 @@ import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
   rowTestType,
+  rowTestUuid,
   runEvaluatorSummary,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
@@ -111,8 +112,8 @@ function toRows(results: TestCaseResult[], runStopped: boolean): Row[] {
           ? "passed"
           : "failed";
     return {
-      id: r.test_case_id ?? `idx-${i}`,
-      testUuid: r.test_case_id,
+      id: rowTestUuid(r) ?? `idx-${i}`,
+      testUuid: rowTestUuid(r) ?? undefined,
       name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
       status,
       unanswered: isUnanswered(r),
@@ -393,9 +394,10 @@ export function TestRunnerDialog({
     if (toolCallEvaluatorUuid) return;
     if (!run || !isTerminalRunStatus(run.status)) return;
     const first = (run.results ?? []).find(
-      (r) => isToolCallRow(r) && r.test_case_id,
+      (r) => isToolCallRow(r) && rowTestUuid(r),
     );
-    if (!first?.test_case_id) return;
+    const firstUuid = first ? rowTestUuid(first) : null;
+    if (!firstUuid) return;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl || !backendAccessToken) return;
 
@@ -404,7 +406,7 @@ export function TestRunnerDialog({
       backendUrl,
       backendAccessToken,
       taskId,
-      first.test_case_id,
+      firstUuid,
     )
       .then((testCase) => {
         const uuid = testCase.judge_results?.[0]?.evaluator_uuid;
@@ -868,7 +870,6 @@ export function TestRunnerDialog({
           results: fullRows
             .filter((r) => labellingSelectedIds.has(r.id))
             .map((r) => ({
-              test_uuid: r.testUuid,
               test_name: r.name,
               status:
                 r.status === "passed" || r.status === "failed"
