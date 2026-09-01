@@ -145,6 +145,7 @@ export const A = {
   runClose: '[data-tour="run-close"]',
   startTour: '[data-tour="start-tour"]',
   runSummary: '[data-tour="test-run-summary"]',
+  runTabSummary: '[data-tour="run-tab-summary"]',
   runTabTests: '[data-tour="run-tab-tests"]',
   runOutputsList: '[data-tour="run-outputs-list"]',
   runResultRow: '[data-tour="run-result-row"]',
@@ -508,6 +509,18 @@ function expandFailedReasoning(): void {
       return false;
     }) ?? toggles[0];
   failToggle.click();
+}
+
+/**
+ * Wait for the run to finish, then open its Results tab. The run window stays
+ * on the tests while the reader watches a run, so the tour opens the Results
+ * itself before the card that points at it.
+ */
+async function openRunResults(): Promise<void> {
+  const tab = await waitForElement(A.runTabSummary, { timeout: 90000 });
+  if (!tab) return;
+  await clickElement(A.runTabSummary, { timeout: 8000 });
+  await waitForElement(A.runSummary, { timeout: 8000 });
 }
 
 /** Open the previously-failing phone-number test result in the outputs list. */
@@ -917,7 +930,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       popoverClass: "calibrate-tour-running",
       autoAdvance: true,
       action: async () => {
-        await waitForElement(A.runSummary, { timeout: 90000 });
+        await openRunResults();
       },
     },
     {
@@ -1036,7 +1049,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       popoverClass: "calibrate-tour-running",
       autoAdvance: true,
       action: async () => {
-        await waitForElement(A.runSummary, { timeout: 90000 });
+        await openRunResults();
       },
     },
     {

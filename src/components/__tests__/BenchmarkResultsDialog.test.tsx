@@ -301,7 +301,7 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it("starts a new benchmark run, polls, and lands on the leaderboard tab when done", async () => {
+  it("starts a new benchmark run, polls, and stays on the tests when done", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onBenchmarkCreated = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
@@ -342,7 +342,12 @@ describe("BenchmarkResultsDialog", () => {
 
     await waitFor(() => expect(onBenchmarkCreated).toHaveBeenCalledWith("task-1"));
     await waitFor(() => expect(screen.getByText("Run One")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
+    // The reader started this comparison here and watched it run, so it does
+    // not move them off the tests when it finishes.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
 
     expect(
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
@@ -613,10 +618,11 @@ describe("BenchmarkResultsDialog", () => {
       await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
     });
 
-    // The run is now done, which auto-switches to the leaderboard tab; flip
-    // back to the Tests tab to read the evaluators prop passed to the panel.
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-    await setupUser().click(screen.getByRole("button", { name: "Tests" }));
+    // The run is now done. It was started here, so the reader stays on the
+    // tests and the panel keeps reading the evaluators prop.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+    );
 
     await waitFor(() =>
       expect(screen.getByTestId("outputs-panel-evaluators").textContent).toBe(
@@ -1516,19 +1522,18 @@ describe("BenchmarkResultsDialog", () => {
       await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
     });
 
-    // Second poll adds "gpt-4" with results too and completes the run, which
-    // auto-switches to the leaderboard tab; flip back to outputs. The
-    // selection should stay pinned to whatever was auto-selected first
+    // Second poll adds "gpt-4" with results too and completes the run. The run
+    // was still going when the window opened, so the reader stays on the
+    // tests. The selection should stay pinned to whatever was auto-selected first
     // (guarded by a ref) rather than jumping to "gpt-4". We can't directly
     // read `selectedTest` from the mock, but we can assert the panel renders
     // without crashing; deeper assertion would require exposing selectedTest
     // through the outputs panel mock, which duplicates internal state -
     // skipped per task's guidance on deeply nested edge cases under
     // fake-timer flakiness.
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-    await act(async () => {
-      await setupUser().click(screen.getByRole("button", { name: "Tests" }));
-    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+    );
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
   });
 });

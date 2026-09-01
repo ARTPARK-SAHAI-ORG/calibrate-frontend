@@ -290,6 +290,41 @@ describe("first-eval tour step actions", () => {
       timeout: 10000,
     });
   });
+
+  // The run window stays on the tests while a run is watched, so the card that
+  // points at the Results only has something to point at if the tour opens
+  // that tab itself.
+  it.each(["Running your tests", "Running again"])(
+    "opens the run's Results tab after the run finishes (%s)",
+    async (title) => {
+      const resultsTab = document.createElement("button");
+      resultsTab.setAttribute("data-tour", "run-tab-summary");
+      const summary = document.createElement("div");
+      summary.setAttribute("data-tour", "test-run-summary");
+      document.body.append(resultsTab, summary);
+
+      const tour = buildTour();
+      await stepByTitle(tour, title).action?.();
+
+      expect(mockClickElement).toHaveBeenCalledWith(A.runTabSummary, {
+        timeout: 8000,
+      });
+      expect(mockWaitForElement).toHaveBeenCalledWith(A.runSummary, {
+        timeout: 8000,
+      });
+    },
+  );
+
+  // Nothing to open means nothing to click: the run never finished.
+  it("does not click the Results tab when the run never finishes", async () => {
+    const tour = buildTour();
+    await stepByTitle(tour, "Running your tests").action?.();
+
+    expect(mockClickElement).not.toHaveBeenCalledWith(
+      A.runTabSummary,
+      expect.anything(),
+    );
+  });
 });
 
 describe("resolveEvaluatorPlan", () => {

@@ -214,7 +214,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     ).toBeVisible({ timeout: 30000 });
 
     // Results tab: a Pass rate card. Every fake verdict passes → 100% pass rate
-    // (asserted on the percentage, which is robust to the test-case count).
+    // (asserted on the percentage, which is robust to the test-case count). A
+    // run watched to the end stays on the tests, so the tab is opened by hand.
+    await runWindow.getByRole("button", { name: "Results", exact: true }).click();
     await expect(runWindow.getByText("Pass rate").first()).toBeVisible({
       timeout: 15000,
     });
@@ -338,7 +340,10 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
       page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
-    // The leaderboard renders a table (model rows + pass-rate columns).
+    // The leaderboard renders a table (model rows + pass-rate columns). A
+    // comparison watched to the end stays on the tests, so the tab is opened
+    // by hand.
+    await page.getByRole("button", { name: "Results", exact: true }).click();
     await expect(page.locator("table").first()).toBeVisible({
       timeout: 15000,
     });
