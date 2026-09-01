@@ -614,7 +614,7 @@ describe("BenchmarkResultsDialog", () => {
     });
 
     // The run is now done, which auto-switches to the leaderboard tab; flip
-    // back to outputs to read the evaluators prop passed to the panel.
+    // back to the Tests tab to read the evaluators prop passed to the panel.
     await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
     await setupUser().click(screen.getByRole("button", { name: "Tests" }));
 

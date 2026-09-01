@@ -832,7 +832,7 @@ describe("TestRunnerDialog", () => {
     );
     expect(screen.getByText(/summary 1\/1/)).toBeInTheDocument();
 
-    // Tab nav is visible once done; switch back to outputs.
+    // Tab nav is visible once done; switch back to the Tests tab.
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
@@ -889,7 +889,7 @@ describe("TestRunnerDialog", () => {
       expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
     );
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
-    // A failed run still must not jump to the summary tab on its own.
+    // A failed run still must not jump to the Results tab on its own.
     expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByTestId("summary-gaps")).toHaveTextContent(
@@ -1344,8 +1344,8 @@ describe("TestRunnerDialog", () => {
       await user.click(
         screen.getByRole("button", { name: "toggle-labelling-test-1" }),
       );
-      // Switch back to the summary tab so the submit click also exercises
-      // the "switch back to outputs" branch inside the handler.
+      // Switch back to the Results tab so the submit click also exercises
+      // the "switch back to the Tests tab" branch inside the handler.
       await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(
         screen.getByRole("button", { name: "Submit for labelling" }),
