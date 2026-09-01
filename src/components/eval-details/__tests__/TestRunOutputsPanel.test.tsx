@@ -129,6 +129,22 @@ describe("TestRunOutputsPanel", () => {
     expect(screen.getByText("Pending (1)")).toBeInTheDocument();
   });
 
+  it("lets the browser skip off-screen rows, so a run of thousands still opens", () => {
+    // The list draws every row. Containment keeps the browser from laying out
+    // and painting the ones off screen; 36px is a row's real height.
+    render(
+      <TestRunOutputsPanel results={allResults} selectedId={null} onSelect={jest.fn()} />,
+    );
+    const rows = screen
+      .getAllByText(/Test One$/)
+      .map((name) => name.closest("button")!.parentElement as HTMLElement);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.className).toContain("[content-visibility:auto]");
+      expect(row.className).toContain("[contain-intrinsic-size:auto_36px]");
+    }
+  });
+
   it("does not render a group with zero items", () => {
     render(
       <TestRunOutputsPanel results={[passedResult]} selectedId={null} onSelect={jest.fn()} />,

@@ -34,6 +34,16 @@ jest.mock("../eval-details", () => {
         <div data-testid="outputs-panel-evaluators">
           {JSON.stringify(props.evaluatorsByUuid)}
         </div>
+        <div data-testid="outputs-panel-rows">
+          {JSON.stringify(
+            props.modelResults.map((m: any) =>
+              (m.test_results ?? []).map((r: any) => ({
+                name: r.name,
+                reply: r.output?.response ?? null,
+              })),
+            ),
+          )}
+        </div>
         <div data-testid="outputs-panel-labelling-selection">
           {props.labellingSelection
             ? JSON.stringify(Array.from(props.labellingSelection))
@@ -209,6 +219,13 @@ async function flush() {
   });
 }
 
+/** The comparison-detail request for `taskId`, whatever query it carries. The
+ * window asks for the light version (`?mode=summary`), so an exact-URL match
+ * would miss it. A per-case, abort or rename request is NOT this. */
+function isBenchmarkDetail(url: string, taskId: string): boolean {
+  return String(url).split("?")[0].endsWith(`/agent-tests/benchmark/${taskId}`);
+}
+
 describe("BenchmarkResultsDialog", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
@@ -291,7 +308,7 @@ describe("BenchmarkResultsDialog", () => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
         return Promise.resolve(jsonResponse({ task_id: "task-1", status: "queued" }));
       }
-      if (url.endsWith("/agent-tests/benchmark/task-1")) {
+      if (isBenchmarkDetail(url, "task-1")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-1",
@@ -343,7 +360,7 @@ describe("BenchmarkResultsDialog", () => {
 
   it("views an existing run via taskId without POSTing a new benchmark", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-existing")) {
+      if (isBenchmarkDetail(url, "task-existing")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-existing",
@@ -386,7 +403,7 @@ describe("BenchmarkResultsDialog", () => {
   it("does not keep the previous run's name when the window opens another run", async () => {
     let holdSecond: (value: any) => void = () => {};
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-first")) {
+      if (isBenchmarkDetail(url, "task-first")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-first",
@@ -396,7 +413,7 @@ describe("BenchmarkResultsDialog", () => {
           }),
         );
       }
-      if (url.endsWith("/agent-tests/benchmark/task-second")) {
+      if (isBenchmarkDetail(url, "task-second")) {
         return new Promise((resolve) => {
           holdSecond = resolve;
         });
@@ -462,7 +479,7 @@ describe("BenchmarkResultsDialog", () => {
             }),
           );
         }
-        if (url.endsWith("/agent-tests/benchmark/task-existing")) {
+        if (isBenchmarkDetail(url, "task-existing")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-existing",
@@ -550,7 +567,7 @@ describe("BenchmarkResultsDialog", () => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
         return Promise.resolve(jsonResponse({ task_id: "task-2", status: "queued" }));
       }
-      if (url.endsWith("/agent-tests/benchmark/task-2")) {
+      if (isBenchmarkDetail(url, "task-2")) {
         pollCount += 1;
         if (pollCount === 1) {
           return Promise.resolve(
@@ -614,7 +631,7 @@ describe("BenchmarkResultsDialog", () => {
 
   it("sets error and calls reportError when the poll response carries a result-level error", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-err")) {
+      if (isBenchmarkDetail(url, "task-err")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-err",
@@ -644,7 +661,7 @@ describe("BenchmarkResultsDialog", () => {
   it("stops polling, reports the error, and sets status failed when the poll fetch rejects", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-throw")) {
+      if (isBenchmarkDetail(url, "task-throw")) {
         return Promise.reject(new Error("network down"));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -677,7 +694,7 @@ describe("BenchmarkResultsDialog", () => {
   it("stops polling immediately when the dialog is closed", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-close")) {
+      if (isBenchmarkDetail(url, "task-close")) {
         return Promise.resolve(
           jsonResponse({ task_id: "task-close", status: "in_progress" }),
         );
@@ -731,7 +748,7 @@ describe("BenchmarkResultsDialog", () => {
               }),
             );
           }
-          if (url.endsWith("/agent-tests/benchmark/task-stop")) {
+          if (isBenchmarkDetail(url, "task-stop")) {
             return Promise.resolve(
               jsonResponse({
                 task_id: "task-stop",
@@ -775,7 +792,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("says it cannot stop the run when the backend address is missing", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-stop")) {
+        if (isBenchmarkDetail(url, "task-stop")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-stop",
@@ -813,7 +830,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("has no Stop once the run has finished", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-done")) {
+        if (isBenchmarkDetail(url, "task-done")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-done",
@@ -850,7 +867,7 @@ describe("BenchmarkResultsDialog", () => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
         return Promise.resolve(jsonResponse({ task_id: "task-refresh", status: "queued" }));
       }
-      if (url.endsWith("/agent-tests/benchmark/task-refresh")) {
+      if (isBenchmarkDetail(url, "task-refresh")) {
         return Promise.resolve(
           jsonResponse({ task_id: "task-refresh", status: "in_progress" }),
         );
@@ -894,7 +911,7 @@ describe("BenchmarkResultsDialog", () => {
             jsonResponse({ task_id: "task-ph", status: "queued" }),
           );
         }
-        if (url.endsWith("/agent-tests/benchmark/task-ph")) {
+        if (isBenchmarkDetail(url, "task-ph")) {
           return Promise.resolve(
             jsonResponse({ task_id: "task-ph", status: "in_progress" }),
           );
@@ -925,7 +942,7 @@ describe("BenchmarkResultsDialog", () => {
             jsonResponse({ task_id: "task-partial", status: "queued" }),
           );
         }
-        if (url.endsWith("/agent-tests/benchmark/task-partial")) {
+        if (isBenchmarkDetail(url, "task-partial")) {
           pollCount += 1;
           return Promise.resolve(
             jsonResponse({
@@ -966,7 +983,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("returns modelResults as-is once done", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-done")) {
+        if (isBenchmarkDetail(url, "task-done")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-done",
@@ -1013,7 +1030,7 @@ describe("BenchmarkResultsDialog", () => {
   describe("done-state UI: tabs, pager, export, share, labelling, rerun", () => {
     async function renderDoneRun(overrides: Partial<any> = {}) {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-ui")) {
+        if (isBenchmarkDetail(url, "task-ui")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-ui",
@@ -1071,7 +1088,7 @@ describe("BenchmarkResultsDialog", () => {
       // Viewing a past run: `models` prop is empty, so the rerun config must be
       // recovered from the loaded model_results.
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-rerun")) {
+        if (isBenchmarkDetail(url, "task-rerun")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-rerun",
@@ -1144,7 +1161,7 @@ describe("BenchmarkResultsDialog", () => {
       // A viewed benchmark that predates the backend snapshot: no test_uuids,
       // and the view surfaces pass onRerun but not onGoBack.
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-legacy")) {
+        if (isBenchmarkDetail(url, "task-legacy")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-legacy",
@@ -1325,7 +1342,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("does not show export/share/submit-for-labelling when there are no results", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-empty")) {
+        if (isBenchmarkDetail(url, "task-empty")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-empty",
@@ -1369,7 +1386,7 @@ describe("BenchmarkResultsDialog", () => {
     it("does not show share button when backendAccessToken is falsy", async () => {
       useAccessTokenMock.mockReturnValue(null as any);
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-notoken")) {
+        if (isBenchmarkDetail(url, "task-notoken")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-notoken",
@@ -1430,7 +1447,7 @@ describe("BenchmarkResultsDialog", () => {
   it("auto-selects the first test with results once, and does not jump on subsequent updates", async () => {
     let pollCount = 0;
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-auto")) {
+      if (isBenchmarkDetail(url, "task-auto")) {
         pollCount += 1;
         if (pollCount === 1) {
           return Promise.resolve(
@@ -1513,5 +1530,136 @@ describe("BenchmarkResultsDialog", () => {
       await setupUser().click(screen.getByRole("button", { name: "Results" }));
     });
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+  });
+});
+
+// A comparison runs every test once per model, so its results are the heaviest
+// thing the app reads. The window reads them without each test's conversation,
+// reply and judge reasoning, and asks for the one test someone opens — for the
+// model whose answer is on screen.
+describe("reading a comparison light, and one test in full", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  const lightComparison = {
+    task_id: "task-light",
+    status: "completed",
+    model_results: [
+      {
+        model: "openai/gpt-4.1",
+        total_tests: 1,
+        test_results: [
+          {
+            test_case_id: "test-1",
+            name: "First test",
+            passed: true,
+            test_type: "response",
+          },
+        ],
+      },
+    ],
+  };
+
+  /** Every request for one test's own result. */
+  const caseCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("/agent-tests/run/task-light/results/"),
+    );
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    (global.fetch as any) = jest.fn((url: string) => {
+      if (String(url).includes("/agent-tests/run/task-light/results/test-1")) {
+        return Promise.resolve(
+          jsonResponse({
+            test_case_id: "test-1",
+            name: "First test",
+            passed: true,
+            output: { response: "The full reply" },
+            test_case: { evaluation: { type: "response" } },
+            judge_results: [{ evaluator_uuid: "eval-1", match: true }],
+          }),
+        );
+      }
+      if (isBenchmarkDetail(String(url), "task-light")) {
+        return Promise.resolve(jsonResponse(lightComparison));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    jest.useRealTimers();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const open = () =>
+    render(
+      <BenchmarkResultsDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        testUuids={[]}
+        testNames={[]}
+        models={[]}
+        taskId="task-light"
+      />,
+    );
+
+  /** Open the window and go to the list of tests. A finished comparison lands
+   * on the leaderboard, so the list is one click away. */
+  const openOnResults = async (user: ReturnType<typeof setupUser>) => {
+    open();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Results" }));
+    await screen.findByTestId("outputs-panel");
+  };
+
+  it("asks for the comparison without every test's detail", async () => {
+    open();
+    await screen.findByTestId("leaderboard");
+    const detailUrls = (global.fetch as jest.Mock).mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => isBenchmarkDetail(url, "task-light"));
+    expect(detailUrls.length).toBeGreaterThan(0);
+    for (const url of detailUrls) expect(url).toContain("mode=summary");
+  });
+
+  it("reads the open test in full, naming the model whose answer is shown", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+
+    // The window opens the first test with results on its own, so exactly that
+    // one test is read in full and its reply appears on the row.
+    await user.click(screen.getByText("selecttest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel-rows")).toHaveTextContent(
+        "The full reply",
+      ),
+    );
+    expect(caseCalls()).toHaveLength(1);
+    const url = String(caseCalls()[0][0]);
+    expect(url).toContain("/agent-tests/run/task-light/results/test-1");
+    // A model name has a slash in it, so it goes in the query, encoded.
+    expect(url).toContain(`model=${encodeURIComponent("openai/gpt-4.1")}`);
+  });
+
+  it("reads every test in full only when the results are exported", async () => {
+    const user = setupUser();
+    open();
+    await screen.findByTestId("leaderboard");
+    const fullReads = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) =>
+          isBenchmarkDetail(String(url), "task-light") &&
+          !String(url).includes("mode=summary"),
+      );
+    expect(fullReads()).toHaveLength(0);
+
+    await user.click(screen.getByTestId("export-button"));
+    await waitFor(() => expect(fullReads()).toHaveLength(1));
   });
 });

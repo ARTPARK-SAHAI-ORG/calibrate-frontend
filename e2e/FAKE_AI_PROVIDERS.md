@@ -142,7 +142,7 @@ Args: `llm -c <input/test_config.json> [-m <model>...] [-p <provider>] -o <outpu
       "total_tokens": {"mean": 42, "min": 42, "max": 42, "count": <n_tests>},
       "criteria": {
         "<evaluator_name>": {"type": "binary", "evaluator_id": "<uuid>",
-                             "passed": <n_tests>, "total": <n_tests>, "pass_rate": 1.0}
+                             "passed": <n_tests>, "total": <n_tests>, "pass_rate": 100.0}
       }}
      ```
      `criteria` is **required for benchmark** (consumed by `_build_evaluator_summary`);

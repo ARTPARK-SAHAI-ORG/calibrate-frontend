@@ -30,10 +30,7 @@ import {
   StopRunButton,
 } from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import {
-  AddRunToLabellingTaskDialog,
-  isLabellingEligibleRaw,
-} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { AddRunToLabellingTaskDialog } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import {
   TestRunOutputsPanel,
@@ -43,14 +40,18 @@ import {
 } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
-  buildEvaluatorSummaryFromResults,
-  toolCallEvaluatorUuidFromRows,
+  isToolCallRow,
+  rowTestType,
+  rowTestUuid,
+  runEvaluatorSummary,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
   abortRunOrNotify,
   startTestRunOrNotify,
+  fetchTestCase,
   fetchTestRun,
+  getCachedTestRun,
   isTerminalRunStatus,
   UnauthorizedError,
   type TestCaseResult,
@@ -84,7 +85,49 @@ type Row = {
    * be run. */
   reasoning?: string;
   judgeResults?: JudgeResult[] | null;
+  /** This test's answer is being read. */
+  loading?: boolean;
+  /** What kind of test this row ran: "response", "general", "tool_call" or
+   * "conversation". Null on a run old enough to say neither. */
+  testType: string | null;
 };
+
+/** The three kinds of test that can be sent for human labelling — the same
+ * three `isLabellingEligibleRaw` accepts, decided from the kind the row
+ * itself reports rather than from a whole test case the summary leaves out. */
+const LABELLABLE_TEST_TYPES = new Set(["response", "general", "tool_call"]);
+
+/** Turn a run's cases into the rows the window works from. The same rule for
+ * the run read without each case's detail and for the full read Export and
+ * Submit for labelling ask for, so the two can never disagree. */
+function toRows(results: TestCaseResult[], runStopped: boolean): Row[] {
+  return results.map((r, i): Row => {
+    // A missing verdict means the test has not finished — unless the run was
+    // stopped, in which case it never started and nothing more is coming. A
+    // test that produced no answer says so itself and comes back with
+    // `passed: false`.
+    const status: Row["status"] = isNotRun(r, runStopped)
+      ? "not_run"
+      : r.passed === null || r.passed === undefined
+        ? "running"
+        : r.passed === true
+          ? "passed"
+          : "failed";
+    return {
+      id: rowTestUuid(r) ?? `idx-${i}`,
+      testUuid: rowTestUuid(r) ?? undefined,
+      name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
+      status,
+      unanswered: isUnanswered(r),
+      output: r.output ?? undefined,
+      testCase: r.test_case ?? undefined,
+      inputs: r.inputs ?? undefined,
+      reasoning: r.reasoning,
+      judgeResults: r.judge_results ?? null,
+      testType: rowTestType(r),
+    };
+  });
+}
 
 type TestRunnerDialogProps = {
   isOpen: boolean;
@@ -131,6 +174,22 @@ export function TestRunnerDialog({
     "outputs",
   );
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  // Tests read in full, keyed by test id. The run itself is read without each
+  // case's conversation, reply and verdicts, so the one the reader opens is
+  // asked for on its own.
+  const [openedCases, setOpenedCases] = useState<Record<string, TestCaseResult>>(
+    {},
+  );
+  // The test whose full result is on its way, so the panel can say so.
+  const [loadingCaseId, setLoadingCaseId] = useState<string | null>(null);
+  // The evaluator that judged this run's tool-call tests, read off one case.
+  const [toolCallEvaluatorUuid, setToolCallEvaluatorUuid] = useState<
+    string | null
+  >(null);
+  // Every case in full. Only Export and Submit for labelling need this, and
+  // only when clicked, so it is read then rather than with the run.
+  const [fullResults, setFullResults] = useState<TestCaseResult[] | null>(null);
+  const [isPreparingLabelling, setIsPreparingLabelling] = useState(false);
   // Guards the rerun POST: a test run is billed, so a second click while the
   // first request is in flight must not start a second run.
   const [isStartingRun, setIsStartingRun] = useState(false);
@@ -172,10 +231,18 @@ export function TestRunnerDialog({
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) return;
 
-    setRun(null);
-    setIsLoading(true);
+    // A run already read this session is shown straight away, so reopening it
+    // does not download megabytes of results again. The fetch below still
+    // runs: the name, or whether it is shared, can have changed elsewhere.
+    const cached = getCachedTestRun(taskId, "summary");
+    setRun(cached ?? null);
+    setIsLoading(!cached);
     setSelectedTestUuid(null);
     setActiveTab("outputs");
+    setOpenedCases({});
+    setLoadingCaseId(null);
+    setToolCallEvaluatorUuid(null);
+    setFullResults(null);
     hasAutoSelectedRef.current = false;
     clearLabellingSelection();
 
@@ -194,6 +261,7 @@ export function TestRunnerDialog({
           backendUrl,
           backendAccessToken,
           taskId,
+          "summary",
         );
         if (cancelled) return;
         setRun(result);
@@ -240,35 +308,10 @@ export function TestRunnerDialog({
       return "queued";
     }, [run]);
 
-  const rows: Row[] = useMemo(() => {
-    const results = run?.results ?? [];
-    const runStopped = run ? isRunStopped(run) : false;
-    return results.map((r: TestCaseResult, i): Row => {
-      // A missing verdict means the test has not finished — unless the run was
-      // stopped, in which case it never started and nothing more is coming. A
-      // test that produced no answer says so itself and comes back with
-      // `passed: false`.
-      const status: Row["status"] = isNotRun(r, runStopped)
-        ? "not_run"
-        : r.passed === null || r.passed === undefined
-          ? "running"
-          : r.passed === true
-            ? "passed"
-            : "failed";
-      return {
-        id: r.test_case_id ?? `idx-${i}`,
-        testUuid: r.test_case_id,
-        name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
-        status,
-        unanswered: isUnanswered(r),
-        output: r.output ?? undefined,
-        testCase: r.test_case ?? undefined,
-        inputs: r.inputs ?? undefined,
-        reasoning: r.reasoning,
-        judgeResults: r.judge_results ?? null,
-      };
-    });
-  }, [run]);
+  const rows: Row[] = useMemo(
+    () => toRows(run?.results ?? [], run ? isRunStopped(run) : false),
+    [run],
+  );
 
   const runEvaluators = useMemo(
     () => (Array.isArray(run?.evaluators) ? run.evaluators : []),
@@ -315,16 +358,16 @@ export function TestRunnerDialog({
   // are kept; the rest were never started.
   const wasStopped = run ? isRunStopped(run) : false;
   // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
-  // the test case's evaluation type.
+  // the kind of test the row itself reports.
   const toolCall = toolCallPassFail(
     rows.map((r) => ({
-      toolCall: r.testCase?.evaluation?.type === "tool_call",
+      toolCall: r.testType === "tool_call",
       passed: r.status === "passed",
       failed: r.status === "failed" && !r.unanswered,
     })),
   );
-  const hasLabellingEligibleTests = rows.some((r) =>
-    isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
+  const hasLabellingEligibleTests = rows.some(
+    (r) => r.testType !== null && LABELLABLE_TEST_TYPES.has(r.testType),
   );
   // The row checkboxes exist only to feed the "Submit for labelling" button,
   // so they appear exactly when it does — never on a run with nothing that
@@ -334,24 +377,155 @@ export function TestRunnerDialog({
   const showLabelling =
     isFinished && rows.length > 0 && hasLabellingEligibleTests;
 
-  // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
-  // backend `evaluator_summary` block (only benchmarks do), so aggregate it
-  // from each case's judge_results against the run's evaluator metadata.
-  // The evaluator that judged the tool-call tests, when the run has one.
-  // Found from the rows rather than the run's evaluator list, which carries
-  // no kind, and never by name, which a workspace can change.
-  const toolCallEvaluatorUuid = useMemo(
-    () => toolCallEvaluatorUuidFromRows(rows),
-    [rows],
+  // Per-evaluator totals for the Summary tab. The run counts these itself, so
+  // nothing here has to add up each case's verdicts.
+  const evaluatorSummary = useMemo(
+    () => runEvaluatorSummary(run?.evaluator_summary),
+    [run],
   );
 
-  const evaluatorSummary = useMemo(
+  // The evaluator that judged this run's tool-call tests, when it has any.
+  // The run's own evaluator list does not say which one that is, and its name
+  // can be changed by the workspace, so the only place it can be read is a
+  // tool-call test's own verdict.
+  //
+  // ponytail: one small request. Reading the whole run in full to answer this
+  // is what the summary mode exists to avoid, and the case is remembered, so
+  // opening that test afterwards costs nothing.
+  useEffect(() => {
+    if (toolCallEvaluatorUuid) return;
+    if (!run || !isTerminalRunStatus(run.status)) return;
+    const first = (run.results ?? []).find(
+      (r) => isToolCallRow(r) && rowTestUuid(r),
+    );
+    const firstUuid = first ? rowTestUuid(first) : null;
+    if (!firstUuid) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !backendAccessToken) return;
+
+    let cancelled = false;
+    fetchTestCase(
+      backendUrl,
+      backendAccessToken,
+      taskId,
+      firstUuid,
+    )
+      .then((testCase) => {
+        const uuid = testCase.judge_results?.[0]?.evaluator_uuid;
+        if (!cancelled && uuid) setToolCallEvaluatorUuid(uuid);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          reportError("Error reading the tool-call evaluator:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run, taskId, backendAccessToken, toolCallEvaluatorUuid]);
+
+  // Read the test the reader opened in full: its conversation, the agent's
+  // reply and each evaluator's verdict, none of which come with the run.
+  useEffect(() => {
+    const row = selectedTestUuid
+      ? rows.find((r) => r.id === selectedTestUuid)
+      : undefined;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    // Nothing to read: no test open, a run old enough to send no test ids, a
+    // test still going or never started, or one already read. Clear the mark
+    // rather than returning under it — moving to a test already read used to
+    // leave the previous one marked as loading with nothing left to clear it.
+    if (
+      !row?.testUuid ||
+      row.status === "running" ||
+      row.status === "not_run" ||
+      openedCases[row.testUuid] ||
+      !backendUrl ||
+      !backendAccessToken
+    ) {
+      setLoadingCaseId(null);
+      return;
+    }
+
+    const testUuid = row.testUuid;
+    let cancelled = false;
+    setLoadingCaseId(selectedTestUuid);
+    fetchTestCase(backendUrl, backendAccessToken, taskId, testUuid)
+      .then((testCase) => {
+        if (!cancelled) {
+          setOpenedCases((prev) => ({ ...prev, [testUuid]: testCase }));
+        }
+      })
+      .catch((error) => {
+        // The test stays selected and the run stays on screen; only this
+        // test's detail is missing.
+        if (!cancelled) reportError("Error reading a test's result:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCaseId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTestUuid, rows, openedCases, taskId, backendAccessToken]);
+
+  // The rows as the panel draws them: the opened test filled in from its own
+  // read, and the one still being read shown as busy.
+  const displayRows: Row[] = useMemo(
     () =>
-      buildEvaluatorSummaryFromResults(
-        rows.map((r) => ({ judge_results: r.judgeResults })),
-        evaluatorsByUuid,
-      ),
-    [rows, evaluatorsByUuid],
+      rows.map((r) => {
+        const opened = r.testUuid ? openedCases[r.testUuid] : undefined;
+        if (opened) {
+          return {
+            ...r,
+            output: opened.output ?? undefined,
+            testCase: opened.test_case ?? undefined,
+            inputs: opened.inputs ?? undefined,
+            reasoning: opened.reasoning ?? r.reasoning,
+            judgeResults: opened.judge_results ?? null,
+          };
+        }
+        // The list decides which tests can be ticked for labelling from the
+        // test case's kind. The run gives that as the row's own kind instead,
+        // so carry it across in the shape the list reads.
+        const testCase =
+          r.testCase ??
+          (r.testType ? { evaluation: { type: r.testType } } : undefined);
+        return { ...r, testCase, loading: r.id === loadingCaseId };
+      }),
+    [rows, openedCases, loadingCaseId],
+  );
+
+  // Every case in full, read once and kept. Export and Submit for labelling
+  // both need each test's conversation, reply and verdicts, which the run
+  // itself leaves out. Null when it could not be read.
+  const loadFullResults = async (): Promise<TestCaseResult[] | null> => {
+    if (fullResults) return fullResults;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return null;
+    try {
+      const full = await fetchTestRun(
+        backendUrl,
+        backendAccessToken,
+        taskId,
+        "full",
+      );
+      const results = full.results ?? [];
+      setFullResults(results);
+      return results;
+    } catch (error) {
+      reportError("Error reading the run's full results:", error);
+      return null;
+    }
+  };
+
+  // The same rows again, from the full read. Empty until Export or Submit for
+  // labelling has asked for it.
+  const fullRows = useMemo(
+    () => toRows(fullResults ?? [], run ? isRunStopped(run) : false),
+    [fullResults, run],
   );
 
   // Stop a run that is still going, then read it back, since the stop itself
@@ -370,7 +544,9 @@ export function TestRunnerDialog({
     );
     if (!stopped) return;
     try {
-      setRun(await fetchTestRun(backendUrl, backendAccessToken, taskId));
+      setRun(
+        await fetchTestRun(backendUrl, backendAccessToken, taskId, "summary"),
+      );
     } catch (error) {
       reportError("Error reading a stopped test run:", error);
     }
@@ -484,9 +660,19 @@ export function TestRunnerDialog({
               <div className="hidden md:block">
                 <ExportResultsButton
                   filename={`test-run-${agentName}`}
-                  getRows={() =>
-                    buildTestRunCsv(
-                      rows.map((r) => ({
+                  getRows={async () => {
+                    // Every column of the file is a case's conversation, reply
+                    // or verdict, none of which come with the run, so the full
+                    // results are read here rather than on open.
+                    const results = await loadFullResults();
+                    if (!results) {
+                      toast.error(
+                        "Could not read the results to export. Please try again.",
+                      );
+                      return { columns: [], rows: [] };
+                    }
+                    return buildTestRunCsv(
+                      toRows(results, wasStopped).map((r) => ({
                         name: r.name,
                         status: r.unanswered ? "error" : r.status,
                         output: r.output,
@@ -495,8 +681,8 @@ export function TestRunnerDialog({
                         judgeResults: r.judgeResults,
                       })),
                       evaluatorsByUuid,
-                    )
-                  }
+                    );
+                  }}
                 />
               </div>
             )}
@@ -504,7 +690,8 @@ export function TestRunnerDialog({
               <div className="hidden md:block">
                 <button
                   type="button"
-                  onClick={() => {
+                  disabled={isPreparingLabelling}
+                  onClick={async () => {
                     if (activeTab === "summary") {
                       setActiveTab("outputs");
                     }
@@ -514,11 +701,27 @@ export function TestRunnerDialog({
                       );
                       return;
                     }
-                    setAddToTaskOpen(true);
+                    if (isPreparingLabelling) return;
+                    setIsPreparingLabelling(true);
+                    try {
+                      // Each test goes over as its conversation, the agent's
+                      // reply and its verdicts, so the full results are read
+                      // here rather than on open.
+                      const results = await loadFullResults();
+                      if (!results) {
+                        toast.error(
+                          "Could not read the results to submit. Please try again.",
+                        );
+                        return;
+                      }
+                      setAddToTaskOpen(true);
+                    } finally {
+                      setIsPreparingLabelling(false);
+                    }
                   }}
-                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
                 >
-                  Submit for labelling
+                  {isPreparingLabelling ? "Preparing…" : "Submit for labelling"}
                 </button>
               </div>
             )}
@@ -631,7 +834,7 @@ export function TestRunnerDialog({
             ) : (
               <div className="flex-1 overflow-hidden">
                 <TestRunOutputsPanel
-                  results={rows.map((r) => ({
+                  results={displayRows.map((r) => ({
                     id: r.id,
                     name: r.name,
                     status: r.status,
@@ -641,6 +844,7 @@ export function TestRunnerDialog({
                     inputs: r.inputs,
                     reasoning: r.reasoning,
                     judgeResults: r.judgeResults,
+                    loading: r.loading,
                   }))}
                   selectedId={selectedTestUuid}
                   onSelect={setSelectedTestUuid}
@@ -674,10 +878,9 @@ export function TestRunnerDialog({
         source={{
           type: "test_run",
           runUuid: taskId,
-          results: rows
+          results: fullRows
             .filter((r) => labellingSelectedIds.has(r.id))
             .map((r) => ({
-              test_uuid: r.testUuid,
               test_name: r.name,
               status:
                 r.status === "passed" || r.status === "failed"

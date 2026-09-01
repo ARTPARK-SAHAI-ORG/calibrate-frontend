@@ -7,6 +7,7 @@ import {
   runDisplayName,
   isRunStopped,
   isNotRun,
+  isRunInProgress,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -204,4 +205,23 @@ describe("getRunBreakdown on a stopped run", () => {
       getRunBreakdown({ total_tests: 10, passed: 3, unanswered_tests: 1 }),
     ).toEqual({ passed: 3, failed: 6, unanswered: 1 });
   });
+});
+
+// Both run lists refresh themselves only while this says a run is still
+// going, so a wrong answer here either leaves a finished list refreshing
+// forever or leaves a running one frozen.
+describe("isRunInProgress", () => {
+  it.each(["pending", "queued", "in_progress"])(
+    "says a run is still going when its status is %s",
+    (status) => {
+      expect(isRunInProgress({ status })).toBe(true);
+    },
+  );
+
+  it.each(["completed", "done", "failed", "aborted", ""])(
+    "says a run is not going when its status is %s",
+    (status) => {
+      expect(isRunInProgress({ status })).toBe(false);
+    },
+  );
 });

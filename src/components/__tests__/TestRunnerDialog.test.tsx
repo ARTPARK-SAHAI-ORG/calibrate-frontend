@@ -1,6 +1,7 @@
 import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { toast } from "sonner";
 import { TestRunnerDialog } from "../TestRunnerDialog";
+import { clearTestRunCache } from "@/lib/testRunApi";
 
 // Mock heavy child components so this file tests TestRunnerDialog's own
 // state machine (fetch/poll lifecycle, row derivation, labelling gating), not
@@ -25,6 +26,7 @@ jest.mock("../eval-details", () => ({
             {r.inputs ? JSON.stringify(r.inputs) : ""}
           </span>
           <span data-testid={`unanswered-${r.id}`}>{String(r.unanswered)}</span>
+          <span data-testid={`loading-${r.id}`}>{String(!!r.loading)}</span>
           {onToggleLabellingSelection && (
             <button
               aria-label={`toggle-labelling-${r.id}`}
@@ -45,6 +47,7 @@ jest.mock("../eval-details", () => ({
     stoppedEarly,
     stopped,
     onReviewUnanswered,
+    ...props
   }: any) => (
     <div data-testid="summary-panel">
       summary {passed}/{total}
@@ -52,6 +55,9 @@ jest.mock("../eval-details", () => ({
         {JSON.stringify({ unanswered, stoppedEarly })}
       </span>
       <span data-testid="summary-stopped">{String(stopped === true)}</span>
+      <span data-testid="summary-evaluators">
+        {JSON.stringify(props.evaluatorSummary ?? [])}
+      </span>
       <button onClick={onReviewUnanswered}>review-unanswered</button>
     </div>
   ),
@@ -90,8 +96,13 @@ jest.mock("../human-labelling/AddRunToLabellingTaskDialog", () => ({
         <button onClick={onClose}>Close labelling</button>
       </div>
     ) : null,
+  // Matches the real rule in that module: a next-reply test, a single agent
+  // response test and a tool-call test can all be labelled; a whole
+  // conversation cannot. The stub used to say the opposite for a tool call.
   isLabellingEligibleRaw: ({ test_case }: any) =>
-    test_case?.evaluation?.type !== "tool_call",
+    ["response", "general", "tool_call"].includes(
+      test_case?.evaluation?.type,
+    ),
 }));
 
 jest.mock("sonner", () => ({
@@ -113,7 +124,7 @@ function jsonResponse(body: any, ok = true, status = ok ? 200 : 500) {
 /** How many times the run endpoint for `taskId` has been fetched. */
 function runFetchCount(taskId: string) {
   return (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-    String(url).endsWith(`/agent-tests/run/${taskId}`),
+    isRunDetail(String(url), taskId),
   ).length;
 }
 
@@ -134,6 +145,13 @@ async function stopAndConfirm(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getAllByRole("button", { name: "Stop" })[1]);
 }
 
+/** The run-detail request for `taskId`, whatever query it carries. The window
+ * asks for the light version (`?mode=summary`), so an exact-URL match would
+ * miss it. A per-case or rename/abort request under the same run is NOT this. */
+function isRunDetail(url: string, taskId: string): boolean {
+  return String(url).split("?")[0].endsWith(`/agent-tests/run/${taskId}`);
+}
+
 describe("TestRunnerDialog", () => {
   const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -141,6 +159,10 @@ describe("TestRunnerDialog", () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
     localStorage.setItem("access_token", "test-token");
     (global.fetch as any) = jest.fn();
+    // Several tests here reuse one task id with different runs behind it. The
+    // window remembers finished runs, so without this a run from an earlier
+    // test would be shown by a later one.
+    clearTestRunCache();
   });
 
   afterEach(() => {
@@ -169,7 +191,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-slow")) {
+      if (isRunDetail(url, "task-slow")) {
         return new Promise((resolve) => {
           resolveRun = resolve;
         });
@@ -230,7 +252,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-inputs")) {
+      if (isRunDetail(url, "task-inputs")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-inputs",
@@ -271,7 +293,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-rows")) {
+      if (isRunDetail(url, "task-rows")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-rows",
@@ -325,7 +347,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-legacy-rows")) {
+      if (isRunDetail(url, "task-legacy-rows")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-legacy-rows",
@@ -372,7 +394,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-tick")) {
+      if (isRunDetail(url, "task-tick")) {
         pollCount += 1;
         if (pollCount === 1) {
           return Promise.resolve(
@@ -443,7 +465,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-open")) {
+      if (isRunDetail(url, "task-open")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-open",
@@ -490,7 +512,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-rerun")) {
+      if (isRunDetail(url, "task-rerun")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-rerun",
@@ -555,7 +577,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-idle")) {
+      if (isRunDetail(url, "task-idle")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-idle",
@@ -614,7 +636,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-rerun-fail")) {
+      if (isRunDetail(url, "task-rerun-fail")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-rerun-fail",
@@ -697,7 +719,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-legacy")) {
+      if (isRunDetail(url, "task-legacy")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-legacy",
@@ -734,7 +756,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-norerun")) {
+      if (isRunDetail(url, "task-norerun")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-norerun",
@@ -776,7 +798,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-summary")) {
+      if (isRunDetail(url, "task-summary")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-summary",
@@ -827,7 +849,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-err")) {
+      if (isRunDetail(url, "task-err")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-err",
@@ -880,7 +902,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-err-empty")) {
+      if (isRunDetail(url, "task-err-empty")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-err-empty",
@@ -913,7 +935,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-partial")) {
+      if (isRunDetail(url, "task-partial")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-partial",
@@ -962,7 +984,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-401")) {
+      if (isRunDetail(url, "task-401")) {
         return Promise.resolve(jsonResponse({}, false, 401));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -988,7 +1010,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-bad")) {
+      if (isRunDetail(url, "task-bad")) {
         return Promise.resolve(jsonResponse({}, false, 500));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -1020,10 +1042,10 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-broken")) {
+      if (isRunDetail(url, "task-broken")) {
         return Promise.resolve(jsonResponse({}, false, 500));
       }
-      if (url.endsWith("/agent-tests/run/task-next")) {
+      if (isRunDetail(url, "task-next")) {
         return new Promise(() => {});
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -1064,7 +1086,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-flaky")) {
+      if (isRunDetail(url, "task-flaky")) {
         calls += 1;
         if (calls === 1) {
           return Promise.resolve(
@@ -1175,7 +1197,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-select")) {
+      if (isRunDetail(url, "task-select")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-select",
@@ -1217,7 +1239,7 @@ describe("TestRunnerDialog", () => {
         if (url.includes("/evaluators?include_defaults=true")) {
           return Promise.resolve(jsonResponse([]));
         }
-        if (url.endsWith("/agent-tests/run/task-label")) {
+        if (isRunDetail(url, "task-label")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-label",
@@ -1275,7 +1297,7 @@ describe("TestRunnerDialog", () => {
         if (url.includes("/evaluators?include_defaults=true")) {
           return Promise.resolve(jsonResponse([]));
         }
-        if (url.endsWith("/agent-tests/run/task-toolonly")) {
+        if (isRunDetail(url, "task-toolonly")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-toolonly",
@@ -1283,9 +1305,10 @@ describe("TestRunnerDialog", () => {
               results: [
                 {
                   test_case_id: "test-2",
-                  name: "Tool Test",
+                  name: "Conversation Test",
                   passed: true,
-                  test_case: { evaluation: { type: "tool_call" } },
+                  test_type: "conversation",
+                  test_case: { evaluation: { type: "conversation" } },
                 },
               ],
             }),
@@ -1349,6 +1372,10 @@ describe("tests that produced no answer", () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
     localStorage.setItem("access_token", "test-token");
     (global.fetch as any) = jest.fn();
+    // Several tests here reuse one task id with different runs behind it. The
+    // window remembers finished runs, so without this a run from an earlier
+    // test would be shown by a later one.
+    clearTestRunCache();
   });
 
   afterEach(() => {
@@ -1362,7 +1389,7 @@ describe("tests that produced no answer", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-gaps")) {
+      if (isRunDetail(url, "task-gaps")) {
         return Promise.resolve(
           jsonResponse({ task_id: "task-gaps", status: "done", ...payload }),
         );
@@ -1474,7 +1501,7 @@ describe("tests that produced no answer", () => {
               }),
             );
           }
-          if (url.endsWith("/agent-tests/run/task-stop")) {
+          if (isRunDetail(url, "task-stop")) {
             return Promise.resolve(
               jsonResponse({
                 task_id: "task-stop",
@@ -1555,7 +1582,7 @@ describe("tests that produced no answer", () => {
         if (url.endsWith("/agent-tests/run/task-stop/abort")) {
           return Promise.resolve(jsonResponse({ task_id: "task-stop" }));
         }
-        if (url.endsWith("/agent-tests/run/task-stop")) {
+        if (isRunDetail(url, "task-stop")) {
           // The first read lands, the read after the stop does not.
           return (global.fetch as jest.Mock).mock.calls.filter(([u]) =>
             String(u).endsWith("/agent-tests/run/task-stop"),
@@ -1623,7 +1650,7 @@ describe("tests that produced no answer", () => {
               }),
             );
           }
-          if (url.endsWith("/agent-tests/run/task-name")) {
+          if (isRunDetail(url, "task-name")) {
             return Promise.resolve(
               jsonResponse({
                 task_id: "task-name",
@@ -1682,5 +1709,287 @@ describe("tests that produced no answer", () => {
       ).toBeInTheDocument();
       expect(onRenamed).toHaveBeenCalledWith("Regression before v2");
     });
+  });
+});
+
+// The window reads a run without each test's conversation, reply and verdicts,
+// and asks for the one test someone opens. A run of nearly two thousand tests
+// was 4.64 MB read this way and 0.86 MB read the light way.
+describe("reading a run light, and one test in full", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  const lightRun = {
+    task_id: "task-light",
+    status: "completed",
+    total_tests: 2,
+    passed: 2,
+    failed: 0,
+    results: [
+      {
+        // Calibrate replaces the id it is sent with the test's name, so this
+        // row carries a name here and the test's real id in `test_uuid`.
+        test_case_id: "v4_ex__pruned__p1__district",
+        test_uuid: "test-1",
+        name: "First test",
+        passed: true,
+        test_type: "response",
+      },
+      {
+        test_case_id: "test-2",
+        name: "Second test",
+        passed: true,
+        test_type: "response",
+      },
+    ],
+    evaluator_summary: [
+      {
+        metric_key: "correctness",
+        name: "Correctness",
+        type: "binary",
+        evaluator_uuid: "eval-1",
+        passed: 2,
+        total: 2,
+        pass_rate: 100,
+      },
+    ],
+  };
+
+  const fullCase = {
+    test_case_id: "test-1",
+    name: "First test",
+    passed: true,
+    test_type: "response",
+    inputs: { city: "Bengaluru" },
+    output: { response: "The full reply" },
+    test_case: { evaluation: { type: "response" } },
+    judge_results: [{ evaluator_uuid: "eval-1", match: true }],
+  };
+
+  /** Every request the window made for one test's own result. */
+  const caseCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("/agent-tests/run/task-light/results/"),
+    );
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    (global.fetch as any) = jest.fn((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (String(url).includes("/agent-tests/run/task-light/results/test-1")) {
+        return Promise.resolve(jsonResponse(fullCase));
+      }
+      if (String(url).includes("/agent-tests/run/task-light/results/test-2")) {
+        return Promise.resolve(
+          jsonResponse({ ...fullCase, test_case_id: "test-2", name: "Second test" }),
+        );
+      }
+      if (isRunDetail(url, "task-light")) {
+        return Promise.resolve(jsonResponse(lightRun));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    clearTestRunCache();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    jest.useRealTimers();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const open = () =>
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-light"
+      />,
+    );
+
+  /** Open the window and go to the list of tests. A finished run lands on the
+   * Summary tab, so the list is one click away. */
+  const openOnResults = async (user: ReturnType<typeof setupUser>) => {
+    open();
+    await screen.findByTestId("summary-panel");
+    await user.click(screen.getByRole("button", { name: "Results" }));
+    await screen.findByTestId("outputs-panel");
+  };
+
+  it("asks for the run without every test's detail", async () => {
+    open();
+    await screen.findByTestId("summary-panel");
+    const runUrls = (global.fetch as jest.Mock).mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => isRunDetail(url, "task-light"));
+    expect(runUrls.length).toBeGreaterThan(0);
+    for (const url of runUrls) expect(url).toContain("mode=summary");
+  });
+
+  it("reads one test in full, not all of them", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+
+    // The window opens the first finished test on its own, so exactly that one
+    // test is read in full. The second is not touched until someone opens it.
+    await waitFor(() =>
+      expect(screen.getByTestId("inputs-test-1")).toHaveTextContent(
+        "Bengaluru",
+      ),
+    );
+    expect(caseCalls()).toHaveLength(1);
+    expect(String(caseCalls()[0][0])).toContain(
+      "/agent-tests/run/task-light/results/test-1",
+    );
+    expect(screen.getByTestId("inputs-test-2")).toHaveTextContent("");
+
+    await user.click(screen.getByText("Second test:passed"));
+    await waitFor(() => expect(caseCalls()).toHaveLength(2));
+    expect(String(caseCalls()[1][0])).toContain("results/test-2");
+  });
+
+  it("does not ask for the same test twice", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+    await user.click(screen.getByText("First test:passed"));
+    await waitFor(() => expect(caseCalls()).toHaveLength(1));
+    await user.click(screen.getByText("Second test:passed"));
+    await user.click(screen.getByText("First test:passed"));
+    await waitFor(() =>
+      expect(screen.getByTestId("inputs-test-1")).toHaveTextContent(
+        "Bengaluru",
+      ),
+    );
+    expect(
+      caseCalls().filter(([url]) => String(url).includes("test-1")),
+    ).toHaveLength(1);
+  });
+
+  it("takes the per-evaluator totals from the run rather than counting them here", async () => {
+    open();
+    await screen.findByTestId("summary-panel");
+    const shown = JSON.parse(
+      screen.getByTestId("summary-evaluators").textContent || "[]",
+    );
+    expect(shown).toHaveLength(1);
+    expect(shown[0].name).toBe("Correctness");
+    // Straight from the backend: the cards draw a percentage out of 100 and
+    // nothing here rescales it.
+    expect(shown[0].pass_rate).toBe(100);
+  });
+
+  it("reads every test in full only when the results are exported", async () => {
+    const user = setupUser();
+    open();
+    await screen.findByTestId("summary-panel");
+    const fullReads = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) =>
+          isRunDetail(String(url), "task-light") &&
+          !String(url).includes("mode=summary"),
+      );
+    expect(fullReads()).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(fullReads()).toHaveLength(1));
+  });
+});
+
+// A row's verdict is what puts it in a group, so reading its answer must not
+// touch it. Marking the row "running" while it loaded moved it out of Passed
+// and changed that group's count on every click.
+describe("a test loading its answer", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  let release: (value: unknown) => void;
+  const run = {
+    task_id: "task-load",
+    status: "completed",
+    results: [
+      { test_uuid: "t1", name: "Alpha", passed: true, test_type: "response" },
+      { test_uuid: "t2", name: "Beta", passed: true, test_type: "response" },
+    ],
+  };
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    clearTestRunCache();
+    (global.fetch as any) = jest.fn((url: string) => {
+      if (String(url).includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (String(url).includes("/results/t1")) {
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      if (String(url).includes("/results/t2")) {
+        return Promise.resolve(
+          jsonResponse({ test_uuid: "t2", name: "Beta", passed: true }),
+        );
+      }
+      if (isRunDetail(url, "task-load")) return Promise.resolve(jsonResponse(run));
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const openOnResults = async (user: ReturnType<typeof setupUser>) => {
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-load"
+      />,
+    );
+    await screen.findByTestId("summary-panel");
+    await user.click(screen.getByRole("button", { name: "Results" }));
+    await screen.findByTestId("outputs-panel");
+  };
+
+  it("keeps the row's own verdict, so it stays in its group", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+    // Alpha opens on its own and its answer is still on its way.
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("true"),
+    );
+    expect(screen.getByText("Alpha:passed")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha:running")).not.toBeInTheDocument();
+    release(jsonResponse({ test_uuid: "t1", name: "Alpha", passed: true }));
+  });
+
+  it("stops marking a test as loading once the reader moves to one already read", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("true"),
+    );
+
+    // Beta lands, so it is held. Going back to it must not leave Alpha marked.
+    await user.click(screen.getByText("Beta:passed"));
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t2")).toHaveTextContent("false"),
+    );
+    await user.click(screen.getByText("Alpha:passed"));
+    await user.click(screen.getByText("Beta:passed"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-t1")).toHaveTextContent("false"),
+    );
+    release(jsonResponse({ test_uuid: "t1", name: "Alpha", passed: true }));
   });
 });

@@ -92,7 +92,6 @@ const benchmarkRun: AgentRun = {
 let state: {
   runs: AgentRun[];
   total?: number;
-  pollUnit?: unknown;
   deleteOk?: boolean;
   /** Holds the next runs request until this resolves. */
   holdList?: Promise<void>;
@@ -119,9 +118,6 @@ function installFetch() {
     if (url.includes("/agent-tests/job/")) {
       return jsonResponse(state.deleteOk === false ? {} : { message: "ok" },
         state.deleteOk !== false, state.deleteOk === false ? 500 : 200);
-    }
-    if (url.includes("/agent-tests/run/")) {
-      return jsonResponse(state.pollUnit ?? {}, !!state.pollUnit, 200);
     }
     return jsonResponse({});
   }) as jest.Mock;
@@ -591,10 +587,7 @@ describe("RunsTabContent", () => {
   it("asks the list for a run not on this page once, not on every refresh", async () => {
     // A run that is not on this page, next to one that is still going, so the
     // rows keep refreshing underneath it.
-    state.runs = [
-      { ...unitRun, uuid: "run-pending", status: "pending", results: null },
-    ];
-    state.pollUnit = { status: "pending", results: null };
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
     window.history.replaceState(null, "", "/?runId=run-elsewhere");
     renderTab();
     await screen.findAllByText("Running");
@@ -607,43 +600,36 @@ describe("RunsTabContent", () => {
 
     // Wait for the rows to be refreshed twice rather than for a fixed time, so
     // a slow machine cannot make this pass by accident.
-    const pollCalls = () =>
+    const listCalls = () =>
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).includes("/agent-tests/run/run-pending"),
+        String(url).includes("/runs?"),
       ).length;
-    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+    const before = listCalls();
+    await waitFor(() => expect(listCalls()).toBeGreaterThanOrEqual(before + 2), {
       timeout: 8000,
     });
     expect(existsCalls()).toBe(1);
   }, 12000);
 
-  it("leaves a running run alone when one ask for it fails", async () => {
-    state.runs = [
-      {
-        ...unitRun,
-        uuid: "run-pending",
-        status: "pending",
-        results: [{ passed: null }],
-      },
-    ];
-    // Every ask about this run fails, as a dropped connection would.
+  it("leaves a running run alone when a refresh fails", async () => {
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
+    // The first read works; every refresh after it fails, as a dropped
+    // connection would. The rows already on screen must stay.
+    let listCallCount = 0;
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        listCallCount += 1;
+        if (listCallCount > 1) throw new Error("offline");
         return jsonResponse({ items: state.runs, total: state.runs.length });
       }
-      if (url.includes("/agent-tests/run/")) throw new Error("offline");
       return jsonResponse({});
     });
 
     renderTab();
     await screen.findAllByText("Running");
 
-    // Wait for two failed asks rather than for a fixed time.
-    const pollCalls = () =>
-      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).includes("/agent-tests/run/"),
-      ).length;
-    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+    // Wait for two failed refreshes rather than for a fixed time.
+    await waitFor(() => expect(listCallCount).toBeGreaterThanOrEqual(3), {
       timeout: 8000,
     });
 
@@ -654,27 +640,38 @@ describe("RunsTabContent", () => {
   }, 12000);
 
   it("keeps an unfinished run up to date", async () => {
-    state.runs = [
-      {
-        ...unitRun,
-        uuid: "run-pending",
-        status: "pending",
-        results: [{ passed: null }],
-      },
-    ];
-    state.pollUnit = {
-      status: "done",
-      total_tests: 1,
-      passed: 1,
-      failed: 0,
-      results: [{ passed: true }],
-    };
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
+    // The run finishes between the first read and the next refresh.
+    let listCallCount = 0;
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        listCallCount += 1;
+        const runs =
+          listCallCount === 1
+            ? state.runs
+            : [
+                {
+                  ...unitRun,
+                  uuid: "run-pending",
+                  status: "done",
+                  total_tests: 1,
+                  passed: 1,
+                  failed: 0,
+                  unanswered_tests: 0,
+                },
+              ];
+        return jsonResponse({ items: runs, total: 1 });
+      }
+      return jsonResponse({});
+    });
+
     renderTab();
     await screen.findAllByText("Running");
     expect(
-      (await screen.findAllByText("1 Success", {}, { timeout: 5000 })).length,
+      (await screen.findAllByText("1 Success", {}, { timeout: 8000 })).length,
     ).toBeGreaterThan(0);
-  }, 10000);
+  }, 12000);
+
   describe("deleting a run", () => {
     /** The delete buttons in the desktop table. */
     const deleteButtons = () =>

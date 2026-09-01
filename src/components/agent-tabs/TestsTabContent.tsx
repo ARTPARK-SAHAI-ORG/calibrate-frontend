@@ -403,6 +403,16 @@ export function TestsTabContent({
   // Benchmark dialog state
   const [runAllConfirmOpen, setRunAllConfirmOpen] = useState(false);
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
+  // Whether the comparison window that is open actually started a run.
+  // Closing it then lands on Evaluations, where the run is listed, the same
+  // way closing a plain run window does. Cancelling the model picker without
+  // starting anything leaves the reader where they were.
+  const startedComparisonRef = useRef(false);
+  const closeComparison = () => {
+    const started = startedComparisonRef.current;
+    startedComparisonRef.current = false;
+    if (started) onRunWindowClosed?.();
+  };
   // The tests the benchmark dialog compares the models on: the ticked rows
   // for the "Compare" bulk action, and nothing for the header's "Compare
   // models", which means every test linked to the agent. The backend runs
@@ -2484,13 +2494,17 @@ export function TestsTabContent({
           onClose={() => {
             setBenchmarkDialogOpen(false);
             setBenchmarkTests([]);
+            closeComparison();
           }}
           agentUuid={agentUuid}
           agentName={agentName}
           agentNature={agentNature}
           tests={benchmarkTests}
           totalTests={linkedTestsTotal}
-          onBenchmarkCreated={() => onRunStarted?.()}
+          onBenchmarkCreated={() => {
+            startedComparisonRef.current = true;
+            onRunStarted?.();
+          }}
           agentType={agentType}
           benchmarkModelsVerified={benchmarkModelsVerified}
           benchmarkProvider={benchmarkProvider}
@@ -2502,8 +2516,14 @@ export function TestsTabContent({
       <BenchmarkRerunDialog
         config={benchmarkRerun.config}
         rerunKey={benchmarkRerun.key}
-        onClose={benchmarkRerun.clear}
-        onBenchmarkCreated={() => onRunStarted?.()}
+        onClose={() => {
+          benchmarkRerun.clear();
+          closeComparison();
+        }}
+        onBenchmarkCreated={() => {
+          startedComparisonRef.current = true;
+          onRunStarted?.();
+        }}
         onRerun={benchmarkRerun.start}
       />
     </div>

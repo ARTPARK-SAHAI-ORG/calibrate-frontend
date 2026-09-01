@@ -1773,6 +1773,37 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(onRunWindowClosed).toHaveBeenCalled();
   });
 
+  it("tells the parent when a comparison window that started a run is closed", async () => {
+    state.agentTests = [responseTest];
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    // Same as a plain run: the parent takes the reader to Evaluations, where
+    // the comparison it just started is listed.
+    expect(onRunWindowClosed).toHaveBeenCalled();
+  });
+
+  it("stays put when the comparison window is closed without starting one", async () => {
+    state.agentTests = [responseTest];
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
+  });
+
   it("opens the run dialog and tells the parent a run started", async () => {
     state.agentTests = [responseTest];
     const onRunStarted = jest.fn();

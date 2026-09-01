@@ -31,7 +31,8 @@ export type AgentRun = {
    * the run had no evaluators. Older backends send bare names instead of
    * `{uuid, name}`, so both shapes are read.
    */
-  evaluators?: (string | { uuid?: string | null; name?: string | null })[] | null;
+  evaluators?:
+    (string | { uuid?: string | null; name?: string | null })[] | null;
   model_results?:
     | {
         model: string;
@@ -156,17 +157,25 @@ export function useAgentRuns({
   }, [listKey]);
 
   const load = useCallback(
-    async (targetOffset: number) => {
+    async (
+      targetOffset: number,
+      { quiet = false }: { quiet?: boolean } = {},
+    ) => {
       if (!accessToken) return;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) return;
       const requestedAroundId = aroundRunIdRef.current ?? null;
       const useAround =
-        !!requestedAroundId && consumedAroundIdRef.current !== requestedAroundId;
+        !!requestedAroundId &&
+        consumedAroundIdRef.current !== requestedAroundId;
       if (useAround) consumedAroundIdRef.current = requestedAroundId;
-      const requestId = ++requestIdRef.current;
-      setIsLoading(true);
-      setError(null);
+      // A background refresh never claims the list: it keeps the current id,
+      // so anything the reader asked for still wins and still finishes.
+      const requestId = quiet ? requestIdRef.current : ++requestIdRef.current;
+      if (!quiet) {
+        setIsLoading(true);
+        setError(null);
+      }
       if (useAround) setAroundNotFound(false);
       try {
         const params = new URLSearchParams({
@@ -188,7 +197,7 @@ export function useAgentRuns({
           // effect, so ask for page one directly instead of just setting it.
           setAroundNotFound(true);
           if (targetOffset === 0) {
-            void load(0);
+            void load(0, { quiet });
           } else {
             setOffset(0);
           }
@@ -212,11 +221,14 @@ export function useAgentRuns({
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
         reportError("Error fetching agent runs:", err);
+        // A background refresh that fails leaves the rows already on screen
+        // alone: the reader is reading them, and the next tick tries again.
+        if (quiet) return;
         setItems([]);
         setTotal(0);
         setError("Failed to load runs. Please try again.");
       } finally {
-        if (requestId === requestIdRef.current) setIsLoading(false);
+        if (!quiet && requestId === requestIdRef.current) setIsLoading(false);
       }
     },
     // `aroundRunId` deliberately left out — see `aroundRunIdRef` above.
@@ -263,76 +275,18 @@ export function useAgentRuns({
     await load(offset);
   }, [total, pageSize, offset, load]);
 
-  // Keep unfinished runs on this page up to date. `skipUuid` is the run
-  // already open in a window, which asks for itself.
-  const skipUuidRef = useRef<string | null>(null);
-  const itemsRef = useRef<AgentRun[]>([]);
+  // Keep unfinished runs on this page up to date by re-asking for the page
+  // itself, quietly. The list already carries every number a row shows, so
+  // there is no reason to download a whole run's results for it.
+  const hasRunInProgress = items.some(isRunInProgress);
   useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  const setPollSkip = useCallback((uuid: string | null) => {
-    skipUuidRef.current = uuid;
-  }, []);
-
-  useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl || !accessToken) return;
-
-    const pollUnfinished = async () => {
-      const unfinished = itemsRef.current.filter(
-        (run) => isRunInProgress(run) && run.uuid !== skipUuidRef.current,
-      );
-      if (unfinished.length === 0) return;
-
-      for (const run of unfinished) {
-        try {
-          const endpoint =
-            run.type === "llm-unit-test"
-              ? `${backendUrl}/agent-tests/run/${run.uuid}`
-              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: getDefaultHeaders(accessToken),
-          });
-          if (!response.ok) continue;
-          const result = await response.json();
-          setItems((prev) =>
-            prev.map((r) =>
-              r.uuid !== run.uuid
-                ? r
-                : run.type === "llm-unit-test"
-                  ? {
-                      ...r,
-                      status: result.status,
-                      total_tests: result.total_tests ?? r.total_tests,
-                      passed: result.passed ?? r.passed,
-                      failed: result.failed ?? r.failed,
-                      unanswered_tests:
-                        result.unanswered_tests ?? r.unanswered_tests,
-                      updated_at: result.updated_at ?? r.updated_at,
-                    }
-                  : {
-                      ...r,
-                      status: result.status,
-                      model_results: result.model_results ?? r.model_results,
-                      updated_at: result.updated_at ?? r.updated_at,
-                    },
-            ),
-          );
-        } catch (err) {
-          // A failed ask says nothing about the run: it is still going as far
-          // as anyone here knows. Marking it failed would strand it, since a
-          // run that is no longer in progress is never asked about again.
-          reportError(`Error polling run ${run.uuid}:`, err);
-        }
-      }
-    };
-
-    void pollUnfinished();
-    const timer = setInterval(pollUnfinished, POLLING_INTERVAL_MS);
+    if (!hasRunInProgress) return;
+    const timer = setInterval(
+      () => void load(offset, { quiet: true }),
+      POLLING_INTERVAL_MS,
+    );
     return () => clearInterval(timer);
-  }, [accessToken]);
+  }, [hasRunInProgress, load, offset]);
 
   const hasPrev = offset > 0;
   const hasNext = offset + pageSize < total;
@@ -356,7 +310,6 @@ export function useAgentRuns({
     aroundNotFound,
     refetch,
     handleDeleted,
-    setPollSkip,
     hasPrev,
     hasNext,
     prevPage,

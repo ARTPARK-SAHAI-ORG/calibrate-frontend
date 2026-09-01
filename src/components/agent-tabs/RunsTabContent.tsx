@@ -348,7 +348,6 @@ export function RunsTabContent({
     aroundNotFound,
     refetch,
     handleDeleted,
-    setPollSkip,
     hasPrev,
     hasNext,
     prevPage,
@@ -433,11 +432,6 @@ export function RunsTabContent({
     setIsDeleting(false);
     setRunToDelete(null);
   };
-
-  // Whichever run is open asks for itself, so the list stops asking for it.
-  useEffect(() => {
-    setPollSkip(openTestRunId ?? openBenchmarkRun?.uuid ?? null);
-  }, [openTestRunId, openBenchmarkRun, setPollSkip]);
 
   // Once the list (possibly landed on a different page via `around`) has
   // loaded, resolve the pending `?runId=` to the run it names and open the
