@@ -673,9 +673,9 @@ export function BenchmarkResultsDialog({
                   state={wasStopped ? "stopped" : error ? "error" : "finished"}
                 />
               )}
-              {/* The name and its pencil wait for the run itself: an unloaded
-                  run would show the automatic name, which is not necessarily
-                  the name this run carries. */}
+              {/* Nothing is written at the top of the window until the run
+                  itself is here: an unloaded run would show the automatic
+                  name, which is not necessarily the name this run carries. */}
               {isInitialLoading ? null : currentTaskId ? (
                 <EditableRunName
                   taskId={currentTaskId}
@@ -704,9 +704,11 @@ export function BenchmarkResultsDialog({
                 <StopRunButton onStop={stopBenchmark} className="shrink-0" />
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {agentName}
-            </p>
+            {!isInitialLoading && (
+              <p className="text-xs text-muted-foreground truncate">
+                {agentName}
+              </p>
+            )}
           </div>
           {/* Previous/Next pager - centered, desktop only, outputs tab */}
           {activeTab === "outputs" && nav && selectedTest && (

@@ -180,14 +180,17 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
-    // Loading: spinner shown, no outputs panel yet. The run's name and its
-    // rename pencil stay away until the run itself has arrived.
+    // Loading: spinner shown, no outputs panel yet. Nothing is written at the
+    // top of the window until the run itself has arrived: no run name, no
+    // rename pencil, not even the agent's name.
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Rename" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
+    expect(container.querySelector(".animate-ping")).not.toBeInTheDocument();
 
     await act(async () => {
       resolveRun(
@@ -209,6 +212,7 @@ describe("TestRunnerDialog", () => {
       expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
+    expect(screen.getByText("My Agent")).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
@@ -1000,7 +1004,7 @@ describe("TestRunnerDialog", () => {
 
   it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully", async () => {
     delete process.env.NEXT_PUBLIC_BACKEND_URL;
-    render(
+    const { container } = render(
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}
@@ -1010,9 +1014,12 @@ describe("TestRunnerDialog", () => {
       />,
     );
     // Nothing is fetched, so the run never arrives and the window stays on its
-    // loading state: the agent name, no run name.
-    expect(await screen.findByText("My Agent")).toBeInTheDocument();
+    // loading state, with nothing written at the top of it.
+    await waitFor(() =>
+      expect(container.querySelector(".animate-spin")).toBeInTheDocument(),
+    );
     expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
