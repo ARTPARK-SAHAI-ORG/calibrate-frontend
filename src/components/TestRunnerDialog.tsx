@@ -168,8 +168,9 @@ export function TestRunnerDialog({
   const [nav, setNav] = useState<PagerNav | null>(null);
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
     useState<DefaultEvaluatorSummary | null>(null);
-  // Which tab is showing. Tabs only render once the run is done; we default to
-  // the Results tab on completion (mirrors the benchmark dialog).
+  // Which tab is showing. Tabs only render once the run is done. A run that
+  // had already finished when the window opened lands on its Results; a run
+  // that finishes under the reader's eyes leaves them on the tests.
   const [activeTab, setActiveTab] = useState<"summary" | "tests" | "about">(
     "tests",
   );
@@ -235,10 +236,21 @@ export function TestRunnerDialog({
     // does not download megabytes of results again. The fetch below still
     // runs: the name, or whether it is shared, can have changed elsewhere.
     const cached = getCachedTestRun(taskId, "summary");
+    // A run opened from the runs list has already finished, so there is
+    // nothing to watch and it opens on its Results. A run that finishes while
+    // the reader is watching it leaves them on the tests they were reading.
+    const landsOnResults = (status: string) =>
+      isTerminalRunStatus(status) && status !== "failed";
+    let isFirstRead = true;
     setRun(cached ?? null);
     setIsLoading(!cached);
     setSelectedTestUuid(null);
-    setActiveTab("tests");
+    if (cached) {
+      isFirstRead = false;
+      setActiveTab(landsOnResults(cached.status) ? "summary" : "tests");
+    } else {
+      setActiveTab("tests");
+    }
     setOpenedCases({});
     setLoadingCaseId(null);
     setToolCallEvaluatorUuid(null);
@@ -265,15 +277,12 @@ export function TestRunnerDialog({
         );
         if (cancelled) return;
         setRun(result);
+        if (isFirstRead) {
+          isFirstRead = false;
+          if (landsOnResults(result.status)) setActiveTab("summary");
+        }
         if (isTerminalRunStatus(result.status)) {
           stop();
-          // Land on the Results tab when the run finishes cleanly (mirrors the
-          // benchmark dialog). Polling has stopped by now, so this fires once
-          // on completion and will not fight a later manual tab switch. Skip on
-          // failure since there is no useful summary to show.
-          if (result.status !== "failed") {
-            setActiveTab("summary");
-          }
         }
       } catch (error) {
         if (cancelled) return;

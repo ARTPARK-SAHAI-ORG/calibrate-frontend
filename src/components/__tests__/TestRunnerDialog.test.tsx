@@ -2,6 +2,7 @@ import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { toast } from "sonner";
 import { TestRunnerDialog } from "../TestRunnerDialog";
 import { clearTestRunCache } from "@/lib/testRunApi";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 // Mock heavy child components so this file tests TestRunnerDialog's own
 // state machine (fetch/poll lifecycle, row derivation, labelling gating), not
@@ -793,7 +794,7 @@ describe("TestRunnerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("selects the Results tab automatically when the run completes cleanly", async () => {
+  it("opens a run that had already finished on its Results tab", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -842,6 +843,100 @@ describe("TestRunnerDialog", () => {
     expect(screen.getByTestId("about-panel")).toHaveTextContent(
       "Test pass rate",
     );
+  });
+
+  // Opening a run must never show the tests first and then jump. A run read
+  // once this session is shown from that copy straight away, so the tab has to
+  // be right in that very first render, not corrected after the reply lands.
+  it("reopens a finished run on its Results with no stop at the tests", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-reopen")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-reopen",
+            status: "done",
+            results: [
+              { test_case_id: "test-1", name: "Test One", passed: true },
+            ],
+            evaluators: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const props = {
+      isOpen: true as const,
+      onClose: jest.fn(),
+      agentUuid: "agent-1",
+      agentName: "My Agent",
+      taskId: "task-reopen",
+    };
+    // First open fills the session's copy of the run.
+    const first = render(<TestRunnerDialog {...props} />);
+    await screen.findByTestId("summary-panel");
+    first.unmount();
+
+    // Second open reads that copy, so the summary is there in the first
+    // render, with no rendering of the tests in between.
+    render(<TestRunnerDialog {...props} />);
+    expect(screen.getByTestId("summary-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+  });
+
+  // The other half of the rule: a run the reader is watching does not move
+  // them off the tests at the moment it finishes.
+  it("stays on the Tests tab when the run finishes while it is open", async () => {
+    jest.useFakeTimers({ advanceTimers: true });
+    let polls = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-watched")) {
+        polls += 1;
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-watched",
+            status: polls === 1 ? "in_progress" : "done",
+            results: [
+              { test_case_id: "test-1", name: "Test One", passed: true },
+            ],
+            evaluators: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-watched"
+      />,
+    );
+
+    await waitFor(() => expect(polls).toBe(1));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
+    });
+
+    // The run is done — its tabs are there — and the reader is still on the
+    // tests they were watching.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Results" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
+    jest.useRealTimers();
   });
 
   it("shows a failed run's rows and tabs rather than a bare error card", async () => {

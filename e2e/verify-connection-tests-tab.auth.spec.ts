@@ -340,6 +340,8 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     await expect(
       page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
+    // A run watched to the end stays on the tests, so the tab is opened by hand.
+    await page.getByRole("button", { name: "Results", exact: true }).click();
     await expect(page.getByText("100%").first()).toBeVisible({
       timeout: 15000,
     });

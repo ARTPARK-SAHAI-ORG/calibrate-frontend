@@ -220,6 +220,9 @@ export function BenchmarkResultsDialog({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
   const hasAutoSelectedFirstBenchmarkTestRef = useRef(false);
+  // True until the first reply about this run lands, so a comparison that was
+  // already finished when the window opened can land on its Results.
+  const isFirstPollRef = useRef(false);
   /**
    * Which "open session" we've already kicked off — keyed by `taskId` (or a
    * sentinel for a brand-new run). Stays set across auth-token refreshes so a
@@ -338,6 +341,9 @@ export function BenchmarkResultsDialog({
         hasAutoSelectedFirstBenchmarkTestRef.current = false;
         clearLabellingSelection();
         setActiveTab("tests");
+        // Only a comparison opened from the runs list can land on its Results.
+        // One this window starts itself is being watched, so it stays put.
+        isFirstPollRef.current = Boolean(taskId);
         setIsPublic(false);
         setShareToken(null);
         // Cleared with the rest, or the run opened next reads the previous
@@ -491,6 +497,8 @@ export function BenchmarkResultsDialog({
   };
 
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
+    const isFirstPoll = isFirstPollRef.current;
+    isFirstPollRef.current = false;
     try {
       // The light reply: every test's name and verdict, without the
       // conversation, the reply and the judges' reasoning behind them. One
@@ -567,8 +575,10 @@ export function BenchmarkResultsDialog({
           setError(result.error);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
-          // Switch to the Results tab when done
-          setActiveTab("summary");
+          // A comparison that had already finished when the window opened
+          // lands on its Results: there is nothing left to watch. One that
+          // finishes while the reader is watching leaves them on the tests.
+          if (isFirstPoll) setActiveTab("summary");
         }
       }
     } catch (err) {
