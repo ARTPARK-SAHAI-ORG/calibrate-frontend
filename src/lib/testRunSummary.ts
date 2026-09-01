@@ -160,3 +160,40 @@ export function toolCallEvaluatorUuidFromRows(
   }
   return null;
 }
+
+/**
+ * The run's own per-evaluator totals, ready for the cards.
+ *
+ * `pass_rate` is already out of 100, the same as a benchmark's, so nothing is
+ * converted here. The entries are passed through and a missing list reads as
+ * none, so every screen reads the field the same way.
+ */
+export function runEvaluatorSummary(
+  entries: BenchmarkEvaluatorSummaryEntry[] | null | undefined,
+): BenchmarkEvaluatorSummaryEntry[] {
+  return Array.isArray(entries) ? entries : [];
+}
+
+/**
+ * What kind of test a row ran: "response", "general", "tool_call" or
+ * "conversation".
+ *
+ * The backend says so on every case. A run answered before it started saying
+ * so has to be read from the test's own config instead, which is only there
+ * in full mode. This is the ONE rule for the question; never read either
+ * field straight.
+ */
+export function rowTestType(row: {
+  test_type?: string | null;
+  test_case?: { evaluation?: { type?: string } | null } | null;
+}): string | null {
+  return row.test_type ?? row.test_case?.evaluation?.type ?? null;
+}
+
+/** Whether a row ran a tool-call test. */
+export function isToolCallRow(row: {
+  test_type?: string | null;
+  test_case?: { evaluation?: { type?: string } | null } | null;
+}): boolean {
+  return rowTestType(row) === "tool_call";
+}

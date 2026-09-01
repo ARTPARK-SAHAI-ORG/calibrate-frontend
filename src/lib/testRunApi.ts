@@ -4,6 +4,7 @@ import { getDefaultHeaders } from "./api";
 import { overEvalLimit } from "./evalLimit";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
+import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary";
 import type {
   TestCaseOutput,
   TestCaseData,
@@ -33,6 +34,10 @@ export type TestCaseResult = {
   inputs?: Record<string, unknown> | null;
   /** True when this test never started, because the run was stopped first. */
   not_run?: boolean;
+  /** What kind of test this row ran. Sent on every case in both modes. Absent
+   * on runs answered before the backend started sending it, which is why
+   * `rowTestType` falls back to the test's own config. */
+  test_type?: "response" | "general" | "tool_call" | "conversation" | null;
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
@@ -78,6 +83,14 @@ export type TestRunStatusResponse = {
    * same tests. Absent on runs created before the backend started snapshotting
    * it — the Rerun button is hidden in that case. */
   test_uuids?: string[];
+  /** The run's totals for each evaluator that judged something, the same shape
+   * a benchmark gives per model. Counted by the backend as it reads the run,
+   * so it is there for runs made before this existed. An evaluator that has
+   * judged nothing yet is left out rather than shown as a zero.
+   *
+   * Read it through `runEvaluatorSummary`, so a missing list reads as none.
+   * `pass_rate` is out of 100, the same as a benchmark's. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** True when the run itself broke. `status` says the same thing; nothing
    * reads this. */
   error?: boolean;
@@ -169,44 +182,119 @@ export async function startTestRunOrNotify(
  */
 const FINISHED_RUN_CACHE_LIMIT = 3;
 const finishedRuns = new Map<string, TestRunStatusResponse>();
+/** Cases already read in full, keyed by run and test. A finished case never
+ * changes, so reopening a test the reader has already looked at costs
+ * nothing. Capped for the same reason as the runs above. */
+const CASE_CACHE_LIMIT = 200;
+const finishedCases = new Map<string, TestCaseResult>();
+
+/** How much of a run to ask for. `summary` leaves out each case's
+ * conversation, the agent's reply, the judges' reasoning and the custom
+ * inputs, which is nearly all of the weight. Read one case in full with
+ * `fetchTestCase` when someone opens it. */
+export type RunDetailMode = "full" | "summary";
+
+/** Newest last, oldest dropped once past `limit`. */
+function remember<T>(store: Map<string, T>, key: string, value: T, limit: number) {
+  store.delete(key);
+  store.set(key, value);
+  if (store.size > limit) {
+    store.delete(store.keys().next().value as string);
+  }
+}
 
 /** The remembered copy of a finished run, if there is one. */
 export function getCachedTestRun(
   taskId: string,
+  mode: RunDetailMode = "full",
 ): TestRunStatusResponse | undefined {
-  return finishedRuns.get(taskId);
+  return finishedRuns.get(`${taskId}|${mode}`);
 }
 
-/** Clears the remembered runs. For tests. */
+/** Clears the remembered runs and cases. For tests. */
 export function clearTestRunCache(): void {
   finishedRuns.clear();
+  finishedCases.clear();
 }
 
-/** Fetch the full state of a run. The dialog's only source of run content. */
+/**
+ * Fetch a run. `summary` gives every case's name and verdict without the
+ * weight behind them, which is what the list on screen needs; `full` is
+ * unchanged and still carries everything.
+ */
 export async function fetchTestRun(
   backendUrl: string,
   accessToken: string | null | undefined,
   taskId: string,
+  mode: RunDetailMode = "full",
 ): Promise<TestRunStatusResponse> {
-  const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}`, {
-    method: "GET",
-    headers: getDefaultHeaders(accessToken),
-  });
+  const query = mode === "summary" ? "?mode=summary" : "";
+  const response = await fetch(
+    `${backendUrl}/agent-tests/run/${taskId}${query}`,
+    {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    },
+  );
 
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to fetch test run");
 
   const run: TestRunStatusResponse = await response.json();
   if (isTerminalRunStatus(run.status)) {
-    // Re-inserting moves it to the newest position, so a run being read now is
-    // not the one dropped next.
-    finishedRuns.delete(taskId);
-    finishedRuns.set(taskId, run);
-    if (finishedRuns.size > FINISHED_RUN_CACHE_LIMIT) {
-      finishedRuns.delete(finishedRuns.keys().next().value as string);
-    }
+    remember(finishedRuns, `${taskId}|${mode}`, run, FINISHED_RUN_CACHE_LIMIT);
   }
   return run;
+}
+
+/** The remembered copy of a case read in full, if there is one. */
+export function getCachedTestCase(
+  taskId: string,
+  testCaseId: string,
+  model?: string | null,
+): TestCaseResult | undefined {
+  return finishedCases.get(`${taskId}|${testCaseId}|${model ?? ""}`);
+}
+
+/**
+ * One case in full: the conversation, the agent's reply, and each evaluator's
+ * verdict and reasoning. The same object shape as one entry of a run's
+ * `results` in full mode.
+ *
+ * One route serves a plain run and a model comparison alike; a comparison runs
+ * every test once per model, so it needs `model` to say which answer to read.
+ * A case still running has no id yet and cannot be asked for.
+ */
+export async function fetchTestCase(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  testCaseId: string,
+  model?: string | null,
+): Promise<TestCaseResult> {
+  const cached = getCachedTestCase(taskId, testCaseId, model);
+  if (cached) return cached;
+
+  const query = model ? `?model=${encodeURIComponent(model)}` : "";
+  const response = await fetch(
+    `${backendUrl}/agent-tests/run/${taskId}/results/${testCaseId}${query}`,
+    {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    },
+  );
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to fetch the test case");
+
+  const testCase: TestCaseResult = await response.json();
+  remember(
+    finishedCases,
+    `${taskId}|${testCaseId}|${model ?? ""}`,
+    testCase,
+    CASE_CACHE_LIMIT,
+  );
+  return testCase;
 }
 
 /**
@@ -233,8 +321,9 @@ export async function renameRun(
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to rename the run");
 
-  // The remembered copy now has the old name on it, so forget it.
-  finishedRuns.delete(taskId);
+  // The remembered copies now have the old name on them, so forget them.
+  finishedRuns.delete(`${taskId}|full`);
+  finishedRuns.delete(`${taskId}|summary`);
 
   const result: { name?: string | null } = await response.json();
   return result.name ?? "";

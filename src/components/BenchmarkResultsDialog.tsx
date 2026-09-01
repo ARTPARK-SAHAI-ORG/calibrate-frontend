@@ -19,6 +19,7 @@ import {
   LLMEvaluationAbout,
   evaluatorColumnsToAbout,
   type BenchmarkModelResult,
+  type BenchmarkTestResult,
 } from "./eval-details";
 import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
 import {
@@ -29,7 +30,11 @@ import {
   RunStateMark,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { abortRunOrNotify } from "@/lib/testRunApi";
+import {
+  abortRunOrNotify,
+  fetchTestCase,
+  type TestCaseResult,
+} from "@/lib/testRunApi";
 import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -53,11 +58,42 @@ import {
   type BenchmarkLeaderboardSummaryRow,
 } from "@/lib/benchmarkEvaluatorSummary";
 
+/** One test's row in a model comparison, as the light reply sends it: the
+ * conversation, the reply and the judges' reasoning are left out, and
+ * `test_case_id` + `test_type` are there to read that one case in full and to
+ * say what kind of test it was. */
+type BenchmarkRow = BenchmarkTestResult & {
+  test_case_id?: string;
+  test_type?: string | null;
+};
+
+type BenchmarkModelRows = Omit<BenchmarkModelResult, "test_results"> & {
+  test_results: BenchmarkRow[] | null;
+};
+
+/**
+ * Put the kind of test back where the results panel and the labelling helpers
+ * look for it. They read it off the test's own config, which the light reply
+ * leaves out; the row itself says so in `test_type`. Rows that already carry
+ * the test are left alone.
+ */
+function withTestType(models: BenchmarkModelRows[]): BenchmarkModelRows[] {
+  return models.map((model) => ({
+    ...model,
+    test_results:
+      model.test_results?.map((row) =>
+        row.test_case || !row.test_type
+          ? row
+          : { ...row, test_case: { evaluation: { type: row.test_type } } },
+      ) ?? null,
+  }));
+}
+
 type BenchmarkStatusResponse = {
   task_id: string;
   name?: string;
   status: string;
-  model_results?: BenchmarkModelResult[];
+  model_results?: BenchmarkModelRows[];
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
@@ -139,7 +175,16 @@ export function BenchmarkResultsDialog({
   // Loading and data state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [taskStatus, setTaskStatus] = useState<string>("queued");
-  const [modelResults, setModelResults] = useState<BenchmarkModelResult[]>([]);
+  const [modelResults, setModelResults] = useState<BenchmarkModelRows[]>([]);
+  /** Cases read in full, keyed by model and test, because the same test has a
+   * different answer for every model. `null` means the read failed, so it is
+   * not asked for again and the window keeps what the light reply gave it. */
+  const [openCases, setOpenCases] = useState<
+    Record<string, TestCaseResult | null>
+  >({});
+  /** The tests the reader picked, in full, once "Submit for labelling" has
+   * fetched them. */
+  const [labellingRows, setLabellingRows] = useState<BenchmarkModelRows[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
@@ -184,14 +229,27 @@ export function BenchmarkResultsDialog({
     taskStatus === "done" ||
     taskStatus === "failed";
 
-  const labellingModelResults = modelResults
-    .map((mr) => ({
-      ...mr,
-      test_results: (mr.test_results ?? []).filter((_, index) =>
-        labellingSelectedKeys.has(benchmarkLabellingKey(mr.model, index)),
-      ),
-    }))
-    .filter((mr) => (mr.test_results?.length ?? 0) > 0);
+  /**
+   * The whole comparison with every case's conversation, reply and judge
+   * reasoning. Only read when someone exports or submits for labelling, which
+   * need every row; the window itself runs on the light reply. Kept once read,
+   * since a finished run does not change.
+   */
+  const fullModelResultsRef = useRef<BenchmarkModelRows[] | null>(null);
+  const fetchFullModelResults = async (): Promise<BenchmarkModelRows[]> => {
+    if (fullModelResultsRef.current) return fullModelResultsRef.current;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !currentTaskId) return modelResults;
+    const response = await fetch(
+      `${backendUrl}/agent-tests/benchmark/${currentTaskId}`,
+      { method: "GET", headers: getDefaultHeaders(backendAccessToken) },
+    );
+    if (!response.ok) throw new Error("Failed to fetch the model comparison");
+    const result: BenchmarkStatusResponse = await response.json();
+    const rows = result.model_results ?? [];
+    fullModelResultsRef.current = rows;
+    return rows;
+  };
 
   useEffect(() => {
     if (!isOpen || !backendAccessToken) return;
@@ -262,6 +320,9 @@ export function BenchmarkResultsDialog({
         setIsInitialLoading(true);
         setTaskStatus("queued");
         setModelResults([]);
+        setOpenCases({});
+        setLabellingRows([]);
+        fullModelResultsRef.current = null;
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
         setRunTestUuids([]);
@@ -355,6 +416,48 @@ export function BenchmarkResultsDialog({
     });
   }, [isOpen, models, modelResults]);
 
+  // Read the open test in full — its conversation, the model's reply and each
+  // judge's reasoning — for the model whose answer is on screen. The light
+  // reply the window runs on leaves all of that out. A read that fails is
+  // remembered as failed, so it is not asked for again and the window keeps
+  // showing what it already had.
+  useEffect(() => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!selectedTest || !currentTaskId || !backendAccessToken || !backendUrl)
+      return;
+    const row = modelResults.find((m) => m.model === selectedTest.model)
+      ?.test_results?.[selectedTest.testIndex];
+    const testCaseId = row?.test_case_id;
+    if (!testCaseId) return;
+    const key = `${selectedTest.model}|${testCaseId}`;
+    if (key in openCases) return;
+
+    let cancelled = false;
+    fetchTestCase(
+      backendUrl,
+      backendAccessToken,
+      currentTaskId,
+      testCaseId,
+      selectedTest.model,
+    )
+      .then((testCase) => {
+        if (!cancelled) setOpenCases((prev) => ({ ...prev, [key]: testCase }));
+      })
+      .catch((err) => {
+        reportError("Error loading the test case:", err);
+        if (!cancelled) setOpenCases((prev) => ({ ...prev, [key]: null }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedTest,
+    currentTaskId,
+    backendAccessToken,
+    modelResults,
+    openCases,
+  ]);
+
   // Stop a run that is still going, then read it back so the window shows the
   // stopped state at once. The poll that follows sees a finished run and stops
   // polling on its own.
@@ -375,8 +478,11 @@ export function BenchmarkResultsDialog({
 
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
     try {
+      // The light reply: every test's name and verdict, without the
+      // conversation, the reply and the judges' reasoning behind them. One
+      // case is read in full when the reader opens it.
       const response = await fetch(
-        `${backendUrl}/agent-tests/benchmark/${taskId}`,
+        `${backendUrl}/agent-tests/benchmark/${taskId}?mode=summary`,
         {
           method: "GET",
           headers: getDefaultHeaders(backendAccessToken),
@@ -410,7 +516,7 @@ export function BenchmarkResultsDialog({
 
       // Update model results (intermediate or final)
       if (result.model_results) {
-        setModelResults(result.model_results);
+        setModelResults(withTestType(result.model_results));
 
         // Auto-expand the first provider that has results
         if (result.model_results.length > 0) {
@@ -562,7 +668,7 @@ export function BenchmarkResultsDialog({
   };
 
   // Get providers to display (includes placeholders for models without results yet)
-  const getProvidersToDisplay = (): BenchmarkModelResult[] => {
+  const getProvidersToDisplay = (): BenchmarkModelRows[] => {
     // When in progress and no results yet, show all models as placeholders
     if (!isDone && modelResults.length === 0 && models.length > 0) {
       return models.map((model) => ({
@@ -599,7 +705,26 @@ export function BenchmarkResultsDialog({
     return modelResults;
   };
 
-  const providersToDisplay = getProvidersToDisplay();
+  // Rows already read in full replace the light ones, so the test the reader
+  // opened shows its conversation, reply and judge reasoning.
+  const providersToDisplay = getProvidersToDisplay().map((model) => ({
+    ...model,
+    test_results:
+      model.test_results?.map((row) => {
+        const full = row.test_case_id
+          ? openCases[`${model.model}|${row.test_case_id}`]
+          : null;
+        return full
+          ? {
+              ...row,
+              test_case: full.test_case ?? row.test_case,
+              output: full.output ?? undefined,
+              judge_results: full.judge_results,
+              inputs: full.inputs ?? undefined,
+            }
+          : row;
+      }) ?? null,
+  }));
 
   if (!isOpen) return null;
 
@@ -724,9 +849,9 @@ export function BenchmarkResultsDialog({
               <div className="hidden md:block">
                 <ExportResultsButton
                   filename={`${modelComparisonName(runName)}-${agentName}`}
-                  getRows={() =>
+                  getRows={async () =>
                     buildBenchmarkCsv(
-                      modelResults.flatMap((m) =>
+                      (await fetchFullModelResults()).flatMap((m) =>
                         (m.test_results ?? []).map((tr) => ({
                           model: m.model,
                           name: tr.name,
@@ -758,7 +883,7 @@ export function BenchmarkResultsDialog({
             {/* Submit for labelling — only shown when benchmark is done */}
             {showLabelling && currentTaskId && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (activeTab !== "outputs") {
                     setActiveTab("outputs");
                   }
@@ -768,6 +893,31 @@ export function BenchmarkResultsDialog({
                     );
                     return;
                   }
+                  // The labelling dialog needs each test's conversation and
+                  // reply, which the window itself does not hold.
+                  let full: BenchmarkModelRows[];
+                  try {
+                    full = await fetchFullModelResults();
+                  } catch (err) {
+                    reportError("Error loading the run to label:", err);
+                    toast.error(
+                      "Could not load the results. Please try again.",
+                    );
+                    return;
+                  }
+                  setLabellingRows(
+                    full
+                      .map((mr) => ({
+                        ...mr,
+                        test_results: (mr.test_results ?? []).filter(
+                          (_, index) =>
+                            labellingSelectedKeys.has(
+                              benchmarkLabellingKey(mr.model, index),
+                            ),
+                        ),
+                      }))
+                      .filter((mr) => mr.test_results.length > 0),
+                  );
                   setAddToTaskOpen(true);
                 }}
                 className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
@@ -960,7 +1110,7 @@ export function BenchmarkResultsDialog({
             type: "benchmark_run",
             benchmarkUuid: currentTaskId,
             benchmarkName: runName ?? undefined,
-            modelResults: labellingModelResults,
+            modelResults: labellingRows,
             evaluators: runEvaluators,
           }}
         />
