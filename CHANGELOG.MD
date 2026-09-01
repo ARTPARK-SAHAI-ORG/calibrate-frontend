@@ -1,5 +1,6 @@
 ## September 2026
 
+- A test run or model comparison window now shows tabs named Results and Tests instead of Summary and Results or Leaderboard and Results ([#532](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/532))
 - A run with thousands of tests now opens and scrolls much faster, and reopening one you already looked at shows it right away ([#526](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/526))
 - A test run or benchmark window no longer shows a placeholder name and rename pencil before the run has loaded ([#520](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/520))
 - You can now delete a finished evaluation run from an agent's Evaluations tab, while a run still in progress cannot be deleted ([#523](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/523))
