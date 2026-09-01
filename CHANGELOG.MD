@@ -1,5 +1,6 @@
 ## September 2026
 
+- A run with thousands of tests now opens and scrolls much faster, and reopening one you already looked at shows it right away ([#526](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/526))
 - A test run or benchmark window no longer shows a placeholder name and rename pencil before the run has loaded ([#520](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/520))
 - You can now delete a finished evaluation run from an agent's Evaluations tab, while a run still in progress cannot be deleted ([#523](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/523))
 - You can now drag the Run column wider on an agent's Evaluations tab to read long run names in full ([#518](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/518))
