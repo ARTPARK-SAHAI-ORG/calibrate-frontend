@@ -176,6 +176,33 @@ describe("BenchmarkCombinedLeaderboard", () => {
   });
 });
 
+describe("tests that could not be run", () => {
+  it("links to the tests that could not be run, and opens that tab", async () => {
+    const onReviewUnanswered = jest.fn();
+    const user = setupUser();
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [
+              { passed: true },
+              { passed: false, unanswered: true },
+            ],
+          },
+        ]}
+        filename="x"
+        onReviewUnanswered={onReviewUnanswered}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tests tab" }));
+    expect(onReviewUnanswered).toHaveBeenCalled();
+  });
+});
+
 describe("a run someone stopped", () => {
   it("says how far the run got, in the same amber note the run window uses", () => {
     render(

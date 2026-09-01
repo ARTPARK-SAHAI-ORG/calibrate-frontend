@@ -262,6 +262,17 @@ describe("first-eval tour step actions", () => {
     jest.useRealTimers();
   });
 
+  it("opens the Tests tab before describing it", async () => {
+    const testsTab = document.createElement("button");
+    testsTab.setAttribute("data-tour", "run-tab-tests");
+    document.body.append(testsTab);
+
+    const tour = buildTour();
+    await stepByTitle(tour, "See every answer").prepare?.();
+
+    expect(mockClickElement).toHaveBeenCalledWith(A.runTabTests);
+  });
+
   it("opens the phone-number result during the pass-now prepare", async () => {
     const testsTab = document.createElement("button");
     testsTab.setAttribute("data-tour", "run-tab-tests");

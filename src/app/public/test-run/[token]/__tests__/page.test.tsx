@@ -205,6 +205,46 @@ describe("public test run page", () => {
     expect(rows[2].output).toBeUndefined();
   });
 
+  it("opens the Tests tab from the note on the Results tab", async () => {
+    render(<PublicTestRunPage />);
+    await screen.findByTestId("summary-cards");
+
+    // The note about tests that could not be run points at the Tests tab.
+    const review = summaryProps.mock.calls.at(-1)![0]
+      .onReviewUnanswered as () => void;
+    await act(async () => review());
+
+    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+  });
+
+  it("shows Previous and Next once a test is open", async () => {
+    render(<PublicTestRunPage />);
+    await screen.findByTestId("summary-cards");
+    await openResults();
+
+    const props = panelProps.mock.calls.at(-1)![0] as {
+      onSelect: (id: string) => void;
+      onNavChange: (nav: {
+        currentIndex: number;
+        total: number;
+        goPrev: () => void;
+        goNext: () => void;
+      }) => void;
+    };
+    await act(async () => {
+      props.onNavChange({
+        currentIndex: 0,
+        total: 3,
+        goPrev: jest.fn(),
+        goNext: jest.fn(),
+      });
+      props.onSelect("test-0");
+    });
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 3")).toBeInTheDocument();
+  });
+
   it("reads a test only once, however often it is reopened", async () => {
     render(<PublicTestRunPage />);
     await screen.findByTestId("summary-cards");
