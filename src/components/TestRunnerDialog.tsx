@@ -116,6 +116,11 @@ export function TestRunnerDialog({
   // The last server response. The only source of truth for run content.
   const [run, setRun] = useState<TestRunStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // The run could not be read at all. Only ever read alongside a missing run,
+  // and a run on its way is on the loading state before this is looked at, so
+  // nothing has to put it back. Kept apart from the run's own failed status: a
+  // run that failed still has rows to show.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
@@ -210,6 +215,7 @@ export function TestRunnerDialog({
           return;
         }
         reportError("Error polling test run status:", error);
+        setLoadFailed(true);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -298,7 +304,9 @@ export function TestRunnerDialog({
   const passedTests = rows.filter((r) => r.status === "passed");
   // Tests that produced no answer are their own category in the list; keep
   // them out of the "failed" count so the header matches.
-  const failedTests = rows.filter((r) => r.status === "failed" && !r.unanswered);
+  const failedTests = rows.filter(
+    (r) => r.status === "failed" && !r.unanswered,
+  );
   // How many produced no answer, and whether the run gave up before starting
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
@@ -395,7 +403,15 @@ export function TestRunnerDialog({
   // has rows, every one of them carries its own reason, and the summary is
   // where the reader learns the run stopped early — an error card would hide
   // that already produced results must stay visible.
-  const isOverallError = runStatus === "failed" && rows.length === 0;
+  // Either the run failed and left nothing to read, or it never arrived at
+  // all. Both leave the reader with no rows, so both get the error card.
+  const isOverallError =
+    (runStatus === "failed" && rows.length === 0) || (loadFailed && !run);
+
+  // Nothing is written at the top of the window until the run itself is here:
+  // an unloaded run would show the automatic name, which is not necessarily
+  // the name this run carries.
+  const runHasArrived = run !== null;
 
   if (!isOpen) return null;
 
@@ -408,46 +424,46 @@ export function TestRunnerDialog({
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                {(runStatus === "queued" || runStatus === "in_progress") && (
-                  <span
-                    className="relative flex h-2.5 w-2.5 shrink-0"
-                    title="Run in progress"
-                  >
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 dark:bg-yellow-400" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
-                  </span>
-                )}
+                {runHasArrived &&
+                  (runStatus === "queued" || runStatus === "in_progress") && (
+                    <span
+                      className="relative flex h-2.5 w-2.5 shrink-0"
+                      title="Run in progress"
+                    >
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 dark:bg-yellow-400" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
+                    </span>
+                  )}
                 {run &&
                   !isLoading &&
                   (() => {
                     const state = runStateOf(run);
                     return state ? <RunStateMark state={state} /> : null;
                   })()}
-                <EditableRunName
-                  taskId={taskId}
-                  type="llm-unit-test"
-                  name={run?.name}
-                  onRenamed={(name) => {
-                    setRun((prev) => (prev ? { ...prev, name } : prev));
-                    onRenamed?.(name);
-                  }}
-                />
-                {isFinished &&
-                  onNewRun &&
-                  runTestUuids.length > 0 && (
-                    <RerunIconButton
-                      onClick={() => startRun(runTestUuids)}
-                      loading={isStartingRun}
-                      className="shrink-0"
-                    />
-                  )}
-                {!isFinished && !isLoading && (
-                  <StopRunButton onStop={stopRun} className="shrink-0" />
+                {runHasArrived && (
+                  <EditableRunName
+                    taskId={taskId}
+                    type="llm-unit-test"
+                    name={run?.name}
+                    onRenamed={(name) => {
+                      setRun((prev) => (prev ? { ...prev, name } : prev));
+                      onRenamed?.(name);
+                    }}
+                  />
+                )}
+                {isFinished && onNewRun && runTestUuids.length > 0 && (
+                  <RerunIconButton
+                    onClick={() => startRun(runTestUuids)}
+                    loading={isStartingRun}
+                    className="shrink-0"
+                  />
                 )}
               </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {agentName}
-              </p>
+              {runHasArrived && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {agentName}
+                </p>
+              )}
             </div>
           </div>
           {/* Previous/Next pager - centered, desktop only. Outputs tab only. */}
@@ -517,6 +533,9 @@ export function TestRunnerDialog({
                   initialShareToken={run?.share_token ?? null}
                 />
               </div>
+            )}
+            {!isFinished && !isLoading && (
+              <StopRunButton onStop={stopRun} noun="run" className="shrink-0" />
             )}
             <button
               onClick={onClose}

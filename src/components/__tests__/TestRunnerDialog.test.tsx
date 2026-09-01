@@ -127,6 +127,13 @@ async function flush(ms = 0) {
   });
 }
 
+/** Click Stop and answer the question it asks. The second "Stop" is the one
+ *  in the question. */
+async function stopAndConfirm(user: ReturnType<typeof setupUser>) {
+  await user.click(await screen.findByRole("button", { name: "Stop" }));
+  await user.click(screen.getAllByRole("button", { name: "Stop" })[1]);
+}
+
 describe("TestRunnerDialog", () => {
   const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -180,9 +187,17 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
-    // Loading: spinner shown, no outputs panel yet.
+    // Loading: spinner shown, no outputs panel yet. Nothing is written at the
+    // top of the window until the run itself has arrived: no run name, no
+    // rename pencil, not even the agent's name.
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
+    expect(container.querySelector(".animate-ping")).not.toBeInTheDocument();
 
     await act(async () => {
       resolveRun(
@@ -203,6 +218,8 @@ describe("TestRunnerDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Evaluation run")).toBeInTheDocument(),
     );
+    expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
+    expect(screen.getByText("My Agent")).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
@@ -966,7 +983,7 @@ describe("TestRunnerDialog", () => {
     );
   });
 
-  it("keeps rendering the shell when a poll fails with a non-ok response", async () => {
+  it("says something went wrong when the run cannot be read at all", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -988,13 +1005,106 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("My Agent")).toBeInTheDocument(),
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
+    // Nothing pretends the run arrived: no name, no pencil, no agent name.
+    expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
+  });
+
+  it("goes back to loading when the window is pointed at another run after a failure", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-broken")) {
+        return Promise.resolve(jsonResponse({}, false, 500));
+      }
+      if (url.endsWith("/agent-tests/run/task-next")) {
+        return new Promise(() => {});
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const { container, rerender } = render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-broken"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
+    );
+
+    rerender(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-next"
+      />,
+    );
+    // The previous run's failure does not carry over onto the new one.
+    await waitFor(() =>
+      expect(container.querySelector(".animate-spin")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  it("keeps the run on screen when a later poll fails", async () => {
+    let calls = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-flaky")) {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-flaky",
+              status: "in_progress",
+              name: "Run 4",
+              results: [
+                { test_case_id: "t-1", name: "Test One", passed: true },
+              ],
+            }),
+          );
+        }
+        return Promise.resolve(jsonResponse({}, false, 500));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    jest.useFakeTimers();
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-flaky"
+      />,
+    );
+    await flush();
+    expect(screen.getByText("Evaluation run 4")).toBeInTheDocument();
+
+    // The next read fails. The run already on screen stays put.
+    await flush(POLL_MS);
+    expect(screen.getByText("Evaluation run 4")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });
 
   it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully", async () => {
     delete process.env.NEXT_PUBLIC_BACKEND_URL;
-    render(
+    const { container } = render(
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}
@@ -1003,7 +1113,13 @@ describe("TestRunnerDialog", () => {
         taskId="task-noenv"
       />,
     );
-    expect(await screen.findByText("Evaluation run")).toBeInTheDocument();
+    // Nothing is fetched, so the run never arrives and the window stays on its
+    // loading state, with nothing written at the top of it.
+    await waitFor(() =>
+      expect(container.querySelector(".animate-spin")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Evaluation run")).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -1416,10 +1532,10 @@ describe("tests that produced no answer", () => {
       mockRunThenStop();
       const user = setupUser();
       renderDialog();
-      const stopButton = await screen.findByRole("button", { name: "Stop" });
+      await screen.findByRole("button", { name: "Stop" });
 
       delete process.env.NEXT_PUBLIC_BACKEND_URL;
-      await user.click(stopButton);
+      await stopAndConfirm(user);
 
       expect(toast.error).toHaveBeenCalledWith(
         "Cannot stop the run: the backend URL is not configured.",
@@ -1460,7 +1576,7 @@ describe("tests that produced no answer", () => {
 
       const user = setupUser();
       renderDialog();
-      await user.click(await screen.findByRole("button", { name: "Stop" }));
+      await stopAndConfirm(user);
 
       // The run it already had is still on screen, and nothing crashed.
       expect(await screen.findByText(/Test One:passed/)).toBeInTheDocument();
@@ -1471,8 +1587,7 @@ describe("tests that produced no answer", () => {
       const user = setupUser();
       renderDialog();
 
-      const stopButton = await screen.findByRole("button", { name: "Stop" });
-      await user.click(stopButton);
+      await stopAndConfirm(user);
 
       await waitFor(() =>
         expect(

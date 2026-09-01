@@ -673,7 +673,10 @@ export function BenchmarkResultsDialog({
                   state={wasStopped ? "stopped" : error ? "error" : "finished"}
                 />
               )}
-              {currentTaskId ? (
+              {/* Nothing is written at the top of the window until the run
+                  itself is here: an unloaded run would show the automatic
+                  name, which is not necessarily the name this run carries. */}
+              {isInitialLoading ? null : currentTaskId ? (
                 <EditableRunName
                   taskId={currentTaskId}
                   type="llm-benchmark"
@@ -697,13 +700,12 @@ export function BenchmarkResultsDialog({
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
               )}
-              {!isDone && !isInitialLoading && currentTaskId && (
-                <StopRunButton onStop={stopBenchmark} className="shrink-0" />
-              )}
             </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {agentName}
-            </p>
+            {!isInitialLoading && (
+              <p className="text-xs text-muted-foreground truncate">
+                {agentName}
+              </p>
+            )}
           </div>
           {/* Previous/Next pager - centered, desktop only, outputs tab */}
           {activeTab === "outputs" && nav && selectedTest && (
@@ -772,6 +774,13 @@ export function BenchmarkResultsDialog({
               >
                 Submit for labelling
               </button>
+            )}
+            {!isDone && !isInitialLoading && currentTaskId && (
+              <StopRunButton
+                onStop={stopBenchmark}
+                noun="model comparison"
+                className="shrink-0"
+              />
             )}
             <button
               onClick={onClose}

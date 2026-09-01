@@ -99,6 +99,8 @@ jest.mock("../ui", () => ({
       {props.tooltip ?? "Rerun"}
     </button>
   ),
+  // Stands in for the real button, straight through with no question. The
+  // question itself is covered in src/components/ui/__tests__.
   StopRunButton: (props: any) => (
     <button onClick={() => props.onStop()}>Stop</button>
   ),
@@ -428,6 +430,13 @@ describe("BenchmarkResultsDialog", () => {
         screen.queryByText("Regression before v2"),
       ).not.toBeInTheDocument(),
     );
+    // Nothing is written at the top of the window while the run is on its way:
+    // no automatic name, no rename pencil, not even the agent's name.
+    expect(screen.queryByText("Model comparison")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
 
     await act(async () => {
       holdSecond(
