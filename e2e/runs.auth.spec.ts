@@ -203,13 +203,13 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // Confirmation step before a run of every linked test.
     await page.getByRole("button", { name: "Start the run" }).click();
 
-    // Results tabs (Summary / Results) render ONLY once runStatus === "done".
+    // The tabs (Results / Tests) render ONLY once runStatus === "done".
     // Fake backend completes near-instantly; allow for the POST + first poll.
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
-    // Summary tab: a Pass rate card. Every fake verdict passes → 100% pass rate
+    // Results tab: a Pass rate card. Every fake verdict passes → 100% pass rate
     // (asserted on the percentage, which is robust to the test-case count).
     await expect(page.getByText("Pass rate").first()).toBeVisible({
       timeout: 15000,
@@ -218,9 +218,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
       timeout: 15000,
     });
 
-    // Results tab: the per-test results group the passing test under a
+    // Tests tab: the per-test results group the passing test under a
     // "Passed (n)" heading (test-results/shared StatusIcon + grouping).
-    await page.getByRole("button", { name: "Results", exact: true }).click();
+    await page.getByRole("button", { name: "Tests", exact: true }).click();
     await expect(page.getByText(/Passed \(\d+\)/).first()).toBeVisible({
       timeout: 15000,
     });
@@ -249,7 +249,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     // Confirmation step before a run of every linked test.
     await page.getByRole("button", { name: "Start the run" }).click();
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
     await page.keyboard.press("Escape");
 
@@ -263,7 +263,7 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await expect(runRow).toBeVisible({ timeout: 15000 });
     await runRow.click();
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
     await expect(page).toHaveURL(/runId=/, { timeout: 15000 });
@@ -329,9 +329,9 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await page.getByRole("button", { name: "Start the comparison" }).click();
 
     // BenchmarkResultsDialog polls GET /agent-tests/benchmark/{taskId}; the
-    // Leaderboard / Results tabs render only once the run is done.
+    // Results / Tests tabs render only once the run is done.
     await expect(
-      page.getByRole("button", { name: "Leaderboard", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
     // The leaderboard renders a table (model rows + pass-rate columns).

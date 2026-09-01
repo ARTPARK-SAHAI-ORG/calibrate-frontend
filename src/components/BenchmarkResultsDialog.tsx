@@ -161,8 +161,8 @@ export function BenchmarkResultsDialog({
   useHideFloatingButton(isOpen);
 
   const [activeTab, setActiveTab] = useState<
-    "leaderboard" | "top-picks" | "outputs" | "about"
-  >("outputs");
+    "summary" | "top-picks" | "tests" | "about"
+  >("tests");
   // Track which providers are expanded
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
     new Set(),
@@ -337,7 +337,7 @@ export function BenchmarkResultsDialog({
         setSelectedTest(null);
         hasAutoSelectedFirstBenchmarkTestRef.current = false;
         clearLabellingSelection();
-        setActiveTab("outputs");
+        setActiveTab("tests");
         setIsPublic(false);
         setShareToken(null);
         // Cleared with the rest, or the run opened next reads the previous
@@ -567,8 +567,8 @@ export function BenchmarkResultsDialog({
           setError(result.error);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
-          // Switch to leaderboard tab when done
-          setActiveTab("leaderboard");
+          // Switch to the Results tab when done
+          setActiveTab("summary");
         }
       }
     } catch (err) {
@@ -846,8 +846,8 @@ export function BenchmarkResultsDialog({
               </p>
             )}
           </div>
-          {/* Previous/Next pager - centered, desktop only, outputs tab */}
-          {activeTab === "outputs" && nav && selectedTest && (
+          {/* Previous/Next pager - centered, desktop only, tests tab */}
+          {activeTab === "tests" && nav && selectedTest && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -898,8 +898,8 @@ export function BenchmarkResultsDialog({
             {showLabelling && currentTaskId && (
               <button
                 onClick={async () => {
-                  if (activeTab !== "outputs") {
-                    setActiveTab("outputs");
+                  if (activeTab !== "tests") {
+                    setActiveTab("tests");
                   }
                   if (labellingSelectedKeys.size === 0) {
                     toast.error(
@@ -1022,9 +1022,9 @@ export function BenchmarkResultsDialog({
             <div className="flex gap-3 md:gap-4 lg:gap-6">
               <ResultTabs
                 tabs={[
-                  "leaderboard",
+                  "summary",
                   ...(showTopPicks ? (["top-picks"] as const) : []),
-                  "outputs",
+                  "tests",
                   "about",
                 ]}
                 activeTab={activeTab}
@@ -1038,15 +1038,15 @@ export function BenchmarkResultsDialog({
         {/* Content - Show after initial loading */}
         {!isInitialLoading && !error && (
           <div className="flex-1 overflow-hidden">
-            {/* Leaderboard Tab - Only when done */}
-            {isDone && activeTab === "leaderboard" && (
+            {/* Results tab - only when done */}
+            {isDone && activeTab === "summary" && (
               <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
                 <BenchmarkCombinedLeaderboard
                   leaderboardSummary={leaderboardSummary}
                   modelResults={modelResults}
                   filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
                   benchmarkScoreLabel={benchmarkScoreLabel}
-                  onReviewUnanswered={() => setActiveTab("outputs")}
+                  onReviewUnanswered={() => setActiveTab("tests")}
                   runStopped={wasStopped}
                 />
               </div>
@@ -1082,8 +1082,8 @@ export function BenchmarkResultsDialog({
               </div>
             )}
 
-            {/* Outputs Tab - Show during progress and when outputs tab is active when done */}
-            {(!isDone || activeTab === "outputs") && (
+            {/* Tests tab - shown during the run and when it is the tab being read */}
+            {(!isDone || activeTab === "tests") && (
               <BenchmarkOutputsPanel
                 runStopped={wasStopped}
                 modelResults={providersToDisplay}

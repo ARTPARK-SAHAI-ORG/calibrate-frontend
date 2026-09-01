@@ -381,7 +381,7 @@ describe("tests that could not be run", () => {
     ).toBeInTheDocument();
     // No handler given, so the tab is named but not clickable.
     expect(
-      screen.queryByRole("button", { name: "Results tab" }),
+      screen.queryByRole("button", { name: "Tests tab" }),
     ).not.toBeInTheDocument();
   });
 
@@ -396,7 +396,7 @@ describe("tests that could not be run", () => {
       />,
     );
     await setupUser().click(
-      screen.getByRole("button", { name: "Results tab" }),
+      screen.getByRole("button", { name: "Tests tab" }),
     );
     expect(onReviewUnanswered).toHaveBeenCalled();
   });
@@ -405,7 +405,7 @@ describe("tests that could not be run", () => {
     render(<TestRunSummary passed={9} total={10} unanswered={3} />);
     // The shared name, so the note cannot point at a tab called something
     // else on the public page.
-    expect(screen.getByText("Results tab")).toBeInTheDocument();
+    expect(screen.getByText("Tests tab")).toBeInTheDocument();
   });
 
   it("says when the run gave up before starting every test", () => {

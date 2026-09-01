@@ -6,21 +6,25 @@
  * evaluation pages, and the shared links to all four. Each of them used to
  * write its own row of buttons, which is how the same tab came to be called
  * "Results" in one place and "Outputs" in another. The names live here now, so
- * a rename lands everywhere at once.
+ * a rename lands everywhere at once. "outputs" is the row-by-row tab on the
+ * speech pages; a test run and a model comparison call the same tab "tests",
+ * because every row there is one test.
  */
 export type ResultTabId =
   | "summary"
   | "leaderboard"
   | "top-picks"
   | "outputs"
+  | "tests"
   | "about";
 
 /** The one place each of these tabs is named. */
 export const RESULT_TAB_LABELS: Record<ResultTabId, string> = {
-  summary: "Summary",
+  summary: "Results",
   leaderboard: "Leaderboard",
   "top-picks": "Model selection",
   outputs: "Results",
+  tests: "Tests",
   about: "About",
 };
 

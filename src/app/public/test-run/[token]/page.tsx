@@ -116,7 +116,7 @@ export default function PublicTestRunPage() {
   const [notFound, setNotFound] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
-  const [activeTab, setActiveTab] = useState<"summary" | "outputs" | "about">(
+  const [activeTab, setActiveTab] = useState<"summary" | "tests" | "about">(
     "summary",
   );
   // Cases read in full, keyed by test id, so reopening one costs nothing.
@@ -246,7 +246,7 @@ export default function PublicTestRunPage() {
   const failed = results.filter(
     (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
   ).length;
-  // Tool-call pass/fail split for the Summary tab's dedicated card.
+  // Tool-call pass/fail split for the Results tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: isToolCallRow(r),
@@ -292,12 +292,12 @@ export default function PublicTestRunPage() {
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
             <ResultTabs
-              tabs={["summary", "outputs", "about"]}
+              tabs={["summary", "tests", "about"]}
               activeTab={activeTab}
               onChange={setActiveTab}
             />
           </div>
-          {activeTab === "outputs" && nav && selectedId && (
+          {activeTab === "tests" && nav && selectedId && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -331,7 +331,7 @@ export default function PublicTestRunPage() {
           )}
         </div>
 
-        {/* Summary tab */}
+        {/* Results tab */}
         {activeTab === "summary" && (
           <TestRunSummary
             passed={passed}
@@ -340,7 +340,7 @@ export default function PublicTestRunPage() {
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
             runTotalTests={data.total_tests ?? results.length}
-            onReviewUnanswered={() => setActiveTab("outputs")}
+            onReviewUnanswered={() => setActiveTab("tests")}
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
@@ -356,8 +356,8 @@ export default function PublicTestRunPage() {
           />
         )}
 
-        {/* Outputs tab */}
-        {activeTab === "outputs" && results.length > 0 && (
+        {/* Tests tab */}
+        {activeTab === "tests" && results.length > 0 && (
           <div
             className="border border-border rounded-xl overflow-hidden"
             style={{ height: "calc(100vh - 220px)", minHeight: 620 }}

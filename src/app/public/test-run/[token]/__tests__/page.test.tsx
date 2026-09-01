@@ -162,7 +162,7 @@ const caseCalls = (id: string) =>
 /** Show the results panel, which sits behind the second tab. */
 async function openResults() {
   const user = setupUser();
-  await user.click(screen.getByRole("button", { name: "Results" }));
+  await user.click(screen.getByRole("button", { name: "Tests" }));
 }
 
 const lastPanelRows = () =>

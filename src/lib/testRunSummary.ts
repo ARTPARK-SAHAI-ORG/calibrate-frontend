@@ -3,7 +3,7 @@
  * benchmarks do, per model). So we aggregate the per-case `judge_results` into
  * the same `BenchmarkEvaluatorSummaryEntry` shape the benchmark leaderboard
  * uses — binary evaluators → pass rate, rating evaluators → mean — so the test
- * Summary tab can render per-evaluator metrics with the same cards.
+ * Results tab can render per-evaluator metrics with the same cards.
  */
 
 import type {

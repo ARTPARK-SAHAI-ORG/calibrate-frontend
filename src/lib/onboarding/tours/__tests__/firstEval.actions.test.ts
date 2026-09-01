@@ -263,19 +263,19 @@ describe("first-eval tour step actions", () => {
   });
 
   it("opens the phone-number result during the pass-now prepare", async () => {
-    const outputsTab = document.createElement("button");
-    outputsTab.setAttribute("data-tour", "run-tab-outputs");
+    const testsTab = document.createElement("button");
+    testsTab.setAttribute("data-tour", "run-tab-tests");
     const row = document.createElement("button");
     row.setAttribute("data-tour", "run-result-row");
     row.textContent = "Demo · phone number it lacks";
     const detail = document.createElement("div");
     detail.setAttribute("data-tour", "run-result-detail");
-    document.body.append(outputsTab, row, detail);
+    document.body.append(testsTab, row, detail);
 
     const tour = buildTour();
     await stepByTitle(tour, "It passes now ✅").prepare?.();
 
-    expect(mockClickElement).toHaveBeenCalledWith(A.runTabOutputs, {
+    expect(mockClickElement).toHaveBeenCalledWith(A.runTabTests, {
       timeout: 10000,
     });
   });

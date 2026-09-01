@@ -241,7 +241,7 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     ).toBeVisible({ timeout: 15000 });
     // No run started — the results Summary tab is not present.
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toHaveCount(0);
 
     // Scope Verify clicks / dialog assertions to the dialog box: the agent
@@ -338,7 +338,7 @@ test.describe("Verify connection before running tests — agent Tests tab (fake-
     // near-instant; allow for the POST + first poll). Every fake verdict passes
     // → 100% pass rate.
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
     await expect(page.getByText("100%").first()).toBeVisible({
       timeout: 15000,

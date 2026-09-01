@@ -243,7 +243,7 @@ describe("TestRunnerDialog", () => {
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
     expect(screen.getByText("My Agent")).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
-    await setupUser().click(screen.getByRole("button", { name: "Results" }));
+    await setupUser().click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
   });
 
@@ -375,9 +375,9 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "Tests" })).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Results" }));
+    await user.click(screen.getByRole("button", { name: "Tests" }));
 
     expect(screen.getByTestId("results-count")).toHaveTextContent("2");
     // Selectable despite having no test_uuid (stable index id is used).
@@ -793,7 +793,7 @@ describe("TestRunnerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("selects the Summary tab automatically when the run completes cleanly", async () => {
+  it("selects the Results tab automatically when the run completes cleanly", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -834,7 +834,7 @@ describe("TestRunnerDialog", () => {
 
     // Tab nav is visible once done; switch back to outputs.
     const user = setupUser();
-    await user.click(screen.getByRole("button", { name: "Results" }));
+    await user.click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
 
     // The About tab explains the metrics (always documents pass rate).
@@ -891,7 +891,7 @@ describe("TestRunnerDialog", () => {
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
     // A failed run still must not jump to the summary tab on its own.
     expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
-    await setupUser().click(screen.getByRole("button", { name: "Summary" }));
+    await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByTestId("summary-gaps")).toHaveTextContent(
       JSON.stringify({ unanswered: 1, stoppedEarly: true }),
     );
@@ -1276,7 +1276,7 @@ describe("TestRunnerDialog", () => {
       // Wait for the finished run's tabs, not the heading: the heading is the
       // same words for every run, so it is on screen before the results land.
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+        expect(screen.getByRole("button", { name: "Tests" })).toBeInTheDocument(),
       );
     }
 
@@ -1326,12 +1326,12 @@ describe("TestRunnerDialog", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Results" })).toBeInTheDocument(),
+        expect(screen.getByRole("button", { name: "Tests" })).toBeInTheDocument(),
       );
       expect(
         screen.queryByRole("button", { name: "Submit for labelling" }),
       ).not.toBeInTheDocument();
-      await setupUser().click(screen.getByRole("button", { name: "Results" }));
+      await setupUser().click(screen.getByRole("button", { name: "Tests" }));
       expect(
         screen.queryByRole("button", { name: "toggle-labelling-test-2" }),
       ).not.toBeInTheDocument();
@@ -1340,13 +1340,13 @@ describe("TestRunnerDialog", () => {
     it("opens the labelling dialog when an eligible test is selected, and closes it again", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
+      await user.click(screen.getByRole("button", { name: "Tests" }));
       await user.click(
         screen.getByRole("button", { name: "toggle-labelling-test-1" }),
       );
       // Switch back to the summary tab so the submit click also exercises
       // the "switch back to outputs" branch inside the handler.
-      await user.click(screen.getByRole("button", { name: "Summary" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       await user.click(
         screen.getByRole("button", { name: "Submit for labelling" }),
       );
@@ -1471,8 +1471,8 @@ describe("tests that produced no answer", () => {
         },
       ],
     });
-    await screen.findByRole("button", { name: "Results" });
-    await setupUser().click(screen.getByRole("button", { name: "Results" }));
+    await screen.findByRole("button", { name: "Tests" });
+    await setupUser().click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByTestId("unanswered-t-3")).toHaveTextContent("true");
   });
 
@@ -1628,7 +1628,7 @@ describe("tests that produced no answer", () => {
       expect(await screen.findByText(/Test Two:not_run/)).toBeInTheDocument();
 
       // The run is finished now, so the tabs are there to read it.
-      await user.click(await screen.findByRole("button", { name: "Summary" }));
+      await user.click(await screen.findByRole("button", { name: "Results" }));
       expect(screen.getByTestId("summary-stopped")).toHaveTextContent("true");
       expect(
         screen.queryByRole("button", { name: "Stop" }),
@@ -1813,11 +1813,11 @@ describe("reading a run light, and one test in full", () => {
     );
 
   /** Open the window and go to the list of tests. A finished run lands on the
-   * Summary tab, so the list is one click away. */
+   * Results tab, so the list is one click away. */
   const openOnResults = async (user: ReturnType<typeof setupUser>) => {
     open();
     await screen.findByTestId("summary-panel");
-    await user.click(screen.getByRole("button", { name: "Results" }));
+    await user.click(screen.getByRole("button", { name: "Tests" }));
     await screen.findByTestId("outputs-panel");
   };
 
@@ -1956,7 +1956,7 @@ describe("a test loading its answer", () => {
       />,
     );
     await screen.findByTestId("summary-panel");
-    await user.click(screen.getByRole("button", { name: "Results" }));
+    await user.click(screen.getByRole("button", { name: "Tests" }));
     await screen.findByTestId("outputs-panel");
   };
 
