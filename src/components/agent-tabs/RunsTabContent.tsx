@@ -7,6 +7,7 @@ import {
   useAgentRuns,
   useDialogUrlParam,
   usePageSize,
+  useResizableWidth,
   type AgentRun,
   type RunResultFilter,
   type RunTypeFilter,
@@ -365,6 +366,11 @@ export function RunsTabContent({
 
   const benchmarkRerun = useBenchmarkRerun();
 
+  // The Run column starts at the width that fits the longest automatic name
+  // ("Model comparison 999"), and can be dragged wider for runs people have
+  // renamed to something longer.
+  const runColumn = useResizableWidth(240, 140, 560);
+
   // Whichever run is open asks for itself, so the list stops asking for it.
   useEffect(() => {
     setPollSkip(openTestRunId ?? openBenchmarkRun?.uuid ?? null);
@@ -494,10 +500,23 @@ export function RunsTabContent({
             <table className="w-full table-fixed">
               <thead className="bg-muted/30">
                 <tr>
-                  {/* Wide enough for the longest name plus its mark, e.g.
-                      "Model comparison 999", without cutting it short. */}
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-60">
+                  <th
+                    style={{ width: runColumn.width }}
+                    className="relative text-left px-4 py-3 text-sm font-medium text-muted-foreground"
+                  >
                     Run
+                    {/* Nothing to see until you reach for it: the edge takes
+                        a drag, and only then does it show. A visible line
+                        here read as a border the table did not need. */}
+                    {/* Hidden from a screen reader, which reads a heading's
+                        whole contents: a label here made the column announce
+                        itself as "Run Resize the Run column". */}
+                    <div
+                      aria-hidden="true"
+                      data-testid="run-column-resize"
+                      onMouseDown={runColumn.startDrag}
+                      className="hidden md:block absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-accent active:bg-accent transition-colors"
+                    />
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                     Result
