@@ -3,8 +3,10 @@ import { toast } from "sonner";
 import {
   abortRun,
   abortRunOrNotify,
+  clearTestRunCache,
   deleteRun,
   deleteRunOrNotify,
+  getCachedTestRun,
   renameRun,
   startTestRun,
   startTestRunOrNotify,
@@ -42,6 +44,7 @@ function jsonResponse(body: any, ok = true, status = ok ? 200 : 500) {
 describe("testRunApi", () => {
   beforeEach(() => {
     (global.fetch as any) = jest.fn();
+    clearTestRunCache();
   });
 
   afterEach(() => {
@@ -221,6 +224,67 @@ describe("testRunApi", () => {
       await expect(
         fetchTestRun(BACKEND_URL, TOKEN, "task-1"),
       ).rejects.not.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe("remembering finished runs", () => {
+    const run = (taskId: string, status = "done", name?: string) => ({
+      task_id: taskId,
+      status,
+      name,
+      results: [{ test_case_id: "t-1", passed: true }],
+    });
+
+    it("keeps a finished run so it can be shown again without a download", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(run("task-1")));
+
+      expect(getCachedTestRun("task-1")).toBeUndefined();
+      await fetchTestRun(BACKEND_URL, TOKEN, "task-1");
+
+      expect(getCachedTestRun("task-1")).toEqual(run("task-1"));
+      // A second read of the same run still answers from the same copy.
+      await fetchTestRun(BACKEND_URL, TOKEN, "task-1");
+      expect(getCachedTestRun("task-1")).toEqual(run("task-1"));
+    });
+
+    it.each(["queued", "in_progress"])(
+      "never keeps a run that is still %s",
+      async (status) => {
+        (global.fetch as jest.Mock).mockResolvedValue(
+          jsonResponse(run("task-1", status)),
+        );
+
+        await fetchTestRun(BACKEND_URL, TOKEN, "task-1");
+
+        expect(getCachedTestRun("task-1")).toBeUndefined();
+      },
+    );
+
+    it("keeps only the three most recent runs", async () => {
+      for (const id of ["task-1", "task-2", "task-3", "task-4"]) {
+        (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(run(id)));
+        await fetchTestRun(BACKEND_URL, TOKEN, id);
+      }
+
+      expect(getCachedTestRun("task-1")).toBeUndefined();
+      expect(getCachedTestRun("task-2")).toBeDefined();
+      expect(getCachedTestRun("task-3")).toBeDefined();
+      expect(getCachedTestRun("task-4")).toBeDefined();
+    });
+
+    it("forgets a run that has just been renamed, so the old name cannot come back", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse(run("task-1", "done", "Old name")),
+      );
+      await fetchTestRun(BACKEND_URL, TOKEN, "task-1");
+      expect(getCachedTestRun("task-1")?.name).toBe("Old name");
+
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-1", name: "New name" }),
+      );
+      await renameRun(BACKEND_URL, TOKEN, "task-1", "New name");
+
+      expect(getCachedTestRun("task-1")).toBeUndefined();
     });
   });
 

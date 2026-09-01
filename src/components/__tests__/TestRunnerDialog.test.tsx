@@ -1,6 +1,7 @@
 import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { toast } from "sonner";
 import { TestRunnerDialog } from "../TestRunnerDialog";
+import { clearTestRunCache } from "@/lib/testRunApi";
 
 // Mock heavy child components so this file tests TestRunnerDialog's own
 // state machine (fetch/poll lifecycle, row derivation, labelling gating), not
@@ -141,6 +142,10 @@ describe("TestRunnerDialog", () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
     localStorage.setItem("access_token", "test-token");
     (global.fetch as any) = jest.fn();
+    // Several tests here reuse one task id with different runs behind it. The
+    // window remembers finished runs, so without this a run from an earlier
+    // test would be shown by a later one.
+    clearTestRunCache();
   });
 
   afterEach(() => {
@@ -1349,6 +1354,10 @@ describe("tests that produced no answer", () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
     localStorage.setItem("access_token", "test-token");
     (global.fetch as any) = jest.fn();
+    // Several tests here reuse one task id with different runs behind it. The
+    // window remembers finished runs, so without this a run from an earlier
+    // test would be shown by a later one.
+    clearTestRunCache();
   });
 
   afterEach(() => {

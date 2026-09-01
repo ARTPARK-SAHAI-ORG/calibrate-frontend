@@ -51,6 +51,7 @@ import {
   abortRunOrNotify,
   startTestRunOrNotify,
   fetchTestRun,
+  getCachedTestRun,
   isTerminalRunStatus,
   UnauthorizedError,
   type TestCaseResult,
@@ -172,8 +173,12 @@ export function TestRunnerDialog({
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) return;
 
-    setRun(null);
-    setIsLoading(true);
+    // A run already read this session is shown straight away, so reopening it
+    // does not download megabytes of results again. The fetch below still
+    // runs: the name, or whether it is shared, can have changed elsewhere.
+    const cached = getCachedTestRun(taskId);
+    setRun(cached ?? null);
+    setIsLoading(!cached);
     setSelectedTestUuid(null);
     setActiveTab("outputs");
     hasAutoSelectedRef.current = false;

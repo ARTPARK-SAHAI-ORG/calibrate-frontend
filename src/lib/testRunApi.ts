@@ -158,6 +158,30 @@ export async function startTestRunOrNotify(
   }
 }
 
+/**
+ * Runs the backend has finished with, so the window can show one again the
+ * moment it is reopened instead of downloading it a second time. Only finished
+ * runs go in: an unfinished one changes on every poll.
+ *
+ * One run of 1880 tests is several megabytes, so this holds at most three and
+ * drops the oldest. An unbounded cache would grow the tab's memory until it
+ * is reloaded. Lives for the session only.
+ */
+const FINISHED_RUN_CACHE_LIMIT = 3;
+const finishedRuns = new Map<string, TestRunStatusResponse>();
+
+/** The remembered copy of a finished run, if there is one. */
+export function getCachedTestRun(
+  taskId: string,
+): TestRunStatusResponse | undefined {
+  return finishedRuns.get(taskId);
+}
+
+/** Clears the remembered runs. For tests. */
+export function clearTestRunCache(): void {
+  finishedRuns.clear();
+}
+
 /** Fetch the full state of a run. The dialog's only source of run content. */
 export async function fetchTestRun(
   backendUrl: string,
@@ -172,7 +196,17 @@ export async function fetchTestRun(
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to fetch test run");
 
-  return response.json();
+  const run: TestRunStatusResponse = await response.json();
+  if (isTerminalRunStatus(run.status)) {
+    // Re-inserting moves it to the newest position, so a run being read now is
+    // not the one dropped next.
+    finishedRuns.delete(taskId);
+    finishedRuns.set(taskId, run);
+    if (finishedRuns.size > FINISHED_RUN_CACHE_LIMIT) {
+      finishedRuns.delete(finishedRuns.keys().next().value as string);
+    }
+  }
+  return run;
 }
 
 /**
@@ -198,6 +232,9 @@ export async function renameRun(
 
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to rename the run");
+
+  // The remembered copy now has the old name on it, so forget it.
+  finishedRuns.delete(taskId);
 
   const result: { name?: string | null } = await response.json();
   return result.name ?? "";

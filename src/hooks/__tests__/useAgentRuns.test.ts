@@ -4,6 +4,7 @@ import {
   type RunResultFilter,
   type RunTypeFilter,
 } from "../useAgentRuns";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -85,7 +86,9 @@ describe("useAgentRuns around", () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
 
     act(() => result.current.nextPage());
-    await waitFor(() => expect(lastRunsUrl().searchParams.get("offset")).toBe("100"));
+    await waitFor(() =>
+      expect(lastRunsUrl().searchParams.get("offset")).toBe("100"),
+    );
     expect(lastRunsUrl().searchParams.has("around")).toBe(false);
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
   });
@@ -227,5 +230,92 @@ describe("useAgentRuns initialOffset", () => {
 
     await waitFor(() => expect(result.current.offset).toBe(0));
     expect(lastRunsUrl().searchParams.get("type")).toBe("llm-benchmark");
+  });
+});
+
+describe("useAgentRuns background refresh", () => {
+  const runningRun = {
+    uuid: "run-live",
+    name: "",
+    type: "llm-unit-test",
+    status: "in_progress",
+  };
+
+  /** Renders the hook and records `isLoading` on every render. */
+  function setupRecording(firstPage: unknown[]) {
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ items: firstPage, total: firstPage.length, offset: 0 }),
+    ) as jest.Mock;
+    const loadingSeen: boolean[] = [];
+    const { result } = renderHook(() => {
+      const hook = useAgentRuns({
+        agentUuid: AGENT_UUID,
+        accessToken: "tok",
+        pageSize: 50,
+        filter: "all",
+        aroundRunId: null,
+      });
+      loadingSeen.push(hook.isLoading);
+      return hook;
+    });
+    return { result, loadingSeen };
+  }
+
+  async function tick() {
+    await act(async () => {
+      jest.advanceTimersByTime(POLLING_INTERVAL_MS);
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("re-asks for the page, not the runs themselves, while a run is going", async () => {
+    const { result } = setupRecording([runningRun]);
+    await waitFor(() => expect(result.current.items).toEqual([runningRun]));
+    const before = (global.fetch as jest.Mock).mock.calls.length;
+
+    await tick();
+
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(before + 1);
+    expect(lastRunsUrl().pathname).toBe(
+      `/agent-tests/agent/${AGENT_UUID}/runs`,
+    );
+    // The whole point: no run detail is downloaded to learn a status.
+    const paths = urls().map((u) => u.pathname);
+    expect(
+      paths.some(
+        (p) =>
+          p.startsWith("/agent-tests/run/") ||
+          p.startsWith("/agent-tests/benchmark/"),
+      ),
+    ).toBe(false);
+  });
+
+  it("asks for nothing more once every run on the page has finished", async () => {
+    const { result } = setupRecording([runA, runB]);
+    await waitFor(() => expect(result.current.items).toEqual([runA, runB]));
+    const before = (global.fetch as jest.Mock).mock.calls.length;
+
+    await tick();
+    await tick();
+
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(before);
+  });
+
+  it("refreshes without putting the list back into loading", async () => {
+    const { result, loadingSeen } = setupRecording([runningRun]);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    loadingSeen.length = 0;
+
+    await tick();
+
+    expect(loadingSeen).not.toContain(true);
+    expect(result.current.isLoading).toBe(false);
   });
 });

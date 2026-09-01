@@ -52,6 +52,7 @@ import {
   testTypeLabel,
   getRunBreakdown,
   runDisplayName,
+  isRunInProgress,
 } from "@/lib/testTypes";
 import {
   TestTypeFilter,
@@ -342,11 +343,14 @@ function LLMPageInner() {
   // A boolean, not the run id itself, so switching between runs does not
   // refetch the whole list.
   const runsListNeeded = activeTab === "runs" || !!searchParams.get("runId");
-  useEffect(() => {
-    if (!runsListNeeded || !backendAccessToken) return;
-    const fetchAllRuns = async () => {
+
+  // `quiet` skips the loading state, so a refresh while runs are going does not
+  // blank the list every few seconds.
+  const fetchAllRuns = useCallback(
+    async (quiet = false) => {
+      if (!backendAccessToken) return;
       try {
-        setAllRunsLoading(true);
+        if (!quiet) setAllRunsLoading(true);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) throw new Error("BACKEND_URL not set");
         const response = await fetch(`${backendUrl}/agent-tests/runs`, {
@@ -356,128 +360,42 @@ function LLMPageInner() {
         if (response.status === 401) { await signOut({ callbackUrl: "/login" }); return; }
         if (!response.ok) throw new Error("Failed to fetch runs");
         const data = await response.json();
-        setAllRuns(unwrapList<AllRun>(data));
+        const rows = unwrapList<AllRun>(data);
+        // The list does not carry each run's per-test results, and a run of a
+        // single test shows that test's name from them. Keep whatever the row
+        // already had so a just-started run does not lose its name.
+        setAllRuns((prev) => {
+          const previousByUuid = new Map(prev.map((run) => [run.uuid, run]));
+          return rows.map((run) =>
+            run.results
+              ? run
+              : { ...run, results: previousByUuid.get(run.uuid)?.results },
+          );
+        });
       } catch (err) {
         reportError("Error fetching all runs:", err);
       } finally {
-        setAllRunsLoading(false);
+        if (!quiet) setAllRunsLoading(false);
       }
-    };
-    fetchAllRuns();
-  }, [runsListNeeded, backendAccessToken]);
-
-  // Live-update pending runs on the Runs tab.
-  //
-  // Mirrors the polling pattern from the per-agent Tests tab
-  // (`src/components/agent-tabs/TestsTabContent.tsx`): every
-  // POLLING_INTERVAL_MS, fetch the result endpoint for any run whose
-  // status is still pending/queued/in_progress and patch its row in
-  // `allRuns` in-place. The run currently being viewed in a dialog is
-  // skipped — the dialog runs its own polling and we don't want to
-  // race-update its mirror copy on this page.
-  const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
-  const allRunsRef = useRef<AllRun[]>([]);
-  const openTestRunRef = useRef<{ taskId: string } | null>(null);
-  const viewingRunBenchmarkRef = useRef(false);
-  const selectedRunRef = useRef<AllRun | null>(null);
-
-  // Keep refs in sync with state so the polling closure always sees the
-  // latest values without re-creating the interval on every render.
-  useEffect(() => { allRunsRef.current = allRuns; }, [allRuns]);
-  useEffect(() => { openTestRunRef.current = openTestRun; }, [openTestRun]);
-  useEffect(() => { viewingRunBenchmarkRef.current = viewingRunBenchmark; }, [viewingRunBenchmark]);
-  useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
+    },
+    [backendAccessToken],
+  );
 
   useEffect(() => {
-    if (activeTab !== "runs" || !backendAccessToken) return;
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return;
+    if (!runsListNeeded) return;
+    fetchAllRuns();
+  }, [runsListNeeded, fetchAllRuns]);
 
-    if (pendingRunsPollingRef.current) {
-      clearInterval(pendingRunsPollingRef.current);
-      pendingRunsPollingRef.current = null;
-    }
-
-    // The run currently open in a dialog, read fresh from refs so it stays
-    // accurate across the awaits in the loop below.
-    const viewingRunId = () =>
-      openTestRunRef.current?.taskId ??
-      (viewingRunBenchmarkRef.current ? selectedRunRef.current?.uuid : null) ??
-      null;
-
-    const pollPendingRuns = async () => {
-      const pendingRuns = allRunsRef.current.filter(
-        (run) =>
-          (run.status === "pending" ||
-            run.status === "queued" ||
-            run.status === "in_progress") &&
-          run.uuid !== viewingRunId(),
-      );
-
-      if (pendingRuns.length === 0) return;
-
-      for (const run of pendingRuns) {
-        if (run.uuid === viewingRunId()) continue;
-
-        try {
-          const endpoint =
-            run.type === "llm-unit-test"
-              ? `${backendUrl}/agent-tests/run/${run.uuid}`
-              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
-
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: getDefaultHeaders(backendAccessToken),
-          });
-
-          if (response.status === 401) {
-            await signOut({ callbackUrl: "/login" });
-            return;
-          }
-
-          if (!response.ok) continue;
-
-          const result = await response.json();
-
-          setAllRuns((prev) =>
-            prev.map((r) => {
-              if (r.uuid !== run.uuid) return r;
-              if (run.type === "llm-unit-test") {
-                return {
-                  ...r,
-                  status: result.status,
-                  total_tests: result.total_tests ?? r.total_tests,
-                  passed: result.passed ?? r.passed,
-                  failed: result.failed ?? r.failed,
-                  unanswered_tests: result.unanswered_tests ?? r.unanswered_tests,
-                  results: result.results ?? r.results,
-                  updated_at: new Date().toISOString(),
-                };
-              }
-              return {
-                ...r,
-                status: result.status,
-                model_results: result.model_results ?? r.model_results,
-                updated_at: new Date().toISOString(),
-              };
-            }),
-          );
-        } catch (err) {
-          reportError(`Error polling run ${run.uuid}:`, err);
-        }
-      }
-    };
-
-    pollPendingRuns();
-    pendingRunsPollingRef.current = setInterval(pollPendingRuns, POLLING_INTERVAL_MS);
-
-    return () => {
-      if (pendingRunsPollingRef.current) {
-        clearInterval(pendingRunsPollingRef.current);
-        pendingRunsPollingRef.current = null;
-      }
-    };
-  }, [activeTab, backendAccessToken]);
+  // Live-update the Runs tab while anything is still running. The runs list
+  // already carries every counter these rows show, so one quiet re-fetch of the
+  // list replaced the old per-run detail polling (a detail response for a large
+  // run is several megabytes, and only a handful of counters were kept).
+  const hasRunInProgress = allRuns.some(isRunInProgress);
+  useEffect(() => {
+    if (activeTab !== "runs" || !hasRunInProgress || !backendAccessToken) return;
+    const interval = setInterval(() => fetchAllRuns(true), POLLING_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [activeTab, hasRunInProgress, backendAccessToken, fetchAllRuns]);
 
   /** Put a renamed run's new name on its row, so the list behind the run
    * window reads the same as the window. */

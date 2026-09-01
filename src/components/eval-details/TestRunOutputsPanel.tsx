@@ -308,7 +308,12 @@ export function TestRunOutputsPanel({
                     <div
                       key={result.id}
                       ref={selectedId === result.id ? selectedRowRef : undefined}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      // ponytail: the browser skips style/layout/paint for rows
+                      // off screen, but every row element is still created. 36px
+                      // is a row's real height (py-2 = 8+8 around a 20px line).
+                      // If element creation itself ever becomes the bottleneck,
+                      // the upgrade is real windowing: render only the visible slice.
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_36px] ${
                         selectedId === result.id ? "bg-muted" : "hover:bg-muted/50"
                       }`}
                     >
