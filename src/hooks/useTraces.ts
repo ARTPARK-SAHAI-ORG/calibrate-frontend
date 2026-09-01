@@ -121,15 +121,15 @@ export function useTraces({
   /** Re-sync after `count` rows were deleted, clamping the page back into
    *  range when the current offset would land past the new end. */
   const handleDeleted = useCallback(
-    (count: number) => {
+    async (count: number) => {
       const newTotal = Math.max(0, total - count);
       const lastPageOffset =
         Math.max(0, Math.ceil(newTotal / pageSize) - 1) * pageSize;
       if (offset > lastPageOffset) {
         setOffset(lastPageOffset);
-      } else {
-        load(offset);
+        return;
       }
+      await load(offset);
     },
     [total, pageSize, offset, load],
   );

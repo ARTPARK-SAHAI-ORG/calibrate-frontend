@@ -12,6 +12,8 @@ type DeleteIconButtonProps = {
   ariaLabel?: string;
   /** Extra classes appended to the base styling. */
   className?: string;
+  /** Greys the button out and stops it being clicked. */
+  disabled?: boolean;
 };
 
 /**
@@ -24,6 +26,7 @@ export function DeleteIconButton({
   title = "Delete",
   ariaLabel,
   className = "",
+  disabled = false,
 }: DeleteIconButtonProps) {
   return (
     <button
@@ -32,9 +35,16 @@ export function DeleteIconButton({
         e.stopPropagation();
         onClick();
       }}
-      title={title}
+      /* No browser tooltip while disabled: the caller wraps a disabled button
+         in the app's own Tooltip, and two would show at once. */
+      title={disabled ? undefined : title}
       aria-label={ariaLabel ?? title}
-      className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer ${className}`}
+      disabled={disabled}
+      className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground transition-colors ${
+        disabled
+          ? "cursor-not-allowed disabled:opacity-50"
+          : "hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+      } ${className}`}
     >
       <svg
         className="w-4 h-4"

@@ -244,6 +244,25 @@ export function useAgentRuns({
 
   const refetch = useCallback(() => load(offset), [load, offset]);
 
+  /** Re-read the list after one run was deleted, stepping back a page when
+   *  the deleted row was the only one left on this one. Await it before
+   *  closing whatever asked for the delete, so the row is already gone by the
+   *  time the reader is looking at the list again. */
+  const handleDeleted = useCallback(async () => {
+    const newTotal = Math.max(0, total - 1);
+    const lastPageOffset =
+      Math.max(0, Math.ceil(newTotal / pageSize) - 1) * pageSize;
+    if (offset > lastPageOffset) {
+      // The rows for the page being landed on are read right here, so the
+      // effect watching `offset` must not ask for them a second time.
+      skipNextFetchRef.current = true;
+      setOffset(lastPageOffset);
+      await load(lastPageOffset);
+      return;
+    }
+    await load(offset);
+  }, [total, pageSize, offset, load]);
+
   // Keep unfinished runs on this page up to date. `skipUuid` is the run
   // already open in a window, which asks for itself.
   const skipUuidRef = useRef<string | null>(null);
@@ -336,6 +355,7 @@ export function useAgentRuns({
     error,
     aroundNotFound,
     refetch,
+    handleDeleted,
     setPollSkip,
     hasPrev,
     hasNext,

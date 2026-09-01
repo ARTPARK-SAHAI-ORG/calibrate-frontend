@@ -255,3 +255,49 @@ export async function abortRunOrNotify(
 export function isTerminalRunStatus(status: string): boolean {
   return status === "done" || status === "completed" || status === "failed";
 }
+
+/**
+ * Delete a run and the results it produced. One route covers a plain
+ * evaluation run and a model comparison alike.
+ *
+ * Only call this for a run that has finished. Deleting a run still going
+ * removes the record but does not stop the run: the backend holds no handle
+ * on the work, so it keeps going with nowhere left to report to.
+ */
+export async function deleteRun(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+): Promise<void> {
+  const response = await fetch(`${backendUrl}/agent-tests/job/${taskId}`, {
+    method: "DELETE",
+    headers: getDefaultHeaders(accessToken),
+  });
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to delete the run");
+}
+
+/**
+ * `deleteRun` plus the failure handling every caller needs: sign out on a 401,
+ * otherwise report the error and show one toast. Returns whether the run was
+ * deleted, so the caller knows whether to read the list back.
+ */
+export async function deleteRunOrNotify(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+): Promise<boolean> {
+  try {
+    await deleteRun(backendUrl, accessToken, taskId);
+    return true;
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      await signOut({ callbackUrl: "/login" });
+      return false;
+    }
+    reportError("Error deleting test run:", error);
+    toast.error("Could not delete the evaluation. Please try again.");
+    return false;
+  }
+}

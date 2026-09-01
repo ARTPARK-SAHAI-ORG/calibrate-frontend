@@ -21,6 +21,10 @@ import {
   runStateOf,
 } from "@/lib/testTypes";
 import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
+import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { Tooltip } from "@/components/Tooltip";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { deleteRunOrNotify } from "@/lib/testRunApi";
 import {
   EvaluatorPillList,
   NamePillList,
@@ -106,7 +110,9 @@ const PILL_CLASS =
 function RunResult({ run }: { run: AgentRun }) {
   if (isRunInProgress(run)) {
     return (
-      <span className={`${PILL_CLASS} bg-yellow-500/20 text-yellow-500`}>
+      <span
+        className={`${PILL_CLASS} bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-500`}
+      >
         <svg
           className="w-3 h-3 animate-spin mr-1"
           fill="none"
@@ -241,6 +247,37 @@ function RunEvaluators({ run }: { run: AgentRun }) {
 }
 
 /**
+ * The delete button for one run. A run that is still going cannot be deleted:
+ * the button is greyed out until it has finished, since deleting it would only
+ * remove the record while the run itself kept going.
+ */
+function RunDeleteButton({
+  run,
+  onDelete,
+}: {
+  run: AgentRun;
+  onDelete: () => void;
+}) {
+  const running = isRunInProgress(run);
+  const button = (
+    <DeleteIconButton
+      onClick={onDelete}
+      title="Delete evaluation"
+      disabled={running}
+    />
+  );
+  if (!running) return button;
+  return (
+    <Tooltip
+      content="You can delete this evaluation once it has finished."
+      position="left"
+    >
+      {button}
+    </Tooltip>
+  );
+}
+
+/**
  * The Runs tab on the agent page: every past run of this agent's tests, newest
  * first, in one table showing how many tests and how many models each run
  * covered. Clicking a row opens the results it produced.
@@ -310,6 +347,7 @@ export function RunsTabContent({
     error,
     aroundNotFound,
     refetch,
+    handleDeleted,
     setPollSkip,
     hasPrev,
     hasNext,
@@ -370,6 +408,31 @@ export function RunsTabContent({
   // ("Model comparison 999"), and can be dragged wider for runs people have
   // renamed to something longer.
   const runColumn = useResizableWidth(240, 140, 560);
+
+  // The run the reader asked to delete, held while they confirm.
+  const [runToDelete, setRunToDelete] = useState<AgentRun | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!runToDelete || !backendUrl) return;
+    setIsDeleting(true);
+    const deleted = await deleteRunOrNotify(
+      backendUrl,
+      backendAccessToken,
+      runToDelete.uuid,
+    );
+    if (!deleted) {
+      setIsDeleting(false);
+      return;
+    }
+    // Read the list back before closing, so the row is gone the moment the
+    // confirmation does. Closing first left the deleted run on screen for as
+    // long as the list took to answer.
+    await handleDeleted();
+    setIsDeleting(false);
+    setRunToDelete(null);
+  };
 
   // Whichever run is open asks for itself, so the list stops asking for it.
   useEffect(() => {
@@ -533,6 +596,9 @@ export function RunsTabContent({
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">
                     Created at
                   </th>
+                  <th className="px-4 py-3 w-16">
+                    <span className="sr-only">Delete</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -561,6 +627,14 @@ export function RunsTabContent({
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {whenText(run)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end">
+                        <RunDeleteButton
+                          run={run}
+                          onDelete={() => setRunToDelete(run)}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -591,9 +665,15 @@ export function RunsTabContent({
                 <div className="mt-2">
                   <RunEvaluators run={run} />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {whenText(run)}
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    {whenText(run)}
+                  </p>
+                  <RunDeleteButton
+                    run={run}
+                    onDelete={() => setRunToDelete(run)}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -636,6 +716,21 @@ export function RunsTabContent({
               testNames,
             });
           }}
+        />
+      )}
+
+      {runToDelete && (
+        <DeleteConfirmationDialog
+          isOpen
+          onClose={() => setRunToDelete(null)}
+          onConfirm={confirmDelete}
+          title="Delete evaluation"
+          message={`Are you sure you want to delete "${runDisplayName(
+            runToDelete.type,
+            runToDelete.name,
+          )}"? Its results are deleted too, and this cannot be undone.`}
+          confirmText="Delete"
+          isDeleting={isDeleting}
         />
       )}
 

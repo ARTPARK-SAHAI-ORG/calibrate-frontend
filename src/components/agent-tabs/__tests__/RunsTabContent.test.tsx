@@ -20,6 +20,14 @@ jest.mock("../../../hooks", () => ({
 
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 
+const mockToastError = jest.fn();
+jest.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: jest.fn(),
+  },
+}));
+
 let runnerProps: any = null;
 jest.mock("../../TestRunnerDialog", () => ({
   TestRunnerDialog: (props: any) => {
@@ -81,11 +89,23 @@ const benchmarkRun: AgentRun = {
   model_results: [{ model: "a" }, { model: "b" }],
 };
 
-let state: { runs: AgentRun[]; total?: number; pollUnit?: unknown };
+let state: {
+  runs: AgentRun[];
+  total?: number;
+  pollUnit?: unknown;
+  deleteOk?: boolean;
+  /** Holds the next runs request until this resolves. */
+  holdList?: Promise<void>;
+};
 
 function installFetch() {
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+      if (state.holdList) {
+        const hold = state.holdList;
+        state.holdList = undefined;
+        await hold;
+      }
       const around = new URL(url).searchParams.get("around");
       if (around && !state.runs.some((r) => r.uuid === around)) {
         return jsonResponse({}, false, 404);
@@ -95,6 +115,10 @@ function installFetch() {
         total: state.total ?? state.runs.length,
         offset: 0,
       });
+    }
+    if (url.includes("/agent-tests/job/")) {
+      return jsonResponse(state.deleteOk === false ? {} : { message: "ok" },
+        state.deleteOk !== false, state.deleteOk === false ? 500 : 200);
     }
     if (url.includes("/agent-tests/run/")) {
       return jsonResponse(state.pollUnit ?? {}, !!state.pollUnit, 200);
@@ -202,7 +226,8 @@ describe("RunsTabContent", () => {
         "td",
       ),
     ).map((td) => td.textContent);
-    expect(cells[cells.length - 1]).toBe("—");
+    // Last cell is the delete button; "Created at" is the one before it.
+    expect(cells[cells.length - 2]).toBe("—");
   });
 
   it("shows both run kinds in one table with their test and model counts", async () => {
@@ -650,6 +675,117 @@ describe("RunsTabContent", () => {
       (await screen.findAllByText("1 Success", {}, { timeout: 5000 })).length,
     ).toBeGreaterThan(0);
   }, 10000);
+  describe("deleting a run", () => {
+    /** The delete buttons in the desktop table. */
+    const deleteButtons = () =>
+      Array.from(
+        (document.querySelector("table") as HTMLElement).querySelectorAll(
+          'button[aria-label="Delete evaluation"]',
+        ),
+      ) as HTMLButtonElement[];
+
+    it("deletes the run after the reader confirms, then reads the list back", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(deleteButtons()[0]);
+      // The window for the run must not open: the delete button swallows the
+      // row click.
+      expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Are you sure you want to delete "Evaluation run 4"/),
+      ).toBeInTheDocument();
+
+      state.runs = [];
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() =>
+        expect(
+          (global.fetch as jest.Mock).mock.calls.some(
+            ([url, init]) =>
+              String(url) === `${BACKEND}/agent-tests/job/run-unit` &&
+              init.method === "DELETE",
+          ),
+        ).toBe(true),
+      );
+      await screen.findByText("No evaluations yet");
+    });
+
+    it("keeps the confirmation open until the list has been read back", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      // Hold the list request that follows the delete, so the moment between
+      // the delete answering and the fresh list arriving can be looked at.
+      let releaseList: () => void = () => {};
+      state.holdList = new Promise<void>((resolve) => {
+        releaseList = resolve;
+      });
+
+      await user.click(deleteButtons()[0]);
+      state.runs = [];
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      // The delete has answered, the list has not: the confirmation is still
+      // up, saying so, and the row is still the old one.
+      await screen.findByText("Deleting...");
+      expect(
+        screen.getByText(/Are you sure you want to delete/),
+      ).toBeInTheDocument();
+
+      releaseList();
+      await screen.findByText("No evaluations yet");
+      expect(
+        screen.queryByText(/Are you sure you want to delete/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the run listed when the delete fails", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      state.deleteOk = false;
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(deleteButtons()[0]);
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(mockToastError).toHaveBeenCalled());
+      // The confirmation stays open and the run is still there.
+      expect(
+        screen.getByText(/Are you sure you want to delete/),
+      ).toBeInTheDocument();
+    });
+
+    it("steps back a page when the deleted run was the last one on it", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      state.total = 51;
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
+
+      await user.click(deleteButtons()[0]);
+      state.total = 50;
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("0"));
+    });
+
+    it("cannot delete a run that is still going", async () => {
+      state.runs = [{ ...unitRun, uuid: "run-live", status: "in_progress" }];
+      renderTab();
+      await screen.findAllByText("Running");
+
+      expect(deleteButtons()[0]).toBeDisabled();
+    });
+  });
 });
 
 describe("the Run column width", () => {

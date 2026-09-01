@@ -9,7 +9,7 @@ type UseAgentDeletionArgs<T extends AgentLike> = {
   agents: T[];
   /** Prune the given uuids from the page's agent list after a successful
    *  delete. */
-  onDeleted: (uuids: string[]) => void;
+  onDeleted: (uuids: string[]) => void | Promise<void>;
   /** Backend JWT used for the delete requests. */
   accessToken: string | null;
 };
