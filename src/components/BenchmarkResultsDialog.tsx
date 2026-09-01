@@ -700,9 +700,6 @@ export function BenchmarkResultsDialog({
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
               )}
-              {!isDone && !isInitialLoading && currentTaskId && (
-                <StopRunButton onStop={stopBenchmark} className="shrink-0" />
-              )}
             </div>
             {!isInitialLoading && (
               <p className="text-xs text-muted-foreground truncate">
@@ -777,6 +774,13 @@ export function BenchmarkResultsDialog({
               >
                 Submit for labelling
               </button>
+            )}
+            {!isDone && !isInitialLoading && currentTaskId && (
+              <StopRunButton
+                onStop={stopBenchmark}
+                noun="model comparison"
+                className="shrink-0"
+              />
             )}
             <button
               onClick={onClose}

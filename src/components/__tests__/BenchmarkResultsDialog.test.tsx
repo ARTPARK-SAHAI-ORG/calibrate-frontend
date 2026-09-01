@@ -99,6 +99,8 @@ jest.mock("../ui", () => ({
       {props.tooltip ?? "Rerun"}
     </button>
   ),
+  // Stands in for the real button, straight through with no question. The
+  // question itself is covered in src/components/ui/__tests__.
   StopRunButton: (props: any) => (
     <button onClick={() => props.onStop()}>Stop</button>
   ),
