@@ -1,5 +1,6 @@
 ## September 2026
 
+- Model names now show in plain form instead of with their maker's prefix, and long model names in benchmark charts no longer get cut off ([#546](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/546))
 - The FormBharo blog post now credits Jigar Doshi, Sanskriti Midha and the ARMMAN team by name instead of linking to an unpublished preprint ([#548](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/548))
 - You can now read the FormBharo case study on the blog and open it from the ARMMAN customer story link on the landing page ([#544](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/544))
 - Downloading the model selection chart from a shared benchmark link now names the file after what it shows instead of calling it a leaderboard ([#540](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/540))
