@@ -7,7 +7,7 @@ import { render, screen, within } from "@/test-utils";
 import { notFound } from "next/navigation";
 import BlogPage from "../blog/page";
 import BlogPostPage from "../blog/[slug]/page";
-import { POSTS } from "@/lib/blogPosts";
+import { POSTS, findPost } from "@/lib/blogPosts";
 
 describe("Blog", () => {
   it("lists every post, each linking to its own address", () => {
@@ -81,12 +81,12 @@ describe("Blog", () => {
     expect(screen.getByText("2 September 2026")).toBeInTheDocument();
 
     // Its share picture is figure 9 from inside the post, so it is the
-    // thumbnail a shared link shows and is not repeated at the top.
-    expect(
-      document.querySelector(
-        'img[src="/blog/evaluating-a-form-filling-voice-agent.png"]',
-      ),
-    ).toBeNull();
+    // thumbnail a shared link shows and is not repeated at the top. The path
+    // is read from the post itself, so renaming the file cannot quietly turn
+    // this check into one that looks for something nothing renders.
+    const shareImage = findPost("evaluating-a-form-filling-voice-agent")?.image;
+    expect(shareImage).toBeTruthy();
+    expect(document.querySelector(`img[src="${shareImage}"]`)).toBeNull();
     expect(
       screen.getByRole("heading", { level: 2, name: "Findings" }),
     ).toBeInTheDocument();

@@ -17,7 +17,9 @@ export default function BlogPage() {
             {POSTS.map((post) => (
               <li key={post.slug}>
                 <PostByline post={post} />
-                <h2 className="mt-2 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em] text-balance">
+                {/* No text-balance: a title on this page runs the full width
+                    of the column rather than being split into even lines. */}
+                <h2 className="mt-2 text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 leading-[1.12] tracking-[-0.03em]">
                   <Link
                     href={`/blog/${post.slug}`}
                     className="hover:text-gray-600 transition-colors"
