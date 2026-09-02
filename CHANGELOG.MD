@@ -1,5 +1,6 @@
 ## September 2026
 
+- The blog post about the form filling voice agent now links to the current reply generation benchmark instead of an outdated one ([#550](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/550))
 - Model names now show in plain form instead of with their maker's prefix, and long model names in benchmark charts no longer get cut off ([#546](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/546))
 - The FormBharo blog post now credits Jigar Doshi, Sanskriti Midha and the ARMMAN team by name instead of linking to an unpublished preprint ([#548](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/548))
 - You can now read the FormBharo case study on the blog and open it from the ARMMAN customer story link on the landing page ([#544](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/544))
