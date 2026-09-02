@@ -12,6 +12,30 @@ describe("BenchmarkCombinedLeaderboard", () => {
     expect(screen.getByText("No leaderboard data available")).toBeInTheDocument();
   });
 
+  // A model is named the way a person says it, so the company that makes it is
+  // left off both the table and the charts below it.
+  it("names each model without the company that makes it", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[
+          { model: "anthropic/claude-sonnet-4.6", passed: "9", total: "10", pass_rate: "90" },
+          { model: "openai__gpt-4.1", passed: "8", total: "10", pass_rate: "80" },
+        ]}
+        modelResults={[
+          { model: "anthropic/claude-sonnet-4.6", evaluator_summary: [], test_results: [] },
+          { model: "openai__gpt-4.1", evaluator_summary: [], test_results: [] },
+        ]}
+        filename="bench"
+      />,
+    );
+    expect(screen.getAllByText("claude-sonnet-4.6").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("gpt-4.1").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByText("anthropic/claude-sonnet-4.6"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("openai__gpt-4.1")).not.toBeInTheDocument();
+  });
+
   it("renders full table + charts with passed/total, pass rate, latency, cost, tokens, tool-call rate, binary and rating evaluators", () => {
     const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
       {

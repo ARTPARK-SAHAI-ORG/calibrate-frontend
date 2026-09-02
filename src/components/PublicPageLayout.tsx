@@ -133,16 +133,6 @@ export function PublicPageLayout({
       <main className={`flex-1 px-4 md:px-8 py-6 md:py-8 ${contentClassName} w-full mx-auto`}>
         {children}
       </main>
-
-      {/* Minimal footer */}
-      <footer className="border-t border-border px-4 md:px-8 py-4 shrink-0">
-        <p className="text-[12px] text-muted-foreground text-center">
-          Shared via{" "}
-          <Link href="/" className="hover:text-foreground transition-colors underline underline-offset-2">
-            Calibrate
-          </Link>
-        </p>
-      </footer>
     </div>
   );
 }

@@ -1105,7 +1105,6 @@ export function BenchmarkResultsDialog({
                 onClearSelection={() => setSelectedTest(null)}
                 onNavChange={setNav}
                 testNames={testNames}
-                formatModelName={(n) => n.replace("__", "/")}
                 showControls={isDone}
                 showRunningSpinner={true}
                 evaluatorsByUuid={Object.fromEntries(

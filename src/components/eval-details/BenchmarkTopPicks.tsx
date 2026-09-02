@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { displayModelName } from "@/lib/modelName";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -43,7 +44,7 @@ export function BenchmarkTopPicks({
     () =>
       (payload?.rows ?? []).map((row) => ({
         model: String(row.model),
-        label: String(row.model),
+        label: displayModelName(String(row.model)),
         cost: row.avg_cost as number,
         passRate: row.pass_rate as number,
         latency: row.avg_latency_ms as number | undefined,

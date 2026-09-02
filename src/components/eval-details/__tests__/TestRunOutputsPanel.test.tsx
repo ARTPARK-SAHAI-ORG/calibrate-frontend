@@ -145,6 +145,29 @@ describe("TestRunOutputsPanel", () => {
     }
   });
 
+  // While a test's answer is still being read there is nothing to say about
+  // its evaluators yet, so the evaluators column stays away and the one
+  // spinner in the middle covers the whole area.
+  it("hides the evaluators panel while the test is being read", () => {
+    const { rerender } = render(
+      <TestRunOutputsPanel
+        results={[{ ...passedResult, loading: true }]}
+        selectedId="p1"
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("eval-criteria-panel")).not.toBeInTheDocument();
+
+    rerender(
+      <TestRunOutputsPanel
+        results={[passedResult]}
+        selectedId="p1"
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("eval-criteria-panel")).toBeInTheDocument();
+  });
+
   it("does not render a group with zero items", () => {
     render(
       <TestRunOutputsPanel results={[passedResult]} selectedId={null} onSelect={jest.fn()} />,

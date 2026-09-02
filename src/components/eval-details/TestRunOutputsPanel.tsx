@@ -416,7 +416,10 @@ export function TestRunOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedResult && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
+      {/* While the test is still being read this panel stays away, so the one
+          spinner in the middle covers the whole area rather than sitting next
+          to a panel saying the test has no evaluators. */}
+      {selectedResult && !selectedResult.loading && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
         <>
           <ResizeHandle
             onMouseDown={verdictPanel.startDrag}
