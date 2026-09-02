@@ -1432,16 +1432,19 @@ export const POSTS: BlogPost[] = [
         <p>
           <em>
             If you find this type of work interesting or want to transition into
-            the social sector, we are hiring software engineers, ML engineers,
-            ML researchers and Product managers for our team and our partner
-            non-profits.
-          </em>{" "}
-          <em>
-            Refer to{" "}
-            <PostLink href="https://app.notion.com/p/agencyfund/Job-Board-09c6311d558d83cfad6c81d55aad44db">
-              this
+            the social sector, we are hiring{" "}
+            <PostLink href="https://www.artpark.in/careers-1/senior-ai-engineer">
+              Voice AI engineers
+            </PostLink>
+            ,{" "}
+            <PostLink href="https://www.artpark.in/careers-1/developer-advocate">
+              Developer Advocates
             </PostLink>{" "}
-            job board.
+            and{" "}
+            <PostLink href="https://www.artpark.in/careers-1/ai-ml-engineer">
+              ML engineers
+            </PostLink>{" "}
+            in our team.
           </em>
         </p>
       </>
