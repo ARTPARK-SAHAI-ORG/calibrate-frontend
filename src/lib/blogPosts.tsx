@@ -1288,7 +1288,7 @@ export const POSTS: BlogPost[] = [
         <p>
           Similarly, the full comparison of different LLMs for reply generation
           on the Scribe v2 transcripts can be seen{" "}
-          <PostLink href="https://calibrate.artpark.ai/public/benchmark/38b4d5d2-462c-4a58-b194-20effcdecf7a">
+          <PostLink href="https://calibrate.artpark.ai/public/benchmark/a508373f-1ee9-486c-90e3-214abd567d8f">
             here
           </PostLink>
           . In this case, GPT 5.4 mini comes out on top for all the weight
