@@ -6,7 +6,6 @@ import { LandingFooter } from "@/components/LandingFooter";
 import {
   POSTS,
   PostByline,
-  PostKind,
   articleJsonLd,
   findPost,
   tabTitle,
@@ -52,7 +51,7 @@ export default async function BlogPostPage({ params }: PostPageProps) {
     <div className="min-h-screen bg-white landing-page">
       <LandingHeader showLogoLink talkToUsHref="/#join-community" />
       <main className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
-        <article className="max-w-3xl mx-auto">
+        <article className="max-w-5xl mx-auto">
           {/* Escaping "<" keeps a stray angle bracket in a post from closing
               this tag early and spilling the rest onto the page. */}
           <script
@@ -70,14 +69,11 @@ export default async function BlogPostPage({ params }: PostPageProps) {
           >
             ← All posts
           </Link>
-          {/* The pill and the title are spaced as a pair, so a post without a
-              pill keeps the same gap under the link back to the posts. */}
-          <div className="mt-6 space-y-3">
-            <PostKind post={post} />
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em] text-balance">
-              {post.title}
-            </h1>
-          </div>
+          {/* No text-balance: the title runs the full width of the column
+              rather than being split into even lines. */}
+          <h1 className="mt-6 text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em]">
+            {post.title}
+          </h1>
           <PostByline post={post} className="mt-4" />
           {post.image && post.showImageOnPage !== false && (
             // Width and height are the real ones, so the page does not jump

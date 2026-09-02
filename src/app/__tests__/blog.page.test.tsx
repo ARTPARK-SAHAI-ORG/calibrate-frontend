@@ -71,7 +71,7 @@ describe("Blog", () => {
 
   // Each render is scoped to its own container, since three renders in one
   // test all land in the same document and would find each other's pills.
-  it("marks the case study with a pill, on the list and on the post", async () => {
+  it("marks the case study with a pill on the list, not on the post", async () => {
     const list = within(render(<BlogPage />).container);
     // One pill, on the one post that says what kind it is.
     expect(list.getAllByText("Case study")).toHaveLength(1);
@@ -91,6 +91,8 @@ describe("Blog", () => {
     );
     expect(ordinaryPost.queryByText("Case study")).toBeNull();
 
+    // The pill belongs to the list, where it tells posts apart. On the post
+    // itself it says nothing the reader is not about to read.
     const caseStudy = within(
       render(
         await BlogPostPage({
@@ -100,7 +102,7 @@ describe("Blog", () => {
         }),
       ).container,
     );
-    expect(caseStudy.getByText("Case study")).toBeInTheDocument();
+    expect(caseStudy.queryByText("Case study")).toBeNull();
   });
 
   it("shows the case study with its pictures and its recording", async () => {
