@@ -22,6 +22,7 @@ import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { isUnanswered } from "@/lib/testTypes";
+import { displayModelName } from "@/lib/modelName";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -184,7 +185,7 @@ export function BenchmarkOutputsPanel({
   onSelectTest,
   onClearSelection,
   testNames = [],
-  formatModelName = (n) => n,
+  formatModelName = displayModelName,
   showControls = true,
   showRunningSpinner = false,
   runStopped = false,
@@ -623,7 +624,10 @@ export function BenchmarkOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedTestResult && !isUnanswered(selectedTestResult) && selectedTestResult.passed !== null && (
+      {/* While the test is still being read this panel stays away, so the one
+          spinner in the middle covers the whole area rather than sitting next
+          to a panel saying the test has no evaluators. */}
+      {selectedTestResult && !selectedTestResult.loading && !isUnanswered(selectedTestResult) && selectedTestResult.passed !== null && (
         <>
           <ResizeHandle
             onMouseDown={verdictPanel.startDrag}

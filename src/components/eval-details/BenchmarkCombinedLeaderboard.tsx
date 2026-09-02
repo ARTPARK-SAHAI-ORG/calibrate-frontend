@@ -21,11 +21,12 @@ import {
   METRIC_LABELS,
 } from "@/lib/llmMetrics";
 import { RESULT_TAB_LABELS } from "@/components/ui";
+import { displayModelName } from "@/lib/modelName";
 
 type BenchmarkCombinedLeaderboardProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
   modelResults: BenchmarkModelLike[];
-  /** Table/chart labels for `model`; default shows the API string unchanged. */
+  /** Table/chart labels for `model`; defaults to the model without its company. */
   formatModelName?: (model: string) => string;
   filename: string;
   benchmarkScoreLabel?: string;
@@ -240,7 +241,7 @@ function columnsFromPayload(
 export function BenchmarkCombinedLeaderboard({
   leaderboardSummary,
   modelResults,
-  formatModelName = (m: string) => m,
+  formatModelName = displayModelName,
   filename,
   benchmarkScoreLabel = "Test pass rate (%)",
   className,

@@ -36,6 +36,7 @@ import {
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
 import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
+import { displayModelName } from "@/lib/modelName";
 
 // Which page of results is open, so a reload reopens on the same one instead
 // of resetting to the first. Written with `replaceState` like the other
@@ -81,7 +82,7 @@ export function runTestCount(run: AgentRun): number | null {
  */
 export function runModels(run: AgentRun): string[] {
   return (run.model_results ?? [])
-    .map((m) => m.model?.replace(/__/g, "/").split("/").pop() ?? "")
+    .map((m) => (m.model ? displayModelName(m.model) : ""))
     .filter(Boolean);
 }
 
