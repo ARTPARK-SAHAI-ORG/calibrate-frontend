@@ -73,7 +73,7 @@ export default async function BlogPostPage({ params }: PostPageProps) {
             {post.title}
           </h1>
           <PostByline post={post} className="mt-4" />
-          {post.image && (
+          {post.image && post.showImageOnPage !== false && (
             // Width and height are the real ones, so the page does not jump
             // when the picture finishes loading.
             <img

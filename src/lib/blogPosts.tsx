@@ -30,6 +30,9 @@ export type BlogPost = {
   /** Its own share picture, as a path from the site root. Falls back to
    * SHARE_IMAGE when a post has none. */
   image?: string;
+  /** Whether that picture is also shown at the top of the post. A picture that
+   * only works as a thumbnail beside a shared link sets this to false. */
+  showImageOnPage?: boolean;
   body: ReactNode;
 };
 
@@ -212,13 +215,9 @@ function Aside({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * The two screen recordings from the case study below, which are not on
- * YouTube yet. Paste the video id (the part after v= in the YouTube address)
- * and the recording appears in the post.
- */
-const WEIGHTS_VIDEO_ID = "";
-const REPLY_WEIGHTS_VIDEO_ID = "";
+/** The two screen recordings in the case study below, as YouTube video ids. */
+const WEIGHTS_VIDEO_ID = "9j8Y142PWe4";
+const REPLY_WEIGHTS_VIDEO_ID = "gMhKkaRJn10";
 
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
@@ -236,6 +235,9 @@ export const POSTS: BlogPost[] = [
     summary:
       "Our evaluation design for a voice agent that fills a form over a phone call, built on simulated calls, and what the first results say about the models we can deploy.",
     image: "/blog/evaluating-a-form-filling-voice-agent.png",
+    // The picture is figure 9 from inside the post, so it is the thumbnail a
+    // shared link shows but is not repeated at the top of the page.
+    showImageOnPage: false,
     body: (
       <>
         <p>
@@ -386,8 +388,8 @@ export const POSTS: BlogPost[] = [
 
         <Figure
           src="/blog/evaluating-a-form-filling-voice-agent/figure-2.png"
-          width={134217728}
-          height={100667905}
+          width={2010}
+          height={937}
           caption={
             <>
               Figure 2: How FormBharo works. EXTRACT LLM extracts the form
@@ -573,8 +575,8 @@ export const POSTS: BlogPost[] = [
 
         <Figure
           src="/blog/evaluating-a-form-filling-voice-agent/figure-4.png"
-          width={8}
-          height={327954}
+          width={1994}
+          height={666}
           caption={
             <>
               Figure 4: Representation for each user response in every turn. In

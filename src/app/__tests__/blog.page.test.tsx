@@ -79,6 +79,14 @@ describe("Blog", () => {
     );
 
     expect(screen.getByText("2 September 2026")).toBeInTheDocument();
+
+    // Its share picture is figure 9 from inside the post, so it is the
+    // thumbnail a shared link shows and is not repeated at the top.
+    expect(
+      document.querySelector(
+        'img[src="/blog/evaluating-a-form-filling-voice-agent.png"]',
+      ),
+    ).toBeNull();
     expect(
       screen.getByRole("heading", { level: 2, name: "Findings" }),
     ).toBeInTheDocument();
@@ -95,14 +103,13 @@ describe("Blog", () => {
       ),
     ).toBeInTheDocument();
 
-    // The demo call plays in the post. The two screen recordings have no
-    // address yet, so they leave no empty box behind.
+    // The demo call and the two screen recordings all play in the post.
     const videos = document.querySelectorAll("iframe");
-    expect(videos).toHaveLength(1);
-    expect(videos[0]).toHaveAttribute(
-      "src",
+    expect([...videos].map((video) => video.getAttribute("src"))).toEqual([
       "https://www.youtube-nocookie.com/embed/60cSy_doksc",
-    );
+      "https://www.youtube-nocookie.com/embed/9j8Y142PWe4",
+      "https://www.youtube-nocookie.com/embed/gMhKkaRJn10",
+    ]);
   });
 
   it("shows the not-found page for an address nobody wrote", async () => {
