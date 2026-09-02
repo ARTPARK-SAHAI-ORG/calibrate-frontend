@@ -1428,9 +1428,24 @@ export const POSTS: BlogPost[] = [
         <H2>Closing notes</H2>
 
         <p>
-          The full implementation details can be found in our preprint here:{" "}
-          <PostLink href="https://arxiv.org/abs/2608.06027">
-            https://arxiv.org/abs/2608.06027
+          This is joint work with{" "}
+          <PostLink href="https://www.linkedin.com/in/jigarkdoshi/">
+            Jigar Doshi
+          </PostLink>{" "}
+          and{" "}
+          <PostLink href="https://www.linkedin.com/in/sanskriti-midha/">
+            Sanskriti Midha
+          </PostLink>
+          , in collaboration with our partners at{" "}
+          <PostLink href="https://armman.org/">ARMMAN</PostLink>:{" "}
+          <PostLink href="https://www.linkedin.com/in/amrita-mahale-1474497/">
+            Amrita Mahale
+          </PostLink>{" "}
+          <PostLink href="https://www.linkedin.com/in/hetvi-lodaya/">
+            Hetvi Lodaya
+          </PostLink>{" "}
+          <PostLink href="https://www.linkedin.com/in/parina-anand/">
+            Parina Anand
           </PostLink>
         </p>
 
