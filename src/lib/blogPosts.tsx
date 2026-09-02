@@ -486,10 +486,10 @@ export const POSTS: BlogPost[] = [
           <strong>component in isolation</strong>: predicted transcripts against
           reference transcripts, extracted form data against the expected
           values, quality of the agent&rsquo;s response to the user and the
-          ability to end the call at the right time. <em>Integration tests</em>{" "}
+          ability to end the call at the right time. <em>End-to-end tests</em>{" "}
           chain the components to measure the{" "}
           <strong>end-to-end performance</strong> of the agent, mimicking how a
-          real user how would interact with it.
+          real user interacts with it.
         </p>
 
         <H3>Dataset creation</H3>
@@ -825,7 +825,7 @@ export const POSTS: BlogPost[] = [
         <p>Each reply is graded across 6 independent dimensions:</p>
 
         <p>
-          <em>Correctness</em>: Does the response asks the right question?
+          <em>Correctness</em>: Does the response contain the right question?
         </p>
 
         <p>
@@ -905,7 +905,7 @@ export const POSTS: BlogPost[] = [
           height={272}
           caption={
             <>
-              Figure 14: Example of one LLM judge calibrate. The first version
+              Figure 14: Example of one LLM judge calibration. The first version
               of the LLM judge was only 67% aligned with our review. We iterated
               on the prompt until we reached 100% agreement.{" "}
             </>
