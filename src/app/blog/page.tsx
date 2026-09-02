@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
-import { POSTS, PostByline } from "@/lib/blogPosts";
+import { POSTS, PostByline, PostKind } from "@/lib/blogPosts";
 
 export default function BlogPage() {
   return (
@@ -16,6 +16,7 @@ export default function BlogPage() {
           <ul className="space-y-10 md:space-y-14">
             {POSTS.map((post) => (
               <li key={post.slug}>
+                <PostKind post={post} className="mb-2" />
                 <PostByline post={post} />
                 {/* No text-balance: a title on this page runs the full width
                     of the column rather than being split into even lines. */}

@@ -24,6 +24,9 @@ export type BlogPost = {
   /** Where the author's name goes when clicked. Left out for an author with
    * nowhere to point at. */
   authorUrl?: string;
+  /** What kind of post this is, shown as a pill above the title. Left out for
+   * an ordinary post. */
+  kind?: string;
   /** One or two lines shown under the title on the list page, and given to
    * anyone who shares the link. */
   summary: string;
@@ -79,6 +82,24 @@ export function formatPostDate(date: string): string {
 /** What the browser tab and the search result say. */
 export function tabTitle(post: BlogPost): string {
   return `${post.seoTitle ?? post.title} | Calibrate`;
+}
+
+/** What kind of post this is, shown the same way wherever a post appears. */
+export function PostKind({
+  post,
+  className = "",
+}: {
+  post: BlogPost;
+  className?: string;
+}) {
+  if (!post.kind) return null;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600 ${className}`}
+    >
+      {post.kind}
+    </span>
+  );
 }
 
 /** The date and who wrote it, shown the same way wherever a post appears. */
@@ -227,7 +248,8 @@ export const POSTS: BlogPost[] = [
   {
     slug: "evaluating-a-form-filling-voice-agent",
     title:
-      "Evaluating a form-filling voice agent that enrols mothers over a phone call: a case study",
+      "Evaluating a form-filling voice agent that enrols mothers over a phone call",
+    kind: "Case study",
     seoTitle: "How we evaluated a form-filling voice agent",
     date: "2026-09-02",
     author: "Aman Dalmia",

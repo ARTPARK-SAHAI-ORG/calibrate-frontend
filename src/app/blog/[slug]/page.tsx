@@ -6,6 +6,7 @@ import { LandingFooter } from "@/components/LandingFooter";
 import {
   POSTS,
   PostByline,
+  PostKind,
   articleJsonLd,
   findPost,
   tabTitle,
@@ -69,9 +70,14 @@ export default async function BlogPostPage({ params }: PostPageProps) {
           >
             ← All posts
           </Link>
-          <h1 className="mt-6 text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em] text-balance">
-            {post.title}
-          </h1>
+          {/* The pill and the title are spaced as a pair, so a post without a
+              pill keeps the same gap under the link back to the posts. */}
+          <div className="mt-6 space-y-3">
+            <PostKind post={post} />
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 leading-[1.1] tracking-[-0.02em] text-balance">
+              {post.title}
+            </h1>
+          </div>
           <PostByline post={post} className="mt-4" />
           {post.image && post.showImageOnPage !== false && (
             // Width and height are the real ones, so the page does not jump

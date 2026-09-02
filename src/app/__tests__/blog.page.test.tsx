@@ -69,6 +69,40 @@ describe("Blog", () => {
     );
   });
 
+  // Each render is scoped to its own container, since three renders in one
+  // test all land in the same document and would find each other's pills.
+  it("marks the case study with a pill, on the list and on the post", async () => {
+    const list = within(render(<BlogPage />).container);
+    // One pill, on the one post that says what kind it is.
+    expect(list.getAllByText("Case study")).toHaveLength(1);
+    // The words are no longer in the title, which is what the pill replaced.
+    expect(
+      list.getByRole("link", {
+        name: "Evaluating a form-filling voice agent that enrols mothers over a phone call",
+      }),
+    ).toBeInTheDocument();
+
+    const ordinaryPost = within(
+      render(
+        await BlogPostPage({
+          params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+        }),
+      ).container,
+    );
+    expect(ordinaryPost.queryByText("Case study")).toBeNull();
+
+    const caseStudy = within(
+      render(
+        await BlogPostPage({
+          params: Promise.resolve({
+            slug: "evaluating-a-form-filling-voice-agent",
+          }),
+        }),
+      ).container,
+    );
+    expect(caseStudy.getByText("Case study")).toBeInTheDocument();
+  });
+
   it("shows the case study with its pictures and its recording", async () => {
     render(
       await BlogPostPage({
