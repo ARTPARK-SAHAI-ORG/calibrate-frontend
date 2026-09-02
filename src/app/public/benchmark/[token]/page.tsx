@@ -301,7 +301,7 @@ export default function PublicBenchmarkPage() {
             <BenchmarkTopPicks
               leaderboardSummary={data.leaderboard_summary}
               modelResults={data.model_results ?? []}
-              filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+              filename={`benchmark-top-picks-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
               benchmarkScoreLabel={benchmarkScoreLabel}
             />
           </div>
