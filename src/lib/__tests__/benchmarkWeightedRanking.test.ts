@@ -3,8 +3,17 @@ import {
   defaultWeights,
   rebalanceWeights,
   rankModelsByWeights,
+  dimsFromRows,
   type RankingDimension,
+  type WeightedRankingRow,
 } from "../benchmarkWeightedRanking";
+
+const row = (r: Partial<WeightedRankingRow>): WeightedRankingRow => ({
+  model: "m",
+  name: "m",
+  qualityText: "",
+  ...r,
+});
 
 const ALL: RankingDimension[] = ["quality", "cost", "latency"];
 
@@ -240,5 +249,31 @@ describe("rankModelsByWeights", () => {
 
   it("returns an empty array for no rows", () => {
     expect(rankModelsByWeights([], defaultWeights(ALL), ALL)).toEqual([]);
+  });
+});
+
+describe("dimsFromRows", () => {
+  it("offers only the dimensions some row reports", () => {
+    expect(
+      dimsFromRows([
+        row({ pass_rate: 90, avg_cost: 0.01 }),
+        row({ pass_rate: 70 }),
+      ]),
+    ).toEqual(["quality", "cost"]);
+  });
+
+  it("includes latency only when a row carries it", () => {
+    expect(
+      dimsFromRows([
+        row({ pass_rate: 90, avg_cost: 0.01, avg_latency_ms: 800 }),
+        row({ pass_rate: 70, avg_cost: 0.02 }),
+      ]),
+    ).toEqual(["quality", "cost", "latency"]);
+  });
+
+  it("ignores non-finite values so a dead metric never shows a slider", () => {
+    expect(
+      dimsFromRows([row({ pass_rate: 90, avg_cost: undefined })]),
+    ).toEqual(["quality"]);
   });
 });
