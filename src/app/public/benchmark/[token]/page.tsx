@@ -6,6 +6,7 @@ import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/Pu
 import {
   BenchmarkCombinedLeaderboard,
   BenchmarkTopPicks,
+  BenchmarkWeightedRanking,
   BenchmarkOutputsPanel,
   LLMEvaluationAbout,
   evaluatorColumnsToAbout,
@@ -291,12 +292,19 @@ export default function PublicBenchmarkPage() {
 
         {/* Top Picks Tab */}
         {activeTab === "top-picks" && showTopPicks && (
-          <BenchmarkTopPicks
-            leaderboardSummary={data.leaderboard_summary}
-            modelResults={data.model_results ?? []}
-            filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
-            benchmarkScoreLabel={benchmarkScoreLabel}
-          />
+          <div className="space-y-6 md:space-y-8">
+            <BenchmarkWeightedRanking
+              leaderboardSummary={data.leaderboard_summary}
+              modelResults={data.model_results ?? []}
+              benchmarkScoreLabel={benchmarkScoreLabel}
+            />
+            <BenchmarkTopPicks
+              leaderboardSummary={data.leaderboard_summary}
+              modelResults={data.model_results ?? []}
+              filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+              benchmarkScoreLabel={benchmarkScoreLabel}
+            />
+          </div>
         )}
 
         {/* Results Tab */}
