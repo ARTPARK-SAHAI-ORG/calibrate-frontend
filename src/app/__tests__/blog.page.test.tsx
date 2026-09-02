@@ -69,6 +69,42 @@ describe("Blog", () => {
     );
   });
 
+  it("shows the case study with its pictures and its recording", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({
+          slug: "evaluating-a-form-filling-voice-agent",
+        }),
+      }),
+    );
+
+    expect(screen.getByText("2 September 2026")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Findings" }),
+    ).toBeInTheDocument();
+
+    // A picture carries no words of its own: the line under it says what it
+    // shows, so a screen reader reads that instead of reading it twice.
+    const picture = document.querySelector(
+      'img[src="/blog/evaluating-a-form-filling-voice-agent/figure-9.png"]',
+    );
+    expect(picture).toHaveAttribute("alt", "");
+    expect(
+      screen.getByText(
+        /Figure 9: An overview of how the turn-level unit tests/,
+      ),
+    ).toBeInTheDocument();
+
+    // The demo call plays in the post. The two screen recordings have no
+    // address yet, so they leave no empty box behind.
+    const videos = document.querySelectorAll("iframe");
+    expect(videos).toHaveLength(1);
+    expect(videos[0]).toHaveAttribute(
+      "src",
+      "https://www.youtube-nocookie.com/embed/60cSy_doksc",
+    );
+  });
+
   it("shows the not-found page for an address nobody wrote", async () => {
     await BlogPostPage({ params: Promise.resolve({ slug: "no-such-post" }) });
     expect(notFound).toHaveBeenCalled();
