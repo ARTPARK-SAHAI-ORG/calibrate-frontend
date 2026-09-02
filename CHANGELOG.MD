@@ -1,5 +1,6 @@
 ## September 2026
 
+- You can now read the FormBharo case study on the blog and open it from the ARMMAN customer story link on the landing page ([#544](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/544))
 - Downloading the model selection chart from a shared benchmark link now names the file after what it shows instead of calling it a leaderboard ([#540](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/540))
 - Anyone with a shared benchmark link can now use the quality, cost and latency sliders to re-order the models on the Model selection tab ([#538](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/538))
 - Watching a test run or benchmark until it finishes no longer switches you off the Tests tab and onto Results on its own ([#530](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/530))
