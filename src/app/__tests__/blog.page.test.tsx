@@ -7,7 +7,7 @@ import { render, screen, within } from "@/test-utils";
 import { notFound } from "next/navigation";
 import BlogPage from "../blog/page";
 import BlogPostPage from "../blog/[slug]/page";
-import { POSTS } from "@/lib/blogPosts";
+import { POSTS, findPost } from "@/lib/blogPosts";
 
 describe("Blog", () => {
   it("lists every post, each linking to its own address", () => {
@@ -67,6 +67,85 @@ describe("Blog", () => {
       "href",
       "/",
     );
+  });
+
+  // Each render is scoped to its own container, since three renders in one
+  // test all land in the same document and would find each other's pills.
+  it("marks the case study with a pill on the list, not on the post", async () => {
+    const list = within(render(<BlogPage />).container);
+    // One pill, on the one post that says what kind it is.
+    expect(list.getAllByText("Case study")).toHaveLength(1);
+    // The words are no longer in the title, which is what the pill replaced.
+    expect(
+      list.getByRole("link", {
+        name: "Evaluating a form-filling voice agent that enrols mothers over a phone call",
+      }),
+    ).toBeInTheDocument();
+
+    const ordinaryPost = within(
+      render(
+        await BlogPostPage({
+          params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+        }),
+      ).container,
+    );
+    expect(ordinaryPost.queryByText("Case study")).toBeNull();
+
+    // The pill belongs to the list, where it tells posts apart. On the post
+    // itself it says nothing the reader is not about to read.
+    const caseStudy = within(
+      render(
+        await BlogPostPage({
+          params: Promise.resolve({
+            slug: "evaluating-a-form-filling-voice-agent",
+          }),
+        }),
+      ).container,
+    );
+    expect(caseStudy.queryByText("Case study")).toBeNull();
+  });
+
+  it("shows the case study with its pictures and its recording", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({
+          slug: "evaluating-a-form-filling-voice-agent",
+        }),
+      }),
+    );
+
+    expect(screen.getByText("2 September 2026")).toBeInTheDocument();
+
+    // Its share picture is figure 9 from inside the post, so it is the
+    // thumbnail a shared link shows and is not repeated at the top. The path
+    // is read from the post itself, so renaming the file cannot quietly turn
+    // this check into one that looks for something nothing renders.
+    const shareImage = findPost("evaluating-a-form-filling-voice-agent")?.image;
+    expect(shareImage).toBeTruthy();
+    expect(document.querySelector(`img[src="${shareImage}"]`)).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Findings" }),
+    ).toBeInTheDocument();
+
+    // A picture carries no words of its own: the line under it says what it
+    // shows, so a screen reader reads that instead of reading it twice.
+    const picture = document.querySelector(
+      'img[src="/blog/evaluating-a-form-filling-voice-agent/figure-9.png"]',
+    );
+    expect(picture).toHaveAttribute("alt", "");
+    expect(
+      screen.getByText(
+        /Figure 9: An overview of how the turn-level unit tests/,
+      ),
+    ).toBeInTheDocument();
+
+    // The demo call and the two screen recordings all play in the post.
+    const videos = document.querySelectorAll("iframe");
+    expect([...videos].map((video) => video.getAttribute("src"))).toEqual([
+      "https://www.youtube-nocookie.com/embed/60cSy_doksc",
+      "https://www.youtube-nocookie.com/embed/9j8Y142PWe4",
+      "https://www.youtube-nocookie.com/embed/gMhKkaRJn10",
+    ]);
   });
 
   it("shows the not-found page for an address nobody wrote", async () => {

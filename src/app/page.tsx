@@ -47,7 +47,8 @@ const USE_CASES: {
   /** A point is plain text, or text that links out to supporting material. */
   useCase: (string | { text: string; href: string })[];
   quote?: string;
-  quoteHref?: string;
+  /** Where "Read the story" goes: a post on this site, or a page elsewhere. */
+  storyHref?: string;
 }[] = [
   {
     name: "Kabakoo",
@@ -61,7 +62,7 @@ const USE_CASES: {
     ],
     quote:
       "Thanks to a tool like Calibrate, Content and Learning colleagues can write test cases. AI evaluation is not a private language reserved for engineers.",
-    quoteHref:
+    storyHref:
       "https://kabakoo.substack.com/p/the-ai-worked-did-it-work-for-the",
   },
   {
@@ -90,6 +91,7 @@ const USE_CASES: {
       "Finding the best LLM and speech-to-text models with the best cost, quality and latency tradeoff",
       "Aligning LLM judges to humans to enable continuous monitoring of the agent's performance",
     ],
+    storyHref: "/blog/evaluating-a-form-filling-voice-agent",
   },
 ];
 
@@ -106,6 +108,28 @@ function LandingFeatureImageColumn(props: {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * The "Read the story" link on a customer card. A story on this site opens in
+ * the same tab, one written elsewhere opens in a new one.
+ */
+function UseCaseStoryLink(props: { href: string; className?: string }) {
+  const { href, className = "" } = props;
+  const style = `${className} inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer`;
+
+  if (href.startsWith("/")) {
+    return (
+      <Link href={href} className={style}>
+        Read the story
+      </Link>
+    );
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={style}>
+      Read the story
+    </a>
   );
 }
 
@@ -1131,22 +1155,20 @@ export default function HomePage() {
                     );
                   })}
                 </ul>
-                {useCase.quote && (
-                  <figure className="mt-6 pt-5 border-t border-gray-100">
-                    <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
-                      &ldquo;{useCase.quote}&rdquo;
-                    </blockquote>
-                    {useCase.quoteHref && (
-                      <a
-                        href={useCase.quoteHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
-                      >
-                        Read the story
-                      </a>
+                {(useCase.quote || useCase.storyHref) && (
+                  <div className="mt-6 pt-5 border-t border-gray-100">
+                    {useCase.quote && (
+                      <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
+                        &ldquo;{useCase.quote}&rdquo;
+                      </blockquote>
                     )}
-                  </figure>
+                    {useCase.storyHref && (
+                      <UseCaseStoryLink
+                        href={useCase.storyHref}
+                        className={useCase.quote ? "mt-3" : ""}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             ))}
