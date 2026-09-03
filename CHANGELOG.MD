@@ -1,5 +1,6 @@
 ## September 2026
 
+- The note explaining why an agent cannot be used in the agent picker now reads on one line instead of breaking apart around the agent kind pill ([#561](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/561))
 - The agent page now shows next to the agent's name whether it holds a conversation or answers single messages, with a tooltip explaining what that means when you hover over it ([#554](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/554))
 - When you create a new agent, the dialog now opens ready to connect an existing agent with a name already filled in, so you can create one without typing anything ([#555](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/555))
 - The blog post about the form filling voice agent now links to the current reply generation benchmark instead of an outdated one ([#550](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/550))
