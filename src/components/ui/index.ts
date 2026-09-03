@@ -28,3 +28,7 @@ export { SegmentedFilter, type SegmentedFilterOption } from "./SegmentedFilter";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { RenameDialog } from "./RenameDialog";
 export { ResultTabs, RESULT_TAB_LABELS, type ResultTabId } from "./ResultTabs";
+export {
+  InteractionTypePill,
+  INTERACTION_TYPES,
+} from "./InteractionTypePill";

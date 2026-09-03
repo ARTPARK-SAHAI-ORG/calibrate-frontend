@@ -34,7 +34,7 @@ import {
   CopyIcon,
   SaveIcon,
 } from "@/components/icons";
-import { NotFoundState } from "@/components/ui";
+import { NotFoundState, InteractionTypePill } from "@/components/ui";
 import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
@@ -46,6 +46,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 
 export type AgentDetailHeaderState = {
   agentName: string;
+  interactionType?: "conversation" | "general";
   activeTab: string;
   isLoading: boolean;
   hasError: boolean;
@@ -1030,6 +1031,7 @@ export function AgentDetail({
     if (onHeaderStateChange) {
       onHeaderStateChange({
         agentName: agent?.name || "Loading...",
+        interactionType: agent?.interaction_type,
         activeTab,
         isLoading,
         hasError: errorCode !== null,
@@ -1047,6 +1049,7 @@ export function AgentDetail({
     }
   }, [
     agent?.name,
+    agent?.interaction_type,
     errorCode,
     activeTab,
     isLoading,
@@ -1142,6 +1145,10 @@ export function AgentDetail({
             >
               {agent.name}
             </h1>
+            <InteractionTypePill
+              interactionType={agent.interaction_type}
+              className="px-1.5 py-0.5 rounded flex-shrink-0"
+            />
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
