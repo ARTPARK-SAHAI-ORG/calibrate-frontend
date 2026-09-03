@@ -19,7 +19,12 @@ import { InteractionTypeChooser, type InteractionType } from "@/components/ui";
  *
  * The copy can be a different kind of agent from the original, which is the
  * only way to move an agent between holding a conversation and answering once:
- * the type cannot be changed on an agent that already exists.
+ * the type cannot be changed on an agent that already exists. `interaction_type`
+ * is optional on the request, and a value outside the two kinds is refused.
+ *
+ * The backend decides what a copy carries: the agent's tools and evaluators,
+ * never its tests, and, when the kind changes, only the evaluators that can
+ * judge the new kind. The dialog says so before the copy is made.
  */
 export function DuplicateAgentDialog({
   agentUuid,
@@ -42,8 +47,10 @@ export function DuplicateAgentDialog({
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
+  const startingInteractionType: InteractionType =
+    originalInteractionType === "general" ? "general" : "conversation";
   const [interactionType, setInteractionType] = useState<InteractionType>(
-    originalInteractionType === "general" ? "general" : "conversation",
+    startingInteractionType,
   );
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,8 +178,26 @@ export function DuplicateAgentDialog({
           value={interactionType}
           onChange={setInteractionType}
           label="What does the copy do?"
-          className="mb-6 space-y-2"
+          className="mb-4 space-y-2"
         />
+
+        <div className="mb-6 space-y-2">
+          <p className="text-[13px] text-muted-foreground">
+            The copy takes the agent&apos;s tools and evaluators. Its tests are
+            not copied.
+          </p>
+          {/* Both directions drop the judges that cannot run on the kind of
+              agent the copy is. A conversation agent copied as a single
+              response one usually loses all of them, since the correctness
+              judge every agent starts with is a next-reply judge. */}
+          {interactionType !== startingInteractionType && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
+              Evaluators that cannot judge what the copy does are left behind,
+              so the copy can start with none. You can add evaluators to it
+              afterwards.
+            </div>
+          )}
+        </div>
 
         {/* Error Message */}
         {error && (
