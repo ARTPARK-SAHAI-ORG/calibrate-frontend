@@ -1437,6 +1437,7 @@ export function AgentDetail({
         <DuplicateAgentDialog
           agentUuid={agentUuid}
           agentName={agent.name}
+          interactionType={agent.interaction_type}
           onClose={() => setIsDuplicateDialogOpen(false)}
           onDuplicated={(newAgentUuid) =>
             router.push(`/agents/${newAgentUuid}`)

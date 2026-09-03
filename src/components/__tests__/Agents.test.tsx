@@ -805,6 +805,56 @@ describe("Agents", () => {
     expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument();
   });
 
+  it("shows the duplicate row with the type chosen in the dialog", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "a1",
+          name: "Support Bot",
+          type: "agent",
+          interaction_type: "conversation",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+      ]),
+    );
+    const user = setupUser();
+    render(<Agents onNavigateToAgent={jest.fn()} />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+
+    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    await user.click(duplicateButtons[0]);
+    expect(screen.getByDisplayValue("Copy of Support Bot")).toBeInTheDocument();
+
+    // The original holds a conversation; the copy is asked to answer once.
+    await user.click(screen.getByText("Single Agent Response"));
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ uuid: "dup-uuid" }),
+    );
+    const duplicateConfirmButtons = screen.getAllByRole("button", {
+      name: "Duplicate",
+    });
+    await user.click(
+      duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Copy of Support Bot")[0]).toBeInTheDocument(),
+    );
+    const copyRow = screen.getAllByText("Copy of Support Bot")[0].closest("a")!
+      .parentElement!;
+    expect(
+      within(copyRow).getByText("Single Agent Response"),
+    ).toBeInTheDocument();
+    expect(within(copyRow).queryByText("Conversation")).not.toBeInTheDocument();
+
+    const originalRow = screen.getAllByText("Support Bot")[0].closest("a")!
+      .parentElement!;
+    expect(within(originalRow).getByText("Conversation")).toBeInTheDocument();
+  });
+
   it("shows a name-conflict error when duplicating hits 409", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse(agentsPayload),

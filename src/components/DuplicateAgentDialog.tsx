@@ -5,6 +5,11 @@ import { signOut } from "next-auth/react";
 import { reportError } from "@/lib/reportError";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import { useAccessToken } from "@/hooks";
+import {
+  Button,
+  InteractionTypeChooser,
+  type InteractionType,
+} from "@/components/ui";
 
 /**
  * Copy an agent under a new name. Shared by the agents list and the agent
@@ -15,22 +20,40 @@ import { useAccessToken } from "@/hooks";
  * The backend copies the agent it has stored, so a caller that holds edits the
  * person has not saved yet passes `onBeforeDuplicate` to save them first. It
  * returns false when that save fails, and nothing is copied.
+ *
+ * The copy can be a different kind of agent from the original, which is the
+ * only way to move an agent between holding a conversation and answering once:
+ * the type cannot be changed on an agent that already exists. `interaction_type`
+ * is optional on the request, and a value outside the two kinds is refused.
+ *
+ * The backend decides what a copy carries: the agent's tools and evaluators,
+ * never its tests, and, when the kind changes, only the evaluators that can
+ * judge the new kind.
  */
 export function DuplicateAgentDialog({
   agentUuid,
   agentName: originalName,
+  interactionType: originalInteractionType,
   onClose,
   onDuplicated,
   onBeforeDuplicate,
 }: {
   agentUuid: string;
   agentName: string;
+  interactionType?: InteractionType;
   onClose: () => void;
-  onDuplicated: (newAgentUuid: string, name: string) => void;
+  onDuplicated: (
+    newAgentUuid: string,
+    name: string,
+    interactionType: InteractionType,
+  ) => void;
   onBeforeDuplicate?: () => Promise<boolean>;
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
+  const [interactionType, setInteractionType] = useState<InteractionType>(
+    originalInteractionType === "general" ? "general" : "conversation",
+  );
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameConflictError, setNameConflictError] = useState<string | null>(
@@ -69,6 +92,7 @@ export function DuplicateAgentDialog({
           },
           body: JSON.stringify({
             name: agentName.trim(),
+            interaction_type: interactionType,
           }),
         },
       );
@@ -89,7 +113,7 @@ export function DuplicateAgentDialog({
       }
 
       const data = await response.json();
-      onDuplicated(data.uuid, agentName.trim());
+      onDuplicated(data.uuid, agentName.trim(), interactionType);
       onClose();
     } catch (err) {
       reportError("Error duplicating agent:", err);
@@ -104,7 +128,12 @@ export function DuplicateAgentDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      // The dialog stays put until the copy has been made, the same as Cancel
+      // and the corner X, so a stray click cannot take it off screen while the
+      // request is still going.
+      onClick={() => {
+        if (!isDuplicating) onClose();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl p-8 max-w-lg w-full mx-4 shadow-lg"
@@ -112,11 +141,34 @@ export function DuplicateAgentDialog({
       >
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold tracking-tight mb-1">
-            Duplicate agent
-          </h2>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Duplicate agent
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isDuplicating}
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
           <p className="text-muted-foreground text-[15px]">
-            Choose a name for the duplicated agent
+            Choose a name for the new agent and what it does
           </p>
         </div>
 
@@ -152,6 +204,13 @@ export function DuplicateAgentDialog({
           )}
         </div>
 
+        <InteractionTypeChooser
+          value={interactionType}
+          onChange={setInteractionType}
+          label="What does the new agent do?"
+          className="mb-6 space-y-2"
+        />
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-3 rounded-md bg-red-500/10 border border-red-500/20">
@@ -159,59 +218,25 @@ export function DuplicateAgentDialog({
           </div>
         )}
 
-        {/* Footer Buttons */}
-        <div className="flex items-center justify-between">
-          <button
+        <div className="flex items-center justify-end gap-2 md:gap-3">
+          <Button
+            variant="secondary"
+            size="md"
             onClick={onClose}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer flex items-center gap-2"
+            disabled={isDuplicating}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleDuplicate}
-            disabled={!agentName.trim() || isDuplicating}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            disabled={!agentName.trim()}
+            isLoading={isDuplicating}
+            loadingText="Duplicating..."
           >
-            {isDuplicating ? (
-              <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Duplicating...
-              </>
-            ) : (
-              "Duplicate"
-            )}
-          </button>
+            Duplicate
+          </Button>
         </div>
       </div>
     </div>

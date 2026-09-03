@@ -1296,6 +1296,8 @@ describe("AgentDetail", () => {
     expect(saveIndex).toBeLessThan(duplicateIndex);
     expect(JSON.parse(calls[duplicateIndex][1].body)).toEqual({
       name: "Copy of Build Agent",
+      // The picker opens on the agent's own type, untouched here.
+      interaction_type: "conversation",
     });
   });
 

@@ -32,3 +32,7 @@ export {
   InteractionTypePill,
   INTERACTION_TYPES,
 } from "./InteractionTypePill";
+export {
+  InteractionTypeChooser,
+  type InteractionType,
+} from "./InteractionTypeChooser";
