@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useRef } from "react";
 import { INTERACTION_TYPES } from "./InteractionTypePill";
 
 export type InteractionType = "conversation" | "general";
@@ -8,6 +9,11 @@ export type InteractionType = "conversation" | "general";
  * The choice between an agent that holds a conversation and one that answers
  * once. Shown when an agent is created and when one is copied, so both screens
  * offer the same two cards and the same wording.
+ *
+ * The two cards are a radio group, so a screen reader says which one is chosen
+ * rather than reading two plain buttons. Tab reaches the chosen card, and the
+ * arrow keys move between them, which is how a radio group is expected to
+ * behave.
  */
 export function InteractionTypeChooser({
   value,
@@ -24,26 +30,54 @@ export function InteractionTypeChooser({
   highlightPopular?: boolean;
   className?: string;
 }) {
+  const labelId = useId();
+  const groupRef = useRef<HTMLDivElement>(null);
+  const otherType: InteractionType =
+    value === "conversation" ? "general" : "conversation";
+
+  // Two options, so every arrow key lands on the other one.
+  const moveToOther = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!ARROW_KEYS.includes(event.key)) return;
+    event.preventDefault();
+    onChange(otherType);
+    groupRef.current
+      ?.querySelector<HTMLElement>(`[data-tour="agent-nature-${otherType}"]`)
+      ?.focus();
+  };
+
   return (
     <div data-tour="agent-nature-options" className={className}>
-      <label className="block text-[13px] font-medium text-foreground mb-2">
+      <div
+        id={labelId}
+        className="block text-[13px] font-medium text-foreground mb-2"
+      >
         {label}
-      </label>
+      </div>
 
-      <InteractionTypeOption
-        type="conversation"
-        selected={value === "conversation"}
-        onSelect={() => onChange("conversation")}
-        badge={highlightPopular ? "Most popular" : undefined}
-      />
-      <InteractionTypeOption
-        type="general"
-        selected={value === "general"}
-        onSelect={() => onChange("general")}
-      />
+      <div
+        ref={groupRef}
+        role="radiogroup"
+        aria-labelledby={labelId}
+        onKeyDown={moveToOther}
+        className="space-y-2"
+      >
+        <InteractionTypeOption
+          type="conversation"
+          selected={value === "conversation"}
+          onSelect={() => onChange("conversation")}
+          badge={highlightPopular ? "Most popular" : undefined}
+        />
+        <InteractionTypeOption
+          type="general"
+          selected={value === "general"}
+          onSelect={() => onChange("general")}
+        />
+      </div>
     </div>
   );
 }
+
+const ARROW_KEYS = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"];
 
 function InteractionTypeOption({
   type,
@@ -60,6 +94,9 @@ function InteractionTypeOption({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={selected}
+      tabIndex={selected ? 0 : -1}
       data-tour={`agent-nature-${type}`}
       onClick={onSelect}
       className={`relative w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${

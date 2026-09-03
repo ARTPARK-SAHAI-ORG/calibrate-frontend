@@ -62,6 +62,49 @@ describe("InteractionTypeChooser", () => {
     expect(onChange).toHaveBeenCalledWith("conversation");
   });
 
+  it("says which option is chosen, and puts Tab on that one", () => {
+    const { rerender } = render(
+      <InteractionTypeChooser value="conversation" onChange={jest.fn()} />,
+    );
+    const group = screen.getByRole("radiogroup", {
+      name: "What does your agent do?",
+    });
+    expect(group).toBeInTheDocument();
+    expect(cardFor("conversation")).toHaveAttribute("aria-checked", "true");
+    expect(cardFor("general")).toHaveAttribute("aria-checked", "false");
+    expect(cardFor("conversation")).toHaveAttribute("tabindex", "0");
+    expect(cardFor("general")).toHaveAttribute("tabindex", "-1");
+
+    rerender(<InteractionTypeChooser value="general" onChange={jest.fn()} />);
+    expect(cardFor("general")).toHaveAttribute("aria-checked", "true");
+    expect(cardFor("general")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("moves to the other option on any arrow key and focuses it", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    render(<InteractionTypeChooser value="conversation" onChange={onChange} />);
+
+    cardFor("conversation").focus();
+    for (const key of ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"]) {
+      onChange.mockClear();
+      await user.keyboard(`{${key}}`);
+      expect(onChange).toHaveBeenCalledWith("general");
+      expect(cardFor("general")).toHaveFocus();
+      cardFor("conversation").focus();
+    }
+  });
+
+  it("leaves other keys alone", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    render(<InteractionTypeChooser value="conversation" onChange={onChange} />);
+
+    cardFor("conversation").focus();
+    await user.keyboard("{Escape}");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("shows the Most popular badge only when asked, and only on Conversation", () => {
     const { rerender } = render(
       <InteractionTypeChooser value="conversation" onChange={jest.fn()} />,

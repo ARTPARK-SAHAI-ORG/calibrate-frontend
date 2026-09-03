@@ -51,11 +51,11 @@ afterEach(() => {
 
 // The two cards in the picker, named by the description each one carries.
 const conversationCard = () =>
-  screen.getByRole("button", {
+  screen.getByRole("radio", {
     name: /Your agent has a conversation with a user/,
   });
 const generalCard = () =>
-  screen.getByRole("button", {
+  screen.getByRole("radio", {
     name: /The agent takes an input and generates an output/,
   });
 
