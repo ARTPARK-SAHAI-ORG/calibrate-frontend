@@ -65,13 +65,17 @@ describe("AgentPicker", () => {
     const user = setupUser();
     render(<AgentPicker selectedAgentUuid="" onSelectAgent={jest.fn()} />);
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.example.com/agents",
-      expect.objectContaining({
-        method: "GET",
-        headers: expect.objectContaining({ Authorization: "Bearer token-123" }),
-      }),
-    ));
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://api.example.com/agents",
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({
+            Authorization: "Bearer token-123",
+          }),
+        }),
+      ),
+    );
 
     await user.click(screen.getByRole("button", { name: "Select an agent" }));
 
@@ -166,7 +170,9 @@ describe("AgentPicker", () => {
     const user = setupUser();
     render(<AgentPicker selectedAgentUuid="a1" onSelectAgent={jest.fn()} />);
 
-    await user.click(await screen.findByRole("button", { name: "Support Bot" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Support Bot" }),
+    );
 
     const optionEl = await screen.findByRole("option", { name: /Support Bot/ });
     const tick = optionEl.querySelector("path[d='M4.5 12.75l6 6 9-13.5']");
@@ -237,7 +243,7 @@ describe("AgentPicker", () => {
     expect(disabledOption).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getByText(
-        "This agent answers one input at a time, so there is no conversation to simulate",
+        "This agent was created as a Single Agent Response agent. A simulation needs a Conversation agent, and that choice is only made when an agent is created.",
       ),
     ).toBeInTheDocument();
 
@@ -262,9 +268,7 @@ describe("AgentPicker", () => {
     mockFetchOnce({ json: async () => payload });
     const user = setupUser();
     const onSelectAgent = jest.fn();
-    render(
-      <AgentPicker selectedAgentUuid="" onSelectAgent={onSelectAgent} />,
-    );
+    render(<AgentPicker selectedAgentUuid="" onSelectAgent={onSelectAgent} />);
 
     await user.click(screen.getByRole("button", { name: "Select an agent" }));
     await user.click(await screen.findByRole("option", { name: /Summariser/ }));
@@ -468,7 +472,9 @@ describe("MultiAgentPicker", () => {
   });
 
   it("reports an error when fetch throws", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("network down"));
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      new Error("network down"),
+    );
     const { reportError } = require("../../lib/reportError");
     render(
       <MultiAgentPicker selectedAgentUuids={[]} onToggleAgent={jest.fn()} />,

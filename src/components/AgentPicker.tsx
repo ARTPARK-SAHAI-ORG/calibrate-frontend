@@ -22,7 +22,8 @@ export type Agent = {
 // `config.default_inputs` so it works whether or not the slimmed backend
 // response has shipped.
 function agentHasDefaultInputs(agent: any): boolean {
-  if (agent.has_default_inputs != null) return agent.has_default_inputs === true;
+  if (agent.has_default_inputs != null)
+    return agent.has_default_inputs === true;
   const di = agent.config?.default_inputs;
   return !!di && Object.keys(di).length > 0;
 }
@@ -189,7 +190,7 @@ export function AgentPicker({
         disableCustomFieldConnections || disableGeneralAgents
           ? (a) => {
               if (disableGeneralAgents && a.interaction_type === "general") {
-                return "This agent answers one input at a time, so there is no conversation to simulate";
+                return "This agent was created as a Single Agent Response agent. A simulation needs a Conversation agent, and that choice is only made when an agent is created.";
               }
               if (disableCustomFieldConnections && a.hasDefaultInputs) {
                 return "Text simulation is not supported for connections with custom fields";
@@ -368,21 +369,17 @@ export function MultiAgentPicker({
             style={{
               ...(triggerRef.current
                 ? (() => {
-                    const rect =
-                      triggerRef.current.getBoundingClientRect();
+                    const rect = triggerRef.current.getBoundingClientRect();
                     const dropdownHeight = 240;
-                    const spaceBelow =
-                      window.innerHeight - rect.bottom - 8;
+                    const spaceBelow = window.innerHeight - rect.bottom - 8;
                     const openAbove =
-                      spaceBelow < dropdownHeight &&
-                      rect.top > dropdownHeight;
+                      spaceBelow < dropdownHeight && rect.top > dropdownHeight;
                     return {
                       left: rect.left,
                       width: rect.width,
                       ...(openAbove
                         ? {
-                            bottom:
-                              window.innerHeight - rect.top + 8,
+                            bottom: window.innerHeight - rect.top + 8,
                           }
                         : { top: rect.bottom + 8 }),
                     };
@@ -430,9 +427,7 @@ export function MultiAgentPicker({
                 </div>
               ) : (
                 filteredAgents.map((agent) => {
-                  const isSelected = selectedAgentUuids.includes(
-                    agent.uuid,
-                  );
+                  const isSelected = selectedAgentUuids.includes(agent.uuid);
                   return (
                     <button
                       key={agent.uuid}
