@@ -249,17 +249,39 @@ export function SingleSelectPicker<T>({
                       // left, and whatever the row puts on the right (a pill,
                       // say) spans both rows, so it sits in the middle of the
                       // row, level with the pills on the one-line rows.
+                      // The row is greyed by the name's colour, never by fading
+                      // the whole row: fading also washes out the reason the
+                      // row cannot be picked, which is the one thing here the
+                      // reader has to be able to read. Pills carry their own
+                      // colours, so they stay as they are.
                       return (
                         <div
                           key={id}
                           role="option"
                           aria-selected={isSelected}
                           aria-disabled={true}
-                          className={`w-full ${optionPaddingClass} text-left text-sm cursor-not-allowed opacity-50 text-foreground grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 [&>*:nth-child(2)]:row-span-2`}
+                          className={`w-full ${optionPaddingClass} text-left text-sm cursor-not-allowed text-muted-foreground grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 [&>*:nth-child(2)]:row-span-2`}
                         >
                           {renderOption(item, isSelected)}
-                          <div className="col-start-1 text-[11px] text-muted-foreground mt-0.5">
-                            {disabledReason}
+                          {/* The reason wears the warning colour and a warning
+                              sign, so it reads as "you cannot pick this" rather
+                              than as a description of the item. */}
+                          <div className="col-start-1 mt-0.5 flex items-start gap-1 text-xs text-yellow-700 dark:text-yellow-500">
+                            <svg
+                              className="w-3.5 h-3.5 mt-px flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                              />
+                            </svg>
+                            <span>{disabledReason}</span>
                           </div>
                         </div>
                       );
