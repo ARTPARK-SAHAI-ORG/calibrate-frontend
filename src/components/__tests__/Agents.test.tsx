@@ -27,6 +27,17 @@ function jsonResponse(body: any, overrides: Partial<Response> = {}) {
   } as Response;
 }
 
+// The name box opens with a default name in it, so a test that wants its own
+// name replaces what is there rather than adding to it.
+async function typeAgentName(
+  user: ReturnType<typeof setupUser>,
+  name: string,
+) {
+  const input = screen.getByPlaceholderText("Enter agent name");
+  await user.clear(input);
+  await user.type(input, name);
+}
+
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "https://api.example.com";
   global.fetch = jest.fn();
@@ -251,6 +262,73 @@ describe("Agents", () => {
     );
   });
 
+  it("opens with a name filled in and connecting an existing agent chosen", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
+    const onNavigateToAgent = jest.fn();
+    const user = setupUser();
+    render(<Agents onNavigateToAgent={onNavigateToAgent} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("No agents found")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+
+    expect(screen.getByPlaceholderText("Enter agent name")).toHaveValue(
+      "Untitled agent",
+    );
+
+    // Connecting an existing agent is the first of the two options.
+    const kinds = Array.from(
+      document.querySelectorAll("[data-agent-kind]"),
+    ).map((el) => el.getAttribute("data-agent-kind"));
+    expect(kinds).toEqual(["connection", "agent"]);
+
+    // Nothing typed and nothing picked: the agent can be created as it stands.
+    await user.click(screen.getByText("Next"));
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ uuid: "default-uuid" }),
+    );
+    await user.click(screen.getByText("Create"));
+
+    await waitFor(() =>
+      expect(onNavigateToAgent).toHaveBeenCalledWith("default-uuid"),
+    );
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
+    expect(body.name).toBe("Untitled agent");
+    expect(body.type).toBe("connection");
+  });
+
+  it("numbers the default name past agents already using it", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          uuid: "u1",
+          name: "Untitled agent",
+          type: "agent",
+          updated_at: "2024-01-01T10:00:00.000Z",
+        },
+        {
+          uuid: "u2",
+          name: "untitled agent 2",
+          type: "agent",
+          updated_at: "2024-01-02T10:00:00.000Z",
+        },
+      ]),
+    );
+    const user = setupUser();
+    render(<Agents />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Untitled agent")[0]).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+
+    expect(screen.getByPlaceholderText("Enter agent name")).toHaveValue(
+      "Untitled agent 3",
+    );
+  });
+
   it("opens the new agent dialog, switches kind, and creates an agent (build)", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
     const onNavigateToAgent = jest.fn();
@@ -266,8 +344,7 @@ describe("Agents", () => {
       screen.getByText("Choose a name and how you want to set up your agent"),
     ).toBeInTheDocument();
 
-    const nameInput = screen.getByPlaceholderText("Enter agent name");
-    await user.type(nameInput, "My New Agent");
+    await typeAgentName(user, "My New Agent");
 
     // Switch to "Connect" then back to "Build" to exercise both kind branches.
     await user.click(screen.getByText("Connect your existing agent"));
@@ -300,10 +377,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(
-      screen.getByPlaceholderText("Enter agent name"),
-      "Conn Agent",
-    );
+    await typeAgentName(user, "Conn Agent");
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Single Agent Response"));
@@ -329,10 +403,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(
-      screen.getByPlaceholderText("Enter agent name"),
-      "Gated Agent",
-    );
+    await typeAgentName(user, "Gated Agent");
     await user.click(screen.getByText("Next"));
 
     // Nothing to click: the common answer is already chosen, so the agent can
@@ -361,10 +432,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(
-      screen.getByPlaceholderText("Enter agent name"),
-      "Back Agent",
-    );
+    await typeAgentName(user, "Back Agent");
     await user.click(screen.getByText("Next"));
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
 
@@ -382,6 +450,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
+    await user.clear(screen.getByPlaceholderText("Enter agent name"));
     expect(screen.getByText("Next")).toBeDisabled();
   });
 
@@ -393,10 +462,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(
-      screen.getByPlaceholderText("Enter agent name"),
-      "Dup Agent",
-    );
+    await typeAgentName(user, "Dup Agent");
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Conversation"));
 
@@ -432,7 +498,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Agent X");
+    await typeAgentName(user, "Agent X");
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Conversation"));
 
@@ -454,7 +520,7 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    await user.type(screen.getByPlaceholderText("Enter agent name"), "Agent Y");
+    await typeAgentName(user, "Agent Y");
     await user.click(screen.getByText("Next"));
     await user.click(screen.getByText("Conversation"));
 
@@ -482,9 +548,8 @@ describe("Agents", () => {
       expect(screen.getByText("No agents found")).toBeInTheDocument(),
     );
     await user.click(screen.getAllByText("New agent")[0]);
-    const input = screen.getByPlaceholderText("Enter agent name");
-    await user.type(input, "Enter Agent");
-    await user.type(input, "{Enter}");
+    await typeAgentName(user, "Enter Agent");
+    await user.type(screen.getByPlaceholderText("Enter agent name"), "{Enter}");
 
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
     await user.click(screen.getByText("Single Agent Response"));
