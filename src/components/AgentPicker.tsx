@@ -1,6 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
+import { InteractionTypePill } from "@/components/ui";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -190,7 +191,21 @@ export function AgentPicker({
         disableCustomFieldConnections || disableGeneralAgents
           ? (a) => {
               if (disableGeneralAgents && a.interaction_type === "general") {
-                return "This agent was created as a Single Agent Response agent. A simulation needs a Conversation agent, and that choice is only made when an agent is created.";
+                return (
+                  <span>
+                    This agent was created as a{" "}
+                    <InteractionTypePill
+                      interactionType="general"
+                      className="px-1.5 py-0.5 rounded align-middle"
+                    />{" "}
+                    agent. Create your agent as a{" "}
+                    <InteractionTypePill
+                      interactionType="conversation"
+                      className="px-1.5 py-0.5 rounded align-middle"
+                    />{" "}
+                    agent to run simulations.
+                  </span>
+                );
               }
               if (disableCustomFieldConnections && a.hasDefaultInputs) {
                 return "Text simulation is not supported for connections with custom fields";

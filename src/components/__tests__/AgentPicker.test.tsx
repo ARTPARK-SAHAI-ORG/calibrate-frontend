@@ -241,11 +241,11 @@ describe("AgentPicker", () => {
 
     const disabledOption = screen.getByRole("option", { name: /Summariser/ });
     expect(disabledOption).toHaveAttribute("aria-disabled", "true");
-    expect(
-      screen.getByText(
-        "This agent was created as a Single Agent Response agent. A simulation needs a Conversation agent, and that choice is only made when an agent is created.",
-      ),
-    ).toBeInTheDocument();
+    // The two kinds are named with the same pills the agents list uses, so
+    // the sentence is spread over several elements.
+    expect(disabledOption.textContent).toContain(
+      "This agent was created as a Single Agent Response agent. Create your agent as a Conversation agent to run simulations.",
+    );
 
     // Clicking it does nothing.
     await user.click(disabledOption);

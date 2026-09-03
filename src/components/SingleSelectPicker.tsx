@@ -29,7 +29,7 @@ type SingleSelectPickerProps<T> = {
   compact?: boolean;
   // Returns a reason string when an item cannot be selected (rendered as a
   // muted line under the option and made non-interactive), or null when it can.
-  isItemDisabled?: (item: T) => string | null;
+  isItemDisabled?: (item: T) => React.ReactNode | null;
   // Content pinned above the options inside the open panel, e.g. a form that
   // creates a new item. `close` shuts the panel once that action is done.
   renderHeader?: (close: () => void) => React.ReactNode;
