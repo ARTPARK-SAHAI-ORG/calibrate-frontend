@@ -163,6 +163,8 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 **Agent types**: there are two — `type: "agent"` (Build, platform-configured STT/TTS/LLM) and `type: "connection"` (Connect, external `agent_url`). Never use `"calibrate"` as the type value. Tabs and settings differ between the two.
 
+**What an agent does** is a second, separate field: `interaction_type` is `"conversation"` (it talks with a user) or `"general"` (Single Agent Response, one input in and one output out). `INTERACTION_TYPES` in `src/components/ui/InteractionTypePill.tsx` holds the label and description shown everywhere, `InteractionTypePill` shows it on the agents list and the agent page, and `InteractionTypeChooser` is the two-card picker shared by the new-agent dialog and `DuplicateAgentDialog`. The backend sets it when the agent is created and `AgentUpdate` cannot change it, so copying an agent, which sends `interaction_type` alongside the new name to `POST /agents/{uuid}/duplicate`, is the only way to move an existing agent between the two.
+
 **Monitoring**: Sentry is wired through `sentry.edge.config.ts`, `sentry.server.config.ts`, `src/instrumentation.ts`, and `src/instrumentation-client.ts`. `@vercel/analytics` is also enabled. In catch blocks use `reportError(message, error)` from `src/lib/reportError.ts` instead of `console.error` — it captures the failure in Sentry (and still logs to the console in development). Don't add bare `console.error`/`console.log` calls.
 
 ## Limits on bulk runs

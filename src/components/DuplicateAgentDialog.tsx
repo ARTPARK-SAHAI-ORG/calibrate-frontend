@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { reportError } from "@/lib/reportError";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import { useAccessToken } from "@/hooks";
+import { InteractionTypeChooser, type InteractionType } from "@/components/ui";
 
 /**
  * Copy an agent under a new name. Shared by the agents list and the agent
@@ -15,22 +16,35 @@ import { useAccessToken } from "@/hooks";
  * The backend copies the agent it has stored, so a caller that holds edits the
  * person has not saved yet passes `onBeforeDuplicate` to save them first. It
  * returns false when that save fails, and nothing is copied.
+ *
+ * The copy can be a different kind of agent from the original, which is the
+ * only way to move an agent between holding a conversation and answering once:
+ * the type cannot be changed on an agent that already exists.
  */
 export function DuplicateAgentDialog({
   agentUuid,
   agentName: originalName,
+  interactionType: originalInteractionType,
   onClose,
   onDuplicated,
   onBeforeDuplicate,
 }: {
   agentUuid: string;
   agentName: string;
+  interactionType?: InteractionType;
   onClose: () => void;
-  onDuplicated: (newAgentUuid: string, name: string) => void;
+  onDuplicated: (
+    newAgentUuid: string,
+    name: string,
+    interactionType: InteractionType,
+  ) => void;
   onBeforeDuplicate?: () => Promise<boolean>;
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
+  const [interactionType, setInteractionType] = useState<InteractionType>(
+    originalInteractionType === "general" ? "general" : "conversation",
+  );
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameConflictError, setNameConflictError] = useState<string | null>(
@@ -69,6 +83,7 @@ export function DuplicateAgentDialog({
           },
           body: JSON.stringify({
             name: agentName.trim(),
+            interaction_type: interactionType,
           }),
         },
       );
@@ -89,7 +104,7 @@ export function DuplicateAgentDialog({
       }
 
       const data = await response.json();
-      onDuplicated(data.uuid, agentName.trim());
+      onDuplicated(data.uuid, agentName.trim(), interactionType);
       onClose();
     } catch (err) {
       reportError("Error duplicating agent:", err);
@@ -116,7 +131,7 @@ export function DuplicateAgentDialog({
             Duplicate agent
           </h2>
           <p className="text-muted-foreground text-[15px]">
-            Choose a name for the duplicated agent
+            Choose a name for the copy and what it does
           </p>
         </div>
 
@@ -151,6 +166,13 @@ export function DuplicateAgentDialog({
             <p className="mt-1 text-[13px] text-red-500">{nameConflictError}</p>
           )}
         </div>
+
+        <InteractionTypeChooser
+          value={interactionType}
+          onChange={setInteractionType}
+          label="What does the copy do?"
+          className="mb-6 space-y-2"
+        />
 
         {/* Error Message */}
         {error && (
