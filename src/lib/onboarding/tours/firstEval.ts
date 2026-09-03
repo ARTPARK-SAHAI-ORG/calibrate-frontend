@@ -131,6 +131,7 @@ export const A = {
   addEvaluatorsDialog: '[data-tour="add-evaluators-dialog"]',
   evaluatorsAddConfirm: '[data-tour="evaluators-add-confirm"]',
   agentTypeOptions: '[data-tour="agent-type-options"]',
+  agentKindBuild: '[data-agent-kind="agent"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
   // The whole picker body (options + example), so the card's "compare these
@@ -703,6 +704,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Create",
       timeout: 10000,
       action: async () => {
+        // Connecting an agent you already run is the chosen option; the demo
+        // builds one here, so pick that first.
+        await clickElement(A.agentKindBuild);
         await clickElement(A.agentNextSubmit);
         // The dialog's second step asks what the agent does; the demo agent
         // is conversational (a phone helpline), so pick that before creating.
