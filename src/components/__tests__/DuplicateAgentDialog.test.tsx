@@ -91,37 +91,16 @@ describe("DuplicateAgentDialog", () => {
     expect(generalCard()).not.toHaveClass("border-foreground");
   });
 
-  it("says the tests are not copied, whichever type is chosen", async () => {
+  it("closes from the X in the corner and from Cancel", async () => {
     const user = setupUser();
-    renderDialog({ interactionType: "conversation" });
-    const note = /The copy takes the agent's tools and evaluators\. Its tests are not copied\./;
-    expect(screen.getByText(note)).toBeInTheDocument();
+    const { onClose } = renderDialog();
 
-    await user.click(generalCard());
-    expect(screen.getByText(note)).toBeInTheDocument();
-  });
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
 
-  it("warns that evaluators are left behind only once the type differs", async () => {
-    const user = setupUser();
-    renderDialog({ interactionType: "conversation" });
-    const warning = /Evaluators that cannot judge what the copy does are left behind/;
-    expect(screen.queryByText(warning)).not.toBeInTheDocument();
-
-    await user.click(generalCard());
-    expect(screen.getByText(warning)).toBeInTheDocument();
-
-    await user.click(conversationCard());
-    expect(screen.queryByText(warning)).not.toBeInTheDocument();
-  });
-
-  it("warns a single agent response agent copied as a conversation one too", async () => {
-    const user = setupUser();
-    renderDialog({ interactionType: "general" });
-    const warning = /Evaluators that cannot judge what the copy does are left behind/;
-    expect(screen.queryByText(warning)).not.toBeInTheDocument();
-
-    await user.click(conversationCard());
-    expect(screen.getByText(warning)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("falls back to Conversation when no type is given", () => {

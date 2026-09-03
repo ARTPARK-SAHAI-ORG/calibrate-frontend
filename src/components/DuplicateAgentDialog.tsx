@@ -5,7 +5,11 @@ import { signOut } from "next-auth/react";
 import { reportError } from "@/lib/reportError";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import { useAccessToken } from "@/hooks";
-import { InteractionTypeChooser, type InteractionType } from "@/components/ui";
+import {
+  Button,
+  InteractionTypeChooser,
+  type InteractionType,
+} from "@/components/ui";
 
 /**
  * Copy an agent under a new name. Shared by the agents list and the agent
@@ -24,7 +28,7 @@ import { InteractionTypeChooser, type InteractionType } from "@/components/ui";
  *
  * The backend decides what a copy carries: the agent's tools and evaluators,
  * never its tests, and, when the kind changes, only the evaluators that can
- * judge the new kind. The dialog says so before the copy is made.
+ * judge the new kind.
  */
 export function DuplicateAgentDialog({
   agentUuid,
@@ -47,10 +51,8 @@ export function DuplicateAgentDialog({
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
-  const startingInteractionType: InteractionType =
-    originalInteractionType === "general" ? "general" : "conversation";
   const [interactionType, setInteractionType] = useState<InteractionType>(
-    startingInteractionType,
+    originalInteractionType === "general" ? "general" : "conversation",
   );
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,11 +136,34 @@ export function DuplicateAgentDialog({
       >
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold tracking-tight mb-1">
-            Duplicate agent
-          </h2>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Duplicate agent
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isDuplicating}
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
           <p className="text-muted-foreground text-[15px]">
-            Choose a name for the copy and what it does
+            Choose a name for the new agent and what it does
           </p>
         </div>
 
@@ -177,27 +202,9 @@ export function DuplicateAgentDialog({
         <InteractionTypeChooser
           value={interactionType}
           onChange={setInteractionType}
-          label="What does the copy do?"
-          className="mb-4 space-y-2"
+          label="What does the new agent do?"
+          className="mb-6 space-y-2"
         />
-
-        <div className="mb-6 space-y-2">
-          <p className="text-[13px] text-muted-foreground">
-            The copy takes the agent&apos;s tools and evaluators. Its tests are
-            not copied.
-          </p>
-          {/* Both directions drop the judges that cannot run on the kind of
-              agent the copy is. A conversation agent copied as a single
-              response one usually loses all of them, since the correctness
-              judge every agent starts with is a next-reply judge. */}
-          {interactionType !== startingInteractionType && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
-              Evaluators that cannot judge what the copy does are left behind,
-              so the copy can start with none. You can add evaluators to it
-              afterwards.
-            </div>
-          )}
-        </div>
 
         {/* Error Message */}
         {error && (
@@ -206,59 +213,25 @@ export function DuplicateAgentDialog({
           </div>
         )}
 
-        {/* Footer Buttons */}
-        <div className="flex items-center justify-between">
-          <button
+        <div className="flex items-center justify-end gap-2 md:gap-3">
+          <Button
+            variant="secondary"
+            size="md"
             onClick={onClose}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer flex items-center gap-2"
+            disabled={isDuplicating}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleDuplicate}
-            disabled={!agentName.trim() || isDuplicating}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            disabled={!agentName.trim()}
+            isLoading={isDuplicating}
+            loadingText="Duplicating..."
           >
-            {isDuplicating ? (
-              <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Duplicating...
-              </>
-            ) : (
-              "Duplicate"
-            )}
-          </button>
+            Duplicate
+          </Button>
         </div>
       </div>
     </div>
