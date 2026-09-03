@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
+import { InteractionTypePill, INTERACTION_TYPES } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useAccessToken, useAgentDeletion } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
@@ -457,17 +458,9 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   }}
                   className="flex items-center py-2"
                 >
-                  <span
-                    className={`text-xs px-2 py-1 rounded-md font-medium ${
-                      agent.interaction_type === "general"
-                        ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
-                        : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
-                    }`}
-                  >
-                    {agent.interaction_type === "general"
-                      ? "Single Agent Response"
-                      : "Conversation"}
-                  </span>
+                  <InteractionTypePill
+                    interactionType={agent.interaction_type}
+                  />
                 </Link>
                 {/* Last Updated At Column */}
                 <Link
@@ -594,17 +587,10 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                     >
                       {agent.type === "connection" ? "Connection" : "Agent"}
                     </span>
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        agent.interaction_type === "general"
-                          ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
-                          : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
-                      }`}
-                    >
-                      {agent.interaction_type === "general"
-                        ? "Single Agent Response"
-                        : "Conversation"}
-                    </span>
+                    <InteractionTypePill
+                      interactionType={agent.interaction_type}
+                      className="px-1.5 py-0.5 rounded"
+                    />
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {agent.updatedAt}
@@ -1040,10 +1026,10 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      Conversation
+                      {INTERACTION_TYPES.conversation.label}
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Your agent has a conversation with a user
+                      {INTERACTION_TYPES.conversation.description}
                     </div>
                   </div>
                   {/* Most agents are this kind, so it is marked and starts
@@ -1080,10 +1066,10 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      Single Agent Response
+                      {INTERACTION_TYPES.general.label}
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      The agent takes an input and generates an output
+                      {INTERACTION_TYPES.general.description}
                     </div>
                   </div>
                 </div>
