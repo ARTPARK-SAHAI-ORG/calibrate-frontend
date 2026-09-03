@@ -459,6 +459,20 @@ describe("AgentDetail", () => {
     );
   });
 
+  it("shows the agent's interaction type as a pill above the tabs", async () => {
+    const generalAgent = {
+      ...buildAgent,
+      uuid: "agent-4",
+      interaction_type: "general",
+    };
+    mockFetchSequenceForAgent(generalAgent);
+    render(<AgentDetail agentUuid={generalAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Single Agent Response")).toBeInTheDocument(),
+    );
+  });
+
   it("defaults the agent's nature to conversation when interaction_type is absent", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();

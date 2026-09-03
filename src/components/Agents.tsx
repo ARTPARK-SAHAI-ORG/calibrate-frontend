@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
+import { InteractionTypePill, INTERACTION_TYPES } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useAccessToken, useAgentDeletion } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
@@ -40,6 +41,18 @@ const formatDate = (dateString: string): string => {
   } catch {
     return dateString;
   }
+};
+
+// A new agent opens with a name already filled in, the way a new document
+// does, so nothing has to be typed to get going. The number keeps it clear of
+// names already in the workspace, which the backend would refuse.
+const defaultAgentName = (existingNames: string[]): string => {
+  const base = "Untitled agent";
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  let suffix = 2;
+  while (taken.has(`${base} ${suffix}`.toLowerCase())) suffix += 1;
+  return `${base} ${suffix}`;
 };
 
 export function Agents({ onNavigateToAgent }: AgentsProps) {
@@ -445,17 +458,9 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   }}
                   className="flex items-center py-2"
                 >
-                  <span
-                    className={`text-xs px-2 py-1 rounded-md font-medium ${
-                      agent.interaction_type === "general"
-                        ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
-                        : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
-                    }`}
-                  >
-                    {agent.interaction_type === "general"
-                      ? "Single Agent Response"
-                      : "Conversation"}
-                  </span>
+                  <InteractionTypePill
+                    interactionType={agent.interaction_type}
+                  />
                 </Link>
                 {/* Last Updated At Column */}
                 <Link
@@ -582,17 +587,10 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                     >
                       {agent.type === "connection" ? "Connection" : "Agent"}
                     </span>
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        agent.interaction_type === "general"
-                          ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
-                          : "bg-pink-500/10 text-pink-600 dark:text-pink-400"
-                      }`}
-                    >
-                      {agent.interaction_type === "general"
-                        ? "Single Agent Response"
-                        : "Conversation"}
-                    </span>
+                    <InteractionTypePill
+                      interactionType={agent.interaction_type}
+                      className="px-1.5 py-0.5 rounded"
+                    />
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {agent.updatedAt}
@@ -678,6 +676,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
       {/* New Agent Dialog */}
       {dialogOpen && (
         <NewAgentDialog
+          defaultName={defaultAgentName(agents.map((agent) => agent.name))}
           onClose={() => setDialogOpen(false)}
           onCreateAgent={onNavigateToAgent}
           backendAccessToken={backendAccessToken ?? undefined}
@@ -720,16 +719,22 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
 }
 
 function NewAgentDialog({
+  defaultName,
   onClose,
   onCreateAgent,
   backendAccessToken,
 }: {
+  defaultName: string;
   onClose: () => void;
   onCreateAgent?: (agentUuid: string) => void;
   backendAccessToken?: string;
 }) {
-  const [agentName, setAgentName] = useState("");
-  const [agentKind, setAgentKind] = useState<"agent" | "connection">("agent");
+  const [agentName, setAgentName] = useState(defaultName);
+  // Most people bring an agent they already run, so connecting one starts
+  // chosen and is the first option on the list.
+  const [agentKind, setAgentKind] = useState<"agent" | "connection">(
+    "connection",
+  );
   // Most agents have a conversation, so that answer starts chosen rather than
   // leaving the step cold. Same as the new-test screen, which opens on its
   // most popular type.
@@ -875,6 +880,7 @@ function NewAgentDialog({
                   className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                     nameConflictError ? "border-red-500" : "border-border"
                   }`}
+                  onFocus={(e) => e.currentTarget.select()}
                   maxLength={maxLength}
                   autoFocus
                 />
@@ -896,6 +902,41 @@ function NewAgentDialog({
               <label className="block text-[13px] font-medium text-foreground mb-2">
                 Setup
               </label>
+
+              {/* Connect option */}
+              <button
+                type="button"
+                data-agent-kind="connection"
+                onClick={() => setAgentKind("connection")}
+                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+                  agentKind === "connection"
+                    ? "border-foreground bg-muted/30"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      agentKind === "connection"
+                        ? "border-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {agentKind === "connection" && (
+                      <div className="w-2 h-2 rounded-full bg-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      Connect your existing agent
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
+                      Provide a URL for your deployed agent. Calibrate will call
+                      it directly to run evals, benchmarks and simulations.
+                    </div>
+                  </div>
+                </div>
+              </button>
 
               {/* Build option */}
               <button
@@ -928,41 +969,6 @@ function NewAgentDialog({
                       Configure the LLM/STT/TTS models for your agent, set the
                       instructions and define the tools your agent can use. All
                       within Calibrate.
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Connect option */}
-              <button
-                type="button"
-                data-agent-kind="connection"
-                onClick={() => setAgentKind("connection")}
-                className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
-                  agentKind === "connection"
-                    ? "border-foreground bg-muted/30"
-                    : "border-border hover:border-muted-foreground"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                      agentKind === "connection"
-                        ? "border-foreground"
-                        : "border-muted-foreground"
-                    }`}
-                  >
-                    {agentKind === "connection" && (
-                      <div className="w-2 h-2 rounded-full bg-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-medium text-foreground">
-                      Connect your existing agent
-                    </div>
-                    <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Provide a URL for your deployed agent. Calibrate will call
-                      it directly to run evals, benchmarks and simulations.
                     </div>
                   </div>
                 </div>
@@ -1020,10 +1026,10 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      Conversation
+                      {INTERACTION_TYPES.conversation.label}
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      Your agent has a conversation with a user
+                      {INTERACTION_TYPES.conversation.description}
                     </div>
                   </div>
                   {/* Most agents are this kind, so it is marked and starts
@@ -1060,10 +1066,10 @@ function NewAgentDialog({
                   </div>
                   <div>
                     <div className="text-[13px] font-medium text-foreground">
-                      Single Agent Response
+                      {INTERACTION_TYPES.general.label}
                     </div>
                     <div className="text-[12px] text-muted-foreground mt-0.5">
-                      The agent takes an input and generates an output
+                      {INTERACTION_TYPES.general.description}
                     </div>
                   </div>
                 </div>
