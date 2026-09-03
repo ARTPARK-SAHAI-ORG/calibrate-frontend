@@ -31,7 +31,13 @@ export function InteractionTypePill({
   const { label, description } =
     INTERACTION_TYPES[isGeneral ? "general" : "conversation"];
   return (
-    <Tooltip content={description} position="top">
+    // Inline, so a pill written inside a sentence does not push the words
+    // around it onto their own lines.
+    <Tooltip
+      content={description}
+      position="top"
+      className="inline-block align-middle"
+    >
       <span
         className={`text-xs font-medium ${className} ${
           isGeneral
