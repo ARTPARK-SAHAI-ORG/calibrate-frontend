@@ -103,6 +103,23 @@ describe("DuplicateAgentDialog", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("stays open when the grey area is clicked while the copy is being made", async () => {
+    const user = setupUser();
+    let finishRequest: (value: Response) => void = () => {};
+    (global.fetch as jest.Mock).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        finishRequest = resolve;
+      }),
+    );
+    const { onClose } = renderDialog();
+
+    await duplicate(user);
+    await user.click(document.querySelector(".fixed.inset-0") as HTMLElement);
+    expect(onClose).not.toHaveBeenCalled();
+
+    finishRequest(jsonResponse({ uuid: "dup-1" }));
+  });
+
   it("falls back to Conversation when no type is given", () => {
     renderDialog();
     expect(conversationCard()).toHaveClass("border-foreground");

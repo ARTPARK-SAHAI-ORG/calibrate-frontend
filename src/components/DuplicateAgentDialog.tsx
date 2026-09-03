@@ -128,7 +128,12 @@ export function DuplicateAgentDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      // The dialog stays put until the copy has been made, the same as Cancel
+      // and the corner X, so a stray click cannot take it off screen while the
+      // request is still going.
+      onClick={() => {
+        if (!isDuplicating) onClose();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl p-8 max-w-lg w-full mx-4 shadow-lg"
