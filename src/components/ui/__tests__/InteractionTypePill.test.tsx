@@ -29,6 +29,13 @@ describe("InteractionTypePill", () => {
     ).toBeInTheDocument();
   });
 
+  it("sits in the line of text so a sentence around it stays on one line", () => {
+    render(<InteractionTypePill interactionType="conversation" />);
+    expect(screen.getByText("Conversation").parentElement).toHaveClass(
+      "inline-block"
+    );
+  });
+
   it("takes padding and corner classes from the caller", () => {
     render(
       <InteractionTypePill

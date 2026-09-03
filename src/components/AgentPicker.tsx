@@ -196,12 +196,12 @@ export function AgentPicker({
                     This agent was created as a{" "}
                     <InteractionTypePill
                       interactionType="general"
-                      className="px-1.5 py-0.5 rounded align-middle"
+                      className="px-1.5 py-0.5 rounded"
                     />{" "}
                     agent. Create your agent as a{" "}
                     <InteractionTypePill
                       interactionType="conversation"
-                      className="px-1.5 py-0.5 rounded align-middle"
+                      className="px-1.5 py-0.5 rounded"
                     />{" "}
                     agent to run simulations.
                   </span>
