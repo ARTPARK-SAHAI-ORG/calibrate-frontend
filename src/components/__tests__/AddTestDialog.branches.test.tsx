@@ -1,10 +1,4 @@
-import {
-  render,
-  screen,
-  setupUser,
-  waitFor,
-  fireEvent,
-} from "@/test-utils";
+import { render, screen, setupUser, waitFor, fireEvent } from "@/test-utils";
 import { AddTestDialog, TestConfig } from "../AddTestDialog";
 
 // jsdom lacks ResizeObserver + scrollIntoView, both used by the dialog.
@@ -38,7 +32,11 @@ jest.mock("../ToolPicker", () => ({
         Pick inbuilt tool
       </button>
       {availableTools.map((t: any) => (
-        <button key={t.uuid} type="button" onClick={() => onSelectCustomTool(t)}>
+        <button
+          key={t.uuid}
+          type="button"
+          onClick={() => onSelectCustomTool(t)}
+        >
           Pick {t.name}
         </button>
       ))}
@@ -364,10 +362,7 @@ describe("AddTestDialog — additional branch coverage", () => {
         screen.getByLabelText("Parameter type"),
         "integer",
       );
-      await user.type(
-        screen.getByPlaceholderText("Your test name"),
-        "Bad int",
-      );
+      await user.type(screen.getByPlaceholderText("Your test name"), "Bad int");
       await fillHistory(user);
       await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -410,16 +405,16 @@ describe("AddTestDialog — additional branch coverage", () => {
       await user.click(screen.getByLabelText("Collapse parameter"));
       expect(screen.getByText("No parameters added")).toBeInTheDocument();
       await user.click(screen.getByLabelText("Expand parameter"));
-      expect(
-        screen.queryByText("No parameters added"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("No parameters added")).not.toBeInTheDocument();
     });
   });
 
   describe("tool-invocation: accept-any toggle repopulates params", () => {
     it("toggling accept-any on then off restores the parameters section", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
       await user.click(screen.getByRole("button", { name: "Add tool" }));
       await waitFor(() =>
         expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
@@ -441,7 +436,9 @@ describe("AddTestDialog — additional branch coverage", () => {
   describe("tool-invocation: JSON mode edits", () => {
     it("rejects a non-object top-level JSON value", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
       await user.click(screen.getByRole("button", { name: "Add tool" }));
       await waitFor(() =>
         expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
@@ -459,7 +456,9 @@ describe("AddTestDialog — additional branch coverage", () => {
 
     it("accepts valid JSON and flows it back into the form", async () => {
       const user = setupUser();
-      render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+      render(
+        <AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />,
+      );
       await user.click(screen.getByRole("button", { name: "Add tool" }));
       await waitFor(() =>
         expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
@@ -773,6 +772,12 @@ describe("AddTestDialog — additional branch coverage", () => {
       );
       await waitFor(() =>
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      // A new test opens with the worked example filled in, including the
+      // criteria this test needs empty.
+      await user.clear(screen.getByPlaceholderText("Your test name"));
+      await user.clear(
+        screen.getByPlaceholderText("Enter value for {{criteria}}"),
       );
       await user.type(
         screen.getByPlaceholderText("Your test name"),

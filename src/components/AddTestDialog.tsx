@@ -34,6 +34,7 @@ import {
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
@@ -923,6 +924,18 @@ export function AddTestDialog({
     setTypeChosen(true);
   };
 
+  // A test written from scratch opens with a worked example already in the
+  // boxes — the same clinic example the type picker just showed — so the
+  // reader edits one rather than filling an empty form. Editing, duplicating
+  // and labelling items all bring their own content, so they are left alone,
+  // and so is any caller that asked for a transcript of its own shape.
+  const prefillsSample =
+    !isLabelItem &&
+    !isEditing &&
+    !initialConfig &&
+    !allowAgentLastMessage &&
+    !requireAssistantLastMessage;
+
   // Available tools state - declared early so it's available for initialConfig parsing
   const [createToolOpen, setCreateToolOpen] = useState(false);
   // Same flow, opened from "Agent tool call" in the conversation history's
@@ -1372,6 +1385,42 @@ export function AddTestDialog({
 
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
+  // Fill the example into the name and the conversation (or the single input)
+  // once, as soon as the reader has picked a test type. Runs only for a test
+  // written from scratch — see `prefillsSample` above.
+  const samplePrefilled = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      samplePrefilled.current = false;
+      return;
+    }
+    if (!prefillsSample || !typeChosen || samplePrefilled.current) return;
+    samplePrefilled.current = true;
+    const sample = sampleTest(activeTab, isGeneralTest);
+    setTestName(sample.name);
+    if (usesPlainInput) {
+      setGeneralInput(sample.input);
+    } else {
+      setChatMessages(
+        sample.history.map((m, i) => ({
+          id: String(i + 1),
+          role: m.role,
+          content: m.content,
+        })),
+      );
+    }
+    // setTestName comes from the parent and is not memoised there, so it is
+    // left out: this must run once per open, not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    prefillsSample,
+    typeChosen,
+    activeTab,
+    isGeneralTest,
+    usesPlainInput,
+  ]);
+
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
     setChatMessages([...chatMessages, { id, role, content: "" }]);
@@ -1807,30 +1856,55 @@ export function AddTestDialog({
         : tab === "conversation"
           ? CONVERSATION_EVALUATOR_TYPE
           : "llm";
-      const toAttached = (o: LLMEvaluatorOption): AttachedEvaluator => ({
+      const toAttached = (
+        o: LLMEvaluatorOption,
+        explicitValues?: Record<string, string>,
+      ): AttachedEvaluator => ({
         evaluator_uuid: o.uuid,
         name: o.name,
         description: o.description,
         slug: o.slug,
         variables: o.variables,
-        variable_values: buildInitialVariableValues(o.variables),
+        variable_values: buildInitialVariableValues(
+          o.variables,
+          explicitValues,
+        ),
       });
       const agentSet = new Set(agentEvaluatorUuids ?? []);
       const agentMatches = availableLLMEvaluators.filter(
         (o) => agentSet.has(o.uuid) && o.evaluator_type === wantedType,
       );
       if (isGeneralNextReply)
-        return agentMatches.length > 0 ? agentMatches.map(toAttached) : [];
-      if (agentMatches.length > 0) return agentMatches.map(toAttached);
+        return agentMatches.length > 0
+          ? agentMatches.map((o) => toAttached(o))
+          : [];
+      if (agentMatches.length > 0)
+        return agentMatches.map((o) => toAttached(o));
       if (tab === "next-reply") {
         const correctness = availableLLMEvaluators.find((o) =>
           isDefaultLLMNextReplyEvaluator(o),
         );
-        if (correctness) return [toAttached(correctness)];
+        if (correctness)
+          return [
+            toAttached(
+              correctness,
+              // A brand-new test gets the example's criteria filled in; an
+              // evaluator the reader connected themselves is left as they
+              // wrote it.
+              prefillsSample
+                ? { criteria: sampleTest(tab, isGeneralTest).criteria }
+                : undefined,
+            ),
+          ];
       }
       return [];
     },
-    [agentEvaluatorUuids, availableLLMEvaluators, isGeneralTest],
+    [
+      agentEvaluatorUuids,
+      availableLLMEvaluators,
+      isGeneralTest,
+      prefillsSample,
+    ],
   );
 
   // Initialize attached evaluators once props + evaluator list have settled.
