@@ -29,16 +29,14 @@ export function InviteDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-border flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base md:text-lg font-semibold text-foreground">
-              Invite team members
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Nobody is notified, so tell them once they are in.
-            </p>
-          </div>
+      {/* Height is fixed rather than growing with the content, so adding a
+          few people does not make the dialog jump about. Same pair as
+          AddEvaluatorsDialog, the app's other wide two-column dialog. */}
+      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] md:h-[85vh]">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+          <h2 className="text-base md:text-lg font-semibold text-foreground">
+            Invite team members
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -61,13 +59,15 @@ export function InviteDialog({
           </button>
         </div>
 
-        {/* One column on a phone, two side by side from md up. The divider
-            only exists on the wider layout, where the columns sit together. */}
-        <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 md:divide-x divide-border">
-          <div className="p-6">
+        {/* One column on a phone, two side by side from md up. Side by side,
+            each column scrolls on its own, so a long list of people being
+            added does not drag the invite link out of view. Stacked, the whole
+            body scrolls as one. */}
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-2">
+          <div className="p-6 md:overflow-y-auto">
             <AddByEmailPanel onAddMember={onAddMember} />
           </div>
-          <div className="p-6 border-t border-border md:border-t-0">
+          <div className="p-6 border-t border-border md:border-t-0 md:overflow-y-auto">
             <InviteLinkPanel orgUuid={orgUuid} />
           </div>
         </div>

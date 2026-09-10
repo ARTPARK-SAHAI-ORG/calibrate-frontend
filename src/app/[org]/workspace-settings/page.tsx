@@ -345,7 +345,7 @@ function MembersSection({
             Members
           </h2>
           <p className="text-sm text-muted-foreground">
-            People who can open this workspace
+            Invite team members and collaborators
           </p>
         </div>
         <button
