@@ -212,6 +212,24 @@ that repeats another one, something meant only for people given the link. The
 cost of guessing is silent, since a wrongly filed page either never appears in
 search or appears when it should not, and nothing breaks either way.
 
+### Only our own address is indexed
+
+Anyone can fork this repo and deploy it, which SELF_HOSTING.md tells them how
+to do. Every copy carries the same pages and the same words, so a search engine
+sees several sites saying the same thing and picks one, which has already meant
+a copy outranking us.
+
+`CANONICAL_HOST` in [src/lib/site.ts](src/lib/site.ts) is the one address the
+site is meant to be found at. [src/middleware.ts](src/middleware.ts) answers
+every page with `X-Robots-Tag: noindex, nofollow` when the request came in on
+any other address, which is how a copy stays out of search. This also covers
+preview builds and a local server, since neither is our production address.
+
+Two things follow. Moving to a new address means changing `CANONICAL_HOST` with
+it, or our own site disappears from search. And robots.txt deliberately stays
+open on a copy: blocking the crawler would stop it reading the header, so pages
+already in search would sit there instead of dropping out.
+
 ### A page open to everyone writes its own link preview
 
 Build the metadata for any page in `PAGES` with `pageMetadata()` from
