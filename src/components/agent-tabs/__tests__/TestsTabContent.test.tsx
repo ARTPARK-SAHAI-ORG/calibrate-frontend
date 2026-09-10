@@ -510,7 +510,7 @@ describe("TestsTabContent — load states", () => {
     state.agentTestsInit = { ok: false, status: 401 };
     renderComponent();
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalled(),
     );
   });
 
@@ -1082,7 +1082,7 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByText("Run all tests"));
     await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalled(),
     );
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();

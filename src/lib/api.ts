@@ -1,4 +1,5 @@
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   clearActiveOrgUuid,
   getActiveOrgUuid,
@@ -131,8 +132,9 @@ export async function apiClient<T>(
     clearOrgsCache();
     // Clear cookie
     document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
-    // Sign out via NextAuth
-    await signOut({ callbackUrl: "/login" });
+    // Sign out via NextAuth, remembering the page they were on so signing in
+    // again brings them back to it.
+    await signOut({ callbackUrl: loginPathAfterSignOut() });
     throw new Error("Unauthorized - session expired");
   }
 

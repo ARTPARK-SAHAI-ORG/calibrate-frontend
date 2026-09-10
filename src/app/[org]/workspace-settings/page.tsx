@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
-import { InviteLinkPanel } from "@/components/workspace/InviteLinkPanel";
+import { InviteDialog } from "@/components/workspace/InviteDialog";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
@@ -271,9 +271,7 @@ function MembersSection({
     removeMember,
   } = useOrgMembers(accessToken, orgUuid);
 
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const [memberToRemove, setMemberToRemove] =
     useState<OrganizationMember | null>(null);
@@ -281,22 +279,6 @@ function MembersSection({
 
   const isSelfRemoval =
     !!memberToRemove && memberToRemove.user_id === currentUserId;
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email || isAdding) return;
-    setIsAdding(true);
-    setAddError(null);
-    try {
-      await addMember(email);
-      setInviteEmail("");
-    } catch (err) {
-      setAddError(parseBackendErrorMessage(err, "Failed to add member"));
-    } finally {
-      setIsAdding(false);
-    }
-  };
 
   const handleRemove = async () => {
     if (!memberToRemove) return;
@@ -357,46 +339,23 @@ function MembersSection({
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-base md:text-lg font-semibold text-foreground">
-          Members
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Invite team members by email
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base md:text-lg font-semibold text-foreground">
+            Members
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            People who can open this workspace
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsInviteOpen(true)}
+          className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
+        >
+          Invite
+        </button>
       </div>
-
-      <div>
-        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => {
-              setInviteEmail(e.target.value);
-              setAddError(null);
-            }}
-            placeholder="teammate@example.com"
-            disabled={isAdding}
-            className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
-              addError
-                ? "border-red-500/60 focus:ring-red-500/20"
-                : "border-border focus:ring-foreground/10"
-            }`}
-          />
-          <button
-            type="submit"
-            disabled={!inviteEmail.trim() || isAdding}
-            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isAdding ? "Adding..." : "Add member"}
-          </button>
-        </form>
-        {addError && (
-          <p className="mt-1 text-[13px] text-red-500">{addError}</p>
-        )}
-      </div>
-
-      <InviteLinkPanel orgUuid={orgUuid} />
 
       <div className="border border-border rounded-lg overflow-hidden">
         {isLoading && members.length === 0 ? (
@@ -485,6 +444,14 @@ function MembersSection({
         }
         confirmText={isSelfRemoval ? "Leave" : "Remove"}
         isDeleting={isRemoving}
+      />
+
+      <InviteDialog
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        orgUuid={orgUuid}
+        orgName={orgName}
+        onAddMember={addMember}
       />
     </section>
   );
