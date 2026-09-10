@@ -10,7 +10,14 @@ jest.mock("../AddByEmailPanel", () => ({
     onAddMember,
   }: {
     onAddMember: (email: string) => Promise<unknown>;
-  }) => <div data-testid="add-by-email">{typeof onAddMember}</div>,
+  }) => (
+    <div data-testid="add-by-email">
+      {typeof onAddMember}
+      {/* Stands in for the addresses being typed, so a test can tell whether
+          swapping sides threw them away. */}
+      <input aria-label="stand-in for what is typed" defaultValue="" />
+    </div>
+  ),
 }));
 
 jest.mock("../InviteLinkPanel", () => ({
@@ -41,27 +48,27 @@ beforeEach(() => {
 describe("InviteDialog", () => {
   it("shows nothing while it is closed", () => {
     open(false);
-    expect(screen.queryByText("Invite team members")).toBeNull();
+    expect(screen.queryByText("Add team members")).toBeNull();
   });
 
   it("opens on the email side, with the link side put away", () => {
     open();
 
-    expect(screen.getByText("Invite team members")).toBeInTheDocument();
-    expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
-    expect(screen.queryByTestId("invite-link")).toBeNull();
+    expect(screen.getByText("Add team members")).toBeInTheDocument();
+    expect(screen.getByTestId("add-by-email")).toBeVisible();
+    expect(screen.getByTestId("invite-link")).not.toBeVisible();
   });
 
   it("swaps to the link side and back", async () => {
     const user = setupUser();
     open();
 
-    await user.click(screen.getByRole("button", { name: "With a link" }));
-    expect(screen.getByTestId("invite-link")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-by-email")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Invite with a link" }));
+    expect(screen.getByTestId("invite-link")).toBeVisible();
+    expect(screen.getByTestId("add-by-email")).not.toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "By email" }));
-    expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
+    expect(screen.getByTestId("add-by-email")).toBeVisible();
   });
 
   it("hands each side what it needs", async () => {
@@ -70,7 +77,7 @@ describe("InviteDialog", () => {
 
     expect(screen.getByTestId("add-by-email")).toHaveTextContent("function");
 
-    await user.click(screen.getByRole("button", { name: "With a link" }));
+    await user.click(screen.getByRole("button", { name: "Invite with a link" }));
     expect(screen.getByTestId("invite-link")).toHaveTextContent("org-1");
   });
 
@@ -80,13 +87,13 @@ describe("InviteDialog", () => {
     const user = setupUser();
     open();
 
-    await user.click(screen.getByRole("button", { name: "With a link" }));
-    expect(screen.getByTestId("invite-link")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Invite with a link" }));
+    expect(screen.getByTestId("invite-link")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
 
-    expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
+    expect(screen.getByTestId("add-by-email")).toBeVisible();
   });
 
   it("closes from the cross", async () => {
@@ -95,5 +102,23 @@ describe("InviteDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // Swapping to the link and back used to build the email side again from
+  // scratch, losing every address already typed.
+  it("keeps what was typed when the sides are swapped", async () => {
+    const user = setupUser();
+    open();
+
+    const typed = screen.getByLabelText("stand-in for what is typed");
+    await user.type(typed, "aman@artpark.in");
+    expect(typed).toHaveValue("aman@artpark.in");
+
+    await user.click(screen.getByRole("button", { name: "Invite with a link" }));
+    await user.click(screen.getByRole("button", { name: "By email" }));
+
+    expect(screen.getByLabelText("stand-in for what is typed")).toHaveValue(
+      "aman@artpark.in",
+    );
   });
 });

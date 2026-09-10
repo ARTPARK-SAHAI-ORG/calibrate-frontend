@@ -110,7 +110,7 @@ describe("InvitePage", () => {
     const user = setupUser();
     render(<InvitePage />);
 
-    await user.click(await screen.findByRole("button", { name: "Join Acme" }));
+    await user.click(await screen.findByRole("button", { name: "Join" }));
 
     await waitFor(() =>
       expect(acceptInvite).toHaveBeenCalledWith(TOKEN, "jwt-token"),
@@ -134,13 +134,13 @@ describe("InvitePage", () => {
     const user = setupUser();
     render(<InvitePage />);
 
-    await user.click(await screen.findByRole("button", { name: "Join Acme" }));
+    await user.click(await screen.findByRole("button", { name: "Join" }));
 
     expect(
       await screen.findByText("You are already a member"),
     ).toBeInTheDocument();
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Join Acme" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Join" })).toBeEnabled();
   });
 
   // A link that could not be checked must not be reported as dead. Telling

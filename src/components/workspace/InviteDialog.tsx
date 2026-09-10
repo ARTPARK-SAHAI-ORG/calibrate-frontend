@@ -8,7 +8,7 @@ import { InviteLinkPanel } from "@/components/workspace/InviteLinkPanel";
 
 const WAYS = [
   { value: "email" as const, label: "By email" },
-  { value: "link" as const, label: "With a link" },
+  { value: "link" as const, label: "Invite with a link" },
 ];
 type Way = (typeof WAYS)[number]["value"];
 
@@ -48,10 +48,14 @@ export function InviteDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+      {/* Wide enough to show a whole invite address without cutting it off:
+          the site address plus a 36 character id is about 72 characters. This
+          is the same width CreateApiKeyDialog uses when it has a long value to
+          show. */}
+      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
         <div className="px-5 md:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Invite team members
+            Add team members
           </h2>
           <button
             type="button"
@@ -84,14 +88,19 @@ export function InviteDialog({
             className="w-fit"
           />
 
-          {/* A floor under the two sides, so switching between them does not
-              make the dialog jump, and a few addresses fit before it grows. */}
+          {/* Both sides stay put and the one not in use is hidden, rather than
+              being thrown away and built again. Switching to the link and back
+              would otherwise lose every address already typed.
+
+              A floor under them keeps the dialog from jumping as the sides swap
+              and as a few addresses are added. */}
           <div className="min-h-[10rem]">
-            {way === "email" ? (
+            <div hidden={way !== "email"}>
               <AddByEmailPanel onAddMember={onAddMember} />
-            ) : (
+            </div>
+            <div hidden={way !== "link"}>
               <InviteLinkPanel orgUuid={orgUuid} />
-            )}
+            </div>
           </div>
         </div>
       </div>

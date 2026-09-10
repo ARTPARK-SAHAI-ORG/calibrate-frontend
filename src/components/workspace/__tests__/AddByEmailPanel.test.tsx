@@ -182,4 +182,14 @@ describe("AddByEmailPanel", () => {
       expect(screen.queryByRole("button", { name: /Adding people/ })).toBeNull(),
     );
   });
+
+  // Nothing is emailed and there is nothing to accept, so the screen has to
+  // say what actually happens next.
+  it("says what happens after they are added", () => {
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    expect(
+      screen.getByText(/the workspace will be visible to them/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -251,6 +251,11 @@ function useCurrentUserId(): string | null {
   return sessionUuid || localUuid;
 }
 
+/** Picks the name being acted on out of a sentence of grey dialog text. */
+function Emphasised({ children }: { children: React.ReactNode }) {
+  return <span className="font-medium text-foreground">{children}</span>;
+}
+
 function MembersSection({
   orgUuid,
   orgName,
@@ -433,14 +438,26 @@ function MembersSection({
         onConfirm={handleRemove}
         title={isSelfRemoval ? "Leave workspace" : "Remove member"}
         message={
-          memberToRemove
-            ? isSelfRemoval
-              ? `Are you sure you want to leave ${orgName}? You will lose all access immediately.`
-              : `Remove ${
-                  `${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
-                  memberToRemove.email
-                } from this workspace? They will lose access immediately.`
-            : ""
+          memberToRemove ? (
+            isSelfRemoval ? (
+              <>
+                Are you sure you want to leave{" "}
+                <Emphasised>{orgName}</Emphasised>? You will lose all access
+                immediately.
+              </>
+            ) : (
+              <>
+                Remove{" "}
+                <Emphasised>
+                  {`${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
+                    memberToRemove.email}
+                </Emphasised>{" "}
+                from this workspace? They will lose access immediately.
+              </>
+            )
+          ) : (
+            ""
+          )
         }
         confirmText={isSelfRemoval ? "Leave" : "Remove"}
         isDeleting={isRemoving}

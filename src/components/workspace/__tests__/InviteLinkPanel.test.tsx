@@ -1,26 +1,17 @@
 /**
- * Interaction tests for the invite link column of the invite dialog.
- * `@/hooks` is mocked so nothing reaches the backend.
+ * The invite link is made once and then shown. There is no turning it off and
+ * no replacing it, so there is nothing here that needs a confirmation.
  */
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { InviteLinkPanel } from "../InviteLinkPanel";
 
 const createInviteLink = jest.fn();
-const revokeInviteLink = jest.fn();
+const refetch = jest.fn();
 const LINK = { token: "abc123", created_at: "2026-01-01T00:00:00Z" };
 let inviteLink: { token: string; created_at: string } | null = null;
 let isLoading = false;
 let loadError: string | null = null;
-const refetch = jest.fn();
 let accessToken: string | null = "test-token";
-
-const toastError = jest.fn();
-jest.mock("sonner", () => ({
-  toast: {
-    error: (...args: unknown[]) => toastError(...args),
-    success: jest.fn(),
-  },
-}));
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => accessToken,
@@ -30,93 +21,96 @@ jest.mock("../../../hooks", () => ({
     error: loadError,
     refetch,
     createInviteLink,
-    revokeInviteLink,
   }),
 }));
 
-const renderPanel = () => render(<InviteLinkPanel orgUuid="org-1" />);
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 
 beforeEach(() => {
-  toastError.mockReset();
+  createInviteLink.mockReset().mockResolvedValue(LINK);
   refetch.mockReset();
   inviteLink = null;
   isLoading = false;
   loadError = null;
   accessToken = "test-token";
-  createInviteLink.mockReset().mockResolvedValue(LINK);
-  revokeInviteLink.mockReset().mockResolvedValue(undefined);
 });
 
+const address = `${window.location.origin}/invite/abc123`;
+
 describe("InviteLinkPanel", () => {
-  it("shows the switch off with no link, and turning it on makes one", async () => {
-    const user = setupUser();
-    renderPanel();
+  it("offers to make a link when the workspace has none", () => {
+    render(<InviteLinkPanel orgUuid="org-1" />);
 
-    const toggle = screen.getByRole("switch", { name: "Invite link" });
-    expect(toggle).toHaveAttribute("aria-checked", "false");
     expect(
-      screen.getByText("Anyone with this link can join this workspace."),
-    ).toBeInTheDocument();
-
-    await user.click(toggle);
-    await waitFor(() => expect(createInviteLink).toHaveBeenCalledTimes(1));
+      screen.getByRole("button", { name: "Create an invite link" }),
+    ).toBeEnabled();
   });
 
-  it("shows the address, the copy button and Reset link once a link exists", () => {
-    inviteLink = LINK;
-    renderPanel();
-
-    expect(screen.getByRole("switch", { name: "Invite link" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(
-      screen.getByText(`${window.location.origin}/invite/abc123`),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Reset link" }),
-    ).toBeInTheDocument();
-  });
-
-  it("asks for confirmation before turning the link off", async () => {
-    inviteLink = LINK;
+  it("makes the link and then just shows it", async () => {
     const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("switch", { name: "Invite link" }));
-    expect(revokeInviteLink).not.toHaveBeenCalled();
-    expect(screen.getByText(/The link will stop working/)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Turn off the link" }));
-    await waitFor(() => expect(revokeInviteLink).toHaveBeenCalledTimes(1));
-  });
-
-  it("asks for confirmation before resetting the link", async () => {
-    inviteLink = LINK;
-    const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("button", { name: "Reset link" }));
-    expect(createInviteLink).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/The link you are sharing now will stop working/),
-    ).toBeInTheDocument();
+    const { rerender } = render(<InviteLinkPanel orgUuid="org-1" />);
 
     await user.click(
-      screen.getAllByRole("button", { name: "Reset link" }).at(-1)!,
+      screen.getByRole("button", { name: "Create an invite link" }),
     );
     await waitFor(() => expect(createInviteLink).toHaveBeenCalledTimes(1));
+
+    inviteLink = LINK;
+    rerender(<InviteLinkPanel orgUuid="org-1" />);
+
+    expect(screen.getByText(address)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
   });
 
-  // A link that could not be read is not a workspace with no link. An off
-  // switch here would invite the reader to replace the link people hold.
-  it("shows Try again and no switch when the link could not be read", async () => {
-    loadError = "Request failed: 500 - Server error";
-    const user = setupUser();
-    renderPanel();
+  // Both of these stop an address other people are already holding from
+  // working, so neither is offered.
+  it("offers no way to turn the link off or replace it", () => {
+    inviteLink = LINK;
+    render(<InviteLinkPanel orgUuid="org-1" />);
 
     expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("button", { name: /reset/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /turn off/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Create an invite link" }),
+    ).toBeNull();
+  });
+
+  it("copies the whole address, not a shortened one", async () => {
+    inviteLink = LINK;
+    const user = setupUser();
+    render(<InviteLinkPanel orgUuid="org-1" />);
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    await expect(navigator.clipboard.readText()).resolves.toBe(address);
+  });
+
+  it("shows why making the link failed and leaves the button usable", async () => {
+    createInviteLink.mockRejectedValue(new Error("Something went wrong"));
+    const user = setupUser();
+    render(<InviteLinkPanel orgUuid="org-1" />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Create an invite link" }),
+    );
+
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create an invite link" }),
+    ).toBeEnabled();
+  });
+
+  // A link that could not be read is not a workspace with no link. Offering to
+  // make one here would replace the link people are already holding.
+  it("offers Try again, not a create button, when the link could not be read", async () => {
+    loadError = "Request failed: 500 - Server error";
+    const user = setupUser();
+    render(<InviteLinkPanel orgUuid="org-1" />);
+
+    expect(
+      screen.queryByRole("button", { name: "Create an invite link" }),
+    ).toBeNull();
     expect(
       screen.getByText("The invite link could not be read. Try again."),
     ).toBeInTheDocument();
@@ -125,74 +119,21 @@ describe("InviteLinkPanel", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("shows no switch before it knows who is signed in", () => {
+  it("offers nothing before it knows who is signed in", () => {
     accessToken = null;
-    renderPanel();
-    expect(screen.queryByRole("switch")).toBeNull();
-  });
-
-  // A message written under the switch would sit behind the open
-  // confirmation, so a confirmed action reports over the top of it.
-  it("says so over the confirmation when turning the link off fails", async () => {
-    inviteLink = LINK;
-    revokeInviteLink.mockRejectedValue(new Error("Could not reach the server"));
-    const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("switch", { name: "Invite link" }));
-    await user.click(screen.getByRole("button", { name: "Turn off the link" }));
-
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Could not reach the server"),
-    );
-    // The confirmation is still open, so the reader can try again.
-    expect(screen.getByText(/The link will stop working/)).toBeInTheDocument();
-  });
-
-  it("says so over the confirmation when resetting the link fails", async () => {
-    inviteLink = LINK;
-    createInviteLink.mockRejectedValue(new Error("Could not reach the server"));
-    const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("button", { name: "Reset link" }));
-    await user.click(
-      screen.getAllByRole("button", { name: "Reset link" }).at(-1)!,
-    );
-
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Could not reach the server"),
-    );
-    expect(
-      screen.getByText(/The link you are sharing now will stop working/),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps the confirmation in its loading state until the request answers", async () => {
-    inviteLink = LINK;
-    createInviteLink.mockImplementation(() => new Promise(() => {}));
-    const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("button", { name: "Reset link" }));
-    await user.click(
-      screen.getAllByRole("button", { name: "Reset link" }).at(-1)!,
-    );
+    render(<InviteLinkPanel orgUuid="org-1" />);
 
     expect(
-      await screen.findByText("Resetting the link..."),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Create an invite link" }),
+    ).toBeNull();
   });
 
-  it("shows the failure under the switch when turning it on fails", async () => {
-    createInviteLink.mockRejectedValue(new Error("Could not reach the server"));
-    const user = setupUser();
-    renderPanel();
-
-    await user.click(screen.getByRole("switch", { name: "Invite link" }));
+  it("offers nothing while the link is still being read", () => {
+    isLoading = true;
+    render(<InviteLinkPanel orgUuid="org-1" />);
 
     expect(
-      await screen.findByText("Could not reach the server"),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Create an invite link" }),
+    ).toBeNull();
   });
 });

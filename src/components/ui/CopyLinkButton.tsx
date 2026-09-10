@@ -19,11 +19,18 @@ import { copyToClipboard } from "@/lib/clipboard";
 export function CopyLinkButton({
   value,
   label = "Copy link",
+  size = "sm",
 }: {
   /** The address to copy. */
   value: string;
   /** What the hover text and a screen reader say before it is copied. */
   label?: string;
+  /**
+   * "sm" (default) sits in a table row beside a line of text. "md" matches the
+   * height of a form field, for when it sits next to a box holding the
+   * address, where a smaller button reads as misaligned.
+   */
+  size?: "sm" | "md";
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -45,7 +52,9 @@ export function CopyLinkButton({
           setCopied(true);
         }}
         aria-label={text}
-        className={`w-7 h-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
+        className={`${
+          size === "md" ? "w-10 h-10" : "w-7 h-7"
+        } flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
           copied
             ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-400"
             : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -53,7 +62,7 @@ export function CopyLinkButton({
       >
         {copied ? (
           <svg
-            className="w-3.5 h-3.5"
+            className={size === "md" ? "w-4 h-4" : "w-3.5 h-3.5"}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -63,7 +72,7 @@ export function CopyLinkButton({
           </svg>
         ) : (
           <svg
-            className="w-3.5 h-3.5"
+            className={size === "md" ? "w-4 h-4" : "w-3.5 h-3.5"}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

@@ -102,77 +102,82 @@ export function AddByEmailPanel({
 
   return (
     <div className="space-y-2">
-      {/* One box holding the addresses already entered and the caret, the way
-          every other address field works. Clicking anywhere in it types. */}
-      <div
-        onClick={() => inputRef.current?.focus()}
-        className={`flex flex-wrap items-center gap-1.5 min-h-10 px-2 py-1.5 rounded-md border bg-background cursor-text focus-within:ring-2 ${
-          typingError
-            ? "border-red-500/60 focus-within:ring-red-500/20"
-            : "border-border focus-within:ring-foreground/10"
-        }`}
-      >
-        {chips.map((chip) => (
-          <span
-            key={chip.email}
-            className={`inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded border ${
-              chip.failure
-                ? "border-red-500/60 bg-red-500/10 text-red-500"
-                : "border-border bg-muted/40 text-foreground"
-            }`}
-          >
-            {chip.email}
-            <button
-              type="button"
-              onClick={() =>
-                setChips((current) =>
-                  current.filter((c) => c.email !== chip.email),
-                )
-              }
-              disabled={isAdding}
-              aria-label={`Remove ${chip.email}`}
-              className="cursor-pointer hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((chip) => (
+            <span
+              key={chip.email}
+              className={`inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded border ${
+                chip.failure
+                  ? "border-red-500/60 bg-red-500/10 text-red-500"
+                  : "border-border bg-muted/40 text-foreground"
+              }`}
             >
-              <svg
-                aria-hidden="true"
-                className="w-3 h-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+              {chip.email}
+              <button
+                type="button"
+                onClick={() =>
+                  setChips((current) =>
+                    current.filter((c) => c.email !== chip.email),
+                  )
+                }
+                disabled={isAdding}
+                aria-label={`Remove ${chip.email}`}
+                className="cursor-pointer hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </span>
-        ))}
+                <svg
+                  aria-hidden="true"
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setTypingError(null);
-          }}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          ref={inputRef}
-          placeholder={chips.length === 0 ? "teammate@example.com" : ""}
-          autoFocus
-          disabled={isAdding}
-          aria-label="Email address"
-          className="flex-1 min-w-[10rem] h-7 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
-        />
-      </div>
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setTypingError(null);
+        }}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        ref={inputRef}
+        placeholder="teammate@example.com"
+        autoFocus
+        disabled={isAdding}
+        aria-label="Email address"
+        // The browser's saved addresses, and any password manager, otherwise
+        // cover this box with a list of suggestions the moment it is focused.
+        // Nothing here is a sign-in field, and the addresses being typed are
+        // other people's, so there is nothing worth suggesting.
+        autoComplete="off"
+        data-1p-ignore
+        data-lpignore="true"
+        data-form-type="other"
+        className={`w-full h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+          typingError
+            ? "border-red-500/60 focus:ring-red-500/20"
+            : "border-border focus:ring-foreground/10"
+        }`}
+      />
 
-      {typingError && <p className="text-[13px] text-red-500">{typingError}</p>}
+      {typingError && <p className="text-sm text-red-500">{typingError}</p>}
 
       {chips.some((c) => c.failure) && (
         <ul className="space-y-1">
           {chips
             .filter((c) => c.failure)
             .map((c) => (
-              <li key={c.email} className="text-[13px] text-red-500">
+              <li key={c.email} className="text-sm text-red-500">
                 {c.email}: {c.failure}
               </li>
             ))}
@@ -208,6 +213,30 @@ export function AddByEmailPanel({
             ? `Add ${pending} people`
             : "Add"}
       </button>
+
+      {/* Nothing is emailed, and there is nothing for the person to accept, so
+          say what actually happens or the reader is left waiting for a step
+          that never comes. Same callout the labelling dialogs use. */}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
+        <svg
+          className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+          />
+        </svg>
+        <span>
+          Once you add someone, the workspace will be visible to them once they
+          log in
+        </span>
+      </div>
     </div>
   );
 }

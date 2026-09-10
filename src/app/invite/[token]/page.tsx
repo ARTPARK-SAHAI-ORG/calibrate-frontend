@@ -128,12 +128,15 @@ export default function InvitePage() {
               {isAuthenticated ? (
                 <>
                   <div className="mt-6 flex justify-center">
+                    {/* Just "Join". The heading right above it already names
+                        the workspace, so repeating it only makes the button
+                        wrap. */}
                     <Button
                       onClick={handleJoin}
                       isLoading={isJoining}
-                      loadingText={`Joining ${workspaceName}`}
+                      loadingText="Joining..."
                     >
-                      Join {workspaceName}
+                      Join
                     </Button>
                   </div>
                   {joinError && (
