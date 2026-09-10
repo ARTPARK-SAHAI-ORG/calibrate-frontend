@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/public/",
         "/annotate-job/",
+        "/invite/",
         "/api/",
         "/login",
         "/signup",

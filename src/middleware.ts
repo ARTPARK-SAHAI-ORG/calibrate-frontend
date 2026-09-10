@@ -40,9 +40,16 @@ export default auth((req) => {
     req.nextUrl.pathname === "/sitemap.xml";
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
+  // An invite link is opened by someone who may have no account yet, so the
+  // page has to render signed out and offer to sign in or sign up. Match the
+  // real shape of the page, "/invite/" plus exactly one more part: a plain
+  // "starts with" would let "/invite/agents/<uuid>" through, and Next would
+  // read "invite" as the workspace and serve the agent page to a visitor who
+  // has not signed in.
+  const isInviteRoute = /^\/invite\/[^/]+\/?$/.test(req.nextUrl.pathname);
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
     return NextResponse.next();
   }
 

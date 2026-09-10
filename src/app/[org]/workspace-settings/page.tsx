@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
+import { InviteLinkPanel } from "@/components/workspace/InviteLinkPanel";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
@@ -394,6 +395,8 @@ function MembersSection({
           <p className="mt-1 text-[13px] text-red-500">{addError}</p>
         )}
       </div>
+
+      <InviteLinkPanel orgUuid={orgUuid} />
 
       <div className="border border-border rounded-lg overflow-hidden">
         {isLoading && members.length === 0 ? (

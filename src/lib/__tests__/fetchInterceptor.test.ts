@@ -4,6 +4,10 @@
 // argument. Jest mocks are keyed by the resolved absolute file path though,
 // so a relative specifier here still intercepts the "@/lib/orgs" import.
 jest.mock("../orgs", () => ({
+  // The real rule for which paths must not carry the workspace header. Faking
+  // it would let this file pass while the wrapper stamps a request the shared
+  // list says it must leave alone.
+  ...jest.requireActual("../orgs"),
   getActiveOrgUuid: jest.fn(),
 }));
 
@@ -85,6 +89,21 @@ describe("installOrgFetchInterceptor", () => {
     installOrgFetchInterceptor();
     await window.fetch("http://backend.test/organizations");
     expect(original).toHaveBeenCalledWith("http://backend.test/organizations", undefined);
+  });
+
+  // Joining a workspace is named by the link, not by the workspace the reader
+  // last had open. apiClient already leaves the header off; if this wrapper put
+  // it back, the join would go out naming the wrong workspace.
+  it("passes through a request to join a workspace without adding X-Org-UUID", async () => {
+    const { installOrgFetchInterceptor, getActiveOrgUuid } = await freshModules();
+    getActiveOrgUuid.mockReturnValue("org-1");
+    const original = window.fetch;
+    installOrgFetchInterceptor();
+    await window.fetch("http://backend.test/invites/tok-123/accept");
+    expect(original).toHaveBeenCalledWith(
+      "http://backend.test/invites/tok-123/accept",
+      undefined,
+    );
   });
 
   it("passes through unmodified when no active org uuid is set", async () => {

@@ -9,7 +9,7 @@
  * workspace from this header.
  */
 
-import { getActiveOrgUuid } from "@/lib/orgs";
+import { getActiveOrgUuid, isWorkspaceFreePath } from "@/lib/orgs";
 
 let installed = false;
 
@@ -39,10 +39,13 @@ export function installOrgFetchInterceptor(): void {
       return originalFetch(input, init);
     }
 
-    // The /organizations management surface (list/create/rename + members)
-    // operates above any single workspace — don't scope it with X-Org-UUID.
+    // Some surfaces sit above any single workspace and must not be scoped
+    // with X-Org-UUID. `isWorkspaceFreePath` in orgs.ts holds the one list,
+    // shared with apiClient — a path added there but not here would still be
+    // stamped, because this wrapper runs after apiClient has built its
+    // headers.
     const path = url.slice(backendUrl.length);
-    if (path.startsWith("/organizations")) {
+    if (isWorkspaceFreePath(path)) {
       return originalFetch(input, init);
     }
 
