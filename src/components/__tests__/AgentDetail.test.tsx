@@ -642,7 +642,7 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -674,7 +674,7 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -810,7 +810,7 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
 
     alertSpy.mockRestore();
@@ -902,7 +902,7 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
 
     alertSpy.mockRestore();

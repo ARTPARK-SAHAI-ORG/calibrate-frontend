@@ -1,4 +1,5 @@
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
 import { overEvalLimit } from "./evalLimit";
@@ -167,7 +168,7 @@ export async function startTestRunOrNotify(
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return null;
     }
     reportError("Error starting test run:", error);
@@ -373,7 +374,7 @@ export async function abortRunOrNotify(
     return true;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return false;
     }
     reportError("Error stopping test run:", error);
@@ -424,7 +425,7 @@ export async function deleteRunOrNotify(
     return true;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return false;
     }
     reportError("Error deleting test run:", error);

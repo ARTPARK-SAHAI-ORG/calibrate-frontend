@@ -52,6 +52,6 @@ describe("deleteTool", () => {
       } as Response) as unknown as typeof fetch;
 
     await deleteTool("tool-1", "tok");
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
   });
 });

@@ -11,6 +11,7 @@ import {
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import {
   TestCaseOutput,
@@ -288,7 +289,7 @@ export function TestRunnerDialog({
         if (cancelled) return;
         if (error instanceof UnauthorizedError) {
           stop();
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
         reportError("Error polling test run status:", error);

@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import {
@@ -118,7 +119,7 @@ export default function SimulationRunPage() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -465,7 +466,7 @@ export default function SimulationRunPage() {
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

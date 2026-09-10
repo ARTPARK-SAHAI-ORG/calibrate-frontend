@@ -5,6 +5,7 @@ import { unwrapList } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
   useMaxRowsPerEval,
@@ -216,7 +217,7 @@ export function SpeechToTextEvaluation({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -371,7 +372,7 @@ export function SpeechToTextEvaluation({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

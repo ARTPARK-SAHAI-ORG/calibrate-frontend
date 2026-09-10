@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { reportError } from "@/lib/reportError";
 
 /** A delete request the caller wants issued — the hook adds auth headers and,
@@ -199,7 +200,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

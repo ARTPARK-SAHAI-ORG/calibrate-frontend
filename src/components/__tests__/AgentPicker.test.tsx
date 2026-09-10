@@ -115,7 +115,7 @@ describe("AgentPicker", () => {
     render(<AgentPicker selectedAgentUuid="" onSelectAgent={jest.fn()} />);
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -459,7 +459,7 @@ describe("MultiAgentPicker", () => {
       <MultiAgentPicker selectedAgentUuids={[]} onToggleAgent={jest.fn()} />,
     );
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

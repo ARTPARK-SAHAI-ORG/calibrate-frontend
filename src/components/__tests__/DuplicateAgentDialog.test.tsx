@@ -276,7 +276,7 @@ describe("DuplicateAgentDialog", () => {
     await duplicate(user);
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 });

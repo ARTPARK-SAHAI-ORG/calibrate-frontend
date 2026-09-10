@@ -203,7 +203,7 @@ describe("useVerifyConnection", () => {
       });
 
       expect(success).toBe(false);
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
 
     it("sets generic error when response is not ok (non-401)", async () => {
@@ -468,7 +468,7 @@ describe("useVerifyConnection", () => {
       });
 
       expect(success).toBe(false);
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
 
     it("sets generic error when response not ok (non-401)", async () => {

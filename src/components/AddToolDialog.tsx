@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { FieldError } from "@/components/ui/FieldError";
@@ -1028,7 +1029,7 @@ export function AddToolDialog({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1215,7 +1216,7 @@ export function AddToolDialog({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1322,7 +1323,7 @@ export function AddToolDialog({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

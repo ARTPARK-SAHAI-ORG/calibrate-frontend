@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import { useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "./useAccessToken";
 
 export type VerifyMessage = { role: string; content: string };
@@ -47,7 +48,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
 
   const handleResponse = async (response: Response): Promise<boolean> => {
     if (response.status === 401) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return false;
     }
 

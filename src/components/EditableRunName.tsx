@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { Tooltip } from "@/components/Tooltip";
 import { EditIcon } from "@/components/icons";
 import { RenameDialog } from "@/components/ui";
@@ -46,7 +47,7 @@ export function EditableRunName({
       onRenamed(await renameRun(backendUrl, accessToken, taskId, newName));
     } catch (error) {
       if (error instanceof UnauthorizedError) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
       reportError("Error renaming run:", error);

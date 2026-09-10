@@ -69,7 +69,9 @@ describe("usePageErrorState", () => {
       });
 
       expect(handled).toBe(true);
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(mockSignOut).toHaveBeenCalledWith({
+        callbackUrl: `/login?callbackUrl=${encodeURIComponent("/11111111-1111-4111-8111-111111111111/agents/agent-1")}`,
+      });
       expect(result.current.errorCode).toBeNull();
     });
 

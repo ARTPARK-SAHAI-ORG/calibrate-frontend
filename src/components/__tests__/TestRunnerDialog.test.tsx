@@ -710,7 +710,7 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
     expect(onNewRun).not.toHaveBeenCalled();
   });
@@ -1096,7 +1096,7 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

@@ -5,6 +5,7 @@ import { unwrapList } from "@/lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import { replaceUrl, useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
   useVerifyConnection,
@@ -225,7 +226,7 @@ export default function SimulationDetailPage() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -298,7 +299,7 @@ export default function SimulationDetailPage() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -426,7 +427,7 @@ export default function SimulationDetailPage() {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -472,7 +473,7 @@ export default function SimulationDetailPage() {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -524,7 +525,7 @@ export default function SimulationDetailPage() {
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -586,7 +587,7 @@ export default function SimulationDetailPage() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

@@ -1,5 +1,6 @@
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 
 /** Permanently delete a tool from the workspace. */
 export async function deleteTool(
@@ -11,7 +12,7 @@ export async function deleteTool(
     headers: getDefaultHeaders(accessToken),
   });
   if (response.status === 401) {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: loginPathAfterSignOut() });
     return;
   }
   if (!response.ok) {

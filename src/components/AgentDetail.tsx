@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
@@ -600,7 +601,7 @@ export function AgentDetail({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -645,7 +646,7 @@ export function AgentDetail({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -734,7 +735,7 @@ export function AgentDetail({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return false;
         }
 
@@ -960,7 +961,7 @@ export function AgentDetail({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
