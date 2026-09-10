@@ -83,7 +83,6 @@ export function InviteLinkPanel({ orgUuid }: { orgUuid: string }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-foreground">Invite link</p>
 
       {isSettling ? (
         <LoadingState />

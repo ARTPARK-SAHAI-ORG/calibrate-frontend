@@ -10,7 +10,9 @@ jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 const onAddMember = jest.fn();
 
 const renderPanel = () => render(<AddByEmailPanel onAddMember={onAddMember} />);
-const box = () => screen.getByPlaceholderText("teammate@example.com");
+// By its name, not its placeholder: the placeholder is dropped once there is
+// an address in the box, the way every address field behaves.
+const box = () => screen.getByRole("textbox", { name: "Email address" });
 
 beforeEach(() => {
   onAddMember.mockReset().mockResolvedValue(undefined);

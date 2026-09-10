@@ -32,9 +32,14 @@ export function Switch({
         checked ? "bg-foreground" : "bg-muted"
       }`}
     >
+      {/* `left-0.5` is not decoration. Without it the knob is placed wherever
+          the button happens to lay out an absolutely positioned child, and the
+          slide is measured from there: on a 44px track the "on" knob ended up
+          at 42px, almost entirely outside the pill, so the switch read as a
+          plain black lozenge with no knob at all. */}
       <span
-        className={`absolute top-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
+        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
+          checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>

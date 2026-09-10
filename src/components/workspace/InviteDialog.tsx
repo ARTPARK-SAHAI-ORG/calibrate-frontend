@@ -1,16 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { SegmentedFilter } from "@/components/ui";
 import { AddByEmailPanel } from "@/components/workspace/AddByEmailPanel";
 import { InviteLinkPanel } from "@/components/workspace/InviteLinkPanel";
 
+const WAYS = [
+  { value: "email" as const, label: "By email" },
+  { value: "link" as const, label: "With a link" },
+];
+type Way = (typeof WAYS)[number]["value"];
+
 /**
- * The one place a workspace invites people, in two columns: by email on the
- * left for people whose address is known, by a link on the right for people
+ * The one place a workspace invites people. The two ways in are different
+ * enough that showing both at once left most of the dialog empty, so they take
+ * turns: by email for people whose address is known, by a link for people
  * whose address is not, or for a group chat.
  *
- * Each column owns its own requests and its own failures, so neither can
- * leave the other half finished.
+ * There is no footer. Each way has its own action, and a second button next to
+ * it would only be there to close the dialog, which the cross already does.
  */
 export function InviteDialog({
   isOpen,
@@ -25,21 +34,28 @@ export function InviteDialog({
 }) {
   useHideFloatingButton(isOpen);
 
+  const [way, setWay] = useState<Way>("email");
+
+  // Closing puts it back to the email side, so it opens the same way every
+  // time. Remembering the side used last would be a surprise on a screen
+  // opened this rarely.
+  const close = () => {
+    setWay("email");
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      {/* Height is fixed rather than growing with the content, so adding a
-          few people does not make the dialog jump about. Same pair as
-          AddEvaluatorsDialog, the app's other wide two-column dialog. */}
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] md:h-[85vh]">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="px-5 md:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             Invite team members
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close"
             className="shrink-0 w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
           >
@@ -59,33 +75,28 @@ export function InviteDialog({
           </button>
         </div>
 
-        {/* One column on a phone, two side by side from md up. Side by side,
-            each column scrolls on its own, so a long list of people being
-            added does not drag the invite link out of view. Stacked, the whole
-            body scrolls as one. */}
-        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-2">
-          <div className="p-6 md:overflow-y-auto">
-            <AddByEmailPanel onAddMember={onAddMember} />
-          </div>
-          <div className="p-6 border-t border-border md:border-t-0 md:overflow-y-auto">
-            <InviteLinkPanel orgUuid={orgUuid} />
-          </div>
-        </div>
+        <div className="px-5 md:px-6 py-5 overflow-y-auto space-y-4">
+          <SegmentedFilter
+            value={way}
+            onChange={setWay}
+            options={WAYS}
+            ariaLabel="How to invite"
+            className="w-fit"
+          />
 
-        {/* Done only dismisses. Both columns act on their own, so nothing in
-            here is waiting on a footer button. */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-          >
-            Done
-          </button>
+          {/* A floor under the two sides, so switching between them does not
+              make the dialog jump, and a few addresses fit before it grows. */}
+          <div className="min-h-[10rem]">
+            {way === "email" ? (
+              <AddByEmailPanel onAddMember={onAddMember} />
+            ) : (
+              <InviteLinkPanel orgUuid={orgUuid} />
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="absolute inset-0 -z-10" onClick={onClose} />
+      <div className="absolute inset-0 -z-10" onClick={close} />
     </div>
   );
 }

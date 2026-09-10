@@ -44,29 +44,56 @@ describe("InviteDialog", () => {
     expect(screen.queryByText("Invite team members")).toBeNull();
   });
 
-  it("shows both ways of inviting side by side", () => {
+  it("opens on the email side, with the link side put away", () => {
     open();
 
     expect(screen.getByText("Invite team members")).toBeInTheDocument();
     expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
-    expect(screen.getByTestId("invite-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("invite-link")).toBeNull();
   });
 
-  it("hands each column what it needs", () => {
-    open();
-
-    expect(screen.getByTestId("add-by-email")).toHaveTextContent("function");
-    expect(screen.getByTestId("invite-link")).toHaveTextContent("org-1");
-  });
-
-  it("closes from Done and from the cross", async () => {
+  it("swaps to the link side and back", async () => {
     const user = setupUser();
     open();
 
-    await user.click(screen.getByRole("button", { name: "Done" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "With a link" }));
+    expect(screen.getByTestId("invite-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-by-email")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "By email" }));
+    expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
+  });
+
+  it("hands each side what it needs", async () => {
+    const user = setupUser();
+    open();
+
+    expect(screen.getByTestId("add-by-email")).toHaveTextContent("function");
+
+    await user.click(screen.getByRole("button", { name: "With a link" }));
+    expect(screen.getByTestId("invite-link")).toHaveTextContent("org-1");
+  });
+
+  // Reopening on whichever side was used last would be a surprise on a screen
+  // opened this rarely.
+  it("comes back on the email side after it was closed on the link side", async () => {
+    const user = setupUser();
+    open();
+
+    await user.click(screen.getByRole("button", { name: "With a link" }));
+    expect(screen.getByTestId("invite-link")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalled();
+
+    expect(screen.getByTestId("add-by-email")).toBeInTheDocument();
+  });
+
+  it("closes from the cross", async () => {
+    const user = setupUser();
+    open();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
