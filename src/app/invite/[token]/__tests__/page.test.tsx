@@ -94,12 +94,12 @@ describe("InvitePage", () => {
     ).toBeInTheDocument();
 
     const back = encodeURIComponent(`/invite/${TOKEN}`);
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in to your account" })).toHaveAttribute(
       "href",
       `/login?callbackUrl=${back}`,
     );
     expect(
-      screen.getByRole("link", { name: "Create an account" }),
+      screen.getByRole("link", { name: "Create a new account" }),
     ).toHaveAttribute("href", `/signup?callbackUrl=${back}`);
   });
 
@@ -188,7 +188,7 @@ describe("InvitePage", () => {
     render(<InvitePage />);
 
     await waitFor(() => expect(fetchInvitePreview).toHaveBeenCalled());
-    expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Sign in to your account" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Join/ })).toBeNull();
   });
 });

@@ -144,25 +144,23 @@ export default function InvitePage() {
                   )}
                 </>
               ) : (
-                <>
-                  <p className="text-base text-muted-foreground mt-2">
-                    Sign in or create an account to join.
-                  </p>
-                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <Link
-                      href={`/login?${callback}`}
-                      className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity flex items-center justify-center cursor-pointer"
-                    >
-                      Sign in
-                    </Link>
-                    <Link
-                      href={`/signup?${callback}`}
-                      className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center justify-center cursor-pointer"
-                    >
-                      Create an account
-                    </Link>
-                  </div>
-                </>
+                <div className="mt-6 flex flex-col gap-3">
+                  {/* Stacked, each naming what it does in full. Side by side
+                      they read as one choice cut in half, and the line above
+                      them was only saying what the buttons already say. */}
+                  <Link
+                    href={`/login?${callback}`}
+                    className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity flex items-center justify-center cursor-pointer"
+                  >
+                    Sign in to your account
+                  </Link>
+                  <Link
+                    href={`/signup?${callback}`}
+                    className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    Create a new account
+                  </Link>
+                </div>
               )}
             </>
           )}
