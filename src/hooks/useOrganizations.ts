@@ -389,8 +389,6 @@ type UseOrgInviteLinkReturn = {
   refetch: () => Promise<void>;
   /** Make a link, replacing any existing one. */
   createInviteLink: () => Promise<InviteLink>;
-  /** Turn the link off. */
-  revokeInviteLink: () => Promise<void>;
 };
 
 // Module-level cache + in-flight dedup for a workspace's invite link, keyed by
@@ -496,22 +494,12 @@ export function useOrgInviteLink(
     return created;
   }, [accessToken, orgUuid]);
 
-  const revokeInviteLink = useCallback(async (): Promise<void> => {
-    if (!accessToken || !orgUuid) {
-      throw new Error("Not signed in");
-    }
-    await apiDelete(`/organizations/${orgUuid}/invite-link`, accessToken);
-    inviteLinkCache.set(inviteLinkKey(accessToken, orgUuid), null);
-    setInviteLink(null);
-  }, [accessToken, orgUuid]);
-
   return {
     inviteLink,
     isLoading,
     error,
     refetch,
     createInviteLink,
-    revokeInviteLink,
   };
 }
 

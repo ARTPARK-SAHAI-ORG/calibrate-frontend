@@ -25,13 +25,12 @@ jest.mock("../../lib/reportError", () => ({
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useOrgInviteLink } from "@/hooks/useOrganizations";
-import { apiDelete, apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { clearAllRequestCaches } from "@/lib/requestCache";
 import type { InviteLink } from "@/lib/invites";
 
 const mockApiGet = apiGet as jest.Mock;
 const mockApiPost = apiPost as jest.Mock;
-const mockApiDelete = apiDelete as jest.Mock;
 
 const ORG = "org-1";
 const TOKEN = "token-a";
@@ -105,24 +104,6 @@ describe("useOrgInviteLink", () => {
     expect(result.current.inviteLink).toEqual(created);
   });
 
-  it("turns the link off", async () => {
-    mockApiGet.mockResolvedValueOnce(link);
-    mockApiDelete.mockResolvedValueOnce({});
-
-    const { result } = renderHook(() => useOrgInviteLink(TOKEN, ORG));
-    await waitFor(() => expect(result.current.inviteLink).toEqual(link));
-
-    await act(async () => {
-      await result.current.revokeInviteLink();
-    });
-
-    expect(mockApiDelete).toHaveBeenCalledWith(
-      `/organizations/${ORG}/invite-link`,
-      TOKEN,
-    );
-    expect(result.current.inviteLink).toBeNull();
-  });
-
   it("reuses the answer it already has instead of asking again", async () => {
     mockApiGet.mockResolvedValueOnce(link);
 
@@ -157,18 +138,14 @@ describe("useOrgInviteLink", () => {
     );
   });
 
-  it("refuses to make or turn off a link without a signed-in reader", async () => {
+  it("refuses to make a link without a signed-in reader", async () => {
     const { result } = renderHook(() => useOrgInviteLink(null, ORG));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await expect(result.current.createInviteLink()).rejects.toThrow(
       "Not signed in",
     );
-    await expect(result.current.revokeInviteLink()).rejects.toThrow(
-      "Not signed in",
-    );
     expect(mockApiPost).not.toHaveBeenCalled();
-    expect(mockApiDelete).not.toHaveBeenCalled();
   });
 
   it("does not read anything without a signed-in reader", async () => {
