@@ -2,7 +2,8 @@ import { render, screen, setupUser, waitFor, fireEvent, act } from "@/test-utils
 import { ShareButton } from "../ShareButton";
 
 jest.mock("../../lib/clipboard", () => ({
-  copyToClipboard: jest.fn().mockResolvedValue(undefined),
+  // true means the text really reached the clipboard.
+  copyToClipboard: jest.fn().mockResolvedValue(true),
 }));
 
 import { copyToClipboard } from "../../lib/clipboard";

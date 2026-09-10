@@ -214,7 +214,7 @@ describe("NewSimulationDialog", () => {
     await user.click(screen.getByRole("button", { name: /Create Simulation/i }));
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
     expect(onCreateSimulation).not.toHaveBeenCalled();
   });

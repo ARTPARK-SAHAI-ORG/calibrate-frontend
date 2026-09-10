@@ -1,4 +1,5 @@
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
 import { createRequestCache } from "@/lib/requestCache";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -102,7 +103,7 @@ export function canDeleteEvaluator(e: {
  */
 async function handledUnauthorized(response: Response): Promise<boolean> {
   if (response.status === 401) {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: loginPathAfterSignOut() });
     return true;
   }
   return false;

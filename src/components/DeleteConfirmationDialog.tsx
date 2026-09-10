@@ -8,7 +8,12 @@ type DeleteConfirmationDialogProps = {
   onClose: () => void;
   onConfirm: () => void;
   title?: string;
-  message: string;
+  /**
+   * A ReactNode, not just a string, so the thing being acted on can be picked
+   * out of the sentence: a name in a wall of grey text is easy to skim past on
+   * a dialog whose whole job is to make sure the right one was chosen.
+   */
+  message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   isDeleting?: boolean;

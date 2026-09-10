@@ -129,7 +129,7 @@ describe("testRunApi", () => {
       await expect(
         startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
       ).resolves.toBeNull();
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
       expect(toast.error).not.toHaveBeenCalled();
     });
 
@@ -575,7 +575,7 @@ describe("testRunApi", () => {
       await expect(
         abortRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
       ).resolves.toBe(false);
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
       expect(toast.error).not.toHaveBeenCalled();
     });
 
@@ -645,7 +645,7 @@ describe("testRunApi", () => {
       await expect(
         deleteRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
       ).resolves.toBe(false);
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
       expect(toast.error).not.toHaveBeenCalled();
     });
 

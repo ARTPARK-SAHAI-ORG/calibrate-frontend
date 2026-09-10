@@ -276,7 +276,7 @@ describe("STTDatasetEditor", () => {
     await uploadWav(container, wavFile());
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
     expect(screen.queryByText("Replace")).not.toBeInTheDocument();
   });

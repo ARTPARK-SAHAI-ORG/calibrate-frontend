@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
@@ -1680,7 +1681,7 @@ export function AddTestDialog({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -1723,7 +1724,7 @@ export function AddTestDialog({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return [];
       }
 

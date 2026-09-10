@@ -174,7 +174,7 @@ describe("Agents", () => {
     render(<Agents />);
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -508,7 +508,7 @@ describe("Agents", () => {
     await user.click(screen.getByText("Create"));
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -733,7 +733,7 @@ describe("Agents", () => {
     await user.click(deleteConfirmButtons[deleteConfirmButtons.length - 1]);
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -910,7 +910,7 @@ describe("Agents", () => {
       duplicateConfirmButtons[duplicateConfirmButtons.length - 1],
     );
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

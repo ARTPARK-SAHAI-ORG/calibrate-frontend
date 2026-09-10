@@ -485,7 +485,7 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),

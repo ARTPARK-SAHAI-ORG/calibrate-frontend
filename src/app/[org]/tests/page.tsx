@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
@@ -313,7 +314,7 @@ function LLMPageInner() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -357,7 +358,7 @@ function LLMPageInner() {
           method: "GET",
           headers: getDefaultHeaders(backendAccessToken),
         });
-        if (response.status === 401) { await signOut({ callbackUrl: "/login" }); return; }
+        if (response.status === 401) { await signOut({ callbackUrl: loginPathAfterSignOut() }); return; }
         if (!response.ok) throw new Error("Failed to fetch runs");
         const data = await response.json();
         const rows = unwrapList<AllRun>(data);
@@ -535,7 +536,7 @@ function LLMPageInner() {
       );
 
       if (unauthorized) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -616,7 +617,7 @@ function LLMPageInner() {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -781,7 +782,7 @@ function LLMPageInner() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -866,7 +867,7 @@ function LLMPageInner() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -941,7 +942,7 @@ function LLMPageInner() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1040,7 +1041,7 @@ function LLMPageInner() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

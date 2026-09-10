@@ -33,6 +33,7 @@ export {
   useOrganizations,
   useActiveOrgUuid,
   useOrgMembers,
+  useOrgInviteLink,
   useWorkspaceApiKeys,
   clearOrgsCache,
   seedOrgsCache,

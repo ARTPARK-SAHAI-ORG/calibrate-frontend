@@ -5,6 +5,7 @@ import { InteractionTypePill } from "@/components/ui";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 
@@ -153,7 +154,7 @@ export function AgentPicker({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -287,7 +288,7 @@ export function MultiAgentPicker({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 

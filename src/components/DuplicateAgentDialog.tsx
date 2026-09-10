@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { reportError } from "@/lib/reportError";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import { useAccessToken } from "@/hooks";
@@ -98,7 +99,7 @@ export function DuplicateAgentDialog({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

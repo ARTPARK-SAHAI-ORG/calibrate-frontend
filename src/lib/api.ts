@@ -1,5 +1,10 @@
 import { signOut } from "next-auth/react";
-import { clearActiveOrgUuid, getActiveOrgUuid } from "@/lib/orgs";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
+import {
+  clearActiveOrgUuid,
+  getActiveOrgUuid,
+  isWorkspaceFreePath,
+} from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
 
 type RequestOptions = {
@@ -97,11 +102,12 @@ export async function apiClient<T>(
     ...customHeaders,
   };
 
-  // /organizations is the workspace-management surface (list, create,
-  // rename, members) and operates above any single workspace. Sending the
-  // active workspace header would either be ignored or — worse — cause a
-  // 403/404 after the user leaves the active workspace.
-  if (endpoint.startsWith("/organizations")) {
+  // Some surfaces sit above any single workspace, so sending the active
+  // workspace would either be ignored or cause a 403/404. The list lives in
+  // orgs.ts because the wrapper around the browser's own fetch reads the same
+  // one; removing the header only here would not work, because that wrapper
+  // puts it back.
+  if (isWorkspaceFreePath(endpoint)) {
     delete headers["X-Org-UUID"];
   }
 
@@ -126,8 +132,9 @@ export async function apiClient<T>(
     clearOrgsCache();
     // Clear cookie
     document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
-    // Sign out via NextAuth
-    await signOut({ callbackUrl: "/login" });
+    // Sign out via NextAuth, remembering the page they were on so signing in
+    // again brings them back to it.
+    await signOut({ callbackUrl: loginPathAfterSignOut() });
     throw new Error("Unauthorized - session expired");
   }
 

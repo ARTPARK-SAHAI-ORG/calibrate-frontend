@@ -5,6 +5,7 @@ import { unwrapList } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { Link } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
@@ -97,7 +98,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -812,7 +813,7 @@ function NewAgentDialog({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

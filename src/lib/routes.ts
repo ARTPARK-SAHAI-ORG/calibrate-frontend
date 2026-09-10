@@ -27,6 +27,7 @@ const PUBLIC_PREFIXES = [
   "/signup",
   "/public/",
   "/annotate-job/",
+  "/invite/",
   "/api/",
   "/terms",
   "/privacy",

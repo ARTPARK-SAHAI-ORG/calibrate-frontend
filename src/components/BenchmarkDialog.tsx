@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
 import { useOpenRouterModels, useAccessToken } from "@/hooks";
@@ -168,7 +169,7 @@ export function BenchmarkDialog({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return { verified: false, error: "Unauthorized" };
       }
 

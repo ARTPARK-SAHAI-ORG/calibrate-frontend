@@ -1,5 +1,6 @@
 import {
   DEFAULT_POST_LOGIN_PATH,
+  loginPathAfterSignOut,
   postLoginPath,
   safeCallbackUrl,
   withCallback,
@@ -87,5 +88,32 @@ describe("withCallback", () => {
 describe("the opening page as a destination", () => {
   it("refuses to send someone back to the opening page", () => {
     expect(safeCallbackUrl("/opening?to=%2Fopening")).toBe("/agents");
+  });
+});
+
+describe("loginPathAfterSignOut", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("carries the page they were on", () => {
+    window.history.replaceState(null, "", "/invite/tok-123");
+    expect(loginPathAfterSignOut()).toBe(
+      `/login?callbackUrl=${encodeURIComponent("/invite/tok-123")}`,
+    );
+  });
+
+  it("keeps the query with it", () => {
+    window.history.replaceState(null, "", "/tests?testId=abc");
+    expect(loginPathAfterSignOut()).toBe(
+      `/login?callbackUrl=${encodeURIComponent("/tests?testId=abc")}`,
+    );
+  });
+
+  it("does not point back at sign-in itself", () => {
+    window.history.replaceState(null, "", "/login");
+    expect(loginPathAfterSignOut()).toBe(
+      `/login?callbackUrl=${encodeURIComponent("/agents")}`,
+    );
   });
 });

@@ -844,7 +844,7 @@ function ConversationViewToggle({
 function CopyJsonButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
-    await copyToClipboard(value);
+    if (!(await copyToClipboard(value))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

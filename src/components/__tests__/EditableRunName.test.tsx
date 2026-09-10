@@ -272,7 +272,7 @@ describe("EditableRunName", () => {
     await user.type(screen.getByLabelText("Name"), "New name{Enter}");
 
     await waitFor(() =>
-      expect(signOutMock).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOutMock).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 });

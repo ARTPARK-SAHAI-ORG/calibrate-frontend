@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import Papa from "papaparse";
@@ -439,7 +440,7 @@ export function BulkUploadTestsModal({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -519,7 +520,7 @@ export function BulkUploadTestsModal({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -1167,7 +1168,7 @@ export function BulkUploadTestsModal({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

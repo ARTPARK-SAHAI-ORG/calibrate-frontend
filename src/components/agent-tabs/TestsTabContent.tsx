@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import {
   useAccessToken,
@@ -488,7 +489,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -763,7 +764,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -861,7 +862,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1043,7 +1044,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1114,7 +1115,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1204,7 +1205,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1361,7 +1362,7 @@ export function TestsTabContent({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
