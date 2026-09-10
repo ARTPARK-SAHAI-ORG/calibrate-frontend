@@ -14,7 +14,7 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
-import { Breadcrumbs, type Crumb } from "@/components/ui";
+import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -569,22 +569,6 @@ function statusLabel(status: AnnotatorJob["status"]): string {
 
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
   const router = useRouter();
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!copiedToken) return;
-    const t = setTimeout(() => setCopiedToken(null), 1500);
-    return () => clearTimeout(t);
-  }, [copiedToken]);
-
-  const handleCopy = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(buildAnnotateUrl(token));
-      setCopiedToken(token);
-    } catch {
-      // ignore
-    }
-  };
 
   return (
     <div className="border border-border rounded-xl overflow-hidden">
@@ -600,7 +584,6 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
       </div>
       {jobs.map((job) => {
         const isImported = job.public_token.startsWith("import:");
-        const copied = copiedToken === job.public_token;
         const url = buildAnnotateUrl(job.public_token);
         return (
           <div
@@ -624,49 +607,7 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
                   <span className="text-xs font-mono text-muted-foreground truncate">
                     {url}
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopy(job.public_token);
-                    }}
-                    aria-label={copied ? "Copied" : "Copy link"}
-                    title={copied ? "Copied" : "Copy link"}
-                    className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
-                      copied
-                        ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-400"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    }`}
-                  >
-                    {copied ? (
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.8}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                        />
-                      </svg>
-                    )}
-                  </button>
+                  <CopyLinkButton value={url} />
                 </>
               )}
             </div>

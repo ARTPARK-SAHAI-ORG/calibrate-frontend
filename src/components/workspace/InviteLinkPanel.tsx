@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useAccessToken, useOrgInviteLink } from "@/hooks";
 import { LoadingState } from "@/components/ui/LoadingState";
-import { Tooltip } from "@/components/Tooltip";
+import { CopyLinkButton } from "@/components/ui";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { buildInviteUrl } from "@/lib/invites";
-import { copyToClipboard } from "@/lib/clipboard";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import { reportError } from "@/lib/reportError";
 
@@ -30,15 +29,8 @@ export function InviteLinkPanel({ orgUuid }: { orgUuid: string }) {
   const [isCreating, setIsCreating] = useState(false);
   const [isTurningOff, setIsTurningOff] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [confirmTurnOff, setConfirmTurnOff] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(t);
-  }, [copied]);
 
   const url = inviteLink ? buildInviteUrl(inviteLink.token) : null;
 
@@ -84,12 +76,6 @@ export function InviteLinkPanel({ orgUuid }: { orgUuid: string }) {
     }
   };
 
-  const handleCopy = async () => {
-    if (!url) return;
-    await copyToClipboard(url);
-    setCopied(true);
-  };
-
   // Until the token has been read out of storage there is nothing to ask with,
   // so the answer is not yet known. Treated as still loading, because showing
   // the create button here would offer to replace a link that may well exist.
@@ -128,48 +114,7 @@ export function InviteLinkPanel({ orgUuid }: { orgUuid: string }) {
                 {url}
               </span>
             </div>
-            <Tooltip content={copied ? "Copied" : "Copy link"} position="top">
-              <button
-                type="button"
-                onClick={handleCopy}
-                aria-label={copied ? "Copied" : "Copy link"}
-                className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
-                  copied
-                    ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-400"
-                    : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                {copied ? (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
-                  </svg>
-                )}
-              </button>
-            </Tooltip>
+            <CopyLinkButton value={url} />
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <button

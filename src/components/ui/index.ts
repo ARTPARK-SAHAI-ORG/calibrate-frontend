@@ -24,6 +24,7 @@ export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
 export { DialogNavHeader } from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
+export { CopyLinkButton } from "./CopyLinkButton";
 export { SegmentedFilter, type SegmentedFilterOption } from "./SegmentedFilter";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { RenameDialog } from "./RenameDialog";
