@@ -35,11 +35,15 @@ export function InviteDialog({
   useHideFloatingButton(isOpen);
 
   const [way, setWay] = useState<Way>("email");
+  const [isAdding, setIsAdding] = useState(false);
 
   // Closing puts it back to the email side, so it opens the same way every
   // time. Remembering the side used last would be a surprise on a screen
   // opened this rarely.
   const close = () => {
+    // Refuse while addresses are still being sent. Closing did not stop the
+    // rest going out, and any that failed had nowhere left to say so.
+    if (isAdding) return;
     setWay("email");
     onClose();
   };
@@ -96,7 +100,11 @@ export function InviteDialog({
               and as a few addresses are added. */}
           <div className="min-h-[10rem]">
             <div hidden={way !== "email"}>
-              <AddByEmailPanel onAddMember={onAddMember} onAllAdded={close} />
+              <AddByEmailPanel
+                onAddMember={onAddMember}
+                onAllAdded={onClose}
+                onBusyChange={setIsAdding}
+              />
             </div>
             <div hidden={way !== "link"}>
               <InviteLinkPanel orgUuid={orgUuid} />

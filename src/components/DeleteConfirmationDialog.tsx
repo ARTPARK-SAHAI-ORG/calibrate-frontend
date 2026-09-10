@@ -15,12 +15,6 @@ type DeleteConfirmationDialogProps = {
    */
   message: React.ReactNode;
   confirmText?: string;
-  /**
-   * What the confirm button says while the request is running. Needed whenever
-   * `confirmText` is more than one word: the fallback below turns a single verb
-   * into "Deleting...", which reads as "Start the runing..." for a phrase.
-   */
-  busyText?: string;
   cancelText?: string;
   isDeleting?: boolean;
   /** Optional content rendered between the message and the action row
@@ -35,7 +29,6 @@ export function DeleteConfirmationDialog({
   title = "Confirm deletion",
   message,
   confirmText = "Remove",
-  busyText,
   cancelText = "Cancel",
   isDeleting = false,
   extraContent,
@@ -96,7 +89,7 @@ export function DeleteConfirmationDialog({
               </svg>
             )}
             {isDeleting
-              ? (busyText ?? `${confirmText.replace(/e$/, "")}ing...`)
+              ? `${confirmText.replace(/e$/, "")}ing...`
               : confirmText}
           </button>
         </div>

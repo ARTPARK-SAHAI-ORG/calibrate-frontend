@@ -64,4 +64,42 @@ describe("CopyLinkButton", () => {
 
     expect(onRowClick).not.toHaveBeenCalled();
   });
+
+  // Saying "Copied" when nothing was copied sends someone off to paste an
+  // empty clipboard into a chat.
+  it("does not say it copied when the clipboard refused", async () => {
+    const write = jest
+      .spyOn(navigator.clipboard, "writeText")
+      .mockRejectedValue(new Error("blocked"));
+    // jsdom has no execCommand at all, so the fallback is defined here and
+    // made to fail, which is what a browser that blocks copying does.
+    (document as unknown as { execCommand: () => boolean }).execCommand = () =>
+      false;
+    const user = setupUser();
+    render(<CopyLinkButton value={URL} />);
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+    write.mockRestore();
+    delete (document as unknown as { execCommand?: () => boolean }).execCommand;
+  });
+
+  // The bubble is drawn over the page, and these buttons sit in table rows
+  // that open something when clicked.
+  it("does not let a click on its hover text reach the row underneath", async () => {
+    const onRowClick = jest.fn();
+    const user = setupUser();
+    render(
+      <div onClick={onRowClick}>
+        <CopyLinkButton value={URL} />
+      </div>,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "Copy link" }));
+    const bubble = await screen.findAllByText("Copy link");
+    await user.click(bubble[bubble.length - 1]);
+
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
 });

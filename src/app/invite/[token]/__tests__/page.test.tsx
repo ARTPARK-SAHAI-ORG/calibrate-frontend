@@ -128,8 +128,14 @@ describe("InvitePage", () => {
   it("shows why joining failed and leaves the button usable", async () => {
     signedIn();
     fetchInvitePreview.mockResolvedValue({ organization_name: "Acme" });
+    // A dead link, which is the failure the backend actually defines here.
+    // Not "already a member": joining twice answers 200 with the same
+    // workspace, so that is not a failure the reader can ever meet. And not a
+    // 500, whose detail is deliberately replaced with a generic line.
     acceptInvite.mockRejectedValue(
-      new Error('Request failed: 400 - {"detail":"You are already a member"}'),
+      new Error(
+        'Request failed: 404 - {"detail":"This invite link no longer works"}',
+      ),
     );
     const user = setupUser();
     render(<InvitePage />);
@@ -137,7 +143,7 @@ describe("InvitePage", () => {
     await user.click(await screen.findByRole("button", { name: "Join" }));
 
     expect(
-      await screen.findByText("You are already a member"),
+      await screen.findByText("This invite link no longer works"),
     ).toBeInTheDocument();
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Join" })).toBeEnabled();

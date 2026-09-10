@@ -339,7 +339,12 @@ export function useOrgMembers(
 
   const addMember = useCallback(
     async (email: string): Promise<OrganizationMember | null> => {
-      if (!accessToken || !orgUuid) return null;
+      // Throws rather than answering null, the way removeMember below does.
+      // A null came back looking exactly like a member who was added, so a
+      // caller counted it as done and told the reader everybody was in.
+      if (!accessToken || !orgUuid) {
+        throw new Error("Not signed in");
+      }
       const created = await apiPost<OrganizationMember>(
         `/organizations/${orgUuid}/members`,
         accessToken,
@@ -433,10 +438,15 @@ export function useOrgInviteLink(
         inviteLinkKey(accessToken, orgUuid),
         async () => {
           try {
-            return await apiGet<InviteLink>(
+            const answer = await apiGet<InviteLink>(
               `/organizations/${orgUuid}/invite-link`,
               accessToken,
             );
+            // An empty answer is no link, not a link with nothing in it.
+            // apiClient turns a 204 or an empty body into `{}`, which is
+            // truthy, and the panel would have shown and copied an address
+            // ending in "undefined".
+            return answer?.token ? answer : null;
           } catch (err) {
             // No link made yet. That is the starting state, not a failure.
             if (

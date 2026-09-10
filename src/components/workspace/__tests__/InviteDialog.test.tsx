@@ -9,14 +9,19 @@ jest.mock("../AddByEmailPanel", () => ({
   AddByEmailPanel: ({
     onAddMember,
     onAllAdded,
+    onBusyChange,
   }: {
     onAddMember: (email: string) => Promise<unknown>;
     onAllAdded?: () => void;
+    onBusyChange?: (busy: boolean) => void;
   }) => (
     <div data-testid="add-by-email">
       {typeof onAddMember}
       <button type="button" onClick={onAllAdded}>
         stand-in for everyone being added
+      </button>
+      <button type="button" onClick={() => onBusyChange?.(true)}>
+        stand-in for adding starting
       </button>
       {/* Stands in for the addresses being typed, so a test can tell whether
           swapping sides threw them away. */}
@@ -138,5 +143,19 @@ describe("InviteDialog", () => {
     );
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // Closing part way through did not stop the rest of the addresses being
+  // sent, and anything that failed had nowhere left to report.
+  it("refuses to close while addresses are still being added", async () => {
+    const user = setupUser();
+    open();
+
+    await user.click(
+      screen.getByRole("button", { name: "stand-in for adding starting" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

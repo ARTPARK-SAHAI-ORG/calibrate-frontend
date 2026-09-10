@@ -235,4 +235,45 @@ describe("AddByEmailPanel", () => {
     expect(await screen.findByText(/Already a member/)).toBeInTheDocument();
     expect(onAllAdded).not.toHaveBeenCalled();
   });
+
+  // The same address twice used to make two chips sharing one name, so
+  // removing either took both away, and the button promised more than it sent.
+  it("keeps one of each address, however many times it is given", async () => {
+    const user = setupUser();
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    await user.type(box(), "a@b.com,a@b.com,c@d.com{Enter}");
+
+    expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Add 2 people" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add 2 people" }));
+    await waitFor(() => expect(onAddMember).toHaveBeenCalledTimes(2));
+  });
+
+  it("counts the same address in the box and on a chip only once", async () => {
+    const user = setupUser();
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    await user.type(box(), "a@b.com{Enter}");
+    await user.type(box(), "a@b.com");
+
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+  });
+
+  it("says it is busy while it works and says so again when it stops", async () => {
+    const onBusyChange = jest.fn();
+    const user = setupUser();
+    render(
+      <AddByEmailPanel onAddMember={onAddMember} onBusyChange={onBusyChange} />,
+    );
+
+    await user.type(box(), "a@b.com{Enter}");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+    expect(onBusyChange.mock.calls.map((c) => c[0])).toEqual([true, false]);
+  });
 });

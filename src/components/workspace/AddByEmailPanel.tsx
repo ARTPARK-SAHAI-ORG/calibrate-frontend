@@ -11,6 +11,26 @@ const looksLikeAnAddress = (value: string) =>
 type Chip = { email: string; failure?: string };
 
 /**
+ * The addresses in `raw` that are not already among `existing`, with repeats
+ * inside `raw` itself dropped too.
+ *
+ * Both the button's count and the loop that does the adding go through this,
+ * so they cannot disagree: pasting the same address twice used to read "Add 2
+ * people" and send one request, and put two chips on screen that shared a
+ * name, so removing either took both away.
+ */
+function newAddresses(raw: string, existing: string[]): string[] {
+  const seen = new Set(existing);
+  const out: string[] = [];
+  for (const part of raw.split(/[,;\s]+/).filter(Boolean)) {
+    if (seen.has(part)) continue;
+    seen.add(part);
+    out.push(part);
+  }
+  return out;
+}
+
+/**
  * The left half of the invite dialog: several email addresses are collected as
  * chips, then added one after another, because the backend adds one person per
  * request. Addresses that were added disappear; the ones that failed stay put
@@ -19,6 +39,7 @@ type Chip = { email: string; failure?: string };
 export function AddByEmailPanel({
   onAddMember,
   onAllAdded,
+  onBusyChange,
 }: {
   onAddMember: (email: string) => Promise<unknown>;
   /**
@@ -27,6 +48,12 @@ export function AddByEmailPanel({
    * Not called when any address failed: those stay on screen with the reason.
    */
   onAllAdded?: () => void;
+  /**
+   * Told when the adding starts and when it stops, so the dialog can refuse to
+   * close in between. Closing mid-way did not stop the remaining addresses
+   * being sent, and any that failed reported into a panel that was gone.
+   */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [chips, setChips] = useState<Chip[]>([]);
   const [text, setText] = useState("");
@@ -43,13 +70,15 @@ export function AddByEmailPanel({
       setTypingError(`${bad[0]} is not an email address.`);
       return false;
     }
-    setChips((current) => {
-      const seen = new Set(current.map((c) => c.email));
-      return [
-        ...current,
-        ...parts.filter((p) => !seen.has(p)).map((email) => ({ email })),
-      ];
-    });
+    setChips((current) => [
+      ...current,
+      ...newAddresses(
+        raw,
+        current.map((c) => c.email),
+      ).map((email) => ({
+        email,
+      })),
+    ]);
     setTypingError(null);
     return true;
   };
@@ -84,13 +113,17 @@ export function AddByEmailPanel({
       );
       return;
     }
-    const queue = [...chips.map((c) => c.email)];
-    for (const part of typed) {
-      if (!queue.includes(part)) queue.push(part);
-    }
+    const queue = [
+      ...chips.map((c) => c.email),
+      ...newAddresses(
+        text,
+        chips.map((c) => c.email),
+      ),
+    ];
     if (queue.length === 0) return;
     setText("");
     setIsAdding(true);
+    onBusyChange?.(true);
     const failures: Chip[] = [];
     for (const email of queue) {
       try {
@@ -105,6 +138,7 @@ export function AddByEmailPanel({
     }
     setChips(failures);
     setIsAdding(false);
+    onBusyChange?.(false);
     if (failures.length === 0) onAllAdded?.();
   };
 
@@ -257,7 +291,11 @@ export function AddByEmailPanel({
 
 /** How many addresses the button would send: the chips plus anything typed. */
 function commitPreview(chips: Chip[], text: string) {
-  const typed = text.split(/[,;\s]+/).filter(Boolean);
-  const seen = new Set(chips.map((c) => c.email));
-  return chips.length + typed.filter((t) => !seen.has(t)).length;
+  return (
+    chips.length +
+    newAddresses(
+      text,
+      chips.map((c) => c.email),
+    ).length
+  );
 }
