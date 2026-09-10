@@ -1,6 +1,23 @@
 import type { Metadata } from "next";
 
 /**
+ * The one address this site is meant to be found at.
+ *
+ * Anyone can copy this repo and put it on their own address, which
+ * SELF_HOSTING.md tells them how to do. Every copy carries the same pages and
+ * the same words, so a search engine sees several sites saying the same thing
+ * and picks one of them to show. Ours is the one that should be shown, so
+ * every other address asks search engines to leave it out. src/middleware.ts
+ * is where that request is sent.
+ *
+ * Written here rather than read from NEXT_PUBLIC_APP_URL because a copy of the
+ * site sets that to its own address, which is the very thing being caught.
+ * Moving to a new address means changing this line with it, or our own site
+ * disappears from search.
+ */
+export const CANONICAL_HOST = "calibrate.artpark.ai";
+
+/**
  * Where the site lives, as an absolute address.
  *
  * Search engines need one, since robots.txt and sitemap.xml carry full
@@ -9,8 +26,18 @@ import type { Metadata } from "next";
  * at the real site rather than at a dead address.
  */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL || "https://calibrate.artpark.ai"
+  process.env.NEXT_PUBLIC_APP_URL || `https://${CANONICAL_HOST}`
 ).replace(/\/$/, "");
+
+/**
+ * True when a request came in on the address above.
+ *
+ * The port is ignored, so a local server on the same name still counts, and
+ * capitals are ignored because a browser may send any mix of them.
+ */
+export function isCanonicalHost(host: string | null | undefined): boolean {
+  return host?.split(":")[0].toLowerCase() === CANONICAL_HOST;
+}
 
 /**
  * The picture shown when a link is pasted into WhatsApp, LinkedIn or X, and

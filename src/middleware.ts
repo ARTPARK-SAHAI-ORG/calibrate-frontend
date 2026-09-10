@@ -1,13 +1,27 @@
 import { auth } from "@/auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
 import { isPublicPath, orgFromPath } from "@/lib/routes";
 import { OPENING_PATH } from "@/lib/opening";
+import { isCanonicalHost } from "@/lib/site";
 
 // Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 
 export default auth((req) => {
+  const response = route(req);
+  // A copy of this site served from any other address asks search engines to
+  // leave it out, so only ours appears in results. Google and Bing read this
+  // header the same way they read a noindex tag on the page itself. See
+  // CANONICAL_HOST in src/lib/site.ts for why a copy exists at all.
+  if (!isCanonicalHost(req.headers.get("host"))) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+});
+
+/** Which page a request is answered with. */
+function route(req: NextRequest & { auth: unknown }): NextResponse {
   const isHomePage = req.nextUrl.pathname === "/";
   const isApiRoute = req.nextUrl.pathname.startsWith("/api/");
 
@@ -86,7 +100,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],

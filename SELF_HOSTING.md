@@ -77,10 +77,26 @@ Vercel is the easiest path to deploy the frontend.
 
 3. Deploy!
 
-### 6. Updating from upstream
+### 6. Your instance is kept out of search results
+
+Your deployment carries the same pages and the same words as
+https://calibrate.artpark.ai. Left alone, a search engine would see two sites
+saying the same thing and pick one of them to show, which is often the copy
+rather than the original.
+
+So every deployment on an address other than `calibrate.artpark.ai` answers
+each page with an `X-Robots-Tag: noindex, nofollow` header, which asks Google
+and Bing to leave it out of their results. Your instance still works normally
+and anyone with the address can open it. Only search engines are affected.
+
+There is no setting for this. If you want your own instance to be findable in
+search, change `CANONICAL_HOST` in `src/lib/site.ts` to your own address in
+your fork.
+
+### 7. Updating from upstream
 
 If you forked, periodically pull upstream from the Github UI itself. Vercel will auto-deploy the merge.
 
-### 7. Self-host on your own infrastructure
+### 8. Self-host on your own infrastructure
 
 If you can't or don't want to use Vercel, the app runs anywhere Node.js runs.
