@@ -70,10 +70,9 @@ const ENTRIES: LearnItem[] = [
   },
   {
     id: "align-llm-judges-with-human-experts",
-    title:
-      "Automatically aligning your LLM judges with human experts using Calibrate and Claude Code",
+    title: "Automatically aligning LLM judges with human experts",
     summary:
-      "A practical walkthrough of using Calibrate and Claude Code to find where an LLM judge disagrees with human experts and improve the judge until their assessments align.",
+      "How you can connect Calibrate with Claude Code to find where your LLM judges disagree with your experts, identify patterns and iteratively improve the LLM judges until they are sufficiently aligned.",
     recordingEmbedUrl: "https://www.youtube.com/embed/AtZMWjER0vQ",
     recordingUrl: "https://youtu.be/AtZMWjER0vQ",
   },
