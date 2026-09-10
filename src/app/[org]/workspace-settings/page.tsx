@@ -450,7 +450,6 @@ function MembersSection({
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
         orgUuid={orgUuid}
-        orgName={orgName}
         onAddMember={addMember}
       />
     </section>
