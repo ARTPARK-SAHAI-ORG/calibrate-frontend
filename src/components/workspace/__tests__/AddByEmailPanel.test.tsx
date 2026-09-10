@@ -276,4 +276,31 @@ describe("AddByEmailPanel", () => {
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     expect(onBusyChange.mock.calls.map((c) => c[0])).toEqual([true, false]);
   });
+
+  it("refuses to add when something in the box is not an address", async () => {
+    const user = setupUser();
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    await user.type(box(), "a@b.com{Enter}");
+    await user.type(box(), "not-an-address");
+    await user.click(screen.getByRole("button", { name: "Add 2 people" }));
+
+    expect(
+      await screen.findByText("not-an-address is not an email address."),
+    ).toBeInTheDocument();
+    expect(onAddMember).not.toHaveBeenCalled();
+  });
+
+  it("takes an address back off with its cross", async () => {
+    const user = setupUser();
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    await user.type(box(), "a@b.com,c@d.com{Enter}");
+    expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Remove a@b.com" }));
+
+    expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+  });
 });

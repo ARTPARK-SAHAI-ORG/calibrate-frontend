@@ -32,4 +32,18 @@ describe("copyToClipboard", () => {
     const el = appendSpy.mock.calls[0][0] as HTMLTextAreaElement;
     expect(el.value).toBe("fallback text");
   });
+
+  // Some browsers throw from execCommand rather than answering false.
+  it("answers false when the fallback throws", async () => {
+    (navigator.clipboard.writeText as jest.Mock).mockRejectedValue(
+      new Error("blocked"),
+    );
+    (document as unknown as { execCommand: () => boolean }).execCommand = () => {
+      throw new Error("not allowed");
+    };
+
+    await expect(copyToClipboard("hello")).resolves.toBe(false);
+
+    delete (document as unknown as { execCommand?: () => boolean }).execCommand;
+  });
 });
