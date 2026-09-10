@@ -192,4 +192,47 @@ describe("AddByEmailPanel", () => {
       screen.getByText(/the workspace will be visible to them/i),
     ).toBeInTheDocument();
   });
+
+  // Every password manager has its own opt-out and ignores everyone else's, so
+  // dropping one quietly brings its suggestion list back over the box.
+  it("asks the browser and the password managers to leave the box alone", () => {
+    render(<AddByEmailPanel onAddMember={onAddMember} />);
+
+    const input = screen.getByRole("textbox", { name: "Email address" });
+    expect(input).toHaveAttribute("autocomplete", "off");
+    expect(input).toHaveAttribute("data-1p-ignore");
+    expect(input).toHaveAttribute("data-lpignore", "true");
+    expect(input).toHaveAttribute("data-bwignore");
+    expect(input).toHaveAttribute("data-form-type", "other");
+  });
+
+  it("says it is finished once every address went in", async () => {
+    const onAllAdded = jest.fn();
+    const user = setupUser();
+    render(
+      <AddByEmailPanel onAddMember={onAddMember} onAllAdded={onAllAdded} />,
+    );
+
+    await user.type(box(), "a@b.com{Enter}");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(onAllAdded).toHaveBeenCalledTimes(1));
+  });
+
+  // Something went wrong and it is on screen, so the reader has to stay here
+  // to see it.
+  it("does not say it is finished when an address failed", async () => {
+    const onAllAdded = jest.fn();
+    onAddMember.mockRejectedValueOnce(new Error("Already a member"));
+    const user = setupUser();
+    render(
+      <AddByEmailPanel onAddMember={onAddMember} onAllAdded={onAllAdded} />,
+    );
+
+    await user.type(box(), "a@b.com{Enter}");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText(/Already a member/)).toBeInTheDocument();
+    expect(onAllAdded).not.toHaveBeenCalled();
+  });
 });

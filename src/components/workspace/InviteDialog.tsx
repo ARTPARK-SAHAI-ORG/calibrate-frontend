@@ -96,7 +96,7 @@ export function InviteDialog({
               and as a few addresses are added. */}
           <div className="min-h-[10rem]">
             <div hidden={way !== "email"}>
-              <AddByEmailPanel onAddMember={onAddMember} />
+              <AddByEmailPanel onAddMember={onAddMember} onAllAdded={close} />
             </div>
             <div hidden={way !== "link"}>
               <InviteLinkPanel orgUuid={orgUuid} />

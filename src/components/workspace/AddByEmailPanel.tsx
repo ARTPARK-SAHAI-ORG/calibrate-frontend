@@ -18,8 +18,15 @@ type Chip = { email: string; failure?: string };
  */
 export function AddByEmailPanel({
   onAddMember,
+  onAllAdded,
 }: {
   onAddMember: (email: string) => Promise<unknown>;
+  /**
+   * Called once every address went in. Nothing is left to read at that point,
+   * so the dialog closes and the member list behind it is the confirmation.
+   * Not called when any address failed: those stay on screen with the reason.
+   */
+  onAllAdded?: () => void;
 }) {
   const [chips, setChips] = useState<Chip[]>([]);
   const [text, setText] = useState("");
@@ -98,6 +105,7 @@ export function AddByEmailPanel({
     }
     setChips(failures);
     setIsAdding(false);
+    if (failures.length === 0) onAllAdded?.();
   };
 
   return (
@@ -159,9 +167,15 @@ export function AddByEmailPanel({
         // cover this box with a list of suggestions the moment it is focused.
         // Nothing here is a sign-in field, and the addresses being typed are
         // other people's, so there is nothing worth suggesting.
+        //
+        // Each password manager has its own opt-out and ignores everyone
+        // else's, so they all have to be named: 1Password, LastPass, Bitwarden
+        // and Dashlane in that order. They also ignore autoComplete="off" on
+        // purpose, so that one is only for the browser itself.
         autoComplete="off"
         data-1p-ignore
         data-lpignore="true"
+        data-bwignore
         data-form-type="other"
         className={`w-full h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
           typingError

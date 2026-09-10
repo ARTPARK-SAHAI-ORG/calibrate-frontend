@@ -8,11 +8,16 @@ import { InviteDialog } from "../InviteDialog";
 jest.mock("../AddByEmailPanel", () => ({
   AddByEmailPanel: ({
     onAddMember,
+    onAllAdded,
   }: {
     onAddMember: (email: string) => Promise<unknown>;
+    onAllAdded?: () => void;
   }) => (
     <div data-testid="add-by-email">
       {typeof onAddMember}
+      <button type="button" onClick={onAllAdded}>
+        stand-in for everyone being added
+      </button>
       {/* Stands in for the addresses being typed, so a test can tell whether
           swapping sides threw them away. */}
       <input aria-label="stand-in for what is typed" defaultValue="" />
@@ -120,5 +125,18 @@ describe("InviteDialog", () => {
     expect(screen.getByLabelText("stand-in for what is typed")).toHaveValue(
       "aman@artpark.in",
     );
+  });
+
+  // Once everyone is in there is nothing left to read here, and the member
+  // list behind the dialog is the confirmation.
+  it("closes itself once every address went in", async () => {
+    const user = setupUser();
+    open();
+
+    await user.click(
+      screen.getByRole("button", { name: "stand-in for everyone being added" }),
+    );
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
