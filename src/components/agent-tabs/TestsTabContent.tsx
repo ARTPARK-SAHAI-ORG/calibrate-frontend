@@ -9,6 +9,7 @@ import {
   useAccessToken,
   useAgentTests,
   useDialogUrlParam,
+  useItemPager,
   usePageSize,
 } from "@/hooks";
 import { fetchAgentTestsPage, fetchAllAgentTests } from "@/lib/agentTestsApi";
@@ -246,6 +247,8 @@ export function TestsTabContent({
     total: agentTestsTotal,
     loadedQ: loadedTestsSearch,
     offset: testsOffset,
+    setOffset: setTestsOffset,
+    loadedOffset: loadedTestsOffset,
     isLoading: agentTestsLoading,
     error: agentTestsError,
     refetch: fetchAgentTests,
@@ -351,6 +354,21 @@ export function TestsTabContent({
     enabled: !!backendAccessToken,
     onOpen: (uuid) => openEditTest(uuid),
     onClose: () => closeTestDialogAfterSave(),
+  });
+
+  // Previous / next across every test the filters match, not just the page
+  // on screen: stepping off either end of the page turns it and opens the
+  // test at the far edge of the page that arrives.
+  const testPager = useItemPager({
+    items: agentTests,
+    openUuid: editingTestUuid,
+    pageStart: loadedTestsOffset,
+    pageSize,
+    total: agentTestsTotal,
+    onOpen: (uuid) => {
+      void openEditTest(uuid);
+    },
+    onPageStartChange: setTestsOffset,
   });
 
   // Selection state for bulk operations
@@ -951,6 +969,7 @@ export function TestsTabContent({
   };
 
   const closeTestDialogAfterSave = () => {
+    testPager.cancel();
     setCreateDialogOpen(false);
     resetTestDialog();
   };
@@ -1030,6 +1049,13 @@ export function TestsTabContent({
       setCreateDialogOpen(true);
       setCreateError(null);
       setNameConflictError(null);
+      // Stepping from one test to another remounts the dialog on the new
+      // uuid; clearing these keeps the test just left from seeding the form
+      // for the moment before the new one arrives.
+      setNewTestName("");
+      setInitialTab(undefined);
+      setInitialConfig(undefined);
+      setInitialEvaluators(undefined);
       // Reflect the open test in the URL (shareable / reload-stable).
       setTestIdParam(uuid);
 
@@ -2044,7 +2070,7 @@ export function TestsTabContent({
                       {agentTests.map((test) => (
                         <div
                           key={test.uuid}
-                          onClick={() => openEditTest(test.uuid)}
+                          onClick={() => testPager.open(test.uuid)}
                           className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                         >
                           {/* Checkbox */}
@@ -2201,7 +2227,7 @@ export function TestsTabContent({
                     {agentTests.map((test) => (
                       <div
                         key={test.uuid}
-                        onClick={() => openEditTest(test.uuid)}
+                        onClick={() => testPager.open(test.uuid)}
                         className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -2350,12 +2376,21 @@ export function TestsTabContent({
           editingTestUuid is set), submits via PUT /tests/{uuid}. */}
       {createDialogOpen && (
         <AddTestDialog
+          // Remounted per test so a step to another one starts the form from
+          // scratch instead of holding the last test's state.
+          key={editingTestUuid ?? "new"}
           agentUuid={agentUuid}
           isOpen={createDialogOpen}
           onClose={() => {
+            testPager.cancel();
             setCreateDialogOpen(false);
             resetTestDialog();
           }}
+          onPrev={editingTestUuid ? testPager.prev : undefined}
+          onNext={editingTestUuid ? testPager.next : undefined}
+          hasPrev={testPager.hasPrev}
+          hasNext={testPager.hasNext}
+          position={testPager.position}
           isEditing={!!editingTestUuid}
           isLoading={isLoadingTest}
           isCreating={isCreating}

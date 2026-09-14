@@ -2033,3 +2033,73 @@ describe("AddTestDialog", () => {
     });
   });
 });
+
+describe("AddTestDialog — stepping to another test", () => {
+  const navProps = (overrides: Record<string, unknown> = {}) => ({
+    isEditing: true,
+    initialTab: "next-reply" as const,
+    testName: "Saved test",
+    onPrev: jest.fn(),
+    onNext: jest.fn(),
+    hasPrev: true,
+    hasNext: true,
+    position: { index: 2, total: 12 },
+    ...overrides,
+  });
+
+  it("shows the arrows and where the open test sits in the list", async () => {
+    render(<AddTestDialog {...baseProps(navProps())} />);
+    await screen.findByText("Test name");
+
+    expect(screen.getByText("3 of 12")).toBeInTheDocument();
+    expect(screen.getByLabelText("Previous test")).toBeEnabled();
+    expect(screen.getByLabelText("Next test")).toBeEnabled();
+  });
+
+  it("steps straight away when nothing has been edited", async () => {
+    const user = setupUser();
+    const props = navProps();
+    render(<AddTestDialog {...baseProps(props)} />);
+    await screen.findByText("Test name");
+
+    await user.click(screen.getByLabelText("Next test"));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+  });
+
+  it("asks before throwing away unsaved edits, and steps only on Discard", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    render(<ControlledDialog {...baseProps(props)} />);
+    // The form is only compared against a baseline once its evaluators have
+    // settled, so wait for the default one before editing anything.
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+
+    await user.click(screen.getByLabelText("Next test"));
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(props.onNext).not.toHaveBeenCalled();
+
+    await user.click(screen.getByLabelText("Previous test"));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(props.onPrev).toHaveBeenCalledTimes(1);
+    expect(props.onNext).not.toHaveBeenCalled();
+  });
+
+  it("hides the arrows when no stepping was offered", async () => {
+    render(
+      <AddTestDialog
+        {...baseProps({ isEditing: true, initialTab: "next-reply" })}
+      />,
+    );
+    await screen.findByText("Test name");
+
+    expect(screen.queryByLabelText("Next test")).not.toBeInTheDocument();
+  });
+});

@@ -33,6 +33,7 @@ jest.mock("../../../hooks", () => ({
     .PAGE_SIZE_OPTIONS,
   useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
     .useAgentTests,
+  useItemPager: jest.requireActual("../../../hooks/useItemPager").useItemPager,
   useDialogUrlParam: (args: any) => {
     if (args.param === "runId") {
       runIdParamArgs = args;
@@ -140,6 +141,15 @@ jest.mock("../../AddTestDialog", () => ({
           }
         >
           SubmitGeneral
+        </button>
+        <div data-testid="add-test-position">
+          {props.position ? `${props.position.index + 1} of ${props.position.total}` : ""}
+        </div>
+        <button onClick={props.onPrev} disabled={!props.hasPrev}>
+          PrevTest
+        </button>
+        <button onClick={props.onNext} disabled={!props.hasNext}>
+          NextTest
         </button>
         <button onClick={props.onClose}>CloseAddTest</button>
       </div>
@@ -588,6 +598,98 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByLabelText("Previous page"));
     await screen.findAllByText("Paged test 1");
+  });
+
+  it("steps from one open test to the next, and back", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getAllByText("Paged test 1")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "1 of 12",
+    );
+    expect(screen.getByText("PrevTest")).toBeDisabled();
+
+    await user.click(screen.getByText("NextTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "2 of 12",
+      ),
+    );
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+        String(url).endsWith("/tests/p2"),
+      ),
+    ).toBe(true);
+
+    await user.click(screen.getByText("PrevTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "1 of 12",
+      ),
+    );
+  });
+
+  it("turns the page when stepping past the last test on it", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 10");
+
+    await user.click(screen.getAllByText("Paged test 10")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "10 of 12",
+    );
+
+    await user.click(screen.getByText("NextTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "11 of 12",
+      ),
+    );
+    expect(screen.getByText("Showing 11–12 of 12 tests")).toBeInTheDocument();
+  });
+
+  it("steps back a page from the first test on it", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 11");
+
+    await user.click(screen.getAllByText("Paged test 11")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "11 of 12",
+    );
+    expect(screen.getByText("NextTest")).toBeEnabled();
+
+    await user.click(screen.getByText("PrevTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "10 of 12",
+      ),
+    );
+    expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
+  });
+
+  it("offers no stepping past the last test in the list", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 12");
+
+    await user.click(screen.getAllByText("Paged test 12")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "12 of 12",
+    );
+    expect(screen.getByText("NextTest")).toBeDisabled();
   });
 
   it("clears the ticked rows when the page turns", async () => {
