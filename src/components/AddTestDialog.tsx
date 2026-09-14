@@ -3380,18 +3380,23 @@ export function AddTestDialog({
             </svg>
           </button>
 
-          {/* Previous / next test, centred on the same row as the close
-              button. */}
-          <div className="absolute top-2.5 md:top-3 left-0 right-0 z-20 flex h-8 items-center justify-center">
-            <DialogNavHeader
-              noun={itemNoun}
-              onPrev={navPrev}
-              onNext={navNext}
-              hasPrev={hasPrev}
-              hasNext={hasNext}
-              position={position}
-            />
-          </div>
+          {/* Previous / next test: a thin row of its own across the top, so
+              nothing sits on the information banner below it. The close
+              button floats in this row's right-hand end. */}
+          {(navPrev || navNext) && (
+            <div className="relative shrink-0 h-12 border-b border-border hidden md:block" data-testid="test-nav-row">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <DialogNavHeader
+                  noun={itemNoun}
+                  onPrev={navPrev}
+                  onNext={navNext}
+                  hasPrev={hasPrev}
+                  hasNext={hasNext}
+                  position={position}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}
