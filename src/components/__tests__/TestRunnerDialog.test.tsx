@@ -1287,6 +1287,41 @@ describe("TestRunnerDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("opens on the first test before any test has finished", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-live")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-live",
+            status: "in_progress",
+            results: [
+              { test_case_id: "test-1", name: "Test One", status: "running", passed: null },
+              { test_case_id: "test-2", name: "Test Two", status: "queued", passed: null },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-live"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("selected-id")).toHaveTextContent("test-1"),
+    );
+  });
+
   it("selects a test from the outputs panel", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {

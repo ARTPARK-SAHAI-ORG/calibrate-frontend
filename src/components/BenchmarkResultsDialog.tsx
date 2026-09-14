@@ -386,9 +386,17 @@ export function BenchmarkResultsDialog({
   // and match by `model` id. When `models` is empty (e.g. past run opened
   // with only `taskId`), use the first API row that has results — the parent
   // often passes `models={[]}` in that case.
+  //
+  // Before any model has answered, the first model's first test is selected
+  // anyway, so the window opens on that test's spinner rather than on "Select
+  // a test to view details". That pick does not count as the auto-select: the
+  // first real result still replaces it, in case it belongs to another model.
   useEffect(() => {
     if (!isOpen || hasAutoSelectedFirstBenchmarkTestRef.current) return;
-    if (modelResults.length === 0) return;
+    if (modelResults.length === 0) {
+      if (models.length > 0) setSelectedTest({ model: models[0], testIndex: 0 });
+      return;
+    }
 
     const pickDefaultSelection = (): {
       model: string;

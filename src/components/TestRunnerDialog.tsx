@@ -336,21 +336,16 @@ export function TestRunnerDialog({
     [run],
   );
 
-  // Auto-open the first completed test when nothing is selected. Covers both
-  // - live runs: as soon as one test transitions to passed/failed (and the
-  //   user hasn't manually picked anything), open it.
-  // - past completed runs: on dialog open every test is already passed/failed
-  //   so this picks index 0 (i.e. always opens the first test).
-  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
+  // Open the first test as soon as the run lists one, whatever its state, so
+  // the window never opens on "Select a test to view details". A test still
+  // going shows its spinner and fills in when it finishes. Fires at most once
+  // per dialog open thanks to `hasAutoSelectedRef`.
   useEffect(() => {
     if (hasAutoSelectedRef.current) return;
     if (selectedTestUuid !== null) return;
-    const firstCompleted = rows.find(
-      (r) => r.status === "passed" || r.status === "failed",
-    );
-    if (firstCompleted) {
+    if (rows.length > 0) {
       hasAutoSelectedRef.current = true;
-      setSelectedTestUuid(firstCompleted.id);
+      setSelectedTestUuid(rows[0].id);
     }
   }, [rows, selectedTestUuid]);
 

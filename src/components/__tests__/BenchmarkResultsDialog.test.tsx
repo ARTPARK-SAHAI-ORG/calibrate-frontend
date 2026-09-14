@@ -31,6 +31,9 @@ jest.mock("../eval-details", () => {
         <div data-testid="outputs-panel-models">
           {JSON.stringify(props.modelResults.map((m: any) => m.model))}
         </div>
+        <div data-testid="outputs-panel-selected">
+          {JSON.stringify(props.selectedTest)}
+        </div>
         <div data-testid="outputs-panel-evaluators">
           {JSON.stringify(props.evaluatorsByUuid)}
         </div>
@@ -1448,6 +1451,64 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     await user.click(screen.getByTestId("close-icon").closest("button")!);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens on the first model's first test before any model has answered, then moves to the first real result", async () => {
+    let pollCount = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-early")) {
+        pollCount += 1;
+        if (pollCount === 1) {
+          return Promise.resolve(
+            jsonResponse({ task_id: "task-early", status: "in_progress", model_results: [] }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-early",
+            status: "in_progress",
+            model_results: [
+              {
+                model: "claude",
+                success: true,
+                message: "",
+                total_tests: 1,
+                passed: 1,
+                failed: 0,
+                test_results: [{ name: "Test One", passed: true }],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    jest.useFakeTimers({ advanceTimers: true });
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={["gpt-4", "claude"]}
+        taskId="task-early"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel-selected")).toHaveTextContent(
+        JSON.stringify({ model: "gpt-4", testIndex: 0 }),
+      ),
+    );
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel-selected")).toHaveTextContent(
+        JSON.stringify({ model: "claude", testIndex: 0 }),
+      ),
+    );
   });
 
   it("auto-selects the first test with results once, and does not jump on subsequent updates", async () => {
