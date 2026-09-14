@@ -29,6 +29,7 @@ type SimulationConfigTabProps = {
   onCreateClick: () => void;
   // Used to show voice simulation restriction for agent connections
   isAgentConnection?: boolean;
+  isWebsocketVoiceConnection?: boolean;
 };
 
 export function SimulationConfigTab({
@@ -51,6 +52,7 @@ export function SimulationConfigTab({
   isCreating,
   onCreateClick,
   isAgentConnection,
+  isWebsocketVoiceConnection,
 }: SimulationConfigTabProps) {
   // Only while the simulation is still being set up: an unverified agent then
   // has nothing worth filling in below it.
@@ -133,7 +135,7 @@ export function SimulationConfigTab({
             )}
 
             {/* Voice simulation notice for agent connections */}
-            {isAgentConnection && (
+            {isAgentConnection && !isWebsocketVoiceConnection && (
               <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                 <svg
                   className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
@@ -149,9 +151,8 @@ export function SimulationConfigTab({
                   />
                 </svg>
                 <p className="text-xs text-blue-600 dark:text-blue-300/90">
-                  Voice simulations are currently only supported for agents
-                  built within Calibrate but you can still run text simulations
-                  on your connected agent
+                  Voice simulations require a Pipecat WebSocket voice connection.
+                  This HTTP chat connection can still run text simulations.
                 </p>
               </div>
             )}
