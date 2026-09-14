@@ -15,6 +15,7 @@ import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import { DialogNavHeader } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -807,6 +808,17 @@ type AddTestDialogProps = {
    * conversation builder).
    */
   agentNature?: "conversation" | "general";
+  /**
+   * Step to the previous / next test in the list behind this dialog. Given
+   * together with `position`, they draw the arrows and the "3 of 41" count
+   * at the top of the dialog. Unsaved edits are guarded the same way closing
+   * is: the discard prompt comes first, and the step only happens on Discard.
+   */
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  position?: { index: number; total: number };
 };
 
 export function AddTestDialog({
@@ -837,6 +849,11 @@ export function AddTestDialog({
   showRunAfterSave = false,
   onRun,
   agentNature = "conversation",
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+  position,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -1526,6 +1543,9 @@ export function AddTestDialog({
     params: Array<{ name: string; value: string }>;
   } | null>(null);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  // What the "Discard changes?" prompt on screen is guarding: closing the
+  // dialog, or stepping to another test.
+  const discardActionRef = useRef<(() => void) | null>(null);
   // Shown when the user hits "Run test" while editing with unsaved edits:
   // asks whether to save-then-run or discard-and-run the saved version.
   const [showRunUnsavedConfirm, setShowRunUnsavedConfirm] = useState(false);
@@ -3181,29 +3201,41 @@ export function AddTestDialog({
     else handleSubmit(true);
   };
 
-  const handleBackdropClick = () => {
-    // Skip the discard prompt when the form is unchanged from the baseline
-    // captured after load (pristine open, or edits reverted). When the
-    // baseline hasn't been captured yet — e.g. an existing test is still
-    // loading — keep the prompt to err on the side of not losing edits.
+  // Run `action`, but ask first when the form has edits that would be lost.
+  // Skip the discard prompt when the form is unchanged from the baseline
+  // captured after load (pristine open, or edits reverted). When the
+  // baseline hasn't been captured yet — e.g. an existing test is still
+  // loading — keep the prompt to err on the side of not losing edits.
+  const confirmDiscard = (action: () => void) => {
     if (
       baselineRef.current !== null &&
       serializeFormState() === baselineRef.current
     ) {
-      onClose();
+      action();
       return;
     }
+    discardActionRef.current = action;
     setShowCloseConfirmation(true);
   };
 
+  const handleBackdropClick = () => confirmDiscard(onClose);
+
   const handleConfirmClose = () => {
     setShowCloseConfirmation(false);
-    onClose();
+    const action = discardActionRef.current ?? onClose;
+    discardActionRef.current = null;
+    action();
   };
 
   const handleCancelClose = () => {
     setShowCloseConfirmation(false);
+    discardActionRef.current = null;
   };
+
+  // Stepping to another test throws away unsaved edits just like closing
+  // does, so both go through the same prompt.
+  const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
+  const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
 
   if (!isOpen) return null;
 
@@ -3347,6 +3379,19 @@ export function AddTestDialog({
               />
             </svg>
           </button>
+
+          {/* Previous / next test, centred on the same row as the close
+              button. */}
+          <div className="absolute top-2.5 md:top-3 left-0 right-0 z-20 flex h-8 items-center justify-center">
+            <DialogNavHeader
+              noun={itemNoun}
+              onPrev={navPrev}
+              onNext={navNext}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+              position={position}
+            />
+          </div>
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}

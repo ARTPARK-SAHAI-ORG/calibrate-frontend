@@ -37,6 +37,11 @@ export function useAgentTests({
   const [items, setItems] = useState<AgentTest[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
+  // The offset `items` actually came from. `offset` itself changes the instant
+  // a page turn is requested, before the fetch for it resolves, so a caller
+  // stepping through tests one at a time (useItemPager) needs this one: it
+  // only moves once the page it describes has loaded.
+  const [loadedOffset, setLoadedOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The search text the rows on screen came from. It lags `q` while a new
@@ -72,6 +77,7 @@ export function useAgentTests({
         setItems(rows);
         setTotal(typeof page?.total === "number" ? page.total : rows.length);
         setLoadedQ(q);
+        setLoadedOffset(targetOffset);
       } catch (err) {
         if (requestId !== requestIdRef.current) return;
         reportError("Error fetching agent tests:", err);
@@ -135,6 +141,8 @@ export function useAgentTests({
     total,
     loadedQ,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     refetch,
