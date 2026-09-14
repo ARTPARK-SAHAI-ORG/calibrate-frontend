@@ -1,5 +1,6 @@
 ## September 2026
 
+- You can now step to the next or previous test with arrows while a test is open on an agent's Tests tab, without losing unsaved edits ([#569](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/569))
 - People can now invite others to a workspace by sharing a single link from workspace settings, with the option to replace or turn it off ([#565](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/565))
 - The note explaining why an agent cannot be used in the agent picker now reads on one line instead of breaking apart around the agent kind pill ([#561](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/561))
 - The agent page now shows next to the agent's name whether it holds a conversation or answers single messages, with a tooltip explaining what that means when you hover over it ([#554](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/554))
