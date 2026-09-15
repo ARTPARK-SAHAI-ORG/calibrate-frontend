@@ -24,6 +24,7 @@ import {
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
 export type ConnectionConfig = {
+  connection_type?: "http_chat" | "websocket_voice";
   agent_url?: string;
   agent_headers?: Record<string, string>;
   connection_verified?: boolean;
@@ -74,6 +75,7 @@ export function AgentConnectionTabContent({
   onVerificationSuccess,
 }: AgentConnectionTabContentProps) {
   const verify = useVerifyConnection();
+  const isWebsocketVoice = connectionConfig.connection_type === "websocket_voice";
 
   const [verifyStatus, setVerifyStatus] = useState<VerificationStatus>(() => {
     if (connectionConfig.connection_verified === true) return "verified";
@@ -218,6 +220,10 @@ export function AgentConnectionTabContent({
   const [showToolCalls, setShowToolCalls] = useState(false);
 
   const handleVerifyClick = () => {
+    if (isWebsocketVoice) {
+      void handleVerifyConfirm([]);
+      return;
+    }
     setVerifyDialogOpen(true);
   };
 
@@ -234,13 +240,22 @@ export function AgentConnectionTabContent({
       }
     }
 
-    const success = await verify.verifyAdHoc(
-      agentUrl,
-      currentHeadersObj,
-      messages,
-      inputs,
-      agentNature,
-    );
+    const success = isWebsocketVoice
+      ? await verify.verifyAdHoc(
+          agentUrl,
+          {},
+          [],
+          undefined,
+          agentNature,
+          "websocket_voice",
+        )
+      : await verify.verifyAdHoc(
+          agentUrl,
+          currentHeadersObj,
+          messages,
+          inputs,
+          agentNature,
+        );
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
     const now = success ? new Date().toISOString() : null;
@@ -399,6 +414,26 @@ export function AgentConnectionTabContent({
             </button>
           </div>
 
+          <div className="space-y-1.5">
+            <label className="block text-sm md:text-base font-medium text-foreground">
+              Connection type
+            </label>
+            <select
+              value={connectionConfig.connection_type || "http_chat"}
+              onChange={(e) =>
+                onConnectionConfigChange({
+                  ...connectionConfig,
+                  connection_type: e.target.value as "http_chat" | "websocket_voice",
+                })
+              }
+              disabled={isSaving}
+              className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            >
+              <option value="http_chat">HTTP chat agent</option>
+              <option value="websocket_voice">Pipecat WebSocket voice agent</option>
+            </select>
+          </div>
+
           {/* Agent URL */}
           <div className="space-y-1.5">
             <label className="block text-sm md:text-base font-medium text-foreground">
@@ -408,17 +443,18 @@ export function AgentConnectionTabContent({
               type="url"
               value={agentUrl}
               onChange={(e) => onAgentUrlChange(e.target.value)}
-              placeholder="https://your-agent.example.com/chat"
+              placeholder={isWebsocketVoice ? "wss://your-agent.example.com/ws" : "https://your-agent.example.com/chat"}
               className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
             <p className="text-xs text-muted-foreground">
-              Calibrate will create a POST request to this URL with the{" "}
-              {isGeneral ? "input" : "conversation messages"}
+              {isWebsocketVoice
+                ? "Your agent must use Pipecat's WebSocket protobuf frame protocol."
+                : `Calibrate will create a POST request to this URL with the ${isGeneral ? "input" : "conversation messages"}`}
             </p>
           </div>
 
           {/* Headers */}
-          <div className="space-y-2">
+          {!isWebsocketVoice && <div className="space-y-2">
             <label className="text-sm md:text-base font-medium text-foreground">
               Headers
             </label>
@@ -535,7 +571,7 @@ export function AgentConnectionTabContent({
               </svg>
               Add header
             </button>
-          </div>
+          </div>}
 
           {/* Custom fields (default_inputs) */}
           <CustomFieldsEditor

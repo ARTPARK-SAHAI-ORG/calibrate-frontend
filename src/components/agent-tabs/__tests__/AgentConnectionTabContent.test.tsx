@@ -173,6 +173,29 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
   });
 
+  it("verifies a WebSocket voice endpoint directly", async () => {
+    const user = setupUser();
+    verifyAdHoc.mockResolvedValue(true);
+    renderComponent({
+      agentUrl: "wss://voice.example.com/ws",
+      connectionConfig: makeConfig({ connection_type: "websocket_voice" }),
+    });
+
+    expect(screen.queryByText("Headers")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Verify"));
+
+    await waitFor(() =>
+      expect(verifyAdHoc).toHaveBeenCalledWith(
+        "wss://voice.example.com/ws",
+        {},
+        [],
+        undefined,
+        "websocket_voice",
+      ),
+    );
+    expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
+  });
+
   it("runs a successful verification and reports success", async () => {
     const user = setupUser();
     verifyAdHoc.mockResolvedValue(true);

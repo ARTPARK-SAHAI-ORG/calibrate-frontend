@@ -28,6 +28,7 @@ export type VerifyConnectionResult = {
     messages?: VerifyMessage[],
     defaultInputs?: Record<string, unknown>,
     interactionType?: "conversation" | "general",
+    connectionType?: "http_chat" | "websocket_voice",
   ) => Promise<boolean>;
   dismiss: () => void;
 };
@@ -119,6 +120,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
       messages?: VerifyMessage[],
       defaultInputs?: Record<string, unknown>,
       interactionType?: "conversation" | "general",
+      connectionType: "http_chat" | "websocket_voice" = "http_chat",
     ): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
@@ -149,6 +151,9 @@ export function useVerifyConnection(): VerifyConnectionResult {
             // The agent is not saved yet, so the probe cannot read this off
             // the stored agent the way the saved-agent call does.
             ...(interactionType && { interaction_type: interactionType }),
+            ...(connectionType !== "http_chat" && {
+              connection_type: connectionType,
+            }),
           }),
         });
 

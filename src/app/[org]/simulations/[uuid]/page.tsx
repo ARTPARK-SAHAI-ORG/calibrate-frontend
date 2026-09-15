@@ -883,6 +883,7 @@ export default function SimulationDetailPage() {
                 isCreating={isCreating}
                 onCreateClick={handleCreate}
                 isAgentConnection={selectedAgent?.type === "connection"}
+                isWebsocketVoiceConnection={selectedAgent?.connectionType === "websocket_voice"}
               />
             )}
 

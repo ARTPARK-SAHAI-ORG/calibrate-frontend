@@ -17,6 +17,7 @@ export type Agent = {
   verified?: boolean;
   // True for connection agents that have custom fields (backend `default_inputs`).
   hasDefaultInputs?: boolean;
+  connectionType?: "http_chat" | "websocket_voice";
 };
 
 // Whether an agent has any custom fields. Reads the new top-level
@@ -48,6 +49,10 @@ function formatAgents(data: unknown): Agent[] {
       agent.type === "connection" && agentHasDefaultInputs(agent),
     interaction_type:
       agent.interaction_type === "general" ? "general" : "conversation",
+    connectionType:
+      agent.type === "connection"
+        ? (agent.connection_type ?? agent.config?.connection_type ?? "http_chat")
+        : undefined,
   }));
 }
 

@@ -194,8 +194,22 @@ describe("SimulationConfigTab", () => {
   it("shows the agent-connection voice notice when isAgentConnection is true", () => {
     render(<SimulationConfigTab {...baseProps({ isAgentConnection: true })} />);
     expect(
-      screen.getByText(/Voice simulations are currently only supported/),
+      screen.getByText(/Voice simulations require a Pipecat WebSocket voice connection/),
     ).toBeInTheDocument();
+  });
+
+  it("does not show the voice notice for a WebSocket voice connection", () => {
+    render(
+      <SimulationConfigTab
+        {...baseProps({
+          isAgentConnection: true,
+          isWebsocketVoiceConnection: true,
+        })}
+      />,
+    );
+    expect(
+      screen.queryByText(/Voice simulations require a Pipecat WebSocket voice connection/),
+    ).not.toBeInTheDocument();
   });
 
   it("calls onSelectAgent with the picked agent, and with null on clear", async () => {
