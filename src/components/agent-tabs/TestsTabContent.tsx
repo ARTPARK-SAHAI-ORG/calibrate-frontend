@@ -267,6 +267,16 @@ export function TestsTabContent({
     type: typeFilter,
   });
 
+  // The first request owns the whole view because there is nothing useful to
+  // show yet. Later requests only refresh the list, so keep the search and
+  // filters mounted while that part loads; otherwise the focused input is
+  // removed after every debounced search.
+  const hasLoadedAgentTestsRef = useRef(false);
+  if (!agentTestsLoading && !agentTestsError) {
+    hasLoadedAgentTestsRef.current = true;
+  }
+  const hasLoadedAgentTests = hasLoadedAgentTestsRef.current;
+
   // How many tests this agent has in all. `agentTestsTotal` counts only the
   // ones matching the search and the type, so it cannot answer "does this
   // agent have any tests" or "how many would Run all run": both of those are
@@ -274,7 +284,7 @@ export function TestsTabContent({
   // that number, so it is remembered while a filter is on.
   const isFiltered = typeFilter !== "all" || testsSearch.trim() !== "";
   const linkedTestsTotalRef = useRef(0);
-  if (!isFiltered && !agentTestsLoading) {
+  if (!isFiltered && !agentTestsLoading && !agentTestsError) {
     linkedTestsTotalRef.current = agentTestsTotal;
   }
   const linkedTestsTotal = isFiltered
@@ -1736,7 +1746,7 @@ export function TestsTabContent({
           prefetch (which only starts once we know the agent list is empty),
           so showing the empty state before it resolves makes it briefly look
           like there are no tests available to add. */}
-      {agentTestsLoading ||
+      {(!hasLoadedAgentTests && agentTestsLoading) ||
       (!agentTestsError && linkedTestsTotal === 0 && !allTestsAttempted) ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="flex items-center gap-3">
@@ -1761,7 +1771,7 @@ export function TestsTabContent({
             </svg>
           </div>
         </div>
-      ) : agentTestsError ? (
+      ) : !hasLoadedAgentTests && agentTestsError ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <p className="text-sm md:text-base text-red-500 mb-2">
             {agentTestsError}
@@ -1773,7 +1783,7 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : linkedTestsTotal === 0 ? (
+      ) : !agentTestsError && linkedTestsTotal === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -2021,7 +2031,27 @@ export function TestsTabContent({
               />
 
               {/* Tests Table */}
-              {agentTests.length === 0 ? (
+              {agentTestsLoading ? (
+                <div
+                  data-testid="tests-list-loading"
+                  className="flex-1 min-h-40 border border-border rounded-xl flex items-center justify-center bg-muted/20"
+                >
+                  <SpinnerIcon className="w-5 h-5 animate-spin" />
+                  <span className="sr-only">Loading tests</span>
+                </div>
+              ) : agentTestsError ? (
+                <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                  <p className="text-sm md:text-base text-red-500 mb-2">
+                    {agentTestsError}
+                  </p>
+                  <button
+                    onClick={() => void fetchAgentTests()}
+                    className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : agentTests.length === 0 ? (
                 <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
                   <p className="text-sm md:text-base text-muted-foreground">
                     {loadedTestsSearch || typeFilter !== "all"

@@ -989,6 +989,70 @@ describe("TestsTabContent — populated table", () => {
     await screen.findByText("No tests match your search");
   });
 
+  it("keeps search focused while only the tests list reloads", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const initialFetch = global.fetch as jest.Mock;
+    let resolveSearch: (() => void) | undefined;
+    global.fetch = jest.fn((url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("q=Weather")) {
+        return new Promise<Response>((resolve) => {
+          resolveSearch = () =>
+            resolve(
+              jsonResponse({
+                items: [toolCallTest],
+                total: 1,
+                limit: 10,
+                offset: 0,
+              }),
+            );
+        });
+      }
+      return initialFetch(url, opts);
+    }) as jest.Mock;
+
+    const search = screen.getByPlaceholderText("Search tests");
+    await user.click(search);
+    await user.type(search, "Weather");
+
+    await waitFor(() => expect(resolveSearch).toBeDefined());
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("Weather");
+    expect(screen.getByPlaceholderText("Search tests")).toBe(search);
+    expect(screen.getByTestId("tests-list-loading")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
+
+    const searchCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url]) => String(url).includes("q="),
+    );
+    expect(searchCalls).toHaveLength(1);
+    expect(String(searchCalls[0][0])).toContain("q=Weather");
+
+    await act(async () => resolveSearch?.());
+    expect((await screen.findAllByText("Weather tool test"))[0]).toBeVisible();
+  });
+
+  it("keeps the controls mounted when a later list request fails", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await screen.findAllByText("Weather tool test");
+
+    state.agentTestsInit = { ok: false, status: 500 };
+    const search = screen.getByPlaceholderText("Search tests");
+    await user.click(screen.getByRole("button", { name: "All" }));
+
+    await screen.findByText("Failed to load agent tests");
+    expect(screen.getByPlaceholderText("Search tests")).toBe(search);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText("No tests attached")).not.toBeInTheDocument();
+  });
+
   it("sends the evaluators when a general test is edited", async () => {
     state.agentTests = [generalTest];
     state.testDetail = { ...generalTest, evaluators: [] };
