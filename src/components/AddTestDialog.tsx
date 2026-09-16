@@ -14,7 +14,11 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
-import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import {
+  DEFAULT_LLM_GENERAL_SLUG,
+  isDefaultLLMNextReplyEvaluator,
+  matchesDefaultSlug,
+} from "@/lib/defaultEvaluators";
 import { DialogNavHeader } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
@@ -1421,7 +1425,11 @@ export function AddTestDialog({
     } else {
       setChatMessages(
         sample.history.map((m, i) => ({
-          id: String(i + 1),
+          // Not the "1", "2", "3" the empty boxes already carry: a reused id
+          // keeps the same box on screen, and a box only grows to fit its
+          // text when it is first drawn, so the example would sit clipped to
+          // one line until it was clicked.
+          id: `sample-${i + 1}`,
           role: m.role,
           content: m.content,
         })),
@@ -1869,6 +1877,12 @@ export function AddTestDialog({
   // connected evaluators of the matching type (`llm` for next-reply,
   // `conversation` for the conversation tab), falling back to the seeded
   // default-correctness evaluator on next-reply when the agent has none.
+  // The two judges that ship with the product, either of which a new test can
+  // be seeded with. Only these get the example's criteria.
+  const isBuiltInJudge = (o: LLMEvaluatorOption) =>
+    isDefaultLLMNextReplyEvaluator(o) ||
+    matchesDefaultSlug(o, DEFAULT_LLM_GENERAL_SLUG);
+
   const buildDefaultAttachedForTab = useCallback(
     (tab: TestTab): AttachedEvaluator[] => {
       const isGeneralNextReply = isGeneralTest && tab === "next-reply";
@@ -1877,10 +1891,7 @@ export function AddTestDialog({
         : tab === "conversation"
           ? CONVERSATION_EVALUATOR_TYPE
           : "llm";
-      const toAttached = (
-        o: LLMEvaluatorOption,
-        explicitValues?: Record<string, string>,
-      ): AttachedEvaluator => ({
+      const toAttached = (o: LLMEvaluatorOption): AttachedEvaluator => ({
         evaluator_uuid: o.uuid,
         name: o.name,
         description: o.description,
@@ -1888,7 +1899,13 @@ export function AddTestDialog({
         variables: o.variables,
         variable_values: buildInitialVariableValues(
           o.variables,
-          explicitValues,
+          // The example's criteria goes into the built-in correctness
+          // evaluator wherever it is seeded from: the agent's own list or
+          // the fallback below. An evaluator someone wrote themselves is
+          // left as they wrote it.
+          prefillsSample && isBuiltInJudge(o)
+            ? { criteria: sampleTest(tab, isGeneralTest).criteria }
+            : undefined,
         ),
       });
       const agentSet = new Set(agentEvaluatorUuids ?? []);
@@ -1896,27 +1913,13 @@ export function AddTestDialog({
         (o) => agentSet.has(o.uuid) && o.evaluator_type === wantedType,
       );
       if (isGeneralNextReply)
-        return agentMatches.length > 0
-          ? agentMatches.map((o) => toAttached(o))
-          : [];
-      if (agentMatches.length > 0)
-        return agentMatches.map((o) => toAttached(o));
+        return agentMatches.length > 0 ? agentMatches.map(toAttached) : [];
+      if (agentMatches.length > 0) return agentMatches.map(toAttached);
       if (tab === "next-reply") {
         const correctness = availableLLMEvaluators.find((o) =>
           isDefaultLLMNextReplyEvaluator(o),
         );
-        if (correctness)
-          return [
-            toAttached(
-              correctness,
-              // A brand-new test gets the example's criteria filled in; an
-              // evaluator the reader connected themselves is left as they
-              // wrote it.
-              prefillsSample
-                ? { criteria: sampleTest(tab, isGeneralTest).criteria }
-                : undefined,
-            ),
-          ];
+        if (correctness) return [toAttached(correctness)];
       }
       return [];
     },

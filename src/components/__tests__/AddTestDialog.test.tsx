@@ -388,6 +388,28 @@ describe("AddTestDialog", () => {
       expect(evaluators[0].variable_values.criteria).toContain("Saturday");
     });
 
+    it("fills the criteria when the agent carries the built-in judge itself", async () => {
+      const user = setupUser();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            agentEvaluatorUuids: [CORRECTNESS_EVALUATOR.uuid],
+          })}
+        />,
+      );
+      await pickTestType(user, "Does the agent give the right reply?");
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      // Seeded from the agent's own list rather than the fallback, and it is
+      // still the judge that ships with the product, so it is still filled.
+      const criteria = (await screen.findByPlaceholderText(
+        "Enter value for {{criteria}}",
+      )) as HTMLInputElement;
+      expect(criteria.value).toContain("Saturday");
+    });
+
     it("fills the single input box for a single response agent", async () => {
       const user = setupUser();
       render(<ControlledDialog {...baseProps({ agentNature: "general" })} />);
