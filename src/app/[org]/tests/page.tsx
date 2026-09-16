@@ -1330,7 +1330,7 @@ function LLMPageInner() {
             {/* Desktop Table View */}
             <div className="hidden md:block border border-border rounded-xl overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-[40px_1fr_1fr_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+              <div className="grid grid-cols-[40px_1fr_160px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center">
                   <button
                     type="button"
@@ -1374,7 +1374,7 @@ function LLMPageInner() {
                 <div
                   key={test.uuid}
                   onClick={() => openEditTest(test.uuid)}
-                  className="grid grid-cols-[40px_1fr_1fr_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                  className="grid grid-cols-[40px_1fr_160px_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                 >
                   <div className="flex items-center">
                     <button
@@ -1415,13 +1415,10 @@ function LLMPageInner() {
                   <p className="text-sm text-muted-foreground">
                     {testTypeLabel(test.type, "—")}
                   </p>
-                  {selectedTestUuids.size === 0 && (
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-end gap-2">
                       {/* Drawn exactly like the bulk toolbar's Run and Delete;
                           Duplicate takes the bordered style the labelling
-                          task's items use for Edit. These go while rows are
-                          ticked, so the only actions on screen are the ones
-                          that work on the selection. */}
+                          task's items use for Edit. */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1477,7 +1474,6 @@ function LLMPageInner() {
                         Delete
                       </button>
                     </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -1533,7 +1529,6 @@ function LLMPageInner() {
                       </div>
                     </div>
                   </div>
-                  {selectedTestUuids.size === 0 && (
                     <div className="flex items-center gap-2 px-4 pb-3 pt-0">
                       <button
                         onClick={(e) => {
@@ -1597,7 +1592,6 @@ function LLMPageInner() {
                         Delete
                       </button>
                     </div>
-                  )}
                 </div>
               ))}
             </div>

@@ -827,7 +827,7 @@ describe("TestsTabContent — paging", () => {
     await user.click(screen.getByText("Select all 12 tests"));
     const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
 
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
@@ -859,7 +859,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
@@ -877,7 +877,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -897,7 +897,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
@@ -914,7 +914,7 @@ describe("TestsTabContent — paging", () => {
     await screen.findByText("Showing 1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     // Not every linked test, so the run has to name the 12 that match.
@@ -1083,7 +1083,7 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByTitle("Select all"));
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
-    expect(screen.getByText("Delete")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
     // One removal action only: it deletes, it does not just detach.
     expect(screen.queryByText("Remove")).not.toBeInTheDocument();
 
@@ -1196,22 +1196,6 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByTestId("add-test-name")).toHaveTextContent(
       "Copy of Greeting test",
     );
-  });
-
-  it("takes the row actions away while rows are ticked", async () => {
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-    expect(
-      screen.getAllByRole("button", { name: "Run test" }).length,
-    ).toBeGreaterThan(0);
-
-    await user.click(screen.getByTitle("Select all"));
-
-    // Only the actions that work on the selection are left.
-    expect(screen.queryByRole("button", { name: "Run test" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Duplicate test" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Delete test" })).toBeNull();
   });
 
   it("disables every duplicate button while one copy is loading", async () => {
@@ -1341,7 +1325,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({
       test_uuids: ["t1", "t2"],
@@ -1740,7 +1724,7 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
       "Delete tests",
@@ -1772,7 +1756,7 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 

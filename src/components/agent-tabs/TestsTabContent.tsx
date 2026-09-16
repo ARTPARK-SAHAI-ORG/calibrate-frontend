@@ -182,9 +182,7 @@ const carriesEvaluators = (type: string) =>
 
 // The actions on one test's row, drawn exactly like the bulk toolbar's Run
 // and Delete so the two read as the same thing; Duplicate takes the bordered
-// style the labelling task's items use for Edit. While rows are ticked they
-// all go, the way that page's items do, so the only actions on screen are
-// the ones that work on the selection.
+// style the labelling task's items use for Edit.
 function TestRowActions({
   onRun,
   running,
@@ -2164,7 +2162,7 @@ export function TestsTabContent({
                       given an opaque background so rows don't show through. */}
                     <div className="overflow-y-auto max-h-[60vh]">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_300px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
+                      <div className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
                           <button
                             type="button"
@@ -2194,7 +2192,7 @@ export function TestsTabContent({
                         <div
                           key={test.uuid}
                           onClick={() => testPager.open(test.uuid)}
-                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                         >
                           {/* Checkbox */}
                           <div className="flex items-center">
@@ -2255,8 +2253,6 @@ export function TestsTabContent({
                             </span>
                           </div>
                           <div>
-                            {selectedTestUuids.size === 0 &&
-                              !selectAllMatching && (
                             <TestRowActions
                               onRun={() =>
                                 void launchTestRun([test], false, test.uuid)
@@ -2268,7 +2264,6 @@ export function TestsTabContent({
                               duplicateDisabled={!!duplicatingUuid}
                               onDelete={() => openDeleteDialog(test)}
                             />
-                          )}
                           </div>
                         </div>
                       ))}
@@ -2307,9 +2302,8 @@ export function TestsTabContent({
                               </p>
                             </div>
                           </div>
-                          {selectedTestUuids.size === 0 && !selectAllMatching && (
-                            <div className="flex-shrink-0">
-                              <TestRowActions
+                          <div className="flex-shrink-0">
+                            <TestRowActions
                                 onRun={() =>
                                   void launchTestRun([test], false, test.uuid)
                                 }
@@ -2320,8 +2314,7 @@ export function TestsTabContent({
                                 duplicateDisabled={!!duplicatingUuid}
                                 onDelete={() => openDeleteDialog(test)}
                               />
-                            </div>
-                          )}
+                          </div>
                         </div>
                       </div>
                     ))}
