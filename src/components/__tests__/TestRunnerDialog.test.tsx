@@ -1322,6 +1322,62 @@ describe("TestRunnerDialog", () => {
     );
   });
 
+  it("keeps the open test selected when it finishes and gets its id", async () => {
+    // A test still running comes back with no id, so its row is named by
+    // position; the finished row carries the real id.
+    jest.useFakeTimers({ advanceTimers: true });
+    let polls = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-ids")) {
+        polls += 1;
+        return Promise.resolve(
+          jsonResponse(
+            polls === 1
+              ? {
+                  task_id: "task-ids",
+                  status: "in_progress",
+                  results: [
+                    { test_case_id: null, test_uuid: null, name: "Test One", passed: null },
+                  ],
+                }
+              : {
+                  task_id: "task-ids",
+                  status: "in_progress",
+                  results: [
+                    { test_case_id: "Test One", test_uuid: "uuid-1", name: "Test One", passed: true },
+                  ],
+                },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-ids"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("selected-id")).toHaveTextContent("idx-0"),
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("selected-id")).toHaveTextContent("uuid-1"),
+    );
+    jest.useRealTimers();
+  });
+
   it("selects a test from the outputs panel", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {

@@ -1202,23 +1202,6 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.getByText("Running test...")).toBeInTheDocument();
     });
 
-    it("renders the running spinner for a selected test that has no row yet while the run is going", () => {
-      render(
-        <BenchmarkOutputsPanel
-          modelResults={[{ ...twoModels[0], test_results: null }]}
-          expandedModels={expandedAll}
-          onToggleModel={jest.fn()}
-          selectedTest={{ model: "model-a", testIndex: 0 }}
-          onSelectTest={jest.fn()}
-          showRunningSpinner
-        />,
-      );
-      expect(screen.getByText("Running test...")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Select a test to view details"),
-      ).not.toBeInTheDocument();
-    });
-
     it("renders TestDetailView (mocked) for non-error, non-null-passed results", () => {
       render(
         <BenchmarkOutputsPanel

@@ -57,11 +57,6 @@ type CommonProps = {
   /** Custom labels for binary verdicts. Defaults to Correct / Wrong. */
   trueLabel?: string | null;
   falseLabel?: string | null;
-  /** Per-option rubric for binary verdicts, authored on the evaluator
-   * version. Shown under the option in write mode only, where the
-   * annotator is choosing. Results never show it. */
-  trueDescription?: string | null;
-  falseDescription?: string | null;
   /** Rating-scale entries with per-level display names and optional
    * per-level rubrics. When names are present we also show the label
    * next to each rating button and beside the score / max pill so
@@ -88,6 +83,11 @@ type ReadProps = CommonProps & {
 
 type WriteProps = CommonProps & {
   mode: "write";
+  /** Per-option rubric for binary verdicts, authored on the evaluator
+   * version. Shown under each option while the annotator is choosing.
+   * A result card never shows it, which is why it is not a read prop. */
+  trueDescription?: string | null;
+  falseDescription?: string | null;
   /** Current value the annotator picked. Boolean for binary, number for rating. */
   value?: boolean | number;
   /** Current free-text reasoning the annotator entered. */

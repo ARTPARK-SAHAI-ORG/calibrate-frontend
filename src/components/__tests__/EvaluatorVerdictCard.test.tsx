@@ -711,23 +711,8 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
     expect(onValueChange).toHaveBeenCalledWith(2);
   });
 
-  it("never shows an option's rubric in read mode", () => {
-    const { rerender } = render(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Eval"
-        outputType="binary"
-        match={false}
-        trueDescription="Answers fully."
-        falseDescription="Leaves out the refund window."
-      />,
-    );
-    expect(
-      screen.queryByText("Leaves out the refund window."),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
-
-    rerender(
+  it("never shows a level's rubric in read mode", () => {
+    render(
       <EvaluatorVerdictCard
         mode="read"
         name="Eval"
