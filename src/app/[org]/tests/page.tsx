@@ -40,7 +40,7 @@ import {
   EvaluatorVariableDef,
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
-import { SpinnerIcon } from "@/components/icons";
+import { CopyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import {
   SearchModeInput,
   matchesSearchMode,
@@ -1457,8 +1457,10 @@ function LLMPageInner() {
                         aria-label="Duplicate test"
                         className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {duplicatingUuid === test.uuid && (
+                        {duplicatingUuid === test.uuid ? (
                           <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CopyIcon className="w-3.5 h-3.5" />
                         )}
                         Duplicate
                       </button>
@@ -1469,8 +1471,9 @@ function LLMPageInner() {
                           openDeleteDialog(test);
                         }}
                         aria-label="Delete test"
-                        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+                        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
+                        <TrashIcon className="w-3.5 h-3.5" />
                         Delete
                       </button>
                     </div>

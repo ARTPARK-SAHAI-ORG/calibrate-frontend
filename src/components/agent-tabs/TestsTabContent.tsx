@@ -33,7 +33,7 @@ import {
 } from "@/components/BenchmarkRerunDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
 import { EnableBenchmarkDialog } from "@/components/agent-tabs/EnableBenchmarkDialog";
-import { SpinnerIcon } from "@/components/icons";
+import { SpinnerIcon, CopyIcon, TrashIcon } from "@/components/icons";
 import {
   AddTestDialog,
   TestConfig,
@@ -246,15 +246,20 @@ function TestRowActions({
         aria-label="Duplicate test"
         className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {duplicating && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+        {duplicating ? (
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <CopyIcon className="w-3.5 h-3.5" />
+        )}
         Duplicate
       </button>
       <button
         type="button"
         onClick={onDelete}
         aria-label="Delete test"
-        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
       >
+        <TrashIcon className="w-3.5 h-3.5" />
         Delete
       </button>
     </div>
@@ -2004,8 +2009,9 @@ export function TestsTabContent({
                   <button
                     onClick={() => void openBulkDeleteDialog()}
                     title="Delete the selected tests"
-                    className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+                    className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
+                    <TrashIcon className="w-3.5 h-3.5" />
                     Delete
                   </button>
                   <CompareModelsButton
