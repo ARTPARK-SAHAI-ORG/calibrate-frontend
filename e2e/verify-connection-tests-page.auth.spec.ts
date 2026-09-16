@@ -133,7 +133,7 @@ async function deleteTest(page: Page, name: string): Promise<void> {
   const nameCell = page.getByText(name, { exact: true }).first();
   await expect(nameCell).toBeVisible({ timeout: 20000 });
   await nameCell
-    .locator('xpath=ancestor::div[.//button[@title="Delete test"]][1]')
+    .locator('xpath=ancestor::div[.//button[@aria-label="Delete test"]][1]')
     .getByRole("button", { name: "Delete test" })
     .click();
   await expect(
@@ -149,9 +149,9 @@ async function deleteTest(page: Page, name: string): Promise<void> {
 
 // From the /tests list: open a test's Run dialog, pick the connection agent by
 // name, and click "Run test". Leaves the verify gate to the caller to assert.
-// The desktop table row's run control has aria-label "Run this test" (the
-// mobile card uses "Run test", so this stays unambiguous on the desktop
-// viewport). The RunTestDialog agent picker is a SingleSelectPicker whose
+// The desktop table row's Run button carries aria-label "Run test"; the
+// ancestor step below scopes to the row holding it, which the mobile card's
+// plain-text button never matches. The RunTestDialog agent picker is a SingleSelectPicker whose
 // trigger reads the placeholder "Select an agent"; its options render in a
 // portal (role="option") with a "Search agents" box.
 async function openRunDialogPickAgentAndRun(
@@ -165,8 +165,8 @@ async function openRunDialogPickAgentAndRun(
   const nameCell = page.getByText(testName, { exact: true }).first();
   await expect(nameCell).toBeVisible({ timeout: 20000 });
   await nameCell
-    .locator('xpath=ancestor::div[.//button[@aria-label="Run this test"]][1]')
-    .getByRole("button", { name: "Run this test" })
+    .locator('xpath=ancestor::div[.//button[@aria-label="Run test"]][1]')
+    .getByRole("button", { name: "Run test" })
     .click();
 
   // Scope to the RunTestDialog (its own .fixed.inset-0.z-50 overlay) so the

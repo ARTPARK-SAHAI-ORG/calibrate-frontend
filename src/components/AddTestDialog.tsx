@@ -14,7 +14,11 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
-import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import {
+  DEFAULT_LLM_GENERAL_SLUG,
+  isDefaultLLMNextReplyEvaluator,
+  matchesDefaultSlug,
+} from "@/lib/defaultEvaluators";
 import { DialogNavHeader } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
@@ -36,6 +40,7 @@ import {
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
@@ -941,6 +946,18 @@ export function AddTestDialog({
     setTypeChosen(true);
   };
 
+  // A test written from scratch opens with a worked example already in the
+  // boxes — the same clinic example the type picker just showed — so the
+  // reader edits one rather than filling an empty form. Editing, duplicating
+  // and labelling items all bring their own content, so they are left alone,
+  // and so is any caller that asked for a transcript of its own shape.
+  const prefillsSample =
+    !isLabelItem &&
+    !isEditing &&
+    !initialConfig &&
+    !allowAgentLastMessage &&
+    !requireAssistantLastMessage;
+
   // Available tools state - declared early so it's available for initialConfig parsing
   const [createToolOpen, setCreateToolOpen] = useState(false);
   // Same flow, opened from "Agent tool call" in the conversation history's
@@ -1390,6 +1407,46 @@ export function AddTestDialog({
 
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
+  // Fill the example into the name and the conversation (or the single input)
+  // once, as soon as the reader has picked a test type. Runs only for a test
+  // written from scratch — see `prefillsSample` above.
+  const samplePrefilled = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      samplePrefilled.current = false;
+      return;
+    }
+    if (!prefillsSample || !typeChosen || samplePrefilled.current) return;
+    samplePrefilled.current = true;
+    const sample = sampleTest(activeTab, isGeneralTest);
+    setTestName(sample.name);
+    if (usesPlainInput) {
+      setGeneralInput(sample.input);
+    } else {
+      setChatMessages(
+        sample.history.map((m, i) => ({
+          // Not the "1", "2", "3" the empty boxes already carry: a reused id
+          // keeps the same box on screen, and a box only grows to fit its
+          // text when it is first drawn, so the example would sit clipped to
+          // one line until it was clicked.
+          id: `sample-${i + 1}`,
+          role: m.role,
+          content: m.content,
+        })),
+      );
+    }
+    // setTestName comes from the parent and is not memoised there, so it is
+    // left out: this must run once per open, not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    prefillsSample,
+    typeChosen,
+    activeTab,
+    isGeneralTest,
+    usesPlainInput,
+  ]);
+
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
     setChatMessages([...chatMessages, { id, role, content: "" }]);
@@ -1820,6 +1877,12 @@ export function AddTestDialog({
   // connected evaluators of the matching type (`llm` for next-reply,
   // `conversation` for the conversation tab), falling back to the seeded
   // default-correctness evaluator on next-reply when the agent has none.
+  // The two judges that ship with the product, either of which a new test can
+  // be seeded with. Only these get the example's criteria.
+  const isBuiltInJudge = (o: LLMEvaluatorOption) =>
+    isDefaultLLMNextReplyEvaluator(o) ||
+    matchesDefaultSlug(o, DEFAULT_LLM_GENERAL_SLUG);
+
   const buildDefaultAttachedForTab = useCallback(
     (tab: TestTab): AttachedEvaluator[] => {
       const isGeneralNextReply = isGeneralTest && tab === "next-reply";
@@ -1834,7 +1897,16 @@ export function AddTestDialog({
         description: o.description,
         slug: o.slug,
         variables: o.variables,
-        variable_values: buildInitialVariableValues(o.variables),
+        variable_values: buildInitialVariableValues(
+          o.variables,
+          // The example's criteria goes into the built-in correctness
+          // evaluator wherever it is seeded from: the agent's own list or
+          // the fallback below. An evaluator someone wrote themselves is
+          // left as they wrote it.
+          prefillsSample && isBuiltInJudge(o)
+            ? { criteria: sampleTest(tab, isGeneralTest).criteria }
+            : undefined,
+        ),
       });
       const agentSet = new Set(agentEvaluatorUuids ?? []);
       const agentMatches = availableLLMEvaluators.filter(
@@ -1851,7 +1923,12 @@ export function AddTestDialog({
       }
       return [];
     },
-    [agentEvaluatorUuids, availableLLMEvaluators, isGeneralTest],
+    [
+      agentEvaluatorUuids,
+      availableLLMEvaluators,
+      isGeneralTest,
+      prefillsSample,
+    ],
   );
 
   // Initialize attached evaluators once props + evaluator list have settled.

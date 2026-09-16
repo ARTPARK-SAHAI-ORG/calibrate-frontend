@@ -827,7 +827,7 @@ describe("TestsTabContent — paging", () => {
     await user.click(screen.getByText("Select all 12 tests"));
     const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
 
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
@@ -859,7 +859,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
@@ -877,7 +877,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -897,7 +897,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
@@ -914,7 +914,7 @@ describe("TestsTabContent — paging", () => {
     await screen.findByText("Showing 1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     // Not every linked test, so the run has to name the 12 that match.
@@ -1083,7 +1083,7 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByTitle("Select all"));
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
-    expect(screen.getByText("Delete")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
     // One removal action only: it deletes, it does not just detach.
     expect(screen.queryByText("Remove")).not.toBeInTheDocument();
 
@@ -1147,7 +1147,9 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Duplicate test")[0]);
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
     await screen.findByTestId("add-test-dialog");
     expect(screen.getByTestId("add-test-editing")).toHaveTextContent(
       "creating",
@@ -1157,12 +1159,115 @@ describe("TestsTabContent — populated table", () => {
     );
   });
 
+  it("opens the editor only once the copied test has arrived", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The copied test has not arrived yet: nothing opens, and the row's
+    // button shows it is working. Opening here would leave the editor
+    // holding nothing, which it reads as a test written from scratch.
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    ).toBeDisabled();
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+
+    await screen.findByTestId("add-test-dialog");
+    expect(addTestDialogProps.initialConfig).toBeTruthy();
+    expect(addTestDialogProps.initialEvaluators).toHaveLength(1);
+    expect(screen.getByTestId("add-test-name")).toHaveTextContent(
+      "Copy of Greeting test",
+    );
+  });
+
+  it("disables every duplicate button while one copy is loading", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // A second copy started here would land after the first and replace it
+    // underneath the editor that is about to open.
+    for (const button of screen.getAllByRole("button", {
+      name: "Duplicate test",
+    })) {
+      expect(button).toBeDisabled();
+    }
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+    await screen.findByTestId("add-test-dialog");
+  });
+
+  it("says so when the test being copied cannot be loaded", async () => {
+    const user = setupUser();
+    state.detailInit = { ok: false, status: 500 };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The editor never opens, so its own error slot has nowhere to show.
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
+  it("copies a test that carries no content without falling back to the example", async () => {
+    const user = setupUser();
+    state.testDetail = { ...responseTest, config: undefined, evaluators: [] };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    await screen.findByTestId("add-test-dialog");
+    // An absent config reads as a test written from scratch, which fills the
+    // editor with the example instead of this test's (empty) content.
+    expect(addTestDialogProps.initialConfig).toEqual({});
+  });
+
   it("runs a single test via its row Run button — POSTs just that test's uuid", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Run test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Run test" })[0]);
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({ test_uuids: ["t1"] });
     // The dialog views the run the POST just created.
@@ -1220,7 +1325,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Run"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({
       test_uuids: ["t1", "t2"],
@@ -1301,7 +1406,8 @@ describe("TestsTabContent — run controls while a run is starting", () => {
   });
 
   // The row Run buttons render twice per test (desktop table + mobile card).
-  const runTestButtons = () => screen.getAllByTitle("Run test");
+  const runTestButtons = () =>
+    screen.getAllByRole("button", { name: "Run test" });
   const runAllButton = () =>
     screen.getByText("Run all tests").closest("button") as HTMLButtonElement;
 
@@ -1570,7 +1676,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
     expect(screen.getByTestId("delete-message")).toHaveTextContent(
@@ -1607,7 +1713,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
@@ -1618,7 +1724,7 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
       "Delete tests",
@@ -1650,7 +1756,7 @@ describe("TestsTabContent — delete flows", () => {
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Delete"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1677,7 +1783,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1692,7 +1798,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("CloseDelete"));
     expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
