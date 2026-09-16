@@ -1198,6 +1198,22 @@ describe("TestsTabContent — populated table", () => {
     );
   });
 
+  it("takes the row actions away while rows are ticked", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+    expect(
+      screen.getAllByRole("button", { name: "Run test" }).length,
+    ).toBeGreaterThan(0);
+
+    await user.click(screen.getByTitle("Select all"));
+
+    // Only the actions that work on the selection are left.
+    expect(screen.queryByRole("button", { name: "Run test" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Duplicate test" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete test" })).toBeNull();
+  });
+
   it("disables every duplicate button while one copy is loading", async () => {
     const user = setupUser();
     const routed = global.fetch as jest.Mock;
@@ -1267,7 +1283,7 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Run test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Run test" })[0]);
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({ test_uuids: ["t1"] });
     // The dialog views the run the POST just created.
@@ -1406,7 +1422,8 @@ describe("TestsTabContent — run controls while a run is starting", () => {
   });
 
   // The row Run buttons render twice per test (desktop table + mobile card).
-  const runTestButtons = () => screen.getAllByTitle("Run test");
+  const runTestButtons = () =>
+    screen.getAllByRole("button", { name: "Run test" });
   const runAllButton = () =>
     screen.getByText("Run all tests").closest("button") as HTMLButtonElement;
 

@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import {
   useAccessToken,
   useAgentTests,
@@ -180,6 +181,58 @@ const SHOW_ADD_EXISTING_TEST = false;
 // One place, so the create and update paths cannot drift apart.
 const carriesEvaluators = (type: string) =>
   type === "response" || type === "conversation" || type === "general";
+
+// The actions on one test's row: Run named in words rather than left to a
+// play icon, then copy and delete. While rows are ticked they all go, the
+// way the labelling task's items do, so the only actions on screen are the
+// ones that work on the selection.
+function TestRowActions({
+  onRun,
+  running,
+  runDisabled,
+  onDuplicate,
+  duplicating,
+  duplicateDisabled,
+  onDelete,
+}: {
+  onRun: () => void;
+  running: boolean;
+  runDisabled: boolean;
+  onDuplicate: () => void;
+  duplicating: boolean;
+  duplicateDisabled: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className="flex items-center justify-end gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onRun}
+        disabled={runDisabled}
+        aria-busy={running}
+        // The word on screen is "Run", sitting in this test's own row. Said
+        // out loud it needs the object, and it keeps this apart from the
+        // toolbar's Run, which runs the whole selection.
+        aria-label="Run test"
+        className="h-8 px-3 flex items-center gap-1.5 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {running && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+        Run
+      </button>
+      <DuplicateIconButton
+        onClick={onDuplicate}
+        tooltip="Duplicate test"
+        loading={duplicating}
+        disabled={duplicateDisabled}
+        className="hover:bg-muted/50"
+      />
+      <DeleteIconButton onClick={onDelete} title="Delete test" />
+    </div>
+  );
+}
 
 export function TestsTabContent({
   agentUuid,
@@ -2170,78 +2223,19 @@ export function TestsTabContent({
                               {testTypeLabel(test.type)}
                             </span>
                           </div>
-                          {/* Run Button */}
-                          <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void launchTestRun([test], false, test.uuid);
-                              }}
-                              disabled={startingRun !== null}
-                              aria-busy={startingRun === test.uuid}
-                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                                startingRun !== null
-                                  ? "cursor-not-allowed"
-                                  : "cursor-pointer"
-                              }`}
-                              title="Run test"
-                            >
-                              {startingRun === test.uuid ? (
-                                <SpinnerIcon className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.5}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          {/* Duplicate Button — opens the create dialog pre-filled
-                          from this test; nothing is saved until submit. */}
-                          <div className="flex items-center">
-                            <DuplicateIconButton
-                              onClick={() => openDuplicateTest(test)}
-                              tooltip="Duplicate test"
-                              loading={duplicatingUuid === test.uuid}
-                              disabled={!!duplicatingUuid}
-                              className="hover:bg-muted/50"
+                          {selectedTestUuids.size === 0 && !selectAllMatching && (
+                            <TestRowActions
+                              onRun={() =>
+                                void launchTestRun([test], false, test.uuid)
+                              }
+                              running={startingRun === test.uuid}
+                              runDisabled={startingRun !== null}
+                              onDuplicate={() => openDuplicateTest(test)}
+                              duplicating={duplicatingUuid === test.uuid}
+                              duplicateDisabled={!!duplicatingUuid}
+                              onDelete={() => openDeleteDialog(test)}
                             />
-                          </div>
-                          {/* Delete Button — deletes the test from the
-                          workspace, not just off this agent. */}
-                          <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                              title="Delete test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2279,69 +2273,21 @@ export function TestsTabContent({
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void launchTestRun([test], false, test.uuid);
-                              }}
-                              disabled={startingRun !== null}
-                              aria-busy={startingRun === test.uuid}
-                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                                startingRun !== null
-                                  ? "cursor-not-allowed"
-                                  : "cursor-pointer"
-                              }`}
-                              title="Run test"
-                            >
-                              {startingRun === test.uuid ? (
-                                <SpinnerIcon className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.5}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                            <DuplicateIconButton
-                              onClick={() => openDuplicateTest(test)}
-                              tooltip="Duplicate test"
-                              loading={duplicatingUuid === test.uuid}
-                              disabled={!!duplicatingUuid}
-                              className="hover:bg-muted/50"
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                              title="Delete test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                          {selectedTestUuids.size === 0 && !selectAllMatching && (
+                            <div className="flex-shrink-0">
+                              <TestRowActions
+                                onRun={() =>
+                                  void launchTestRun([test], false, test.uuid)
+                                }
+                                running={startingRun === test.uuid}
+                                runDisabled={startingRun !== null}
+                                onDuplicate={() => openDuplicateTest(test)}
+                                duplicating={duplicatingUuid === test.uuid}
+                                duplicateDisabled={!!duplicatingUuid}
+                                onDelete={() => openDeleteDialog(test)}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
