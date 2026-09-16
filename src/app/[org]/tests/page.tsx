@@ -1443,7 +1443,7 @@ function LLMPageInner() {
                       onClick={() => openDuplicateTest(test)}
                       tooltip="Duplicate test"
                       loading={duplicatingUuid === test.uuid}
-                              disabled={!!duplicatingUuid}
+                      disabled={!!duplicatingUuid}
                     />
                     {/* Delete Button */}
                     <DeleteIconButton
@@ -1528,7 +1528,8 @@ function LLMPageInner() {
                         e.stopPropagation();
                         openDuplicateTest(test);
                       }}
-                      className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md text-xs font-medium text-foreground bg-muted hover:bg-muted/70 transition-colors"
+                      disabled={!!duplicatingUuid}
+                      className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md text-xs font-medium text-foreground bg-muted hover:bg-muted/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg
                         className="w-4 h-4"
