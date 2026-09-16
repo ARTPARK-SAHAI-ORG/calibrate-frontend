@@ -13,7 +13,7 @@ export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
 export { useMaxRowsPerEval, getMaxRowsPerEval } from "./useMaxRowsPerEval";
 export { useTraces } from "./useTraces";
-export { useTraceLabels } from "./useTraceLabels";
+export { useTraceLabels, useTraceMetadataKeys } from "./useTraceLabels";
 export { useAgentTests } from "./useAgentTests";
 export {
   useAgentRuns,

@@ -9,6 +9,7 @@ import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
+import { TracesFilterDialog } from "@/components/traces/TracesFilterDialog";
 import {
   AddRunToLabellingTaskDialog,
   isLabellableOutput,
@@ -18,15 +19,13 @@ import {
   type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
-import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
-import { SearchIcon } from "@/components/icons";
+import { FilterIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
   Button,
   LoadingState,
   SearchInput,
-  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
@@ -37,26 +36,19 @@ import {
   usePageSize,
   useTraceDeletion,
   useTraceLabels,
+  useTraceMetadataKeys,
   useTraces,
 } from "@/hooks";
 import {
+  countTraceFilters,
   fetchTrace,
   fetchTraces,
+  NO_TRACE_FILTERS,
   type TraceDetail,
-  type TraceOutputFilter,
+  type TraceFilterValues,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
-
-/** What a trace's output can be filtered down to. A trace that both replied
- *  and called tools counts as a reply, which is also how "Add to tests"
- *  decides: one selected trace with a reply makes the whole batch judge
- *  replies. */
-const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "response", label: "Response" },
-  { value: "tool_call", label: "Tool call" },
-];
 
 /**
  * The Traces tab on the agent detail page: the production conversations sent
@@ -103,27 +95,29 @@ export function TracesTabContent({
     return () => window.clearTimeout(handle);
   }, [searchInput]);
 
-  // Which kind of output to list. "response" is a trace whose agent replied,
-  // "tool_call" one that only called tools. Like the search, the backend does
-  // the filtering, so the count and the pages cover every matching trace and
-  // not just the ones on screen.
-  const [outputFilter, setOutputFilter] = useState<TraceOutputFilter>("all");
+  // Everything narrowing the list other than the search box: the kind of
+  // output, the labels, the metadata keys, and text in the input or the
+  // output. All of it is set in one window and applied together. Like the
+  // search, the backend does the filtering, so the count and the pages cover
+  // every matching trace and not just the ones on screen.
+  const [filters, setFilters] = useState<TraceFilterValues>(NO_TRACE_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterCount = countTraceFilters(filters);
 
-  // The tags sent with the traces, and the ones picked to filter by. A trace
-  // matches when it carries any of the picked ones. The whole set comes from
-  // the backend, since one page of rows is never all of them.
+  // The labels and metadata keys the traces carry, for the window to offer.
+  // Both come from the backend, since one page of rows is never all of them.
   const { labels: allLabels, refetch: refetchLabels } = useTraceLabels(
     accessToken,
     agentUuid,
   );
-  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const { keys: allMetadataKeys, refetch: refetchMetadataKeys } =
+    useTraceMetadataKeys(accessToken, agentUuid);
 
   const {
     items,
     total,
     loadedQ,
-    loadedOutputType,
-    loadedLabels,
+    loadedFilters,
     offset,
     setOffset,
     loadedOffset,
@@ -140,20 +134,14 @@ export function TracesTabContent({
     agentId: agentUuid,
     pageSize,
     q: search,
-    outputType: outputFilter,
-    labels: labelFilter,
+    ...filters,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
   // endpoints re-read the same rows from these filters, so the pages the
   // reader never loaded are included and a stale tick cannot slip through.
   const [everyTraceMatching, setEveryTraceMatching] = useState(false);
-  const traceFilters = {
-    agentId: agentUuid,
-    q: search,
-    outputType: outputFilter,
-    labels: labelFilter,
-  };
+  const traceFilters = { agentId: agentUuid, q: search, ...filters };
 
   const deletion = useTraceDeletion({
     traces: items,
@@ -346,9 +334,7 @@ export function TracesTabContent({
           fetchTraces(accessToken, {
             limit: 1,
             offset: 0,
-            agentId: agentUuid,
-            q: search,
-            labels: labelFilter,
+            ...traceFilters,
             outputType,
           }),
         ),
@@ -390,7 +376,7 @@ export function TracesTabContent({
     pickedRef.current.clear();
     deletion.clearSelection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter, labelFilter]);
+  }, [search, filters]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -411,6 +397,7 @@ export function TracesTabContent({
       // New traces can carry labels nothing has seen yet, so the filter's
       // choices are read again with them.
       refetchLabels();
+      refetchMetadataKeys();
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -461,17 +448,12 @@ export function TracesTabContent({
   // screen are still the old search until the full list has loaded back.
   const isSearching =
     searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
-  // A chosen output kind counts the same way: once one is on, an empty list can
-  // no longer mean "this agent never sent a trace". Both the chosen value and
-  // the one the rows came from count, because after the filter is set back to
-  // All the rows on screen are still the filtered ones until the full list has
+  // A filter counts the same way: once one is on, an empty list can no longer
+  // mean "this agent never sent a trace". Both the filters the reader set and
+  // the ones the rows on screen came from count, because after a filter is
+  // cleared the rows are still the filtered ones until the full list has
   // loaded back.
-  const isFilteringOutput =
-    outputFilter !== "all" || loadedOutputType !== "all";
-  // Picked labels narrow the list the same way, and the rows on screen are
-  // still the filtered ones until a cleared filter has loaded back.
-  const isFiltering =
-    isFilteringOutput || labelFilter.length > 0 || loadedLabels.length > 0;
+  const isFiltering = filterCount > 0 || countTraceFilters(loadedFilters) > 0;
   const isNarrowed = isSearching || isFiltering;
   const noMatchMessage =
     isSearching && isFiltering
@@ -503,33 +485,23 @@ export function TracesTabContent({
             placeholder="Search traces"
             className="w-full sm:w-2/5"
           />
-          <SegmentedFilter
-            value={outputFilter}
-            onChange={setOutputFilter}
-            options={OUTPUT_FILTER_OPTIONS}
-            className="sm:mr-auto"
-            ariaLabel="Filter traces by output"
-          />
-          {/* Only worth showing once traces carry labels; an agent that sends
-              none would otherwise get an empty picker it can do nothing with. */}
-          {allLabels.length > 0 && (
-            <MultiSelectPicker
-              items={allLabels.map((label) => ({ uuid: label, name: label }))}
-              selectedItems={labelFilter.map((label) => ({
-                uuid: label,
-                name: label,
-              }))}
-              onSelectionChange={(picked) =>
-                setLabelFilter(picked.map((item) => item.uuid))
-              }
-              placeholder="All labels"
-              searchPlaceholder="Search labels"
-              size="sm"
-              className="w-full sm:w-48"
-            />
-          )}
-          {/* Both stand the same height as the search box and the labels
-              picker beside them. */}
+          {/* One button for every filter, so the toolbar stays the same
+              however many filters there are. */}
+          <Button
+            variant="secondary"
+            onClick={() => setFilterOpen(true)}
+            className="sm:mr-auto inline-flex items-center gap-2"
+          >
+            <FilterIcon className="w-4 h-4" />
+            Filters
+            {filterCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-foreground text-background text-xs font-medium">
+                {filterCount}
+              </span>
+            )}
+          </Button>
+          {/* Stands the same height as the search box and the filter
+              button beside it. */}
           <RefreshButton
             size="md"
             loading={isRefreshing}
@@ -550,6 +522,7 @@ export function TracesTabContent({
           onCheckForTraces={async () => {
             // The first trace is also the first chance to have labels.
             refetchLabels();
+            refetchMetadataKeys();
             return refetch();
           }}
         />
@@ -612,9 +585,9 @@ export function TracesTabContent({
                       // The pages behind this one are unread, so the backend
                       // says what kinds they hold before anything is made.
                       const kind =
-                        outputFilter === "all"
+                        filters.outputType === "all"
                           ? await wholeListKindOf()
-                          : outputFilter;
+                          : filters.outputType;
                       if (!kind) return;
                       if (kind === "mixed") {
                         toast.error(
@@ -699,6 +672,15 @@ export function TracesTabContent({
         </div>
       )}
 
+      <TracesFilterDialog
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        value={filters}
+        onApply={setFilters}
+        allLabels={allLabels}
+        allMetadataKeys={allMetadataKeys}
+      />
+
       <TraceIngestCodeDialog
         isOpen={codeOpen}
         onClose={() => setCodeOpen(false)}
@@ -737,17 +719,18 @@ export function TracesTabContent({
                 // Only one kind of test is made per call, so an unfiltered
                 // list is pinned to the kind the counts found.
                 outputType:
-                  outputFilter === "all" && wholeListKind !== "mixed"
+                  filters.outputType === "all" && wholeListKind !== "mixed"
                     ? (wholeListKind ?? "all")
-                    : outputFilter,
+                    : filters.outputType,
               }
             : null
         }
         traceCount={selectionCount}
         testType={
           everyTraceMatching
-            ? (outputFilter === "all" ? wholeListKind : outputFilter) ===
-              "tool_call"
+            ? (filters.outputType === "all"
+                ? wholeListKind
+                : filters.outputType) === "tool_call"
               ? "tool_call"
               : isGeneral
                 ? "general"
