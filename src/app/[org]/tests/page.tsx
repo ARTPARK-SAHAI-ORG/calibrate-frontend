@@ -961,7 +961,10 @@ function LLMPageInner() {
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply"
       );
-      setInitialConfig(testData.config ? (testData.config as TestConfig) : undefined);
+      // Always hand the dialog a config, even for a test that carries none:
+      // an absent one reads as a test written from scratch, which fills the
+      // form with the example instead of this test's content.
+      setInitialConfig((testData.config ?? {}) as TestConfig);
       if (Array.isArray(testData.evaluators)) {
         setInitialEvaluators(
           testData.evaluators.map((e) => ({

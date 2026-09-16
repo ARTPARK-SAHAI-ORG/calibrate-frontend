@@ -1147,7 +1147,9 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Duplicate test")[0]);
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
     await screen.findByTestId("add-test-dialog");
     expect(screen.getByTestId("add-test-editing")).toHaveTextContent(
       "creating",
@@ -1155,6 +1157,61 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByTestId("add-test-name")).toHaveTextContent(
       "Copy of Greeting test",
     );
+  });
+
+  it("opens the editor only once the copied test has arrived", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The copied test has not arrived yet: nothing opens, and the row's
+    // button shows it is working. Opening here would leave the editor
+    // holding nothing, which it reads as a test written from scratch.
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    ).toBeDisabled();
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+
+    await screen.findByTestId("add-test-dialog");
+    expect(addTestDialogProps.initialConfig).toBeTruthy();
+    expect(addTestDialogProps.initialEvaluators).toHaveLength(1);
+    expect(screen.getByTestId("add-test-name")).toHaveTextContent(
+      "Copy of Greeting test",
+    );
+  });
+
+  it("copies a test that carries no content without falling back to the example", async () => {
+    const user = setupUser();
+    state.testDetail = { ...responseTest, config: undefined, evaluators: [] };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    await screen.findByTestId("add-test-dialog");
+    // An absent config reads as a test written from scratch, which fills the
+    // editor with the example instead of this test's (empty) content.
+    expect(addTestDialogProps.initialConfig).toEqual({});
   });
 
   it("runs a single test via its row Run button — POSTs just that test's uuid", async () => {

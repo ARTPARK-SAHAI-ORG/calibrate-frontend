@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
+import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import {
   useAccessToken,
   useAgentTests,
@@ -345,6 +346,9 @@ export function TestsTabContent({
   // endpoint with agent_uuids: [agentUuid].
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
+  // The test whose duplicate button is waiting on its fetch, so that row's
+  // button can show a spinner while the dialog stays closed.
+  const [duplicatingUuid, setDuplicatingUuid] = useState<string | null>(null);
   const [initialTab, setInitialTab] = useState<
     "next-reply" | "tool-invocation" | "conversation" | undefined
   >(undefined);
@@ -1133,9 +1137,8 @@ export function TestsTabContent({
   // via POST /tests/bulk — nothing is persisted until the user submits.
   const openDuplicateTest = async (test: TestData) => {
     try {
-      setIsLoadingTest(true);
+      setDuplicatingUuid(test.uuid);
       setEditingTestUuid(null);
-      setCreateDialogOpen(true);
       setCreateError(null);
       setNameConflictError(null);
       setValidationAttempted(false);
@@ -1165,9 +1168,10 @@ export function TestsTabContent({
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply",
       );
-      if (testData.config) {
-        setInitialConfig(testData.config as TestConfig);
-      }
+      // Always hand the dialog a config, even for a test that carries none:
+      // an absent one reads as a test written from scratch, which fills the
+      // form with the example instead of this test's content.
+      setInitialConfig((testData.config ?? {}) as TestConfig);
       if (Array.isArray(testData.evaluators)) {
         setInitialEvaluators(
           testData.evaluators.map((e) => ({
@@ -1182,13 +1186,18 @@ export function TestsTabContent({
       } else {
         setInitialEvaluators([]);
       }
+
+      // Open only now that the copied test is in hand. Opening first and
+      // filling in afterwards leaves the dialog holding nothing for a moment,
+      // which it reads as a test written from scratch: it fills in the example
+      // and settles its evaluators before this test's own arrive.
+      setCreateDialogOpen(true);
     } catch (err) {
       reportError("Error duplicating test:", err);
-      setCreateError(
-        err instanceof Error ? err.message : "Failed to load test",
-      );
+      // The dialog never opened, so its own error slot has nowhere to show.
+      toast.error("Could not open a copy of this test. Please try again.");
     } finally {
-      setIsLoadingTest(false);
+      setDuplicatingUuid(null);
     }
   };
 
@@ -2199,28 +2208,12 @@ export function TestsTabContent({
                           {/* Duplicate Button — opens the create dialog pre-filled
                           from this test; nothing is saved until submit. */}
                           <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDuplicateTest(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                              title="Duplicate test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                                />
-                              </svg>
-                            </button>
+                            <DuplicateIconButton
+                              onClick={() => openDuplicateTest(test)}
+                              tooltip="Duplicate test"
+                              loading={duplicatingUuid === test.uuid}
+                              className="hover:bg-muted/50"
+                            />
                           </div>
                           {/* Delete Button — deletes the test from the
                           workspace, not just off this agent. */}
@@ -2318,28 +2311,12 @@ export function TestsTabContent({
                                 </svg>
                               )}
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDuplicateTest(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                              title="Duplicate test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                                />
-                              </svg>
-                            </button>
+                            <DuplicateIconButton
+                              onClick={() => openDuplicateTest(test)}
+                              tooltip="Duplicate test"
+                              loading={duplicatingUuid === test.uuid}
+                              className="hover:bg-muted/50"
+                            />
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
