@@ -1443,6 +1443,7 @@ function LLMPageInner() {
                       onClick={() => openDuplicateTest(test)}
                       tooltip="Duplicate test"
                       loading={duplicatingUuid === test.uuid}
+                              disabled={!!duplicatingUuid}
                     />
                     {/* Delete Button */}
                     <DeleteIconButton

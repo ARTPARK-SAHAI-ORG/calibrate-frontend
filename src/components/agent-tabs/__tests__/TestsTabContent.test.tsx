@@ -1198,6 +1198,39 @@ describe("TestsTabContent — populated table", () => {
     );
   });
 
+  it("disables every duplicate button while one copy is loading", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // A second copy started here would land after the first and replace it
+    // underneath the editor that is about to open.
+    for (const button of screen.getAllByRole("button", {
+      name: "Duplicate test",
+    })) {
+      expect(button).toBeDisabled();
+    }
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+    await screen.findByTestId("add-test-dialog");
+  });
+
   it("copies a test that carries no content without falling back to the example", async () => {
     const user = setupUser();
     state.testDetail = { ...responseTest, config: undefined, evaluators: [] };

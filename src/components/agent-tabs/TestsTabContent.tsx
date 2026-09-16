@@ -2212,6 +2212,7 @@ export function TestsTabContent({
                               onClick={() => openDuplicateTest(test)}
                               tooltip="Duplicate test"
                               loading={duplicatingUuid === test.uuid}
+                              disabled={!!duplicatingUuid}
                               className="hover:bg-muted/50"
                             />
                           </div>
@@ -2315,6 +2316,7 @@ export function TestsTabContent({
                               onClick={() => openDuplicateTest(test)}
                               tooltip="Duplicate test"
                               loading={duplicatingUuid === test.uuid}
+                              disabled={!!duplicatingUuid}
                               className="hover:bg-muted/50"
                             />
                             <button
