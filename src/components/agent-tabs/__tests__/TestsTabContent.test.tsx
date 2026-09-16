@@ -1231,6 +1231,21 @@ describe("TestsTabContent — populated table", () => {
     await screen.findByTestId("add-test-dialog");
   });
 
+  it("says so when the test being copied cannot be loaded", async () => {
+    const user = setupUser();
+    state.detailInit = { ok: false, status: 500 };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The editor never opens, so its own error slot has nowhere to show.
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
   it("copies a test that carries no content without falling back to the example", async () => {
     const user = setupUser();
     state.testDetail = { ...responseTest, config: undefined, evaluators: [] };
