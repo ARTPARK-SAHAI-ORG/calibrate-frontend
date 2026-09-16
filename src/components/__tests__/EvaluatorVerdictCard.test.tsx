@@ -711,56 +711,7 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
     expect(onValueChange).toHaveBeenCalledWith(2);
   });
 
-  it("shows only the given verdict's rubric in read mode", () => {
-    const { rerender } = render(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Eval"
-        outputType="binary"
-        match={false}
-        trueDescription="Answers fully."
-        falseDescription="Leaves out the refund window."
-      />,
-    );
-    expect(
-      screen.getByText("Leaves out the refund window."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
-
-    rerender(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Eval"
-        outputType="rating"
-        score={2}
-        scaleMin={1}
-        scaleMax={2}
-        ratingScale={[
-          { value: 1, name: "Bad", description: "Ignores the question." },
-          { value: 2, name: "Good", description: "Answers it fully." },
-        ]}
-      />,
-    );
-    expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
-    expect(screen.queryByText("Ignores the question.")).not.toBeInTheDocument();
-
-    rerender(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Eval"
-        outputType="binary"
-        match={true}
-        trueDescription="Answers fully."
-        falseDescription="Leaves out the refund window."
-      />,
-    );
-    expect(screen.getByText("Answers fully.")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Leaves out the refund window."),
-    ).not.toBeInTheDocument();
-  });
-
-  it("keeps the read-mode rubric under a recorded label that renames the level", () => {
+  it("never shows a level's rubric in read mode", () => {
     render(
       <EvaluatorVerdictCard
         mode="read"
@@ -770,13 +721,15 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
         scaleMin={1}
         scaleMax={2}
         ratingLabel="Excellent"
-        ratingScale={[{ value: 2, name: "Good", description: "Answers it fully." }]}
+        ratingScale={[
+          { value: 1, name: "Bad", description: "Ignores the question." },
+          { value: 2, name: "Good", description: "Answers it fully." },
+        ]}
       />,
     );
-    // The recorded name wins for the pill, but the rubric still comes
-    // from the local scale entry for this score.
     expect(screen.getByText("Excellent")).toBeInTheDocument();
-    expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
+    expect(screen.queryByText("Answers it fully.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ignores the question.")).not.toBeInTheDocument();
   });
 
   it("marks the picked option as pressed so it is not signalled by colour alone", () => {
@@ -798,23 +751,6 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
       "aria-pressed",
       "false",
     );
-  });
-
-  it("shows no rubric in read mode when there is no verdict", () => {
-    render(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Eval"
-        outputType="binary"
-        match={null}
-        trueDescription="Answers fully."
-        falseDescription="Leaves out the refund window."
-      />,
-    );
-    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Leaves out the refund window."),
-    ).not.toBeInTheDocument();
   });
 });
 

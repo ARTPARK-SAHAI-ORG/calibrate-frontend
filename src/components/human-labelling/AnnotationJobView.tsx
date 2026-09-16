@@ -1480,8 +1480,6 @@ function EvaluatorsPane({
               reasoning={typeof f?.comment === "string" ? f.comment : null}
               trueLabel={trueLabel}
               falseLabel={falseLabel}
-              trueDescription={trueDescription}
-              falseDescription={falseDescription}
               ratingScale={ratingScale}
             />
           );

@@ -57,11 +57,6 @@ type CommonProps = {
   /** Custom labels for binary verdicts. Defaults to Correct / Wrong. */
   trueLabel?: string | null;
   falseLabel?: string | null;
-  /** Per-option rubric for binary verdicts, authored on the evaluator
-   * version. Shown under the option in write mode, and under the verdict
-   * in read mode. Optional — nothing renders when absent. */
-  trueDescription?: string | null;
-  falseDescription?: string | null;
   /** Rating-scale entries with per-level display names and optional
    * per-level rubrics. When names are present we also show the label
    * next to each rating button and beside the score / max pill so
@@ -88,6 +83,11 @@ type ReadProps = CommonProps & {
 
 type WriteProps = CommonProps & {
   mode: "write";
+  /** Per-option rubric for binary verdicts, authored on the evaluator
+   * version. Shown under each option while the annotator is choosing.
+   * A result card never shows it, which is why it is not a read prop. */
+  trueDescription?: string | null;
+  falseDescription?: string | null;
   /** Current value the annotator picked. Boolean for binary, number for rating. */
   value?: boolean | number;
   /** Current free-text reasoning the annotator entered. */
@@ -176,12 +176,6 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   const surface = evaluatorCardSurfaceClass(tone);
 
-  // Read mode has no option buttons, so the per-option rubric that write
-  // mode shows under every choice collapses to just the one for the
-  // verdict that was actually given.
-  const verdictDescription =
-    props.mode === "read" ? readVerdictDescription(props) : null;
-
   return (
     <div className={`${surface} p-3 space-y-3`}>
       {/* Header: name + verdict pill + toggle on one row; description
@@ -241,11 +235,6 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         {props.description && (
           <p className="text-xs text-muted-foreground whitespace-normal break-words">
             {props.description}
-          </p>
-        )}
-        {verdictDescription && (
-          <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-border pl-2">
-            {verdictDescription}
           </p>
         )}
       </div>
@@ -605,25 +594,6 @@ function WriteControls({
         );
       })}
     </div>
-  );
-}
-
-// The rubric for the verdict a read-mode card is displaying, if the
-// evaluator authored one for that option.
-function readVerdictDescription(p: ReadProps): string | null {
-  if (p.outputType === "binary") {
-    if (p.match === true) return p.trueDescription?.trim() || null;
-    if (p.match === false) return p.falseDescription?.trim() || null;
-    return null;
-  }
-  if (typeof p.score !== "number") return null;
-  // The pill prefers the caller's pre-resolved `ratingLabel` (the backend's
-  // recorded value_name) over the local level name, but the rubric still
-  // comes from the local scale: the recorded label renames the level, it
-  // does not disqualify its description. Same resolution ItemDetailDialog
-  // uses when it overrides a scale entry's name with the recorded one.
-  return (
-    p.ratingScale?.find((e) => e.value === p.score)?.description?.trim() || null
   );
 }
 

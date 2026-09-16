@@ -359,30 +359,7 @@ describe("JudgeResultsList", () => {
     expect(screen.getAllByText("Evaluator").length).toBeGreaterThan(0);
   });
 
-  it("shows the per-option rubric for a binary evaluator's verdict", () => {
-    render(
-      <JudgeResultsList
-        results={[{ evaluator_uuid: "ev-1", match: false }]}
-        evaluatorsByUuid={{
-          "ev-1": {
-            uuid: "ev-1",
-            name: "Correctness",
-            output_type: "binary",
-            output_config: {
-              scale: [
-                { value: true, name: "Yes", description: "Answers fully." },
-                { value: false, name: "No", description: "Misses the date." },
-              ],
-            },
-          },
-        }}
-      />,
-    );
-    expect(screen.getByText("Misses the date.")).toBeInTheDocument();
-    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
-  });
-
-  it("keeps the rubric under a recorded label that renames the local option", () => {
+  it("shows the picked option's label on a result card, never its description", () => {
     render(
       <JudgeResultsList
         results={[
@@ -395,39 +372,19 @@ describe("JudgeResultsList", () => {
             output_type: "binary",
             output_config: {
               scale: [
-                { value: true, name: "Good", description: "Local v9 rubric." },
-              ],
-            },
-          },
-        }}
-      />,
-    );
-    // The recorded name wins for the label, but it renames the option
-    // rather than disqualifying its rubric — same resolution
-    // ItemDetailDialog uses for a per-row recorded name.
-    expect(screen.getByText("Excellent")).toBeInTheDocument();
-    expect(screen.getByText("Local v9 rubric.")).toBeInTheDocument();
-  });
-
-  it("keeps the rubric when the recorded label agrees with the local scale", () => {
-    render(
-      <JudgeResultsList
-        results={[{ evaluator_uuid: "ev-1", match: true, value_name: "Good" }]}
-        evaluatorsByUuid={{
-          "ev-1": {
-            uuid: "ev-1",
-            name: "Correctness",
-            output_type: "binary",
-            output_config: {
-              scale: [
                 { value: true, name: "Good", description: "Answers fully." },
+                { value: false, name: "No", description: "Misses the date." },
               ],
             },
           },
         }}
       />,
     );
-    expect(screen.getByText("Answers fully.")).toBeInTheDocument();
+    // The description helps an annotator choose while labelling; a result
+    // card only says which option was picked.
+    expect(screen.getByText("Excellent")).toBeInTheDocument();
+    expect(screen.queryByText("Answers fully.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Misses the date.")).not.toBeInTheDocument();
   });
 
   it("does not read a rating evaluator's levels as binary labels or rubrics", () => {

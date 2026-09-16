@@ -165,7 +165,11 @@ export function TestRunnerDialog({
   // nothing has to put it back. Kept apart from the run's own failed status: a
   // run that failed still has rows to show.
   const [loadFailed, setLoadFailed] = useState(false);
-  const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
+  // The open test is remembered by its position, not its id. A test still
+  // running comes back from the backend with no id, so its row is named by
+  // position until it finishes and gets its real id; a selection held by id
+  // would point at nothing the moment the test finished.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
     useState<DefaultEvaluatorSummary | null>(null);
@@ -245,7 +249,7 @@ export function TestRunnerDialog({
     let isFirstRead = true;
     setRun(cached ?? null);
     setIsLoading(!cached);
-    setSelectedTestUuid(null);
+    setSelectedIndex(null);
     if (cached) {
       isFirstRead = false;
       setActiveTab(landsOnResults(cached.status) ? "summary" : "tests");
@@ -322,6 +326,12 @@ export function TestRunnerDialog({
     () => toRows(run?.results ?? [], run ? isRunStopped(run) : false),
     [run],
   );
+  const selectedTestUuid =
+    selectedIndex === null ? null : (rows[selectedIndex]?.id ?? null);
+  const selectTest = (id: string | null) => {
+    const index = id === null ? -1 : rows.findIndex((r) => r.id === id);
+    setSelectedIndex(index === -1 ? null : index);
+  };
 
   const runEvaluators = useMemo(
     () => (Array.isArray(run?.evaluators) ? run.evaluators : []),
@@ -336,23 +346,17 @@ export function TestRunnerDialog({
     [run],
   );
 
-  // Auto-open the first completed test when nothing is selected. Covers both
-  // - live runs: as soon as one test transitions to passed/failed (and the
-  //   user hasn't manually picked anything), open it.
-  // - past completed runs: on dialog open every test is already passed/failed
-  //   so this picks index 0 (i.e. always opens the first test).
-  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
+  // Open the first test as soon as the run lists one, whatever its state, so
+  // the window never opens on "Select a test to view details". A test still
+  // going shows its spinner and fills in when it finishes. Fires at most once
+  // per dialog open thanks to `hasAutoSelectedRef`.
   useEffect(() => {
     if (hasAutoSelectedRef.current) return;
-    if (selectedTestUuid !== null) return;
-    const firstCompleted = rows.find(
-      (r) => r.status === "passed" || r.status === "failed",
-    );
-    if (firstCompleted) {
+    if (rows.length > 0) {
       hasAutoSelectedRef.current = true;
-      setSelectedTestUuid(firstCompleted.id);
+      setSelectedIndex(0);
     }
-  }, [rows, selectedTestUuid]);
+  }, [rows]);
 
   const passedTests = rows.filter((r) => r.status === "passed");
   // Tests that produced no answer are their own category in the list; keep
@@ -857,8 +861,8 @@ export function TestRunnerDialog({
                     loading: r.loading,
                   }))}
                   selectedId={selectedTestUuid}
-                  onSelect={setSelectedTestUuid}
-                  onClearSelection={() => setSelectedTestUuid(null)}
+                  onSelect={selectTest}
+                  onClearSelection={() => selectTest(null)}
                   onNavChange={setNav}
                   evaluatorsByUuid={evaluatorsByUuid}
                   emptyMessage={
