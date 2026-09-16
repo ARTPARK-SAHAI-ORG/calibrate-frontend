@@ -1692,7 +1692,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
     expect(screen.getByTestId("delete-message")).toHaveTextContent(
@@ -1729,7 +1729,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
@@ -1799,7 +1799,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1814,7 +1814,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("CloseDelete"));
     expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();

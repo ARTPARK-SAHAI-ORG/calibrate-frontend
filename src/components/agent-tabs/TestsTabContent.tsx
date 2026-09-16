@@ -5,8 +5,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
-import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import {
   useAccessToken,
   useAgentTests,
@@ -182,10 +180,11 @@ const SHOW_ADD_EXISTING_TEST = false;
 const carriesEvaluators = (type: string) =>
   type === "response" || type === "conversation" || type === "general";
 
-// The actions on one test's row: Run named in words rather than left to a
-// play icon, then copy and delete. While rows are ticked they all go, the
-// way the labelling task's items do, so the only actions on screen are the
-// ones that work on the selection.
+// The actions on one test's row, drawn exactly like the bulk toolbar's Run
+// and Delete so the two read as the same thing; Duplicate takes the bordered
+// style the labelling task's items use for Edit. While rows are ticked they
+// all go, the way that page's items do, so the only actions on screen are
+// the ones that work on the selection.
 function TestRowActions({
   onRun,
   running,
@@ -213,23 +212,51 @@ function TestRowActions({
         onClick={onRun}
         disabled={runDisabled}
         aria-busy={running}
-        // The word on screen is "Run", sitting in this test's own row. Said
-        // out loud it needs the object, and it keeps this apart from the
-        // toolbar's Run, which runs the whole selection.
+        // Said out loud it needs the object, and it keeps this apart from
+        // the toolbar's Run, which runs the whole selection.
         aria-label="Run test"
-        className="h-8 px-3 flex items-center gap-1.5 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
+          runDisabled ? "cursor-not-allowed" : "hover:opacity-90 cursor-pointer"
+        }`}
       >
-        {running && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+        {running ? (
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+            />
+          </svg>
+        )}
         Run
       </button>
-      <DuplicateIconButton
+      <button
+        type="button"
         onClick={onDuplicate}
-        tooltip="Duplicate test"
-        loading={duplicating}
-        disabled={duplicateDisabled}
-        className="hover:bg-muted/50"
-      />
-      <DeleteIconButton onClick={onDelete} title="Delete test" />
+        disabled={duplicating || duplicateDisabled}
+        aria-busy={duplicating}
+        aria-label="Duplicate test"
+        className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {duplicating && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+        Duplicate
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete test"
+        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+      >
+        Delete
+      </button>
     </div>
   );
 }

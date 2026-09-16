@@ -40,8 +40,7 @@ import {
   EvaluatorVariableDef,
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
-import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
-import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import { SpinnerIcon } from "@/components/icons";
 import {
   SearchModeInput,
   matchesSearchMode,
@@ -1418,9 +1417,11 @@ function LLMPageInner() {
                   </p>
                   {selectedTestUuids.size === 0 && (
                     <div className="flex items-center gap-2">
-                      {/* Run named in words rather than left to a play icon.
-                          These go while rows are ticked, so the only actions
-                          on screen are the ones that work on the selection. */}
+                      {/* Drawn exactly like the bulk toolbar's Run and Delete;
+                          Duplicate takes the bordered style the labelling
+                          task's items use for Edit. These go while rows are
+                          ticked, so the only actions on screen are the ones
+                          that work on the selection. */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1428,22 +1429,50 @@ function LLMPageInner() {
                           openRunTestDialog(test);
                         }}
                         aria-label="Run test"
-                        className="h-8 px-3 flex items-center rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                        className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
                       >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                          />
+                        </svg>
                         Run
                       </button>
-                      {/* Opens the create dialog pre-filled from this test;
-                          nothing is saved until submit. */}
-                      <DuplicateIconButton
-                        onClick={() => openDuplicateTest(test)}
-                        tooltip="Duplicate test"
-                        loading={duplicatingUuid === test.uuid}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDuplicateTest(test);
+                        }}
                         disabled={!!duplicatingUuid}
-                      />
-                      <DeleteIconButton
-                        onClick={() => openDeleteDialog(test)}
-                        title="Delete test"
-                      />
+                        aria-busy={duplicatingUuid === test.uuid}
+                        aria-label="Duplicate test"
+                        className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {duplicatingUuid === test.uuid && (
+                          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog(test);
+                        }}
+                        aria-label="Delete test"
+                        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
                     </div>
                   )}
                 </div>
