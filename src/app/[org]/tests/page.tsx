@@ -1330,7 +1330,7 @@ function LLMPageInner() {
             {/* Desktop Table View */}
             <div className="hidden md:block border border-border rounded-xl overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-[40px_1fr_1fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+              <div className="grid grid-cols-[40px_1fr_1fr_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center">
                   <button
                     type="button"
@@ -1367,14 +1367,14 @@ function LLMPageInner() {
                 <div className="text-sm font-medium text-muted-foreground">
                   Type
                 </div>
-                <div className="w-16"></div>
+                <div></div>
               </div>
               {/* Table Rows */}
               {filteredTests.map((test) => (
                 <div
                   key={test.uuid}
                   onClick={() => openEditTest(test.uuid)}
-                  className="grid grid-cols-[40px_1fr_1fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                  className="grid grid-cols-[40px_1fr_1fr_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                 >
                   <div className="flex items-center">
                     <button

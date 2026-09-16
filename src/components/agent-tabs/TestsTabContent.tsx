@@ -2164,7 +2164,7 @@ export function TestsTabContent({
                       given an opaque background so rows don't show through. */}
                     <div className="overflow-y-auto max-h-[60vh]">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
+                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_300px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
                           <button
                             type="button"
@@ -2194,7 +2194,7 @@ export function TestsTabContent({
                         <div
                           key={test.uuid}
                           onClick={() => testPager.open(test.uuid)}
-                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                         >
                           {/* Checkbox */}
                           <div className="flex items-center">
