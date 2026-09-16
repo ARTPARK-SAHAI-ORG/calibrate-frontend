@@ -1,5 +1,6 @@
 ## September 2026
 
+- Opening a test run now shows the first test right away instead of an empty "select a test" screen, and result cards no longer repeat the evaluator option's description ([#571](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/571))
 - Keep agent test search focused while loading ([#573](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/573))
 - You can now step to the next or previous test with arrows while a test is open on an agent's Tests tab, without losing unsaved edits ([#569](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/569))
 - People can now invite others to a workspace by sharing a single link from workspace settings, with the option to replace or turn it off ([#565](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/565))
