@@ -2158,7 +2158,7 @@ export function TestsTabContent({
                       given an opaque background so rows don't show through. */}
                     <div className="overflow-y-auto max-h-[60vh]">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
+                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
                           <button
                             type="button"
@@ -2181,16 +2181,14 @@ export function TestsTabContent({
                         <div className="text-sm font-medium text-muted-foreground">
                           Type
                         </div>
-                        <div className="w-8"></div>
-                        <div className="w-8"></div>
-                        <div className="w-8"></div>
+                        <div></div>
                       </div>
                       {/* Table Body */}
                       {agentTests.map((test) => (
                         <div
                           key={test.uuid}
                           onClick={() => testPager.open(test.uuid)}
-                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                         >
                           {/* Checkbox */}
                           <div className="flex items-center">
@@ -2250,7 +2248,9 @@ export function TestsTabContent({
                               {testTypeLabel(test.type)}
                             </span>
                           </div>
-                          {selectedTestUuids.size === 0 && !selectAllMatching && (
+                          <div>
+                            {selectedTestUuids.size === 0 &&
+                              !selectAllMatching && (
                             <TestRowActions
                               onRun={() =>
                                 void launchTestRun([test], false, test.uuid)
@@ -2263,6 +2263,7 @@ export function TestsTabContent({
                               onDelete={() => openDeleteDialog(test)}
                             />
                           )}
+                          </div>
                         </div>
                       ))}
                     </div>
