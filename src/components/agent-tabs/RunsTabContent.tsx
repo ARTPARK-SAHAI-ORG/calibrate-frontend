@@ -33,7 +33,7 @@ import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
   useAgentRunLaunchers,
-  type AgentRunLauncherOptions,
+  type AgentRunLauncherSettings,
 } from "./useAgentRunLaunchers";
 import {
   BenchmarkRerunDialog,
@@ -292,11 +292,7 @@ export function RunsTabContent({
   agentName,
   isActive = true,
   ...launcherOpts
-}: Omit<
-  AgentRunLauncherOptions,
-  // The last one counts "every linked test", which only the Tests tab runs.
-  "onRunCreated" | "onComparisonCreated" | "onComparisonClosed" | "linkedTestsTotal"
-> & {
+}: AgentRunLauncherSettings & {
   /**
    * Whether this tab is the one showing. Only the tab on screen acts on
    * `?runId=`: the Tests tab names its own open run the same way, and a run

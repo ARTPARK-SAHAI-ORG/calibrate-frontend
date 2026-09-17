@@ -504,7 +504,6 @@ export function TestsTabContent({
   const {
     isConnectionUnverified,
     isBenchmarkDisabled,
-    canEnableBenchmarkHere,
     startingRun,
     launchTestRun,
     confirmTestRun,
@@ -1723,9 +1722,7 @@ export function TestsTabContent({
                 </>
               }
               isConnectionUnverified={isConnectionUnverified}
-              isBenchmarkDisabled={
-                isBenchmarkDisabled && !canEnableBenchmarkHere
-              }
+              isBenchmarkDisabled={isBenchmarkDisabled}
               // No tests named means every test linked to the agent.
               onClick={() => void openCompare([], true)}
             />
@@ -1925,9 +1922,7 @@ export function TestsTabContent({
                     size="bulk"
                     label="Compare"
                     isConnectionUnverified={isConnectionUnverified}
-                    isBenchmarkDisabled={
-                      isBenchmarkDisabled && !canEnableBenchmarkHere
-                    }
+                    isBenchmarkDisabled={isBenchmarkDisabled}
                     onClick={async () => {
                       // `selectedTestCount` is already known: check it before
                       // fetching the selection, which can be every matching

@@ -162,7 +162,6 @@ export function BenchmarkResultsDialog({
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   // The Run button on the ticked-tests strip is out while the parent creates
   // that run.
-  const [isRunningSelected, setIsRunningSelected] = useState(false);
   const {
     selected: labellingSelectedKeys,
     toggle: toggleLabellingSelection,
@@ -599,15 +598,6 @@ export function BenchmarkResultsDialog({
     });
   }
   const selectedTests = Array.from(selectedByUuid.values());
-  const runSelected = async () => {
-    if (!onRunTests) return;
-    setIsRunningSelected(true);
-    try {
-      await onRunTests(selectedTests);
-    } finally {
-      setIsRunningSelected(false);
-    }
-  };
 
   // Config for a rerun. When viewing a past benchmark the props are empty, so
   // fall back to what the loaded results carry: models from the model rows, the
@@ -871,13 +861,12 @@ export function BenchmarkResultsDialog({
                 <SelectedTestsStrip
                   count={selectedTests.length}
                   tickedCount={labellingSelectedKeys.size}
-                  onRun={onRunTests ? runSelected : undefined}
+                  onRun={onRunTests ? () => onRunTests(selectedTests) : undefined}
                   onCompare={
                     onCompareTests
                       ? () => onCompareTests(selectedTests)
                       : undefined
                   }
-                  running={isRunningSelected}
                 />
               ) : undefined
             }

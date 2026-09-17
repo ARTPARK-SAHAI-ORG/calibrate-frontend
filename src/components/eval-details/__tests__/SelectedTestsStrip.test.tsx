@@ -1,3 +1,4 @@
+import { act } from "react";
 import { render, screen, setupUser } from "@/test-utils";
 import { SelectedTestsStrip } from "../SelectedTestsStrip";
 
@@ -56,20 +57,24 @@ describe("SelectedTestsStrip", () => {
     expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
   });
 
-  it("disables both buttons while a run is starting", async () => {
+  it("disables both buttons until the run has been started", async () => {
     const user = setupUser();
-    const onRun = jest.fn();
-    render(
-      <SelectedTestsStrip count={2} onRun={onRun} onCompare={jest.fn()} running />,
+    let finish: () => void = () => {};
+    const onRun = jest.fn(
+      () => new Promise<void>((resolve) => (finish = resolve)),
     );
+    render(<SelectedTestsStrip count={2} onRun={onRun} onCompare={jest.fn()} />);
 
     const run = screen.getByRole("button", { name: "Run" });
+    await user.click(run);
+    expect(onRun).toHaveBeenCalledTimes(1);
     expect(run).toBeDisabled();
     expect(run).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("button", { name: "Compare" })).toBeDisabled();
 
-    await user.click(run);
-    expect(onRun).not.toHaveBeenCalled();
+    await act(async () => finish());
+    expect(run).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Compare" })).toBeEnabled();
   });
 
   it("explains the count when more rows are ticked than distinct tests", async () => {

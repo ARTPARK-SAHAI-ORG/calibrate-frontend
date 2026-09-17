@@ -155,7 +155,7 @@ describe("useAgentRunLaunchers", () => {
     expect(benchmarkProps?.totalTests).toBe(7);
 
     act(() => benchmarkProps?.onBenchmarkCreated?.("bench-1"));
-    expect(onComparisonCreated).toHaveBeenCalledWith("bench-1");
+    expect(onComparisonCreated).toHaveBeenCalledTimes(1);
     act(() => benchmarkProps?.onClose());
     redraw();
     expect(onComparisonClosed).toHaveBeenCalledWith(true);
@@ -179,7 +179,8 @@ describe("useAgentRunLaunchers", () => {
       supportsBenchmark: false,
       onEnableBenchmark: jest.fn(),
     });
-    expect(hook.result.current.canEnableBenchmarkHere).toBe(true);
+    // Benchmarking can be turned on from here, so Compare is not greyed out.
+    expect(hook.result.current.isBenchmarkDisabled).toBe(false);
     await act(async () => {
       await hook.result.current.openCompare([], true);
     });
@@ -358,7 +359,6 @@ describe("useAgentRunLaunchers", () => {
         supportsBenchmark: false,
       });
       expect(hook.result.current.isBenchmarkDisabled).toBe(true);
-      expect(hook.result.current.canEnableBenchmarkHere).toBe(false);
       let opened: boolean | null = null;
       await act(async () => {
         opened = await hook.result.current.openCompare(tests, false);

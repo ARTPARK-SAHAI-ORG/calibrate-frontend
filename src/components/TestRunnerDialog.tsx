@@ -213,7 +213,6 @@ export function TestRunnerDialog({
   const [isStartingRun, setIsStartingRun] = useState(false);
   // The Run button on the ticked-tests strip is out while the parent creates
   // that run.
-  const [isRunningSelected, setIsRunningSelected] = useState(false);
   const {
     selected: labellingSelectedIds,
     toggle: toggleLabellingSelection,
@@ -410,15 +409,6 @@ export function TestRunnerDialog({
   const selectedTests: SelectedTest[] = rows
     .filter((r) => r.testUuid && labellingSelectedIds.has(r.id))
     .map((r) => ({ uuid: r.testUuid as string, name: r.name }));
-  const runSelected = async () => {
-    if (!onRunTests) return;
-    setIsRunningSelected(true);
-    try {
-      await onRunTests(selectedTests);
-    } finally {
-      setIsRunningSelected(false);
-    }
-  };
 
   // Per-evaluator totals for the Results tab. The run counts these itself, so
   // nothing here has to add up each case's verdicts.
@@ -908,13 +898,12 @@ export function TestRunnerDialog({
                     isFinished && selectedTests.length > 0 ? (
                       <SelectedTestsStrip
                         count={selectedTests.length}
-                        onRun={onRunTests ? runSelected : undefined}
+                        onRun={onRunTests ? () => onRunTests(selectedTests) : undefined}
                         onCompare={
                           onCompareTests
                             ? () => onCompareTests(selectedTests)
                             : undefined
                         }
-                        running={isRunningSelected}
                       />
                     ) : undefined
                   }

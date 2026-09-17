@@ -39,11 +39,19 @@ export type AgentRunLauncherOptions = {
   /** A plain run was created. The caller points its run window at it. */
   onRunCreated: (taskId: string) => void;
   /** A model comparison was created (the picker opened its own results window). */
-  onComparisonCreated?: (taskId: string) => void;
+  onComparisonCreated?: () => void;
   /** The picker (or the comparison window it opened) was closed. `started`
    *  says whether a comparison was actually created. */
   onComparisonClosed?: (started: boolean) => void;
 };
+
+/** The agent settings the hook needs; what a tab takes from the agent page. */
+export type AgentRunLauncherSettings = Omit<
+  AgentRunLauncherOptions,
+  "onRunCreated" | "onComparisonCreated" | "onComparisonClosed" | "linkedTestsTotal"
+>;
+
+type RunIntent = { tests: LaunchableTest[]; allLinked: boolean; runKey: string };
 
 export function useAgentRunLaunchers({
   agentUuid,
@@ -78,11 +86,7 @@ export function useAgentRunLaunchers({
   const [startingRun, setStartingRun] = useState<string | null>(null);
   // Set when a Run was clicked on an unverified connection agent: holds the
   // run the user asked for so it can start once the verify dialog passes.
-  const [pendingRun, setPendingRun] = useState<{
-    tests: LaunchableTest[];
-    allLinked: boolean;
-    runKey: string;
-  } | null>(null);
+  const [pendingRun, setPendingRun] = useState<RunIntent | null>(null);
 
   // The tests the model picker compares on. Empty means every test linked to
   // the agent: the backend runs them all when it is sent no test ids.
@@ -94,11 +98,7 @@ export function useAgentRunLaunchers({
   const startedComparisonRef = useRef(false);
 
   // A run waiting on the reader's confirmation.
-  const [runToConfirm, setRunToConfirm] = useState<{
-    tests: LaunchableTest[];
-    allLinked: boolean;
-    runKey: string;
-  } | null>(null);
+  const [runToConfirm, setRunToConfirm] = useState<RunIntent | null>(null);
 
   const countOf = (tests: LaunchableTest[], allLinked: boolean) =>
     allLinked ? (linkedTestsTotal ?? 0) : tests.length;
@@ -270,7 +270,7 @@ export function useAgentRunLaunchers({
           totalTests={linkedTestsTotal}
           onBenchmarkCreated={(taskId) => {
             startedComparisonRef.current = true;
-            onComparisonCreated?.(taskId);
+            onComparisonCreated?.();
           }}
           agentType={agentType}
           benchmarkModelsVerified={benchmarkModelsVerified}
@@ -282,8 +282,8 @@ export function useAgentRunLaunchers({
 
   return {
     isConnectionUnverified,
-    isBenchmarkDisabled,
-    canEnableBenchmarkHere,
+    // Greyed out only when nothing here can turn benchmarking on.
+    isBenchmarkDisabled: isBenchmarkDisabled && !canEnableBenchmarkHere,
     startingRun,
     launchTestRun,
     confirmTestRun,
