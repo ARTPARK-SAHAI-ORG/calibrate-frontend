@@ -14,6 +14,7 @@ import {
   DocumentIcon,
   CloseIcon,
   WarningTriangleIcon,
+  ChevronDownIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { ClampedBlock } from "@/components/ui/ClampedBlock";
@@ -1777,15 +1778,20 @@ export function TestCouldNotRunNotice({ reason }: { reason?: string }) {
             This test could not be run
           </span>
         </div>
-        {reason && (
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {reason}
-          </p>
-        )}
-        <p className="mt-2 text-sm text-muted-foreground">
-          The agent gave no answer, so this test was not scored. It does not
-          count as a wrong answer.
+        <p className="text-sm text-muted-foreground">
+          The agent gave no answer, so this test was not scored
         </p>
+        {reason && (
+          <details className="group mt-3">
+            <summary className="inline-flex list-none items-center gap-1.5 rounded-md border border-amber-500/30 bg-background/60 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors cursor-pointer hover:bg-background [&::-webkit-details-marker]:hidden dark:text-amber-500">
+              <ChevronDownIcon className="w-3.5 h-3.5 -rotate-90 transition-transform group-open:rotate-0" />
+              View details
+            </summary>
+            <p className="mt-2 rounded-md border border-border bg-background p-3 text-xs whitespace-pre-wrap break-words text-foreground">
+              {reason}
+            </p>
+          </details>
+        )}
       </div>
     </div>
   );
