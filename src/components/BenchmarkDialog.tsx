@@ -98,6 +98,7 @@ export function BenchmarkDialog({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [runModelsTogether, setRunModelsTogether] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Per-model verification state for agent connections
   const [expandedModelError, setExpandedModelError] = useState<string | null>(
@@ -131,6 +132,7 @@ export function BenchmarkDialog({
     setSelectedModels([null]);
     setShowResults(false);
     setRunModelsTogether(true);
+    setSettingsOpen(false);
     setModelVerifyStatus({});
     // A check that failed belongs to the models that were picked this time, so
     // it goes with them. Without this the next open still shows the failure
@@ -471,7 +473,7 @@ export function BenchmarkDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-xl w-full max-w-lg h-[38rem] max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4">
           <div>
@@ -582,40 +584,66 @@ export function BenchmarkDialog({
             )}
           </div>
 
-          <fieldset className="space-y-1">
-            <legend className="text-sm font-medium">
-              How to run the models
-            </legend>
-            <p className="text-xs text-muted-foreground">
-              Running them one after another takes longer but spreads the load
-              on your agent.
-            </p>
-            <div className="pt-1">
-              {[
-                { value: "together", label: "All models at the same time" },
-                { value: "sequence", label: "One model after another" },
-              ].map((option) => (
-                <label
-                  key={option.value}
-                  className="flex items-center gap-3 py-1 cursor-pointer select-none"
-                >
-                  <input
-                    type="radio"
-                    name="run-models"
-                    value={option.value}
-                    checked={
-                      runModelsTogether === (option.value === "together")
-                    }
-                    onChange={() =>
-                      setRunModelsTogether(option.value === "together")
-                    }
-                    className="w-4 h-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <span className="text-sm">{option.label}</span>
-                </label>
-              ))}
+          {/* Only a connection agent has a server of its own to overload;
+              a build agent's models are called by the platform. */}
+          {agentType === "connection" && (
+            <div className="border border-border rounded-xl">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((open) => !open)}
+                aria-expanded={settingsOpen}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer"
+              >
+                <span className="flex-1 text-sm font-medium text-foreground">
+                  Settings
+                </span>
+                <ChevronDownIcon
+                  className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
+                    settingsOpen ? "" : "-rotate-90"
+                  }`}
+                />
+              </button>
+              {settingsOpen && (
+                <div className="grid grid-cols-2 gap-4 px-4 pb-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Run the models in parallel or one after another
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Running them in parallel puts more load on your agent
+                      server. Choose sequential if you do not want to overload
+                      it.
+                    </p>
+                  </div>
+                  <div>
+                    {[
+                      { value: "parallel", label: "Parallel" },
+                      { value: "sequential", label: "Sequential" },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-3 py-1 cursor-pointer select-none"
+                      >
+                        <input
+                          type="radio"
+                          name="run-models"
+                          value={option.value}
+                          checked={
+                            runModelsTogether === (option.value === "parallel")
+                          }
+                          onChange={() =>
+                            setRunModelsTogether(option.value === "parallel")
+                          }
+                          className="w-4 h-4 cursor-pointer accent-foreground"
+                        />
+                        <span className="text-sm">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </fieldset>
+          )}
         </div>
 
         {/* Footer */}
@@ -699,7 +727,9 @@ export function BenchmarkDialog({
         testNames={tests.map((t) => t.name)}
         totalTests={tests.length > 0 ? tests.length : totalTests}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
-        parallelModels={runModelsTogether}
+        parallelModels={
+          agentType === "connection" ? runModelsTogether : undefined
+        }
         onBenchmarkCreated={onBenchmarkCreated}
       />
 
