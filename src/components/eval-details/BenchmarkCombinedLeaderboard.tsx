@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
 import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
-import { RunFailureBox } from "@/components/RunFailureBox";
+import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
   benchmarkAnsweredPassFail,
   benchmarkRatingEvaluatorCaption,
@@ -85,25 +85,24 @@ function UnansweredNote({
   );
 
   // "" is a failure the backend recorded nothing about, so it still shows.
-  if (failed) {
-    const ran = Math.max(0, ...perModel.map((c) => c.answered + c.unanswered));
-    const total = Math.max(
-      ran,
-      ...modelResults.map((m) => m.total_tests ?? m.test_results?.length ?? 0),
-    );
-    return (
-      <RunFailureBox
-        className="w-full"
-        sentence={
-          <>
-            {`The evaluation failed after ${ran} of ${total} tests. `}
-            Review the tests that were run in the {tab}.
-          </>
-        }
-        details={failureReason.trim() || null}
-      />
-    );
-  }
+  const failureBox = failed ? (
+    <RunFailureBox
+      className="w-full"
+      sentence={runFailureSentence(
+        Math.max(0, ...perModel.map((c) => c.answered + c.unanswered)),
+        Math.max(
+          Math.max(0, ...perModel.map((c) => c.answered + c.unanswered)),
+          ...modelResults.map(
+            (m) => m.total_tests ?? m.test_results?.length ?? 0,
+          ),
+        ),
+        tab,
+      )}
+      details={failureReason.trim() || null}
+    />
+  ) : null;
+  // A broken run still says how many tests could not be run, under the box.
+  if (failed && totalUnanswered === 0) return failureBox;
 
   const sameForEveryModel = perModel.every(
     (c) =>
@@ -113,15 +112,18 @@ function UnansweredNote({
   const { unanswered, answered } = perModel[0];
 
   return (
-    <RunNote>
-      {!sameForEveryModel
-        ? "Some tests could not be run and were ignored for calculating the metrics. "
-        : answered === 0
-          ? "None of the tests could be run. "
-          : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
-      {stoppedEarly && STOPPED_EARLY_SENTENCE}
-      Review the tests that could not be run in the {tab}.
-    </RunNote>
+    <>
+      {failureBox}
+      <RunNote>
+        {!sameForEveryModel
+          ? "Some tests could not be run and were ignored for calculating the metrics. "
+          : answered === 0
+            ? "None of the tests could be run. "
+            : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
+        {stoppedEarly && STOPPED_EARLY_SENTENCE}
+        Review the tests that could not be run in the {tab}.
+      </RunNote>
+    </>
   );
 }
 

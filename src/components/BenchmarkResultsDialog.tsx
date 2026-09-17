@@ -656,7 +656,9 @@ export function BenchmarkResultsDialog({
   // is hidden rather than silently rerunning the wrong test set.
   const canDirectRerun =
     !!onRerun && rerunModels.length > 0 && rerunTestUuids.length > 0;
-  const showRerunButton = isDone && (canDirectRerun || !!onGoBack);
+  // `error` means the failure box replaced the window, and it carries its own
+  // Try again. A failed run that kept rows shows the header's Rerun as usual.
+  const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
   const handleRerunClick = canDirectRerun
     ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)
     : onGoBack;

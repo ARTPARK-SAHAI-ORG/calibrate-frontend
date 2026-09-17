@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { RunNote } from "./RunNote";
-import { RunFailureBox } from "@/components/RunFailureBox";
+import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -264,26 +264,23 @@ export function TestRunSummary({
         {failureDetails !== null && (
           <RunFailureBox
             className="w-full mb-4"
-            sentence={
-              <>
-                {`The evaluation failed after ${total + unanswered} of ${runTotalTests ?? total + unanswered} tests. `}
-                Review the tests that were run in the{" "}
-                {onReviewUnanswered ? (
-                  <button
-                    type="button"
-                    onClick={onReviewUnanswered}
-                    className="font-medium text-red-500 hover:text-red-600 cursor-pointer"
-                  >
-                    {RESULT_TAB_LABELS.tests} tab
-                  </button>
-                ) : (
-                  <span className="font-medium">
-                    {RESULT_TAB_LABELS.tests} tab
-                  </span>
-                )}
-                .
-              </>
-            }
+            sentence={runFailureSentence(
+              total + unanswered,
+              runTotalTests ?? total + unanswered,
+              onReviewUnanswered ? (
+                <button
+                  type="button"
+                  onClick={onReviewUnanswered}
+                  className="font-medium text-red-500 hover:text-red-600 cursor-pointer"
+                >
+                  {RESULT_TAB_LABELS.tests} tab
+                </button>
+              ) : (
+                <span className="font-medium">
+                  {RESULT_TAB_LABELS.tests} tab
+                </span>
+              ),
+            )}
             details={failureDetails.trim() || null}
           />
         )}

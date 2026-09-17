@@ -506,7 +506,7 @@ describe("a run that failed after finishing some tests", () => {
   it("shows the sentence with no details when the backend recorded nothing", () => {
     render(<TestRunSummary passed={1} total={1} failureDetails="" />);
     expect(
-      screen.getByText(/The evaluation failed after 1 of 1 tests\./),
+      screen.getByText(/The evaluation failed after 1 of 1 test\./),
     ).toBeInTheDocument();
     expect(screen.queryByText("Details")).not.toBeInTheDocument();
   });

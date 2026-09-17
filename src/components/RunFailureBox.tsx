@@ -9,6 +9,25 @@ export const RUN_FAILED_SENTENCE =
   "The evaluation run failed before it produced any result.";
 
 /**
+ * The line above the details on a run that broke: how far it got, and where
+ * to look. A run that finished nothing has nothing to point at, so it gets
+ * the plain sentence instead.
+ */
+export function runFailureSentence(
+  ran: number,
+  total: number,
+  tab: React.ReactNode,
+): React.ReactNode {
+  if (ran === 0) return RUN_FAILED_SENTENCE;
+  return (
+    <>
+      {`The evaluation failed after ${ran} of ${total} ${total === 1 ? "test" : "tests"}. `}
+      Review the tests that were run in the {tab}.
+    </>
+  );
+}
+
+/**
  * The red box both run windows show for a run with no results: one fixed
  * sentence, then whatever the backend recorded about the failure, verbatim,
  * with a copy button so it can be pasted into a message to us.

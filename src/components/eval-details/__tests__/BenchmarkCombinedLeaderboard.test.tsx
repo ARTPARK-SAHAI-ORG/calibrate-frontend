@@ -422,7 +422,9 @@ describe("a run that failed after finishing some tests", () => {
       />,
     );
     expect(
-      screen.getByText(/The evaluation failed after 0 of 2 tests/),
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("boom")).toBeInTheDocument();
     expect(
@@ -450,8 +452,12 @@ describe("a run that failed before any model produced a row", () => {
       />,
     );
     expect(
-      screen.getByText(/The evaluation failed after 0 of 4 tests\./),
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
     ).toBeInTheDocument();
+    // Nothing ran, so there is no Tests tab worth pointing at.
+    expect(screen.queryByText(/Review the tests/)).not.toBeInTheDocument();
     expect(screen.getByText("ValueError: boom")).toBeInTheDocument();
   });
 });
