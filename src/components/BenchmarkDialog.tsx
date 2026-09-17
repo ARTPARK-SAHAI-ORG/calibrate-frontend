@@ -421,6 +421,8 @@ export function BenchmarkDialog({
             onClick={(e) => {
               e.stopPropagation();
               setExpandedModelError(isExpanded ? null : modelId);
+              // Both panels open beside the box, so only one is open at a time.
+              if (!isExpanded) setSettingsOpen(false);
             }}
             aria-expanded={isExpanded}
             className={`rounded-md border border-red-500/40 px-1.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
@@ -560,7 +562,10 @@ export function BenchmarkDialog({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
+                onClick={() => {
+                  setSettingsOpen((open) => !open);
+                  if (!settingsOpen) setExpandedModelError(null);
+                }}
                 aria-expanded={settingsOpen}
                 className={`w-full h-10 px-4 rounded-md text-sm font-medium border border-border flex items-center justify-between cursor-pointer transition-colors focus:outline-none ${
                   settingsOpen ? "bg-muted" : "bg-background hover:bg-muted/50"
