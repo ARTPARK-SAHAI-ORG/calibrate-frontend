@@ -24,15 +24,6 @@ it("reports the choice the user makes", async () => {
   expect(onChange).toHaveBeenCalledWith(true);
 });
 
-it("uses the group name it is given, so two on one page do not clash", () => {
-  render(<RunModelsChoice value={true} onChange={jest.fn()} name="mine" />);
-
-  expect(screen.getByRole("radio", { name: "Parallel" })).toHaveAttribute(
-    "name",
-    "mine",
-  );
-});
-
 it("cannot be changed while it is disabled", async () => {
   const user = setupUser();
   const onChange = jest.fn();

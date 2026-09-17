@@ -308,24 +308,6 @@ const membersKey = (accessToken: string, orgUuid: string) =>
 /**
  * List + invite + remove members of a single workspace.
  */
-/**
- * How the workspace on screen runs the models in a comparison by default.
- *
- * Undefined while the workspaces are still loading, or when they cannot be
- * read at all, so a caller can tell "not known yet" apart from a real choice
- * and fall back to running them at the same time, which is what every
- * comparison did before there was a setting. A comparison is never held up
- * waiting for this.
- */
-export function useBenchmarkParallelDefault(
-  accessToken: string | null | undefined,
-): boolean | undefined {
-  const { organizations } = useOrganizations(accessToken);
-  const [activeUuid] = useActiveOrgUuid();
-  return organizations.find((org) => org.uuid === activeUuid)
-    ?.benchmark_parallel_models;
-}
-
 export function useOrgMembers(
   accessToken: string | null | undefined,
   orgUuid: string | null,

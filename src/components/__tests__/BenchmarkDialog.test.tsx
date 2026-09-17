@@ -15,10 +15,18 @@ jest.mock("../../hooks", () => ({
   __esModule: true,
   useOpenRouterModels: (...args: unknown[]) => mockUseOpenRouterModels(...args),
   useAccessToken: (...args: unknown[]) => mockUseAccessToken(...args),
-  useBenchmarkParallelDefault: (token: unknown) =>
-    mockUseBenchmarkParallelDefault(token),
   useActiveOrgUuid: () => ["org-1", jest.fn()],
-  useOrganizations: () => ({ updateOrganization: mockUpdateOrganization }),
+  // The dialog reads the workspace's own choice off this list. Undefined
+  // stands for a workspace whose choice has not been read yet.
+  useOrganizations: () => ({
+    organizations: [
+      {
+        uuid: "org-1",
+        benchmark_parallel_models: mockUseBenchmarkParallelDefault(),
+      },
+    ],
+    updateOrganization: mockUpdateOrganization,
+  }),
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -1333,17 +1341,63 @@ describe("BenchmarkDialog", () => {
     }
 
     it("saves the choice for the workspace when the box is ticked", async () => {
+      // A connection agent checks its connection with each model before the
+      // comparison starts, so the save is only right once that has passed.
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
       const user = setupUser();
       await pickSequentialAndRun(user, { save: true });
       await user.click(
         screen.getByRole("button", { name: "Start the comparison" }),
       );
+      await user.click(screen.getByText("Confirm"));
 
       await waitFor(() =>
         expect(mockUpdateOrganization).toHaveBeenCalledWith("org-1", {
           benchmark_parallel_models: false,
         }),
       );
+    });
+
+    it("saves nothing when the connection check is cancelled", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      // Start the comparison on a connection agent opens the connection
+      // check, it does not start the comparison. Backing out here means no
+      // comparison ever ran, so the workspace must be left alone.
+      const check = screen.getByTestId("verify-dialog");
+      // Scoped: the picker's own footer has a Cancel too.
+      await user.click(within(check).getByText("Cancel"));
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing when a model fails its connection check", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: false, error: "no" }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("benchmark-results-dialog"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
     });
 
     it("saves nothing when the box is left unticked", async () => {

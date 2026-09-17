@@ -17,14 +17,11 @@ export function RunModelsChoice({
   value,
   onChange,
   disabled = false,
-  name = "run-models",
 }: {
   /** true = the models run at the same time. */
   value: boolean;
   onChange: (next: boolean) => void;
   disabled?: boolean;
-  /** Radio group name, so two of these on one page cannot clash. */
-  name?: string;
 }) {
   return (
     <div>
@@ -37,7 +34,7 @@ export function RunModelsChoice({
         >
           <input
             type="radio"
-            name={name}
+            name="run-models"
             value={option.value}
             checked={value === (option.value === "parallel")}
             onChange={() => onChange(option.value === "parallel")}

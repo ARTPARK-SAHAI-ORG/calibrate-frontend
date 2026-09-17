@@ -11,7 +11,6 @@ import {
   useOpenRouterModels,
   useAccessToken,
   useActiveOrgUuid,
-  useBenchmarkParallelDefault,
   useOrganizations,
 } from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
@@ -113,9 +112,14 @@ export function BenchmarkDialog({
   useHideFloatingButton(isOpen);
   const { providers: llmProviders } = useOpenRouterModels();
   const backendAccessToken = useAccessToken();
-  const workspaceDefault = useBenchmarkParallelDefault(backendAccessToken);
   const [activeOrgUuid] = useActiveOrgUuid();
-  const { updateOrganization } = useOrganizations(backendAccessToken);
+  const { organizations, updateOrganization } =
+    useOrganizations(backendAccessToken);
+  // Undefined until the workspaces have been read, so it can be told apart
+  // from someone actually choosing to run the models together.
+  const workspaceDefault = organizations.find(
+    (org) => org.uuid === activeOrgUuid,
+  )?.benchmark_parallel_models;
 
   // What a comparison ran before wins; otherwise the workspace default; and
   // with neither, the models run at the same time, which is what a comparison
@@ -126,9 +130,10 @@ export function BenchmarkDialog({
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const [runModelsTogether, setRunModelsTogether] = useState(
-    openingRunOrder ?? true,
-  );
+  // Null until the reader picks, so a workspace choice that arrives after the
+  // first render still shows, and can never move a choice already made.
+  const [pickedRunOrder, setPickedRunOrder] = useState<boolean | null>(null);
+  const runModelsTogether = pickedRunOrder ?? openingRunOrder ?? true;
   const [saveAsWorkspaceDefault, setSaveAsWorkspaceDefault] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -175,16 +180,6 @@ export function BenchmarkDialog({
     );
   }, [isOpen, initialModels, llmProviders]);
 
-  // The workspace default arrives after the first render, so it is filled in
-  // once it is known. After that the radios are the reader's own choice: both
-  // this and picking a radio settle it, so a late default never moves it.
-  const runOrderSettled = useRef(openingRunOrder !== undefined);
-  useEffect(() => {
-    if (runOrderSettled.current || openingRunOrder === undefined) return;
-    runOrderSettled.current = true;
-    setRunModelsTogether(openingRunOrder);
-  }, [openingRunOrder]);
-
   if (!isOpen) return null;
 
   const handleClose = () => {
@@ -193,8 +188,7 @@ export function BenchmarkDialog({
     // from the same props again rather than starting empty.
     filledInModels.current = false;
     setShowResults(false);
-    setRunModelsTogether(openingRunOrder ?? true);
-    runOrderSettled.current = openingRunOrder !== undefined;
+    setPickedRunOrder(null);
     setSaveAsWorkspaceDefault(false);
     setSettingsOpen(false);
     setModelVerifyStatus({});
@@ -284,6 +278,12 @@ export function BenchmarkDialog({
 
   // Saving the choice for the workspace is a favour to the reader, not part of
   // the comparison, so it runs alongside it and never holds it up or stops it.
+  //
+  // It is called beside every `setShowResults(true)`, because that is where a
+  // comparison actually starts. Calling it when Start the comparison is
+  // clicked saved the workspace's choice for a comparison that then never ran:
+  // on a connection agent that click only opens the connection check, which
+  // the reader can still cancel.
   const saveWorkspaceDefault = () => {
     if (!saveAsWorkspaceDefault || !activeOrgUuid) return;
     if (runModelsTogether === workspaceDefault) return;
@@ -297,7 +297,6 @@ export function BenchmarkDialog({
 
   const handleRunBenchmark = async () => {
     setConfirmOpen(false);
-    saveWorkspaceDefault();
     if (agentType === "connection") {
       const modelsToVerify = selectedModels
         .filter((m): m is LLMModel => m !== null)
@@ -312,6 +311,7 @@ export function BenchmarkDialog({
       }
     }
 
+    saveWorkspaceDefault();
     setShowResults(true);
   };
 
@@ -329,6 +329,7 @@ export function BenchmarkDialog({
     const anyFailed = results.some((r) => !r.verified);
     setVerifyDialogOpen(false);
     if (!anyFailed) {
+      saveWorkspaceDefault();
       setShowResults(true);
     }
   };
@@ -682,10 +683,7 @@ export function BenchmarkDialog({
                         the two cannot drift apart. */}
                     <RunModelsChoice
                       value={runModelsTogether}
-                      onChange={(next) => {
-                        runOrderSettled.current = true;
-                        setRunModelsTogether(next);
-                      }}
+                      onChange={setPickedRunOrder}
                     />
                     <label className="flex items-center gap-3 py-1 cursor-pointer select-none">
                       <input

@@ -15,7 +15,6 @@ jest.mock("next/navigation", () => ({
 import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useOrganizations,
-  useBenchmarkParallelDefault,
   useActiveOrgUuid,
   useOrgMembers,
   useWorkspaceApiKeys,
@@ -392,47 +391,6 @@ describe("useOrganizations hooks", () => {
       await waitFor(() =>
         expect(result.current.organizations).toEqual([org1, org2]),
       );
-    });
-  });
-
-  describe("useBenchmarkParallelDefault", () => {
-    it("reads the choice off the workspace on screen", async () => {
-      pathname = `/${ORG_IN_ADDRESS}/agents`;
-      mockApiGet.mockResolvedValueOnce([
-        { ...org1, benchmark_parallel_models: true },
-        { ...org2, uuid: ORG_IN_ADDRESS, benchmark_parallel_models: false },
-      ]);
-
-      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
-
-      await waitFor(() => expect(result.current).toBe(false));
-    });
-
-    it("says nothing while the workspaces are still loading", async () => {
-      pathname = `/${ORG_IN_ADDRESS}/agents`;
-      mockApiGet.mockResolvedValueOnce([
-        { ...org1, uuid: ORG_IN_ADDRESS, benchmark_parallel_models: false },
-      ]);
-
-      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
-
-      // Undefined, not true: the caller has to be able to tell "not known
-      // yet" from someone actually choosing to run them together.
-      expect(result.current).toBeUndefined();
-
-      // Let the fetch settle before the test ends. A request left in flight
-      // stays in the shared cache, and the next test reuses it instead of
-      // making its own.
-      await waitFor(() => expect(result.current).toBe(false));
-    });
-
-    it("says nothing for a workspace whose backend does not carry the setting", async () => {
-      pathname = `/${ORG_IN_ADDRESS}/agents`;
-      mockApiGet.mockResolvedValueOnce([{ ...org1, uuid: ORG_IN_ADDRESS }]);
-
-      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
-
-      await waitFor(() => expect(result.current).toBeUndefined());
     });
   });
 
