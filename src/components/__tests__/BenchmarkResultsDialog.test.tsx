@@ -1822,27 +1822,6 @@ describe("running or comparing the ticked tests", () => {
   });
 
 
-  it("keeps Run busy until onRunTests settles", async () => {
-    let settle: () => void = () => {};
-    const onRunTests = jest.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          settle = resolve;
-        }),
-    );
-    renderDone({ onRunTests });
-    const user = setupUser();
-    await tickUnderBothModels(user);
-
-    const run = screen.getByRole("button", { name: "Run" });
-    await user.click(run);
-    expect(run).toBeDisabled();
-    expect(run).toHaveAttribute("aria-busy", "true");
-
-    settle();
-    await waitFor(() => expect(run).toBeEnabled());
-    expect(run).toHaveAttribute("aria-busy", "false");
-  });
 
   it("shows no strip when nothing can run or compare the ticked tests", async () => {
     renderDone({});

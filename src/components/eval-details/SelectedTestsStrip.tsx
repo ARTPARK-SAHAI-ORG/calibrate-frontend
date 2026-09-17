@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { CompareIcon, PlayIcon, SpinnerIcon } from "@/components/icons";
+import React from "react";
+import { CompareIcon, PlayIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 
 export type SelectedTest = { uuid: string; name: string };
@@ -24,21 +24,12 @@ export function SelectedTestsStrip({
 }: {
   /** Distinct tests ticked. */
   count: number;
-  /** Starts the run. Run stays busy and both buttons disabled until it settles. */
-  onRun?: () => Promise<unknown> | void;
+  /** Asks the parent to run the ticked tests. The parent confirms first, so
+   *  the confirmation dialog is what stops a second click. */
+  onRun?: () => void;
   onCompare?: () => void;
 }): React.ReactElement | null {
-  const [running, setRunning] = useState(false);
   if (count === 0 || (!onRun && !onCompare)) return null;
-  const run = async () => {
-    if (!onRun) return;
-    setRunning(true);
-    try {
-      await onRun();
-    } finally {
-      setRunning(false);
-    }
-  };
   const noun = count === 1 ? "test" : "tests";
   // One line, always. When the panel is too narrow the buttons keep their
   // icons and drop their words; the count always stays.
@@ -52,17 +43,11 @@ export function SelectedTestsStrip({
           <Tooltip content="Run the selected tests" position="bottom">
             <button
               type="button"
-              onClick={() => void run()}
-              disabled={running}
-              aria-busy={running}
+              onClick={onRun}
               aria-label="Run"
               className="h-8 px-2.5 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-50"
             >
-              {running ? (
-                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <PlayIcon className="w-3.5 h-3.5" />
-              )}
+              <PlayIcon className="w-3.5 h-3.5" />
               <span className={WORD}>Run</span>
             </button>
           </Tooltip>
@@ -72,7 +57,6 @@ export function SelectedTestsStrip({
             <button
               type="button"
               onClick={onCompare}
-              disabled={running}
               aria-label="Compare"
               className="h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors flex items-center gap-1.5 hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >

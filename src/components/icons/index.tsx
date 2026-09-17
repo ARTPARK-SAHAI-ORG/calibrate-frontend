@@ -313,8 +313,7 @@ export function DocumentIcon({ className }: IconProps) {
   );
 }
 
-// Play Icon
-/** Two bars on a chart: the icon on every Compare models button. */
+/** An easel with a line chart: the icon on every Compare models button. */
 export function CompareIcon({ className }: IconProps) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -327,6 +326,7 @@ export function CompareIcon({ className }: IconProps) {
   );
 }
 
+// Play Icon
 export function PlayIcon({ className }: IconProps) {
   return (
     <svg

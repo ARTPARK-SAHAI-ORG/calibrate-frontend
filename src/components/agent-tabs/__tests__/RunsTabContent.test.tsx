@@ -919,7 +919,7 @@ describe("running tests from an open results window", () => {
     const before = runsListCalls();
 
     await act(async () => {
-      launcherOptions?.onComparisonCreated?.("b1");
+      launcherOptions?.onComparisonCreated?.();
     });
     expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();

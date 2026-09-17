@@ -211,8 +211,6 @@ export function TestRunnerDialog({
   // Guards the rerun POST: a test run is billed, so a second click while the
   // first request is in flight must not start a second run.
   const [isStartingRun, setIsStartingRun] = useState(false);
-  // The Run button on the ticked-tests strip is out while the parent creates
-  // that run.
   const {
     selected: labellingSelectedIds,
     toggle: toggleLabellingSelection,
@@ -898,7 +896,7 @@ export function TestRunnerDialog({
                     isFinished && selectedTests.length > 0 ? (
                       <SelectedTestsStrip
                         count={selectedTests.length}
-                        onRun={onRunTests ? () => onRunTests(selectedTests) : undefined}
+                        onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
                         onCompare={
                           onCompareTests
                             ? () => onCompareTests(selectedTests)

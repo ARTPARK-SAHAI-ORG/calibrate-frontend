@@ -1,4 +1,3 @@
-import { act } from "react";
 import { render, screen, setupUser } from "@/test-utils";
 import { SelectedTestsStrip } from "../SelectedTestsStrip";
 
@@ -55,25 +54,6 @@ describe("SelectedTestsStrip", () => {
     expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
   });
 
-  it("disables both buttons until the run has been started", async () => {
-    const user = setupUser();
-    let finish: () => void = () => {};
-    const onRun = jest.fn(
-      () => new Promise<void>((resolve) => (finish = resolve)),
-    );
-    render(<SelectedTestsStrip count={2} onRun={onRun} onCompare={jest.fn()} />);
-
-    const run = screen.getByRole("button", { name: "Run" });
-    await user.click(run);
-    expect(onRun).toHaveBeenCalledTimes(1);
-    expect(run).toBeDisabled();
-    expect(run).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByRole("button", { name: "Compare" })).toBeDisabled();
-
-    await act(async () => finish());
-    expect(run).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Compare" })).toBeEnabled();
-  });
 
 
 });

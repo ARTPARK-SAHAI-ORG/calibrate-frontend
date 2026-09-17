@@ -271,7 +271,7 @@ export function useAgentRunLaunchers({
           // The picker reads only uuid and name off each test.
           tests={benchmarkTests}
           totalTests={linkedTestsTotal}
-          onBenchmarkCreated={(taskId) => {
+          onBenchmarkCreated={() => {
             startedComparisonRef.current = true;
             onComparisonCreated?.();
           }}

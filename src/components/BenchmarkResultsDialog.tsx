@@ -160,8 +160,6 @@ export function BenchmarkResultsDialog({
   // are kept; the models and tests not reached were never run.
   const [wasStopped, setWasStopped] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
-  // The Run button on the ticked-tests strip is out while the parent creates
-  // that run.
   const {
     selected: labellingSelectedKeys,
     toggle: toggleLabellingSelection,
@@ -860,7 +858,7 @@ export function BenchmarkResultsDialog({
               showLabelling && selectedTests.length > 0 ? (
                 <SelectedTestsStrip
                   count={selectedTests.length}
-                  onRun={onRunTests ? () => onRunTests(selectedTests) : undefined}
+                  onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
                   onCompare={
                     onCompareTests
                       ? () => onCompareTests(selectedTests)

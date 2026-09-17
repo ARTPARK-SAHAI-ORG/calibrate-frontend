@@ -2309,27 +2309,6 @@ describe("running or comparing the ticked tests", () => {
     ]);
   });
 
-  it("keeps Run busy until onRunTests settles", async () => {
-    let settle: () => void = () => {};
-    const onRunTests = jest.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          settle = resolve;
-        }),
-    );
-    renderRun("completed", { onRunTests });
-    const user = setupUser();
-    await tickBoth(user);
-
-    const run = screen.getByRole("button", { name: "Run" });
-    await user.click(run);
-    expect(run).toBeDisabled();
-    expect(run).toHaveAttribute("aria-busy", "true");
-
-    settle();
-    await waitFor(() => expect(run).toBeEnabled());
-    expect(run).toHaveAttribute("aria-busy", "false");
-  });
 
   it("hands the same tests to onCompareTests", async () => {
     const onCompareTests = jest.fn();
