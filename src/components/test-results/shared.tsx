@@ -1779,8 +1779,7 @@ export function TestCouldNotRunNotice({ reason }: { reason?: string }) {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">
-          The agent gave no answer, so this test was not scored. It does not
-          count as a wrong answer.
+          The agent gave no answer, so this test was not scored
         </p>
         {reason && (
           <details className="group mt-3">
