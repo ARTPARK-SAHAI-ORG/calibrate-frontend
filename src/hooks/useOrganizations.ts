@@ -28,6 +28,18 @@ type UseOrganizationsReturn = {
     uuid: string,
     name: string,
   ) => Promise<Organization | null>;
+  /** Change any part of a workspace. Only what is passed is changed, so
+   *  setting one thing never clears another. */
+  updateOrganization: (
+    uuid: string,
+    changes: OrganizationChanges,
+  ) => Promise<Organization | null>;
+};
+
+/** What can be changed about a workspace. */
+export type OrganizationChanges = {
+  name?: string;
+  benchmark_parallel_models?: boolean;
 };
 
 /**
@@ -202,14 +214,17 @@ export function useOrganizations(
     [accessToken],
   );
 
-  const renameOrganization = useCallback(
-    async (uuid: string, name: string): Promise<Organization | null> => {
+  const updateOrganization = useCallback(
+    async (
+      uuid: string,
+      changes: OrganizationChanges,
+    ): Promise<Organization | null> => {
       if (!accessToken) return null;
       try {
         const updated = await apiClient<Organization>(
           `/organizations/${uuid}`,
           accessToken,
-          { method: "PATCH", body: { name } },
+          { method: "PATCH", body: changes },
         );
         setOrganizations((prev) => {
           const next = prev.map((o) => (o.uuid === uuid ? updated : o));
@@ -220,11 +235,16 @@ export function useOrganizations(
         notifyOrganizationsChanged(instanceRef.current);
         return updated;
       } catch (err) {
-        reportError("Error renaming organization:", err);
+        reportError("Error updating organization:", err);
         throw err;
       }
     },
     [accessToken],
+  );
+
+  const renameOrganization = useCallback(
+    (uuid: string, name: string) => updateOrganization(uuid, { name }),
+    [updateOrganization],
   );
 
   return {
@@ -234,6 +254,7 @@ export function useOrganizations(
     refetch,
     createOrganization,
     renameOrganization,
+    updateOrganization,
   };
 }
 
@@ -287,6 +308,24 @@ const membersKey = (accessToken: string, orgUuid: string) =>
 /**
  * List + invite + remove members of a single workspace.
  */
+/**
+ * How the workspace on screen runs the models in a comparison by default.
+ *
+ * Undefined while the workspaces are still loading, or when they cannot be
+ * read at all, so a caller can tell "not known yet" apart from a real choice
+ * and fall back to running them at the same time, which is what every
+ * comparison did before there was a setting. A comparison is never held up
+ * waiting for this.
+ */
+export function useBenchmarkParallelDefault(
+  accessToken: string | null | undefined,
+): boolean | undefined {
+  const { organizations } = useOrganizations(accessToken);
+  const [activeUuid] = useActiveOrgUuid();
+  return organizations.find((org) => org.uuid === activeUuid)
+    ?.benchmark_parallel_models;
+}
+
 export function useOrgMembers(
   accessToken: string | null | undefined,
   orgUuid: string | null,

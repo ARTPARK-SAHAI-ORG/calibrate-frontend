@@ -31,6 +31,7 @@ export { usePageErrorState } from "./usePageErrorState";
 export type { PageErrorCode, PageErrorState } from "./usePageErrorState";
 export {
   useOrganizations,
+  useBenchmarkParallelDefault,
   useActiveOrgUuid,
   useOrgMembers,
   useOrgInviteLink,

@@ -5,8 +5,17 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
-import { useOpenRouterModels, useAccessToken } from "@/hooks";
+import { RunModelsChoice } from "./workspace/RunModelsChoice";
+import { toast } from "sonner";
+import {
+  useOpenRouterModels,
+  useAccessToken,
+  useActiveOrgUuid,
+  useBenchmarkParallelDefault,
+  useOrganizations,
+} from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
+import { reportError } from "@/lib/reportError";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
@@ -104,14 +113,23 @@ export function BenchmarkDialog({
   useHideFloatingButton(isOpen);
   const { providers: llmProviders } = useOpenRouterModels();
   const backendAccessToken = useAccessToken();
+  const workspaceDefault = useBenchmarkParallelDefault(backendAccessToken);
+  const [activeOrgUuid] = useActiveOrgUuid();
+  const { updateOrganization } = useOrganizations(backendAccessToken);
+
+  // What a comparison ran before wins; otherwise the workspace default; and
+  // with neither, the models run at the same time, which is what a comparison
+  // did before there was a setting.
+  const openingRunOrder = initialParallelModels ?? workspaceDefault;
 
   const [selectedModels, setSelectedModels] = useState<LLMModel[]>([]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [runModelsTogether, setRunModelsTogether] = useState(
-    initialParallelModels ?? true,
+    openingRunOrder ?? true,
   );
+  const [saveAsWorkspaceDefault, setSaveAsWorkspaceDefault] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Per-model verification state for agent connections
@@ -157,6 +175,16 @@ export function BenchmarkDialog({
     );
   }, [isOpen, initialModels, llmProviders]);
 
+  // The workspace default arrives after the first render, so it is filled in
+  // once it is known. After that the radios are the reader's own choice: both
+  // this and picking a radio settle it, so a late default never moves it.
+  const runOrderSettled = useRef(openingRunOrder !== undefined);
+  useEffect(() => {
+    if (runOrderSettled.current || openingRunOrder === undefined) return;
+    runOrderSettled.current = true;
+    setRunModelsTogether(openingRunOrder);
+  }, [openingRunOrder]);
+
   if (!isOpen) return null;
 
   const handleClose = () => {
@@ -165,7 +193,9 @@ export function BenchmarkDialog({
     // from the same props again rather than starting empty.
     filledInModels.current = false;
     setShowResults(false);
-    setRunModelsTogether(initialParallelModels ?? true);
+    setRunModelsTogether(openingRunOrder ?? true);
+    runOrderSettled.current = openingRunOrder !== undefined;
+    setSaveAsWorkspaceDefault(false);
     setSettingsOpen(false);
     setModelVerifyStatus({});
     // A check that failed belongs to the models that were picked this time, so
@@ -252,8 +282,22 @@ export function BenchmarkDialog({
     }
   };
 
+  // Saving the choice for the workspace is a favour to the reader, not part of
+  // the comparison, so it runs alongside it and never holds it up or stops it.
+  const saveWorkspaceDefault = () => {
+    if (!saveAsWorkspaceDefault || !activeOrgUuid) return;
+    if (runModelsTogether === workspaceDefault) return;
+    updateOrganization(activeOrgUuid, {
+      benchmark_parallel_models: runModelsTogether,
+    }).catch((err) => {
+      reportError("Error saving the workspace model run order:", err);
+      toast.error("The workspace default was not saved.");
+    });
+  };
+
   const handleRunBenchmark = async () => {
     setConfirmOpen(false);
+    saveWorkspaceDefault();
     if (agentType === "connection") {
       const modelsToVerify = selectedModels
         .filter((m): m is LLMModel => m !== null)
@@ -634,29 +678,28 @@ export function BenchmarkDialog({
                     overloading it.
                   </p>
                   <div className="pt-1">
-                    {[
-                      { value: "parallel", label: "Parallel" },
-                      { value: "sequential", label: "Sequential" },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-3 py-1 cursor-pointer select-none"
-                      >
-                        <input
-                          type="radio"
-                          name="run-models"
-                          value={option.value}
-                          checked={
-                            runModelsTogether === (option.value === "parallel")
-                          }
-                          onChange={() =>
-                            setRunModelsTogether(option.value === "parallel")
-                          }
-                          className="w-4 h-4 cursor-pointer accent-foreground"
-                        />
-                        <span className="text-sm">{option.label}</span>
-                      </label>
-                    ))}
+                    {/* The same two rows the workspace settings page shows, so
+                        the two cannot drift apart. */}
+                    <RunModelsChoice
+                      value={runModelsTogether}
+                      onChange={(next) => {
+                        runOrderSettled.current = true;
+                        setRunModelsTogether(next);
+                      }}
+                    />
+                    <label className="flex items-center gap-3 py-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={saveAsWorkspaceDefault}
+                        onChange={(e) =>
+                          setSaveAsWorkspaceDefault(e.target.checked)
+                        }
+                        className="w-4 h-4 cursor-pointer accent-foreground"
+                      />
+                      <span className="text-sm">
+                        Also save this as the workspace default
+                      </span>
+                    </label>
                   </div>
                 </fieldset>
               )}

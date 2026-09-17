@@ -15,6 +15,7 @@ jest.mock("next/navigation", () => ({
 import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useOrganizations,
+  useBenchmarkParallelDefault,
   useActiveOrgUuid,
   useOrgMembers,
   useWorkspaceApiKeys,
@@ -290,9 +291,47 @@ describe("useOrganizations hooks", () => {
         }),
       ).rejects.toThrow("rename failed");
       expect(reportError).toHaveBeenCalledWith(
-        "Error renaming organization:",
+        "Error updating organization:",
         err,
       );
+    });
+
+    it("updateOrganization sends only what it was given", async () => {
+      mockApiGet.mockResolvedValueOnce([org1, org2]);
+      const { result } = renderHook(() => useOrganizations("tok"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const changed = { ...org1, benchmark_parallel_models: false };
+      mockApiClient.mockResolvedValueOnce(changed);
+      await act(async () => {
+        await result.current.updateOrganization("org-1", {
+          benchmark_parallel_models: false,
+        });
+      });
+
+      // The name must not travel with it: sending one thing cannot overwrite
+      // another.
+      expect(mockApiClient).toHaveBeenCalledWith("/organizations/org-1", "tok", {
+        method: "PATCH",
+        body: { benchmark_parallel_models: false },
+      });
+      expect(result.current.organizations).toEqual([changed, org2]);
+    });
+
+    it("renameOrganization still sends only the name", async () => {
+      mockApiGet.mockResolvedValueOnce([org1]);
+      const { result } = renderHook(() => useOrganizations("tok"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      mockApiClient.mockResolvedValueOnce({ ...org1, name: "Renamed" });
+      await act(async () => {
+        await result.current.renameOrganization("org-1", "Renamed");
+      });
+
+      expect(mockApiClient).toHaveBeenCalledWith("/organizations/org-1", "tok", {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
     });
 
     it("refetches when another instance dispatches ORGANIZATIONS_CHANGED_EVENT with a different source", async () => {
@@ -353,6 +392,47 @@ describe("useOrganizations hooks", () => {
       await waitFor(() =>
         expect(result.current.organizations).toEqual([org1, org2]),
       );
+    });
+  });
+
+  describe("useBenchmarkParallelDefault", () => {
+    it("reads the choice off the workspace on screen", async () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      mockApiGet.mockResolvedValueOnce([
+        { ...org1, benchmark_parallel_models: true },
+        { ...org2, uuid: ORG_IN_ADDRESS, benchmark_parallel_models: false },
+      ]);
+
+      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
+
+      await waitFor(() => expect(result.current).toBe(false));
+    });
+
+    it("says nothing while the workspaces are still loading", async () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      mockApiGet.mockResolvedValueOnce([
+        { ...org1, uuid: ORG_IN_ADDRESS, benchmark_parallel_models: false },
+      ]);
+
+      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
+
+      // Undefined, not true: the caller has to be able to tell "not known
+      // yet" from someone actually choosing to run them together.
+      expect(result.current).toBeUndefined();
+
+      // Let the fetch settle before the test ends. A request left in flight
+      // stays in the shared cache, and the next test reuses it instead of
+      // making its own.
+      await waitFor(() => expect(result.current).toBe(false));
+    });
+
+    it("says nothing for a workspace whose backend does not carry the setting", async () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      mockApiGet.mockResolvedValueOnce([{ ...org1, uuid: ORG_IN_ADDRESS }]);
+
+      const { result } = renderHook(() => useBenchmarkParallelDefault("tok"));
+
+      await waitFor(() => expect(result.current).toBeUndefined());
     });
   });
 

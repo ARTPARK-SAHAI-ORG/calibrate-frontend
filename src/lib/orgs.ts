@@ -65,6 +65,11 @@ export type Organization = {
   uuid: string;
   name: string;
   is_personal: boolean;
+  /** How this workspace runs the models in a comparison by default: true runs
+   *  them at the same time, false one after another. It applies to agents you
+   *  connect, whose own server answers each call. Absent from a backend that
+   *  does not carry the setting yet, which reads as "run them together". */
+  benchmark_parallel_models?: boolean;
   created_by_user_id: string;
   member_role: OrganizationRole;
   created_at: string;
