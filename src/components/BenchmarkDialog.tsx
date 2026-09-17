@@ -482,7 +482,7 @@ export function BenchmarkDialog({
 
             {/* Model Rows */}
             {rows.map((selectedModel, index) => (
-              <div key={index} className="space-y-1">
+              <div key={index} className="relative space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2">
                     <button
@@ -526,14 +526,16 @@ export function BenchmarkDialog({
                     </button>
                   )}
                 </div>
-                {/* Expanded error details — only for failed models */}
+                {/* Why the check failed. Beside the box on a wide screen, the
+                    same way Advanced settings opens, so the rows never move.
+                    On a narrow screen it sits under the row instead. */}
                 {selectedModel &&
                   expandedModelError === selectedModel.id &&
                   benchmarkModelsVerified[selectedModel.id] &&
                   !benchmarkModelsVerified[selectedModel.id].verified && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
                       {benchmarkModelsVerified[selectedModel.id]?.error && (
-                        <p className="text-xs text-red-400">
+                        <p className="text-xs text-red-400 break-words">
                           {benchmarkModelsVerified[selectedModel.id].error}
                         </p>
                       )}
