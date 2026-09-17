@@ -45,10 +45,17 @@ jest.mock("../EnableBenchmarkDialog", () => ({
 }));
 
 let benchmarkProps: BenchmarkProps | null = null;
+// How many times the picker has been mounted, so starting again on newly
+// ticked tests can be told apart from the same window drawing again.
+const mockBenchmarkMounts = { count: 0 };
 jest.mock("../../BenchmarkDialog", () => ({
   __esModule: true,
   BenchmarkDialog: (props: BenchmarkProps) => {
     benchmarkProps = props;
+    const { useEffect } = require("react") as typeof import("react");
+    useEffect(() => {
+      mockBenchmarkMounts.count += 1;
+    }, []);
     return <div data-testid="benchmark-dialog" />;
   },
 }));
@@ -81,6 +88,7 @@ beforeEach(() => {
   overEvalLimitMock.mockReset().mockResolvedValue(false);
   benchmarkProps = null;
   verifyProps = null;
+  mockBenchmarkMounts.count = 0;
   (toast.error as jest.Mock).mockClear();
 });
 
@@ -371,6 +379,73 @@ describe("useAgentRunLaunchers", () => {
       expect(overEvalLimitMock).not.toHaveBeenCalled();
       expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
       expect(screen.queryByTestId("enable-benchmark-dialog")).toBeNull();
+    });
+
+    it("closes the comparison window when a run is started from inside it", async () => {
+      const onComparisonClosed = jest.fn();
+      const { hook, onRunCreated, redraw } = setup({ onComparisonClosed });
+      await act(async () => {
+        await hook.result.current.openCompare(tests, false);
+      });
+      redraw();
+      act(() => benchmarkProps?.onBenchmarkCreated?.("bench-1"));
+
+      // The reader ticks a test inside the comparison window and runs it.
+      await act(async () => {
+        await benchmarkProps?.onRunTests?.([tests[0]]);
+      });
+      redraw();
+      await act(async () => {
+        screen.getByRole("button", { name: "Start the run" }).click();
+      });
+      redraw();
+
+      expect(onRunCreated).toHaveBeenCalledWith("task-1", "window");
+      expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
+      expect(onComparisonClosed).toHaveBeenCalledWith(true);
+    });
+
+    it("starts the picker again on the tests ticked inside the comparison window", async () => {
+      const { hook, redraw } = setup();
+      await act(async () => {
+        await hook.result.current.openCompare(tests, false);
+      });
+      redraw();
+      const mountsBefore = mockBenchmarkMounts.count;
+
+      const ticked = [{ uuid: "t2", name: "Second" }];
+      await act(async () => {
+        benchmarkProps?.onCompareTests?.(ticked);
+      });
+      redraw();
+
+      expect(screen.getByTestId("benchmark-dialog")).toBeInTheDocument();
+      expect(benchmarkProps?.tests).toEqual(ticked);
+      expect(mockBenchmarkMounts.count).toBe(mountsBefore + 1);
+    });
+
+    it("draws the confirmation on top of the comparison window", async () => {
+      const { hook, redraw } = setup();
+      await act(async () => {
+        await hook.result.current.openCompare(tests, false);
+      });
+      redraw();
+      await act(async () => {
+        await benchmarkProps?.onRunTests?.([tests[0]]);
+      });
+      redraw();
+
+      // Both are full-screen boxes at the same depth, so the one written
+      // later is the one the reader sees. The confirmation has to come after
+      // the comparison window, or clicking Run looks like nothing happened.
+      const comparisonWindow = screen.getByTestId("benchmark-dialog");
+      const confirmation = screen.getByRole("button", {
+        name: "Start the run",
+      });
+      expect(
+        comparisonWindow.compareDocumentPosition(confirmation) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     it("reports a cancelled picker as not started", async () => {

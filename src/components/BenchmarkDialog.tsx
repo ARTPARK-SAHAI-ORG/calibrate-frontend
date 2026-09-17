@@ -9,6 +9,7 @@ import { useOpenRouterModels, useAccessToken } from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
+import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
 import {
   CloseIcon,
   ChevronDownIcon,
@@ -51,6 +52,10 @@ type BenchmarkDialogProps = {
     modelId: string,
     entry: { verified: boolean; verified_at: string; error: string | null },
   ) => void;
+  /** Run the tests ticked inside the comparison window this picker opens. */
+  onRunTests?: (tests: SelectedTest[]) => Promise<unknown> | void;
+  /** Compare models on the tests ticked inside that window. */
+  onCompareTests?: (tests: SelectedTest[]) => void;
 };
 
 type ModelVerifications = Record<
@@ -82,6 +87,8 @@ export function BenchmarkDialog({
   benchmarkModelsVerified: initialBenchmarkModelsVerified,
   benchmarkProvider,
   onModelVerified,
+  onRunTests,
+  onCompareTests,
 }: BenchmarkDialogProps) {
   useHideFloatingButton(isOpen);
   const { providers: llmProviders } = useOpenRouterModels();
@@ -703,6 +710,8 @@ export function BenchmarkDialog({
           agentType === "connection" ? runModelsTogether : undefined
         }
         onBenchmarkCreated={onBenchmarkCreated}
+        onRunTests={onRunTests}
+        onCompareTests={onCompareTests}
       />
 
       <ConfirmDialog

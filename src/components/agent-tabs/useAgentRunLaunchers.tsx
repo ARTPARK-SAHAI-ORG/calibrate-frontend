@@ -105,10 +105,26 @@ export function useAgentRunLaunchers({
   // the agent: the backend runs them all when it is sent no test ids.
   const [benchmarkTests, setBenchmarkTests] = useState<LaunchableTest[]>([]);
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
+  // Bumped every time the picker is asked for, and used as the dialog's key so
+  // it starts again on the picker. Asking from inside a comparison window
+  // leaves the dialog open on its results, where setting open to true does
+  // nothing.
+  const [benchmarkOpenKey, setBenchmarkOpenKey] = useState(0);
   const [enableBenchmarkOpen, setEnableBenchmarkOpen] = useState(false);
   // Whether the open comparison window actually started a run, so closing it
   // can be told apart from cancelling the picker.
   const startedComparisonRef = useRef(false);
+
+  // The one way the model picker, and the comparison window it opens, are
+  // closed. Does nothing when neither is open.
+  const closeBenchmarkDialog = () => {
+    if (!benchmarkDialogOpen) return;
+    setBenchmarkDialogOpen(false);
+    setBenchmarkTests([]);
+    const started = startedComparisonRef.current;
+    startedComparisonRef.current = false;
+    onComparisonClosed?.(started);
+  };
 
   // A run waiting on the reader's confirmation.
   const [runToConfirm, setRunToConfirm] = useState<RunIntent | null>(null);
@@ -137,6 +153,10 @@ export function useAgentRunLaunchers({
       );
       if (!taskId) return null;
       onRunCreated(taskId, runKey);
+      // A run asked for from inside a comparison window opens its own window.
+      // The comparison window has to go, or the new one sits behind it and
+      // nothing looks like it happened.
+      closeBenchmarkDialog();
       return taskId;
     } finally {
       setStartingRun(null);
@@ -192,6 +212,7 @@ export function useAgentRunLaunchers({
       return false;
     }
     setBenchmarkTests(allLinked ? [] : tests);
+    setBenchmarkOpenKey((k) => k + 1);
     if (canEnableBenchmarkHere) {
       setEnableBenchmarkOpen(true);
     } else {
@@ -208,6 +229,39 @@ export function useAgentRunLaunchers({
   // fixed overlay and show the page under it.
   const dialogs = (
     <>
+      {/* Rendered only while open, so every open starts from scratch: the
+          models picked and the checks that failed last time belong to that
+          window, not to the next one.
+
+          It comes first so that every dialog below is drawn on top of the
+          comparison window it opens. The confirmation for a run asked for
+          from inside that window, and the connection check before it, are
+          the same kind of full-screen box, and the one written later is the
+          one the reader sees. */}
+      {benchmarkDialogOpen && (
+        <BenchmarkDialog
+          key={benchmarkOpenKey}
+          isOpen
+          onClose={closeBenchmarkDialog}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          agentNature={agentNature}
+          // The picker reads only uuid and name off each test.
+          tests={benchmarkTests}
+          totalTests={linkedTestsTotal}
+          onBenchmarkCreated={() => {
+            startedComparisonRef.current = true;
+            onComparisonCreated?.();
+          }}
+          agentType={agentType}
+          benchmarkModelsVerified={benchmarkModelsVerified}
+          onModelVerified={onBenchmarkModelVerified}
+          benchmarkProvider={benchmarkProvider}
+          onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+          onCompareTests={(tests) => void openCompare(tests, false)}
+        />
+      )}
+
       <ConfirmDialog
         isOpen={runToConfirm !== null}
         onClose={() => setRunToConfirm(null)}
@@ -266,36 +320,6 @@ export function useAgentRunLaunchers({
           setBenchmarkDialogOpen(true);
         }}
       />
-
-      {/* Rendered only while open, so every open starts from scratch: the
-          models picked and the checks that failed last time belong to that
-          window, not to the next one. */}
-      {benchmarkDialogOpen && (
-        <BenchmarkDialog
-          isOpen
-          onClose={() => {
-            setBenchmarkDialogOpen(false);
-            setBenchmarkTests([]);
-            const started = startedComparisonRef.current;
-            startedComparisonRef.current = false;
-            onComparisonClosed?.(started);
-          }}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          agentNature={agentNature}
-          // The picker reads only uuid and name off each test.
-          tests={benchmarkTests}
-          totalTests={linkedTestsTotal}
-          onBenchmarkCreated={() => {
-            startedComparisonRef.current = true;
-            onComparisonCreated?.();
-          }}
-          agentType={agentType}
-          benchmarkModelsVerified={benchmarkModelsVerified}
-          onModelVerified={onBenchmarkModelVerified}
-          benchmarkProvider={benchmarkProvider}
-        />
-      )}
     </>
   );
 

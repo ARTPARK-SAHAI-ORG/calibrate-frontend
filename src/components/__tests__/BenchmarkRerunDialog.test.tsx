@@ -99,6 +99,43 @@ describe("BenchmarkRerunDialog", () => {
       testNames: ["Test One"],
     });
   });
+
+  it("hands the results window the Run and Compare actions for ticked tests", () => {
+    const onRunTests = jest.fn();
+    const onCompareTests = jest.fn();
+    render(
+      <BenchmarkRerunDialog
+        config={config}
+        rerunKey={1}
+        onClose={jest.fn()}
+        onBenchmarkCreated={jest.fn()}
+        onRerun={jest.fn()}
+        onRunTests={onRunTests}
+        onCompareTests={onCompareTests}
+      />,
+    );
+    const ticked = [{ uuid: "tu-1", name: "Test One" }];
+    act(() => resultsProps.onRunTests(ticked));
+    expect(onRunTests).toHaveBeenCalledWith(ticked);
+    act(() => resultsProps.onCompareTests(ticked));
+    expect(onCompareTests).toHaveBeenCalledWith(ticked);
+  });
+
+  it("leaves both actions out when the parent passes neither", () => {
+    // The strip inside the window draws no buttons then, which is what a
+    // caller that cannot start a run wants.
+    render(
+      <BenchmarkRerunDialog
+        config={config}
+        rerunKey={1}
+        onClose={jest.fn()}
+        onBenchmarkCreated={jest.fn()}
+        onRerun={jest.fn()}
+      />,
+    );
+    expect(resultsProps.onRunTests).toBeUndefined();
+    expect(resultsProps.onCompareTests).toBeUndefined();
+  });
 });
 
 describe("useBenchmarkRerun", () => {
