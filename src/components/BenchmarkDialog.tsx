@@ -477,7 +477,10 @@ export function BenchmarkDialog({
               Compare different models
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Select up to 5 models to benchmark on the tests
+              Select up to 5 models to benchmark on{" "}
+              {benchmarkTestCount === undefined
+                ? "the tests"
+                : `the ${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`}
             </p>
           </div>
           <button
