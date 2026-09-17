@@ -104,12 +104,10 @@ export type TestRunStatusResponse = {
   share_token?: string | null;
 };
 
-/** What to show under "Something went wrong": the reason the run carries,
- * or a fixed sentence when it carries none in text. */
-export function runFailureMessage(error: unknown): string {
-  return typeof error === "string" && error.trim()
-    ? error.trim()
-    : "We're looking into it. Please reach out to us if this issue persists.";
+/** What the backend recorded about a failed run, verbatim, or null when it
+ * recorded nothing in text (older runs carry true or false). */
+export function runErrorText(error: unknown): string | null {
+  return typeof error === "string" && error.trim() ? error.trim() : null;
 }
 
 /** Thrown on a 401 so callers can sign the user out. */

@@ -58,6 +58,9 @@ jest.mock("../eval-details", () => ({
         {JSON.stringify({ unanswered, stoppedEarly })}
       </span>
       <span data-testid="summary-stopped">{String(stopped === true)}</span>
+      <span data-testid="summary-failure">
+        {JSON.stringify(props.failureDetails ?? null)}
+      </span>
       <span data-testid="summary-evaluators">
         {JSON.stringify(props.evaluatorSummary ?? [])}
       </span>
@@ -986,18 +989,20 @@ describe("TestRunnerDialog", () => {
     );
 
     // Every row carries its own reason, so hiding them behind one error card
-    // told the reader nothing. The summary is also the only place that says
-    // the run stopped before it started every test.
+    // told the reader nothing. A failed run that kept rows opens on its
+    // summary, where the failure box and the gaps are, with the rows a tab away.
     await waitFor(() =>
-      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
+      expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
     );
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
-    // A failed run still must not jump to the Results tab on its own.
-    expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
-    await setupUser().click(screen.getByRole("button", { name: "Results" }));
     expect(screen.getByTestId("summary-gaps")).toHaveTextContent(
       JSON.stringify({ unanswered: 1, stoppedEarly: true }),
     );
+    expect(screen.getByTestId("summary-failure")).toHaveTextContent(
+      JSON.stringify(""),
+    );
+    await setupUser().click(screen.getByRole("button", { name: "Tests" }));
+    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
   });
 
   it("shows the overall error state when the run fails before any case ran", async () => {
@@ -1031,10 +1036,18 @@ describe("TestRunnerDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
-    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
+    ).toBeInTheDocument();
+    // What the backend recorded, verbatim, with a copy button.
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByText("boom").tagName).toBe("PRE");
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   });
 
-  it("shows the generic sentence when an older failed run carries error: true", async () => {
+  it("shows the sentence and no details block when an older failed run carries error: true", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -1065,10 +1078,12 @@ describe("TestRunnerDialog", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "We're looking into it. Please reach out to us if this issue persists.",
+          "The evaluation run failed before it produced any result.",
         ),
       ).toBeInTheDocument(),
     );
+    // Nothing was recorded in text, so there is no details block to copy.
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
     expect(screen.queryByText("true")).not.toBeInTheDocument();
   });
 
@@ -1112,10 +1127,13 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
+    // The failure sits above the summary, not in place of the rows.
     await waitFor(() =>
-      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
+      expect(screen.getByTestId("summary-failure")).toHaveTextContent(
+        JSON.stringify("boom"),
+      ),
     );
-    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    await setupUser().click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByText(/Passed One:passed/)).toBeInTheDocument();
     expect(screen.getByText(/Errored One:failed/)).toBeInTheDocument();
   });
@@ -2347,7 +2365,6 @@ describe("running or comparing the ticked tests", () => {
       { uuid: "t-2", name: "Beta" },
     ]);
   });
-
 
   it("hands the same tests to onCompareTests", async () => {
     const onCompareTests = jest.fn();

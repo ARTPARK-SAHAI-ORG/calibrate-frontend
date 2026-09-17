@@ -182,6 +182,41 @@ describe("public test run page", () => {
     ]);
   });
 
+  it("shows a failed run with what it did finish", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes("/results/")) return jsonResponse(CASE_ONE);
+        return jsonResponse({
+          ...RUN_SUMMARY,
+          status: "failed",
+          error: "boom",
+        });
+      },
+    );
+    render(<PublicTestRunPage />);
+
+    await screen.findByTestId("summary-cards");
+    expect(
+      screen.queryByText("This link is not available"),
+    ).not.toBeInTheDocument();
+    expect(summaryProps).toHaveBeenCalledWith(
+      expect.objectContaining({ failureDetails: "boom" }),
+    );
+  });
+
+  it("says the run is not there while it is still going", async () => {
+    (global.fetch as jest.Mock).mockImplementation(() =>
+      jsonResponse({ ...RUN_SUMMARY, status: "in_progress" }),
+    );
+    render(<PublicTestRunPage />);
+
+    expect(
+      await screen.findByText("This link is not available"),
+    ).toBeInTheDocument();
+  });
+
   it("shows the run's own per-evaluator totals", async () => {
     render(<PublicTestRunPage />);
 

@@ -58,12 +58,13 @@ import {
   fetchTestRun,
   getCachedTestRun,
   isTerminalRunStatus,
-  runFailureMessage,
+  runErrorText,
   UnauthorizedError,
   type TestCaseResult,
   type TestRunStatusResponse,
 } from "@/lib/testRunApi";
 import { EditableRunName } from "@/components/EditableRunName";
+import { RunFailureBox } from "@/components/RunFailureBox";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -257,15 +258,21 @@ export function TestRunnerDialog({
     // A run opened from the runs list has already finished, so there is
     // nothing to watch and it opens on its Results. A run that finishes while
     // the reader is watching it leaves them on the tests they were reading.
-    const landsOnResults = (status: string) =>
-      isTerminalRunStatus(status) && status !== "failed";
+    // A run that broke with nothing to show opens on its tests; one that
+    // kept some results opens on the summary, where the failure box is.
+    const landsOnResults = (r: {
+      status: string;
+      results?: unknown[] | null;
+    }) =>
+      isTerminalRunStatus(r.status) &&
+      (r.status !== "failed" || (r.results?.length ?? 0) > 0);
     let isFirstRead = true;
     setRun(cached ?? null);
     setIsLoading(!cached);
     setSelectedIndex(null);
     if (cached) {
       isFirstRead = false;
-      setActiveTab(landsOnResults(cached.status) ? "summary" : "tests");
+      setActiveTab(landsOnResults(cached) ? "summary" : "tests");
     } else {
       setActiveTab("tests");
     }
@@ -297,7 +304,7 @@ export function TestRunnerDialog({
         setRun(result);
         if (isFirstRead) {
           isFirstRead = false;
-          if (landsOnResults(result.status)) setActiveTab("summary");
+          if (landsOnResults(result)) setActiveTab("summary");
         }
         if (isTerminalRunStatus(result.status)) {
           stop();
@@ -784,29 +791,7 @@ export function TestRunnerDialog({
         ) : isOverallError ? (
           /* Overall Error State - replaces split panel */
           <div className="flex-1 flex items-center justify-center p-6">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md text-center">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <svg
-                  className="w-5 h-5 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                  />
-                </svg>
-                <span className="font-medium text-red-500">
-                  Something went wrong
-                </span>
-              </div>
-              <p className="text-sm text-red-400">
-                {runFailureMessage(run?.error)}
-              </p>
-            </div>
+            <RunFailureBox details={runErrorText(run?.error)} />
           </div>
         ) : (
           /* Content */
@@ -837,6 +822,11 @@ export function TestRunnerDialog({
                   unanswered={unansweredCount}
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
+                  failureDetails={
+                    run?.status === "failed"
+                      ? (runErrorText(run.error) ?? "")
+                      : null
+                  }
                   runTotalTests={run?.total_tests ?? rows.length}
                   onReviewUnanswered={() => setActiveTab("tests")}
                   latency={run?.latency_ms ?? null}

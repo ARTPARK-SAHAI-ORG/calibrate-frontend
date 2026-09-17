@@ -8,6 +8,7 @@ import {
   isRunStopped,
   isNotRun,
   isRunInProgress,
+  runStateOf,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -224,4 +225,34 @@ describe("isRunInProgress", () => {
       expect(isRunInProgress({ status })).toBe(false);
     },
   );
+});
+
+describe("runStateOf", () => {
+  it("says a finished run ran every test", () => {
+    expect(runStateOf({ status: "done" })).toBe("finished");
+    expect(runStateOf({ status: "done", stopped_early: false })).toBe(
+      "finished",
+    );
+  });
+
+  it("says a run gave up when it stopped before starting every test", () => {
+    expect(runStateOf({ status: "done", stopped_early: true })).toBe(
+      "gave_up",
+    );
+  });
+
+  it("lets stopped and broken win over gave up", () => {
+    expect(
+      runStateOf({ status: "done", aborted: true, stopped_early: true }),
+    ).toBe("stopped");
+    expect(runStateOf({ status: "failed", stopped_early: true })).toBe(
+      "error",
+    );
+  });
+
+  it("says nothing while the run is still going", () => {
+    expect(runStateOf({ status: "in_progress", stopped_early: true })).toBe(
+      null,
+    );
+  });
 });

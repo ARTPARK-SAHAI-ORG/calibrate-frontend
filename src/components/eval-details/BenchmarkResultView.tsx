@@ -129,6 +129,8 @@ type BenchmarkResultViewProps = {
   runStopped?: boolean;
   /** The run gave up before it started every test. */
   runStoppedEarly?: boolean;
+  /** Why the run failed after finishing some tests, shown in the note. */
+  runFailureReason?: string | null;
   activeTab: BenchmarkTabId;
   onTabChange: (tab: BenchmarkTabId) => void;
   /** Reads one test in full, for one model. The window and the shared link
@@ -170,6 +172,7 @@ export function BenchmarkResultView({
   isDone,
   runStopped = false,
   runStoppedEarly = false,
+  runFailureReason = null,
   activeTab,
   onTabChange,
   fetchCase,
@@ -361,6 +364,7 @@ export function BenchmarkResultView({
       onReviewUnanswered={() => onTabChange("tests")}
       runStopped={runStopped}
       stoppedEarly={runStoppedEarly}
+      failureReason={runFailureReason}
     />
   );
 
@@ -393,6 +397,7 @@ export function BenchmarkResultView({
   const outputs = (
     <BenchmarkOutputsPanel
       runStopped={runStopped}
+      runFailed={runFailureReason !== null}
       modelResults={rows}
       expandedModels={expandedModels}
       onToggleModel={toggleModel}

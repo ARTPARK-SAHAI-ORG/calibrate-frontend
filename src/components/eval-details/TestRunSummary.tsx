@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { RunNote } from "./RunNote";
+import { RunFailureBox } from "@/components/RunFailureBox";
 import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -34,6 +35,9 @@ type TestRunSummaryProps = {
   stoppedEarly?: boolean;
   /** True when someone stopped the run before it finished. */
   stopped?: boolean;
+  /** What the backend recorded when the run failed part way, or "" when it
+   * recorded nothing; null when the run did not fail. */
+  failureDetails?: string | null;
   /** How many tests the run set out to do. On a stopped run it is what the
    * tests that did run are counted against. */
   runTotalTests?: number | null;
@@ -206,6 +210,7 @@ export function TestRunSummary({
   unanswered = 0,
   stoppedEarly = false,
   stopped = false,
+  failureDetails = null,
   runTotalTests = null,
   onReviewUnanswered,
   latency,
@@ -256,6 +261,32 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
+        {failureDetails !== null && (
+          <RunFailureBox
+            className="w-full mb-4"
+            sentence={
+              <>
+                {`The evaluation failed after ${total + unanswered} of ${runTotalTests ?? total + unanswered} tests. `}
+                Review the tests that were run in the{" "}
+                {onReviewUnanswered ? (
+                  <button
+                    type="button"
+                    onClick={onReviewUnanswered}
+                    className="font-medium text-red-500 hover:text-red-600 cursor-pointer"
+                  >
+                    {RESULT_TAB_LABELS.tests} tab
+                  </button>
+                ) : (
+                  <span className="font-medium">
+                    {RESULT_TAB_LABELS.tests} tab
+                  </span>
+                )}
+                .
+              </>
+            }
+            details={failureDetails.trim() || null}
+          />
+        )}
         {(unanswered > 0 || stoppedEarly || stopped) && (
           <div className="mb-4">
             <RunNote>

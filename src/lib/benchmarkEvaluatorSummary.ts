@@ -276,8 +276,25 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   leaderboardSummary: BenchmarkLeaderboardSummaryRow[] | undefined,
   modelResults: BenchmarkModelLike[],
   benchmarkScoreLabel: string,
+  countFromRows = false,
 ): BenchmarkCombinedLeaderboardPayload | null {
   const keys = benchmarkMetricKeyOrder(modelResults);
+  // A run that failed part way has no summary from the backend, so count the
+  // tests each model did finish, the same numbers the table works out anyway.
+  if (countFromRows && !leaderboardSummary?.length) {
+    leaderboardSummary = modelResults.flatMap((m) => {
+      const c = benchmarkAnsweredPassFail(m);
+      if (!c || c.answered === 0) return [];
+      return [
+        {
+          model: m.model,
+          passed: String(c.passed),
+          total: String(c.answered),
+          pass_rate: String((c.passed / c.answered) * 100),
+        },
+      ];
+    });
+  }
   const showOverallPassRate =
     Array.isArray(leaderboardSummary) && leaderboardSummary.length > 0;
   const showPassedTotal = showOverallPassRate;

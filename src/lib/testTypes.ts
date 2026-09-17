@@ -136,6 +136,8 @@ export type RunCountsLike = {
   unanswered_tests?: number | null;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean | null;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean | null;
 };
 
 /**
@@ -176,6 +178,8 @@ export type RunStatusLike = {
   failed?: number | null;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean | null;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean | null;
 };
 
 /**
@@ -200,7 +204,7 @@ export function isRunStopped(run: { aborted?: boolean | null }): boolean {
 /** Added to the could-not-be-run note when the run gave up before starting
  * every test. Shared by the run summary and the model comparison note. */
 export const STOPPED_EARLY_SENTENCE =
-  "The run stopped before it started every test. ";
+  "The evaluation stopped before it started every test. ";
 
 export function stoppedRunSentence(
   testsRun: number,
@@ -216,7 +220,7 @@ export function stoppedRunSentence(
  * How a run itself went, as opposed to how its tests went. Null while the run
  * is still going, which the run says where its results would be.
  */
-export type RunState = "finished" | "stopped" | "error";
+export type RunState = "finished" | "gave_up" | "stopped" | "error";
 
 /**
  * Which of those a run is. The one rule, so the list of runs and the window
@@ -226,6 +230,7 @@ export function runStateOf(run: RunStatusLike): RunState | null {
   if (isRunStopped(run)) return "stopped";
   if (isRunErrored(run)) return "error";
   if (isRunInProgress(run)) return null;
+  if (run.stopped_early === true) return "gave_up";
   return "finished";
 }
 

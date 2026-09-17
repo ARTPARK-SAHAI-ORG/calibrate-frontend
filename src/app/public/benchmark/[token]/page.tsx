@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { runErrorText } from "@/lib/testRunApi";
 import { useParams } from "next/navigation";
 import {
   PublicPageLayout,
@@ -31,7 +32,7 @@ type BenchmarkStatusResponse = {
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
-  error?: string;
+  error?: string | boolean | null;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean;
   /** True when the run gave up before it started every test. */
@@ -72,7 +73,13 @@ export default function PublicBenchmarkPage() {
         if (!res.ok) throw new Error("Failed to load results");
 
         const result: BenchmarkStatusResponse = await res.json();
-        if (result.status !== "done" && result.status !== "completed") {
+        // A run still going has nothing to share yet. A failed one is shown
+        // with what it did finish, the same as in the app.
+        if (
+          result.status !== "done" &&
+          result.status !== "completed" &&
+          result.status !== "failed"
+        ) {
           setNotFound(true);
           return;
         }
@@ -144,6 +151,9 @@ export default function PublicBenchmarkPage() {
           evaluators={data.evaluators}
           runStopped={isRunStopped(data)}
           runStoppedEarly={data.stopped_early === true}
+          runFailureReason={
+            data.status === "failed" ? (runErrorText(data.error) ?? "") : null
+          }
           activeTab={activeTab}
           onTabChange={setActiveTab}
           fetchCase={fetchCase}

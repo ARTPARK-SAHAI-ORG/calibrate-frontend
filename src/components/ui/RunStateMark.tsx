@@ -7,7 +7,7 @@ const MARKS: Record<
   { tooltip: string; className: string; glyph: ReactNode }
 > = {
   finished: {
-    tooltip: "Ran every test",
+    tooltip: "The evaluation ran every test",
     className: "text-green-600",
     glyph: (
       <path
@@ -19,8 +19,23 @@ const MARKS: Record<
       />
     ),
   },
+  gave_up: {
+    tooltip: "Partially complete as some tests could not be run",
+    className: "text-amber-500",
+    glyph: (
+      <>
+        <path
+          d="M12 7v6"
+          stroke="white"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="16.5" r="1.3" fill="white" />
+      </>
+    ),
+  },
   stopped: {
-    tooltip: "Someone stopped this run before it finished",
+    tooltip: "Someone stopped the evaluation before it finished",
     className: "text-amber-500",
     glyph: (
       <>
@@ -42,7 +57,7 @@ const MARKS: Record<
     ),
   },
   error: {
-    tooltip: "This run broke before it could finish",
+    tooltip: "The evaluation broke before it could finish",
     className: "text-red-500",
     glyph: (
       <>
