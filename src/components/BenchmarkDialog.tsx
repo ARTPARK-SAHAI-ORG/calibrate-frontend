@@ -423,7 +423,11 @@ export function BenchmarkDialog({
               setExpandedModelError(isExpanded ? null : modelId);
             }}
             aria-expanded={isExpanded}
-            className="rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
+            className={`rounded-md border border-red-500/40 px-1.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
+              isExpanded
+                ? "bg-red-500 text-white hover:bg-red-600"
+                : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
+            }`}
           >
             See why
           </button>
