@@ -2117,7 +2117,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(benchmarkProps.totalTests).toBe(2);
   });
 
-  it("opens the benchmark dialog scoped to selected tests (bulk Compare)", async () => {
+  it("compares the ticked tests, keeping the ticks until a comparison starts", async () => {
     state.agentTests = [responseTest, toolCallTest];
     const user = setupUser();
     renderComponent();
@@ -2128,6 +2128,15 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
+    // Closing the model picker without starting keeps the ticks.
+    await user.click(screen.getByText("CloseBenchmark"));
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+
+    // Starting a comparison clears them.
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
   });
 
   it("blocks header Compare models before opening the picker when linked tests exceed the limit", async () => {

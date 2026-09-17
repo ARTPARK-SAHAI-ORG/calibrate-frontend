@@ -540,6 +540,9 @@ export function TestsTabContent({
     },
     onComparisonCreated: () => {
       onRunStarted?.();
+      // A comparison of the ticked tests clears the ticks only now, once it
+      // has started. Closing the model picker without starting keeps them.
+      clearSelection();
       // The comparison was asked for from inside a run window: that window
       // gives way to the comparison's own. Only the window closes here, not
       // the tab: switching to Evaluations would hide this tab, and the
@@ -1702,8 +1705,7 @@ export function TestsTabContent({
     }
     const { tests, allLinked } = await selectedTestsForAction();
     if (!allLinked && tests.length === 0) return;
-    if (!(await openCompare(tests, allLinked))) return;
-    clearSelection();
+    await openCompare(tests, allLinked);
   };
 
   return (
