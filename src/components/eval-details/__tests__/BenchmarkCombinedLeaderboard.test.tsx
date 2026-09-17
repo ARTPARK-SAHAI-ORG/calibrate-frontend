@@ -432,6 +432,34 @@ describe("a run that failed after finishing some tests", () => {
     ).toBeInTheDocument();
   });
 
+  it("gives no count when the models got different distances", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "100" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 4,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+          {
+            model: "b",
+            total_tests: 4,
+            test_results: [{ passed: true }],
+          },
+        ]}
+        filename="x"
+        failureReason="boom"
+      />,
+    );
+    expect(
+      screen.getByText(/The evaluation failed before it ran every test\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/The evaluation failed after/),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows no failure box without a reason", () => {
     render(failedRun(null));
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();

@@ -84,14 +84,27 @@ function UnansweredNote({
     <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
   );
 
+  const sameForEveryModel = perModel.every(
+    (c) =>
+      c.unanswered === perModel[0].unanswered &&
+      c.answered === perModel[0].answered,
+  );
+
+  // How far the models got. They can differ, so the sentence gives a count
+  // only when every model reached the same point.
+  const ranPerModel = Math.max(
+    0,
+    ...perModel.map((c) => c.answered + c.unanswered),
+  );
+
   // "" is a failure the backend recorded nothing about, so it still shows.
   const failureBox = failed ? (
     <RunFailureBox
       className="w-full"
       sentence={runFailureSentence(
-        Math.max(0, ...perModel.map((c) => c.answered + c.unanswered)),
+        ranPerModel === 0 || sameForEveryModel ? ranPerModel : null,
         Math.max(
-          Math.max(0, ...perModel.map((c) => c.answered + c.unanswered)),
+          ranPerModel,
           ...modelResults.map(
             (m) => m.total_tests ?? m.test_results?.length ?? 0,
           ),
@@ -104,11 +117,6 @@ function UnansweredNote({
   // A broken run still says how many tests could not be run, under the box.
   if (failed && totalUnanswered === 0) return failureBox;
 
-  const sameForEveryModel = perModel.every(
-    (c) =>
-      c.unanswered === perModel[0].unanswered &&
-      c.answered === perModel[0].answered,
-  );
   const { unanswered, answered } = perModel[0];
 
   return (

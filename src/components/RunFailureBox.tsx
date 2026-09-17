@@ -14,14 +14,19 @@ export const RUN_FAILED_SENTENCE =
  * the plain sentence instead.
  */
 export function runFailureSentence(
-  ran: number,
+  ran: number | null,
   total: number,
   tab: React.ReactNode,
 ): React.ReactNode {
   if (ran === 0) return RUN_FAILED_SENTENCE;
   return (
     <>
-      {`The evaluation failed after ${ran} of ${total} ${total === 1 ? "test" : "tests"}. `}
+      {/* `null` is a model comparison whose models got different distances,
+          so there is no one count to give, the way the note about tests that
+          could not be run says "Some tests" when the models disagree. */}
+      {ran === null
+        ? "The evaluation failed before it ran every test. "
+        : `The evaluation failed after ${ran} of ${total} ${total === 1 ? "test" : "tests"}. `}
       Review the tests that were run in the {tab}.
     </>
   );
