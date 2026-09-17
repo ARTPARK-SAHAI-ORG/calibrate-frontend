@@ -26,6 +26,7 @@ const config: BenchmarkRerunConfig = {
   models: ["gpt-4", "claude"],
   testUuids: ["tu-1", "tu-2"],
   testNames: ["Test One", "Test Two"],
+  parallelModels: false,
 };
 
 describe("BenchmarkRerunDialog", () => {
@@ -63,6 +64,8 @@ describe("BenchmarkRerunDialog", () => {
     expect(resultsProps.testUuids).toEqual(["tu-1", "tu-2"]);
     expect(resultsProps.testNames).toEqual(["Test One", "Test Two"]);
     expect(resultsProps.agentUuid).toBe("agent-1");
+    // The rerun runs its models the way the run it came from did.
+    expect(resultsProps.parallelModels).toBe(false);
   });
 
   it("passes the run config back with the new task id on creation", () => {
@@ -80,7 +83,7 @@ describe("BenchmarkRerunDialog", () => {
     expect(onBenchmarkCreated).toHaveBeenCalledWith("task-99", config);
   });
 
-  it("hands a re-rerun the updated models/testUuids/testNames merged onto the config", () => {
+  it("hands a re-rerun the updated request merged onto the config", () => {
     const onRerun = jest.fn();
     render(
       <BenchmarkRerunDialog
@@ -91,12 +94,20 @@ describe("BenchmarkRerunDialog", () => {
         onRerun={onRerun}
       />,
     );
-    act(() => resultsProps.onRerun(["gpt-4"], ["tu-1"], ["Test One"]));
+    act(() =>
+      resultsProps.onRerun({
+        models: ["gpt-4"],
+        testUuids: ["tu-1"],
+        testNames: ["Test One"],
+        parallelModels: true,
+      }),
+    );
     expect(onRerun).toHaveBeenCalledWith({
       ...config,
       models: ["gpt-4"],
       testUuids: ["tu-1"],
       testNames: ["Test One"],
+      parallelModels: true,
     });
   });
 

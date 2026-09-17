@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import type { LLMModel } from "./agent-tabs/constants/providers";
@@ -46,6 +46,13 @@ type BenchmarkDialogProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  /** The models to open with, as ids (e.g. "openai/gpt-4.1"). Used when a past
+   *  comparison is run again, so the reader can change the models before
+   *  starting it. */
+  initialModels?: string[];
+  /** Whether to open with the models running at the same time. Defaults to
+   *  running them together, which is what a fresh comparison does. */
+  initialParallelModels?: boolean;
   /** Called when a model passes its check, so the agent page can remember it
    *  and the next comparison does not ask again before a reload. */
   onModelVerified?: (
@@ -62,6 +69,8 @@ type ModelVerifications = Record<
   string,
   { verified: boolean; verified_at: string; error: string | null }
 >;
+
+const maxModels = 5;
 
 /** The saved model checks worth showing on a fresh open: the ones that passed.
  *  A past failure is not carried into a new window. */
@@ -86,6 +95,8 @@ export function BenchmarkDialog({
   agentType,
   benchmarkModelsVerified: initialBenchmarkModelsVerified,
   benchmarkProvider,
+  initialModels,
+  initialParallelModels,
   onModelVerified,
   onRunTests,
   onCompareTests,
@@ -98,7 +109,9 @@ export function BenchmarkDialog({
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const [runModelsTogether, setRunModelsTogether] = useState(true);
+  const [runModelsTogether, setRunModelsTogether] = useState(
+    initialParallelModels ?? true,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Per-model verification state for agent connections
@@ -121,12 +134,38 @@ export function BenchmarkDialog({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
+  // `initialModels` names the models an earlier comparison ran, and the list of
+  // models comes from the backend, so an id can only be turned into a model
+  // once that list has arrived. It is filled in once per open: after that the
+  // models on screen are the reader's own choice and are left alone.
+  const filledInModels = useRef(false);
+  useEffect(() => {
+    if (!isOpen || filledInModels.current) return;
+    if (!initialModels || initialModels.length === 0) return;
+    if (llmProviders.length === 0) return;
+    filledInModels.current = true;
+    const byId = new Map(
+      llmProviders.flatMap((p) => p.models).map((m) => [m.id, m] as const),
+    );
+    setSelectedModels(
+      Array.from(new Set(initialModels))
+        .slice(0, maxModels)
+        // A model that has since been retired is no longer in the list. It
+        // still gets a row, named by its id, so the reader can see what the
+        // earlier comparison used and swap it for one that still exists.
+        .map((id) => byId.get(id) ?? { id, name: id }),
+    );
+  }, [isOpen, initialModels, llmProviders]);
+
   if (!isOpen) return null;
 
   const handleClose = () => {
     setSelectedModels([]);
+    // Closing puts the window back to how it opened, so the next open fills in
+    // from the same props again rather than starting empty.
+    filledInModels.current = false;
     setShowResults(false);
-    setRunModelsTogether(true);
+    setRunModelsTogether(initialParallelModels ?? true);
     setSettingsOpen(false);
     setModelVerifyStatus({});
     // A check that failed belongs to the models that were picked this time, so
@@ -339,7 +378,6 @@ export function BenchmarkDialog({
   // that is still empty gives the whole width to the picker.
   const showStatusColumn =
     agentType === "connection" && selectedModels.some((m) => m !== null);
-  const maxModels = 5;
   // The chosen models, then one blank row to pick the next in, until five
   // are chosen. Picking a model fills the blank and a new blank appears.
   const rows: (LLMModel | null)[] =
