@@ -35,8 +35,7 @@ import { getDefaultHeaders } from "@/lib/api";
 import {
   abortRunOrNotify,
   fetchTestCase,
-  runErrorText,
-  RUN_FAILED_GENERIC_MESSAGE,
+  runFailureMessage,
 } from "@/lib/testRunApi";
 import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
@@ -313,6 +312,7 @@ export function BenchmarkResultsDialog({
         setRunEvaluators([]);
         setRunTestUuids([]);
         setWasStopped(false);
+        setStoppedEarly(false);
         setError(null);
         setNav(null);
         clearLabellingSelection();
@@ -436,12 +436,9 @@ export function BenchmarkResultsDialog({
 
         setStoppedEarly(result.stopped_early === true);
         if (result.error) {
-          const reason = runErrorText(result.error);
-          reportError(
-            "Model comparison failed",
-            new Error(reason ?? "unknown reason"),
-          );
-          setError(reason ?? RUN_FAILED_GENERIC_MESSAGE);
+          const reason = runFailureMessage(result.error);
+          reportError("Model comparison failed", new Error(reason));
+          setError(reason);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
           // A comparison that had already finished when the window opened
@@ -454,7 +451,7 @@ export function BenchmarkResultsDialog({
       reportError("Error polling benchmark status:", err);
       setIsInitialLoading(false);
       setTaskStatus("failed");
-      setError(RUN_FAILED_GENERIC_MESSAGE);
+      setError(runFailureMessage(null));
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -878,7 +875,11 @@ export function BenchmarkResultsDialog({
               showLabelling && selectedTests.length > 0 ? (
                 <SelectedTestsStrip
                   count={selectedTests.length}
-                  onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
+                  onRun={
+                    onRunTests
+                      ? () => void onRunTests(selectedTests)
+                      : undefined
+                  }
                   onCompare={
                     onCompareTests
                       ? () => onCompareTests(selectedTests)

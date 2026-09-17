@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence } from "@/lib/testTypes";
+import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
@@ -264,9 +264,7 @@ export function TestRunSummary({
                   ? "None of the tests could be run. "
                   : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
               {stopped && `${stoppedSentence}${unanswered > 0 ? ". " : ""}`}
-              {stoppedEarly &&
-                !stopped &&
-                "The run stopped before it started every test. "}
+              {stoppedEarly && !stopped && STOPPED_EARLY_SENTENCE}
               {unanswered > 0 && (
                 <>
                   Review the tests that could not be run in the{" "}
@@ -279,7 +277,9 @@ export function TestRunSummary({
                       {RESULT_TAB_LABELS.tests} tab
                     </button>
                   ) : (
-                    <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
+                    <span className="font-medium">
+                      {RESULT_TAB_LABELS.tests} tab
+                    </span>
                   )}
                   .
                 </>

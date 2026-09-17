@@ -58,8 +58,7 @@ import {
   fetchTestRun,
   getCachedTestRun,
   isTerminalRunStatus,
-  runErrorText,
-  RUN_FAILED_GENERIC_MESSAGE,
+  runFailureMessage,
   UnauthorizedError,
   type TestCaseResult,
   type TestRunStatusResponse,
@@ -805,7 +804,7 @@ export function TestRunnerDialog({
                 </span>
               </div>
               <p className="text-sm text-red-400">
-                {runErrorText(run?.error) ?? RUN_FAILED_GENERIC_MESSAGE}
+                {runFailureMessage(run?.error)}
               </p>
             </div>
           </div>
@@ -897,7 +896,11 @@ export function TestRunnerDialog({
                     isFinished && selectedTests.length > 0 ? (
                       <SelectedTestsStrip
                         count={selectedTests.length}
-                        onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
+                        onRun={
+                          onRunTests
+                            ? () => void onRunTests(selectedTests)
+                            : undefined
+                        }
                         onCompare={
                           onCompareTests
                             ? () => onCompareTests(selectedTests)

@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence } from "@/lib/testTypes";
+import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import {
   benchmarkAnsweredPassFail,
   benchmarkRatingEvaluatorCaption,
@@ -84,11 +84,11 @@ function UnansweredNote({
   return (
     <RunNote>
       {!sameForEveryModel
-          ? "Some tests could not be run and were ignored for calculating the metrics. "
-          : answered === 0
-            ? "None of the tests could be run. "
-            : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
-      {stoppedEarly && "The run stopped before it started every test. "}
+        ? "Some tests could not be run and were ignored for calculating the metrics. "
+        : answered === 0
+          ? "None of the tests could be run. "
+          : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
+      {stoppedEarly && STOPPED_EARLY_SENTENCE}
       Review the tests that could not be run in the {tab}.
     </RunNote>
   );
@@ -149,7 +149,10 @@ function columnsFromPayload(
   ];
 
   if (payload.plan.showPassedTotal) {
-    cols.push({ key: "passed", header: "Passed" }, { key: "total", header: "Total" });
+    cols.push(
+      { key: "passed", header: "Passed" },
+      { key: "total", header: "Total" },
+    );
   }
 
   if (payload.plan.showOverallPassRate) {
@@ -229,7 +232,11 @@ function columnsFromPayload(
       header,
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
-          ev.type === "binary" ? formatPercent(v) : formatRating(v)
+          ev.type === "binary" ? (
+            formatPercent(v)
+          ) : (
+            formatRating(v)
+          )
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -285,7 +292,9 @@ export function BenchmarkCombinedLeaderboard({
     }
     return (
       <div className="text-center py-12">
-        <p className="text-sm text-muted-foreground">No leaderboard data available</p>
+        <p className="text-sm text-muted-foreground">
+          No leaderboard data available
+        </p>
       </div>
     );
   }

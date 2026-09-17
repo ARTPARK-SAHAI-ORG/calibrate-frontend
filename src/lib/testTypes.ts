@@ -197,6 +197,11 @@ export function isRunStopped(run: { aborted?: boolean | null }): boolean {
  * leaderboard both say it, so it lives here and neither writes its own. No
  * full stop: a caller that follows it with another sentence adds one.
  */
+/** Added to the could-not-be-run note when the run gave up before starting
+ * every test. Shared by the run summary and the model comparison note. */
+export const STOPPED_EARLY_SENTENCE =
+  "The run stopped before it started every test. ";
+
 export function stoppedRunSentence(
   testsRun: number,
   totalTests: number | null,

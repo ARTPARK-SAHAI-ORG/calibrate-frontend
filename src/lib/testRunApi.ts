@@ -104,13 +104,12 @@ export type TestRunStatusResponse = {
   share_token?: string | null;
 };
 
-/** Shown when a run failed and the backend gave no reason. */
-export const RUN_FAILED_GENERIC_MESSAGE =
-  "We're looking into it. Please reach out to us if this issue persists.";
-
-/** The failure reason a run carries, or null when it has none in text. */
-export function runErrorText(error: unknown): string | null {
-  return typeof error === "string" && error.trim() ? error.trim() : null;
+/** What to show under "Something went wrong": the reason the run carries,
+ * or a fixed sentence when it carries none in text. */
+export function runFailureMessage(error: unknown): string {
+  return typeof error === "string" && error.trim()
+    ? error.trim()
+    : "We're looking into it. Please reach out to us if this issue persists.";
 }
 
 /** Thrown on a 401 so callers can sign the user out. */
@@ -210,7 +209,12 @@ const finishedCases = new Map<string, TestCaseResult>();
 export type RunDetailMode = "full" | "summary";
 
 /** Newest last, oldest dropped once past `limit`. */
-function remember<T>(store: Map<string, T>, key: string, value: T, limit: number) {
+function remember<T>(
+  store: Map<string, T>,
+  key: string,
+  value: T,
+  limit: number,
+) {
   store.delete(key);
   store.set(key, value);
   if (store.size > limit) {
