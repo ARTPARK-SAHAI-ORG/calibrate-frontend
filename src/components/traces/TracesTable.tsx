@@ -128,10 +128,6 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-function rowGrid(scoreColumnCount: number) {
-  const scores = "_minmax(6rem,0.5fr)".repeat(scoreColumnCount);
-  return `grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)${scores}_160px_auto] gap-4 px-4`;
-}
 
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
@@ -148,12 +144,20 @@ export function TracesTable({
   onDelete,
   scoreColumns = [],
 }: TracesTableProps) {
-  const ROW_GRID = rowGrid(scoreColumns.length);
+  // Tailwind only compiles class names it can read in the source, so a grid
+  // whose column count depends on the evaluators has to be an inline style.
+  const ROW_CLASS = "grid gap-4 px-4";
+  const ROW_STYLE = {
+    gridTemplateColumns: `40px minmax(0,1fr) minmax(0,1fr)${" minmax(6rem,0.5fr)".repeat(scoreColumns.length)} 160px auto`,
+  };
   return (
     <>
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className={`${ROW_GRID} py-2 border-b border-border bg-muted/30 items-center`}>
+        <div
+          style={ROW_STYLE}
+          className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
+        >
           <div className="flex items-center">
             <SelectCheckbox
               checked={allSelected}
@@ -184,7 +188,8 @@ export function TracesTable({
             <div
               key={trace.uuid}
               onClick={() => onOpen(trace.uuid)}
-              className={`${ROW_GRID} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              style={ROW_STYLE}
+              className={`${ROW_CLASS} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
             >
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />

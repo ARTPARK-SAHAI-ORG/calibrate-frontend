@@ -111,9 +111,9 @@ export function SettingsTabContent({
               <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
                 New traces this agent receives are scored with its evaluators.
               </p>
-              {traceScoring.saveError ? (
+              {traceScoring.saveError || traceScoring.eligibilityError ? (
                 <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
-                  {traceScoring.saveError}
+                  {traceScoring.saveError ?? traceScoring.eligibilityError}
                 </p>
               ) : traceScoring.enableBlocked ? (
                 <p className="text-xs md:text-sm text-muted-foreground mt-1">

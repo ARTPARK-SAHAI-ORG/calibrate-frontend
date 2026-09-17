@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
-import { pageHasOpenTraceScoring } from "@/lib/traceScoring";
+import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 
@@ -68,6 +68,9 @@ export function useTraces({
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   const requestIdRef = useRef(0);
+  // The normal load whose spinner is on screen. A silent re-read must not
+  // stop it from clearing that spinner when it answers.
+  const loadingIdRef = useRef(0);
 
   useEffect(() => {
     setOffset(0);
@@ -83,6 +86,7 @@ export function useTraces({
       // must not let the slower one write an older status back onto the page.
       const requestId = ++requestIdRef.current;
       if (!silent) {
+        loadingIdRef.current = requestId;
         setIsLoading(true);
         setError(null);
       }
@@ -106,8 +110,8 @@ export function useTraces({
         return nextTotal;
       } catch (err) {
         if (requestId !== requestIdRef.current) return 0;
-        if (silent) return 0;
         reportError("Error fetching traces:", err);
+        if (silent) return 0;
         // Drop the last page too: leaving it on screen next to the message
         // would let the reader tick and delete rows from a failed load.
         setItems([]);
@@ -115,7 +119,7 @@ export function useTraces({
         setError("Failed to load traces. Please try again.");
         return 0;
       } finally {
-        if (!silent && requestId === requestIdRef.current) setIsLoading(false);
+        if (!silent && requestId === loadingIdRef.current) setIsLoading(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,7 +143,9 @@ export function useTraces({
 
   /** Re-ask for this page while any visible row is still waiting to be scored.
    *  One list request, never one per row. */
-  const hasOpenScoring = pageHasOpenTraceScoring(items);
+  const hasOpenScoring = items.some((t) =>
+    isTraceScoringInProgress(t.latest_run_status),
+  );
   useEffect(() => {
     if (!poll || !accessToken || isLoading || !hasOpenScoring) return;
     const timer = window.setInterval(() => {

@@ -20,6 +20,7 @@ import {
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
+import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
   PassFailCountPills,
   RunStateMark,
@@ -112,8 +113,6 @@ function RunResultPlaceholder() {
   return <span className="text-sm text-muted-foreground/70">No results</span>;
 }
 
-const PILL_CLASS =
-  "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
 
 /** The result pills for one run: running, error, or the per-test tally. */
 function RunResult({ run }: { run: AgentRun }) {

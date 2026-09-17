@@ -38,7 +38,7 @@ export type TraceScoringControls = {
 /**
  * Eligibility + opt-in for automatic trace scoring. Enabling is blocked when
  * no linked evaluator can score this agent; disabling is always allowed.
- * Eligibility stays unknown until a GET succeeds — a missing or failed check
+ * Eligibility stays unknown until a GET succeeds. A missing or failed check
  * is not treated as "no eligible evaluators".
  */
 export function useAgentTraceScoring({
@@ -89,6 +89,8 @@ export function useAgentTraceScoring({
 
   useEffect(() => {
     if (!isActive) return;
+    // Coming back to the tab rechecks, and drops what the last refusal said.
+    setSaveError(null);
     void loadEligibility();
   }, [isActive, loadEligibility]);
 

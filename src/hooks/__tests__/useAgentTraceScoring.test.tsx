@@ -117,6 +117,35 @@ it("surfaces a generic error when enabling fails for another reason", async () =
   expect(mockReportError).toHaveBeenCalled();
 });
 
+it("drops the refusal message when the reader comes back to the tab", async () => {
+  mockSetFlag.mockRejectedValue(
+    new Error(
+      `Request failed: 422 - ${JSON.stringify({
+        detail: "There are no eligible evaluators configured for this agent",
+      })}`,
+    ),
+  );
+  const { result, rerender } = renderHook(
+    (props: { isActive: boolean }) =>
+      useAgentTraceScoring({
+        accessToken: "tok",
+        agentUuid: "ag-1",
+        enabled: false,
+        isActive: props.isActive,
+      }),
+    { initialProps: { isActive: true } },
+  );
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
+  await act(async () => {
+    await result.current.setEnabled(true);
+  });
+  expect(result.current.saveError).toMatch(/no eligible evaluators/);
+
+  rerender({ isActive: false });
+  rerender({ isActive: true });
+  await waitFor(() => expect(result.current.saveError).toBeNull());
+});
+
 it("records when eligibility cannot be loaded", async () => {
   mockEligibility.mockRejectedValue(new Error("offline"));
   const { result } = setup(false);

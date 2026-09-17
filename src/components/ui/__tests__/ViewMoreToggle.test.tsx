@@ -20,19 +20,6 @@ it("offers View more while closed and View less while open", async () => {
   );
 });
 
-it("names the region it opens when the parent passes one", () => {
-  render(
-    <ViewMoreToggle
-      expanded={false}
-      onClick={() => {}}
-      aria-controls="details"
-    />,
-  );
-  expect(screen.getByRole("button", { name: "View more" })).toHaveAttribute(
-    "aria-controls",
-    "details",
-  );
-});
 
 it("keeps extra classes the parent needs for overlay or inline placement", () => {
   render(

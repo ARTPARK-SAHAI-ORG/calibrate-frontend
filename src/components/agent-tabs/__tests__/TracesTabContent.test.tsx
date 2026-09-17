@@ -447,7 +447,7 @@ describe("TracesTabContent", () => {
     it("says new traces are not scored and sends the reader to Settings", async () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
-      expect(screen.getByText("New traces are not scored.")).toBeInTheDocument();
+      expect(screen.getByText("New traces are not scored automatically.")).toBeInTheDocument();
       await user.click(
         screen.getByRole("button", { name: "Turn on in Settings" }),
       );
@@ -602,7 +602,7 @@ describe("TracesTabContent", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("Old judge")).toBeInTheDocument();
       expect(
-        screen.getByText("Has no current version to run"),
+        screen.getByText("Has no live version"),
       ).toBeInTheDocument();
     });
 
@@ -627,14 +627,24 @@ describe("TracesTabContent", () => {
         />,
       );
       expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
-      expect(screen.queryByText("New traces are not scored.")).not.toBeInTheDocument();
+      expect(screen.queryByText("New traces are not scored automatically.")).not.toBeInTheDocument();
       expect(screen.queryByText("Old judge")).not.toBeInTheDocument();
     });
 
-    it("hands the table one column per evaluator that can score", () => {
-      render(<TracesTabContent {...tabProps} />);
+    it("hands the table one column per evaluator that can score, once scoring is on", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
       // The desktop header and the mobile card both name the column.
       expect(screen.getAllByText("Tone")).toHaveLength(2);
+    });
+
+    it("shows no evaluator columns while scoring is off and nothing has been scored", () => {
+      render(<TracesTabContent {...tabProps} />);
+      expect(screen.queryByText("Tone")).not.toBeInTheDocument();
     });
   });
 

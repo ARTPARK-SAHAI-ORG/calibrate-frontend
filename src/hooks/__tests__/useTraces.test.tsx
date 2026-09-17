@@ -533,6 +533,33 @@ describe("useTraces", () => {
     setIntervalSpy.mockRestore();
   });
 
+  it("clears the spinner when a silent re-read overtakes a normal load", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let resolveSlow: (value: unknown) => void = () => {};
+    mockFetchTraces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSlow = resolve;
+      }),
+    );
+    mockFetchTraces.mockResolvedValueOnce(page([{ uuid: "t1" }], 1));
+    act(() => {
+      void result.current.refetch();
+    });
+    expect(result.current.isLoading).toBe(true);
+    await act(async () => {
+      await result.current.refetchSilently();
+    });
+    await act(async () => {
+      resolveSlow(page([{ uuid: "t1" }], 1));
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
   it("does not let a slower silent poll overwrite a newer status", async () => {
     const setIntervalSpy = jest.spyOn(window, "setInterval");
     mockFetchTraces.mockResolvedValue(
@@ -559,8 +586,6 @@ describe("useTraces", () => {
             uuid: "t1",
             latest_run_status: "completed",
             passed: true,
-            n_passed: 1,
-            n_total: 1,
           },
         ],
         1,

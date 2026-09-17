@@ -86,7 +86,7 @@ function FieldList({
 /**
  * The request that sends one trace, in the reader's language of choice, beside
  * what each field means. Used by the setup steps before the first trace lands
- * and by the "View code" dialog afterwards, so both show the same thing.
+ * and by the "Integration guide" dialog afterwards, so both show the same thing.
  */
 export function TraceIngestSnippet({
   agentUuid,
@@ -219,7 +219,7 @@ export function TraceIngestSnippet({
               />
             </button>
             <span className="text-sm text-muted-foreground">
-              Include optional fields in snippet
+              Include optional fields in the code
             </span>
           </label>
         </div>

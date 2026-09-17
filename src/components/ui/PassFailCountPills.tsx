@@ -2,7 +2,7 @@
  * The Success / Fail (and optional Not run) tally used on completed runs.
  * Counts live in the pill; a pill with a zero count is omitted.
  */
-const PILL_CLASS =
+export const PILL_CLASS =
   "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
 
 type PassFailCountPillsProps = {

@@ -55,10 +55,6 @@ export type TraceSummary = {
   /** One entry per evaluator on the latest completed run. Absent until the
    *  backend sends it. */
   scores?: TraceSummaryScore[] | null;
-  /** How many evaluators passed on the latest completed run. */
-  n_passed?: number | null;
-  /** How many evaluators the latest completed run scored. */
-  n_total?: number | null;
 };
 
 export type TraceSummaryScore = {

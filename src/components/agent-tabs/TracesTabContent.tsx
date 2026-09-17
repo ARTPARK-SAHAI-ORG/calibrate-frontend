@@ -425,12 +425,12 @@ export function TracesTabContent({
     setIsScoringPast(true);
     try {
       const { queued } = await scoreAgentTraces(accessToken, agentUuid);
+      await refetchSilently();
       toast.success(
         queued === 0
           ? "Every trace has already been scored"
           : `Queued ${queued} trace${queued === 1 ? "" : "s"} for scoring`,
       );
-      await refetchSilently();
     } catch (err) {
       reportError("Error scoring past traces:", err);
       toast.error("Could not queue the traces for scoring. Please try again.");
@@ -532,7 +532,7 @@ export function TracesTabContent({
               <span className="text-sm text-muted-foreground">
                 {traceScoring.enabled
                   ? "New traces are scored automatically with this agent's evaluators."
-                  : "New traces are not scored."}
+                  : "New traces are not scored automatically."}
                 {traceScoring.saveError && (
                   <span className="text-red-600 dark:text-red-400">
                     {" "}
@@ -790,7 +790,11 @@ export function TracesTabContent({
                 onToggleSelectAll={deletion.toggleSelectAll}
                 onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
-                scoreColumns={traceScoring.eligibility?.eligible ?? []}
+                scoreColumns={
+                traceScoring.enabled || items.some((t) => t.latest_run_status)
+                  ? (traceScoring.eligibility?.eligible ?? [])
+                  : []
+              }
               />
             </div>
           )}

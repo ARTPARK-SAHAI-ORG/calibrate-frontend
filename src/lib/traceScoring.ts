@@ -11,25 +11,17 @@ export function isTraceScoringInProgress(
   return status === "pending" || status === "processing";
 }
 
-export function pageHasOpenTraceScoring(
-  traces: Pick<TraceSummary, "latest_run_status">[],
-): boolean {
-  return traces.some((trace) =>
-    isTraceScoringInProgress(trace.latest_run_status),
-  );
-}
-
 /** Why a linked evaluator cannot score this agent's traces. */
 export function ineligibleReasonCopy(
   reason: TraceScoringIneligibleReason | string,
 ): string {
   switch (reason) {
     case "wrong_type_for_agent":
-      return "Does not match this agent";
+      return "Is not the kind of evaluator this agent uses";
     case "no_live_version":
-      return "Has no current version to run";
+      return "Has no live version";
     case "declares_variables":
-      return "Needs extra details that are not set for this agent";
+      return "Uses variables, which cannot be filled in for a trace";
     default:
       return "Cannot score traces for this agent";
   }
@@ -53,34 +45,4 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
   }
 }
 
-export function scoringStatusLabel(status: TraceScoringStatus): string {
-  switch (status) {
-    case "pending":
-      return "Waiting";
-    case "processing":
-      return "Scoring";
-    case "completed":
-      return "Scored";
-    case "failed":
-      return "Failed";
-    case "skipped":
-      return "Skipped";
-  }
-}
 
-export type ScoringResultCounts = {
-  passed: number;
-  failed: number;
-};
-
-/**
- * Success / Fail counts for a completed run. Pills carry each count themselves.
- */
-export function scoringResultCounts(
-  nPassed: number | null | undefined,
-  nTotal: number | null | undefined,
-): ScoringResultCounts | null {
-  if (nPassed == null || nTotal == null || nTotal < 1) return null;
-  const passed = Math.max(nPassed, 0);
-  return { passed, failed: Math.max(nTotal - passed, 0) };
-}

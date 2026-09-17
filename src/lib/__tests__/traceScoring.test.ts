@@ -1,10 +1,7 @@
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
-  pageHasOpenTraceScoring,
-  scoringResultCounts,
   scoringRunErrorCopy,
-  scoringStatusLabel,
 } from "../traceScoring";
 
 describe("isTraceScoringInProgress", () => {
@@ -16,30 +13,17 @@ describe("isTraceScoringInProgress", () => {
   });
 });
 
-describe("pageHasOpenTraceScoring", () => {
-  it("is true when any visible row is still being scored", () => {
-    expect(
-      pageHasOpenTraceScoring([
-        { latest_run_status: "completed" },
-        { latest_run_status: "pending" },
-      ]),
-    ).toBe(true);
-    expect(pageHasOpenTraceScoring([{ latest_run_status: "failed" }])).toBe(
-      false,
-    );
-  });
-});
 
 describe("copy", () => {
   it("explains ineligible evaluators in ordinary words", () => {
     expect(ineligibleReasonCopy("wrong_type_for_agent")).toBe(
-      "Does not match this agent",
+      "Is not the kind of evaluator this agent uses",
     );
     expect(ineligibleReasonCopy("no_live_version")).toBe(
-      "Has no current version to run",
+      "Has no live version",
     );
     expect(ineligibleReasonCopy("declares_variables")).toBe(
-      "Needs extra details that are not set for this agent",
+      "Uses variables, which cannot be filled in for a trace",
     );
     expect(ineligibleReasonCopy("other")).toBe(
       "Cannot score traces for this agent",
@@ -63,16 +47,4 @@ describe("copy", () => {
     expect(scoringRunErrorCopy("unknown-code")).toBe("Scoring did not finish");
   });
 
-  it("labels statuses and pass counts without mixing evaluator types", () => {
-    expect(scoringStatusLabel("pending")).toBe("Waiting");
-    expect(scoringStatusLabel("processing")).toBe("Scoring");
-    expect(scoringResultCounts(2, 4)).toEqual({ passed: 2, failed: 2 });
-    expect(scoringResultCounts(2, 2)).toEqual({ passed: 2, failed: 0 });
-    expect(scoringResultCounts(0, 3)).toEqual({ passed: 0, failed: 3 });
-    expect(scoringResultCounts(0, 0)).toBeNull();
-    expect(scoringResultCounts(null, 4)).toBeNull();
-    expect(scoringResultCounts(2, undefined)).toBeNull();
-    expect(scoringResultCounts(-1, 3)).toEqual({ passed: 0, failed: 3 });
-    expect(scoringResultCounts(5, 3)).toEqual({ passed: 5, failed: 0 });
-  });
 });

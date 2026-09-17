@@ -23,7 +23,7 @@ function verdictFields(result: TraceScoreResult): {
   if (result.output_type === "rating") {
     return { score: result.value };
   }
-  return { match: result.value === 1 };
+  return { match: result.passed };
 }
 
 function RunBody({ run }: { run: TraceScoringRun }) {
@@ -47,7 +47,7 @@ function RunBody({ run }: { run: TraceScoringRun }) {
   if (run.results.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No evaluator results were stored for this run.
+        This run produced no scores.
       </p>
     );
   }

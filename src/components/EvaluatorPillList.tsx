@@ -150,41 +150,22 @@ export function EvaluatorPillList({
   }
 
   if (layout === "flow") {
-    const withDetail = evaluators.some((ev) => ev.detail);
     return (
       <>
-        <div
-          className={
-            withDetail
-              ? "flex flex-col items-start gap-1.5 min-w-0"
-              : "inline-flex flex-wrap items-center gap-1 min-w-0"
-          }
-        >
-          {evaluators.map((ev, index) => {
-            const pill = (
+        <div className="flex flex-col items-start gap-1.5 min-w-0">
+          {evaluators.map((ev, index) => (
+            <div
+              key={pillKey(ev, index)}
+              className="flex flex-wrap items-center gap-2 min-w-0"
+            >
               <NamePill name={ev.name} wrap onOpen={openFor(ev)} />
-            );
-            if (!withDetail) {
-              return (
-                <span key={pillKey(ev, index)} className="min-w-0">
-                  {pill}
+              {ev.detail ? (
+                <span className="text-xs md:text-sm text-muted-foreground">
+                  {ev.detail}
                 </span>
-              );
-            }
-            return (
-              <div
-                key={pillKey(ev, index)}
-                className="flex flex-wrap items-center gap-2 min-w-0"
-              >
-                {pill}
-                {ev.detail ? (
-                  <span className="text-xs md:text-sm text-muted-foreground">
-                    {ev.detail}
-                  </span>
-                ) : null}
-              </div>
-            );
-          })}
+              ) : null}
+            </div>
+          ))}
         </div>
         {modal}
       </>

@@ -224,6 +224,14 @@ describe("TracesTable", () => {
     expect(screen.getAllByText("—")).toHaveLength(2);
   });
 
+  it("sizes the grid inline, one track per evaluator, so Tailwind need not compile it", () => {
+    renderTable({ scoreColumns: columns, traces: [trace({})] });
+    const header = screen.getByText("Input").closest("div[style]") as HTMLElement;
+    expect(header.style.gridTemplateColumns).toBe(
+      "40px minmax(0,1fr) minmax(0,1fr) minmax(6rem,0.5fr) minmax(6rem,0.5fr) 160px auto",
+    );
+  });
+
   it("shows one spinner across the evaluator columns while scoring runs", () => {
     renderTable({
       scoreColumns: columns,

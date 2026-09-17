@@ -451,7 +451,7 @@ export function TraceDetailDialog({
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
           {trace && (
-            <div className="md:w-80 border-b md:border-b-0 md:border-r border-border overflow-y-auto shrink-0">
+            <div className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border overflow-y-auto shrink-0">
               <TraceMetaPanel
                 messageId={trace.message_id}
                 conversationId={trace.conversation_id}

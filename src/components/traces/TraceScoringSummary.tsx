@@ -1,15 +1,13 @@
 "use client";
 
 import { SpinnerIcon } from "@/components/icons";
+import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import { getStatusBadgeClass } from "@/lib/status";
-import { isTraceScoringInProgress, scoringStatusLabel } from "@/lib/traceScoring";
+import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 
 export type TraceScoreColumn = { evaluator_uuid: string; name: string };
 
-// The same pill PassFailCountPills draws, for one evaluator's verdict.
-const PILL_CLASS =
-  "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 type Props = {
@@ -68,7 +66,7 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
         <span
           className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
         >
-          {scoringStatusLabel(status)}
+          {status === "failed" ? "Failed" : "Skipped"}
         </span>
       )
     ) : null;

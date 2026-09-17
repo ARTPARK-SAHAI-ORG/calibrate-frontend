@@ -75,7 +75,7 @@ it("draws one card per evaluator of the latest run only, with no id pill", () =>
   render(<TraceScoreHistory runs={[completed, prior]} />);
 
   expect(screen.getByRole("heading", { name: "Scores" })).toBeInTheDocument();
-  // A binary value 1 reaches the verdict card as a true match; a rating
+  // A binary result reaches the verdict card as its passed flag; a rating
   // value reaches it as the score. Neither field carries the other type.
   expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
     "binary match:true score:undefined",
@@ -166,7 +166,7 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(
-    screen.getByText("No evaluator results were stored for this run."),
+    screen.getByText("This run produced no scores."),
   ).toBeInTheDocument();
 });
 
