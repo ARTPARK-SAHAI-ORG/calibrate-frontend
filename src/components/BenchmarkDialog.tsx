@@ -97,6 +97,7 @@ export function BenchmarkDialog({
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [runModelsTogether, setRunModelsTogether] = useState(true);
 
   // Per-model verification state for agent connections
   const [expandedModelError, setExpandedModelError] = useState<string | null>(
@@ -129,6 +130,7 @@ export function BenchmarkDialog({
   const handleClose = () => {
     setSelectedModels([null]);
     setShowResults(false);
+    setRunModelsTogether(true);
     setModelVerifyStatus({});
     // A check that failed belongs to the models that were picked this time, so
     // it goes with them. Without this the next open still shows the failure
@@ -579,6 +581,41 @@ export function BenchmarkDialog({
               </button>
             )}
           </div>
+
+          <fieldset className="space-y-1">
+            <legend className="text-sm font-medium">
+              How to run the models
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              Running them one after another takes longer but spreads the load
+              on your agent.
+            </p>
+            <div className="pt-1">
+              {[
+                { value: "together", label: "All models at the same time" },
+                { value: "sequence", label: "One model after another" },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className="flex items-center gap-3 py-1 cursor-pointer select-none"
+                >
+                  <input
+                    type="radio"
+                    name="run-models"
+                    value={option.value}
+                    checked={
+                      runModelsTogether === (option.value === "together")
+                    }
+                    onChange={() =>
+                      setRunModelsTogether(option.value === "together")
+                    }
+                    className="w-4 h-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <span className="text-sm">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </div>
 
         {/* Footer */}
@@ -662,6 +699,7 @@ export function BenchmarkDialog({
         testNames={tests.map((t) => t.name)}
         totalTests={tests.length > 0 ? tests.length : totalTests}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
+        parallelModels={runModelsTogether}
         onBenchmarkCreated={onBenchmarkCreated}
       />
 

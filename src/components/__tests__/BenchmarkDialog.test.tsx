@@ -68,6 +68,7 @@ jest.mock("../BenchmarkResultsDialog", () => ({
           agentUuid: props.agentUuid,
           models: props.models,
           testUuids: props.testUuids,
+          parallelModels: props.parallelModels,
         })}
         <button onClick={props.onClose}>results-close</button>
         <button onClick={props.onGoBack}>results-go-back</button>
@@ -323,9 +324,7 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByRole("button", { name: /Run comparison/i }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(
-      screen.queryByText("Compare the models"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Compare the models")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -485,7 +484,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
@@ -842,6 +843,61 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
     ).not.toBeInTheDocument();
+  });
+
+  it("runs all models at the same time by default", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+    expect(
+      screen.getByRole("radio", { name: "All models at the same time" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "One model after another" }),
+    ).not.toBeChecked();
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Add model"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o-mini"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+
+    const payload = JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+    expect(payload.models).toEqual(["openai/gpt-4o", "openai/gpt-4o-mini"]);
+    expect(payload.parallelModels).toBe(true);
+  });
+
+  it("sends the models one after another when that option is picked", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Add model"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o-mini"));
+    await user.click(
+      screen.getByRole("radio", { name: "One model after another" }),
+    );
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+
+    const payload = JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+    expect(payload.parallelModels).toBe(false);
   });
 
   it("names every linked test in the question when no tests are named", async () => {

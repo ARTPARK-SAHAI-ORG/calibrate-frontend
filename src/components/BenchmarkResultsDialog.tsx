@@ -83,6 +83,9 @@ type BenchmarkResultsDialogProps = {
    *  every linked test. Defaults to the number of names. */
   totalTests?: number;
   models: string[];
+  /** False runs the models one after another instead of at the same time.
+   * Sent as `parallel_models`; left out means the backend default (together). */
+  parallelModels?: boolean;
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
   // Called when the user clicks "Rerun" on a completed benchmark. Hands the
@@ -109,6 +112,7 @@ export function BenchmarkResultsDialog({
   testNames,
   totalTests,
   models,
+  parallelModels,
   taskId,
   onBenchmarkCreated,
   onRerun,
@@ -471,6 +475,9 @@ export function BenchmarkResultsDialog({
           body: JSON.stringify({
             models: models,
             test_uuids: testUuids,
+            ...(parallelModels !== undefined && {
+              parallel_models: parallelModels,
+            }),
           }),
         },
       );
