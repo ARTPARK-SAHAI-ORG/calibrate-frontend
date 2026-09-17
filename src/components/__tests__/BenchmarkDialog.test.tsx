@@ -417,6 +417,44 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
   });
 
+  it("tells the parent about a model that passed its check, and not about one that failed", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: false, error: "connection refused" }),
+      });
+    const onModelVerified = jest.fn();
+    const user = setupUser();
+    render(
+      <BenchmarkDialog
+        {...baseProps({ agentType: "connection", onModelVerified })}
+      />,
+    );
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Add model"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-anthropic/claude-3-5-sonnet"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    await waitFor(() => expect(onModelVerified).toHaveBeenCalledTimes(1));
+    expect(onModelVerified).toHaveBeenCalledWith(
+      "openai/gpt-4o",
+      expect.objectContaining({ verified: true, error: null }),
+    );
+  });
+
   it("says failed when the check gives no reason to show", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       status: 200,
