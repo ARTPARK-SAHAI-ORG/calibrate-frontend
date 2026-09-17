@@ -77,6 +77,24 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
   });
 
+  test("the Settings tab says how the models run in a comparison", async ({
+    page,
+  }) => {
+    await openWorkspaceSettings(page, "Settings");
+
+    await expect(
+      page.getByRole("heading", {
+        name: "How to run the models in a comparison",
+      }),
+    ).toBeVisible({ timeout: 15000 });
+
+    // The workspace's own choice, as two rows. Reading them is all this
+    // checks: saving one is covered by the component tests, and an older
+    // backend has no such setting to save.
+    await expect(page.getByRole("radio", { name: "Parallel" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Sequential" })).toBeVisible();
+  });
+
   test("creates a new workspace from the sidebar switcher", async ({
     page,
   }) => {
