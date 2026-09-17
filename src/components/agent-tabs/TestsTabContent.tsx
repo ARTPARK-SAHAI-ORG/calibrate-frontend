@@ -534,8 +534,7 @@ export function TestsTabContent({
       // started: through the confirmation, and on a connection agent through
       // the connection check as well. A refused run keeps them for a retry.
       if (runKey === "bulk") {
-        setSelectedTestUuids(new Set());
-        setSelectAllMatching(false);
+        clearSelection();
       }
     },
     onComparisonCreated: () => {
@@ -746,11 +745,6 @@ export function TestsTabContent({
   // fewer tests than the count promises. "Every test matching" is the way to
   // act on more than one page, and it is dropped here too, because a filter
   // change redefines what it stands for.
-  useEffect(() => {
-    setSelectedTestUuids(new Set());
-    setSelectAllMatching(false);
-  }, [testsOffset, testsSearch, testsSearchMode, typeFilter, pageSize]);
-
   /**
    * Every test matching the search and the type is selected, not just the
    * ticked rows on this page. Offered once every row on the page is ticked
@@ -758,6 +752,22 @@ export function TestsTabContent({
    * actions cannot say "all of them except this one".
    */
   const [selectAllMatching, setSelectAllMatching] = useState(false);
+  // The one way the ticks are dropped: every row on this page, and "every
+  // test matching" with them.
+  const clearSelection = useCallback(() => {
+    setSelectedTestUuids(new Set());
+    setSelectAllMatching(false);
+  }, []);
+  useEffect(() => {
+    clearSelection();
+  }, [
+    clearSelection,
+    testsOffset,
+    testsSearch,
+    testsSearchMode,
+    typeFilter,
+    pageSize,
+  ]);
   const selectedTestCount = selectAllMatching
     ? agentTestsTotal
     : selectedTestUuids.size;
@@ -1361,8 +1371,7 @@ export function TestsTabContent({
 
   const toggleSelectAll = () => {
     if (selectAllMatching || selectedTestUuids.size === agentTests.length) {
-      setSelectedTestUuids(new Set());
-      setSelectAllMatching(false);
+      clearSelection();
     } else {
       setSelectedTestUuids(new Set(agentTests.map((t) => t.uuid)));
     }
@@ -1467,8 +1476,7 @@ export function TestsTabContent({
       // Also drop the test from the "add an existing test" list so it does
       // not reappear as available to add.
       setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
-      setSelectedTestUuids(new Set());
-      setSelectAllMatching(false);
+      clearSelection();
       closeDeleteDialog();
     } catch (err) {
       reportError("Error deleting test(s):", err);
@@ -1684,10 +1692,6 @@ export function TestsTabContent({
   // instead of every linked test, so there is one Run and one Compare on
   // screen rather than a second pair in the selection strip.
   const hasSelection = selectedTestUuids.size > 0 || selectAllMatching;
-  const clearSelection = () => {
-    setSelectedTestUuids(new Set());
-    setSelectAllMatching(false);
-  };
   const runSelected = async () => {
     // `selectedTestCount` is already known: check it before resolving the
     // selection.

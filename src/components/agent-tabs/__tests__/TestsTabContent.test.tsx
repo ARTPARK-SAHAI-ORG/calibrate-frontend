@@ -943,6 +943,36 @@ describe("TestsTabContent — paging", () => {
     expect(JSON.parse(runPostCall()![1].body).test_uuids).toHaveLength(12);
   });
 
+  it("compares every linked test, naming none, when all are selected and nothing is filtered", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByTestId("compare-header"));
+
+    await screen.findByTestId("benchmark-dialog");
+    // No tests named means every test linked to the agent.
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("0");
+  });
+
+  it("compares the matching tests by name when all are selected under a filter", async () => {
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await screen.findByText("Showing 1–10 of 12 tests");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByTestId("compare-header"));
+
+    await screen.findByTestId("benchmark-dialog");
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("12");
+  });
+
   it("drops the across-pages selection when a row is unticked", async () => {
     const user = setupUser();
     renderComponent();
