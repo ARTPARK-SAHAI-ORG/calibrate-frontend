@@ -1,5 +1,6 @@
 ## September 2026
 
+- When a test could not be run, the reason it failed is now hidden behind a View details button instead of shown right away ([#595](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/595))
 - A test run or model comparison that fails now shows the actual reason it failed instead of a generic message ([#585](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/585))
 - In the model picker, opening See why on a failed model now shows the reason in a panel beside the box instead of moving the rows around ([#589](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/589))
 - On the Tests tab, ticking some tests now makes the Run and Compare models buttons run and compare only those tests ([#583](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/583))
