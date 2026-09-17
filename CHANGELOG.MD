@@ -1,5 +1,6 @@
 ## September 2026
 
+- In the model picker, opening See why on a failed model now shows the reason in a panel beside the box instead of moving the rows around ([#589](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/589))
 - On the Tests tab, ticking some tests now makes the Run and Compare models buttons run and compare only those tests ([#583](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/583))
 - When comparing models you can now choose to run them one after another instead of all at the same time ([#581](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/581))
 - Once a model passes its connection check in a comparison, calibrate does not ask to verify it again for the rest of the session ([#579](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/579))
