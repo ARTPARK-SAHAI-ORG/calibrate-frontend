@@ -134,6 +134,7 @@ export function useAgentRunLaunchers({
     if (!benchmarkDialogOpen) return;
     setBenchmarkDialogOpen(false);
     setBenchmarkTests([]);
+    setBenchmarkPreset(null);
     const started = startedComparisonRef.current;
     startedComparisonRef.current = false;
     onComparisonClosed?.(started);
@@ -264,6 +265,8 @@ export function useAgentRunLaunchers({
           // The picker reads only uuid and name off each test.
           tests={benchmarkTests}
           totalTests={linkedTestsTotal}
+          initialModels={benchmarkPreset?.models}
+          initialParallelModels={benchmarkPreset?.parallelModels}
           onBenchmarkCreated={() => {
             startedComparisonRef.current = true;
             onComparisonCreated?.();

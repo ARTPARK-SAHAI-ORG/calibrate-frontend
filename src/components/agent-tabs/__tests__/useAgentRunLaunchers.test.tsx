@@ -170,6 +170,55 @@ describe("useAgentRunLaunchers", () => {
     expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
   });
 
+  it("hands the picker the models a past comparison ran", async () => {
+    const { hook, redraw } = setup();
+    await act(async () => {
+      await hook.result.current.openCompare(tests, false, {
+        models: ["openai/gpt-4o", "anthropic/claude"],
+        parallelModels: false,
+      });
+    });
+    redraw();
+
+    // The seam between "rerun asked for this" and the picker showing it. Both
+    // ends were tested and this join was not, so the picker opened empty and
+    // every test still passed.
+    expect(benchmarkProps?.initialModels).toEqual([
+      "openai/gpt-4o",
+      "anthropic/claude",
+    ]);
+    expect(benchmarkProps?.initialParallelModels).toBe(false);
+  });
+
+  it("opens the picker empty for a comparison started from scratch", async () => {
+    const { hook, redraw } = setup();
+    await act(async () => {
+      await hook.result.current.openCompare(tests, false);
+    });
+    redraw();
+
+    expect(benchmarkProps?.initialModels).toBeUndefined();
+    expect(benchmarkProps?.initialParallelModels).toBeUndefined();
+  });
+
+  it("does not carry one comparison's models into the next", async () => {
+    const { hook, redraw } = setup();
+    await act(async () => {
+      await hook.result.current.openCompare(tests, false, {
+        models: ["openai/gpt-4o"],
+      });
+    });
+    redraw();
+    act(() => benchmarkProps?.onClose());
+    redraw();
+
+    await act(async () => {
+      await hook.result.current.openCompare(tests, false);
+    });
+    redraw();
+    expect(benchmarkProps?.initialModels).toBeUndefined();
+  });
+
   it("checks the linked total and names no tests when comparing every linked test", async () => {
     const { hook, redraw } = setup();
     await act(async () => {
