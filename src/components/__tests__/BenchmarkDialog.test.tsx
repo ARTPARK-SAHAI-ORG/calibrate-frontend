@@ -68,6 +68,7 @@ jest.mock("../BenchmarkResultsDialog", () => ({
           agentUuid: props.agentUuid,
           models: props.models,
           testUuids: props.testUuids,
+          parallelModels: props.parallelModels,
         })}
         <button onClick={props.onClose}>results-close</button>
         <button onClick={props.onGoBack}>results-go-back</button>
@@ -896,6 +897,74 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
     ).not.toBeInTheDocument();
+  });
+
+  it("build agent: has no Settings and sends no run order", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+    expect(
+      screen.queryByRole("button", { name: "Settings" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+
+    const payload = JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+    expect(payload).not.toHaveProperty("parallelModels");
+  });
+
+  async function startConnectionComparison(
+    user: ReturnType<typeof setupUser>,
+    pickOrder?: "Parallel" | "Sequential",
+  ) {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    // Settings starts closed, so the options are not on screen yet.
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
+    if (pickOrder) {
+      await user.click(screen.getByRole("radio", { name: pickOrder }));
+    }
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    return JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+  }
+
+  it("connection agent: runs the models in parallel by default", async () => {
+    const payload = await startConnectionComparison(setupUser());
+    expect(payload.parallelModels).toBe(true);
+  });
+
+  it("connection agent: sends sequential when that option is picked", async () => {
+    const payload = await startConnectionComparison(setupUser(), "Sequential");
+    expect(payload.parallelModels).toBe(false);
   });
 
   it("names every linked test in the question when no tests are named", async () => {

@@ -351,6 +351,70 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  function mockBenchmarkStart() {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-1", status: "queued" }),
+        );
+      }
+      if (isBenchmarkDetail(url, "task-1")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-1",
+            status: "running",
+            model_results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+  }
+
+  async function startedBenchmarkBody() {
+    let body: Record<string, unknown> | undefined;
+    await waitFor(() => {
+      const post = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
+      );
+      expect(post).toBeDefined();
+      body = JSON.parse(post![1].body);
+    });
+    return body!;
+  }
+
+  it.each([
+    ["sends parallel_models: false when the models run one after another", false],
+    ["sends parallel_models: true when the models run together", true],
+  ])("%s", async (_name, parallelModels) => {
+    mockBenchmarkStart();
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={["gpt-4"]}
+        parallelModels={parallelModels}
+      />,
+    );
+
+    expect(await startedBenchmarkBody()).toEqual({
+      models: ["gpt-4"],
+      test_uuids: defaultProps.testUuids,
+      parallel_models: parallelModels,
+    });
+  });
+
+  it("leaves parallel_models out when nothing was chosen", async () => {
+    mockBenchmarkStart();
+
+    render(
+      <BenchmarkResultsDialog {...defaultProps} isOpen models={["gpt-4"]} />,
+    );
+
+    expect(await startedBenchmarkBody()).not.toHaveProperty("parallel_models");
+  });
+
   it("starts a new benchmark run, polls, and stays on the tests when done", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onBenchmarkCreated = jest.fn();
