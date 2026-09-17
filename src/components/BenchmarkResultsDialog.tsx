@@ -615,12 +615,14 @@ export function BenchmarkResultsDialog({
   );
   // A comparison that ran a test which produced no answer did not cover every
   // test either, so its mark reads the same as a plain run's. The counts are
-  // per model, and one test that failed under two models is still a test that
-  // could not be run.
-  const unansweredTests = modelResults.reduce(
-    (n, m) => n + (benchmarkAnsweredPassFail(m)?.unanswered ?? 0),
+  // per model, and one test that could not be run under two models counts
+  // under each, which is also how the total is counted.
+  const answerCounts = modelResults.map((m) => benchmarkAnsweredPassFail(m));
+  const unansweredTests = answerCounts.reduce(
+    (n, c) => n + (c?.unanswered ?? 0),
     0,
   );
+  const scoredTests = answerCounts.reduce((n, c) => n + (c?.answered ?? 0), 0);
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -690,6 +692,7 @@ export function BenchmarkResultsDialog({
                       aborted: wasStopped,
                       stopped_early: stoppedEarly,
                       unanswered_tests: unansweredTests,
+                      total_tests: unansweredTests + scoredTests,
                     }) ?? "finished"
                   }
                 />

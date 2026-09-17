@@ -182,6 +182,9 @@ export type RunStatusLike = {
   stopped_early?: boolean | null;
   /** How many tests were tried but produced no answer. */
   unanswered_tests?: number | null;
+  /** How many tests the run set out to do. Read with `unanswered_tests` to
+   * tell a run where nothing could be run from one where some tests were. */
+  total_tests?: number | null;
 };
 
 /**
@@ -222,7 +225,8 @@ export function stoppedRunSentence(
  * How a run itself went, as opposed to how its tests went. Null while the run
  * is still going, which the run says where its results would be.
  */
-export type RunState = "finished" | "gave_up" | "stopped" | "error";
+export type RunState =
+  "finished" | "gave_up" | "none_run" | "stopped" | "error";
 
 /**
  * Which of those a run is. The one rule, so the list of runs and the window
@@ -234,10 +238,12 @@ export function runStateOf(run: RunStatusLike): RunState | null {
   if (isRunInProgress(run)) return null;
   // Two ways a run can end without covering every test: it gave up before
   // starting them all, or it started a test that never produced an answer.
-  // Both read as partly done, so neither gets the green tick that says every
-  // test ran.
-  if (run.stopped_early === true || (run.unanswered_tests ?? 0) > 0)
-    return "gave_up";
+  // Neither gets the green tick that says every test ran.
+  const unanswered = run.unanswered_tests ?? 0;
+  // Nothing was scored at all when every test the run set out to do produced
+  // no answer, which reads differently from a run that got part of the way.
+  if (unanswered > 0 && unanswered >= (run.total_tests ?? 0)) return "none_run";
+  if (run.stopped_early === true || unanswered > 0) return "gave_up";
   return "finished";
 }
 
