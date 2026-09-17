@@ -448,7 +448,6 @@ describe("BenchmarkDialog", () => {
 
     await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
-    await user.click(screen.getByText("Add model"));
     await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-anthropic/claude-3-5-sonnet"));
     await user.click(screen.getByRole("button", { name: /Run comparison/i }));
