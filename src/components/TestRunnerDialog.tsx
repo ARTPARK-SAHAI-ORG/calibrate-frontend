@@ -39,6 +39,10 @@ import {
   LLMEvaluationAbout,
   evaluatorSummaryToAbout,
 } from "./eval-details";
+import {
+  SelectedTestsStrip,
+  type SelectedTest,
+} from "./eval-details/SelectedTestsStrip";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
@@ -142,6 +146,12 @@ type TestRunnerDialogProps = {
   /** Called after the run is renamed, with the name as it now reads, so the
    * list behind this window shows it too. */
   onRenamed?: (name: string) => void;
+  /** Start a plain run of these tests. The parent creates the run and points
+   * this window at it. Resolves when the run has been created or refused. */
+  onRunTests?: (tests: SelectedTest[]) => Promise<unknown> | void;
+  /** Open the model picker on these tests. The parent closes this window once
+   * the comparison is created. */
+  onCompareTests?: (tests: SelectedTest[]) => void;
 };
 
 export function TestRunnerDialog({
@@ -152,6 +162,8 @@ export function TestRunnerDialog({
   taskId,
   onNewRun,
   onRenamed,
+  onRunTests,
+  onCompareTests,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -183,9 +195,9 @@ export function TestRunnerDialog({
   // Tests read in full, keyed by test id. The run itself is read without each
   // case's conversation, reply and verdicts, so the one the reader opens is
   // asked for on its own.
-  const [openedCases, setOpenedCases] = useState<Record<string, TestCaseResult>>(
-    {},
-  );
+  const [openedCases, setOpenedCases] = useState<
+    Record<string, TestCaseResult>
+  >({});
   // The test whose full result is on its way, so the panel can say so.
   const [loadingCaseId, setLoadingCaseId] = useState<string | null>(null);
   // The evaluator that judged this run's tool-call tests, read off one case.
@@ -199,6 +211,9 @@ export function TestRunnerDialog({
   // Guards the rerun POST: a test run is billed, so a second click while the
   // first request is in flight must not start a second run.
   const [isStartingRun, setIsStartingRun] = useState(false);
+  // The Run button on the ticked-tests strip is out while the parent creates
+  // that run.
+  const [isRunningSelected, setIsRunningSelected] = useState(false);
   const {
     selected: labellingSelectedIds,
     toggle: toggleLabellingSelection,
@@ -390,6 +405,20 @@ export function TestRunnerDialog({
   const isFinished = runStatus === "done" || runStatus === "failed";
   const showLabelling =
     isFinished && rows.length > 0 && hasLabellingEligibleTests;
+  // The ticked tests, for the Run / Compare strip. A legacy row with no test
+  // id cannot be run again, so it is left out.
+  const selectedTests: SelectedTest[] = rows
+    .filter((r) => r.testUuid && labellingSelectedIds.has(r.id))
+    .map((r) => ({ uuid: r.testUuid as string, name: r.name }));
+  const runSelected = async () => {
+    if (!onRunTests) return;
+    setIsRunningSelected(true);
+    try {
+      await onRunTests(selectedTests);
+    } finally {
+      setIsRunningSelected(false);
+    }
+  };
 
   // Per-evaluator totals for the Results tab. The run counts these itself, so
   // nothing here has to add up each case's verdicts.
@@ -418,12 +447,7 @@ export function TestRunnerDialog({
     if (!backendUrl || !backendAccessToken) return;
 
     let cancelled = false;
-    fetchTestCase(
-      backendUrl,
-      backendAccessToken,
-      taskId,
-      firstUuid,
-    )
+    fetchTestCase(backendUrl, backendAccessToken, taskId, firstUuid)
       .then((testCase) => {
         const uuid = testCase.judge_results?.[0]?.evaluator_uuid;
         if (!cancelled && uuid) setToolCallEvaluatorUuid(uuid);
@@ -879,6 +903,20 @@ export function TestRunnerDialog({
                   }
                   onLabellingBulkToggle={
                     showLabelling ? toggleLabellingBulk : undefined
+                  }
+                  selectionStrip={
+                    isFinished && selectedTests.length > 0 ? (
+                      <SelectedTestsStrip
+                        count={selectedTests.length}
+                        onRun={onRunTests ? runSelected : undefined}
+                        onCompare={
+                          onCompareTests
+                            ? () => onCompareTests(selectedTests)
+                            : undefined
+                        }
+                        running={isRunningSelected}
+                      />
+                    ) : undefined
                   }
                 />
               </div>

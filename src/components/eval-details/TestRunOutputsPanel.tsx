@@ -69,6 +69,8 @@ type TestRunOutputsPanelProps = {
   onToggleLabellingSelection?: (id: string) => void;
   /** Toggle select-all / deselect-all for the given ids. */
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Shown under the search box once tests are ticked (count, Run, Compare). */
+  selectionStrip?: React.ReactNode;
 };
 
 type StatusGroup = {
@@ -92,6 +94,7 @@ export function TestRunOutputsPanel({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -249,6 +252,7 @@ export function TestRunOutputsPanel({
               {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
             </button>
           )}
+          {selectionStrip}
         </div>
         <div
           ref={listContainerRef}

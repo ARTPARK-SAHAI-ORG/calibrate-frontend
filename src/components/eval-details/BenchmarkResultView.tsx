@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   BenchmarkCombinedLeaderboard,
   BenchmarkOutputsPanel,
@@ -137,6 +143,9 @@ type BenchmarkResultViewProps = {
   labellingSelection?: Set<string>;
   onToggleLabellingSelection?: (key: string) => void;
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Sits under the test search box (the window's Run / Compare strip for the
+   * ticked tests). */
+  selectionStrip?: React.ReactNode;
   /** Reports which test is open so the window can draw the Previous/Next
    * pager in its own header. The shared link draws it in the tab row. */
   onNavChange?: (nav: PagerNav) => void;
@@ -167,6 +176,7 @@ export function BenchmarkResultView({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
   onNavChange,
   tabsRight,
 }: BenchmarkResultViewProps) {
@@ -396,6 +406,7 @@ export function BenchmarkResultView({
       labellingSelection={labellingSelection}
       onToggleLabellingSelection={onToggleLabellingSelection}
       onLabellingBulkToggle={onLabellingBulkToggle}
+      selectionStrip={selectionStrip}
     />
   );
 
@@ -438,7 +449,11 @@ export function BenchmarkResultView({
     <>
       <div className="relative flex items-end justify-between gap-2 border-b border-border">
         <div className="flex gap-2">
-          <ResultTabs tabs={tabs} activeTab={activeTab} onChange={onTabChange} />
+          <ResultTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={onTabChange}
+          />
         </div>
         {activeTab === "tests" && nav && nav.currentIndex >= 0 && (
           <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

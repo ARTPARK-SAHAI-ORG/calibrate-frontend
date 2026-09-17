@@ -15,8 +15,10 @@ jest.mock("../eval-details", () => ({
     onSelect,
     labellingSelection,
     onToggleLabellingSelection,
+    selectionStrip,
   }: any) => (
     <div data-testid="outputs-panel">
+      {selectionStrip}
       <div data-testid="results-count">{results.length}</div>
       {results.map((r: any) => (
         <div key={r.id}>
@@ -101,9 +103,7 @@ jest.mock("../human-labelling/AddRunToLabellingTaskDialog", () => ({
   // response test and a tool-call test can all be labelled; a whole
   // conversation cannot. The stub used to say the opposite for a tool call.
   isLabellingEligibleRaw: ({ test_case }: any) =>
-    ["response", "general", "tool_call"].includes(
-      test_case?.evaluation?.type,
-    ),
+    ["response", "general", "tool_call"].includes(test_case?.evaluation?.type),
 }));
 
 jest.mock("sonner", () => ({
@@ -314,7 +314,11 @@ describe("TestRunnerDialog", () => {
                 passed: false,
               },
               // Falls back to test_name.
-              { test_case_id: "t-3", test_name: "From test_name", passed: false },
+              {
+                test_case_id: "t-3",
+                test_name: "From test_name",
+                passed: false,
+              },
               // passed: null → still running, NOT failed.
               { test_case_id: "t-4", name: "Still Running", passed: null },
             ],
@@ -402,7 +406,9 @@ describe("TestRunnerDialog", () => {
             jsonResponse({
               task_id: "task-tick",
               status: "in_progress",
-              results: [{ test_case_id: "t-1", name: "Test One", passed: null }],
+              results: [
+                { test_case_id: "t-1", name: "Test One", passed: null },
+              ],
             }),
           );
         }
@@ -710,7 +716,9 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
     expect(onNewRun).not.toHaveBeenCalled();
   });
@@ -1096,7 +1104,9 @@ describe("TestRunnerDialog", () => {
     );
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -1298,8 +1308,18 @@ describe("TestRunnerDialog", () => {
             task_id: "task-live",
             status: "in_progress",
             results: [
-              { test_case_id: "test-1", name: "Test One", status: "running", passed: null },
-              { test_case_id: "test-2", name: "Test Two", status: "queued", passed: null },
+              {
+                test_case_id: "test-1",
+                name: "Test One",
+                status: "running",
+                passed: null,
+              },
+              {
+                test_case_id: "test-2",
+                name: "Test Two",
+                status: "queued",
+                passed: null,
+              },
             ],
           }),
         );
@@ -1340,14 +1360,24 @@ describe("TestRunnerDialog", () => {
                   task_id: "task-ids",
                   status: "in_progress",
                   results: [
-                    { test_case_id: null, test_uuid: null, name: "Test One", passed: null },
+                    {
+                      test_case_id: null,
+                      test_uuid: null,
+                      name: "Test One",
+                      passed: null,
+                    },
                   ],
                 }
               : {
                   task_id: "task-ids",
                   status: "in_progress",
                   results: [
-                    { test_case_id: "Test One", test_uuid: "uuid-1", name: "Test One", passed: true },
+                    {
+                      test_case_id: "Test One",
+                      test_uuid: "uuid-1",
+                      name: "Test One",
+                      passed: true,
+                    },
                   ],
                 },
           ),
@@ -1462,7 +1492,9 @@ describe("TestRunnerDialog", () => {
       // Wait for the finished run's tabs, not the heading: the heading is the
       // same words for every run, so it is on screen before the results land.
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Tests" })).toBeInTheDocument(),
+        expect(
+          screen.getByRole("button", { name: "Tests" }),
+        ).toBeInTheDocument(),
       );
     }
 
@@ -1512,7 +1544,9 @@ describe("TestRunnerDialog", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Tests" })).toBeInTheDocument(),
+        expect(
+          screen.getByRole("button", { name: "Tests" }),
+        ).toBeInTheDocument(),
       );
       expect(
         screen.queryByRole("button", { name: "Submit for labelling" }),
@@ -1969,7 +2003,11 @@ describe("reading a run light, and one test in full", () => {
       }
       if (String(url).includes("/agent-tests/run/task-light/results/test-2")) {
         return Promise.resolve(
-          jsonResponse({ ...fullCase, test_case_id: "test-2", name: "Second test" }),
+          jsonResponse({
+            ...fullCase,
+            test_case_id: "test-2",
+            name: "Second test",
+          }),
         );
       }
       if (isRunDetail(url, "task-light")) {
@@ -2120,7 +2158,8 @@ describe("a test loading its answer", () => {
           jsonResponse({ test_uuid: "t2", name: "Beta", passed: true }),
         );
       }
-      if (isRunDetail(url, "task-load")) return Promise.resolve(jsonResponse(run));
+      if (isRunDetail(url, "task-load"))
+        return Promise.resolve(jsonResponse(run));
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
   });
@@ -2177,5 +2216,201 @@ describe("a test loading its answer", () => {
       expect(screen.getByTestId("loading-t1")).toHaveTextContent("false"),
     );
     release(jsonResponse({ test_uuid: "t1", name: "Alpha", passed: true }));
+  });
+});
+
+describe("running or comparing the ticked tests", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    clearTestRunCache();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const TWO_TESTS = [
+    {
+      test_uuid: "t-1",
+      name: "Alpha",
+      passed: true,
+      test_case: { evaluation: { type: "response" } },
+    },
+    {
+      test_uuid: "t-2",
+      name: "Beta",
+      passed: false,
+      test_case: { evaluation: { type: "response" } },
+    },
+  ];
+
+  function renderRun(
+    status: string,
+    props: Partial<React.ComponentProps<typeof TestRunnerDialog>> = {},
+  ) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-strip")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-strip", status, results: TWO_TESTS }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-strip"
+        {...props}
+      />,
+    );
+  }
+
+  async function tickBoth(user: ReturnType<typeof setupUser>) {
+    // A finished run opens on its Results, so the tests are a tab away.
+    await user.click(await screen.findByRole("button", { name: "Tests" }));
+    await user.click(
+      await screen.findByRole("button", { name: "toggle-labelling-t-1" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "toggle-labelling-t-2" }),
+    );
+  }
+
+  const stripLabel = (text: string) =>
+    screen.queryByText(
+      (_, el) => el?.tagName === "SPAN" && el.textContent === text,
+    );
+  const stripCount = () => stripLabel("2 tests selected");
+
+  it("runs the two ticked tests through onRunTests", async () => {
+    const onRunTests = jest.fn().mockResolvedValue(undefined);
+    renderRun("completed", { onRunTests });
+    const user = setupUser();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+    await tickBoth(user);
+
+    expect(stripCount()).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(onRunTests).toHaveBeenCalledWith([
+      { uuid: "t-1", name: "Alpha" },
+      { uuid: "t-2", name: "Beta" },
+    ]);
+  });
+
+  it("keeps Run busy until onRunTests settles", async () => {
+    let settle: () => void = () => {};
+    const onRunTests = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          settle = resolve;
+        }),
+    );
+    renderRun("completed", { onRunTests });
+    const user = setupUser();
+    await tickBoth(user);
+
+    const run = screen.getByRole("button", { name: "Run" });
+    await user.click(run);
+    expect(run).toBeDisabled();
+    expect(run).toHaveAttribute("aria-busy", "true");
+
+    settle();
+    await waitFor(() => expect(run).toBeEnabled());
+    expect(run).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("hands the same tests to onCompareTests", async () => {
+    const onCompareTests = jest.fn();
+    renderRun("completed", { onCompareTests });
+    const user = setupUser();
+    await tickBoth(user);
+
+    await user.click(screen.getByRole("button", { name: "Compare" }));
+    expect(onCompareTests).toHaveBeenCalledWith([
+      { uuid: "t-1", name: "Alpha" },
+      { uuid: "t-2", name: "Beta" },
+    ]);
+  });
+
+  it("shows no strip when nothing can run or compare the ticked tests", async () => {
+    renderRun("completed");
+    const user = setupUser();
+    await tickBoth(user);
+
+    expect(
+      screen.getByRole("button", { name: "toggle-labelling-t-1" }),
+    ).toHaveTextContent("selected");
+    expect(stripCount()).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Compare" })).toBeNull();
+  });
+
+  it("leaves a ticked row with no test id out of the count", async () => {
+    const onRunTests = jest.fn().mockResolvedValue(undefined);
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-strip")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-strip",
+            status: "completed",
+            results: [
+              TWO_TESTS[0],
+              {
+                name: "Legacy",
+                passed: true,
+                test_case: { evaluation: { type: "response" } },
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-strip"
+        onRunTests={onRunTests}
+      />,
+    );
+    const user = setupUser();
+    await user.click(await screen.findByRole("button", { name: "Tests" }));
+
+    // Only the row with no id is ticked: nothing to run, so no strip.
+    await user.click(
+      await screen.findByRole("button", { name: "toggle-labelling-idx-1" }),
+    );
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: "toggle-labelling-t-1" }),
+    );
+    expect(stripLabel("1 test selected")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(onRunTests).toHaveBeenCalledWith([{ uuid: "t-1", name: "Alpha" }]);
+  });
+
+  it("shows no strip while the run is still going", async () => {
+    renderRun("in_progress", { onRunTests: jest.fn() });
+    await screen.findByTestId("outputs-panel");
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
   });
 });

@@ -106,6 +106,8 @@ type BenchmarkOutputsPanelProps = {
   onToggleLabellingSelection?: (key: string) => void;
   /** Toggle select-all / deselect-all for the given keys. */
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Shown under the search box once tests are ticked (count, Run, Compare). */
+  selectionStrip?: React.ReactNode;
 };
 
 export function benchmarkLabellingKey(model: string, testIndex: number): string {
@@ -128,7 +130,7 @@ function benchmarkTestStatus(
 
 // Display name for a benchmark test row (falls back to the placeholder name
 // when the result hasn't arrived yet).
-function benchmarkTestName(
+export function benchmarkTestName(
   tr: BenchmarkTestResult | undefined,
   index: number,
   testNames: string[],
@@ -197,6 +199,7 @@ export function BenchmarkOutputsPanel({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -421,12 +424,13 @@ export function BenchmarkOutputsPanel({
       >
         {/* Search */}
         {modelResults.length > 0 && (
-          <div className="shrink-0 p-3 border-b border-border">
+          <div className="shrink-0 p-3 border-b border-border space-y-2">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search tests"
             />
+            {selectionStrip}
           </div>
         )}
         {(showBulkSelect || showBulkExpand) && (

@@ -10,7 +10,7 @@ import {
   type TestRunEvaluator,
   type PagerNav,
 } from "./test-results/shared";
-import { benchmarkLabellingKey } from "./eval-details";
+import { benchmarkLabellingKey, benchmarkTestName } from "./eval-details";
 import {
   BenchmarkResultView,
   benchmarkCsvRows,
@@ -20,6 +20,11 @@ import {
   type BenchmarkModelRows,
   type BenchmarkTabId,
 } from "./eval-details/BenchmarkResultView";
+import {
+  SelectedTestsStrip,
+  type SelectedTest,
+} from "./eval-details/SelectedTestsStrip";
+import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   StatusBadge,
   RerunIconButton,
@@ -97,6 +102,12 @@ type BenchmarkResultsDialogProps = {
   /** Called after the run is renamed, with the name as it now reads, so the
    * list behind this window shows it too. */
   onRenamed?: (name: string) => void;
+  /** Start a plain run of these tests. The parent creates the run and points
+   * this window at it. Resolves when the run has been created or refused. */
+  onRunTests?: (tests: SelectedTest[]) => Promise<unknown> | void;
+  /** Open the model picker on these tests. The parent closes this window once
+   * the comparison is created. */
+  onCompareTests?: (tests: SelectedTest[]) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -113,6 +124,8 @@ export function BenchmarkResultsDialog({
   onBenchmarkCreated,
   onRerun,
   onRenamed,
+  onRunTests,
+  onCompareTests,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -147,6 +160,9 @@ export function BenchmarkResultsDialog({
   // are kept; the models and tests not reached were never run.
   const [wasStopped, setWasStopped] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  // The Run button on the ticked-tests strip is out while the parent creates
+  // that run.
+  const [isRunningSelected, setIsRunningSelected] = useState(false);
   const {
     selected: labellingSelectedKeys,
     toggle: toggleLabellingSelection,
@@ -447,10 +463,13 @@ export function BenchmarkResultsDialog({
     // Every test is run once per model, so the work is tests times models.
     // Over the limit, the toast says so and we hand the user back to the model
     // picker (or close, when there is no picker to go back to).
+    // No uuids means every linked test, so count those through `totalTests`.
+    const testCount =
+      testUuids.length > 0 ? testUuids.length : (totalTests ?? 0);
     if (
       await overEvalLimit(
         backendAccessToken,
-        testUuids.length * models.length,
+        testCount * models.length,
         "tests",
       )
     ) {
@@ -564,6 +583,31 @@ export function BenchmarkResultsDialog({
   // that can be labelled.
   const showLabelling =
     isDone && !error && hasAnyResults && hasLabellingEligibleTests;
+  // The ticked tests, for the Run / Compare strip. The same test ticked under
+  // two models is one test, and a row with no test id cannot be run again.
+  const selectedByUuid = new Map<string, SelectedTest>();
+  for (const mr of modelResults) {
+    (mr.test_results ?? []).forEach((tr, index) => {
+      const uuid = rowTestUuid(tr);
+      if (!uuid) return;
+      if (!labellingSelectedKeys.has(benchmarkLabellingKey(mr.model, index)))
+        return;
+      selectedByUuid.set(uuid, {
+        uuid,
+        name: benchmarkTestName(tr, index, testNames),
+      });
+    });
+  }
+  const selectedTests = Array.from(selectedByUuid.values());
+  const runSelected = async () => {
+    if (!onRunTests) return;
+    setIsRunningSelected(true);
+    try {
+      await onRunTests(selectedTests);
+    } finally {
+      setIsRunningSelected(false);
+    }
+  };
 
   // Config for a rerun. When viewing a past benchmark the props are empty, so
   // fall back to what the loaded results carry: models from the model rows, the
@@ -821,6 +865,21 @@ export function BenchmarkResultsDialog({
             }
             onLabellingBulkToggle={
               showLabelling ? toggleLabellingBulk : undefined
+            }
+            selectionStrip={
+              showLabelling && selectedTests.length > 0 ? (
+                <SelectedTestsStrip
+                  count={selectedTests.length}
+                  tickedCount={labellingSelectedKeys.size}
+                  onRun={onRunTests ? runSelected : undefined}
+                  onCompare={
+                    onCompareTests
+                      ? () => onCompareTests(selectedTests)
+                      : undefined
+                  }
+                  running={isRunningSelected}
+                />
+              ) : undefined
             }
           />
         )}

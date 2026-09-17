@@ -92,7 +92,20 @@ jest.mock("../agent-tabs", () => ({
     </div>
   ),
   RunsTabContent: (props: any) => (
-    <div data-testid="runs-tab-content">RunsTabContent-{props.agentUuid}</div>
+    <div data-testid="runs-tab-content">
+      RunsTabContent-{props.agentUuid}
+      <span data-testid="runs-launcher-props">
+        {[
+          props.agentType,
+          String(props.connectionVerified),
+          String(props.supportsBenchmark),
+          String(props.benchmarkProvider),
+        ].join("|")}
+      </span>
+      <button onClick={() => props.onConnectionVerified?.()}>
+        VerifyFromRuns
+      </button>
+    </div>
   ),
   EvaluatorsTabContent: (props: any) => {
     // Mounted once per `key` value: a ref initialized on mount lets a test
@@ -300,6 +313,47 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Traces")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+  });
+
+  it("hands the Evaluations tab what it needs to run tests for a connection agent", async () => {
+    mockFetchSequenceForAgent({
+      ...connectionAgent,
+      config: {
+        ...connectionAgent.config,
+        supports_benchmark: true,
+        benchmark_provider: "google",
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "connection|false|true|google",
+    );
+
+    // Verifying from inside a results window marks the connection verified
+    // on the page, the same as the header's Verify button does.
+    await user.click(screen.getByText("VerifyFromRuns"));
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "connection|true|true|google",
+    );
+  });
+
+  it("hands the Evaluations tab no connection settings for a build agent", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Evaluations"));
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "agent|undefined|undefined|undefined",
+    );
   });
 
   it("hides Evaluations and opens a connection agent on Tests when nothing has been run", async () => {

@@ -254,6 +254,27 @@ export function AgentDetail({
     window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
+  // Shared by the Tests and Evaluations tabs, which can both start a run or a
+  // model comparison. A passing connection check is recorded here, and turning
+  // benchmarking on is persisted by the auto-save effects above for both
+  // verified and unverified agents.
+  const markConnectionVerified = () =>
+    setConnectionConfig((prev) => ({
+      ...prev,
+      connection_verified: true,
+      connection_verified_at: new Date().toISOString(),
+      connection_verified_error: null,
+    }));
+  const enableBenchmark =
+    agent?.type === "connection"
+      ? (provider: string) =>
+          setConnectionConfig((prev) => ({
+            ...prev,
+            supports_benchmark: true,
+            benchmark_provider: provider,
+          }))
+      : undefined;
+
   // Update URL when tab changes, with unsaved-changes guard for benchmark provider
   const handleTabChange = (tab: TabType) => {
     if (
@@ -1341,28 +1362,9 @@ export function AgentDetail({
                   ? connectionConfig.default_input_types
                   : undefined
               }
-              onConnectionVerified={() =>
-                setConnectionConfig((prev) => ({
-                  ...prev,
-                  connection_verified: true,
-                  connection_verified_at: new Date().toISOString(),
-                  connection_verified_error: null,
-                }))
-              }
+              onConnectionVerified={markConnectionVerified}
               onGoToConnectionSettings={() => performTabSwitch("connection")}
-              // Turning benchmarking on from the Tests tab. Setting it here is
-              // enough to persist it: the auto-save effects above save the
-              // benchmarking toggle for both verified and unverified agents.
-              onEnableBenchmark={
-                agent.type === "connection"
-                  ? (provider: string) =>
-                      setConnectionConfig((prev) => ({
-                        ...prev,
-                        supports_benchmark: true,
-                        benchmark_provider: provider,
-                      }))
-                  : undefined
-              }
+              onEnableBenchmark={enableBenchmark}
               onRunStarted={() => {
                 markHasRuns();
                 setRunsReloadKey((k) => k + 1);
@@ -1389,6 +1391,31 @@ export function AgentDetail({
               agentUuid={agentUuid}
               agentName={agent.name}
               isActive={activeTab === "runs"}
+              agentType={agent.type}
+              agentNature={agent.interaction_type ?? "conversation"}
+              connectionVerified={
+                agent.type === "connection"
+                  ? connectionConfig.connection_verified === true
+                  : undefined
+              }
+              supportsBenchmark={
+                agent.type === "connection"
+                  ? connectionConfig.supports_benchmark === true
+                  : undefined
+              }
+              benchmarkModelsVerified={
+                agent.type === "connection"
+                  ? connectionConfig.benchmark_models_verified
+                  : undefined
+              }
+              benchmarkProvider={
+                agent.type === "connection"
+                  ? connectionConfig.benchmark_provider
+                  : undefined
+              }
+              onConnectionVerified={markConnectionVerified}
+              onGoToConnectionSettings={() => performTabSwitch("connection")}
+              onEnableBenchmark={enableBenchmark}
             />
           </div>
         )}
