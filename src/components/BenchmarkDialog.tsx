@@ -421,24 +421,17 @@ export function BenchmarkDialog({
             onClick={(e) => {
               e.stopPropagation();
               setExpandedModelError(isExpanded ? null : modelId);
+              // Both panels open beside the box, so only one is open at a time.
+              if (!isExpanded) setSettingsOpen(false);
             }}
             aria-expanded={isExpanded}
-            className="flex items-center gap-0.5 rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
+            className={`rounded-md border border-red-500/40 px-1.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
+              isExpanded
+                ? "bg-red-500 text-white hover:bg-red-600"
+                : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
+            }`}
           >
             See why
-            <svg
-              className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-              />
-            </svg>
           </button>
         )}
       </span>
@@ -482,7 +475,7 @@ export function BenchmarkDialog({
 
             {/* Model Rows */}
             {rows.map((selectedModel, index) => (
-              <div key={index} className="space-y-1">
+              <div key={index} className="relative space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2">
                     <button
@@ -526,14 +519,16 @@ export function BenchmarkDialog({
                     </button>
                   )}
                 </div>
-                {/* Expanded error details — only for failed models */}
+                {/* Why the check failed. Beside the box on a wide screen, the
+                    same way Advanced settings opens, so the rows never move.
+                    On a narrow screen it sits under the row instead. */}
                 {selectedModel &&
                   expandedModelError === selectedModel.id &&
                   benchmarkModelsVerified[selectedModel.id] &&
                   !benchmarkModelsVerified[selectedModel.id].verified && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
                       {benchmarkModelsVerified[selectedModel.id]?.error && (
-                        <p className="text-xs text-red-400">
+                        <p className="text-xs text-red-400 break-words">
                           {benchmarkModelsVerified[selectedModel.id].error}
                         </p>
                       )}
@@ -567,7 +562,10 @@ export function BenchmarkDialog({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
+                onClick={() => {
+                  setSettingsOpen((open) => !open);
+                  if (!settingsOpen) setExpandedModelError(null);
+                }}
                 aria-expanded={settingsOpen}
                 className={`w-full h-10 px-4 rounded-md text-sm font-medium border border-border flex items-center justify-between cursor-pointer transition-colors focus:outline-none ${
                   settingsOpen ? "bg-muted" : "bg-background hover:bg-muted/50"

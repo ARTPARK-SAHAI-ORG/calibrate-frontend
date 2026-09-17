@@ -525,6 +525,16 @@ describe("BenchmarkDialog", () => {
     // collapse again
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
+
+    // Both panels open beside the box, so opening one closes the other.
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /see why/i }));
+    expect(screen.getByText("connection refused")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
+    expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
 
   it("401 response triggers signOut and treats model as not verified", async () => {
