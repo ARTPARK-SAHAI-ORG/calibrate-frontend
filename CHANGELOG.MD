@@ -1,5 +1,6 @@
 ## September 2026
 
+- Inside a finished test run or model comparison, you can now tick specific tests and run or compare just those, right from the same window ([#575](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/575))
 - The Compare models dialog now shows how many tests will run before you start a benchmark ([#577](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/577))
 - A new test you write from scratch now starts filled in with a worked example you can change or clear, instead of empty boxes ([#567](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/567))
 - On a shared benchmark link, downloading the results now includes the conversation, reply and reasoning, the test list correctly shows tool-call tests, and the tests tab opens on a test that has an answer instead of an empty one ([#542](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/542))
