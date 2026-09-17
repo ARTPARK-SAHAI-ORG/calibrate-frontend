@@ -224,6 +224,85 @@ describe("BenchmarkOutputsPanel", () => {
     });
   });
 
+  describe("a run that failed part way", () => {
+    it("names the tests it never reached instead of leaving them spinning", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runFailed
+        />,
+      );
+      const icons = screen.getAllByTestId("status-icon").map((n) => n.textContent);
+      expect(icons).toContain("queued");
+      expect(icons).not.toContain("running");
+    });
+
+    it("says how far a model got before the run failed", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runFailed
+        />,
+      );
+      expect(screen.getByText("Failed after 1 of 2")).toBeInTheDocument();
+      expect(screen.queryByText(/Stopped after/)).not.toBeInTheDocument();
+    });
+
+    it("says the evaluation failed before it reached an opened test", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          selectedTest={{ model: "model-b", testIndex: 1 }}
+          onToggleModel={jest.fn()}
+          onSelectTest={jest.fn()}
+          runFailed
+        />,
+      );
+      expect(
+        screen.getByText(
+          "This test was not run. The evaluation failed before it got here.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/The run was stopped before it got here/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("reads the backend's own not-run flag even when the run says nothing about stopping", () => {
+    const flagged = makeModel({
+      model: "model-d",
+      success: true,
+      total_tests: 2,
+      passed: 1,
+      failed: 0,
+      test_results: [
+        { name: "Delta Passed", passed: true, reasoning: "great" },
+        { name: "Delta Skipped", passed: null, not_run: true },
+      ],
+    });
+    render(
+      <BenchmarkOutputsPanel
+        modelResults={[flagged]}
+        expandedModels={new Set(["model-d"])}
+        onToggleModel={jest.fn()}
+        selectedTest={null}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    const icons = screen.getAllByTestId("status-icon").map((n) => n.textContent);
+    expect(icons).toEqual(["passed", "queued"]);
+  });
+
   // While a test's answer is still being read there is nothing to say about
   // its evaluators yet, so the evaluators column stays away and the one
   // spinner in the middle covers the whole area.

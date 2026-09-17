@@ -22,6 +22,7 @@ export type AgentRun = {
   failed: number | null;
   /** How many of the run's tests produced no answer. */
   unanswered_tests?: number | null;
+  stopped_early?: boolean | null;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean | null;
   /**

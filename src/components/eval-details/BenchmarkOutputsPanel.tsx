@@ -22,7 +22,7 @@ import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
-import { isUnanswered } from "@/lib/testTypes";
+import { isUnanswered, isNotRun } from "@/lib/testTypes";
 import { displayModelName } from "@/lib/modelName";
 
 export type BenchmarkTestResult = {
@@ -39,6 +39,8 @@ export type BenchmarkTestResult = {
    * an error, or the judge could not be reached. `reasoning` then holds why,
    * and `passed: false` on such a row is not a verdict on the agent. */
   unanswered?: boolean;
+  /** True when the run ended before this test was started. */
+  not_run?: boolean | null;
   /** Per-evaluator verdicts for response (next-reply) tests. Null for
    * tool-call tests; legacy rows omit the field and fall back to the
    * legacy single-reasoning UI. */
@@ -90,6 +92,9 @@ type BenchmarkOutputsPanelProps = {
   /** True when someone stopped the run before it finished. Tests it never
    * started are named as not run instead of being left spinning. */
   runStopped?: boolean;
+  /** True when the run failed part way. The tests it never reached read as
+   * not run, the same as on a stopped run. */
+  runFailed?: boolean;
   height?: string;
   /** Top-level evaluators[] keyed by uuid. Threaded down into the
    * per-evaluator cards as the source of truth for name, description,
@@ -122,10 +127,10 @@ function benchmarkTestStatus(
   runStopped = false,
 ): "error" | "running" | "passed" | "failed" | "not_run" {
   if (isUnanswered(tr)) return "error";
-  // On a stopped run a test with no verdict never started: the run is over, so
-  // nothing more is coming for it.
-  if (tr.passed === null || tr.passed === undefined)
-    return runStopped ? "not_run" : "running";
+  // A test the run never reached: marked by the backend once the run ended,
+  // or any test with no verdict once someone stopped the run.
+  if (isNotRun(tr, runStopped)) return "not_run";
+  if (tr.passed === null || tr.passed === undefined) return "running";
   return tr.passed ? "passed" : "failed";
 }
 
@@ -191,7 +196,8 @@ export function BenchmarkOutputsPanel({
   formatModelName = displayModelName,
   showControls = true,
   showRunningSpinner = false,
-  runStopped = false,
+  runStopped: runStoppedProp = false,
+  runFailed = false,
   height,
   evaluatorsByUuid,
   enableEvaluatorLinks = true,
@@ -222,6 +228,8 @@ export function BenchmarkOutputsPanel({
   // navigation keeps the selection in view (a page at a time).
   const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLDivElement>(null);
+  // A run that failed part way is over the same way a stopped one is.
+  const runStopped = runStoppedProp || runFailed;
 
   // Count how many tests fall in each filterable status across all models, so
   // we only render a pill when there's something to filter to. A pill is shown
@@ -544,6 +552,7 @@ export function BenchmarkOutputsPanel({
                 formatModelName={formatModelName}
                 showRunningSpinner={showRunningSpinner}
                 runStopped={runStopped}
+                runFailed={runFailed}
                 selectedRowRef={selectedRowRef}
                 labellingSelection={labellingSelection}
                 onToggleLabellingSelection={onToggleLabellingSelection}
@@ -594,7 +603,9 @@ export function BenchmarkOutputsPanel({
             ) : selectedTestResult.passed === null && runStopped ? (
               <div className="flex items-center justify-center h-full p-6">
                 <p className="text-muted-foreground text-center">
-                  This test was not run. The run was stopped before it got here.
+                  {runFailed
+                    ? "This test was not run. The evaluation failed before it got here."
+                    : "This test was not run. The run was stopped before it got here."}
                 </p>
               </div>
             ) : selectedTestResult.passed === null && showRunningSpinner ? (
@@ -678,6 +689,7 @@ function ModelSection({
   formatModelName,
   showRunningSpinner = false,
   runStopped = false,
+  runFailed = false,
   selectedRowRef,
   labellingSelection,
   onToggleLabellingSelection,
@@ -695,6 +707,7 @@ function ModelSection({
   formatModelName: (name: string) => string;
   showRunningSpinner?: boolean;
   runStopped?: boolean;
+  runFailed?: boolean;
   selectedRowRef: React.RefObject<HTMLDivElement | null>;
   labellingSelection?: Set<string>;
   onToggleLabellingSelection?: (key: string) => void;
@@ -770,7 +783,8 @@ function ModelSection({
           )}
           {stoppedUnfinished && (
             <div className="text-xs text-amber-600 dark:text-amber-500 flex-shrink-0 ml-4">
-              Stopped after {finishedCount} of {expectedCount}
+              {runFailed ? "Failed" : "Stopped"} after {finishedCount} of{" "}
+              {expectedCount}
             </div>
           )}
           {!isProcessing && modelResult.success !== null && (

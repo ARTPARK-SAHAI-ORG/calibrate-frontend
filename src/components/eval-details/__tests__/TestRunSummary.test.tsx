@@ -395,9 +395,7 @@ describe("tests that could not be run", () => {
         onReviewUnanswered={onReviewUnanswered}
       />,
     );
-    await setupUser().click(
-      screen.getByRole("button", { name: "Tests tab" }),
-    );
+    await setupUser().click(screen.getByRole("button", { name: "Tests tab" }));
     expect(onReviewUnanswered).toHaveBeenCalled();
   });
 
@@ -411,7 +409,7 @@ describe("tests that could not be run", () => {
   it("says when the run gave up before starting every test", () => {
     render(<TestRunSummary passed={9} total={10} stoppedEarly />);
     expect(
-      screen.getByText(/The run stopped before it started every test\./),
+      screen.getByText(/The evaluation stopped before it started every test\./),
     ).toBeInTheDocument();
   });
 
@@ -459,18 +457,62 @@ describe("tests that could not be run", () => {
       screen.getByText("This run was stopped before it finished"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/The run stopped before it started every test\./),
+      screen.queryByText(
+        /The evaluation stopped before it started every test\./,
+      ),
     ).not.toBeInTheDocument();
   });
 
   it("says none could be run rather than counting them all", () => {
     // 14 of 14 read as a sum the reader has to do; say it plainly instead,
     // and keep the stopped-early clause in the same sentence.
-    render(<TestRunSummary passed={0} total={0} unanswered={14} stoppedEarly />);
+    render(
+      <TestRunSummary passed={0} total={0} unanswered={14} stoppedEarly />,
+    );
     const note = screen.getByText(/None of the tests could be run\./);
     expect(note).toHaveTextContent(
-      "None of the tests could be run. The run stopped before it started every test.",
+      "None of the tests could be run. The evaluation stopped before it started every test.",
     );
     expect(screen.queryByText(/14 of 14/)).not.toBeInTheDocument();
+  });
+});
+
+describe("a run that failed after finishing some tests", () => {
+  it("shows the red box with how far it got and the recorded details", () => {
+    render(
+      <TestRunSummary
+        passed={2}
+        total={3}
+        unanswered={1}
+        runTotalTests={10}
+        failureDetails="calibrate-agent process killed by signal 15 (SIGTERM: Terminated)"
+        onReviewUnanswered={() => {}}
+      />,
+    );
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The evaluation failed after 4 of 10 tests\. Review the tests that were run in the/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "calibrate-agent process killed by signal 15 (SIGTERM: Terminated)",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
+
+  it("shows the sentence with no details when the backend recorded nothing", () => {
+    render(<TestRunSummary passed={1} total={1} failureDetails="" />);
+    expect(
+      screen.getByText(/The evaluation failed after 1 of 1 test\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+  });
+
+  it("shows no box when the run did not fail", () => {
+    render(<TestRunSummary passed={1} total={1} failureDetails={null} />);
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });
 });

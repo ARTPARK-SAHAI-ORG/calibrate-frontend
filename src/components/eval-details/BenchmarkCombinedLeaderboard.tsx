@@ -3,7 +3,8 @@
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence } from "@/lib/testTypes";
+import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
+import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
   benchmarkAnsweredPassFail,
   benchmarkRatingEvaluatorCaption,
@@ -36,6 +37,10 @@ type BenchmarkCombinedLeaderboardProps = {
   onReviewUnanswered?: () => void;
   /** True when someone stopped the run before it finished. */
   runStopped?: boolean;
+  /** True when the run gave up before it started every test. */
+  stoppedEarly?: boolean;
+  /** Why the run failed after finishing some tests. */
+  failureReason?: string | null;
 };
 
 /**
@@ -47,29 +52,31 @@ type BenchmarkCombinedLeaderboardProps = {
 function UnansweredNote({
   modelResults,
   onReviewUnanswered,
+  stoppedEarly = false,
+  failureReason = null,
 }: {
   modelResults: BenchmarkModelLike[];
   onReviewUnanswered?: () => void;
+  stoppedEarly?: boolean;
+  failureReason?: string | null;
 }) {
   const perModel = modelResults
     .map((m) => benchmarkAnsweredPassFail(m))
     .filter((c) => c !== null);
-  if (perModel.length === 0) return null;
+  const failed = failureReason !== null;
+  if (perModel.length === 0 && !failed) return null;
   const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
-  if (totalUnanswered === 0) return null;
-
-  const sameForEveryModel = perModel.every(
-    (c) =>
-      c.unanswered === perModel[0].unanswered &&
-      c.answered === perModel[0].answered,
-  );
-  const { unanswered, answered } = perModel[0];
+  if (totalUnanswered === 0 && !failed) return null;
 
   const tab = onReviewUnanswered ? (
     <button
       type="button"
       onClick={onReviewUnanswered}
-      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+      className={
+        failed
+          ? "font-medium text-red-500 hover:text-red-600 cursor-pointer"
+          : "font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
+      }
     >
       {RESULT_TAB_LABELS.tests} tab
     </button>
@@ -77,15 +84,54 @@ function UnansweredNote({
     <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
   );
 
+  const sameForEveryModel = perModel.every(
+    (c) =>
+      c.unanswered === perModel[0].unanswered &&
+      c.answered === perModel[0].answered,
+  );
+
+  // How far the models got. They can differ, so the sentence gives a count
+  // only when every model reached the same point.
+  const ranPerModel = Math.max(
+    0,
+    ...perModel.map((c) => c.answered + c.unanswered),
+  );
+
+  // "" is a failure the backend recorded nothing about, so it still shows.
+  const failureBox = failed ? (
+    <RunFailureBox
+      className="w-full"
+      sentence={runFailureSentence(
+        ranPerModel === 0 || sameForEveryModel ? ranPerModel : null,
+        Math.max(
+          ranPerModel,
+          ...modelResults.map(
+            (m) => m.total_tests ?? m.test_results?.length ?? 0,
+          ),
+        ),
+        tab,
+      )}
+      details={failureReason.trim() || null}
+    />
+  ) : null;
+  // A broken run still says how many tests could not be run, under the box.
+  if (failed && totalUnanswered === 0) return failureBox;
+
+  const { unanswered, answered } = perModel[0];
+
   return (
-    <RunNote>
-      {!sameForEveryModel
+    <>
+      {failureBox}
+      <RunNote>
+        {!sameForEveryModel
           ? "Some tests could not be run and were ignored for calculating the metrics. "
           : answered === 0
             ? "None of the tests could be run. "
             : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
-      Review the tests that could not be run in the {tab}.
-    </RunNote>
+        {stoppedEarly && STOPPED_EARLY_SENTENCE}
+        Review the tests that could not be run in the {tab}.
+      </RunNote>
+    </>
   );
 }
 
@@ -144,7 +190,10 @@ function columnsFromPayload(
   ];
 
   if (payload.plan.showPassedTotal) {
-    cols.push({ key: "passed", header: "Passed" }, { key: "total", header: "Total" });
+    cols.push(
+      { key: "passed", header: "Passed" },
+      { key: "total", header: "Total" },
+    );
   }
 
   if (payload.plan.showOverallPassRate) {
@@ -224,7 +273,11 @@ function columnsFromPayload(
       header,
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
-          ev.type === "binary" ? formatPercent(v) : formatRating(v)
+          ev.type === "binary" ? (
+            formatPercent(v)
+          ) : (
+            formatRating(v)
+          )
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -247,6 +300,8 @@ export function BenchmarkCombinedLeaderboard({
   className,
   onReviewUnanswered,
   runStopped = false,
+  stoppedEarly = false,
+  failureReason = null,
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -254,8 +309,10 @@ export function BenchmarkCombinedLeaderboard({
         leaderboardSummary,
         modelResults,
         benchmarkScoreLabel,
+        // A failed run has no summary from the backend; count what finished.
+        failureReason !== null,
       ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel],
+    [leaderboardSummary, modelResults, benchmarkScoreLabel, failureReason],
   );
 
   const columns = useMemo(
@@ -278,8 +335,19 @@ export function BenchmarkCombinedLeaderboard({
       );
     }
     return (
-      <div className="text-center py-12">
-        <p className="text-sm text-muted-foreground">No leaderboard data available</p>
+      <div className={className}>
+        {failureReason !== null && (
+          <UnansweredNote
+            modelResults={modelResults}
+            onReviewUnanswered={onReviewUnanswered}
+            failureReason={failureReason}
+          />
+        )}
+        <div className="text-center py-12">
+          <p className="text-sm text-muted-foreground">
+            No leaderboard data available
+          </p>
+        </div>
       </div>
     );
   }
@@ -295,6 +363,8 @@ export function BenchmarkCombinedLeaderboard({
       <UnansweredNote
         modelResults={modelResults}
         onReviewUnanswered={onReviewUnanswered}
+        stoppedEarly={stoppedEarly && !runStopped}
+        failureReason={failureReason}
       />
       <LeaderboardTab
         className={className}

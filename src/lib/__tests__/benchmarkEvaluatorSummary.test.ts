@@ -102,9 +102,9 @@ describe("benchmarkRatingEvaluatorCaption", () => {
   });
 
   it("returns the bare label when both bounds are non-finite", () => {
-    expect(
-      benchmarkRatingEvaluatorCaption("Coherence", NaN, Infinity),
-    ).toBe("Coherence");
+    expect(benchmarkRatingEvaluatorCaption("Coherence", NaN, Infinity)).toBe(
+      "Coherence",
+    );
   });
 });
 
@@ -191,15 +191,11 @@ describe("benchmarkMetricKeyOrder", () => {
 describe("benchmarkCanonicalModelId", () => {
   it("returns the exact match when present", () => {
     const modelResults: BenchmarkModelLike[] = [{ model: "gpt-4.1" }];
-    expect(benchmarkCanonicalModelId("gpt-4.1", modelResults)).toBe(
-      "gpt-4.1",
-    );
+    expect(benchmarkCanonicalModelId("gpt-4.1", modelResults)).toBe("gpt-4.1");
   });
 
   it("resolves a single suffix match when raw has no slash", () => {
-    const modelResults: BenchmarkModelLike[] = [
-      { model: "openai/gpt-4.1" },
-    ];
+    const modelResults: BenchmarkModelLike[] = [{ model: "openai/gpt-4.1" }];
     expect(benchmarkCanonicalModelId("gpt-4.1", modelResults)).toBe(
       "openai/gpt-4.1",
     );
@@ -210,16 +206,14 @@ describe("benchmarkCanonicalModelId", () => {
       { model: "openai/gpt-4.1" },
       { model: "azure/gpt-4.1" },
     ];
-    expect(benchmarkCanonicalModelId("gpt-4.1", modelResults)).toBe(
-      "gpt-4.1",
-    );
+    expect(benchmarkCanonicalModelId("gpt-4.1", modelResults)).toBe("gpt-4.1");
   });
 
   it("returns raw unchanged when raw already contains a slash and no exact match", () => {
     const modelResults: BenchmarkModelLike[] = [{ model: "azure/gpt-4.1" }];
-    expect(
-      benchmarkCanonicalModelId("openai/gpt-4.1", modelResults),
-    ).toBe("openai/gpt-4.1");
+    expect(benchmarkCanonicalModelId("openai/gpt-4.1", modelResults)).toBe(
+      "openai/gpt-4.1",
+    );
   });
 
   it("returns raw unchanged when there is no match at all", () => {
@@ -409,6 +403,23 @@ describe("buildBenchmarkCombinedLeaderboardPayload", () => {
     // no leaderboardSummary and no evaluator_summary -> null despite tool-call tests,
     // since showOverallPassRate is false and evaluators.length is 0
     expect(result).toBeNull();
+    // A run that failed part way has no summary from the backend: asked to,
+    // the rows are counted from the tests the model did finish.
+    const counted = buildBenchmarkCombinedLeaderboardPayload(
+      undefined,
+      modelResults,
+      "Score",
+      true,
+    );
+    expect(counted).not.toBeNull();
+    expect(counted!.rows).toEqual([
+      expect.objectContaining({
+        model: "m1",
+        passed: "1",
+        total: "2",
+        pass_rate: 50,
+      }),
+    ]);
   });
 
   it("includes tool-call pass rate alongside evaluators", () => {

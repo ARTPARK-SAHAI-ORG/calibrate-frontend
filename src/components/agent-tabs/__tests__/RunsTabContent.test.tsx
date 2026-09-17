@@ -356,7 +356,7 @@ describe("RunsTabContent", () => {
     renderTab();
     // The mark sits with the run's name, not among the result pills.
     expect(
-      (await screen.findAllByLabelText("Someone stopped this run before it finished")).length,
+      (await screen.findAllByLabelText("Someone stopped the evaluation before it finished")).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("3 Success").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
@@ -372,14 +372,14 @@ describe("RunsTabContent", () => {
     ];
     renderTab();
     // Desktop table and mobile cards both render, so each mark appears twice.
-    expect((await screen.findAllByLabelText("Ran every test")).length).toBe(2);
+    expect((await screen.findAllByLabelText("The evaluation ran every test")).length).toBe(2);
     expect(
       screen.getAllByLabelText(
-        "Someone stopped this run before it finished",
+        "Someone stopped the evaluation before it finished",
       ).length,
     ).toBe(2);
     expect(
-      screen.getAllByLabelText("This run broke before it could finish").length,
+      screen.getAllByLabelText("The evaluation broke before it could finish").length,
     ).toBe(2);
     // A run still going says so in the results instead.
     expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
@@ -398,7 +398,7 @@ describe("RunsTabContent", () => {
     expect(
       (
         await screen.findAllByLabelText(
-          "Someone stopped this run before it finished",
+          "Someone stopped the evaluation before it finished",
         )
       ).length,
     ).toBeGreaterThan(0);

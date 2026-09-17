@@ -9,7 +9,9 @@ import type {
 describe("BenchmarkCombinedLeaderboard", () => {
   it("shows the empty state when there is no leaderboard data", () => {
     render(<BenchmarkCombinedLeaderboard modelResults={[]} filename="bench" />);
-    expect(screen.getByText("No leaderboard data available")).toBeInTheDocument();
+    expect(
+      screen.getByText("No leaderboard data available"),
+    ).toBeInTheDocument();
   });
 
   // A model is named the way a person says it, so the company that makes it is
@@ -18,11 +20,25 @@ describe("BenchmarkCombinedLeaderboard", () => {
     render(
       <BenchmarkCombinedLeaderboard
         leaderboardSummary={[
-          { model: "anthropic/claude-sonnet-4.6", passed: "9", total: "10", pass_rate: "90" },
-          { model: "openai__gpt-4.1", passed: "8", total: "10", pass_rate: "80" },
+          {
+            model: "anthropic/claude-sonnet-4.6",
+            passed: "9",
+            total: "10",
+            pass_rate: "90",
+          },
+          {
+            model: "openai__gpt-4.1",
+            passed: "8",
+            total: "10",
+            pass_rate: "80",
+          },
         ]}
         modelResults={[
-          { model: "anthropic/claude-sonnet-4.6", evaluator_summary: [], test_results: [] },
+          {
+            model: "anthropic/claude-sonnet-4.6",
+            evaluator_summary: [],
+            test_results: [],
+          },
           { model: "openai__gpt-4.1", evaluator_summary: [], test_results: [] },
         ]}
         filename="bench"
@@ -135,7 +151,9 @@ describe("BenchmarkCombinedLeaderboard", () => {
     expect(screen.getByText("Total")).toBeInTheDocument();
     expect(screen.getAllByText("Test pass rate (%)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Latency").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Tool-call pass rate (%)").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Tool-call pass rate (%)").length,
+    ).toBeGreaterThan(0);
     expect(screen.getAllByText("Safety").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Quality (1–5)").length).toBeGreaterThan(0);
 
@@ -176,7 +194,12 @@ describe("BenchmarkCombinedLeaderboard", () => {
         ],
       },
     ];
-    render(<BenchmarkCombinedLeaderboard modelResults={modelResults} filename="bench" />);
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={modelResults}
+        filename="bench"
+      />,
+    );
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
     // "helpfulness" appears both as the table header and the chart title.
     expect(screen.getAllByText("helpfulness").length).toBeGreaterThan(0);
@@ -227,6 +250,42 @@ describe("tests that could not be run", () => {
   });
 });
 
+describe("a run that gave up before it started every test", () => {
+  const unansweredRun = (props: {
+    stoppedEarly?: boolean;
+    runStopped?: boolean;
+  }) => (
+    <BenchmarkCombinedLeaderboard
+      leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+      modelResults={[
+        {
+          model: "a",
+          total_tests: 2,
+          test_results: [{ passed: true }, { passed: false, unanswered: true }],
+        },
+      ]}
+      filename="x"
+      {...props}
+    />
+  );
+  const sentence = /The evaluation stopped before it started every test\./;
+
+  it("says so in the note about the tests that could not be run", () => {
+    render(unansweredRun({ stoppedEarly: true }));
+    expect(screen.getByText(sentence)).toBeInTheDocument();
+  });
+
+  it("says nothing when the run started every test", () => {
+    render(unansweredRun({ stoppedEarly: false }));
+    expect(screen.queryByText(sentence)).not.toBeInTheDocument();
+  });
+
+  it("says nothing when someone stopped the run, since that note covers it", () => {
+    render(unansweredRun({ stoppedEarly: true, runStopped: true }));
+    expect(screen.queryByText(sentence)).not.toBeInTheDocument();
+  });
+});
+
 describe("a run someone stopped", () => {
   it("says how far the run got, in the same amber note the run window uses", () => {
     render(
@@ -235,7 +294,11 @@ describe("a run someone stopped", () => {
           {
             model: "a",
             total_tests: 6,
-            test_results: [{ passed: true }, { passed: false }, { passed: null }],
+            test_results: [
+              { passed: true },
+              { passed: false },
+              { passed: null },
+            ],
           },
         ]}
         filename="x"
@@ -275,5 +338,154 @@ describe("a run someone stopped", () => {
     expect(
       screen.getByText("This run was stopped before any test ran"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("a run that failed after finishing some tests", () => {
+  const failedRun = (failureReason: string | null) => (
+    <BenchmarkCombinedLeaderboard
+      leaderboardSummary={[{ model: "a", pass_rate: "100" }]}
+      modelResults={[
+        {
+          model: "a",
+          total_tests: 4,
+          test_results: [
+            { passed: true },
+            { passed: true },
+            { passed: true },
+            { passed: null },
+          ],
+        },
+      ]}
+      filename="x"
+      failureReason={failureReason}
+    />
+  );
+
+  it("says how far it got and shows the recorded details, even with no unanswered rows", () => {
+    render(failedRun("Traceback: judge unreachable"));
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The evaluation failed after 3 of 4 tests\. Review the tests that were run in the/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByText("Traceback: judge unreachable").tagName).toBe(
+      "PRE",
+    );
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
+
+  it("shows the sentence with no details block when the backend recorded nothing in text", () => {
+    render(failedRun(""));
+    expect(
+      screen.getByText(/The evaluation failed after 3 of 4 tests/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+  });
+
+  it("opens the Tests tab from the sentence", async () => {
+    const onReviewUnanswered = jest.fn();
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "100" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        failureReason="boom"
+        onReviewUnanswered={onReviewUnanswered}
+      />,
+    );
+    await setupUser().click(screen.getByRole("button", { name: "Tests tab" }));
+    expect(onReviewUnanswered).toHaveBeenCalled();
+  });
+
+  it("shows the failure box above the empty message when there are no leaderboard rows", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: null }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        failureReason="boom"
+      />,
+    );
+    expect(
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(
+      screen.getByText("No leaderboard data available"),
+    ).toBeInTheDocument();
+  });
+
+  it("gives no count when the models got different distances", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "100" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 4,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+          {
+            model: "b",
+            total_tests: 4,
+            test_results: [{ passed: true }],
+          },
+        ]}
+        filename="x"
+        failureReason="boom"
+      />,
+    );
+    expect(
+      screen.getByText(/The evaluation failed before it ran every test\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/The evaluation failed after/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no failure box without a reason", () => {
+    render(failedRun(null));
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/The evaluation failed after/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("a run that failed before any model produced a row", () => {
+  it("still shows the failure box", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[{ model: "a", total_tests: 4, test_results: [] }]}
+        filename="x"
+        failureReason="ValueError: boom"
+      />,
+    );
+    expect(
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
+    ).toBeInTheDocument();
+    // Nothing ran, so there is no Tests tab worth pointing at.
+    expect(screen.queryByText(/Review the tests/)).not.toBeInTheDocument();
+    expect(screen.getByText("ValueError: boom")).toBeInTheDocument();
   });
 });

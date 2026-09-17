@@ -138,6 +138,17 @@ describe("PublicBenchmarkPage", () => {
     expect(address).toBe("http://backend.test/public/benchmark/tok-1?mode=summary");
   });
 
+  it("tells the leaderboard when the run gave up before it started every test", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, stopped_early: true })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ stoppedEarly: true }),
+    );
+  });
+
   it("names the two charts after what each one shows", async () => {
     const user = setupUser();
     render(<PublicBenchmarkPage />);
@@ -214,6 +225,42 @@ describe("PublicBenchmarkPage", () => {
     expect(
       await screen.findByText("This link is not available"),
     ).toBeInTheDocument();
+  });
+
+  it("shows a failed run with what it did finish, and tells the leaderboard why it failed", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        jsonResponse({ ...LIGHT_RUN, status: "failed", error: "judge unreachable" }),
+      ),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    expect(await screen.findByText("Nightly comparison")).toBeInTheDocument();
+    expect(
+      screen.queryByText("This link is not available"),
+    ).not.toBeInTheDocument();
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ failureReason: "judge unreachable" }),
+    );
+  });
+
+  it("tells the leaderboard a run failed even when nothing was recorded in text", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, status: "failed", error: true })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ failureReason: "" }),
+    );
+  });
+
+  it("tells the leaderboard nothing about failure on a run that finished", async () => {
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ failureReason: null }),
+    );
   });
 
   it("says the run is not there while it is still going", async () => {
