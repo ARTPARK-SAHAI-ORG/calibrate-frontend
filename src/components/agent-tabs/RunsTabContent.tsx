@@ -417,12 +417,16 @@ export function RunsTabContent({
       ...launcherOpts,
       onRunCreated: (taskId) => {
         void refetch();
+        // The rerun window is closed too, so the run it just started is not
+        // opened behind it.
+        benchmarkRerun.clear();
         openTestRun(taskId);
       },
       onComparisonCreated: () => {
         void refetch();
         closeTestRun();
         closeBenchmarkRun();
+        benchmarkRerun.clear();
       },
     });
 
@@ -763,6 +767,8 @@ export function RunsTabContent({
         onClose={benchmarkRerun.clear}
         onBenchmarkCreated={() => void refetch()}
         onRerun={benchmarkRerun.start}
+        onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+        onCompareTests={(tests) => void openCompare(tests, false)}
       />
     </div>
   );

@@ -72,10 +72,19 @@ jest.mock("../BenchmarkResultsDialog", () => ({
         })}
         <button onClick={props.onClose}>results-close</button>
         <button onClick={props.onGoBack}>results-go-back</button>
+        <button onClick={() => props.onRunTests?.(mockTickedTests)}>
+          results-run-ticked
+        </button>
+        <button onClick={() => props.onCompareTests?.(mockTickedTests)}>
+          results-compare-ticked
+        </button>
       </div>
     );
   },
 }));
+
+// What the reader ticked inside the comparison window.
+const mockTickedTests = [{ uuid: "test-2", name: "Test Two" }];
 
 jest.mock("../VerifyRequestPreviewDialog", () => ({
   __esModule: true,
@@ -996,5 +1005,29 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.getByText(/This will start the comparison on 7 tests with GPT-4o/),
     ).toBeInTheDocument();
+  });
+
+  it("hands Run and Compare on the ticked tests to the comparison window", async () => {
+    const user = setupUser();
+    const onRunTests = jest.fn();
+    const onCompareTests = jest.fn();
+    render(
+      <BenchmarkDialog
+        {...baseProps({ agentType: "agent", onRunTests, onCompareTests })}
+      />,
+    );
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await screen.findByTestId("benchmark-results-dialog");
+
+    await user.click(screen.getByText("results-run-ticked"));
+    expect(onRunTests).toHaveBeenCalledWith(mockTickedTests);
+    await user.click(screen.getByText("results-compare-ticked"));
+    expect(onCompareTests).toHaveBeenCalledWith(mockTickedTests);
   });
 });

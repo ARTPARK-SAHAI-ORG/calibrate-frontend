@@ -63,15 +63,27 @@ jest.mock("../useAgentRunLaunchers", () => ({
   },
 }));
 
+// Kept stateful, the way the real hook is, so a rerun window that opens can
+// also be seen to close again.
 const rerunStart = jest.fn();
+let rerunDialogProps: any = null;
 jest.mock("../../BenchmarkRerunDialog", () => ({
-  BenchmarkRerunDialog: () => null,
-  useBenchmarkRerun: () => ({
-    config: null,
-    key: 0,
-    start: rerunStart,
-    clear: jest.fn(),
-  }),
+  BenchmarkRerunDialog: (props: any) => {
+    rerunDialogProps = props;
+    return props.config ? <div data-testid="benchmark-rerun">rerun</div> : null;
+  },
+  useBenchmarkRerun: () => {
+    const [config, setConfig] = React.useState<any>(null);
+    return {
+      config,
+      key: 0,
+      start: (next: any) => {
+        rerunStart(next);
+        setConfig(next);
+      },
+      clear: () => setConfig(null),
+    };
+  },
 }));
 
 function jsonResponse(data: unknown, ok = true, status = 200) {
@@ -159,6 +171,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   runnerProps = null;
   benchmarkResultsProps = null;
+  rerunDialogProps = null;
   launcherOptions = null;
   state = { runs: [unitRun, benchmarkRun] };
   installFetch();
@@ -896,7 +909,7 @@ describe("running tests from an open results window", () => {
     const before = runsListCalls();
 
     await act(async () => {
-      launcherOptions?.onRunCreated("run-new");
+      launcherOptions?.onRunCreated("run-new", "window");
     });
     expect(screen.getByTestId("test-runner")).toHaveTextContent(
       "runner:run-new",
@@ -927,5 +940,48 @@ describe("running tests from an open results window", () => {
       new URLSearchParams(window.location.search).get("runId"),
     ).toBeNull();
     await waitFor(() => expect(runsListCalls()).toBe(before + 1));
+  });
+
+  /** Open a past comparison, then rerun it, so the rerun window is on screen. */
+  async function openRerunWindow() {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+    await act(async () => {
+      benchmarkResultsProps.onRerun(["gpt-4"], ["t1"], ["A"]);
+    });
+    await screen.findByTestId("benchmark-rerun");
+  }
+
+  it("runs or compares the ticked tests from the rerun window", async () => {
+    await openRerunWindow();
+
+    rerunDialogProps.onRunTests(tests);
+    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
+    rerunDialogProps.onCompareTests(tests);
+    expect(openCompare).toHaveBeenCalledWith(tests, false);
+  });
+
+  it("closes the rerun window and opens the run it started", async () => {
+    await openRerunWindow();
+
+    await act(async () => {
+      launcherOptions?.onRunCreated("run-new", "window");
+    });
+    expect(screen.queryByTestId("benchmark-rerun")).not.toBeInTheDocument();
+    expect(screen.getByTestId("test-runner")).toHaveTextContent(
+      "runner:run-new",
+    );
+  });
+
+  it("closes the rerun window once a comparison is created", async () => {
+    await openRerunWindow();
+
+    await act(async () => {
+      launcherOptions?.onComparisonCreated?.();
+    });
+    expect(screen.queryByTestId("benchmark-rerun")).not.toBeInTheDocument();
   });
 });
