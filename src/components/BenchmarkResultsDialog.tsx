@@ -56,7 +56,10 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
+import {
+  benchmarkAnsweredPassFail,
+  type BenchmarkLeaderboardSummaryRow,
+} from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -610,6 +613,14 @@ export function BenchmarkResultsDialog({
   const hasAnyResults = modelResults.some(
     (m) => m.test_results && m.test_results.length > 0,
   );
+  // A comparison that ran a test which produced no answer did not cover every
+  // test either, so its mark reads the same as a plain run's. The counts are
+  // per model, and one test that failed under two models is still a test that
+  // could not be run.
+  const unansweredTests = modelResults.reduce(
+    (n, m) => n + (benchmarkAnsweredPassFail(m)?.unanswered ?? 0),
+    0,
+  );
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -678,6 +689,7 @@ export function BenchmarkResultsDialog({
                         error || failureReason !== null ? "failed" : taskStatus,
                       aborted: wasStopped,
                       stopped_early: stoppedEarly,
+                      unanswered_tests: unansweredTests,
                     }) ?? "finished"
                   }
                 />
