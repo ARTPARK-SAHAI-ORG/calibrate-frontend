@@ -97,12 +97,18 @@ export type TestRunStatusResponse = {
    * Read it through `runEvaluatorSummary`, so a missing list reads as none.
    * `pass_rate` is out of 100, the same as a benchmark's. */
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  /** True when the run itself broke. `status` says the same thing; nothing
-   * reads this. */
-  error?: boolean;
+  /** Why the run could not be carried out, as text. Older runs carry true or
+   * false instead. */
+  error?: string | boolean | null;
   is_public?: boolean;
   share_token?: string | null;
 };
+
+/** What the backend recorded about a failed run, verbatim, or null when it
+ * recorded nothing in text (older runs carry true or false). */
+export function runErrorText(error: unknown): string | null {
+  return typeof error === "string" && error.trim() ? error.trim() : null;
+}
 
 /** Thrown on a 401 so callers can sign the user out. */
 export class UnauthorizedError extends Error {
@@ -201,7 +207,12 @@ const finishedCases = new Map<string, TestCaseResult>();
 export type RunDetailMode = "full" | "summary";
 
 /** Newest last, oldest dropped once past `limit`. */
-function remember<T>(store: Map<string, T>, key: string, value: T, limit: number) {
+function remember<T>(
+  store: Map<string, T>,
+  key: string,
+  value: T,
+  limit: number,
+) {
   store.delete(key);
   store.set(key, value);
   if (store.size > limit) {

@@ -98,7 +98,14 @@ jest.mock("../eval-details", () => {
       </div>
     ),
     BenchmarkCombinedLeaderboard: (props: any) => (
-      <div data-testid="leaderboard">{props.filename}</div>
+      <div
+        data-testid="leaderboard"
+        data-failure-reason={
+          props.failureReason === null ? "null" : props.failureReason
+        }
+      >
+        {props.filename}
+      </div>
     ),
     LLMEvaluationAbout: (props: any) => (
       <div data-testid="about-panel">
@@ -384,7 +391,10 @@ describe("BenchmarkResultsDialog", () => {
   }
 
   it.each([
-    ["sends parallel_models: false when the models run one after another", false],
+    [
+      "sends parallel_models: false when the models run one after another",
+      false,
+    ],
     ["sends parallel_models: true when the models run together", true],
   ])("%s", async (_name, parallelModels) => {
     mockBenchmarkStart();
@@ -784,7 +794,202 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
-    expect(reportError).toHaveBeenCalledWith("Benchmark error:", "boom");
+    expect(
+      screen.getByText(
+        "The evaluation run failed before it produced any result.",
+      ),
+    ).toBeInTheDocument();
+    // What the backend recorded, verbatim, with a copy button.
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByText("boom").tagName).toBe("PRE");
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+    expect(reportError).toHaveBeenCalledWith(
+      "Model comparison failed",
+      expect.objectContaining({ message: "boom" }),
+    );
+  });
+
+  it("shows the sentence and no details block when an older run carries error: true", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-err-bool")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-err-bool",
+            status: "failed",
+            error: true,
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-err-bool"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "The evaluation run failed before it produced any result.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    // Nothing was recorded in text, so there is no details block to copy.
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+    expect(screen.queryByText("true")).not.toBeInTheDocument();
+  });
+
+  it("keeps the finished rows of a run that failed part way, and says why above them", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-partial")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-partial",
+            status: "failed",
+            error: "judge unreachable",
+            model_results: [
+              {
+                model: "m1",
+                success: null,
+                total_tests: 2,
+                test_results: [
+                  { name: "Finished One", passed: true },
+                  { name: "Never Reached", passed: null },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const onGoBack = jest.fn();
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-partial"
+        onGoBack={onGoBack}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("error"),
+    );
+    // The view stays: the rows it finished are still there to read.
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "The evaluation run failed before it produced any result.",
+      ),
+    ).not.toBeInTheDocument();
+    // The reason goes to the leaderboard, which shows it above the table.
+    expect(screen.getByTestId("leaderboard")).toHaveAttribute(
+      "data-failure-reason",
+      "judge unreachable",
+    );
+    expect(reportError).toHaveBeenCalledWith(
+      "Model comparison failed",
+      expect.objectContaining({ message: "judge unreachable" }),
+    );
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    expect(screen.getByTestId("outputs-panel-rows")).toHaveTextContent(
+      "Finished One",
+    );
+    // Rerun stays available on a failed run.
+    await user.click(screen.getByRole("button", { name: /Rerun/ }));
+    expect(onGoBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a finished run that gave up before starting every test", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-gave-up")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-gave-up",
+            status: "done",
+            stopped_early: true,
+            model_results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-gave-up"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("gave_up"),
+    );
+    expect(screen.getByTestId("leaderboard")).toHaveAttribute(
+      "data-failure-reason",
+      "null",
+    );
+  });
+
+  it.each([
+    ["opening a past run", { taskId: "task-no-url" }],
+    ["starting a new run", { models: ["gpt-4"] }],
+  ])(
+    "shows the failure box with the missing backend address as its details when %s",
+    async (_name, props) => {
+      delete process.env.NEXT_PUBLIC_BACKEND_URL;
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          {...props}
+        />,
+      );
+      expect(
+        await screen.findByText("Something went wrong"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("BACKEND_URL environment variable is not set").tagName,
+      ).toBe("PRE");
+      expect(global.fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("passes stopped_early on a finished run to the result view", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-stopped-early")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-stopped-early",
+            status: "done",
+            stopped_early: true,
+            model_results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-stopped-early"
+      />,
+    );
   });
 
   it("stops polling, reports the error, and sets status failed when the poll fetch rejects", async () => {
@@ -1884,8 +2089,6 @@ describe("running or comparing the ticked tests", () => {
       { uuid: "t1", name: "Test One" },
     ]);
   });
-
-
 
   it("shows no strip when nothing can run or compare the ticked tests", async () => {
     renderDone({});

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { runErrorText } from "@/lib/testRunApi";
 import { useParams } from "next/navigation";
 import {
   TestCaseOutput,
@@ -96,7 +97,7 @@ type TestRunStatusResponse = {
   latency_ms?: LatencyStat;
   cost?: AggStat;
   total_tokens?: AggStat;
-  error?: string;
+  error?: string | boolean | null;
 };
 
 function getStatus(
@@ -182,7 +183,13 @@ export default function PublicTestRunPage() {
         if (!res.ok) throw new Error("Failed to load results");
 
         const result: TestRunStatusResponse = await res.json();
-        if (result.status !== "done" && result.status !== "completed") {
+        // A run still going has nothing to share yet. A failed one is shown
+        // with what it did finish, the same as in the app.
+        if (
+          result.status !== "done" &&
+          result.status !== "completed" &&
+          result.status !== "failed"
+        ) {
           setNotFound(true);
           return;
         }
@@ -239,8 +246,9 @@ export default function PublicTestRunPage() {
   // Someone stopped this run before it finished, so the tests it never started
   // are neither passes nor failures.
   const wasStopped = isRunStopped(data);
-  const passed = results.filter((r) => getStatus(r, wasStopped) === "passed")
-    .length;
+  const passed = results.filter(
+    (r) => getStatus(r, wasStopped) === "passed",
+  ).length;
   // A test that produced no answer was never scored; keep it out of the
   // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
@@ -339,6 +347,9 @@ export default function PublicTestRunPage() {
             unanswered={data.unanswered_tests ?? 0}
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
+            failureDetails={
+              data.status === "failed" ? (runErrorText(data.error) ?? "") : null
+            }
             runTotalTests={data.total_tests ?? results.length}
             onReviewUnanswered={() => setActiveTab("tests")}
             latency={data.latency_ms ?? null}

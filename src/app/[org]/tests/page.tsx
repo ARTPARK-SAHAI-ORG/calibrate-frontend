@@ -121,6 +121,7 @@ type AllRun = {
   failed: number | null;
   /** How many of the run's tests produced no answer. */
   unanswered_tests?: number | null;
+  stopped_early?: boolean | null;
   results?: TestRunResult[] | null;
   model_results?: { model: string }[] | null;
   leaderboard_summary?: null;

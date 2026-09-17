@@ -32,9 +32,14 @@ import {
   RunStateMark,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { abortRunOrNotify, fetchTestCase } from "@/lib/testRunApi";
-import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
+import {
+  abortRunOrNotify,
+  fetchTestCase,
+  runErrorText,
+} from "@/lib/testRunApi";
+import { modelComparisonName, isRunStopped, runStateOf } from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
+import { RunFailureBox } from "@/components/RunFailureBox";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -66,7 +71,11 @@ type BenchmarkStatusResponse = {
    * benchmarks that predate the backend snapshot. */
   test_uuids?: string[];
   results_s3_prefix?: string;
-  error?: string;
+  /** Why the run could not be carried out, as text. Older runs carry true or
+   * false instead. */
+  error?: string | boolean | null;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
   is_public?: boolean;
   share_token?: string | null;
   /** True when someone stopped the run before it finished. */
@@ -147,7 +156,12 @@ export function BenchmarkResultsDialog({
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
-  const [error, setError] = useState<string | null>(null);
+  // Set when the run failed with nothing to show: the box replaces the view.
+  const [error, setError] = useState<{ details: string | null } | null>(null);
+  const [stoppedEarly, setStoppedEarly] = useState(false);
+  // Why the run failed, when it had already finished some tests: those rows
+  // are shown as usual with this line in the note above the leaderboard.
+  const [failureReason, setFailureReason] = useState<string | null>(null);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
@@ -266,7 +280,7 @@ export function BenchmarkResultsDialog({
       }
       if (!backendUrl) {
         setIsInitialLoading(false);
-        setError("BACKEND_URL environment variable is not set");
+        setError({ details: "BACKEND_URL environment variable is not set" });
         return;
       }
       pollingIntervalRef.current = setInterval(() => {
@@ -303,6 +317,8 @@ export function BenchmarkResultsDialog({
         setRunEvaluators([]);
         setRunTestUuids([]);
         setWasStopped(false);
+        setStoppedEarly(false);
+        setFailureReason(null);
         setError(null);
         setNav(null);
         clearLabellingSelection();
@@ -424,10 +440,24 @@ export function BenchmarkResultsDialog({
           pollingIntervalRef.current = null;
         }
 
-        if (result.error) {
-          reportError("Benchmark error:", result.error);
-          setError(result.error);
+        setStoppedEarly(result.stopped_early === true);
+        const failed = result.status === "failed" || Boolean(result.error);
+        const details = runErrorText(result.error);
+        if (failed) {
+          reportError(
+            "Model comparison failed",
+            new Error(details ?? "no details recorded"),
+          );
+        }
+        const keptRows = (result.model_results ?? []).some((m) =>
+          (m.test_results ?? []).some((t) => t.passed != null),
+        );
+        if (failed && !keptRows) {
+          setError({ details });
         } else {
+          // A run that failed after finishing some tests keeps them: the
+          // window reads as usual, with the reason in the note.
+          setFailureReason(failed ? (details ?? "") : null);
           setLeaderboardSummary(result.leaderboard_summary);
           // A comparison that had already finished when the window opened
           // lands on its Results: there is nothing left to watch. One that
@@ -439,7 +469,7 @@ export function BenchmarkResultsDialog({
       reportError("Error polling benchmark status:", err);
       setIsInitialLoading(false);
       setTaskStatus("failed");
-      setError(err instanceof Error ? err.message : "Failed to poll status");
+      setError({ details: null });
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -457,7 +487,7 @@ export function BenchmarkResultsDialog({
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) {
       setIsInitialLoading(false);
-      setError("BACKEND_URL environment variable is not set");
+      setError({ details: "BACKEND_URL environment variable is not set" });
       return;
     }
 
@@ -529,9 +559,10 @@ export function BenchmarkResultsDialog({
     } catch (err) {
       reportError("Error starting benchmark:", err);
       setIsInitialLoading(false);
-      setError(
-        err instanceof Error ? err.message : "Failed to start benchmark",
-      );
+      setError({
+        details:
+          err instanceof Error ? err.message : "Failed to start benchmark",
+      });
     }
   };
 
@@ -625,6 +656,8 @@ export function BenchmarkResultsDialog({
   // is hidden rather than silently rerunning the wrong test set.
   const canDirectRerun =
     !!onRerun && rerunModels.length > 0 && rerunTestUuids.length > 0;
+  // `error` means the failure box replaced the window, and it carries its own
+  // Try again. A failed run that kept rows shows the header's Rerun as usual.
   const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
   const handleRerunClick = canDirectRerun
     ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)
@@ -639,7 +672,14 @@ export function BenchmarkResultsDialog({
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
               {isDone && !isInitialLoading && (
                 <RunStateMark
-                  state={wasStopped ? "stopped" : error ? "error" : "finished"}
+                  state={
+                    runStateOf({
+                      status:
+                        error || failureReason !== null ? "failed" : taskStatus,
+                      aborted: wasStopped,
+                      stopped_early: stoppedEarly,
+                    }) ?? "finished"
+                  }
                 />
               )}
               {/* Nothing is written at the top of the window until the run
@@ -788,51 +828,7 @@ export function BenchmarkResultsDialog({
         {/* Error State */}
         {!isInitialLoading && error && (
           <div className="flex-1 flex items-center justify-center p-4 md:p-6">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 md:p-6 max-w-md w-full mx-4">
-              <div className="flex items-center gap-2 mb-2">
-                <svg
-                  className="w-5 h-5 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                  />
-                </svg>
-                <span className="font-medium text-red-500">
-                  Something went wrong
-                </span>
-              </div>
-              <p className="text-sm text-red-400 mb-4">
-                We&apos;re looking into it. Please reach out to us if this issue
-                persists.
-              </p>
-              {onGoBack && (
-                <button
-                  onClick={onGoBack}
-                  className="w-full h-9 md:h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
-                    />
-                  </svg>
-                  Try again
-                </button>
-              )}
-            </div>
+            <RunFailureBox details={error.details} onTryAgain={onGoBack} />
           </div>
         )}
 
@@ -845,6 +841,8 @@ export function BenchmarkResultsDialog({
             leaderboardSummary={leaderboardSummary}
             evaluators={runEvaluators}
             runStopped={wasStopped}
+            runStoppedEarly={stoppedEarly}
+            runFailureReason={failureReason}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             fetchCase={fetchCase}
@@ -865,7 +863,11 @@ export function BenchmarkResultsDialog({
               showLabelling && selectedTests.length > 0 ? (
                 <SelectedTestsStrip
                   count={selectedTests.length}
-                  onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
+                  onRun={
+                    onRunTests
+                      ? () => void onRunTests(selectedTests)
+                      : undefined
+                  }
                   onCompare={
                     onCompareTests
                       ? () => onCompareTests(selectedTests)

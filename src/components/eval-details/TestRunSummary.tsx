@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence } from "@/lib/testTypes";
+import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
+import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
@@ -34,6 +35,9 @@ type TestRunSummaryProps = {
   stoppedEarly?: boolean;
   /** True when someone stopped the run before it finished. */
   stopped?: boolean;
+  /** What the backend recorded when the run failed part way, or "" when it
+   * recorded nothing; null when the run did not fail. */
+  failureDetails?: string | null;
   /** How many tests the run set out to do. On a stopped run it is what the
    * tests that did run are counted against. */
   runTotalTests?: number | null;
@@ -206,6 +210,7 @@ export function TestRunSummary({
   unanswered = 0,
   stoppedEarly = false,
   stopped = false,
+  failureDetails = null,
   runTotalTests = null,
   onReviewUnanswered,
   latency,
@@ -256,6 +261,29 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
+        {failureDetails !== null && (
+          <RunFailureBox
+            className="w-full mb-4"
+            sentence={runFailureSentence(
+              total + unanswered,
+              runTotalTests ?? total + unanswered,
+              onReviewUnanswered ? (
+                <button
+                  type="button"
+                  onClick={onReviewUnanswered}
+                  className="font-medium text-red-500 hover:text-red-600 cursor-pointer"
+                >
+                  {RESULT_TAB_LABELS.tests} tab
+                </button>
+              ) : (
+                <span className="font-medium">
+                  {RESULT_TAB_LABELS.tests} tab
+                </span>
+              ),
+            )}
+            details={failureDetails.trim() || null}
+          />
+        )}
         {(unanswered > 0 || stoppedEarly || stopped) && (
           <div className="mb-4">
             <RunNote>
@@ -264,9 +292,7 @@ export function TestRunSummary({
                   ? "None of the tests could be run. "
                   : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
               {stopped && `${stoppedSentence}${unanswered > 0 ? ". " : ""}`}
-              {stoppedEarly &&
-                !stopped &&
-                "The run stopped before it started every test. "}
+              {stoppedEarly && !stopped && STOPPED_EARLY_SENTENCE}
               {unanswered > 0 && (
                 <>
                   Review the tests that could not be run in the{" "}
@@ -279,7 +305,9 @@ export function TestRunSummary({
                       {RESULT_TAB_LABELS.tests} tab
                     </button>
                   ) : (
-                    <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
+                    <span className="font-medium">
+                      {RESULT_TAB_LABELS.tests} tab
+                    </span>
                   )}
                   .
                 </>
