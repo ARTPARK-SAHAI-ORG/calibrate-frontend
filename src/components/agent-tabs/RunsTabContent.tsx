@@ -502,7 +502,7 @@ export function RunsTabContent({
   };
 
   return (
-    <div className="flex flex-col space-y-4 md:space-y-6">
+    <div className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-wrap items-center gap-1.5">
         <FilterChips
           options={RESULT_FILTERS}

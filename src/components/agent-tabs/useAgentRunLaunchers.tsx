@@ -188,6 +188,9 @@ export function useAgentRunLaunchers({
   };
 
   const runToConfirmCount = runToConfirm ? countOf(runToConfirm.tests, runToConfirm.allLinked) : 0;
+  // The overlays here are fixed to the viewport. The tabs that mount them lay
+  // their children out with flex gap, never space-y: a margin would shrink a
+  // fixed overlay and show the page under it.
   const dialogs = (
     <>
       <ConfirmDialog

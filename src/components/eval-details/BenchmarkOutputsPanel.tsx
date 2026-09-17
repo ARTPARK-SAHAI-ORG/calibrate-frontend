@@ -21,6 +21,7 @@ import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSum
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
 import { isUnanswered } from "@/lib/testTypes";
 import { displayModelName } from "@/lib/modelName";
 
@@ -264,7 +265,7 @@ export function BenchmarkOutputsPanel({
   // "hasn't been manually resized yet" flag if that turns out to matter.
   const defaultListWidth = Math.min(
     512,
-    Math.max(288, longestModelNameChars * 8 + 176),
+    Math.max(LIST_PANEL_MIN_WIDTH_FOR_WORDS, longestModelNameChars * 8 + 176),
   );
   const listPanel = useResizableWidth(defaultListWidth, 288, 512, "grow-right");
   const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");

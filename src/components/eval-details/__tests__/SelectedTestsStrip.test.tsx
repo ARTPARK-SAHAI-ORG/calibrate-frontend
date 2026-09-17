@@ -2,8 +2,6 @@ import { act } from "react";
 import { render, screen, setupUser } from "@/test-utils";
 import { SelectedTestsStrip } from "../SelectedTestsStrip";
 
-const TOOLTIP = "The same test ticked under more than one model counts once.";
-
 describe("SelectedTestsStrip", () => {
   it("renders nothing when no tests are selected", () => {
     const { container } = render(
@@ -77,26 +75,5 @@ describe("SelectedTestsStrip", () => {
     expect(screen.getByRole("button", { name: "Compare" })).toBeEnabled();
   });
 
-  it("explains the count when more rows are ticked than distinct tests", async () => {
-    const user = setupUser();
-    render(<SelectedTestsStrip count={2} tickedCount={4} onRun={jest.fn()} />);
 
-    const label = screen.getByText("tests selected", { exact: false });
-    expect(label).toHaveClass("cursor-help");
-    expect(screen.queryByText(TOOLTIP)).not.toBeInTheDocument();
-
-    await user.hover(label);
-    expect(await screen.findByText(TOOLTIP)).toBeInTheDocument();
-  });
-
-  it("has no explanation when the ticked rows equal the distinct tests", async () => {
-    const user = setupUser();
-    render(<SelectedTestsStrip count={2} tickedCount={2} onRun={jest.fn()} />);
-
-    const label = screen.getByText("tests selected", { exact: false });
-    expect(label).not.toHaveClass("cursor-help");
-
-    await user.hover(label);
-    expect(screen.queryByText(TOOLTIP)).not.toBeInTheDocument();
-  });
 });

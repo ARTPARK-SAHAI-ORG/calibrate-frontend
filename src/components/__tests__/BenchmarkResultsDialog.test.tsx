@@ -1798,12 +1798,10 @@ describe("running or comparing the ticked tests", () => {
     await user.click(screen.getByText("togglelabel-m1-0"));
   }
 
+  // The strip label is one span: a bold count then " tests selected".
   const stripLabel = (text: string) =>
     screen.queryByText(
-      (_, el) =>
-        el?.tagName === "SPAN" &&
-        !el.classList.contains("cursor-help") &&
-        el.textContent === text,
+      (_, el) => el?.tagName === "SPAN" && el.textContent === text,
     );
 
   it("counts the same test ticked under two models once", async () => {
@@ -1815,10 +1813,6 @@ describe("running or comparing the ticked tests", () => {
     await tickUnderBothModels(user);
 
     expect(stripLabel("1 test selected")).toBeInTheDocument();
-    // Two ticks, one test: the label says why through a hover note.
-    expect(document.querySelector(".cursor-help")).toHaveTextContent(
-      "1 test selected",
-    );
     await user.click(screen.getByRole("button", { name: "Run" }));
     expect(onRunTests).toHaveBeenCalledWith([{ uuid: "t1", name: "Test One" }]);
     await user.click(screen.getByRole("button", { name: "Compare" }));
@@ -1827,15 +1821,6 @@ describe("running or comparing the ticked tests", () => {
     ]);
   });
 
-  it("has no hover note when each ticked row is a different test", async () => {
-    renderDone({ onRunTests: jest.fn() });
-    const user = setupUser();
-    await user.click(await screen.findByRole("button", { name: "Tests" }));
-    await user.click(await screen.findByText("togglelabel0"));
-
-    expect(stripLabel("1 test selected")).toBeInTheDocument();
-    expect(document.querySelector(".cursor-help")).toBeNull();
-  });
 
   it("keeps Run busy until onRunTests settles", async () => {
     let settle: () => void = () => {};

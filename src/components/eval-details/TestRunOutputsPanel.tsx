@@ -19,6 +19,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
 import { isUnanswered } from "@/lib/testTypes";
 
 export type TestRunResult = {
@@ -104,7 +105,12 @@ export function TestRunOutputsPanel({
   const selectedRowRef = useRef<HTMLDivElement>(null);
   // Both side columns start at their old fixed widths but are user-resizable,
   // so a long input/output pair in the middle can be given more room.
-  const listPanel = useResizableWidth(320, 240, 560, "grow-right");
+  const listPanel = useResizableWidth(
+    LIST_PANEL_MIN_WIDTH_FOR_WORDS,
+    240,
+    560,
+    "grow-right",
+  );
   const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   const toggleSection = (key: string) => {

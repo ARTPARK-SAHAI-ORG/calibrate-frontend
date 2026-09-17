@@ -860,7 +860,6 @@ export function BenchmarkResultsDialog({
               showLabelling && selectedTests.length > 0 ? (
                 <SelectedTestsStrip
                   count={selectedTests.length}
-                  tickedCount={labellingSelectedKeys.size}
                   onRun={onRunTests ? () => onRunTests(selectedTests) : undefined}
                   onCompare={
                     onCompareTests
