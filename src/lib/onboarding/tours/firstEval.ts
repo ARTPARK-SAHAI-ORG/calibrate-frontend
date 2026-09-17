@@ -131,6 +131,7 @@ export const A = {
   addEvaluatorsDialog: '[data-tour="add-evaluators-dialog"]',
   evaluatorsAddConfirm: '[data-tour="evaluators-add-confirm"]',
   agentTypeOptions: '[data-tour="agent-type-options"]',
+  agentKindBuild: '[data-agent-kind="agent"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
   // The whole picker body (options + example), so the card's "compare these
@@ -145,7 +146,8 @@ export const A = {
   runClose: '[data-tour="run-close"]',
   startTour: '[data-tour="start-tour"]',
   runSummary: '[data-tour="test-run-summary"]',
-  runTabOutputs: '[data-tour="run-tab-outputs"]',
+  runTabSummary: '[data-tour="run-tab-summary"]',
+  runTabTests: '[data-tour="run-tab-tests"]',
   runOutputsList: '[data-tour="run-outputs-list"]',
   runResultRow: '[data-tour="run-result-row"]',
   runResultDetail: '[data-tour="run-result-detail"]',
@@ -510,6 +512,18 @@ function expandFailedReasoning(): void {
   failToggle.click();
 }
 
+/**
+ * Wait for the run to finish, then open its Results tab. The run window stays
+ * on the tests while the reader watches a run, so the tour opens the Results
+ * itself before the card that points at it.
+ */
+async function openRunResults(): Promise<void> {
+  const tab = await waitForElement(A.runTabSummary, { timeout: 90000 });
+  if (!tab) return;
+  await clickElement(A.runTabSummary, { timeout: 8000 });
+  await waitForElement(A.runSummary, { timeout: 8000 });
+}
+
 /** Open the previously-failing phone-number test result in the outputs list. */
 function openPhoneNumberResult(): void {
   const rows = Array.from(
@@ -690,6 +704,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Create",
       timeout: 10000,
       action: async () => {
+        // Connecting an agent you already run is the chosen option; the demo
+        // builds one here, so pick that first.
+        await clickElement(A.agentKindBuild);
         await clickElement(A.agentNextSubmit);
         // The dialog's second step asks what the agent does; the demo agent
         // is conversational (a phone helpline), so pick that before creating.
@@ -917,7 +934,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       popoverClass: "calibrate-tour-running",
       autoAdvance: true,
       action: async () => {
-        await waitForElement(A.runSummary, { timeout: 90000 });
+        await openRunResults();
       },
     },
     {
@@ -930,17 +947,17 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       timeout: 90000,
     },
     {
-      anchor: A.runTabOutputs,
+      anchor: A.runTabTests,
       title: "See every answer",
       description:
-        "That was the overview. The <strong>Results</strong> tab shows <strong>each test</strong> your agent ran, one by one.",
+        "That was the overview. The <strong>Tests</strong> tab shows <strong>each test</strong> your agent ran, one by one.",
       side: "bottom",
       align: "start",
       actionLabel: "Next",
       prepare: async () => {
-        // Open the Results tab now so it is the active tab while this card
+        // Open the Tests tab now so it is the active tab while this card
         // describes it (rather than only switching on the next click).
-        await clickElement(A.runTabOutputs);
+        await clickElement(A.runTabTests);
       },
     },
     {
@@ -1036,7 +1053,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       popoverClass: "calibrate-tour-running",
       autoAdvance: true,
       action: async () => {
-        await waitForElement(A.runSummary, { timeout: 90000 });
+        await openRunResults();
       },
     },
     {
@@ -1048,9 +1065,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       timeout: 90000,
       prepare: async () => {
-        // Open the Results tab and the previously-failing test so the pass is
+        // Open the Tests tab and the previously-failing test so the pass is
         // shown on the exact case, not just the summary.
-        await clickElement(A.runTabOutputs, { timeout: 10000 });
+        await clickElement(A.runTabTests, { timeout: 10000 });
         await waitForElement(A.runResultRow, { timeout: 8000 });
         openPhoneNumberResult();
         await waitForElement(A.runResultDetail, { timeout: 8000 });

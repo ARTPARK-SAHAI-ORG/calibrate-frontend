@@ -34,7 +34,7 @@ type UseJobDeletionArgs<T extends JobLike> = {
   /** The currently visible (sorted) jobs — drives the "select all" toggle. */
   jobs: T[];
   /** Prune the given uuids from the page's job list after a successful delete. */
-  onDeleted: (uuids: string[]) => void;
+  onDeleted: (uuids: string[]) => void | Promise<void>;
   /** Backend JWT used for the DELETE request. */
   accessToken: string | null;
 };

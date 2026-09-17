@@ -11,9 +11,15 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
-import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import {
+  DEFAULT_LLM_GENERAL_SLUG,
+  isDefaultLLMNextReplyEvaluator,
+  matchesDefaultSlug,
+} from "@/lib/defaultEvaluators";
+import { DialogNavHeader } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -34,6 +40,7 @@ import {
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
@@ -786,6 +793,17 @@ type AddTestDialogProps = {
    * conversation builder).
    */
   agentNature?: "conversation" | "general";
+  /**
+   * Step to the previous / next test in the list behind this dialog. Given
+   * together with `position`, they draw the arrows and the "3 of 41" count
+   * at the top of the dialog. Unsaved edits are guarded the same way closing
+   * is: the discard prompt comes first, and the step only happens on Discard.
+   */
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  position?: { index: number; total: number };
 };
 
 export function AddTestDialog({
@@ -816,6 +834,11 @@ export function AddTestDialog({
   showRunAfterSave = false,
   onRun,
   agentNature = "conversation",
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+  position,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -902,6 +925,18 @@ export function AddTestDialog({
     setActiveTab(tab);
     setTypeChosen(true);
   };
+
+  // A test written from scratch opens with a worked example already in the
+  // boxes — the same clinic example the type picker just showed — so the
+  // reader edits one rather than filling an empty form. Editing, duplicating
+  // and labelling items all bring their own content, so they are left alone,
+  // and so is any caller that asked for a transcript of its own shape.
+  const prefillsSample =
+    !isLabelItem &&
+    !isEditing &&
+    !initialConfig &&
+    !allowAgentLastMessage &&
+    !requireAssistantLastMessage;
 
   // Available tools state - declared early so it's available for initialConfig parsing
   const [createToolOpen, setCreateToolOpen] = useState(false);
@@ -1352,6 +1387,46 @@ export function AddTestDialog({
 
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
+  // Fill the example into the name and the conversation (or the single input)
+  // once, as soon as the reader has picked a test type. Runs only for a test
+  // written from scratch — see `prefillsSample` above.
+  const samplePrefilled = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      samplePrefilled.current = false;
+      return;
+    }
+    if (!prefillsSample || !typeChosen || samplePrefilled.current) return;
+    samplePrefilled.current = true;
+    const sample = sampleTest(activeTab, isGeneralTest);
+    setTestName(sample.name);
+    if (usesPlainInput) {
+      setGeneralInput(sample.input);
+    } else {
+      setChatMessages(
+        sample.history.map((m, i) => ({
+          // Not the "1", "2", "3" the empty boxes already carry: a reused id
+          // keeps the same box on screen, and a box only grows to fit its
+          // text when it is first drawn, so the example would sit clipped to
+          // one line until it was clicked.
+          id: `sample-${i + 1}`,
+          role: m.role,
+          content: m.content,
+        })),
+      );
+    }
+    // setTestName comes from the parent and is not memoised there, so it is
+    // left out: this must run once per open, not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    prefillsSample,
+    typeChosen,
+    activeTab,
+    isGeneralTest,
+    usesPlainInput,
+  ]);
+
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
     setChatMessages([...chatMessages, { id, role, content: "" }]);
@@ -1505,6 +1580,9 @@ export function AddTestDialog({
     params: Array<{ name: string; value: string }>;
   } | null>(null);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  // What the "Discard changes?" prompt on screen is guarding: closing the
+  // dialog, or stepping to another test.
+  const discardActionRef = useRef<(() => void) | null>(null);
   // Shown when the user hits "Run test" while editing with unsaved edits:
   // asks whether to save-then-run or discard-and-run the saved version.
   const [showRunUnsavedConfirm, setShowRunUnsavedConfirm] = useState(false);
@@ -1660,7 +1738,7 @@ export function AddTestDialog({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -1703,7 +1781,7 @@ export function AddTestDialog({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return [];
       }
 
@@ -1779,6 +1857,12 @@ export function AddTestDialog({
   // connected evaluators of the matching type (`llm` for next-reply,
   // `conversation` for the conversation tab), falling back to the seeded
   // default-correctness evaluator on next-reply when the agent has none.
+  // The two judges that ship with the product, either of which a new test can
+  // be seeded with. Only these get the example's criteria.
+  const isBuiltInJudge = (o: LLMEvaluatorOption) =>
+    isDefaultLLMNextReplyEvaluator(o) ||
+    matchesDefaultSlug(o, DEFAULT_LLM_GENERAL_SLUG);
+
   const buildDefaultAttachedForTab = useCallback(
     (tab: TestTab): AttachedEvaluator[] => {
       const isGeneralNextReply = isGeneralTest && tab === "next-reply";
@@ -1793,7 +1877,16 @@ export function AddTestDialog({
         description: o.description,
         slug: o.slug,
         variables: o.variables,
-        variable_values: buildInitialVariableValues(o.variables),
+        variable_values: buildInitialVariableValues(
+          o.variables,
+          // The example's criteria goes into the built-in correctness
+          // evaluator wherever it is seeded from: the agent's own list or
+          // the fallback below. An evaluator someone wrote themselves is
+          // left as they wrote it.
+          prefillsSample && isBuiltInJudge(o)
+            ? { criteria: sampleTest(tab, isGeneralTest).criteria }
+            : undefined,
+        ),
       });
       const agentSet = new Set(agentEvaluatorUuids ?? []);
       const agentMatches = availableLLMEvaluators.filter(
@@ -1810,7 +1903,12 @@ export function AddTestDialog({
       }
       return [];
     },
-    [agentEvaluatorUuids, availableLLMEvaluators, isGeneralTest],
+    [
+      agentEvaluatorUuids,
+      availableLLMEvaluators,
+      isGeneralTest,
+      prefillsSample,
+    ],
   );
 
   // Initialize attached evaluators once props + evaluator list have settled.
@@ -3160,29 +3258,41 @@ export function AddTestDialog({
     else handleSubmit(true);
   };
 
-  const handleBackdropClick = () => {
-    // Skip the discard prompt when the form is unchanged from the baseline
-    // captured after load (pristine open, or edits reverted). When the
-    // baseline hasn't been captured yet — e.g. an existing test is still
-    // loading — keep the prompt to err on the side of not losing edits.
+  // Run `action`, but ask first when the form has edits that would be lost.
+  // Skip the discard prompt when the form is unchanged from the baseline
+  // captured after load (pristine open, or edits reverted). When the
+  // baseline hasn't been captured yet — e.g. an existing test is still
+  // loading — keep the prompt to err on the side of not losing edits.
+  const confirmDiscard = (action: () => void) => {
     if (
       baselineRef.current !== null &&
       serializeFormState() === baselineRef.current
     ) {
-      onClose();
+      action();
       return;
     }
+    discardActionRef.current = action;
     setShowCloseConfirmation(true);
   };
 
+  const handleBackdropClick = () => confirmDiscard(onClose);
+
   const handleConfirmClose = () => {
     setShowCloseConfirmation(false);
-    onClose();
+    const action = discardActionRef.current ?? onClose;
+    discardActionRef.current = null;
+    action();
   };
 
   const handleCancelClose = () => {
     setShowCloseConfirmation(false);
+    discardActionRef.current = null;
   };
+
+  // Stepping to another test throws away unsaved edits just like closing
+  // does, so both go through the same prompt.
+  const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
+  const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
 
   if (!isOpen) return null;
 
@@ -3326,6 +3436,24 @@ export function AddTestDialog({
               />
             </svg>
           </button>
+
+          {/* Previous / next test: a thin row of its own across the top, so
+              nothing sits on the information banner below it. The close
+              button floats in this row's right-hand end. */}
+          {(navPrev || navNext) && (
+            <div className="relative shrink-0 h-12 border-b border-border hidden md:block" data-testid="test-nav-row">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <DialogNavHeader
+                  noun={itemNoun}
+                  onPrev={navPrev}
+                  onNext={navNext}
+                  hasPrev={hasPrev}
+                  hasNext={hasNext}
+                  position={position}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}

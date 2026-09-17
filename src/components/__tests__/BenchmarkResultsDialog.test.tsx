@@ -26,6 +26,7 @@ jest.mock("../eval-details", () => {
   return {
     __esModule: true,
     benchmarkLabellingKey: actual.benchmarkLabellingKey,
+    benchmarkTestName: actual.benchmarkTestName,
     BenchmarkOutputsPanel: (props: any) => (
       <div data-testid="outputs-panel">
         <div data-testid="outputs-panel-models">
@@ -34,15 +35,46 @@ jest.mock("../eval-details", () => {
         <div data-testid="outputs-panel-evaluators">
           {JSON.stringify(props.evaluatorsByUuid)}
         </div>
+        <div data-testid="outputs-panel-rows">
+          {JSON.stringify(
+            props.modelResults.map((m: any) =>
+              (m.test_results ?? []).map((r: any) => ({
+                name: r.name,
+                reply: r.output?.response ?? null,
+              })),
+            ),
+          )}
+        </div>
         <div data-testid="outputs-panel-labelling-selection">
           {props.labellingSelection
             ? JSON.stringify(Array.from(props.labellingSelection))
             : "undefined"}
         </div>
-        <button onClick={() => props.onNavChange?.({ currentIndex: 0, total: 1, goPrev: () => {}, goNext: () => {} })}>
+        {props.selectionStrip}
+        <button
+          onClick={() =>
+            props.onToggleLabellingSelection?.(
+              actual.benchmarkLabellingKey(props.modelResults[1]?.model, 0),
+            )
+          }
+        >
+          togglelabel-m1-0
+        </button>
+        <button
+          onClick={() =>
+            props.onNavChange?.({
+              currentIndex: 0,
+              total: 1,
+              goPrev: () => {},
+              goNext: () => {},
+            })
+          }
+        >
           setnav
         </button>
-        <button onClick={() => props.onSelectTest?.(props.modelResults[0]?.model, 0)}>
+        <button
+          onClick={() => props.onSelectTest?.(props.modelResults[0]?.model, 0)}
+        >
           selecttest
         </button>
         <button
@@ -99,10 +131,14 @@ jest.mock("../ui", () => ({
       {props.tooltip ?? "Rerun"}
     </button>
   ),
+  // Stands in for the real button, straight through with no question. The
+  // question itself is covered in src/components/ui/__tests__.
   StopRunButton: (props: any) => (
     <button onClick={() => props.onStop()}>Stop</button>
   ),
   RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
+  // The real rename box, so renaming a run is exercised end to end here.
+  RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -205,6 +241,13 @@ async function flush() {
   });
 }
 
+/** The comparison-detail request for `taskId`, whatever query it carries. The
+ * window asks for the light version (`?mode=summary`), so an exact-URL match
+ * would miss it. A per-case, abort or rename request is NOT this. */
+function isBenchmarkDetail(url: string, taskId: string): boolean {
+  return String(url).split("?")[0].endsWith(`/agent-tests/benchmark/${taskId}`);
+}
+
 describe("BenchmarkResultsDialog", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
@@ -261,6 +304,34 @@ describe("BenchmarkResultsDialog", () => {
     ).toHaveLength(0);
   });
 
+  it("counts every linked test when no uuids are given", async () => {
+    // No uuids means every linked test: 50 tests across 3 models is 150 test
+    // runs, over the limit of 100. Counting the uuids would have checked 0.
+    const onGoBack = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.reject(new Error(`Unexpected fetch ${url}`)),
+    );
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        testUuids={[]}
+        testNames={[]}
+        totalTests={50}
+        isOpen
+        models={["gpt-4", "gpt-5", "claude"]}
+        onGoBack={onGoBack}
+      />,
+    );
+
+    await waitFor(() => expect(onGoBack).toHaveBeenCalled());
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("closes when there is no picker to go back to and the run is over the limit", async () => {
     getMaxRowsPerEvalMock.mockResolvedValueOnce(1);
     const onClose = jest.fn();
@@ -280,14 +351,80 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it("starts a new benchmark run, polls, and lands on the leaderboard tab when done", async () => {
+  function mockBenchmarkStart() {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-1", status: "queued" }),
+        );
+      }
+      if (isBenchmarkDetail(url, "task-1")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-1",
+            status: "running",
+            model_results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+  }
+
+  async function startedBenchmarkBody() {
+    let body: Record<string, unknown> | undefined;
+    await waitFor(() => {
+      const post = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
+      );
+      expect(post).toBeDefined();
+      body = JSON.parse(post![1].body);
+    });
+    return body!;
+  }
+
+  it.each([
+    ["sends parallel_models: false when the models run one after another", false],
+    ["sends parallel_models: true when the models run together", true],
+  ])("%s", async (_name, parallelModels) => {
+    mockBenchmarkStart();
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={["gpt-4"]}
+        parallelModels={parallelModels}
+      />,
+    );
+
+    expect(await startedBenchmarkBody()).toEqual({
+      models: ["gpt-4"],
+      test_uuids: defaultProps.testUuids,
+      parallel_models: parallelModels,
+    });
+  });
+
+  it("leaves parallel_models out when nothing was chosen", async () => {
+    mockBenchmarkStart();
+
+    render(
+      <BenchmarkResultsDialog {...defaultProps} isOpen models={["gpt-4"]} />,
+    );
+
+    expect(await startedBenchmarkBody()).not.toHaveProperty("parallel_models");
+  });
+
+  it("starts a new benchmark run, polls, and stays on the tests when done", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onBenchmarkCreated = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-1", status: "queued" }));
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-1", status: "queued" }),
+        );
       }
-      if (url.endsWith("/agent-tests/benchmark/task-1")) {
+      if (isBenchmarkDetail(url, "task-1")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-1",
@@ -319,9 +456,20 @@ describe("BenchmarkResultsDialog", () => {
       />,
     );
 
-    await waitFor(() => expect(onBenchmarkCreated).toHaveBeenCalledWith("task-1"));
-    await waitFor(() => expect(screen.getByText("Run One")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(onBenchmarkCreated).toHaveBeenCalledWith("task-1"),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Run One")).toBeInTheDocument(),
+    );
+    // The reader started this comparison here and watched it run, so it does
+    // not move them off the tests when it finishes.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Results" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
 
     expect(
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
@@ -339,7 +487,7 @@ describe("BenchmarkResultsDialog", () => {
 
   it("views an existing run via taskId without POSTing a new benchmark", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-existing")) {
+      if (isBenchmarkDetail(url, "task-existing")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-existing",
@@ -371,7 +519,9 @@ describe("BenchmarkResultsDialog", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("Past Run")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Past Run")).toBeInTheDocument(),
+    );
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>
         String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
@@ -379,10 +529,124 @@ describe("BenchmarkResultsDialog", () => {
     ).toBe(false);
   });
 
-  it("does not fetch and clears initial loading when models is empty and no taskId", async () => {
-    render(
-      <BenchmarkResultsDialog {...defaultProps} isOpen models={[]} />,
+  it("does not keep the previous run's name when the window opens another run", async () => {
+    let holdSecond: (value: any) => void = () => {};
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-first")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-first",
+            status: "completed",
+            name: "Regression before v2",
+            model_results: [],
+          }),
+        );
+      }
+      if (isBenchmarkDetail(url, "task-second")) {
+        return new Promise((resolve) => {
+          holdSecond = resolve;
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const { rerender } = render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-first"
+      />,
     );
+    await waitFor(() =>
+      expect(screen.getByText("Regression before v2")).toBeInTheDocument(),
+    );
+
+    // The same window is pointed at another run, whose reply has not arrived.
+    rerender(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-second"
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Regression before v2"),
+      ).not.toBeInTheDocument(),
+    );
+    // Nothing is written at the top of the window while the run is on its way:
+    // no automatic name, no rename pencil, not even the agent's name.
+    expect(screen.queryByText("Model comparison")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rename" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("My Agent")).not.toBeInTheDocument();
+
+    await act(async () => {
+      holdSecond(
+        jsonResponse({
+          task_id: "task-second",
+          status: "completed",
+          name: "Benchmark 2",
+          model_results: [],
+        }),
+      );
+    });
+    expect(await screen.findByText("Model comparison 2")).toBeInTheDocument();
+  });
+
+  it("renames a model comparison and tells the parent the new name", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (url: string, init?: any) => {
+        if (url.endsWith("/agent-tests/run/task-existing/name")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-existing",
+              name: JSON.parse(init.body).name,
+            }),
+          );
+        }
+        if (isBenchmarkDetail(url, "task-existing")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-existing",
+              status: "completed",
+              name: "Benchmark 3",
+              model_results: [],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      },
+    );
+    const onRenamed = jest.fn();
+    const user = setupUser();
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-existing"
+        onRenamed={onRenamed}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Model comparison 3")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Nightly models{Enter}");
+
+    expect(await screen.findByText("Nightly models")).toBeInTheDocument();
+    expect(onRenamed).toHaveBeenCalledWith("Nightly models");
+  });
+
+  it("does not fetch and clears initial loading when models is empty and no taskId", async () => {
+    render(<BenchmarkResultsDialog {...defaultProps} isOpen models={[]} />);
 
     await waitFor(() =>
       expect(screen.queryByText("Loading")).not.toBeInTheDocument(),
@@ -425,9 +689,11 @@ describe("BenchmarkResultsDialog", () => {
     let pollCount = 0;
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-2", status: "queued" }));
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-2", status: "queued" }),
+        );
       }
-      if (url.endsWith("/agent-tests/benchmark/task-2")) {
+      if (isBenchmarkDetail(url, "task-2")) {
         pollCount += 1;
         if (pollCount === 1) {
           return Promise.resolve(
@@ -473,10 +739,13 @@ describe("BenchmarkResultsDialog", () => {
       await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
     });
 
-    // The run is now done, which auto-switches to the leaderboard tab; flip
-    // back to outputs to read the evaluators prop passed to the panel.
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-    await setupUser().click(screen.getByRole("button", { name: "Results" }));
+    // The run is now done. It was started here, so the reader stays on the
+    // tests and the panel keeps reading the evaluators prop.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Results" }),
+      ).toBeInTheDocument(),
+    );
 
     await waitFor(() =>
       expect(screen.getByTestId("outputs-panel-evaluators").textContent).toBe(
@@ -491,7 +760,7 @@ describe("BenchmarkResultsDialog", () => {
 
   it("sets error and calls reportError when the poll response carries a result-level error", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-err")) {
+      if (isBenchmarkDetail(url, "task-err")) {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-err",
@@ -521,7 +790,7 @@ describe("BenchmarkResultsDialog", () => {
   it("stops polling, reports the error, and sets status failed when the poll fetch rejects", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-throw")) {
+      if (isBenchmarkDetail(url, "task-throw")) {
         return Promise.reject(new Error("network down"));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -554,7 +823,7 @@ describe("BenchmarkResultsDialog", () => {
   it("stops polling immediately when the dialog is closed", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-close")) {
+      if (isBenchmarkDetail(url, "task-close")) {
         return Promise.resolve(
           jsonResponse({ task_id: "task-close", status: "in_progress" }),
         );
@@ -608,7 +877,7 @@ describe("BenchmarkResultsDialog", () => {
               }),
             );
           }
-          if (url.endsWith("/agent-tests/benchmark/task-stop")) {
+          if (isBenchmarkDetail(url, "task-stop")) {
             return Promise.resolve(
               jsonResponse({
                 task_id: "task-stop",
@@ -652,7 +921,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("says it cannot stop the run when the backend address is missing", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-stop")) {
+        if (isBenchmarkDetail(url, "task-stop")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-stop",
@@ -690,7 +959,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("has no Stop once the run has finished", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-done")) {
+        if (isBenchmarkDetail(url, "task-done")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-done",
@@ -725,9 +994,11 @@ describe("BenchmarkResultsDialog", () => {
     jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-refresh", status: "queued" }));
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-refresh", status: "queued" }),
+        );
       }
-      if (url.endsWith("/agent-tests/benchmark/task-refresh")) {
+      if (isBenchmarkDetail(url, "task-refresh")) {
         return Promise.resolve(
           jsonResponse({ task_id: "task-refresh", status: "in_progress" }),
         );
@@ -771,7 +1042,7 @@ describe("BenchmarkResultsDialog", () => {
             jsonResponse({ task_id: "task-ph", status: "queued" }),
           );
         }
-        if (url.endsWith("/agent-tests/benchmark/task-ph")) {
+        if (isBenchmarkDetail(url, "task-ph")) {
           return Promise.resolve(
             jsonResponse({ task_id: "task-ph", status: "in_progress" }),
           );
@@ -788,9 +1059,9 @@ describe("BenchmarkResultsDialog", () => {
       );
 
       await waitFor(() =>
-        expect(
-          screen.getByTestId("outputs-panel-models").textContent,
-        ).toBe(JSON.stringify(["gpt-4", "claude"])),
+        expect(screen.getByTestId("outputs-panel-models").textContent).toBe(
+          JSON.stringify(["gpt-4", "claude"]),
+        ),
       );
     });
 
@@ -802,7 +1073,7 @@ describe("BenchmarkResultsDialog", () => {
             jsonResponse({ task_id: "task-partial", status: "queued" }),
           );
         }
-        if (url.endsWith("/agent-tests/benchmark/task-partial")) {
+        if (isBenchmarkDetail(url, "task-partial")) {
           pollCount += 1;
           return Promise.resolve(
             jsonResponse({
@@ -834,16 +1105,16 @@ describe("BenchmarkResultsDialog", () => {
       );
 
       await waitFor(() =>
-        expect(
-          screen.getByTestId("outputs-panel-models").textContent,
-        ).toBe(JSON.stringify(["gpt-4", "claude"])),
+        expect(screen.getByTestId("outputs-panel-models").textContent).toBe(
+          JSON.stringify(["gpt-4", "claude"]),
+        ),
       );
       expect(pollCount).toBeGreaterThanOrEqual(1);
     });
 
     it("returns modelResults as-is once done", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-done")) {
+        if (isBenchmarkDetail(url, "task-done")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-done",
@@ -876,13 +1147,15 @@ describe("BenchmarkResultsDialog", () => {
 
       // Done runs auto-switch to the leaderboard tab; flip back to outputs
       // to read the modelResults passed to the panel.
-      await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-      await setupUser().click(screen.getByRole("button", { name: "Results" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
+      );
+      await setupUser().click(screen.getByRole("button", { name: "Tests" }));
 
       await waitFor(() =>
-        expect(
-          screen.getByTestId("outputs-panel-models").textContent,
-        ).toBe(JSON.stringify(["gpt-4"])),
+        expect(screen.getByTestId("outputs-panel-models").textContent).toBe(
+          JSON.stringify(["gpt-4"]),
+        ),
       );
     });
   });
@@ -890,7 +1163,7 @@ describe("BenchmarkResultsDialog", () => {
   describe("done-state UI: tabs, pager, export, share, labelling, rerun", () => {
     async function renderDoneRun(overrides: Partial<any> = {}) {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-ui")) {
+        if (isBenchmarkDetail(url, "task-ui")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-ui",
@@ -926,7 +1199,9 @@ describe("BenchmarkResultsDialog", () => {
           onGoBack={onGoBack}
         />,
       );
-      await waitFor(() => expect(screen.getByText("UI Run")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("UI Run")).toBeInTheDocument(),
+      );
       return { onGoBack };
     }
 
@@ -948,7 +1223,7 @@ describe("BenchmarkResultsDialog", () => {
       // Viewing a past run: `models` prop is empty, so the rerun config must be
       // recovered from the loaded model_results.
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-rerun")) {
+        if (isBenchmarkDetail(url, "task-rerun")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-rerun",
@@ -1021,7 +1296,7 @@ describe("BenchmarkResultsDialog", () => {
       // A viewed benchmark that predates the backend snapshot: no test_uuids,
       // and the view surfaces pass onRerun but not onGoBack.
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-legacy")) {
+        if (isBenchmarkDetail(url, "task-legacy")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-legacy",
@@ -1073,17 +1348,19 @@ describe("BenchmarkResultsDialog", () => {
         expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Results" }));
+      await user.click(screen.getByRole("button", { name: "Tests" }));
       expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Leaderboard" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       expect(screen.getByTestId("leaderboard")).toBeInTheDocument();
     });
 
     it("shows the Top picks tab content when the Top picks tab is clicked", async () => {
       // The tab only appears when the run has cost + pass-rate data to plot.
       await renderDoneRun({
-        leaderboard_summary: [{ model: "gpt-4", pass_rate: "100", cost: "0.05" }],
+        leaderboard_summary: [
+          { model: "gpt-4", pass_rate: "100", cost: "0.05" },
+        ],
       });
       const user = setupUser();
 
@@ -1111,7 +1388,7 @@ describe("BenchmarkResultsDialog", () => {
     it("shows the nav pager only on the outputs tab once nav + selectedTest are set", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
+      await user.click(screen.getByRole("button", { name: "Tests" }));
 
       expect(screen.queryByTestId("result-pager")).not.toBeInTheDocument();
       await user.click(screen.getByText("setnav"));
@@ -1121,7 +1398,7 @@ describe("BenchmarkResultsDialog", () => {
         expect(screen.getByTestId("result-pager")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Leaderboard" }));
+      await user.click(screen.getByRole("button", { name: "Results" }));
       expect(screen.queryByTestId("result-pager")).not.toBeInTheDocument();
     });
 
@@ -1141,7 +1418,9 @@ describe("BenchmarkResultsDialog", () => {
       expect(toast.error).toHaveBeenCalledWith(
         "Select one or more tests to submit for labelling",
       );
-      expect(screen.queryByTestId("add-to-task-dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("add-to-task-dialog"),
+      ).not.toBeInTheDocument();
     });
 
     it("submit-for-labelling: switches from leaderboard to outputs first, then requires a selection", async () => {
@@ -1167,7 +1446,7 @@ describe("BenchmarkResultsDialog", () => {
       expect(
         screen.queryByRole("button", { name: "Submit for labelling" }),
       ).not.toBeInTheDocument();
-      await setupUser().click(screen.getByRole("button", { name: "Results" }));
+      await setupUser().click(screen.getByRole("button", { name: "Tests" }));
       expect(
         screen.getByTestId("outputs-panel-labelling-selection"),
       ).toHaveTextContent("undefined");
@@ -1176,7 +1455,7 @@ describe("BenchmarkResultsDialog", () => {
     it("submit-for-labelling: opens the AddRunToLabellingTaskDialog when eligible tests are selected", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
+      await user.click(screen.getByRole("button", { name: "Tests" }));
       await user.click(screen.getByText("togglelabel0"));
 
       await user.click(
@@ -1185,13 +1464,15 @@ describe("BenchmarkResultsDialog", () => {
       expect(screen.getByTestId("add-to-task-dialog")).toBeInTheDocument();
 
       await user.click(screen.getByText("close"));
-      expect(screen.queryByTestId("add-to-task-dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("add-to-task-dialog"),
+      ).not.toBeInTheDocument();
     });
 
     it("bulk-toggle labelling selection also drives eligibility", async () => {
       await renderDoneRun();
       const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Results" }));
+      await user.click(screen.getByRole("button", { name: "Tests" }));
       await user.click(screen.getByText("bulktogglelabel0"));
 
       await user.click(
@@ -1202,7 +1483,7 @@ describe("BenchmarkResultsDialog", () => {
 
     it("does not show export/share/submit-for-labelling when there are no results", async () => {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-empty")) {
+        if (isBenchmarkDetail(url, "task-empty")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-empty",
@@ -1246,7 +1527,7 @@ describe("BenchmarkResultsDialog", () => {
     it("does not show share button when backendAccessToken is falsy", async () => {
       useAccessTokenMock.mockReturnValue(null as any);
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
-        if (url.endsWith("/agent-tests/benchmark/task-notoken")) {
+        if (isBenchmarkDetail(url, "task-notoken")) {
           return Promise.resolve(
             jsonResponse({
               task_id: "task-notoken",
@@ -1307,7 +1588,7 @@ describe("BenchmarkResultsDialog", () => {
   it("auto-selects the first test with results once, and does not jump on subsequent updates", async () => {
     let pollCount = 0;
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.endsWith("/agent-tests/benchmark/task-auto")) {
+      if (isBenchmarkDetail(url, "task-auto")) {
         pollCount += 1;
         if (pollCount === 1) {
           return Promise.resolve(
@@ -1376,19 +1657,246 @@ describe("BenchmarkResultsDialog", () => {
       await jest.advanceTimersByTimeAsync(POLLING_INTERVAL_MS);
     });
 
-    // Second poll adds "gpt-4" with results too and completes the run, which
-    // auto-switches to the leaderboard tab; flip back to outputs. The
-    // selection should stay pinned to whatever was auto-selected first
+    // Second poll adds "gpt-4" with results too and completes the run. The run
+    // was still going when the window opened, so the reader stays on the
+    // tests. The selection should stay pinned to whatever was auto-selected first
     // (guarded by a ref) rather than jumping to "gpt-4". We can't directly
     // read `selectedTest` from the mock, but we can assert the panel renders
     // without crashing; deeper assertion would require exposing selectedTest
     // through the outputs panel mock, which duplicates internal state -
     // skipped per task's guidance on deeply nested edge cases under
     // fake-timer flakiness.
-    await waitFor(() => expect(screen.getByTestId("leaderboard")).toBeInTheDocument());
-    await act(async () => {
-      await setupUser().click(screen.getByRole("button", { name: "Results" }));
-    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Results" }),
+      ).toBeInTheDocument(),
+    );
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+  });
+});
+
+// A comparison runs every test once per model, so its results are the heaviest
+// thing the app reads. The window reads them without each test's conversation,
+// reply and judge reasoning, and asks for the one test someone opens — for the
+// model whose answer is on screen.
+describe("reading a comparison light, and one test in full", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  const lightComparison = {
+    task_id: "task-light",
+    status: "completed",
+    model_results: [
+      {
+        model: "openai/gpt-4.1",
+        total_tests: 1,
+        test_results: [
+          {
+            test_case_id: "test-1",
+            name: "First test",
+            passed: true,
+            test_type: "response",
+          },
+        ],
+      },
+    ],
+  };
+
+  /** Every request for one test's own result. */
+  const caseCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("/agent-tests/run/task-light/results/"),
+    );
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    (global.fetch as any) = jest.fn((url: string) => {
+      if (String(url).includes("/agent-tests/run/task-light/results/test-1")) {
+        return Promise.resolve(
+          jsonResponse({
+            test_case_id: "test-1",
+            name: "First test",
+            passed: true,
+            output: { response: "The full reply" },
+            test_case: { evaluation: { type: "response" } },
+            judge_results: [{ evaluator_uuid: "eval-1", match: true }],
+          }),
+        );
+      }
+      if (isBenchmarkDetail(String(url), "task-light")) {
+        return Promise.resolve(jsonResponse(lightComparison));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    jest.useRealTimers();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const open = () =>
+    render(
+      <BenchmarkResultsDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        testUuids={[]}
+        testNames={[]}
+        models={[]}
+        taskId="task-light"
+      />,
+    );
+
+  /** Open the window and go to the list of tests. A finished comparison lands
+   * on the leaderboard, so the list is one click away. */
+  const openOnResults = async (user: ReturnType<typeof setupUser>) => {
+    open();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await screen.findByTestId("outputs-panel");
+  };
+
+  it("asks for the comparison without every test's detail", async () => {
+    open();
+    await screen.findByTestId("leaderboard");
+    const detailUrls = (global.fetch as jest.Mock).mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => isBenchmarkDetail(url, "task-light"));
+    expect(detailUrls.length).toBeGreaterThan(0);
+    for (const url of detailUrls) expect(url).toContain("mode=summary");
+  });
+
+  it("reads the open test in full, naming the model whose answer is shown", async () => {
+    const user = setupUser();
+    await openOnResults(user);
+
+    // The window opens the first test with results on its own, so exactly that
+    // one test is read in full and its reply appears on the row.
+    await user.click(screen.getByText("selecttest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel-rows")).toHaveTextContent(
+        "The full reply",
+      ),
+    );
+    expect(caseCalls()).toHaveLength(1);
+    const url = String(caseCalls()[0][0]);
+    expect(url).toContain("/agent-tests/run/task-light/results/test-1");
+    // A model name has a slash in it, so it goes in the query, encoded.
+    expect(url).toContain(`model=${encodeURIComponent("openai/gpt-4.1")}`);
+  });
+
+  it("reads every test in full only when the results are exported", async () => {
+    const user = setupUser();
+    open();
+    await screen.findByTestId("leaderboard");
+    const fullReads = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) =>
+          isBenchmarkDetail(String(url), "task-light") &&
+          !String(url).includes("mode=summary"),
+      );
+    expect(fullReads()).toHaveLength(0);
+
+    await user.click(screen.getByTestId("export-button"));
+    await waitFor(() => expect(fullReads()).toHaveLength(1));
+  });
+});
+
+describe("running or comparing the ticked tests", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    useAccessTokenMock.mockReturnValue("test-token");
+    isLabellingEligibleRawMock.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    delete process.env.NEXT_PUBLIC_BACKEND_URL;
+  });
+
+  const ONE_TEST_TWO_MODELS = ["gpt-4", "claude"].map((model) => ({
+    model,
+    success: true,
+    message: "",
+    total_tests: 1,
+    passed: 1,
+    failed: 0,
+    test_results: [{ name: "Test One", passed: true, test_uuid: "t1" }],
+  }));
+
+  function renderDone(
+    props: Partial<React.ComponentProps<typeof BenchmarkResultsDialog>>,
+  ) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-strip")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-strip",
+            status: "completed",
+            model_results: ONE_TEST_TWO_MODELS,
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-strip"
+        {...props}
+      />,
+    );
+  }
+
+  async function tickUnderBothModels(user: ReturnType<typeof setupUser>) {
+    // A finished comparison opens on its Results, so the tests are a tab away.
+    await user.click(await screen.findByRole("button", { name: "Tests" }));
+    await user.click(await screen.findByText("togglelabel0"));
+    await user.click(screen.getByText("togglelabel-m1-0"));
+  }
+
+  // The strip label is one span: a bold count then " tests selected".
+  const stripLabel = (text: string) =>
+    screen.queryByText(
+      (_, el) => el?.tagName === "SPAN" && el.textContent === text,
+    );
+
+  it("counts the same test ticked under two models once", async () => {
+    const onRunTests = jest.fn().mockResolvedValue(undefined);
+    const onCompareTests = jest.fn();
+    renderDone({ onRunTests, onCompareTests });
+    const user = setupUser();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+    await tickUnderBothModels(user);
+
+    expect(stripLabel("1 test selected")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(onRunTests).toHaveBeenCalledWith([{ uuid: "t1", name: "Test One" }]);
+    await user.click(screen.getByRole("button", { name: "Compare" }));
+    expect(onCompareTests).toHaveBeenCalledWith([
+      { uuid: "t1", name: "Test One" },
+    ]);
+  });
+
+
+
+  it("shows no strip when nothing can run or compare the ticked tests", async () => {
+    renderDone({});
+    const user = setupUser();
+    await tickUnderBothModels(user);
+
+    expect(
+      screen.getByTestId("outputs-panel-labelling-selection"),
+    ).not.toHaveTextContent("[]");
+    expect(stripLabel("1 test selected")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Compare" })).toBeNull();
   });
 });

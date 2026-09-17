@@ -69,6 +69,14 @@ const ENTRIES: LearnItem[] = [
     recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
   },
   {
+    id: "align-llm-judges-with-human-experts",
+    title: "Automatically aligning LLM judges with human experts",
+    summary:
+      "How you can connect Calibrate with Claude Code to find where your LLM judges disagree with your experts, identify patterns and iteratively improve the LLM judges until they are sufficiently aligned.",
+    recordingEmbedUrl: "https://www.youtube.com/embed/AtZMWjER0vQ",
+    recordingUrl: "https://youtu.be/AtZMWjER0vQ",
+  },
+  {
     id: "workshop-for-leaders",
     title: "Getting started with AI evals",
     summary: (

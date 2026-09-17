@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ToolLibraryPicker } from "@/components/tools/ToolLibraryPicker";
@@ -133,7 +134,7 @@ export function AddToolDialog({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

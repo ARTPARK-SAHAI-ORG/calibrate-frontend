@@ -1,9 +1,11 @@
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
 import { overEvalLimit } from "./evalLimit";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
+import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary";
 import type {
   TestCaseOutput,
   TestCaseData,
@@ -12,8 +14,13 @@ import type {
 } from "@/components/test-results/shared";
 
 export type TestCaseResult = {
-  /** The test this row ran. */
+  /** The test this row ran. Read it through `rowTestUuid`, never straight:
+   * older runs put the test's name here rather than its id. */
   test_case_id?: string;
+  /** The uuid of the test this row ran. Sent on every case; absent on a run
+   * answered before the backend started stamping it, which is why
+   * `rowTestUuid` falls back to `test_case_id`. */
+  test_uuid?: string | null;
   test_name?: string;
   name?: string; // Test name from in-progress API response
   /** null / absent means the test has not finished yet. It never means the
@@ -33,6 +40,10 @@ export type TestCaseResult = {
   inputs?: Record<string, unknown> | null;
   /** True when this test never started, because the run was stopped first. */
   not_run?: boolean;
+  /** What kind of test this row ran. Sent on every case in both modes. Absent
+   * on runs answered before the backend started sending it, which is why
+   * `rowTestType` falls back to the test's own config. */
+  test_type?: "response" | "general" | "tool_call" | "conversation" | null;
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
@@ -46,6 +57,8 @@ export type TestCaseResult = {
 export type TestRunStatusResponse = {
   task_id: string;
   status: string;
+  /** What the run is called. The automatic "Run 3" unless someone renamed it. */
+  name?: string | null;
   total_tests?: number;
   passed?: number;
   failed?: number;
@@ -76,6 +89,14 @@ export type TestRunStatusResponse = {
    * same tests. Absent on runs created before the backend started snapshotting
    * it — the Rerun button is hidden in that case. */
   test_uuids?: string[];
+  /** The run's totals for each evaluator that judged something, the same shape
+   * a benchmark gives per model. Counted by the backend as it reads the run,
+   * so it is there for runs made before this existed. An evaluator that has
+   * judged nothing yet is left out rather than shown as a zero.
+   *
+   * Read it through `runEvaluatorSummary`, so a missing list reads as none.
+   * `pass_rate` is out of 100, the same as a benchmark's. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** True when the run itself broke. `status` says the same thing; nothing
    * reads this. */
   error?: boolean;
@@ -147,7 +168,7 @@ export async function startTestRunOrNotify(
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return null;
     }
     reportError("Error starting test run:", error);
@@ -156,21 +177,162 @@ export async function startTestRunOrNotify(
   }
 }
 
-/** Fetch the full state of a run. The dialog's only source of run content. */
+/**
+ * Runs the backend has finished with, so the window can show one again the
+ * moment it is reopened instead of downloading it a second time. Only finished
+ * runs go in: an unfinished one changes on every poll.
+ *
+ * One run of 1880 tests is several megabytes, so this holds at most three and
+ * drops the oldest. An unbounded cache would grow the tab's memory until it
+ * is reloaded. Lives for the session only.
+ */
+const FINISHED_RUN_CACHE_LIMIT = 3;
+const finishedRuns = new Map<string, TestRunStatusResponse>();
+/** Cases already read in full, keyed by run and test. A finished case never
+ * changes, so reopening a test the reader has already looked at costs
+ * nothing. Capped for the same reason as the runs above. */
+const CASE_CACHE_LIMIT = 200;
+const finishedCases = new Map<string, TestCaseResult>();
+
+/** How much of a run to ask for. `summary` leaves out each case's
+ * conversation, the agent's reply, the judges' reasoning and the custom
+ * inputs, which is nearly all of the weight. Read one case in full with
+ * `fetchTestCase` when someone opens it. */
+export type RunDetailMode = "full" | "summary";
+
+/** Newest last, oldest dropped once past `limit`. */
+function remember<T>(store: Map<string, T>, key: string, value: T, limit: number) {
+  store.delete(key);
+  store.set(key, value);
+  if (store.size > limit) {
+    store.delete(store.keys().next().value as string);
+  }
+}
+
+/** The remembered copy of a finished run, if there is one. */
+export function getCachedTestRun(
+  taskId: string,
+  mode: RunDetailMode = "full",
+): TestRunStatusResponse | undefined {
+  return finishedRuns.get(`${taskId}|${mode}`);
+}
+
+/** Clears the remembered runs and cases. For tests. */
+export function clearTestRunCache(): void {
+  finishedRuns.clear();
+  finishedCases.clear();
+}
+
+/**
+ * Fetch a run. `summary` gives every case's name and verdict without the
+ * weight behind them, which is what the list on screen needs; `full` is
+ * unchanged and still carries everything.
+ */
 export async function fetchTestRun(
   backendUrl: string,
   accessToken: string | null | undefined,
   taskId: string,
+  mode: RunDetailMode = "full",
 ): Promise<TestRunStatusResponse> {
-  const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}`, {
-    method: "GET",
-    headers: getDefaultHeaders(accessToken),
-  });
+  const query = mode === "summary" ? "?mode=summary" : "";
+  const response = await fetch(
+    `${backendUrl}/agent-tests/run/${taskId}${query}`,
+    {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    },
+  );
 
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error("Failed to fetch test run");
 
-  return response.json();
+  const run: TestRunStatusResponse = await response.json();
+  if (isTerminalRunStatus(run.status)) {
+    remember(finishedRuns, `${taskId}|${mode}`, run, FINISHED_RUN_CACHE_LIMIT);
+  }
+  return run;
+}
+
+/** The remembered copy of a case read in full, if there is one. */
+export function getCachedTestCase(
+  taskId: string,
+  testCaseId: string,
+  model?: string | null,
+): TestCaseResult | undefined {
+  return finishedCases.get(`${taskId}|${testCaseId}|${model ?? ""}`);
+}
+
+/**
+ * One case in full: the conversation, the agent's reply, and each evaluator's
+ * verdict and reasoning. The same object shape as one entry of a run's
+ * `results` in full mode.
+ *
+ * One route serves a plain run and a model comparison alike; a comparison runs
+ * every test once per model, so it needs `model` to say which answer to read.
+ * A case still running has no id yet and cannot be asked for.
+ */
+export async function fetchTestCase(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  testCaseId: string,
+  model?: string | null,
+): Promise<TestCaseResult> {
+  const cached = getCachedTestCase(taskId, testCaseId, model);
+  if (cached) return cached;
+
+  const query = model ? `?model=${encodeURIComponent(model)}` : "";
+  const response = await fetch(
+    `${backendUrl}/agent-tests/run/${taskId}/results/${testCaseId}${query}`,
+    {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    },
+  );
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to fetch the test case");
+
+  const testCase: TestCaseResult = await response.json();
+  remember(
+    finishedCases,
+    `${taskId}|${testCaseId}|${model ?? ""}`,
+    testCase,
+    CASE_CACHE_LIMIT,
+  );
+  return testCase;
+}
+
+/**
+ * Rename a run, or clear the name back to the automatic one by passing an
+ * empty string. One route covers a plain evaluation run and a model
+ * comparison alike. Returns the name as it now reads, which for a cleared
+ * name is the automatic one the backend gives back (e.g. "Run 3").
+ */
+export async function renameRun(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+  name: string,
+): Promise<string> {
+  const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}/name`, {
+    method: "PATCH",
+    headers: {
+      ...getDefaultHeaders(accessToken),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: name.trim() || null }),
+  });
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to rename the run");
+
+  // The remembered copies now have the old name on them, so forget them.
+  finishedRuns.delete(`${taskId}|full`);
+  finishedRuns.delete(`${taskId}|summary`);
+
+  const result: { name?: string | null } = await response.json();
+  return result.name ?? "";
 }
 
 /**
@@ -212,7 +374,7 @@ export async function abortRunOrNotify(
     return true;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return false;
     }
     reportError("Error stopping test run:", error);
@@ -224,4 +386,50 @@ export async function abortRunOrNotify(
 /** Whether a run status means the backend is finished with it. */
 export function isTerminalRunStatus(status: string): boolean {
   return status === "done" || status === "completed" || status === "failed";
+}
+
+/**
+ * Delete a run and the results it produced. One route covers a plain
+ * evaluation run and a model comparison alike.
+ *
+ * Only call this for a run that has finished. Deleting a run still going
+ * removes the record but does not stop the run: the backend holds no handle
+ * on the work, so it keeps going with nowhere left to report to.
+ */
+export async function deleteRun(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+): Promise<void> {
+  const response = await fetch(`${backendUrl}/agent-tests/job/${taskId}`, {
+    method: "DELETE",
+    headers: getDefaultHeaders(accessToken),
+  });
+
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error("Failed to delete the run");
+}
+
+/**
+ * `deleteRun` plus the failure handling every caller needs: sign out on a 401,
+ * otherwise report the error and show one toast. Returns whether the run was
+ * deleted, so the caller knows whether to read the list back.
+ */
+export async function deleteRunOrNotify(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  taskId: string,
+): Promise<boolean> {
+  try {
+    await deleteRun(backendUrl, accessToken, taskId);
+    return true;
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
+      return false;
+    }
+    reportError("Error deleting test run:", error);
+    toast.error("Could not delete the evaluation. Please try again.");
+    return false;
+  }
 }

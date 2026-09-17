@@ -98,6 +98,44 @@ describe("LeaderboardBarChart", () => {
     expect(screen.getByText("Custom Chart")).toBeInTheDocument();
   });
 
+  // The x-axis labels are rotated, so a long model name runs down and to the
+  // left of its bar. Without extra room under and beside the chart the name is
+  // cut off by the chart edge, which is what these two checks guard.
+  const axisLeftEdge = (container: HTMLElement) =>
+    Number(
+      container
+        .querySelector(".recharts-yAxis .recharts-cartesian-axis-line")
+        ?.getAttribute("x")
+    );
+  const chartBoxHeight = (container: HTMLElement) =>
+    Number(
+      (container.querySelector(".recharts-wrapper") as HTMLElement)?.style
+        .height.replace("px", "")
+    );
+
+  it("keeps short labels on the default chart size", () => {
+    const { container } = render(
+      <LeaderboardBarChart title="Short" data={sampleData} height={300} />
+    );
+    expect(chartBoxHeight(container)).toBe(300);
+    expect(axisLeftEdge(container)).toBe(20);
+  });
+
+  it("makes room below and to the left for long labels", () => {
+    const { container } = render(
+      <LeaderboardBarChart
+        title="Long"
+        data={[
+          { label: "anthropic/claude-sonnet-4.6", value: 97.5 },
+          { label: "google/gemini-3-flash-preview", value: 96 },
+        ]}
+        height={300}
+      />
+    );
+    expect(chartBoxHeight(container)).toBeGreaterThan(300);
+    expect(axisLeftEdge(container)).toBeGreaterThan(20);
+  });
+
   it("renders with empty data without crashing", () => {
     render(<LeaderboardBarChart title="Empty Chart" data={[]} />);
     expect(screen.getByText("Empty Chart")).toBeInTheDocument();

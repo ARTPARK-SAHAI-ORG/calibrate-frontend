@@ -232,7 +232,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
 
     // Clean up: delete via the row's "Delete test" icon button + confirm dialog.
     await nameCell
-      .locator('xpath=ancestor::div[.//button[@title="Delete test"]][1]')
+      .locator('xpath=ancestor::div[.//button[@aria-label="Delete test"]][1]')
       .getByRole("button", { name: "Delete test" })
       .click();
     await expect(

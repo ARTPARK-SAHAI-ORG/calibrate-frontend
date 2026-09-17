@@ -10,27 +10,31 @@ import {
   type TestRunEvaluator,
   type PagerNav,
 } from "./test-results/shared";
+import { benchmarkLabellingKey, benchmarkTestName } from "./eval-details";
 import {
-  BenchmarkOutputsPanel,
-  BenchmarkCombinedLeaderboard,
-  BenchmarkTopPicks,
-  BenchmarkWeightedRanking,
-  benchmarkLabellingKey,
-  LLMEvaluationAbout,
-  evaluatorColumnsToAbout,
-  type BenchmarkModelResult,
-} from "./eval-details";
-import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
+  BenchmarkResultView,
+  benchmarkCsvRows,
+  evaluatorsByUuid,
+  withTestType,
+  type BenchmarkCaseDetail,
+  type BenchmarkModelRows,
+  type BenchmarkTabId,
+} from "./eval-details/BenchmarkResultView";
+import {
+  SelectedTestsStrip,
+  type SelectedTest,
+} from "./eval-details/SelectedTestsStrip";
+import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   StatusBadge,
   RerunIconButton,
-  ResultTabs,
   StopRunButton,
   RunStateMark,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { abortRunOrNotify } from "@/lib/testRunApi";
+import { abortRunOrNotify, fetchTestCase } from "@/lib/testRunApi";
 import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
+import { EditableRunName } from "@/components/EditableRunName";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -47,16 +51,13 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import {
-  hasBenchmarkTopPicks,
-  type BenchmarkLeaderboardSummaryRow,
-} from "@/lib/benchmarkEvaluatorSummary";
+import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
   name?: string;
   status: string;
-  model_results?: BenchmarkModelResult[];
+  model_results?: BenchmarkModelRows[];
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
@@ -87,6 +88,9 @@ type BenchmarkResultsDialogProps = {
    *  every linked test. Defaults to the number of names. */
   totalTests?: number;
   models: string[];
+  /** False runs the models one after another instead of at the same time.
+   * Sent as `parallel_models`; left out means the backend default (together). */
+  parallelModels?: boolean;
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
   // Called when the user clicks "Rerun" on a completed benchmark. Hands the
@@ -98,6 +102,15 @@ type BenchmarkResultsDialogProps = {
     testUuids: string[],
     testNames: string[],
   ) => void;
+  /** Called after the run is renamed, with the name as it now reads, so the
+   * list behind this window shows it too. */
+  onRenamed?: (name: string) => void;
+  /** Start a plain run of these tests. The parent creates the run and points
+   * this window at it. Resolves when the run has been created or refused. */
+  onRunTests?: (tests: SelectedTest[]) => Promise<unknown> | void;
+  /** Open the model picker on these tests. The parent closes this window once
+   * the comparison is created. */
+  onCompareTests?: (tests: SelectedTest[]) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -110,31 +123,27 @@ export function BenchmarkResultsDialog({
   testNames,
   totalTests,
   models,
+  parallelModels,
   taskId,
   onBenchmarkCreated,
   onRerun,
+  onRenamed,
+  onRunTests,
+  onCompareTests,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
 
-  const [activeTab, setActiveTab] = useState<
-    "leaderboard" | "top-picks" | "outputs" | "about"
-  >("outputs");
-  // Track which providers are expanded
-  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
-    new Set(),
-  );
-  // Track selected test: { model, testIndex }
-  const [selectedTest, setSelectedTest] = useState<{
-    model: string;
-    testIndex: number;
-  } | null>(null);
+  const [activeTab, setActiveTab] = useState<BenchmarkTabId>("tests");
   const [nav, setNav] = useState<PagerNav | null>(null);
 
   // Loading and data state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [taskStatus, setTaskStatus] = useState<string>("queued");
-  const [modelResults, setModelResults] = useState<BenchmarkModelResult[]>([]);
+  const [modelResults, setModelResults] = useState<BenchmarkModelRows[]>([]);
+  /** The tests the reader picked, in full, once "Submit for labelling" has
+   * fetched them. */
+  const [labellingRows, setLabellingRows] = useState<BenchmarkModelRows[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
@@ -163,8 +172,9 @@ export function BenchmarkResultsDialog({
   } = useLabellingSelection();
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  /** Once per dialog open: select first test of `models[0]` when its row exists. */
-  const hasAutoSelectedFirstBenchmarkTestRef = useRef(false);
+  // True until the first reply about this run lands, so a comparison that was
+  // already finished when the window opened can land on its Results.
+  const isFirstPollRef = useRef(false);
   /**
    * Which "open session" we've already kicked off — keyed by `taskId` (or a
    * sentinel for a brand-new run). Stays set across auth-token refreshes so a
@@ -179,14 +189,44 @@ export function BenchmarkResultsDialog({
     taskStatus === "done" ||
     taskStatus === "failed";
 
-  const labellingModelResults = modelResults
-    .map((mr) => ({
-      ...mr,
-      test_results: (mr.test_results ?? []).filter((_, index) =>
-        labellingSelectedKeys.has(benchmarkLabellingKey(mr.model, index)),
-      ),
-    }))
-    .filter((mr) => (mr.test_results?.length ?? 0) > 0);
+  /**
+   * The whole comparison with every case's conversation, reply and judge
+   * reasoning. Only read when someone exports or submits for labelling, which
+   * need every row; the window itself runs on the light reply. Kept once read,
+   * since a finished run does not change.
+   */
+  const fullModelResultsRef = useRef<BenchmarkModelRows[] | null>(null);
+  const fetchFullModelResults = async (): Promise<BenchmarkModelRows[]> => {
+    if (fullModelResultsRef.current) return fullModelResultsRef.current;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !currentTaskId) return modelResults;
+    const response = await fetch(
+      `${backendUrl}/agent-tests/benchmark/${currentTaskId}`,
+      { method: "GET", headers: getDefaultHeaders(backendAccessToken) },
+    );
+    if (!response.ok) throw new Error("Failed to fetch the model comparison");
+    const result: BenchmarkStatusResponse = await response.json();
+    const rows = result.model_results ?? [];
+    fullModelResultsRef.current = rows;
+    return rows;
+  };
+
+  /** One test read in full, for the model whose answer is on screen. */
+  const fetchCase = async (
+    testUuid: string,
+    model: string,
+  ): Promise<BenchmarkCaseDetail> => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !currentTaskId)
+      throw new Error("Cannot read the test: the backend URL is not set");
+    return fetchTestCase(
+      backendUrl,
+      backendAccessToken,
+      currentTaskId,
+      testUuid,
+      model,
+    );
+  };
 
   useEffect(() => {
     if (!isOpen || !backendAccessToken) return;
@@ -257,18 +297,24 @@ export function BenchmarkResultsDialog({
         setIsInitialLoading(true);
         setTaskStatus("queued");
         setModelResults([]);
+        setLabellingRows([]);
+        fullModelResultsRef.current = null;
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
         setRunTestUuids([]);
         setWasStopped(false);
         setError(null);
-        setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
-        setSelectedTest(null);
-        hasAutoSelectedFirstBenchmarkTestRef.current = false;
+        setNav(null);
         clearLabellingSelection();
-        setActiveTab("outputs");
+        setActiveTab("tests");
+        // Only a comparison opened from the runs list can land on its Results.
+        // One this window starts itself is being watched, so it stays put.
+        isFirstPollRef.current = Boolean(taskId);
         setIsPublic(false);
         setShareToken(null);
+        // Cleared with the rest, or the run opened next reads the previous
+        // run's name until its first reply lands.
+        setRunName(null);
         setCurrentTaskId(taskId ?? null);
 
         if (taskId) {
@@ -301,52 +347,6 @@ export function BenchmarkResultsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, backendAccessToken]);
 
-  // Default selection: first test (index 0) of the first model that has
-  // `test_results`. When `models` is populated (new run), prefer that order
-  // and match by `model` id. When `models` is empty (e.g. past run opened
-  // with only `taskId`), use the first API row that has results — the parent
-  // often passes `models={[]}` in that case.
-  useEffect(() => {
-    if (!isOpen || hasAutoSelectedFirstBenchmarkTestRef.current) return;
-    if (modelResults.length === 0) return;
-
-    const pickDefaultSelection = (): {
-      model: string;
-      testIndex: number;
-    } | null => {
-      if (models.length > 0) {
-        for (const modelId of models) {
-          const mr = modelResults.find((m) => m.model === modelId);
-          if (mr?.test_results && mr.test_results.length > 0) {
-            return { model: modelId, testIndex: 0 };
-          }
-        }
-        // Config order vs API label mismatch — first row with results
-        const firstWith = modelResults.find(
-          (m) => m.test_results && m.test_results.length > 0,
-        );
-        if (firstWith) return { model: firstWith.model, testIndex: 0 };
-        return null;
-      }
-      const firstWith = modelResults.find(
-        (m) => m.test_results && m.test_results.length > 0,
-      );
-      if (firstWith) return { model: firstWith.model, testIndex: 0 };
-      return null;
-    };
-
-    const sel = pickDefaultSelection();
-    if (!sel) return;
-
-    hasAutoSelectedFirstBenchmarkTestRef.current = true;
-    setSelectedTest(sel);
-    setExpandedProviders((prev) => {
-      const next = new Set(prev);
-      next.add(sel.model);
-      return next;
-    });
-  }, [isOpen, models, modelResults]);
-
   // Stop a run that is still going, then read it back so the window shows the
   // stopped state at once. The poll that follows sees a finished run and stops
   // polling on its own.
@@ -366,9 +366,14 @@ export function BenchmarkResultsDialog({
   };
 
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
+    const isFirstPoll = isFirstPollRef.current;
+    isFirstPollRef.current = false;
     try {
+      // The light reply: every test's name and verdict, without the
+      // conversation, the reply and the judges' reasoning behind them. One
+      // case is read in full when the reader opens it.
       const response = await fetch(
-        `${backendUrl}/agent-tests/benchmark/${taskId}`,
+        `${backendUrl}/agent-tests/benchmark/${taskId}?mode=summary`,
         {
           method: "GET",
           headers: getDefaultHeaders(backendAccessToken),
@@ -402,22 +407,7 @@ export function BenchmarkResultsDialog({
 
       // Update model results (intermediate or final)
       if (result.model_results) {
-        setModelResults(result.model_results);
-
-        // Auto-expand the first provider that has results
-        if (result.model_results.length > 0) {
-          setExpandedProviders((prev) => {
-            if (prev.size === 0) {
-              const firstWithResults = result.model_results!.find(
-                (m) => m.test_results && m.test_results.length > 0,
-              );
-              if (firstWithResults) {
-                return new Set([firstWithResults.model]);
-              }
-            }
-            return prev;
-          });
-        }
+        setModelResults(withTestType(result.model_results));
       }
 
       // After first response, we're no longer in initial loading
@@ -439,8 +429,10 @@ export function BenchmarkResultsDialog({
           setError(result.error);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
-          // Switch to leaderboard tab when done
-          setActiveTab("leaderboard");
+          // A comparison that had already finished when the window opened
+          // lands on its Results: there is nothing left to watch. One that
+          // finishes while the reader is watching leaves them on the tests.
+          if (isFirstPoll) setActiveTab("summary");
         }
       }
     } catch (err) {
@@ -472,10 +464,13 @@ export function BenchmarkResultsDialog({
     // Every test is run once per model, so the work is tests times models.
     // Over the limit, the toast says so and we hand the user back to the model
     // picker (or close, when there is no picker to go back to).
+    // No uuids means every linked test, so count those through `totalTests`.
+    const testCount =
+      testUuids.length > 0 ? testUuids.length : (totalTests ?? 0);
     if (
       await overEvalLimit(
         backendAccessToken,
-        testUuids.length * models.length,
+        testCount * models.length,
         "tests",
       )
     ) {
@@ -496,6 +491,9 @@ export function BenchmarkResultsDialog({
           body: JSON.stringify({
             models: models,
             test_uuids: testUuids,
+            ...(parallelModels !== undefined && {
+              parallel_models: parallelModels,
+            }),
           }),
         },
       );
@@ -537,24 +535,8 @@ export function BenchmarkResultsDialog({
     }
   };
 
-  const toggleProvider = (model: string) => {
-    setExpandedProviders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(model)) {
-        newSet.delete(model);
-      } else {
-        newSet.add(model);
-      }
-      return newSet;
-    });
-  };
-
-  const handleTestSelect = (model: string, testIndex: number) => {
-    setSelectedTest({ model, testIndex });
-  };
-
   // Get providers to display (includes placeholders for models without results yet)
-  const getProvidersToDisplay = (): BenchmarkModelResult[] => {
+  const getProvidersToDisplay = (): BenchmarkModelRows[] => {
     // When in progress and no results yet, show all models as placeholders
     if (!isDone && modelResults.length === 0 && models.length > 0) {
       return models.map((model) => ({
@@ -573,7 +555,7 @@ export function BenchmarkResultsDialog({
       const existingModels = new Set(modelResults.map((m) => m.model));
       const missingModels = models.filter((m) => !existingModels.has(m));
       if (missingModels.length > 0) {
-        const placeholders: BenchmarkModelResult[] = missingModels.map(
+        const placeholders: BenchmarkModelRows[] = missingModels.map(
           (model) => ({
             model,
             success: null,
@@ -591,28 +573,7 @@ export function BenchmarkResultsDialog({
     return modelResults;
   };
 
-  const providersToDisplay = getProvidersToDisplay();
-
   if (!isOpen) return null;
-
-  const benchmarkScoreLabel = "Test pass rate (%)";
-  // Only offer the Top picks tab when there is cost + pass-rate data to plot.
-  const showTopPicks = hasBenchmarkTopPicks(
-    leaderboardSummary,
-    modelResults,
-    benchmarkScoreLabel,
-  );
-
-  // Metric-presence plan for the About tab (built only when it's showing so the
-  // scan doesn't run on every poll). Shares the leaderboard's builder.
-  const aboutPlan =
-    isDone && activeTab === "about"
-      ? (buildBenchmarkCombinedLeaderboardPayload(
-          leaderboardSummary,
-          modelResults,
-          benchmarkScoreLabel,
-        )?.plan ?? null)
-      : null;
 
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
@@ -626,6 +587,22 @@ export function BenchmarkResultsDialog({
   // that can be labelled.
   const showLabelling =
     isDone && !error && hasAnyResults && hasLabellingEligibleTests;
+  // The ticked tests, for the Run / Compare strip. The same test ticked under
+  // two models is one test, and a row with no test id cannot be run again.
+  const selectedByUuid = new Map<string, SelectedTest>();
+  for (const mr of modelResults) {
+    (mr.test_results ?? []).forEach((tr, index) => {
+      const uuid = rowTestUuid(tr);
+      if (!uuid) return;
+      if (!labellingSelectedKeys.has(benchmarkLabellingKey(mr.model, index)))
+        return;
+      selectedByUuid.set(uuid, {
+        uuid,
+        name: benchmarkTestName(tr, index, testNames),
+      });
+    });
+  }
+  const selectedTests = Array.from(selectedByUuid.values());
 
   // Config for a rerun. When viewing a past benchmark the props are empty, so
   // fall back to what the loaded results carry: models from the model rows, the
@@ -665,9 +642,24 @@ export function BenchmarkResultsDialog({
                   state={wasStopped ? "stopped" : error ? "error" : "finished"}
                 />
               )}
-              <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                {modelComparisonName(runName)}
-              </h2>
+              {/* Nothing is written at the top of the window until the run
+                  itself is here: an unloaded run would show the automatic
+                  name, which is not necessarily the name this run carries. */}
+              {isInitialLoading ? null : currentTaskId ? (
+                <EditableRunName
+                  taskId={currentTaskId}
+                  type="llm-benchmark"
+                  name={runName}
+                  onRenamed={(name) => {
+                    setRunName(name);
+                    onRenamed?.(name);
+                  }}
+                />
+              ) : (
+                <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+                  {modelComparisonName(runName)}
+                </h2>
+              )}
               {showRerunButton && handleRerunClick && (
                 <RerunIconButton
                   onClick={handleRerunClick}
@@ -677,16 +669,15 @@ export function BenchmarkResultsDialog({
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
               )}
-              {!isDone && !isInitialLoading && currentTaskId && (
-                <StopRunButton onStop={stopBenchmark} className="shrink-0" />
-              )}
             </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {agentName}
-            </p>
+            {!isInitialLoading && (
+              <p className="text-xs text-muted-foreground truncate">
+                {agentName}
+              </p>
+            )}
           </div>
-          {/* Previous/Next pager - centered, desktop only, outputs tab */}
-          {activeTab === "outputs" && nav && selectedTest && (
+          {/* Previous/Next pager - centered, desktop only, tests tab */}
+          {activeTab === "tests" && nav && nav.currentIndex >= 0 && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -702,20 +693,10 @@ export function BenchmarkResultsDialog({
               <div className="hidden md:block">
                 <ExportResultsButton
                   filename={`${modelComparisonName(runName)}-${agentName}`}
-                  getRows={() =>
+                  getRows={async () =>
                     buildBenchmarkCsv(
-                      modelResults.flatMap((m) =>
-                        (m.test_results ?? []).map((tr) => ({
-                          model: m.model,
-                          name: tr.name,
-                          passed: tr.passed,
-                          reasoning: tr.reasoning,
-                          output: tr.output,
-                          testCase: tr.test_case,
-                          judgeResults: tr.judge_results,
-                        })),
-                      ),
-                      Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
+                      benchmarkCsvRows(await fetchFullModelResults()),
+                      evaluatorsByUuid(runEvaluators),
                     )
                   }
                 />
@@ -736,9 +717,9 @@ export function BenchmarkResultsDialog({
             {/* Submit for labelling — only shown when benchmark is done */}
             {showLabelling && currentTaskId && (
               <button
-                onClick={() => {
-                  if (activeTab !== "outputs") {
-                    setActiveTab("outputs");
+                onClick={async () => {
+                  if (activeTab !== "tests") {
+                    setActiveTab("tests");
                   }
                   if (labellingSelectedKeys.size === 0) {
                     toast.error(
@@ -746,12 +727,44 @@ export function BenchmarkResultsDialog({
                     );
                     return;
                   }
+                  // The labelling dialog needs each test's conversation and
+                  // reply, which the window itself does not hold.
+                  let full: BenchmarkModelRows[];
+                  try {
+                    full = await fetchFullModelResults();
+                  } catch (err) {
+                    reportError("Error loading the run to label:", err);
+                    toast.error(
+                      "Could not load the results. Please try again.",
+                    );
+                    return;
+                  }
+                  setLabellingRows(
+                    full
+                      .map((mr) => ({
+                        ...mr,
+                        test_results: (mr.test_results ?? []).filter(
+                          (_, index) =>
+                            labellingSelectedKeys.has(
+                              benchmarkLabellingKey(mr.model, index),
+                            ),
+                        ),
+                      }))
+                      .filter((mr) => mr.test_results.length > 0),
+                  );
                   setAddToTaskOpen(true);
                 }}
                 className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
               >
                 Submit for labelling
               </button>
+            )}
+            {!isDone && !isInitialLoading && currentTaskId && (
+              <StopRunButton
+                onStop={stopBenchmark}
+                noun="model comparison"
+                className="shrink-0"
+              />
             )}
             <button
               onClick={onClose}
@@ -823,104 +836,45 @@ export function BenchmarkResultsDialog({
           </div>
         )}
 
-        {/* Tab Navigation - Only show when done */}
-        {!isInitialLoading && !error && isDone && (
-          <div className="border-b border-border -mx-4 md:mx-0 px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar">
-            <div className="flex gap-3 md:gap-4 lg:gap-6">
-              <ResultTabs
-                tabs={[
-                  "leaderboard",
-                  ...(showTopPicks ? (["top-picks"] as const) : []),
-                  "outputs",
-                  "about",
-                ]}
-                activeTab={activeTab}
-                onChange={setActiveTab}
-                size="window"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Content - Show after initial loading */}
         {!isInitialLoading && !error && (
-          <div className="flex-1 overflow-hidden">
-            {/* Leaderboard Tab - Only when done */}
-            {isDone && activeTab === "leaderboard" && (
-              <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
-                <BenchmarkCombinedLeaderboard
-                  leaderboardSummary={leaderboardSummary}
-                  modelResults={modelResults}
-                  filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
-                  benchmarkScoreLabel={benchmarkScoreLabel}
-                  onReviewUnanswered={() => setActiveTab("outputs")}
-                  runStopped={wasStopped}
+          <BenchmarkResultView
+            key={currentTaskId ?? "new"}
+            surface="window"
+            isDone={isDone}
+            modelResults={getProvidersToDisplay()}
+            leaderboardSummary={leaderboardSummary}
+            evaluators={runEvaluators}
+            runStopped={wasStopped}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            fetchCase={fetchCase}
+            filenameKey={agentName}
+            testNames={testNames}
+            legacyDefaultEvaluator={defaultNextReplyEvaluator}
+            onNavChange={setNav}
+            labellingSelection={
+              showLabelling ? labellingSelectedKeys : undefined
+            }
+            onToggleLabellingSelection={
+              showLabelling ? toggleLabellingSelection : undefined
+            }
+            onLabellingBulkToggle={
+              showLabelling ? toggleLabellingBulk : undefined
+            }
+            selectionStrip={
+              showLabelling && selectedTests.length > 0 ? (
+                <SelectedTestsStrip
+                  count={selectedTests.length}
+                  onRun={onRunTests ? () => void onRunTests(selectedTests) : undefined}
+                  onCompare={
+                    onCompareTests
+                      ? () => onCompareTests(selectedTests)
+                      : undefined
+                  }
                 />
-              </div>
-            )}
-
-            {/* About Tab - explains the metrics (latency is p50, cost/tokens mean). */}
-            {isDone && activeTab === "about" && (
-              <div className="p-4 md:p-6 overflow-y-auto h-full">
-                <LLMEvaluationAbout
-                  showToolCalls={!!aboutPlan?.showToolCallPassRate}
-                  showLatency={!!aboutPlan?.showLatency}
-                  showCost={!!aboutPlan?.showCost}
-                  showTokens={!!aboutPlan?.showTokens}
-                  evaluators={evaluatorColumnsToAbout(aboutPlan?.evaluators)}
-                />
-              </div>
-            )}
-
-            {/* Top Picks Tab - Only when done and there is data to plot */}
-            {isDone && showTopPicks && activeTab === "top-picks" && (
-              <div className="p-4 md:p-6 space-y-6 md:space-y-8 overflow-y-auto h-full">
-                <BenchmarkWeightedRanking
-                  leaderboardSummary={leaderboardSummary}
-                  modelResults={modelResults}
-                  benchmarkScoreLabel={benchmarkScoreLabel}
-                />
-                <BenchmarkTopPicks
-                  leaderboardSummary={leaderboardSummary}
-                  modelResults={modelResults}
-                  filename={`benchmark-top-picks-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
-                  benchmarkScoreLabel={benchmarkScoreLabel}
-                />
-              </div>
-            )}
-
-            {/* Outputs Tab - Show during progress and when outputs tab is active when done */}
-            {(!isDone || activeTab === "outputs") && (
-              <BenchmarkOutputsPanel
-                runStopped={wasStopped}
-                modelResults={providersToDisplay}
-                expandedModels={expandedProviders}
-                onToggleModel={toggleProvider}
-                onSetExpandedModels={setExpandedProviders}
-                selectedTest={selectedTest}
-                onSelectTest={handleTestSelect}
-                onClearSelection={() => setSelectedTest(null)}
-                onNavChange={setNav}
-                testNames={testNames}
-                formatModelName={(n) => n.replace("__", "/")}
-                showControls={isDone}
-                showRunningSpinner={true}
-                evaluatorsByUuid={Object.fromEntries(
-                  runEvaluators.map((e) => [e.uuid, e]),
-                )}
-                legacyDefaultEvaluator={defaultNextReplyEvaluator}
-                labellingSelection={
-                  showLabelling ? labellingSelectedKeys : undefined
-                }
-                onToggleLabellingSelection={
-                  showLabelling ? toggleLabellingSelection : undefined
-                }
-                onLabellingBulkToggle={
-                  showLabelling ? toggleLabellingBulk : undefined
-                }
-              />
-            )}
-          </div>
+              ) : undefined
+            }
+          />
         )}
       </div>
       {currentTaskId && (
@@ -931,7 +885,7 @@ export function BenchmarkResultsDialog({
             type: "benchmark_run",
             benchmarkUuid: currentTaskId,
             benchmarkName: runName ?? undefined,
-            modelResults: labellingModelResults,
+            modelResults: labellingRows,
             evaluators: runEvaluators,
           }}
         />

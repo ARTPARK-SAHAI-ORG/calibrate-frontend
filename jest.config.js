@@ -20,6 +20,11 @@ const config = {
     // though the rest of src/app is E2E-only.
     "src/app/[[]org[]]/stt/page.tsx",
     "src/app/[[]org[]]/tts/page.tsx",
+    // Same for the invite page: it has its own component test
+    // (src/app/invite/[token]/__tests__/page.test.tsx) covering every state
+    // it can be in, and it is not reachable from any E2E run, since joining
+    // needs a real invite link.
+    "src/app/invite/[[]token[]]/page.tsx",
     "!src/instrumentation*.ts",
     "!src/middleware.ts",
     // NextAuth v5 config — providers, callbacks, and the backend token

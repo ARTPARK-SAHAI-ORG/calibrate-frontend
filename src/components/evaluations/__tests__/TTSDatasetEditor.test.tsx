@@ -155,12 +155,10 @@ describe("TTSDatasetEditor", () => {
     ).toHaveLength(2);
 
     // Second row is blank; its delete button removes it directly.
-    const deleteButtons = screen.getAllByRole("button").filter((b) =>
-      b.querySelector("svg"),
-    );
-    const rowDeleteButtons = deleteButtons.filter(
-      (b) => b.textContent === "",
-    );
+    const deleteButtons = screen
+      .getAllByRole("button")
+      .filter((b) => b.querySelector("svg"));
+    const rowDeleteButtons = deleteButtons.filter((b) => b.textContent === "");
     await user.click(rowDeleteButtons[rowDeleteButtons.length - 1]);
 
     expect(
@@ -224,7 +222,9 @@ describe("TTSDatasetEditor", () => {
 
   it("renders saved items and edits are tracked as dirty updates", async () => {
     const user = setupUser();
-    const savedItems = [makeItem({ uuid: "a", text: "Original", order_index: 0 })];
+    const savedItems = [
+      makeItem({ uuid: "a", text: "Original", order_index: 0 }),
+    ];
     const onHasPendingChangesChange = jest.fn();
     render(
       <Harness
@@ -249,31 +249,64 @@ describe("TTSDatasetEditor", () => {
     await waitFor(() => expect(getHandle().getDirtyUpdates()).toEqual([]));
   });
 
-  it("blocks deleting a saved item when it is the last one, with a toast", async () => {
+  it("counts the rows that are typed but not saved", async () => {
     const user = setupUser();
-    const savedItems = [makeItem({ uuid: "a" })];
+    const onUnsavedRowCountChange = jest.fn();
     render(
-      <Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />,
+      <Harness
+        savedItems={[makeItem({ uuid: "a" }), makeItem({ uuid: "b" })]}
+        onDeleteSavedItem={jest.fn()}
+        onUnsavedRowCountChange={onUnsavedRowCountChange}
+      />,
     );
+    expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(0);
 
-    await user.click(screen.getByTitle("Delete item"));
-    expect(toast.error).toHaveBeenCalledWith(
-      "Dataset must have at least 2 items.",
+    await user.type(
+      screen.getAllByPlaceholderText("Enter text to synthesize")[0],
+      "a new line",
     );
-    expect(screen.queryByText("Remove this item from the dataset?")).not.toBeInTheDocument();
+    expect(onUnsavedRowCountChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it("offers no delete on the last saved item, which cannot be deleted", () => {
+    const savedItems = [makeItem({ uuid: "a" })];
+    render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
+  });
+
+  it("takes the delete off saved rows while there is unsaved work", async () => {
+    const user = setupUser();
+    const savedItems = [
+      makeItem({ uuid: "a" }),
+      makeItem({ uuid: "b", text: "Second" }),
+    ];
+    render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+    expect(screen.getAllByTitle("Delete item").length).toBeGreaterThan(0);
+
+    // Typing in the new row at the bottom is unsaved work.
+    await user.type(
+      screen.getAllByPlaceholderText("Enter text to synthesize")[0],
+      "a new line",
+    );
+    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
   });
 
   it("deletes a saved item via confirmation dialog when onDeleteSavedItem resolves", async () => {
     const user = setupUser();
     const onDeleteSavedItem = jest.fn().mockResolvedValue(undefined);
-    const savedItems = [makeItem({ uuid: "a" }), makeItem({ uuid: "b", text: "Second" })];
+    const savedItems = [
+      makeItem({ uuid: "a" }),
+      makeItem({ uuid: "b", text: "Second" }),
+    ];
     render(
       <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
     );
 
     const deleteButtons = screen.getAllByTitle("Delete item");
     await user.click(deleteButtons[0]);
-    expect(screen.getByText("Remove this item from the dataset?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Remove this item from the dataset?"),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onDeleteSavedItem).toHaveBeenCalledWith("a"));
@@ -315,7 +348,9 @@ describe("TTSDatasetEditor", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onDeleteSavedItem).not.toHaveBeenCalled();
-    expect(screen.queryByText("Remove this item from the dataset?")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Remove this item from the dataset?"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not render a delete button for saved items when onDeleteSavedItem is absent", () => {
@@ -344,9 +379,11 @@ describe("TTSDatasetEditor", () => {
       ).toHaveLength(1),
     );
     expect(
-      (screen.getByPlaceholderText(
-        "Enter text to synthesize",
-      ) as HTMLInputElement).value,
+      (
+        screen.getByPlaceholderText(
+          "Enter text to synthesize",
+        ) as HTMLInputElement
+      ).value,
     ).toBe("");
   });
 
@@ -388,9 +425,7 @@ describe("TTSDatasetEditor", () => {
       const input = container.querySelector(
         "#tts-csv-upload",
       ) as HTMLInputElement;
-      const file = csvFile(
-        'text\n"Hello, world"\nSecond line',
-      );
+      const file = csvFile('text\n"Hello, world"\nSecond line');
       await setupUser().upload(input, file);
 
       await waitFor(() =>
@@ -410,9 +445,7 @@ describe("TTSDatasetEditor", () => {
       const file = csvFile("text\nOne\nTwo");
       await setupUser().upload(input, file);
 
-      await waitFor(() =>
-        expect(toast.error).toHaveBeenCalled(),
-      );
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
       expect(
         screen.getAllByPlaceholderText("Enter text to synthesize"),
       ).toHaveLength(1);

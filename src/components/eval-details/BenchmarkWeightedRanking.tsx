@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { displayModelName } from "@/lib/modelName";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 import {
   buildBenchmarkCombinedLeaderboardPayload,
@@ -46,7 +47,6 @@ const PRESETS: {
   { label: "Balanced", template: { quality: 1, cost: 1, latency: 1 } },
 ];
 
-const formatModelName = (name: string) => name.replace(/__/g, "/");
 
 /** Score-band color for the ranking bar: 70+ green, 50–69 yellow, below 50 red. */
 export function scoreBandClass(score: number): string {
@@ -225,7 +225,7 @@ export function BenchmarkWeightedRanking({
             />
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-foreground truncate">
-                {formatModelName(m.model)}
+                {displayModelName(m.model)}
               </div>
               <div className="text-xs text-muted-foreground tabular-nums">
                 {formatPercent(m.quality)} pass · {formatCostUsd(m.cost)} ·{" "}

@@ -1,6 +1,10 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
-import { TTSResultsTable, type TTSResultRow, type TTSEvaluatorColumn } from "../TTSResultsTable";
+import { render, screen, setupUser } from "@/test-utils";
+import {
+  TTSResultsTable,
+  type TTSResultRow,
+  type TTSEvaluatorColumn,
+} from "../TTSResultsTable";
 
 const baseRow: TTSResultRow = {
   id: "1",
@@ -21,18 +25,93 @@ describe("TTSResultsTable", () => {
     expect(screen.getAllByText("hello world").length).toBeGreaterThan(0);
   });
 
+  it("sorts the rows by an evaluator score, from the heading or the picker", async () => {
+    const user = setupUser();
+    const cols: TTSEvaluatorColumn[] = [
+      {
+        key: "quality",
+        label: "Quality",
+        outputType: "rating",
+        scoreField: "quality_score",
+        reasoningField: "quality_reasoning",
+        scaleMax: 5,
+      },
+    ];
+    render(
+      <TTSResultsTable
+        results={[
+          { ...baseRow, text: "second", quality_score: "5" },
+          { ...baseRow, text: "first", quality_score: "1" },
+        ]}
+        evaluatorColumns={cols}
+      />,
+    );
+    const desktopRows = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelectorAll("td")[1].textContent,
+      );
+
+    expect(desktopRows()).toEqual(["second", "first"]);
+    await user.click(screen.getByRole("button", { name: /Quality/ }));
+    expect(desktopRows()).toEqual(["first", "second"]);
+
+    await user.selectOptions(
+      screen.getByLabelText("Sort by"),
+      "evaluator:quality",
+    );
+    await user.click(screen.getByRole("button", { name: /Ascending/ }));
+    expect(desktopRows()).toEqual(["second", "first"]);
+    // The row keeps the number it had before the sort moved it.
+    expect(
+      document.querySelectorAll("tbody tr")[0].querySelectorAll("td")[0]
+        .textContent,
+    ).toBe("1");
+  });
+
+  it("hides the Sort by picker when the run measured nothing", () => {
+    render(
+      <TTSResultsTable
+        results={[
+          {
+            ...baseRow,
+            llm_judge_score: undefined,
+            llm_judge_reasoning: undefined,
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByLabelText("Sort by")).not.toBeInTheDocument();
+  });
+
   it("renders Fail badge for a falsy legacy score", () => {
-    render(<TTSResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />);
+    render(
+      <TTSResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />,
+    );
     expect(screen.getAllByText("Fail").length).toBeGreaterThan(0);
   });
 
-  it("renders dash when llm_judge_score is missing", () => {
-    render(<TTSResultsTable results={[{ ...baseRow, llm_judge_score: undefined, llm_judge_reasoning: undefined }]} />);
-    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  it("hides the evaluator column when no row was scored", () => {
+    render(
+      <TTSResultsTable
+        results={[
+          {
+            ...baseRow,
+            llm_judge_score: undefined,
+            llm_judge_reasoning: undefined,
+          },
+        ]}
+      />,
+    );
+    // A run with no evaluators used to show an "Evaluator" column of dashes.
+    expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
   });
 
   it("falls back to 'Score: X' tooltip when reasoning is missing", () => {
-    render(<TTSResultsTable results={[{ ...baseRow, llm_judge_reasoning: undefined }]} />);
+    render(
+      <TTSResultsTable
+        results={[{ ...baseRow, llm_judge_reasoning: undefined }]}
+      />,
+    );
     expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
   });
 
@@ -46,19 +125,38 @@ describe("TTSResultsTable", () => {
     render(<TTSResultsTable results={[baseRow]} judgeLabel="Custom Judge" />);
     expect(screen.getAllByText("Custom Judge").length).toBeGreaterThan(0);
     // Mobile reasoning block uses the judgeLabel too
-    expect(screen.getAllByText("Custom Judge Reasoning").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Custom Judge Reasoning").length,
+    ).toBeGreaterThan(0);
   });
 
   it("does not render mobile pass pill when llm_judge_score is falsy", () => {
-    render(<TTSResultsTable results={[{ ...baseRow, llm_judge_score: undefined }]} />);
+    render(
+      <TTSResultsTable
+        results={[{ ...baseRow, llm_judge_score: undefined }]}
+      />,
+    );
     // header index pill still renders
     expect(screen.getByText("#1")).toBeInTheDocument();
   });
 
   it("renders dynamic evaluator columns (binary + rating) via flat score fields", () => {
     const cols: TTSEvaluatorColumn[] = [
-      { key: "semantic_match", label: "Semantic Match", outputType: "binary", scoreField: "semantic_match_score", reasoningField: "semantic_match_reasoning" },
-      { key: "quality", label: "Quality", outputType: "rating", scoreField: "quality_score", reasoningField: "quality_reasoning", scaleMax: 5 },
+      {
+        key: "semantic_match",
+        label: "Semantic Match",
+        outputType: "binary",
+        scoreField: "semantic_match_score",
+        reasoningField: "semantic_match_reasoning",
+      },
+      {
+        key: "quality",
+        label: "Quality",
+        outputType: "rating",
+        scoreField: "quality_score",
+        reasoningField: "quality_reasoning",
+        scaleMax: 5,
+      },
     ];
     render(
       <TTSResultsTable
@@ -83,7 +181,12 @@ describe("TTSResultsTable", () => {
 
   it("reads dynamic evaluator via evaluator_outputs uuid path and shows error badge", () => {
     const cols: TTSEvaluatorColumn[] = [
-      { key: "ev1", label: "Ev1", outputType: "binary", evaluatorUuid: "uuid-1" },
+      {
+        key: "ev1",
+        label: "Ev1",
+        outputType: "binary",
+        evaluatorUuid: "uuid-1",
+      },
     ];
     render(
       <TTSResultsTable

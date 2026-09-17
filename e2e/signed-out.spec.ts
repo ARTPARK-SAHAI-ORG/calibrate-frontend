@@ -55,6 +55,28 @@ test.describe("Signed out", () => {
     await expect(page).toHaveURL("/public/test-run/not-a-real-token");
   });
 
+  test("an invite link opens without signing in", async ({ page }) => {
+    // The token is not a real one, so the page cannot read the workspace name
+    // without a backend. What matters here is that it is never sent to sign in.
+    await page.goto("/invite/not-a-real-token");
+
+    await expect(page).toHaveURL("/invite/not-a-real-token");
+  });
+
+  // "/invite/" is public, so the check has to match the real shape of the page.
+  // A plain "starts with" would let "/invite/agents/<id>" through, and the app
+  // would read "invite" as the workspace and serve the agent page.
+  test("an app page dressed up as an invite link still sends you to sign in", async ({
+    page,
+  }) => {
+    const wanted = `/invite/agents/${WORKSPACE}`;
+    await page.goto(wanted);
+
+    await expect(page).toHaveURL(
+      `/login?callbackUrl=${encodeURIComponent(wanted)}`,
+    );
+  });
+
   test("the landing page still opens", async ({ page }) => {
     await page.goto("/");
 

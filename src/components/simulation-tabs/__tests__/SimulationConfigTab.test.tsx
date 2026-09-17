@@ -136,6 +136,50 @@ describe("SimulationConfigTab", () => {
     expect(screen.getByText(/needs to be verified/)).toBeInTheDocument();
   });
 
+  it("replaces the rest of the setup with a link to the agent's connection when the agent is unverified", () => {
+    render(
+      <SimulationConfigTab
+        {...baseProps({
+          selectedAgent: { uuid: "a2", name: "Agent Two", verified: false },
+        })}
+      />,
+    );
+
+    const verifyLink = screen.getByRole("link", {
+      name: "Verify the connection",
+    });
+    expect(verifyLink).toHaveAttribute("href", "/agents/a2?tab=connection");
+    expect(
+      screen.queryByTestId("multiselect-Select personas"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("multiselect-Select scenarios"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Select evaluators")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Create/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the configured setup on screen when a configured simulation's agent is unverified", () => {
+    render(
+      <SimulationConfigTab
+        {...baseProps({
+          selectedAgent: { uuid: "a2", name: "Agent Two", verified: false },
+          isConfigured: true,
+        })}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Verify the connection" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/needs to be verified/)).toBeInTheDocument();
+    expect(
+      screen.getByTestId("multiselect-Select personas"),
+    ).toBeInTheDocument();
+  });
+
   it("does not show the unverified warning when selectedAgent.verified is true", () => {
     render(
       <SimulationConfigTab

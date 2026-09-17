@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   CartesianGrid,
   Line,
@@ -358,7 +359,7 @@ function EvaluatorDetailPageInner() {
         },
       );
       if (res.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
       if (!res.ok) throw new Error("Failed to set live version");
@@ -489,7 +490,7 @@ function EvaluatorDetailPageInner() {
         }),
       });
       if (res.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
       if (!res.ok) {
@@ -696,7 +697,7 @@ function EvaluatorDetailPageInner() {
         body: JSON.stringify(body),
       });
       if (res.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
       if (!res.ok) {
@@ -759,7 +760,7 @@ function EvaluatorDetailPageInner() {
         },
       );
       if (res.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
       if (!res.ok) throw new Error("Failed to fetch agreement trend");

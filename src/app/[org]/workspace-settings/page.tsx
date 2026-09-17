@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
+import { InviteDialog } from "@/components/workspace/InviteDialog";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
@@ -250,6 +251,11 @@ function useCurrentUserId(): string | null {
   return sessionUuid || localUuid;
 }
 
+/** Picks the name being acted on out of a sentence of grey dialog text. */
+function Emphasised({ children }: { children: React.ReactNode }) {
+  return <span className="font-medium text-foreground">{children}</span>;
+}
+
 function MembersSection({
   orgUuid,
   orgName,
@@ -270,9 +276,7 @@ function MembersSection({
     removeMember,
   } = useOrgMembers(accessToken, orgUuid);
 
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const [memberToRemove, setMemberToRemove] =
     useState<OrganizationMember | null>(null);
@@ -280,22 +284,6 @@ function MembersSection({
 
   const isSelfRemoval =
     !!memberToRemove && memberToRemove.user_id === currentUserId;
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email || isAdding) return;
-    setIsAdding(true);
-    setAddError(null);
-    try {
-      await addMember(email);
-      setInviteEmail("");
-    } catch (err) {
-      setAddError(parseBackendErrorMessage(err, "Failed to add member"));
-    } finally {
-      setIsAdding(false);
-    }
-  };
 
   const handleRemove = async () => {
     if (!memberToRemove) return;
@@ -356,43 +344,22 @@ function MembersSection({
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-base md:text-lg font-semibold text-foreground">
-          Members
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Invite team members by email
-        </p>
-      </div>
-
-      <div>
-        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => {
-              setInviteEmail(e.target.value);
-              setAddError(null);
-            }}
-            placeholder="teammate@example.com"
-            disabled={isAdding}
-            className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
-              addError
-                ? "border-red-500/60 focus:ring-red-500/20"
-                : "border-border focus:ring-foreground/10"
-            }`}
-          />
-          <button
-            type="submit"
-            disabled={!inviteEmail.trim() || isAdding}
-            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isAdding ? "Adding..." : "Add member"}
-          </button>
-        </form>
-        {addError && (
-          <p className="mt-1 text-[13px] text-red-500">{addError}</p>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base md:text-lg font-semibold text-foreground">
+            Members
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Invite team members and collaborators
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsInviteOpen(true)}
+          className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
+        >
+          Invite
+        </button>
       </div>
 
       <div className="border border-border rounded-lg overflow-hidden">
@@ -471,17 +438,36 @@ function MembersSection({
         onConfirm={handleRemove}
         title={isSelfRemoval ? "Leave workspace" : "Remove member"}
         message={
-          memberToRemove
-            ? isSelfRemoval
-              ? `Are you sure you want to leave ${orgName}? You will lose all access immediately.`
-              : `Remove ${
-                  `${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
-                  memberToRemove.email
-                } from this workspace? They will lose access immediately.`
-            : ""
+          memberToRemove ? (
+            isSelfRemoval ? (
+              <>
+                Are you sure you want to leave{" "}
+                <Emphasised>{orgName}</Emphasised>? You will lose all access
+                immediately.
+              </>
+            ) : (
+              <>
+                Remove{" "}
+                <Emphasised>
+                  {`${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
+                    memberToRemove.email}
+                </Emphasised>{" "}
+                from this workspace? They will lose access immediately.
+              </>
+            )
+          ) : (
+            ""
+          )
         }
         confirmText={isSelfRemoval ? "Leave" : "Remove"}
         isDeleting={isRemoving}
+      />
+
+      <InviteDialog
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        orgUuid={orgUuid}
+        onAddMember={addMember}
       />
     </section>
   );

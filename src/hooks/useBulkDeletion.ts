@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { reportError } from "@/lib/reportError";
 
 /** A delete request the caller wants issued — the hook adds auth headers and,
@@ -15,8 +16,10 @@ type DeleteRequest = {
 type UseBulkDeletionArgs<T extends { uuid: string }> = {
   /** The currently visible (sorted/filtered) items — drives "select all". */
   items: T[];
-  /** Prune the given uuids from the caller's list after a successful delete. */
-  onDeleted: (uuids: string[]) => void;
+  /** Prune the given uuids from the caller's list after a successful delete.
+   *  Awaited, so a caller that re-reads the list from the backend keeps the
+   *  confirmation on screen until the rows are actually gone. */
+  onDeleted: (uuids: string[]) => void | Promise<void>;
   /** Backend JWT used for the delete requests. */
   accessToken: string | null;
   /** Accessible label for a row's selection checkbox. */
@@ -197,7 +200,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -221,7 +224,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
         throw new Error("Failed to delete");
       }
 
-      onDeleted(uuidsToDelete);
+      await onDeleted(uuidsToDelete);
       setSelectedUuids(new Set());
       setDeleteDialogOpen(false);
       setItemToDelete(null);

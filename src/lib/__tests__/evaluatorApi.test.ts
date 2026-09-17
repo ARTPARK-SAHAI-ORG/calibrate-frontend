@@ -222,7 +222,7 @@ describe("fetch helpers", () => {
 
     const items = await fetchAllEvaluators("token");
     expect(items).toEqual([]);
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
   });
 
   it("fetchAllEvaluators throws on other failures", async () => {

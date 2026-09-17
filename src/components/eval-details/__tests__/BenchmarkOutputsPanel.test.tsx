@@ -224,6 +224,54 @@ describe("BenchmarkOutputsPanel", () => {
     });
   });
 
+  // While a test's answer is still being read there is nothing to say about
+  // its evaluators yet, so the evaluators column stays away and the one
+  // spinner in the middle covers the whole area.
+  it("hides the evaluators panel while the test is being read", () => {
+    const loadingModel = makeModel({
+      model: "model-a",
+      success: true,
+      total_tests: 1,
+      passed: 1,
+      failed: 0,
+      test_results: [
+        { name: "Alpha Passed", passed: true, reasoning: "good", loading: true },
+      ],
+    });
+    const { rerender } = render(
+      <BenchmarkOutputsPanel
+        modelResults={[loadingModel]}
+        expandedModels={new Set(["model-a"])}
+        selectedTest={{ model: "model-a", testIndex: 0 }}
+        onToggleModel={jest.fn()}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("eval-criteria-panel")).not.toBeInTheDocument();
+
+    rerender(
+      <BenchmarkOutputsPanel
+        modelResults={[
+          makeModel({
+            model: "model-a",
+            success: true,
+            total_tests: 1,
+            passed: 1,
+            failed: 0,
+            test_results: [
+              { name: "Alpha Passed", passed: true, reasoning: "good" },
+            ],
+          }),
+        ]}
+        expandedModels={new Set(["model-a"])}
+        selectedTest={{ model: "model-a", testIndex: 0 }}
+        onToggleModel={jest.fn()}
+        onSelectTest={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId("eval-criteria-panel")).toBeInTheDocument();
+  });
+
   it("renders model sections collapsed by default (no rows) and expands on toggle", async () => {
     const user = setupUser();
     const onToggleModel = jest.fn();

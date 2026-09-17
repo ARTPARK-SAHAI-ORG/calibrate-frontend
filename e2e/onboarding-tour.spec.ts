@@ -402,6 +402,21 @@ async function installFakeBackend(
           status: "queued",
         });
       }
+      // One test in full. The window reads a run without each test's
+      // conversation, reply and judge reasoning, and asks for the test the
+      // reader opens on its own, so this has to answer or the reasoning the
+      // tour points at never arrives.
+      const caseMatch = pathname.match(
+        /\/agent-tests\/run\/run-(\d+)\/results\/(.+)$/,
+      );
+      if (method === "GET" && caseMatch) {
+        const n = Number(caseMatch[1]);
+        const testUuid = decodeURIComponent(caseMatch[2]);
+        const found = runStatus(`run-${n}`, n).results.find(
+          (r) => r.test_uuid === testUuid,
+        );
+        return json(route, found ?? {});
+      }
       const runMatch = pathname.match(/\/agent-tests\/run\/run-(\d+)$/);
       if (method === "GET" && runMatch) {
         const n = Number(runMatch[1]);

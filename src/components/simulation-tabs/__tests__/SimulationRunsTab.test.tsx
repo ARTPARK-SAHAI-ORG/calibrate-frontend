@@ -90,7 +90,7 @@ describe("SimulationRunsTab", () => {
     render(<SimulationRunsTab simulationUuid="sim-1" />);
 
     await waitFor(() =>
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

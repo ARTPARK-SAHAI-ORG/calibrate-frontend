@@ -10,7 +10,8 @@ jest.mock("../../../lib/clipboard", () => ({
 const mockCopy = copyToClipboard as jest.Mock;
 
 beforeEach(() => {
-  mockCopy.mockReset().mockResolvedValue(undefined);
+  // true means the text really reached the clipboard.
+  mockCopy.mockReset().mockResolvedValue(true);
 });
 
 it("copies the code and says so", async () => {
@@ -31,4 +32,16 @@ it("takes its own label, so a page of them reads apart", () => {
   expect(
     screen.getByRole("button", { name: "Copy the request body" }),
   ).toBeInTheDocument();
+});
+
+// Saying "Copied" when nothing was copied sends someone off to paste an empty
+// clipboard into a chat.
+it("does not say it copied when the clipboard refused", async () => {
+  mockCopy.mockResolvedValue(false);
+  const user = setupUser();
+  render(<CopyCodeButton value='{ "input": "Hi" }' />);
+
+  await user.click(screen.getByRole("button", { name: "Copy code" }));
+
+  expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
 });

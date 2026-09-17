@@ -197,7 +197,38 @@ describe("apiClient", () => {
     expect(window.localStorage.getItem("user")).toBeNull();
     expect(window.localStorage.getItem(ACTIVE_ORG_UUID_KEY)).toBeNull();
     expect(clearOrgsCache).toHaveBeenCalled();
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  // A session that runs out mid-action used to drop the reader on /agents.
+  // A page they reached by a link somebody sent them (an invite, a shared
+  // result) was then simply gone: they had to find the message again.
+  it("comes back to the page they were on after they sign in again", async () => {
+    window.history.replaceState(null, "", "/invite/tok-123");
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(401, {}));
+
+    await expect(apiClient("/invites/tok-123/accept", "tok")).rejects.toThrow(
+      "Unauthorized - session expired",
+    );
+
+    expect(signOut).toHaveBeenCalledWith({
+      callbackUrl: `/login?callbackUrl=${encodeURIComponent("/invite/tok-123")}`,
+    });
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("does not send them back to sign-in itself", async () => {
+    window.history.replaceState(null, "", "/login");
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(401, {}));
+
+    await expect(apiClient("/agents", "tok")).rejects.toThrow(
+      "Unauthorized - session expired",
+    );
+
+    expect(signOut).toHaveBeenCalledWith({
+      callbackUrl: `/login?callbackUrl=${encodeURIComponent("/agents")}`,
+    });
+    window.history.replaceState(null, "", "/");
   });
 
   it("throws Request failed with status and body text for other non-2xx", async () => {

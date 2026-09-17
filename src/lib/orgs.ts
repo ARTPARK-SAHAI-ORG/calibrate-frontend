@@ -38,6 +38,27 @@ export function notifyOrganizationsChanged(source?: symbol): void {
   );
 }
 
+/**
+ * Backend paths that must NOT be scoped to a workspace.
+ *
+ * `/organizations` is the workspace-management surface (list, create, rename,
+ * members) and sits above any single workspace. `/invites` is the same: the
+ * workspace being joined is named by the link, and the invite page carries no
+ * workspace in its address, so the header would carry over whichever workspace
+ * the reader last had open.
+ *
+ * This list is the ONE rule. Both ways a request can reach the backend read
+ * it: `apiClient` in `src/lib/api.ts`, and the wrapper around the browser's
+ * own fetch in `src/lib/fetchInterceptor.ts`. Adding a path to only one of
+ * them does nothing, because the wrapper puts the header back.
+ */
+const WORKSPACE_FREE_PREFIXES = ["/organizations", "/invites"];
+
+/** True when a request to this backend path must not carry `X-Org-UUID`. */
+export function isWorkspaceFreePath(path: string): boolean {
+  return WORKSPACE_FREE_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 export type OrganizationRole = "owner" | "admin";
 
 export type Organization = {

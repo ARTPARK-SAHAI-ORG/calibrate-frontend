@@ -33,6 +33,7 @@ jest.mock("../../../hooks", () => ({
     .PAGE_SIZE_OPTIONS,
   useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
     .useAgentTests,
+  useItemPager: jest.requireActual("../../../hooks/useItemPager").useItemPager,
   useDialogUrlParam: (args: any) => {
     if (args.param === "runId") {
       runIdParamArgs = args;
@@ -141,6 +142,17 @@ jest.mock("../../AddTestDialog", () => ({
         >
           SubmitGeneral
         </button>
+        <div data-testid="add-test-position">
+          {props.position
+            ? `${props.position.index + 1} of ${props.position.total}`
+            : ""}
+        </div>
+        <button onClick={props.onPrev} disabled={!props.hasPrev}>
+          PrevTest
+        </button>
+        <button onClick={props.onNext} disabled={!props.hasNext}>
+          NextTest
+        </button>
         <button onClick={props.onClose}>CloseAddTest</button>
       </div>
     ) : null;
@@ -172,6 +184,20 @@ jest.mock("../../TestRunnerDialog", () => ({
         <div data-testid="runner-task-id">{props.taskId}</div>
         <button onClick={() => props.onNewRun?.("task-rerun", ["t1", "t2"])}>
           TriggerNewRun
+        </button>
+        <button
+          onClick={() =>
+            props.onRunTests?.([{ uuid: "t2", name: "Tool call test" }])
+          }
+        >
+          RunTestsFromWindow
+        </button>
+        <button
+          onClick={() =>
+            props.onCompareTests?.([{ uuid: "t2", name: "Tool call test" }])
+          }
+        >
+          CompareTestsFromWindow
         </button>
         <button onClick={props.onClose}>CloseRunner</button>
       </div>
@@ -213,11 +239,11 @@ jest.mock("../CompareModelsButton", () => ({
   __esModule: true,
   CompareModelsButton: (props: any) => (
     <button
-      data-testid={`compare-${props.size}`}
+      data-testid="compare-header"
       disabled={props.isConnectionUnverified || props.isBenchmarkDisabled}
       onClick={props.onClick}
     >
-      Compare-{props.size}
+      Compare models
     </button>
   ),
 }));
@@ -326,30 +352,16 @@ function installFetch() {
         state.startRunInit,
       );
     }
-    if (url.includes("/agent-tests/bulk-unlink")) {
+    if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
-      if (!state.bulkUnlinkInit) {
-        // The tab re-asks for the page after a removal, so the fake backend
+      if (!state.bulkDeleteInit) {
+        // The tab re-asks for the page after a delete, so the fake backend
         // has to actually drop the rows.
         const removed = new Set<string>(body.test_uuids);
         state.agentTests = state.agentTests.filter(
           (t: any) => !removed.has(t.uuid),
         );
       }
-      return jsonResponse(
-        state.bulkUnlink ?? {
-          deleted_count: body.test_uuids.length,
-          message: "unlinked",
-        },
-        state.bulkUnlinkInit,
-      );
-    }
-    if (url.includes("/agent-tests/bulk-delete-tests")) {
-      const body = JSON.parse(opts.body);
-      const removed = new Set<string>(body.test_uuids);
-      state.agentTests = state.agentTests.filter(
-        (t: any) => !removed.has(t.uuid),
-      );
       return jsonResponse(
         state.bulkDelete ?? {
           deleted_count: body.test_uuids.length,
@@ -523,9 +535,7 @@ describe("TestsTabContent — load states", () => {
   it("signs out on a 401 from the agent-tests fetch", async () => {
     state.agentTestsInit = { ok: false, status: 401 };
     renderComponent();
-    await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
-    );
+    await waitFor(() => expect(signOut).toHaveBeenCalled());
   });
 
   it("does not fetch when there is no access token", () => {
@@ -602,6 +612,98 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByLabelText("Previous page"));
     await screen.findAllByText("Paged test 1");
+  });
+
+  it("steps from one open test to the next, and back", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getAllByText("Paged test 1")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "1 of 12",
+    );
+    expect(screen.getByText("PrevTest")).toBeDisabled();
+
+    await user.click(screen.getByText("NextTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "2 of 12",
+      ),
+    );
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+        String(url).endsWith("/tests/p2"),
+      ),
+    ).toBe(true);
+
+    await user.click(screen.getByText("PrevTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "1 of 12",
+      ),
+    );
+  });
+
+  it("turns the page when stepping past the last test on it", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 10");
+
+    await user.click(screen.getAllByText("Paged test 10")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "10 of 12",
+    );
+
+    await user.click(screen.getByText("NextTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "11 of 12",
+      ),
+    );
+    expect(screen.getByText("Showing 11–12 of 12 tests")).toBeInTheDocument();
+  });
+
+  it("steps back a page from the first test on it", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 11");
+
+    await user.click(screen.getAllByText("Paged test 11")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "11 of 12",
+    );
+    expect(screen.getByText("NextTest")).toBeEnabled();
+
+    await user.click(screen.getByText("PrevTest"));
+    await waitFor(() =>
+      expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+        "10 of 12",
+      ),
+    );
+    expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
+  });
+
+  it("offers no stepping past the last test in the list", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByLabelText("Next page"));
+    await screen.findAllByText("Paged test 12");
+
+    await user.click(screen.getAllByText("Paged test 12")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-position")).toHaveTextContent(
+      "12 of 12",
+    );
+    expect(screen.getByText("NextTest")).toBeDisabled();
   });
 
   it("clears the ticked rows when the page turns", async () => {
@@ -724,7 +826,7 @@ describe("TestsTabContent — paging", () => {
     expect(runPostCall()).toBeFalsy();
   });
 
-  it("blocks the bulk Run button before resolving the selection when it exceeds the limit", async () => {
+  it("blocks Run N tests before resolving the selection when it exceeds the limit", async () => {
     getMaxRowsPerEvalMock.mockResolvedValue(1);
     const user = setupUser();
     renderComponent();
@@ -739,7 +841,9 @@ describe("TestsTabContent — paging", () => {
     await user.click(screen.getByText("Select all 12 tests"));
     const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
 
-    await user.click(screen.getByText("Run"));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
@@ -761,6 +865,27 @@ describe("TestsTabContent — paging", () => {
     );
   });
 
+  it("says so when the list of tests to delete cannot be read", async () => {
+    // Choosing every matching test asks the backend for their ids, so that
+    // read can fail on its own. The click must not be swallowed.
+    state.allAgentTestsInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("removes every test, not only the page, once all are selected", async () => {
     const user = setupUser();
     renderComponent();
@@ -768,16 +893,16 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
     await waitFor(() => {
-      const unlink = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
-        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      const deleted = (global.fetch as jest.Mock).mock.calls.find((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
       );
-      expect(unlink).toBeTruthy();
-      expect(JSON.parse(unlink![1].body).test_uuids).toHaveLength(12);
+      expect(deleted).toBeTruthy();
+      expect(JSON.parse(deleted![1].body).test_uuids).toHaveLength(12);
     });
   });
 
@@ -788,7 +913,10 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
@@ -805,11 +933,44 @@ describe("TestsTabContent — paging", () => {
     await screen.findByText("Showing 1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getByText("Run"));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     // Not every linked test, so the run has to name the 12 that match.
     expect(JSON.parse(runPostCall()![1].body).test_uuids).toHaveLength(12);
+  });
+
+  it("compares every linked test, naming none, when all are selected and nothing is filtered", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByTestId("compare-header"));
+
+    await screen.findByTestId("benchmark-dialog");
+    // No tests named means every test linked to the agent.
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("0");
+  });
+
+  it("compares the matching tests by name when all are selected under a filter", async () => {
+    const user = setupUser();
+    state.agentTests = [...manyTests, toolCallTest];
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await screen.findByText("Showing 1–10 of 12 tests");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Select all 12 tests"));
+    await user.click(screen.getByTestId("compare-header"));
+
+    await screen.findByTestId("benchmark-dialog");
+    expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("12");
   });
 
   it("drops the across-pages selection when a row is unticked", async () => {
@@ -880,6 +1041,70 @@ describe("TestsTabContent — populated table", () => {
     await screen.findByText("No tests match your search");
   });
 
+  it("keeps search focused while only the tests list reloads", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const initialFetch = global.fetch as jest.Mock;
+    let resolveSearch: (() => void) | undefined;
+    global.fetch = jest.fn((url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("q=Weather")) {
+        return new Promise<Response>((resolve) => {
+          resolveSearch = () =>
+            resolve(
+              jsonResponse({
+                items: [toolCallTest],
+                total: 1,
+                limit: 10,
+                offset: 0,
+              }),
+            );
+        });
+      }
+      return initialFetch(url, opts);
+    }) as jest.Mock;
+
+    const search = screen.getByPlaceholderText("Search tests");
+    await user.click(search);
+    await user.type(search, "Weather");
+
+    await waitFor(() => expect(resolveSearch).toBeDefined());
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("Weather");
+    expect(screen.getByPlaceholderText("Search tests")).toBe(search);
+    expect(screen.getByTestId("tests-list-loading")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.queryAllByText("Greeting test")).toHaveLength(0);
+
+    const searchCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("q="),
+    );
+    expect(searchCalls).toHaveLength(1);
+    expect(String(searchCalls[0][0])).toContain("q=Weather");
+
+    await act(async () => resolveSearch?.());
+    expect((await screen.findAllByText("Weather tool test"))[0]).toBeVisible();
+  });
+
+  it("keeps the controls mounted when a later list request fails", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await screen.findAllByText("Weather tool test");
+
+    state.agentTestsInit = { ok: false, status: 500 };
+    const search = screen.getByPlaceholderText("Search tests");
+    await user.click(screen.getByRole("button", { name: "All" }));
+
+    await screen.findByText("Failed to load agent tests");
+    expect(screen.getByPlaceholderText("Search tests")).toBe(search);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText("No tests attached")).not.toBeInTheDocument();
+  });
+
   it("sends the evaluators when a general test is edited", async () => {
     state.agentTests = [generalTest];
     state.testDetail = { ...generalTest, evaluators: [] };
@@ -902,20 +1127,29 @@ describe("TestsTabContent — populated table", () => {
     });
   });
 
-  it("selects all rows and shows the bulk-action toolbar, then clears", async () => {
+  it("selects all rows: the header Run button names the count, Delete selected appears, then clears", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
+    expect(screen.getByText("Run all tests")).toBeInTheDocument();
 
     await user.click(screen.getByTitle("Select all"));
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
-    expect(screen.getByText("Remove")).toBeInTheDocument();
-    // Deleting from the library is hidden for now; Remove detaches only.
-    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+    expect(screen.getByText("Run 2 tests")).toBeInTheDocument();
+    expect(screen.queryByText("Run all tests")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Delete selected/ }),
+    ).toBeInTheDocument();
+    // One removal action only: it deletes, it does not just detach.
+    expect(screen.queryByText("Remove")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Clear"));
     expect(screen.queryByText(/tests selected/)).not.toBeInTheDocument();
+    expect(screen.getByText("Run all tests")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Delete selected/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("selects a single row via its checkbox", async () => {
@@ -974,7 +1208,9 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Duplicate test")[0]);
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
     await screen.findByTestId("add-test-dialog");
     expect(screen.getByTestId("add-test-editing")).toHaveTextContent(
       "creating",
@@ -984,12 +1220,115 @@ describe("TestsTabContent — populated table", () => {
     );
   });
 
+  it("opens the editor only once the copied test has arrived", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The copied test has not arrived yet: nothing opens, and the row's
+    // button shows it is working. Opening here would leave the editor
+    // holding nothing, which it reads as a test written from scratch.
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    ).toBeDisabled();
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+
+    await screen.findByTestId("add-test-dialog");
+    expect(addTestDialogProps.initialConfig).toBeTruthy();
+    expect(addTestDialogProps.initialEvaluators).toHaveLength(1);
+    expect(screen.getByTestId("add-test-name")).toHaveTextContent(
+      "Copy of Greeting test",
+    );
+  });
+
+  it("disables every duplicate button while one copy is loading", async () => {
+    const user = setupUser();
+    const routed = global.fetch as jest.Mock;
+    let releaseDetail: (() => void) | null = null;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (String(url).includes("/tests/") && (opts.method ?? "GET") === "GET") {
+        await new Promise<void>((resolve) => {
+          releaseDetail = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // A second copy started here would land after the first and replace it
+    // underneath the editor that is about to open.
+    for (const button of screen.getAllByRole("button", {
+      name: "Duplicate test",
+    })) {
+      expect(button).toBeDisabled();
+    }
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+    await screen.findByTestId("add-test-dialog");
+  });
+
+  it("says so when the test being copied cannot be loaded", async () => {
+    const user = setupUser();
+    state.detailInit = { ok: false, status: 500 };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    // The editor never opens, so its own error slot has nowhere to show.
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
+  it("copies a test that carries no content without falling back to the example", async () => {
+    const user = setupUser();
+    state.testDetail = { ...responseTest, config: undefined, evaluators: [] };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Duplicate test" })[0],
+    );
+
+    await screen.findByTestId("add-test-dialog");
+    // An absent config reads as a test written from scratch, which fills the
+    // editor with the example instead of this test's (empty) content.
+    expect(addTestDialogProps.initialConfig).toEqual({});
+  });
+
   it("runs a single test via its row Run button — POSTs just that test's uuid", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Run test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Run test" })[0]);
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({ test_uuids: ["t1"] });
     // The dialog views the run the POST just created.
@@ -1041,13 +1380,16 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
 
-  it("runs the selected tests from the bulk toolbar", async () => {
+  it("runs only the ticked tests from the header Run button", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Run"));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({
       test_uuids: ["t1", "t2"],
@@ -1074,9 +1416,7 @@ describe("TestsTabContent — populated table", () => {
 
     await user.click(screen.getByText("Run all tests"));
     await user.click(screen.getByRole("button", { name: "Start the run" }));
-    await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
-    );
+    await waitFor(() => expect(signOut).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
   });
@@ -1098,6 +1438,93 @@ describe("TestsTabContent — populated table", () => {
         String(url).endsWith("/agent-tests/agent/agent-1/run"),
       ),
     ).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Running or comparing again from inside an open run window.
+// ---------------------------------------------------------------------------
+
+describe("TestsTabContent: run and compare from the run window", () => {
+  beforeEach(() => {
+    state.agentTests = [responseTest, toolCallTest];
+  });
+
+  async function openRunWindow(user: ReturnType<typeof setupUser>) {
+    await user.click(screen.getAllByRole("button", { name: "Run test" })[0]);
+    await screen.findByTestId("test-runner-dialog");
+  }
+
+  it("opens the model picker on the window's tests, hands the window over to the comparison, and switches tabs only when the comparison closes", async () => {
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+    setRunIdParamMock.mockClear();
+
+    await user.click(screen.getByText("CompareTestsFromWindow"));
+    await screen.findByTestId("benchmark-dialog");
+    expect(benchmarkProps.tests).toEqual([
+      { uuid: "t2", name: "Tool call test" },
+    ]);
+    // The picker sits over the run window until a comparison is created.
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith(null);
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText("CloseBenchmark"));
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
+    expect(onRunWindowClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelling the picker from the window keeps the window and switches no tab", async () => {
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+
+    await user.click(screen.getByText("CompareTestsFromWindow"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
+  });
+
+  it("asks before running the window's tests, then points the window at the new run", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("task-new");
+    state.startRun = { task_id: "task-from-window" };
+
+    await user.click(screen.getByText("RunTestsFromWindow"));
+    expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
+    expect(
+      screen.getByText(/start the evaluation on 1 test\./),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
+        "task-from-window",
+      ),
+    );
+    const posts = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url, init]) =>
+        init?.method === "POST" &&
+        String(url).endsWith("/agent-tests/agent/agent-1/run"),
+    );
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[1][1].body)).toEqual({ test_uuids: ["t2"] });
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith("task-from-window");
   });
 });
 
@@ -1128,7 +1555,8 @@ describe("TestsTabContent — run controls while a run is starting", () => {
   });
 
   // The row Run buttons render twice per test (desktop table + mobile card).
-  const runTestButtons = () => screen.getAllByTitle("Run test");
+  const runTestButtons = () =>
+    screen.getAllByRole("button", { name: "Run test" });
   const runAllButton = () =>
     screen.getByText("Run all tests").closest("button") as HTMLButtonElement;
 
@@ -1219,7 +1647,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await waitFor(() => expect(runTestButtons()[0]).toBeDisabled());
     await user.click(screen.getByTitle("Select all"));
 
-    const bulkRun = screen.getByRole("button", { name: "Run" });
+    const bulkRun = screen.getByRole("button", { name: /^Run [0-9]+ tests?/ });
     expect(bulkRun).toBeDisabled();
     await user.click(bulkRun);
     expect(
@@ -1233,7 +1661,9 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await release();
     await screen.findByTestId("test-runner-dialog");
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled(),
+      expect(
+        screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+      ).not.toBeDisabled(),
     );
   });
 
@@ -1254,17 +1684,20 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps the bulk toolbar up and spins its own button while the bulk run starts", async () => {
+  it("keeps the selection and spins the header Run button while the run of the ticked tests starts", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByRole("button", { name: "Run" }));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     // The ticks are not cleared yet, so the bar is still shown and its own
     // button is marked busy while the single POST is in flight.
-    const bulkRun = screen.getByRole("button", { name: "Run" });
+    const bulkRun = screen.getByRole("button", { name: /^Run [0-9]+ tests?/ });
     expect(bulkRun).toBeInTheDocument();
     expect(bulkRun).toHaveAttribute("aria-busy", "true");
     expect(
@@ -1280,25 +1713,30 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await screen.findByTestId("test-runner-dialog");
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "Run" }),
+        screen.queryByRole("button", { name: /^Run [0-9]+ tests?/ }),
       ).not.toBeInTheDocument(),
     );
   });
 
-  it("keeps the selection when the bulk run fails", async () => {
+  it("keeps the selection when the run of the ticked tests fails", async () => {
     state.startRunInit = { ok: false, status: 500 };
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByRole("button", { name: "Run" }));
+    await user.click(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await release();
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     // The run did not start, so the ticks are kept and the bar stays for a
     // retry rather than silently clearing.
-    expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
 });
@@ -1392,53 +1830,66 @@ describe("TestsTabContent — delete flows", () => {
     state.agentTests = [responseTest, toolCallTest];
   });
 
-  it("removes a single test from the agent (POST /agent-tests/bulk-unlink)", async () => {
+  it("deletes a single test from the workspace (POST /agent-tests/bulk-delete-tests)", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
+    expect(screen.getByTestId("delete-title")).toHaveTextContent("Delete test");
+    expect(screen.getByTestId("delete-message")).toHaveTextContent(
+      "Are you sure you want to delete this test? This cannot be undone.",
+    );
+    // A test belongs to one agent, so the window must not talk about others.
+    expect(screen.getByTestId("delete-message")).not.toHaveTextContent(
+      /every agent/i,
+    );
     await user.click(screen.getByText("ConfirmDelete"));
 
     await waitFor(() =>
       expect(screen.queryAllByText("Greeting test")).toHaveLength(0),
     );
-    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
     );
-    expect(unlinkCalls).toHaveLength(1);
-    expect(unlinkCalls[0][1].method).toBe("POST");
-    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+    expect(deleteCalls).toHaveLength(1);
+    expect(deleteCalls[0][1].method).toBe("POST");
+    expect(JSON.parse(deleteCalls[0][1].body)).toEqual({
       agent_uuid: "agent-1",
       test_uuids: [responseTest.uuid],
     });
+    // Nothing on this tab only takes a test off the agent any more.
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
+        String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+      ),
+    ).toHaveLength(0);
   });
 
-  it("does not offer to delete a single test from the library", async () => {
+  it("does not offer a keep-in-the-library choice on a delete", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
-    // The window only takes the test off this agent now: no checkbox to turn
-    // it into a permanent library delete.
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.getByTestId("delete-title")).toHaveTextContent("Remove test");
   });
 
-  it("bulk-removes selected tests", async () => {
+  it("bulk-deletes selected tests", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
-      "Remove tests",
+      "Delete tests",
+    );
+    expect(screen.getByTestId("delete-message")).toHaveTextContent(
+      "Are you sure you want to delete 2 tests? This cannot be undone.",
     );
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1447,24 +1898,24 @@ describe("TestsTabContent — delete flows", () => {
     );
 
     // One call for the whole selection, not one per test.
-    const unlinkCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any[]) => String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
     );
-    expect(unlinkCalls).toHaveLength(1);
-    expect(JSON.parse(unlinkCalls[0][1].body)).toEqual({
+    expect(deleteCalls).toHaveLength(1);
+    expect(JSON.parse(deleteCalls[0][1].body)).toEqual({
       agent_uuid: "agent-1",
       test_uuids: [responseTest.uuid, toolCallTest.uuid],
     });
   });
 
-  it("keeps the tests on screen when the unlink call fails", async () => {
-    state.bulkUnlinkInit = { ok: false, status: 500 };
+  it("keeps the tests on screen when the delete call fails", async () => {
+    state.bulkDeleteInit = { ok: false, status: 500 };
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByTitle("Select all"));
-    await user.click(screen.getByText("Remove"));
+    await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
 
@@ -1473,11 +1924,31 @@ describe("TestsTabContent — delete flows", () => {
     await waitFor(() =>
       expect(
         (global.fetch as jest.Mock).mock.calls.filter((c: any[]) =>
-          String(c[0]).endsWith("/agent-tests/bulk-unlink"),
+          String(c[0]).endsWith("/agent-tests/bulk-delete-tests"),
         ),
       ).toHaveLength(1),
     );
     expect(screen.getByTestId("delete-dialog")).toBeInTheDocument();
+    expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
+    // ...and the window says what happened rather than looking unchanged.
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not delete these tests. Please try again.",
+    );
+  });
+
+  it("says so in the window when deleting one test fails", async () => {
+    state.bulkDeleteInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
+    await screen.findByTestId("delete-dialog");
+    await user.click(screen.getByText("ConfirmDelete"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not delete this test. Please try again.",
+    );
     expect(screen.getAllByText("Greeting test").length).toBeGreaterThan(0);
   });
 
@@ -1486,7 +1957,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getAllByTitle("Delete test")[0]);
+    await user.click(screen.getAllByRole("button", { name: "Delete test" })[0]);
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("CloseDelete"));
     expect(screen.queryByTestId("delete-dialog")).not.toBeInTheDocument();
@@ -1676,7 +2147,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     expect(benchmarkProps.totalTests).toBe(2);
   });
 
-  it("opens the benchmark dialog scoped to selected tests (bulk Compare)", async () => {
+  it("compares the ticked tests, keeping the ticks until a comparison starts", async () => {
     state.agentTests = [responseTest, toolCallTest];
     const user = setupUser();
     renderComponent();
@@ -1684,9 +2155,18 @@ describe("TestsTabContent — benchmark & past runs", () => {
 
     const rowCheckboxes = screen.getAllByTitle("Select test");
     await user.click(rowCheckboxes[0]);
-    await user.click(screen.getByTestId("compare-bulk"));
+    await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
     expect(screen.getByTestId("benchmark-test-count")).toHaveTextContent("1");
+    // Closing the model picker without starting keeps the ticks.
+    await user.click(screen.getByText("CloseBenchmark"));
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+
+    // Starting a comparison clears them.
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
   });
 
   it("blocks header Compare models before opening the picker when linked tests exceed the limit", async () => {
@@ -1711,7 +2191,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     const rowCheckboxes = screen.getAllByTitle("Select test");
     await user.click(rowCheckboxes[0]);
     await user.click(rowCheckboxes[1]);
-    await user.click(screen.getByTestId("compare-bulk"));
+    await user.click(screen.getByTestId("compare-header"));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
   });
@@ -1731,6 +2211,37 @@ describe("TestsTabContent — benchmark & past runs", () => {
       testRunnerProps.onClose();
     });
     expect(onRunWindowClosed).toHaveBeenCalled();
+  });
+
+  it("tells the parent when a comparison window that started a run is closed", async () => {
+    state.agentTests = [responseTest];
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    // Same as a plain run: the parent takes the reader to Evaluations, where
+    // the comparison it just started is listed.
+    expect(onRunWindowClosed).toHaveBeenCalled();
+  });
+
+  it("stays put when the comparison window is closed without starting one", async () => {
+    state.agentTests = [responseTest];
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
   });
 
   it("opens the run dialog and tells the parent a run started", async () => {

@@ -21,7 +21,9 @@ import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSum
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
 import { isUnanswered } from "@/lib/testTypes";
+import { displayModelName } from "@/lib/modelName";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -41,6 +43,10 @@ export type BenchmarkTestResult = {
    * tool-call tests; legacy rows omit the field and fall back to the
    * legacy single-reasoning UI. */
   judge_results?: JudgeResult[] | null;
+  /** This test's answer is being read. Only the detail pane reads it: the
+   * row keeps its own verdict, so it stays in its group and its group's
+   * count does not move while the answer is on its way. */
+  loading?: boolean;
   /** Per-case agent latency (ms) / cost (USD). Null while running, for
    * eval-only runs, and — for cost — the `openai` provider. */
   latency_ms?: number | null;
@@ -101,6 +107,8 @@ type BenchmarkOutputsPanelProps = {
   onToggleLabellingSelection?: (key: string) => void;
   /** Toggle select-all / deselect-all for the given keys. */
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Shown under the search box once tests are ticked (count, Run, Compare). */
+  selectionStrip?: React.ReactNode;
 };
 
 export function benchmarkLabellingKey(model: string, testIndex: number): string {
@@ -123,7 +131,7 @@ function benchmarkTestStatus(
 
 // Display name for a benchmark test row (falls back to the placeholder name
 // when the result hasn't arrived yet).
-function benchmarkTestName(
+export function benchmarkTestName(
   tr: BenchmarkTestResult | undefined,
   index: number,
   testNames: string[],
@@ -180,7 +188,7 @@ export function BenchmarkOutputsPanel({
   onSelectTest,
   onClearSelection,
   testNames = [],
-  formatModelName = (n) => n,
+  formatModelName = displayModelName,
   showControls = true,
   showRunningSpinner = false,
   runStopped = false,
@@ -192,6 +200,7 @@ export function BenchmarkOutputsPanel({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -256,7 +265,7 @@ export function BenchmarkOutputsPanel({
   // "hasn't been manually resized yet" flag if that turns out to matter.
   const defaultListWidth = Math.min(
     512,
-    Math.max(288, longestModelNameChars * 8 + 176),
+    Math.max(LIST_PANEL_MIN_WIDTH_FOR_WORDS, longestModelNameChars * 8 + 176),
   );
   const listPanel = useResizableWidth(defaultListWidth, 288, 512, "grow-right");
   const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
@@ -416,12 +425,13 @@ export function BenchmarkOutputsPanel({
       >
         {/* Search */}
         {modelResults.length > 0 && (
-          <div className="shrink-0 p-3 border-b border-border">
+          <div className="shrink-0 p-3 border-b border-border space-y-2">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search tests"
             />
+            {selectionStrip}
           </div>
         )}
         {(showBulkSelect || showBulkExpand) && (
@@ -572,7 +582,14 @@ export function BenchmarkOutputsPanel({
 
         <div className="flex-1 overflow-y-auto">
           {selectedTestResult ? (
-            isUnanswered(selectedTestResult) ? (
+            selectedTestResult.loading ? (
+              <div className="flex items-center justify-center h-full">
+                <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            ) : isUnanswered(selectedTestResult) ? (
               <TestCouldNotRunNotice reason={selectedTestResult.reasoning} />
             ) : selectedTestResult.passed === null && runStopped ? (
               <div className="flex items-center justify-center h-full p-6">
@@ -612,7 +629,10 @@ export function BenchmarkOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedTestResult && !isUnanswered(selectedTestResult) && selectedTestResult.passed !== null && (
+      {/* While the test is still being read this panel stays away, so the one
+          spinner in the middle covers the whole area rather than sitting next
+          to a panel saying the test has no evaluators. */}
+      {selectedTestResult && !selectedTestResult.loading && !isUnanswered(selectedTestResult) && selectedTestResult.passed !== null && (
         <>
           <ResizeHandle
             onMouseDown={verdictPanel.startDrag}

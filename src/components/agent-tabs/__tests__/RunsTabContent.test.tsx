@@ -9,6 +9,7 @@ import {
 } from "@/test-utils";
 import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
+import type { AgentRunLauncherOptions } from "../useAgentRunLaunchers";
 
 const BACKEND = "http://test-backend";
 const AGENT_UUID = "agent-1";
@@ -19,6 +20,14 @@ jest.mock("../../../hooks", () => ({
 }));
 
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
+
+const mockToastError = jest.fn();
+jest.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: jest.fn(),
+  },
+}));
 
 let runnerProps: any = null;
 jest.mock("../../TestRunnerDialog", () => ({
@@ -37,6 +46,20 @@ jest.mock("../../BenchmarkResultsDialog", () => ({
     return props.isOpen ? (
       <div data-testid="benchmark-results">bench:{props.taskId}</div>
     ) : null;
+  },
+}));
+
+let launcherOptions: AgentRunLauncherOptions | null = null;
+const confirmTestRun = jest.fn();
+const openCompare = jest.fn().mockResolvedValue(true);
+jest.mock("../useAgentRunLaunchers", () => ({
+  useAgentRunLaunchers: (options: AgentRunLauncherOptions) => {
+    launcherOptions = options;
+    return {
+      confirmTestRun,
+      openCompare,
+      dialogs: <div data-testid="launcher-dialogs" />,
+    };
   },
 }));
 
@@ -81,11 +104,22 @@ const benchmarkRun: AgentRun = {
   model_results: [{ model: "a" }, { model: "b" }],
 };
 
-let state: { runs: AgentRun[]; total?: number; pollUnit?: unknown };
+let state: {
+  runs: AgentRun[];
+  total?: number;
+  deleteOk?: boolean;
+  /** Holds the next runs request until this resolves. */
+  holdList?: Promise<void>;
+};
 
 function installFetch() {
   global.fetch = jest.fn(async (url: string) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+      if (state.holdList) {
+        const hold = state.holdList;
+        state.holdList = undefined;
+        await hold;
+      }
       const around = new URL(url).searchParams.get("around");
       if (around && !state.runs.some((r) => r.uuid === around)) {
         return jsonResponse({}, false, 404);
@@ -96,8 +130,9 @@ function installFetch() {
         offset: 0,
       });
     }
-    if (url.includes("/agent-tests/run/")) {
-      return jsonResponse(state.pollUnit ?? {}, !!state.pollUnit, 200);
+    if (url.includes("/agent-tests/job/")) {
+      return jsonResponse(state.deleteOk === false ? {} : { message: "ok" },
+        state.deleteOk !== false, state.deleteOk === false ? 500 : 200);
     }
     return jsonResponse({});
   }) as jest.Mock;
@@ -124,6 +159,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   runnerProps = null;
   benchmarkResultsProps = null;
+  launcherOptions = null;
   state = { runs: [unitRun, benchmarkRun] };
   installFetch();
 });
@@ -202,7 +238,8 @@ describe("RunsTabContent", () => {
         "td",
       ),
     ).map((td) => td.textContent);
-    expect(cells[cells.length - 1]).toBe("—");
+    // Last cell is the delete button; "Created at" is the one before it.
+    expect(cells[cells.length - 2]).toBe("—");
   });
 
   it("shows both run kinds in one table with their test and model counts", async () => {
@@ -566,10 +603,7 @@ describe("RunsTabContent", () => {
   it("asks the list for a run not on this page once, not on every refresh", async () => {
     // A run that is not on this page, next to one that is still going, so the
     // rows keep refreshing underneath it.
-    state.runs = [
-      { ...unitRun, uuid: "run-pending", status: "pending", results: null },
-    ];
-    state.pollUnit = { status: "pending", results: null };
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
     window.history.replaceState(null, "", "/?runId=run-elsewhere");
     renderTab();
     await screen.findAllByText("Running");
@@ -582,43 +616,36 @@ describe("RunsTabContent", () => {
 
     // Wait for the rows to be refreshed twice rather than for a fixed time, so
     // a slow machine cannot make this pass by accident.
-    const pollCalls = () =>
+    const listCalls = () =>
       (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).includes("/agent-tests/run/run-pending"),
+        String(url).includes("/runs?"),
       ).length;
-    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+    const before = listCalls();
+    await waitFor(() => expect(listCalls()).toBeGreaterThanOrEqual(before + 2), {
       timeout: 8000,
     });
     expect(existsCalls()).toBe(1);
   }, 12000);
 
-  it("leaves a running run alone when one ask for it fails", async () => {
-    state.runs = [
-      {
-        ...unitRun,
-        uuid: "run-pending",
-        status: "pending",
-        results: [{ passed: null }],
-      },
-    ];
-    // Every ask about this run fails, as a dropped connection would.
+  it("leaves a running run alone when a refresh fails", async () => {
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
+    // The first read works; every refresh after it fails, as a dropped
+    // connection would. The rows already on screen must stay.
+    let listCallCount = 0;
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        listCallCount += 1;
+        if (listCallCount > 1) throw new Error("offline");
         return jsonResponse({ items: state.runs, total: state.runs.length });
       }
-      if (url.includes("/agent-tests/run/")) throw new Error("offline");
       return jsonResponse({});
     });
 
     renderTab();
     await screen.findAllByText("Running");
 
-    // Wait for two failed asks rather than for a fixed time.
-    const pollCalls = () =>
-      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).includes("/agent-tests/run/"),
-      ).length;
-    await waitFor(() => expect(pollCalls()).toBeGreaterThanOrEqual(2), {
+    // Wait for two failed refreshes rather than for a fixed time.
+    await waitFor(() => expect(listCallCount).toBeGreaterThanOrEqual(3), {
       timeout: 8000,
     });
 
@@ -629,25 +656,276 @@ describe("RunsTabContent", () => {
   }, 12000);
 
   it("keeps an unfinished run up to date", async () => {
-    state.runs = [
-      {
-        ...unitRun,
-        uuid: "run-pending",
-        status: "pending",
-        results: [{ passed: null }],
-      },
-    ];
-    state.pollUnit = {
-      status: "done",
-      total_tests: 1,
-      passed: 1,
-      failed: 0,
-      results: [{ passed: true }],
-    };
+    state.runs = [{ ...unitRun, uuid: "run-pending", status: "pending" }];
+    // The run finishes between the first read and the next refresh.
+    let listCallCount = 0;
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        listCallCount += 1;
+        const runs =
+          listCallCount === 1
+            ? state.runs
+            : [
+                {
+                  ...unitRun,
+                  uuid: "run-pending",
+                  status: "done",
+                  total_tests: 1,
+                  passed: 1,
+                  failed: 0,
+                  unanswered_tests: 0,
+                },
+              ];
+        return jsonResponse({ items: runs, total: 1 });
+      }
+      return jsonResponse({});
+    });
+
     renderTab();
     await screen.findAllByText("Running");
     expect(
-      (await screen.findAllByText("1 Success", {}, { timeout: 5000 })).length,
+      (await screen.findAllByText("1 Success", {}, { timeout: 8000 })).length,
     ).toBeGreaterThan(0);
+  }, 12000);
+
+  describe("deleting a run", () => {
+    /** The delete buttons in the desktop table. */
+    const deleteButtons = () =>
+      Array.from(
+        (document.querySelector("table") as HTMLElement).querySelectorAll(
+          'button[aria-label="Delete evaluation"]',
+        ),
+      ) as HTMLButtonElement[];
+
+    it("deletes the run after the reader confirms, then reads the list back", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(deleteButtons()[0]);
+      // The window for the run must not open: the delete button swallows the
+      // row click.
+      expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Are you sure you want to delete "Evaluation run 4"/),
+      ).toBeInTheDocument();
+
+      state.runs = [];
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() =>
+        expect(
+          (global.fetch as jest.Mock).mock.calls.some(
+            ([url, init]) =>
+              String(url) === `${BACKEND}/agent-tests/job/run-unit` &&
+              init.method === "DELETE",
+          ),
+        ).toBe(true),
+      );
+      await screen.findByText("No evaluations yet");
+    });
+
+    it("keeps the confirmation open until the list has been read back", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      // Hold the list request that follows the delete, so the moment between
+      // the delete answering and the fresh list arriving can be looked at.
+      let releaseList: () => void = () => {};
+      state.holdList = new Promise<void>((resolve) => {
+        releaseList = resolve;
+      });
+
+      await user.click(deleteButtons()[0]);
+      state.runs = [];
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      // The delete has answered, the list has not: the confirmation is still
+      // up, saying so, and the row is still the old one.
+      await screen.findByText("Deleting...");
+      expect(
+        screen.getByText(/Are you sure you want to delete/),
+      ).toBeInTheDocument();
+
+      releaseList();
+      await screen.findByText("No evaluations yet");
+      expect(
+        screen.queryByText(/Are you sure you want to delete/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the run listed when the delete fails", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      state.deleteOk = false;
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(deleteButtons()[0]);
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(mockToastError).toHaveBeenCalled());
+      // The confirmation stays open and the run is still there.
+      expect(
+        screen.getByText(/Are you sure you want to delete/),
+      ).toBeInTheDocument();
+    });
+
+    it("steps back a page when the deleted run was the last one on it", async () => {
+      const user = setupUser();
+      state.runs = [{ ...unitRun, name: "Run 4" }];
+      state.total = 51;
+      renderTab();
+      await screen.findAllByText("1 Success");
+
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
+
+      await user.click(deleteButtons()[0]);
+      state.total = 50;
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("0"));
+    });
+
+    it("cannot delete a run that is still going", async () => {
+      state.runs = [{ ...unitRun, uuid: "run-live", status: "in_progress" }];
+      renderTab();
+      await screen.findAllByText("Running");
+
+      expect(deleteButtons()[0]).toBeDisabled();
+    });
+  });
+});
+
+describe("the Run column width", () => {
+  it("gets wider when its edge is dragged right, and stops at the widest", async () => {
+    renderTab();
+    await screen.findAllByText("1 Success");
+    const header = screen.getByRole("columnheader", { name: /Run/ });
+    const handle = screen.getByTestId("run-column-resize");
+    expect(header).toHaveStyle({ width: "240px" });
+    // The heading itself reads as "Run", with nothing about the drag edge.
+    expect(header).toHaveAccessibleName("Run");
+
+    act(() => {
+      handle.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, clientX: 100 }),
+      );
+      document.dispatchEvent(
+        new MouseEvent("mousemove", { bubbles: true, clientX: 160 }),
+      );
+    });
+    expect(header).toHaveStyle({ width: "300px" });
+
+    act(() => {
+      document.dispatchEvent(
+        new MouseEvent("mousemove", { bubbles: true, clientX: 9999 }),
+      );
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    expect(header).toHaveStyle({ width: "560px" });
   }, 10000);
+});
+
+describe("running tests from an open results window", () => {
+  const tests = [{ uuid: "t1", name: "A" }];
+  const runsListCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("/runs?"),
+    ).length;
+
+  it("passes the agent's launcher settings through and draws the launcher dialogs", async () => {
+    render(
+      <RunsTabContent
+        agentUuid={AGENT_UUID}
+        agentName="Test agent"
+        agentType="connection"
+        connectionVerified={false}
+        supportsBenchmark
+        benchmarkProvider="google"
+      />,
+    );
+    await screen.findAllByText("1 Success");
+    expect(screen.getByTestId("launcher-dialogs")).toBeInTheDocument();
+    expect(launcherOptions).toMatchObject({
+      agentUuid: AGENT_UUID,
+      agentName: "Test agent",
+      agentType: "connection",
+      connectionVerified: false,
+      supportsBenchmark: true,
+      benchmarkProvider: "google",
+    });
+  });
+
+  it("runs or compares the ticked tests from the run window", async () => {
+    state.runs = [unitRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await screen.findByTestId("test-runner");
+
+    runnerProps.onRunTests(tests);
+    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
+    runnerProps.onCompareTests(tests);
+    expect(openCompare).toHaveBeenCalledWith(tests, false);
+  });
+
+  it("runs or compares the ticked tests from the model comparison window", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    benchmarkResultsProps.onRunTests(tests);
+    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
+    benchmarkResultsProps.onCompareTests(tests);
+    expect(openCompare).toHaveBeenCalledWith(tests, false);
+  });
+
+  it("opens the new run in the window and reads the list again once it is created", async () => {
+    state.runs = [unitRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await screen.findByTestId("test-runner");
+    const before = runsListCalls();
+
+    await act(async () => {
+      launcherOptions?.onRunCreated("run-new");
+    });
+    expect(screen.getByTestId("test-runner")).toHaveTextContent(
+      "runner:run-new",
+    );
+    expect(new URLSearchParams(window.location.search).get("runId")).toBe(
+      "run-new",
+    );
+    await waitFor(() => expect(runsListCalls()).toBe(before + 1));
+  });
+
+  it("closes the open window and reads the list again once a comparison is created", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+    expect(new URLSearchParams(window.location.search).get("runId")).toBe(
+      "run-bench",
+    );
+    const before = runsListCalls();
+
+    await act(async () => {
+      launcherOptions?.onComparisonCreated?.();
+    });
+    expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+    expect(
+      new URLSearchParams(window.location.search).get("runId"),
+    ).toBeNull();
+    await waitFor(() => expect(runsListCalls()).toBe(before + 1));
+  });
 });

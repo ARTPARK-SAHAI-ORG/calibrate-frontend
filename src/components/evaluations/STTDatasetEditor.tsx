@@ -56,6 +56,12 @@ type Props = {
   onDeleteSavedItem?: (uuid: string) => Promise<void>;
   /** Called when pending changes (new rows or dirty transcripts) appear/disappear */
   onHasPendingChangesChange?: (has: boolean) => void;
+  /** Called with how many new rows are waiting to be saved. */
+  onUnsavedRowCountChange?: (count: number) => void;
+  /** Called while audio is still being uploaded — reading a zip, or any row
+   *  whose clip has not landed yet. Rows without an uploaded clip cannot be
+   *  saved or run, so whatever consumes them must wait. */
+  onUploadingChange?: (uploading: boolean) => void;
   /** Show the dataset name input at the top */
   showDatasetName?: boolean;
   datasetName?: string;
@@ -79,6 +85,8 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       savedItems = [],
       onDeleteSavedItem,
       onHasPendingChangesChange,
+      onUnsavedRowCountChange,
+      onUploadingChange,
       showDatasetName = false,
       datasetName = "",
       onDatasetNameChange,
@@ -104,18 +112,38 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
     const zipInputRef = useRef<HTMLInputElement>(null);
 
-    // Notify parent when there are pending changes (new rows or dirty transcripts)
-    useEffect(() => {
-      const hasDirty = savedItems.some(
+    // Rows the reader has started but not saved. They are not in the dataset
+    // yet, so the page counts them separately from its item count.
+    const unsavedRowCount = newRows.filter(
+      (r) => r.s3Path || r.audioFile || r.text.trim(),
+    ).length;
+
+    // Changes the reader has made but not saved: an edited transcript, or a
+    // new row with anything in it.
+    const hasPendingChanges =
+      savedItems.some(
         (item) =>
           editedTexts[item.uuid] !== undefined &&
           editedTexts[item.uuid] !== item.text,
-      );
-      const hasNewWork = newRows.some(
-        (r) => r.s3Path || r.audioFile || r.text.trim(),
-      );
-      onHasPendingChangesChange?.(hasDirty || hasNewWork);
-    }, [newRows, editedTexts, savedItems, onHasPendingChangesChange]);
+      ) || unsavedRowCount > 0;
+
+    useEffect(() => {
+      onHasPendingChangesChange?.(hasPendingChanges);
+    }, [hasPendingChanges, onHasPendingChangesChange]);
+
+    useEffect(() => {
+      onUnsavedRowCountChange?.(unsavedRowCount);
+    }, [unsavedRowCount, onUnsavedRowCountChange]);
+
+    // Tell the parent while audio is still going up: reading a zip, or any row
+    // whose clip has not landed. A zip of a thousand clips takes minutes, and
+    // until they are all up there is nothing complete to save or run.
+    const isUploadingRows =
+      isProcessingZip ||
+      Object.values(uploadStatus).some((s) => s === "uploading");
+    useEffect(() => {
+      onUploadingChange?.(isUploadingRows);
+    }, [isUploadingRows, onUploadingChange]);
 
     // ── Imperative handle ──────────────────────────────────────────────────
 
@@ -123,8 +151,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       validate() {
         const invalid = new Set<string>();
         newRows.forEach((row) => {
-          const isBlank =
-            !row.audioFile && !row.text.trim() && !row.s3Path;
+          const isBlank = !row.audioFile && !row.text.trim() && !row.s3Path;
           if (isBlank) return;
           const complete = !!(row.s3Path && row.text.trim());
           if (!complete) invalid.add(row.id);
@@ -153,7 +180,15 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         setEditedTexts({});
       },
       clearNewRows() {
-        setNewRows([{ id: Date.now().toString(), audioFile: null, audioUrl: null, text: "", s3Path: null }]);
+        setNewRows([
+          {
+            id: Date.now().toString(),
+            audioFile: null,
+            audioUrl: null,
+            text: "",
+            s3Path: null,
+          },
+        ]);
       },
     }));
 
@@ -166,13 +201,14 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
 
     const addRow = () => {
       if (newRows.length >= maxRowsPerEval) {
-        showLimitToast(`You can only add up to ${maxRowsPerEval} rows at a time.`);
+        showLimitToast(
+          `You can only add up to ${maxRowsPerEval} rows at a time.`,
+        );
         return;
       }
       const invalid = new Set<string>();
       newRows.forEach((row) => {
-        const isBlank =
-          !row.audioFile && !row.text.trim() && !row.s3Path;
+        const isBlank = !row.audioFile && !row.text.trim() && !row.s3Path;
         if (isBlank) return;
         const complete = !!(row.s3Path && row.text.trim());
         if (!complete) invalid.add(row.id);
@@ -186,7 +222,13 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       setInvalidRowIds(new Set());
       setNewRows((prev) => [
         ...prev,
-        { id: Date.now().toString(), audioFile: null, audioUrl: null, text: "", s3Path: null },
+        {
+          id: Date.now().toString(),
+          audioFile: null,
+          audioUrl: null,
+          text: "",
+          s3Path: null,
+        },
       ]);
     };
 
@@ -220,9 +262,17 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         const row = newRows.find((r) => r.id === id);
         if (row?.audioUrl) URL.revokeObjectURL(row.audioUrl);
         setNewRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, audioFile: null, audioUrl: null, s3Path: null } : r)),
+          prev.map((r) =>
+            r.id === id
+              ? { ...r, audioFile: null, audioUrl: null, s3Path: null }
+              : r,
+          ),
         );
-        setUploadStatus((prev) => { const n = { ...prev }; delete n[id]; return n; });
+        setUploadStatus((prev) => {
+          const n = { ...prev };
+          delete n[id];
+          return n;
+        });
         setInvalidRowIds((prev) => {
           const n = new Set(prev);
           n.delete(id);
@@ -234,7 +284,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       // Validate size
       const sizeMB = file.size / (1024 * 1024);
       if (sizeMB > LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB) {
-        showLimitToast(`Audio file must be less than ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB. This file is ${sizeMB.toFixed(2)} MB.`);
+        showLimitToast(
+          `Audio file must be less than ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB. This file is ${sizeMB.toFixed(2)} MB.`,
+        );
         return;
       }
 
@@ -242,7 +294,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       try {
         const duration = await getAudioDuration(file);
         if (duration > LIMITS.STT_MAX_AUDIO_DURATION_SECONDS) {
-          showLimitToast(`Audio file must be less than ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS} seconds. This file is ${Math.round(duration)} seconds.`);
+          showLimitToast(
+            `Audio file must be less than ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS} seconds. This file is ${Math.round(duration)} seconds.`,
+          );
           return;
         }
       } catch {
@@ -258,7 +312,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         const hadText = !!prevRow?.text.trim();
         const audioUrl = URL.createObjectURL(file);
         setNewRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, audioFile: file, audioUrl, s3Path } : r)),
+          prev.map((r) =>
+            r.id === id ? { ...r, audioFile: file, audioUrl, s3Path } : r,
+          ),
         );
         setUploadStatus((prev) => ({ ...prev, [id]: "success" }));
         if (hadText) {
@@ -317,12 +373,17 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         const zip = await JSZip.loadAsync(file);
 
         const csv = findDataCsvInZip(zip);
-        if (!csv) { toast.error("ZIP must contain a data.csv file"); return; }
+        if (!csv) {
+          toast.error("ZIP must contain a data.csv file");
+          return;
+        }
         const basePath = csv.basePath;
 
         const lines = splitCsvLines(await csv.file.async("string"));
         if (lines.length < 2) {
-          toast.error(`data.csv must have a header and at least one data row. Found ${lines.length} line(s).`);
+          toast.error(
+            `data.csv must have a header and at least one data row. Found ${lines.length} line(s).`,
+          );
           return;
         }
 
@@ -338,21 +399,32 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         for (let i = 1; i < lines.length; i++) {
           const values = parseCsvLine(lines[i]);
           if (values[audioIdx] && values[textIdx]) {
-            dataRows.push({ audioFileName: values[audioIdx], text: values[textIdx] });
+            dataRows.push({
+              audioFileName: values[audioIdx],
+              text: values[textIdx],
+            });
           }
         }
 
-        if (dataRows.length === 0) { toast.error("No valid data rows found in data.csv"); return; }
+        if (dataRows.length === 0) {
+          toast.error("No valid data rows found in data.csv");
+          return;
+        }
         if (dataRows.length > maxRowsPerEval) {
-          showLimitToast(`You can only upload up to ${maxRowsPerEval} rows at a time.`);
+          showLimitToast(
+            `You can only upload up to ${maxRowsPerEval} rows at a time.`,
+          );
           return;
         }
 
         // Revoke existing new-row URLs
-        newRows.forEach((r) => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl); });
+        newRows.forEach((r) => {
+          if (r.audioUrl) URL.revokeObjectURL(r.audioUrl);
+        });
 
         const builtRows: NewRow[] = [];
-        const builtStatus: Record<string, "uploading" | "success" | "error"> = {};
+        const builtStatus: Record<string, "uploading" | "success" | "error"> =
+          {};
 
         for (let i = 0; i < dataRows.length; i++) {
           const { audioFileName, text } = dataRows[i];
@@ -360,25 +432,41 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           const audioFileZip = findZipAudioFile(zip, basePath, audioFileName);
 
           if (!audioFileZip) {
-            builtRows.push({ id: rowId, audioFile: null, audioUrl: null, text, s3Path: null });
+            builtRows.push({
+              id: rowId,
+              audioFile: null,
+              audioUrl: null,
+              text,
+              s3Path: null,
+            });
             continue;
           }
 
           const audioBlob = await audioFileZip.async("blob");
-          const audioFile = new File([audioBlob], audioFileName, { type: "audio/wav" });
+          const audioFile = new File([audioBlob], audioFileName, {
+            type: "audio/wav",
+          });
 
           const sizeMB = audioFile.size / (1024 * 1024);
           if (sizeMB > LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB) {
-            toast.error(`"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB.`);
-            builtRows.forEach((r) => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl); });
+            toast.error(
+              `"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB.`,
+            );
+            builtRows.forEach((r) => {
+              if (r.audioUrl) URL.revokeObjectURL(r.audioUrl);
+            });
             return;
           }
 
           try {
             const duration = await getAudioDuration(audioFile);
             if (duration > LIMITS.STT_MAX_AUDIO_DURATION_SECONDS) {
-              toast.error(`"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS}s.`);
-              builtRows.forEach((r) => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl); });
+              toast.error(
+                `"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS}s.`,
+              );
+              builtRows.forEach((r) => {
+                if (r.audioUrl) URL.revokeObjectURL(r.audioUrl);
+              });
               return;
             }
           } catch {
@@ -386,7 +474,13 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           }
 
           const audioUrl = URL.createObjectURL(audioFile);
-          builtRows.push({ id: rowId, audioFile, audioUrl, text, s3Path: null });
+          builtRows.push({
+            id: rowId,
+            audioFile,
+            audioUrl,
+            text,
+            s3Path: null,
+          });
           builtStatus[rowId] = "uploading";
         }
 
@@ -403,7 +497,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             const row = pending[cursor++];
             const s3Path = await uploadFileToS3(row.audioFile!);
             if (s3Path) {
-              setNewRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, s3Path } : r)));
+              setNewRows((prev) =>
+                prev.map((r) => (r.id === row.id ? { ...r, s3Path } : r)),
+              );
               setUploadStatus((prev) => ({ ...prev, [row.id]: "success" }));
             } else {
               setUploadStatus((prev) => ({ ...prev, [row.id]: "error" }));
@@ -442,7 +538,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               onChange={(e) => onDatasetNameChange?.(e.target.value)}
               placeholder="e.g. English customer calls"
               className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
-                datasetNameInvalid ? "border-red-500 bg-red-500/10" : "border-border"
+                datasetNameInvalid
+                  ? "border-red-500 bg-red-500/10"
+                  : "border-border"
               }`}
             />
           </div>
@@ -458,11 +556,26 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               <LazyAudioPlayer src={item.audio_path!} className="w-96" />
             ) : (
               <div className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background flex items-center gap-1.5 text-muted-foreground min-w-[140px]">
-                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                <svg
+                  className="w-3.5 h-3.5 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+                  />
                 </svg>
-                <span className="truncate max-w-[120px]" title={item.audio_path ?? ""}>
-                  {item.audio_path ? item.audio_path.split("/").pop() : "No audio"}
+                <span
+                  className="truncate max-w-[120px]"
+                  title={item.audio_path ?? ""}
+                >
+                  {item.audio_path
+                    ? item.audio_path.split("/").pop()
+                    : "No audio"}
                 </span>
               </div>
             );
@@ -473,29 +586,42 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                   type="text"
                   value={currentText}
                   onChange={(e) =>
-                    setEditedTexts((prev) => ({ ...prev, [item.uuid]: e.target.value }))
+                    setEditedTexts((prev) => ({
+                      ...prev,
+                      [item.uuid]: e.target.value,
+                    }))
                   }
                   className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30"
                 />
               </div>
             );
 
-            const deleteBtn = onDeleteSavedItem && (
-              <button
-                onClick={() => {
-                  if (savedItems.length <= 1) {
-                    toast.error("Dataset must have at least 2 items.");
-                    return;
-                  }
-                  setDeleteSavedId(item.uuid);
-                }}
-                className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-              </button>
-            );
+            // Deleting a saved row happens on the server straight away. That
+            // cannot be offered next to unsaved work, and a dataset cannot be
+            // emptied, so the last remaining row keeps no button either.
+            const deleteBtn = onDeleteSavedItem &&
+              !hasPendingChanges &&
+              savedItems.length > 1 && (
+                <button
+                  onClick={() => setDeleteSavedId(item.uuid)}
+                  aria-label="Delete this item"
+                  className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                    />
+                  </svg>
+                </button>
+              );
 
             return (
               <div
@@ -516,13 +642,30 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                     {deleteBtn}
                   </div>
                   {isPlayableUrl ? (
-                    <LazyAudioPlayer src={item.audio_path!} className="w-full" />
+                    <LazyAudioPlayer
+                      src={item.audio_path!}
+                      className="w-full"
+                    />
                   ) : (
                     <div className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background flex items-center gap-1.5 text-muted-foreground w-full">
-                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+                        />
                       </svg>
-                      <span className="truncate">{item.audio_path ? item.audio_path.split("/").pop() : "No audio"}</span>
+                      <span className="truncate">
+                        {item.audio_path
+                          ? item.audio_path.split("/").pop()
+                          : "No audio"}
+                      </span>
                     </div>
                   )}
                   {textField}
@@ -549,7 +692,8 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               setDeleteNewRowId(row.id);
             };
 
-            const triggerFileInput = () => fileInputRefs.current[row.id]?.click();
+            const triggerFileInput = () =>
+              fileInputRefs.current[row.id]?.click();
 
             const rowBadge = <RowIndexBadge value={rowNumber} />;
 
@@ -558,26 +702,63 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                 onClick={handleDelete}
                 className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  />
                 </svg>
               </button>
             );
 
             const uploadButtonContent = isUploading ? (
               <>
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 <span>Uploading...</span>
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                  />
                 </svg>
-                <span>{row.audioFile ? getFileName(row.audioFile) : "Upload .wav"}</span>
+                <span>
+                  {row.audioFile ? getFileName(row.audioFile) : "Upload .wav"}
+                </span>
               </>
             );
 
@@ -611,12 +792,16 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               <div
                 key={row.id}
                 className={`border rounded-lg py-2 md:py-1.5 px-3 transition-colors ${
-                  isInvalid ? "border-red-500 bg-red-500/10" : "border-border bg-muted/10"
+                  isInvalid
+                    ? "border-red-500 bg-red-500/10"
+                    : "border-border bg-muted/10"
                 }`}
               >
                 <input
                   type="file"
-                  ref={(el) => { fileInputRefs.current[row.id] = el; }}
+                  ref={(el) => {
+                    fileInputRefs.current[row.id] = el;
+                  }}
                   accept=".wav,audio/wav,audio/x-wav"
                   onChange={(e) => {
                     const f = e.target.files?.[0] || null;
@@ -660,7 +845,10 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                   <div>
                     {isUploaded && row.audioUrl ? (
                       <div className="space-y-1.5">
-                        <LazyAudioPlayer src={row.audioUrl} className="w-full" />
+                        <LazyAudioPlayer
+                          src={row.audioUrl}
+                          className="w-full"
+                        />
                         {replaceButton}
                       </div>
                     ) : (
@@ -684,8 +872,18 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             onClick={addRow}
             className="w-full h-8 px-3 rounded-lg text-[12px] font-medium border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
             </svg>
             Add another sample
           </button>
@@ -693,7 +891,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           {/* OR divider */}
           <div className="flex items-center gap-4 py-2">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-[13px] font-medium text-muted-foreground">OR</span>
+            <span className="text-[13px] font-medium text-muted-foreground">
+              OR
+            </span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -701,17 +901,33 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           <div className="border border-border rounded-xl p-4 md:p-6 bg-muted/10 w-full md:w-2/3 md:mx-auto">
             <div className="flex items-start gap-3 md:gap-4">
               <div className="flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-full bg-muted flex items-center justify-center">
-                <svg className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                <svg
+                  className="w-5 h-5 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+                  />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-[14px] font-medium text-foreground mb-1">Upload ZIP</h3>
+                <h3 className="text-[14px] font-medium text-foreground mb-1">
+                  Upload ZIP
+                </h3>
                 <p className="text-[13px] text-muted-foreground mb-4">
                   Upload a ZIP file containing an{" "}
-                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">audios</code>{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    audios
+                  </code>{" "}
                   folder with .wav files and a{" "}
-                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">data.csv</code>{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    data.csv
+                  </code>{" "}
                   file mapping audio files to their reference transcriptions.
                 </p>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
@@ -729,16 +945,41 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                   >
                     {isProcessingZip ? (
                       <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
                         </svg>
                         Processing...
                       </>
                     ) : (
                       <>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                          />
                         </svg>
                         Choose ZIP file
                       </>
@@ -749,8 +990,18 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                     disabled={isProcessingZip}
                     className="h-9 px-4 rounded-md text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
                     </svg>
                     Download sample ZIP
                   </button>

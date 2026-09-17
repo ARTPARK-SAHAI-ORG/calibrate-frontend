@@ -5,6 +5,7 @@ import { unwrapList } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
   useMaxRowsPerEval,
@@ -98,6 +99,8 @@ export function SpeechToTextEvaluation({
     initialDatasetId ? "models" : "input",
   );
   const editorRef = useRef<STTDatasetEditorHandle | null>(null);
+  // True while the editor is still sending clips up (a zip, or a single row).
+  const [isUploadingRows, setIsUploadingRows] = useState(false);
   const maxRowsPerEval = useMaxRowsPerEval();
   const [providersInvalid, setProvidersInvalid] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
@@ -214,7 +217,7 @@ export function SpeechToTextEvaluation({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -289,6 +292,15 @@ export function SpeechToTextEvaluation({
         return;
       }
 
+      // A zip of clips can take minutes to upload. Rows whose clip has not
+      // landed have no audio to send, and `validate` would blame them for a
+      // missing transcript, so say what is actually happening and wait.
+      if (isUploadingRows) {
+        setActiveTab("input");
+        toast.error("Wait for the audio to finish uploading.");
+        return;
+      }
+
       // Validate rows via editor ref
       if (!editorRef.current?.validate()) {
         setActiveTab("input");
@@ -360,7 +372,7 @@ export function SpeechToTextEvaluation({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -975,6 +987,7 @@ export function SpeechToTextEvaluation({
             <STTDatasetEditor
               ref={editorRef}
               accessToken={backendAccessToken}
+              onUploadingChange={setIsUploadingRows}
               maxRowsPerEval={maxRowsPerEval}
             />
           </div>

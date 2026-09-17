@@ -530,10 +530,15 @@ describe("useOrganizations hooks", () => {
       expect(result.current.members).toEqual([member]);
     });
 
-    it("addMember returns null when accessToken or orgUuid missing", async () => {
+    // It used to answer null here, which a caller could not tell apart from a
+    // member who was added, so the reader was told everybody was in when
+    // nobody was. It throws now, the same as removeMember.
+    it("addMember refuses when there is no sign-in or no workspace", async () => {
       const { result } = renderHook(() => useOrgMembers(null, null));
-      const added = await act(async () => result.current.addMember("x@y.com"));
-      expect(added).toBeNull();
+      await expect(result.current.addMember("x@y.com")).rejects.toThrow(
+        "Not signed in",
+      );
+      expect(mockApiPost).not.toHaveBeenCalled();
     });
 
     it("removeMember deletes and filters the list", async () => {

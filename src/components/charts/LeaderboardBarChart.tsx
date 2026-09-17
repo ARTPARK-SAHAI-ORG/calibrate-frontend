@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -65,6 +65,42 @@ export function LeaderboardBarChart({
   filename,
 }: LeaderboardBarChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setChartWidth(entry.contentRect.width),
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Labels are rotated 45 degrees and anchored at their end, so a long name
+  // like "anthropic/claude-sonnet-4.6" runs down and to the LEFT of its bar.
+  // Reserve that much room under the chart, and enough on the left that the
+  // first bar's name is not clipped by the chart edge. The first name only
+  // spills past the left edge by whatever its reach exceeds half a bar's
+  // slot, so a wide chart with few bars needs little or no extra room.
+  const longestLabel = data.reduce(
+    (longest, d) => Math.max(longest, d.label.length),
+    0,
+  );
+  const labelReach = Math.min(Math.round(longestLabel * 7 * 0.71), 170);
+  const xAxisHeight = Math.max(60, labelReach + 14);
+  const chartHeight = height + (xAxisHeight - 60);
+  // 90 covers the y-axis and the right margin; the reach is subtracted too so
+  // the slot width is the narrowest it could be once the left room is added.
+  const halfSlot = data.length
+    ? Math.max(0, chartWidth - 90 - labelReach) / (2 * data.length)
+    : 0;
+  // Never hand more than a third of a narrow chart to the names, or the bars
+  // themselves are left with no room.
+  const leftMargin = Math.max(
+    20,
+    Math.round(Math.min(labelReach - halfSlot, chartWidth * 0.33)),
+  );
 
   // Generate color map from data if not provided
   const colors =
@@ -111,7 +147,7 @@ export function LeaderboardBarChart({
         </button>
       </div>
       <div ref={chartRef}>
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={data.map((d) => ({
               label: d.label,
@@ -120,8 +156,8 @@ export function LeaderboardBarChart({
             margin={{
               top: 24,
               right: 30,
-              left: 20,
-              bottom: 40,
+              left: leftMargin,
+              bottom: 0,
             }}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -134,7 +170,8 @@ export function LeaderboardBarChart({
               }}
               angle={-45}
               textAnchor="end"
-              height={60}
+              height={xAxisHeight}
+              interval={0}
             />
             <YAxis tick={{ fontSize: 12 }} domain={yDomain} tickFormatter={yTickFormatter} />
             <Tooltip

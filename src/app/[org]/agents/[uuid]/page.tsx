@@ -12,7 +12,11 @@ import {
   SaveIcon,
 } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
-import { Breadcrumbs, type Crumb } from "@/components/ui";
+import {
+  Breadcrumbs,
+  InteractionTypePill,
+  type Crumb,
+} from "@/components/ui";
 
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
@@ -65,7 +69,21 @@ export default function AgentDetailPage() {
         ]),
   ];
 
-  const customHeader = <Breadcrumbs items={crumbs} />;
+  // The trail, with the kind of agent as a pill on the same line as its name.
+  const showInteractionPill = Boolean(headerState && !headerState.hasError);
+  const trail = (className?: string) => (
+    <div className={`flex items-center gap-2 min-w-0 ${className ?? ""}`}>
+      <Breadcrumbs items={crumbs} />
+      {showInteractionPill && (
+        <InteractionTypePill
+          interactionType={headerState?.interactionType}
+          className="px-1.5 py-0.5 rounded flex-shrink-0"
+        />
+      )}
+    </div>
+  );
+
+  const customHeader = trail();
 
   // Header actions: Verify button (for unverified connection agents) + Save button
   const headerActions =
@@ -133,7 +151,7 @@ export default function AgentDetailPage() {
       headerActions={headerActions}
     >
       {/* AppLayout hides `customHeader` below md. */}
-      <Breadcrumbs items={crumbs} className="md:hidden pt-4" />
+      {trail("md:hidden pt-4")}
       <AgentDetail
         agentUuid={uuid}
         onHeaderStateChange={handleHeaderStateChange}

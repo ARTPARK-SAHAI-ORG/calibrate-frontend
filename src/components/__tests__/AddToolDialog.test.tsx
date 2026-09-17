@@ -438,7 +438,7 @@ describe("AddToolDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add tool" }));
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -807,7 +807,7 @@ describe("AddToolDialog", () => {
     );
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -1174,7 +1174,7 @@ describe("AddToolDialog", () => {
     await screen.findByDisplayValue("Upd 401");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

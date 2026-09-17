@@ -68,6 +68,7 @@ jest.mock("../BenchmarkResultsDialog", () => ({
           agentUuid: props.agentUuid,
           models: props.models,
           testUuids: props.testUuids,
+          parallelModels: props.parallelModels,
         })}
         <button onClick={props.onClose}>results-close</button>
         <button onClick={props.onGoBack}>results-go-back</button>
@@ -108,6 +109,11 @@ const providersFixture = [
       { id: "anthropic/claude-3-5-sonnet", name: "Claude 3.5 Sonnet" },
       { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku" },
     ],
+  },
+  {
+    slug: "google",
+    name: "Google",
+    models: [{ id: "google/gemini-pro", name: "Gemini Pro" }],
   },
 ];
 
@@ -177,16 +183,31 @@ describe("BenchmarkDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("renders header, one row, and add model button", () => {
+  it("renders header and one blank row with no remove button", () => {
     render(<BenchmarkDialog {...baseProps()} />);
     expect(screen.getByText("Compare different models")).toBeInTheDocument();
     expect(
-      screen.getByText("Select up to 5 models to benchmark on the tests"),
+      screen.getByText(
+        `Select up to 5 models to benchmark on the ${tests.length} tests`,
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
-    expect(screen.getByText("Add model")).toBeInTheDocument();
-    // remove button hidden with single row
+    expect(screen.queryByText("Add model")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+  });
+
+  it("counts every linked test in the subtitle when no tests are picked", () => {
+    render(<BenchmarkDialog {...baseProps({ tests: [], totalTests: 7 })} />);
+    expect(
+      screen.getByText("Select up to 5 models to benchmark on the 7 tests"),
+    ).toBeInTheDocument();
+  });
+
+  it("says one test in the singular", () => {
+    render(<BenchmarkDialog {...baseProps({ tests: tests.slice(0, 1) })} />);
+    expect(
+      screen.getByText("Select up to 5 models to benchmark on the test"),
+    ).toBeInTheDocument();
   });
 
   it("opens the LLM selector modal and selects a model, filling the row", async () => {
@@ -213,50 +234,54 @@ describe("BenchmarkDialog", () => {
     expect(screen.getByText("Select a model")).toBeInTheDocument();
   });
 
-  it("adds rows up to the max of 5, then hides add button", async () => {
+  it("picking a model adds the next blank row, until five are chosen", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps()} />);
 
-    for (let i = 0; i < 4; i++) {
-      await user.click(screen.getByText("Add model"));
+    const ids = [
+      "openai/gpt-4o",
+      "openai/gpt-4o-mini",
+      "anthropic/claude-3-5-sonnet",
+      "anthropic/claude-3-haiku",
+      "google/gemini-pro",
+    ];
+    for (const [i, id] of ids.entries()) {
+      // Always exactly one blank row, and one remove button per chosen row.
+      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+      expect(screen.queryAllByTitle("Remove model")).toHaveLength(i);
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText(`select-${id}`));
     }
 
-    expect(screen.getAllByText("Select a model")).toHaveLength(5);
-    expect(screen.queryByText("Add model")).not.toBeInTheDocument();
-    // remove buttons now shown since length > 1
+    // Five chosen: no blank row left.
+    expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
     expect(screen.getAllByTitle("Remove model")).toHaveLength(5);
   });
 
-  it("removes a single row, keeping the others", async () => {
+  it("removes a chosen row, keeping the others and the blank row", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps()} />);
 
-    await user.click(screen.getByText("Add model"));
-    // select model in first row
-    const selectButtons = screen.getAllByText("Select a model");
-    await user.click(selectButtons[0]);
+    await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o-mini"));
 
-    // now row0 = GPT-4o, row1 = empty
-    expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+    // row0 = GPT-4o, row1 = GPT-4o mini, row2 = blank
+    expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+    await user.click(screen.getAllByTitle("Remove model")[0]);
+
+    expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+    expect(screen.getByText("GPT-4o mini")).toBeInTheDocument();
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
-
-    const removeButtons = screen.getAllByTitle("Remove model");
-    // remove the second (empty) row
-    await user.click(removeButtons[1]);
-
-    expect(screen.getByText("GPT-4o")).toBeInTheDocument();
-    expect(screen.queryAllByText("Select a model")).toHaveLength(0);
-    expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+    expect(screen.getAllByTitle("Remove model")).toHaveLength(1);
   });
 
   it("excludes already-selected models from other rows but keeps the current row's own selection available", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps()} />);
 
-    await user.click(screen.getByText("Add model"));
-    const selectButtons = screen.getAllByText("Select a model");
-    await user.click(selectButtons[0]);
+    await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
 
     // Open row 1's selector - gpt-4o should not appear (already selected elsewhere)
@@ -323,9 +348,7 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByRole("button", { name: /Run comparison/i }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(
-      screen.queryByText("Compare the models"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Compare the models")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -403,6 +426,43 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
   });
 
+  it("tells the parent about a model that passed its check, and not about one that failed", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: false, error: "connection refused" }),
+      });
+    const onModelVerified = jest.fn();
+    const user = setupUser();
+    render(
+      <BenchmarkDialog
+        {...baseProps({ agentType: "connection", onModelVerified })}
+      />,
+    );
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-anthropic/claude-3-5-sonnet"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    await waitFor(() => expect(onModelVerified).toHaveBeenCalledTimes(1));
+    expect(onModelVerified).toHaveBeenCalledWith(
+      "openai/gpt-4o",
+      expect.objectContaining({ verified: true, error: null }),
+    );
+  });
+
   it("says failed when the check gives no reason to show", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       status: 200,
@@ -465,6 +525,16 @@ describe("BenchmarkDialog", () => {
     // collapse again
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
+
+    // Both panels open beside the box, so opening one closes the other.
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /see why/i }));
+    expect(screen.getByText("connection refused")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
+    expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
 
   it("401 response triggers signOut and treats model as not verified", async () => {
@@ -485,7 +555,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
@@ -630,9 +702,7 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("select-openai/gpt-4o"));
     expect(screen.getByText("verified")).toBeInTheDocument();
 
-    await user.click(screen.getByText("Add model"));
-    const remainingSelect = screen.getByText("Select a model");
-    await user.click(remainingSelect);
+    await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o-mini"));
 
     // dropped false entry -> "not checked", not "failed"
@@ -681,8 +751,7 @@ describe("BenchmarkDialog", () => {
       <BenchmarkDialog {...baseProps({ onClose, agentType: "agent" })} />,
     );
 
-    await user.click(screen.getByText("Add model"));
-    await user.click(screen.getAllByText("Select a model")[0]);
+    await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
 
@@ -842,6 +911,74 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
     ).not.toBeInTheDocument();
+  });
+
+  it("build agent: has no Advanced settings and sends no run order", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+    expect(
+      screen.queryByRole("button", { name: "Advanced settings" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+
+    const payload = JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+    expect(payload).not.toHaveProperty("parallelModels");
+  });
+
+  async function startConnectionComparison(
+    user: ReturnType<typeof setupUser>,
+    pickOrder?: "Parallel" | "Sequential",
+  ) {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    // Advanced settings starts closed, so the options are not on screen yet.
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
+    if (pickOrder) {
+      await user.click(screen.getByRole("radio", { name: pickOrder }));
+    }
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    return JSON.parse(
+      (
+        await screen.findByTestId("benchmark-results-dialog")
+      ).textContent!.split("results-close")[0],
+    );
+  }
+
+  it("connection agent: runs the models in parallel by default", async () => {
+    const payload = await startConnectionComparison(setupUser());
+    expect(payload.parallelModels).toBe(true);
+  });
+
+  it("connection agent: sends sequential when that option is picked", async () => {
+    const payload = await startConnectionComparison(setupUser(), "Sequential");
+    expect(payload.parallelModels).toBe(false);
   });
 
   it("names every linked test in the question when no tests are named", async () => {

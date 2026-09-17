@@ -19,7 +19,6 @@ import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { ClampedBlock } from "@/components/ui/ClampedBlock";
 import {
   binaryScaleFor,
-  getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
 } from "@/lib/binaryLabels";
@@ -744,8 +743,6 @@ function JudgeResultCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryScale, true)}
-      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />
@@ -844,7 +841,7 @@ function ConversationViewToggle({
 function CopyJsonButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
-    await copyToClipboard(value);
+    if (!(await copyToClipboard(value))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -1385,8 +1382,6 @@ function EvaluatorPanelCard({
           ? valueName
           : getBinaryLabel(binaryScale, false)
       }
-      trueDescription={getBinaryDescription(binaryScale, true)}
-      falseDescription={getBinaryDescription(binaryScale, false)}
       ratingScale={toRatingScale(scale)}
       ratingLabel={valueName}
     />

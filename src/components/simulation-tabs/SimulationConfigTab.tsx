@@ -4,6 +4,7 @@ import React from "react";
 import { AgentPicker, Agent } from "@/components/AgentPicker";
 import { MultiSelectPicker, PickerItem } from "@/components/MultiSelectPicker";
 import { RunEvaluatorsPanel } from "@/components/evaluations/RunEvaluatorsPanel";
+import { Link } from "@/lib/nav";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 type SimulationConfigTabProps = {
@@ -51,6 +52,10 @@ export function SimulationConfigTab({
   onCreateClick,
   isAgentConnection,
 }: SimulationConfigTabProps) {
+  // Only while the simulation is still being set up: an unverified agent then
+  // has nothing worth filling in below it.
+  const needsVerification = selectedAgent?.verified === false && !isConfigured;
+
   return (
     <div className="space-y-6">
       {/* Agent Picker */}
@@ -64,155 +69,194 @@ export function SimulationConfigTab({
         disableGeneralAgents
       />
 
-      {/* The two notices sit closer to each other than to the rest of the
-          form, since they both answer "what about this agent". */}
-      {(selectedAgent?.verified === false || isAgentConnection) && (
-        <div className="space-y-2">
-          {/* Unverified agent warning */}
-          {selectedAgent?.verified === false && (
-            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <svg
-                className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                />
-              </svg>
-              <p className="text-xs text-yellow-700 dark:text-yellow-300/90">
-                This agent needs to be verified before the simulation can be
-                run. Please verify the agent connection in the agent settings
-                first.
-              </p>
-            </div>
-          )}
-
-          {/* Voice simulation notice for agent connections */}
-          {isAgentConnection && (
-            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <svg
-                className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                />
-              </svg>
-              <p className="text-xs text-blue-600 dark:text-blue-300/90">
-                Voice simulations are currently only supported for agents built
-                within Calibrate but you can still run text simulations on your
-                connected agent
-              </p>
-            </div>
-          )}
+      {/* An unverified agent stops the setup here: nothing below can be used
+          until the connection works, so the rest of the form is replaced by
+          the one thing left to do. Once the simulation is configured the form
+          is a record of what was chosen, so it stays on screen and the header
+          keeps its own Verify button. */}
+      {needsVerification && (
+        <div className="space-y-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          <div className="flex items-start gap-2.5">
+            <svg
+              className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+            <p className="text-xs text-yellow-700 dark:text-yellow-300/90">
+              This agent needs to be verified before the simulation can be run.
+            </p>
+          </div>
+          <Link
+            href={`/agents/${selectedAgent?.uuid}?tab=connection`}
+            className="inline-flex items-center h-9 px-4 rounded-md text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer"
+          >
+            Verify the connection
+          </Link>
         </div>
       )}
 
-      {/* Personas Picker */}
-      <MultiSelectPicker
-        items={personas}
-        selectedItems={selectedPersonas}
-        onSelectionChange={onPersonasChange}
-        label="Select personas"
-        placeholder="Choose one or more personas"
-        searchPlaceholder="Search personas"
-        isLoading={personasLoading}
-        disabled={isConfigured}
-      />
-
-      {/* Scenarios Picker */}
-      <MultiSelectPicker
-        items={scenarios}
-        selectedItems={selectedScenarios}
-        onSelectionChange={onScenariosChange}
-        label="Select scenarios"
-        placeholder="Choose one or more scenarios"
-        searchPlaceholder="Search scenarios"
-        isLoading={scenariosLoading}
-        disabled={isConfigured}
-      />
-
-      {/* Evaluators — the same add and create flow as the agent page. */}
-      <div className="space-y-1">
-        <label className="block text-sm md:text-base font-medium text-foreground">
-          Select evaluators
-        </label>
-        <RunEvaluatorsPanel
-          evaluatorType="conversation"
-          available={evaluators}
-          isLoading={evaluatorsLoading}
-          selectedUuids={selectedEvaluatorUuids}
-          onSelectedChange={onEvaluatorsChange}
-          onRefresh={onEvaluatorsRefresh}
-          readOnly={isConfigured}
-          description="These evaluators evaluate the agent's performance in each simulated conversation"
-        />
-      </div>
-
-      {/* Create Button - shown when not configured */}
-      {!isConfigured && (
-        <button
-          onClick={onCreateClick}
-          disabled={
-            isCreating ||
-            !selectedAgent ||
-            selectedPersonas.length === 0 ||
-            selectedScenarios.length === 0
-          }
-          className="h-10 px-5 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isCreating ? (
-            <>
-              <svg
-                className="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
+      {/* The two notices sit closer to each other than to the rest of the
+          form, since they both answer "what about this agent". */}
+      {!needsVerification &&
+        (selectedAgent?.verified === false || isAgentConnection) && (
+          <div className="space-y-2">
+            {/* Unverified agent warning */}
+            {selectedAgent?.verified === false && (
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <svg
+                  className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Creating...
-            </>
-          ) : (
-            <>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-              Create
-            </>
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
+                </svg>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300/90">
+                  This agent needs to be verified before the simulation can be
+                  run. Please verify the agent connection in the agent settings
+                  first.
+                </p>
+              </div>
+            )}
+
+            {/* Voice simulation notice for agent connections */}
+            {isAgentConnection && (
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <svg
+                  className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  />
+                </svg>
+                <p className="text-xs text-blue-600 dark:text-blue-300/90">
+                  Voice simulations are currently only supported for agents
+                  built within Calibrate but you can still run text simulations
+                  on your connected agent
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+      {!needsVerification && (
+        <>
+          {/* Personas Picker */}
+          <MultiSelectPicker
+            items={personas}
+            selectedItems={selectedPersonas}
+            onSelectionChange={onPersonasChange}
+            label="Select personas"
+            placeholder="Choose one or more personas"
+            searchPlaceholder="Search personas"
+            isLoading={personasLoading}
+            disabled={isConfigured}
+          />
+
+          {/* Scenarios Picker */}
+          <MultiSelectPicker
+            items={scenarios}
+            selectedItems={selectedScenarios}
+            onSelectionChange={onScenariosChange}
+            label="Select scenarios"
+            placeholder="Choose one or more scenarios"
+            searchPlaceholder="Search scenarios"
+            isLoading={scenariosLoading}
+            disabled={isConfigured}
+          />
+
+          {/* Evaluators — the same add and create flow as the agent page. */}
+          <div className="space-y-1">
+            <label className="block text-sm md:text-base font-medium text-foreground">
+              Select evaluators
+            </label>
+            <RunEvaluatorsPanel
+              evaluatorType="conversation"
+              available={evaluators}
+              isLoading={evaluatorsLoading}
+              selectedUuids={selectedEvaluatorUuids}
+              onSelectedChange={onEvaluatorsChange}
+              onRefresh={onEvaluatorsRefresh}
+              readOnly={isConfigured}
+              description="These evaluators evaluate the agent's performance in each simulated conversation"
+            />
+          </div>
+
+          {/* Create Button - shown when not configured */}
+          {!isConfigured && (
+            <button
+              onClick={onCreateClick}
+              disabled={
+                isCreating ||
+                !selectedAgent ||
+                selectedPersonas.length === 0 ||
+                selectedScenarios.length === 0
+              }
+              className="h-10 px-5 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isCreating ? (
+                <>
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4.5v15m7.5-7.5h-15"
+                    />
+                  </svg>
+                  Create
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </>
       )}
     </div>
   );

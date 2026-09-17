@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect } from "react";
 import { Link } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 
@@ -51,7 +52,7 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 

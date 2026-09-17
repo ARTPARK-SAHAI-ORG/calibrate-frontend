@@ -62,17 +62,23 @@ export function matchesTestTypeFilter(
  * backend names those runs "Benchmark 3"; everywhere a reader can see one, the
  * app calls it a model comparison, which is the word on the button that starts
  * it and on the filter that lists them.
+ *
+ * Only that automatic name is rewritten. A name someone typed is shown word
+ * for word, even one that starts with "Benchmark".
  */
 export function modelComparisonName(name?: string | null): string {
   const trimmed = name?.trim();
   if (!trimmed) return "Model comparison";
-  return trimmed.replace(/^Benchmark\b/, "Model comparison");
+  return trimmed.replace(/^Benchmark (\d+)$/, "Model comparison $1");
 }
 
 /**
  * What to call one run where it is listed. The backend names runs "Run 12" and
  * "Benchmark 3"; on screen those are an evaluation run and a model comparison,
  * the words used on the tab and on the button that starts each one.
+ *
+ * Only those automatic names are rewritten. A name someone typed is shown word
+ * for word, even one that starts with "Run".
  */
 export function runDisplayName(
   type: string | null | undefined,
@@ -81,7 +87,7 @@ export function runDisplayName(
   if (type === "llm-benchmark") return modelComparisonName(name);
   const trimmed = name?.trim();
   if (!trimmed) return "Evaluation run";
-  return trimmed.replace(/^Run\b/, "Evaluation run");
+  return trimmed.replace(/^Run (\d+)$/, "Evaluation run $1");
 }
 
 /** A test row, trimmed to what the shared rules need. */

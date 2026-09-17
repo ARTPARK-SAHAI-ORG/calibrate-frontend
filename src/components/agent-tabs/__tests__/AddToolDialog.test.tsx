@@ -499,7 +499,7 @@ describe("AddToolDialog", () => {
     await user.click(screen.getByText("Add (1)"));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
     expect(onToolsAdded).not.toHaveBeenCalled();
   });

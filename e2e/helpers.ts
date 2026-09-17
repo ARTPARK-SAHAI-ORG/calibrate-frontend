@@ -22,9 +22,7 @@ export function workspacePath(path: string | RegExp): RegExp {
     typeof path === "string"
       ? path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
       : path.source;
-  return new RegExp(
-    `^https?://[^/]+/${WORKSPACE_SEGMENT}${body}(?:[?#].*)?$`,
-  );
+  return new RegExp(`^https?://[^/]+/${WORKSPACE_SEGMENT}${body}(?:[?#].*)?$`);
 }
 
 /** The workspace id the address names, or null when it names none. */
@@ -129,9 +127,13 @@ export async function createAgent(
       await page.getByRole("button", { name: "New agent" }).first().click();
       await expect(heading).toBeVisible({ timeout: 5000 });
       await page.getByPlaceholder("Enter agent name").fill(name);
-      if (kind === "connection") {
-        await page.locator('[data-agent-kind="connection"]').click();
-      }
+      // The dialog opens on "connect an existing agent", so a build agent
+      // needs its option picked.
+      await page
+        .locator(
+          `[data-agent-kind="${kind === "connection" ? "connection" : "agent"}"]`,
+        )
+        .click();
       await page.locator('[data-tour="agent-next-submit"]').click();
       // Every spec here exercises conversation-shaped flows.
       await page.locator('[data-tour="agent-nature-conversation"]').click();

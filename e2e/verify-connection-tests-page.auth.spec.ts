@@ -133,7 +133,7 @@ async function deleteTest(page: Page, name: string): Promise<void> {
   const nameCell = page.getByText(name, { exact: true }).first();
   await expect(nameCell).toBeVisible({ timeout: 20000 });
   await nameCell
-    .locator('xpath=ancestor::div[.//button[@title="Delete test"]][1]')
+    .locator('xpath=ancestor::div[.//button[@aria-label="Delete test"]][1]')
     .getByRole("button", { name: "Delete test" })
     .click();
   await expect(
@@ -149,9 +149,9 @@ async function deleteTest(page: Page, name: string): Promise<void> {
 
 // From the /tests list: open a test's Run dialog, pick the connection agent by
 // name, and click "Run test". Leaves the verify gate to the caller to assert.
-// The desktop table row's run control has aria-label "Run this test" (the
-// mobile card uses "Run test", so this stays unambiguous on the desktop
-// viewport). The RunTestDialog agent picker is a SingleSelectPicker whose
+// The desktop table row's Run button carries aria-label "Run test"; the
+// ancestor step below scopes to the row holding it, which the mobile card's
+// plain-text button never matches. The RunTestDialog agent picker is a SingleSelectPicker whose
 // trigger reads the placeholder "Select an agent"; its options render in a
 // portal (role="option") with a "Search agents" box.
 async function openRunDialogPickAgentAndRun(
@@ -165,8 +165,8 @@ async function openRunDialogPickAgentAndRun(
   const nameCell = page.getByText(testName, { exact: true }).first();
   await expect(nameCell).toBeVisible({ timeout: 20000 });
   await nameCell
-    .locator('xpath=ancestor::div[.//button[@aria-label="Run this test"]][1]')
-    .getByRole("button", { name: "Run this test" })
+    .locator('xpath=ancestor::div[.//button[@aria-label="Run test"]][1]')
+    .getByRole("button", { name: "Run test" })
     .click();
 
   // Scope to the RunTestDialog (its own .fixed.inset-0.z-50 overlay) so the
@@ -214,9 +214,9 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     await expect(
       page.getByRole("heading", { name: "Verify connection", exact: true }),
     ).toBeVisible({ timeout: 15000 });
-    // No run started: the run window's Summary tab is absent.
+    // No run started: the run window's Results tab is absent.
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toHaveCount(0);
 
     // Run the check against the real backend — example.com is unreachable, so
@@ -297,7 +297,7 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     ).toBeVisible({ timeout: 15000 });
 
     // Passing check → dialog closes and the run starts. The run window's
-    // Summary tab appears once the mocked run completes; the mocked verdict
+    // The Results tab appears once the mocked run completes; the mocked verdict
     // passes → 100% pass rate. Scope the Verify click to the dialog.
     const verifyDialog = page.locator("div.fixed.inset-0.z-50").filter({
       has: page.getByRole("heading", {
@@ -308,8 +308,10 @@ test.describe("Verify connection before running tests — LLM Tests page (fake-A
     await verifyDialog.getByRole("button", { name: "Verify" }).click();
 
     await expect(
-      page.getByRole("button", { name: "Summary", exact: true }),
+      page.getByRole("button", { name: "Results", exact: true }),
     ).toBeVisible({ timeout: 30000 });
+    // A run watched to the end stays on the tests, so the tab is opened by hand.
+    await page.getByRole("button", { name: "Results", exact: true }).click();
     await expect(page.getByText("100%").first()).toBeVisible({
       timeout: 15000,
     });

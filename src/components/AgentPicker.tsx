@@ -1,9 +1,11 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
+import { InteractionTypePill } from "@/components/ui";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 
@@ -22,7 +24,8 @@ export type Agent = {
 // `config.default_inputs` so it works whether or not the slimmed backend
 // response has shipped.
 function agentHasDefaultInputs(agent: any): boolean {
-  if (agent.has_default_inputs != null) return agent.has_default_inputs === true;
+  if (agent.has_default_inputs != null)
+    return agent.has_default_inputs === true;
   const di = agent.config?.default_inputs;
   return !!di && Object.keys(di).length > 0;
 }
@@ -151,7 +154,7 @@ export function AgentPicker({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -189,7 +192,21 @@ export function AgentPicker({
         disableCustomFieldConnections || disableGeneralAgents
           ? (a) => {
               if (disableGeneralAgents && a.interaction_type === "general") {
-                return "This agent answers one input at a time, so there is no conversation to simulate";
+                return (
+                  <span>
+                    This agent was created as a{" "}
+                    <InteractionTypePill
+                      interactionType="general"
+                      className="px-1.5 py-0.5 rounded"
+                    />{" "}
+                    agent. Create your agent as a{" "}
+                    <InteractionTypePill
+                      interactionType="conversation"
+                      className="px-1.5 py-0.5 rounded"
+                    />{" "}
+                    agent to run simulations.
+                  </span>
+                );
               }
               if (disableCustomFieldConnections && a.hasDefaultInputs) {
                 return "Text simulation is not supported for connections with custom fields";
@@ -271,7 +288,7 @@ export function MultiAgentPicker({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -368,21 +385,17 @@ export function MultiAgentPicker({
             style={{
               ...(triggerRef.current
                 ? (() => {
-                    const rect =
-                      triggerRef.current.getBoundingClientRect();
+                    const rect = triggerRef.current.getBoundingClientRect();
                     const dropdownHeight = 240;
-                    const spaceBelow =
-                      window.innerHeight - rect.bottom - 8;
+                    const spaceBelow = window.innerHeight - rect.bottom - 8;
                     const openAbove =
-                      spaceBelow < dropdownHeight &&
-                      rect.top > dropdownHeight;
+                      spaceBelow < dropdownHeight && rect.top > dropdownHeight;
                     return {
                       left: rect.left,
                       width: rect.width,
                       ...(openAbove
                         ? {
-                            bottom:
-                              window.innerHeight - rect.top + 8,
+                            bottom: window.innerHeight - rect.top + 8,
                           }
                         : { top: rect.bottom + 8 }),
                     };
@@ -430,9 +443,7 @@ export function MultiAgentPicker({
                 </div>
               ) : (
                 filteredAgents.map((agent) => {
-                  const isSelected = selectedAgentUuids.includes(
-                    agent.uuid,
-                  );
+                  const isSelected = selectedAgentUuids.includes(agent.uuid);
                   return (
                     <button
                       key={agent.uuid}

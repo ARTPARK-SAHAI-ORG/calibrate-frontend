@@ -59,3 +59,23 @@ export function withCallback(path: string, search: string): string {
     ? `${path}?${CALLBACK_PARAM}=${encodeURIComponent(wanted)}`
     : path;
 }
+
+/**
+ * Where to send someone whose session has just run out.
+ *
+ * The page they were on is carried along, so signing in again brings them back
+ * to it. Without this a session that expires mid-action drops the reader on
+ * /agents, and a page they reached by a link somebody sent them (an invite, a
+ * shared result) is simply gone: they have to find the message again.
+ *
+ * Everything that signs someone out because of a 401 must use this rather than
+ * writing "/login" by hand.
+ */
+export function loginPathAfterSignOut(): string {
+  const here =
+    typeof window === "undefined"
+      ? null
+      : window.location.pathname + window.location.search;
+  const wanted = safeCallbackUrl(here);
+  return `/login?${CALLBACK_PARAM}=${encodeURIComponent(wanted)}`;
+}

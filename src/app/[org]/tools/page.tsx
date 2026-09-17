@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import { useState, useEffect } from "react";
 import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { AddToolDialog } from "@/components/AddToolDialog";
@@ -67,7 +68,7 @@ export default function ToolsPage() {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -124,7 +125,7 @@ export default function ToolsPage() {
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

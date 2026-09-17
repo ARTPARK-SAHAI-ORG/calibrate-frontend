@@ -233,7 +233,7 @@ describe("SpeechToTextEvaluation", () => {
     const { signOut } = require("next-auth/react");
     render(<SpeechToTextEvaluation />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -686,7 +686,7 @@ describe("SpeechToTextEvaluation", () => {
     });
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 

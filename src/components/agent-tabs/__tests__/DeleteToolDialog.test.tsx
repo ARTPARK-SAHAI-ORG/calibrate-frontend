@@ -139,7 +139,7 @@ describe("DeleteToolDialog", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
     expect(onToolDeleted).not.toHaveBeenCalled();
   });

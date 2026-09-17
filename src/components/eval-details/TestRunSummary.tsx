@@ -276,10 +276,10 @@ export function TestRunSummary({
                       onClick={onReviewUnanswered}
                       className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
                     >
-                      {RESULT_TAB_LABELS.outputs} tab
+                      {RESULT_TAB_LABELS.tests} tab
                     </button>
                   ) : (
-                    <span className="font-medium">{RESULT_TAB_LABELS.outputs} tab</span>
+                    <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
                   )}
                   .
                 </>

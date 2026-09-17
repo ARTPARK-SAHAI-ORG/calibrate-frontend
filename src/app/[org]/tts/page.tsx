@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { Link, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
@@ -118,7 +119,7 @@ function TTSPageInner() {
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 

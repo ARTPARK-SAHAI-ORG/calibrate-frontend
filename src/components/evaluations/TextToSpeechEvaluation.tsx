@@ -6,6 +6,7 @@ import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
   useMaxRowsPerEval,
@@ -177,7 +178,7 @@ export function TextToSpeechEvaluation({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -376,7 +377,7 @@ export function TextToSpeechEvaluation({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

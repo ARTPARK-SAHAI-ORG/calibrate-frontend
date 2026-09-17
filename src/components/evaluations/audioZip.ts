@@ -1,5 +1,6 @@
 import type JSZip from "jszip";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { reportError } from "@/lib/reportError";
 
 /**
@@ -35,7 +36,7 @@ export async function uploadAudioToS3(
       }),
     });
     if (response.status === 401) {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: loginPathAfterSignOut() });
       return null;
     }
     if (!response.ok) throw new Error("Failed to get presigned URL");

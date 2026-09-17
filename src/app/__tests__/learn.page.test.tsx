@@ -37,6 +37,11 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
     recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
   },
   {
+    id: "align-llm-judges-with-human-experts",
+    recordingEmbedUrl: "https://www.youtube.com/embed/AtZMWjER0vQ",
+    recordingUrl: "https://youtu.be/AtZMWjER0vQ",
+  },
+  {
     id: "workshop-for-leaders",
     recordingEmbedUrl: "https://www.youtube.com/embed/Hsqm8lR1U8w",
     recordingUrl: "https://youtu.be/Hsqm8lR1U8w",

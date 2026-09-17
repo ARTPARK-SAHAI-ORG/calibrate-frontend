@@ -1,8 +1,16 @@
 import {
   toolCallPassFail,
   buildEvaluatorSummaryFromResults,
+  runEvaluatorSummary,
+  rowTestType,
+  isToolCallRow,
+  rowTestUuid,
 } from "@/lib/testRunSummary";
 import type { JudgeResult, TestRunEvaluator } from "@/components/test-results/shared";
+import type {
+  BenchmarkEvaluatorSummaryBinary,
+  BenchmarkEvaluatorSummaryRating,
+} from "@/lib/benchmarkEvaluatorSummary";
 
 describe("toolCallPassFail", () => {
   it("returns zero passed/total for an empty list", () => {
@@ -245,5 +253,138 @@ describe("buildEvaluatorSummaryFromResults", () => {
       "eval-binary": binaryEvaluator,
     });
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("runEvaluatorSummary", () => {
+  const binary: BenchmarkEvaluatorSummaryBinary = {
+    metric_key: "eval-binary",
+    name: "Correctness",
+    description: null,
+    evaluator_uuid: "eval-binary",
+    type: "binary",
+    passed: 2,
+    total: 3,
+    // Already out of 100, the same as a benchmark's.
+    pass_rate: 67,
+  };
+
+  const rating: BenchmarkEvaluatorSummaryRating = {
+    metric_key: "eval-rating",
+    name: "Helpfulness",
+    description: null,
+    evaluator_uuid: "eval-rating",
+    type: "rating",
+    mean: 4.2,
+    min: 1,
+    max: 5,
+    count: 10,
+    scale_min: 1,
+    scale_max: 5,
+  };
+
+  it("returns an empty list when the run carries no totals", () => {
+    expect(runEvaluatorSummary(null)).toEqual([]);
+    expect(runEvaluatorSummary(undefined)).toEqual([]);
+    expect(
+      runEvaluatorSummary(
+        {} as unknown as BenchmarkEvaluatorSummaryBinary[],
+      ),
+    ).toEqual([]);
+  });
+
+  it("returns an empty list for an empty set of totals", () => {
+    expect(runEvaluatorSummary([])).toEqual([]);
+  });
+
+  it("hands back a pass rate exactly as the backend counted it", () => {
+    expect(runEvaluatorSummary([binary])).toEqual([binary]);
+    // 67 is already the number the cards draw. Anything that multiplies it
+    // again fails here.
+    expect((runEvaluatorSummary([binary])[0] as typeof binary).pass_rate).toBe(
+      67,
+    );
+  });
+
+  it("leaves a rating untouched", () => {
+    expect(runEvaluatorSummary([rating])).toEqual([rating]);
+  });
+
+  it("hands back both kinds together, in the order they came", () => {
+    expect(runEvaluatorSummary([rating, binary])).toEqual([rating, binary]);
+  });
+});
+
+describe("rowTestType", () => {
+  it("reads what kind of test the backend says the row ran", () => {
+    expect(rowTestType({ test_type: "tool_call" })).toBe("tool_call");
+  });
+
+  it("prefers what the backend says over the test's own config", () => {
+    expect(
+      rowTestType({
+        test_type: "general",
+        test_case: { evaluation: { type: "response" } },
+      }),
+    ).toBe("general");
+  });
+
+  it("falls back to the test's own config on an older run", () => {
+    expect(
+      rowTestType({ test_case: { evaluation: { type: "conversation" } } }),
+    ).toBe("conversation");
+  });
+
+  it("is null when neither says", () => {
+    expect(rowTestType({})).toBeNull();
+    expect(rowTestType({ test_type: null, test_case: null })).toBeNull();
+    expect(rowTestType({ test_case: { evaluation: null } })).toBeNull();
+  });
+});
+
+describe("isToolCallRow", () => {
+  it("is true when the backend says the row ran a tool-call test", () => {
+    expect(isToolCallRow({ test_type: "tool_call" })).toBe(true);
+  });
+
+  it("is true when only the test's own config says so", () => {
+    expect(
+      isToolCallRow({ test_case: { evaluation: { type: "tool_call" } } }),
+    ).toBe(true);
+  });
+
+  it("is false for another kind of test", () => {
+    expect(
+      isToolCallRow({
+        test_type: "response",
+        test_case: { evaluation: { type: "tool_call" } },
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when neither says", () => {
+    expect(isToolCallRow({})).toBe(false);
+  });
+});
+
+// Calibrate replaces the id it is sent with the test's name, so `test_case_id`
+// holds a name on some runs. `test_uuid` is the test's real id.
+describe("rowTestUuid", () => {
+  it("uses the test's own id when the row carries one", () => {
+    expect(
+      rowTestUuid({ test_uuid: "uuid-1", test_case_id: "v4_ex__pruned__p1" }),
+    ).toBe("uuid-1");
+  });
+
+  it("falls back to test_case_id on a run that stamped no id", () => {
+    expect(rowTestUuid({ test_case_id: "case-9" })).toBe("case-9");
+    expect(rowTestUuid({ test_uuid: null, test_case_id: "case-9" })).toBe(
+      "case-9",
+    );
+  });
+
+  it("says nothing when the row identifies no test", () => {
+    expect(rowTestUuid({})).toBeNull();
+    expect(rowTestUuid({ test_uuid: null })).toBeNull();
   });
 });

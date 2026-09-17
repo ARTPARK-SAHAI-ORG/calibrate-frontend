@@ -89,10 +89,37 @@ jest.mock("../agent-tabs", () => ({
       <button onClick={() => props.onEnableBenchmark?.("google")}>
         EnableBenchmarkFromTests
       </button>
+      <button
+        onClick={() =>
+          props.onBenchmarkModelVerified?.("openai/gpt-4o", {
+            verified: true,
+            verified_at: "2024-02-02T00:00:00.000Z",
+            error: null,
+          })
+        }
+      >
+        VerifyModelFromTests
+      </button>
+      <span data-testid="tests-verified-models">
+        {Object.keys(props.benchmarkModelsVerified ?? {}).join(",")}
+      </span>
     </div>
   ),
   RunsTabContent: (props: any) => (
-    <div data-testid="runs-tab-content">RunsTabContent-{props.agentUuid}</div>
+    <div data-testid="runs-tab-content">
+      RunsTabContent-{props.agentUuid}
+      <span data-testid="runs-launcher-props">
+        {[
+          props.agentType,
+          String(props.connectionVerified),
+          String(props.supportsBenchmark),
+          String(props.benchmarkProvider),
+        ].join("|")}
+      </span>
+      <button onClick={() => props.onConnectionVerified?.()}>
+        VerifyFromRuns
+      </button>
+    </div>
   ),
   EvaluatorsTabContent: (props: any) => {
     // Mounted once per `key` value: a ref initialized on mount lets a test
@@ -308,6 +335,47 @@ describe("AgentDetail", () => {
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
 
+  it("hands the Evaluations tab what it needs to run tests for a connection agent", async () => {
+    mockFetchSequenceForAgent({
+      ...connectionAgent,
+      config: {
+        ...connectionAgent.config,
+        supports_benchmark: true,
+        benchmark_provider: "google",
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "connection|false|true|google",
+    );
+
+    // Verifying from inside a results window marks the connection verified
+    // on the page, the same as the header's Verify button does.
+    await user.click(screen.getByText("VerifyFromRuns"));
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "connection|true|true|google",
+    );
+  });
+
+  it("hands the Evaluations tab no connection settings for a build agent", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Evaluations"));
+    expect(screen.getByTestId("runs-launcher-props")).toHaveTextContent(
+      "agent|undefined|undefined|undefined",
+    );
+  });
+
   it("hides Evaluations and opens a connection agent on Tests when nothing has been run", async () => {
     useAgentHasRunsMock.mockReturnValue({
       hasRuns: false,
@@ -485,6 +553,20 @@ describe("AgentDetail", () => {
     );
   });
 
+  it("shows the agent's interaction type as a pill above the tabs", async () => {
+    const generalAgent = {
+      ...buildAgent,
+      uuid: "agent-4",
+      interaction_type: "general",
+    };
+    mockFetchSequenceForAgent(generalAgent);
+    render(<AgentDetail agentUuid={generalAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Single Agent Response")).toBeInTheDocument(),
+    );
+  });
+
   it("defaults the agent's nature to conversation when interaction_type is absent", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();
@@ -654,7 +736,7 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -686,7 +768,7 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -822,7 +904,7 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
 
     alertSpy.mockRestore();
@@ -914,7 +996,7 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
 
     alertSpy.mockRestore();
@@ -1308,6 +1390,8 @@ describe("AgentDetail", () => {
     expect(saveIndex).toBeLessThan(duplicateIndex);
     expect(JSON.parse(calls[duplicateIndex][1].body)).toEqual({
       name: "Copy of Build Agent",
+      // The picker opens on the agent's own type, untouched here.
+      interaction_type: "conversation",
     });
   });
 
@@ -1418,5 +1502,24 @@ describe("AgentDetail — turning benchmarking on from the Tests tab", () => {
     expect(
       screen.getByTestId("connection-benchmark-provider"),
     ).toHaveTextContent("google");
+  });
+
+  it("remembers a model the comparison window verified, so the next comparison does not ask again", async () => {
+    mockFetchSequenceForAgent(connectionAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Tests"));
+    expect(screen.getByTestId("tests-verified-models")).toHaveTextContent("");
+
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(connectionAgent));
+    await user.click(screen.getByText("VerifyModelFromTests"));
+
+    expect(screen.getByTestId("tests-verified-models")).toHaveTextContent(
+      "openai/gpt-4o",
+    );
   });
 });

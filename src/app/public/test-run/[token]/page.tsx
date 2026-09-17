@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   TestCaseOutput,
@@ -25,16 +25,27 @@ import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { ResultTabs } from "@/components/ui";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
-  buildEvaluatorSummaryFromResults,
+  isToolCallRow,
+  rowTestUuid,
+  runEvaluatorSummary,
   toolCallEvaluatorUuidFromRows,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
+import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
-import { isNotRun, isRunStopped, isUnanswered } from "@/lib/testTypes";
+import {
+  isNotRun,
+  isRunStopped,
+  isUnanswered,
+  runDisplayName,
+} from "@/lib/testTypes";
 import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
+  /** The uuid of the test this row ran. Absent on a run answered before the
+   * backend started stamping it, which is why `rowTestUuid` falls back. */
+  test_uuid?: string | null;
   test_name?: string;
   name?: string;
   /** null / absent means the test has not finished. It never means the test
@@ -43,9 +54,18 @@ type TestCaseResult = {
   /** True when the test produced no answer. `reasoning` then holds why. */
   unanswered?: boolean;
   reasoning?: string;
+  /** True when the run was stopped before this test started. */
+  not_run?: boolean;
+  /** What kind of test this row ran. Sent on every case in both modes. Absent
+   * on runs answered before the backend started sending it, which is why
+   * `rowTestType` falls back to the test's own config. */
+  test_type?: "response" | "general" | "tool_call" | "conversation" | null;
+  /** The four fields below are left out of the summary response. They arrive
+   * when one case is read in full. */
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
   judge_results?: JudgeResult[] | null;
+  inputs?: Record<string, unknown> | null;
   /** Per-case agent latency (ms) / cost (USD). */
   latency_ms?: number | null;
   cost?: number | null;
@@ -54,6 +74,8 @@ type TestCaseResult = {
 type TestRunStatusResponse = {
   task_id: string;
   status: string;
+  /** What the run is called. Absent on a backend that predates naming. */
+  name?: string | null;
   total_tests?: number;
   passed?: number;
   failed?: number;
@@ -66,6 +88,9 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
+  /** The run's totals for each evaluator that judged something. An evaluator
+   * that judged nothing is left out. Read it through `runEvaluatorSummary`. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Aggregate per-test latency ({p50,p95,p99,count}; legacy runs use
    * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} | null). */
   latency_ms?: LatencyStat;
@@ -91,13 +116,53 @@ export default function PublicTestRunPage() {
   const [notFound, setNotFound] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
-  const [activeTab, setActiveTab] = useState<"summary" | "outputs" | "about">(
+  const [activeTab, setActiveTab] = useState<"summary" | "tests" | "about">(
     "summary",
   );
+  // Cases read in full, keyed by test id, so reopening one costs nothing.
+  const [cases, setCases] = useState<Record<string, TestCaseResult>>({});
+  /** The test whose answer is being read, so the detail pane can say so. The
+   * row keeps its own verdict, so it stays in its group. */
+  const [loadingCaseId, setLoadingCaseId] = useState<string | null>(null);
+  const requestedCases = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     document.title = "LLM component test | Calibrate";
   }, []);
+
+  /** Read one case in full: its conversation, the agent's answer and each
+   * judge's verdict. The run itself is fetched without any of that. */
+  const fetchCase = useCallback(
+    async (testCaseId: string) => {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) return;
+      if (requestedCases.current.has(testCaseId)) {
+        setLoadingCaseId(null);
+        return;
+      }
+      requestedCases.current.add(testCaseId);
+      setLoadingCaseId(testCaseId);
+      try {
+        const res = await fetch(
+          `${backendUrl}/public/test-run/${token}/results/${testCaseId}`,
+          { headers: { accept: "application/json" } },
+        );
+        if (!res.ok) {
+          requestedCases.current.delete(testCaseId);
+          setLoadingCaseId(null);
+          return;
+        }
+        const full: TestCaseResult = await res.json();
+        setCases((prev) => ({ ...prev, [testCaseId]: full }));
+        setLoadingCaseId(null);
+      } catch {
+        // The rest of the page stays up; the row keeps what the run gave it.
+        requestedCases.current.delete(testCaseId);
+        setLoadingCaseId(null);
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,9 +170,10 @@ export default function PublicTestRunPage() {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) throw new Error("Backend URL not configured");
 
-        const res = await fetch(`${backendUrl}/public/test-run/${token}`, {
-          headers: { accept: "application/json" },
-        });
+        const res = await fetch(
+          `${backendUrl}/public/test-run/${token}?mode=summary`,
+          { headers: { accept: "application/json" } },
+        );
 
         if (res.status === 404) {
           setNotFound(true);
@@ -132,6 +198,23 @@ export default function PublicTestRunPage() {
     fetchData();
   }, [token]);
 
+  // The test on screen is the only one read in full.
+  useEffect(() => {
+    if (!selectedId) return;
+    const row = (data?.results ?? [])[Number(selectedId.replace("test-", ""))];
+    const uuid = row ? rowTestUuid(row) : null;
+    if (uuid) fetchCase(uuid);
+  }, [selectedId, data, fetchCase]);
+
+  // ponytail: the id of the evaluator that judged the tool-call tests is only
+  // in a case's judge_results, which the summary leaves out, so read the first
+  // tool-call case in full. Drop this once the run itself names it.
+  useEffect(() => {
+    const row = (data?.results ?? []).find(isToolCallRow);
+    const uuid = row ? rowTestUuid(row) : null;
+    if (uuid) fetchCase(uuid);
+  }, [data, fetchCase]);
+
   if (isLoading)
     return (
       <PublicPageLayout>
@@ -146,6 +229,13 @@ export default function PublicTestRunPage() {
     );
 
   const results = data.results ?? [];
+  // Each row with whatever has been read in full laid over it.
+  const merged = results.map((r) => {
+    const uuid = rowTestUuid(r);
+    const full = uuid ? cases[uuid] : undefined;
+    if (full) return { ...r, ...full, loading: false };
+    return { ...r, loading: uuid !== null && uuid === loadingCaseId };
+  });
   // Someone stopped this run before it finished, so the tests it never started
   // are neither passes nor failures.
   const wasStopped = isRunStopped(data);
@@ -156,18 +246,44 @@ export default function PublicTestRunPage() {
   const failed = results.filter(
     (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
   ).length;
-  // Tool-call pass/fail split for the Summary tab's dedicated card.
+  // Tool-call pass/fail split for the Results tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
-      toolCall: r.test_case?.evaluation?.type === "tool_call",
+      toolCall: isToolCallRow(r),
       passed: getStatus(r, wasStopped) === "passed",
       failed: getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
     })),
   );
+  const evaluatorsByUuid = Object.fromEntries(
+    (data.evaluators ?? []).map((e) => [e.uuid, e]),
+  );
+  const evaluatorSummary = runEvaluatorSummary(data.evaluator_summary);
+
+  /** The whole run, read only when someone exports it: the file carries each
+   * case's conversation, answer and judge reasoning, none of which the page
+   * itself downloads. Falls back to what is on screen if it cannot be read. */
+  const fetchFullResults = async (): Promise<TestCaseResult[]> => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return merged;
+    try {
+      const res = await fetch(`${backendUrl}/public/test-run/${token}`, {
+        headers: { accept: "application/json" },
+      });
+      if (!res.ok) return merged;
+      const full: TestRunStatusResponse = await res.json();
+      return full.results ?? merged;
+    } catch {
+      return merged;
+    }
+  };
 
   return (
     <PublicPageLayout
-      title="LLM component test"
+      title={
+        data.name
+          ? runDisplayName("llm-unit-test", data.name)
+          : "LLM component test"
+      }
       pills={wasStopped ? <StoppedRunPill /> : undefined}
       contentClassName="max-w-[92rem]"
     >
@@ -176,12 +292,12 @@ export default function PublicTestRunPage() {
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
             <ResultTabs
-              tabs={["summary", "outputs", "about"]}
+              tabs={["summary", "tests", "about"]}
               activeTab={activeTab}
               onChange={setActiveTab}
             />
           </div>
-          {activeTab === "outputs" && nav && selectedId && (
+          {activeTab === "tests" && nav && selectedId && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -195,9 +311,9 @@ export default function PublicTestRunPage() {
             <div className="pb-2">
               <ExportResultsButton
                 filename={`test-run-${token}`}
-                getRows={() =>
+                getRows={async () =>
                   buildTestRunCsv(
-                    results.map((r) => ({
+                    (await fetchFullResults()).map((r) => ({
                       name: r.name || r.test_case?.name || r.test_name,
                       status: isUnanswered(r)
                         ? "error"
@@ -207,9 +323,7 @@ export default function PublicTestRunPage() {
                       reasoning: r.reasoning,
                       judgeResults: r.judge_results,
                     })),
-                    Object.fromEntries(
-                      (data.evaluators ?? []).map((e) => [e.uuid, e]),
-                    ),
+                    evaluatorsByUuid,
                   )
                 }
               />
@@ -217,8 +331,7 @@ export default function PublicTestRunPage() {
           )}
         </div>
 
-        {/* Summary tab. Single runs don't carry a backend evaluator_summary,
-            so derive per-evaluator metrics from the cases' judge_results. */}
+        {/* Results tab */}
         {activeTab === "summary" && (
           <TestRunSummary
             passed={passed}
@@ -227,35 +340,30 @@ export default function PublicTestRunPage() {
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
             runTotalTests={data.total_tests ?? results.length}
-            onReviewUnanswered={() => setActiveTab("outputs")}
+            onReviewUnanswered={() => setActiveTab("tests")}
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
             tokens={data.total_tokens ?? null}
             toolCall={toolCall}
             toolCallEvaluatorUuid={toolCallEvaluatorUuidFromRows(
-              results.map((r) => ({
+              merged.map((r) => ({
                 testCase: r.test_case,
                 judgeResults: r.judge_results,
               })),
             )}
-            evaluatorSummary={buildEvaluatorSummaryFromResults(
-              results,
-              Object.fromEntries(
-                (data.evaluators ?? []).map((e) => [e.uuid, e]),
-              ),
-            )}
+            evaluatorSummary={evaluatorSummary}
             enableEvaluatorLinks={false}
           />
         )}
 
-        {/* Outputs tab */}
-        {activeTab === "outputs" && results.length > 0 && (
+        {/* Tests tab */}
+        {activeTab === "tests" && results.length > 0 && (
           <div
             className="border border-border rounded-xl overflow-hidden"
             style={{ height: "calc(100vh - 220px)", minHeight: 620 }}
           >
             <TestRunOutputsPanel
-              results={results.map((r, i) => ({
+              results={merged.map((r, i) => ({
                 id: `test-${i}`,
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
@@ -264,15 +372,15 @@ export default function PublicTestRunPage() {
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,
                 reasoning: r.reasoning,
+                inputs: r.inputs ?? undefined,
                 judgeResults: r.judge_results ?? null,
+                loading: r.loading,
               }))}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onClearSelection={() => setSelectedId(null)}
               onNavChange={setNav}
-              evaluatorsByUuid={Object.fromEntries(
-                (data.evaluators ?? []).map((e) => [e.uuid, e]),
-              )}
+              evaluatorsByUuid={evaluatorsByUuid}
               enableEvaluatorLinks={false}
             />
           </div>
@@ -285,14 +393,7 @@ export default function PublicTestRunPage() {
             showLatency={!!data.latency_ms}
             showCost={!!data.cost}
             showTokens={!!data.total_tokens}
-            evaluators={evaluatorSummaryToAbout(
-              buildEvaluatorSummaryFromResults(
-                results,
-                Object.fromEntries(
-                  (data.evaluators ?? []).map((e) => [e.uuid, e]),
-                ),
-              ),
-            )}
+            evaluators={evaluatorSummaryToAbout(evaluatorSummary)}
           />
         )}
       </div>

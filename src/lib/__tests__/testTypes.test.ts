@@ -7,6 +7,7 @@ import {
   runDisplayName,
   isRunStopped,
   isNotRun,
+  isRunInProgress,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -104,6 +105,12 @@ describe("modelComparisonName", () => {
   it("leaves a name of its own alone", () => {
     expect(modelComparisonName("Nightly sweep")).toBe("Nightly sweep");
   });
+
+  it("leaves a typed name that starts with Benchmark alone", () => {
+    expect(modelComparisonName("Benchmark before v2")).toBe(
+      "Benchmark before v2",
+    );
+  });
 });
 
 describe("runDisplayName", () => {
@@ -120,6 +127,15 @@ describe("runDisplayName", () => {
   it("names a run the backend has not named yet", () => {
     expect(runDisplayName("llm-unit-test", "")).toBe("Evaluation run");
     expect(runDisplayName("llm-benchmark", null)).toBe("Model comparison");
+  });
+
+  it("leaves a typed name alone, including one that starts with Run", () => {
+    expect(runDisplayName("llm-unit-test", "Regression before v2")).toBe(
+      "Regression before v2",
+    );
+    expect(runDisplayName("llm-unit-test", "Run before the fix")).toBe(
+      "Run before the fix",
+    );
   });
 });
 
@@ -189,4 +205,23 @@ describe("getRunBreakdown on a stopped run", () => {
       getRunBreakdown({ total_tests: 10, passed: 3, unanswered_tests: 1 }),
     ).toEqual({ passed: 3, failed: 6, unanswered: 1 });
   });
+});
+
+// Both run lists refresh themselves only while this says a run is still
+// going, so a wrong answer here either leaves a finished list refreshing
+// forever or leaves a running one frozen.
+describe("isRunInProgress", () => {
+  it.each(["pending", "queued", "in_progress"])(
+    "says a run is still going when its status is %s",
+    (status) => {
+      expect(isRunInProgress({ status })).toBe(true);
+    },
+  );
+
+  it.each(["completed", "done", "failed", "aborted", ""])(
+    "says a run is not going when its status is %s",
+    (status) => {
+      expect(isRunInProgress({ status })).toBe(false);
+    },
+  );
 });

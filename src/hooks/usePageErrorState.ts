@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { getErrorStatusCode } from "@/lib/parseBackendError";
 import {
   orgUuidFromErrorMessage,
@@ -53,7 +54,7 @@ export function usePageErrorState() {
 
   const captureResponse = useCallback((response: Response): boolean => {
     if (response.status === 401) {
-      void signOut({ callbackUrl: "/login" });
+      void signOut({ callbackUrl: loginPathAfterSignOut() });
       return true;
     }
     const status = response.status;

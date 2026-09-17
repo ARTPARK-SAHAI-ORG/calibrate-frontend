@@ -19,6 +19,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
 import { isUnanswered } from "@/lib/testTypes";
 
 export type TestRunResult = {
@@ -39,6 +40,10 @@ export type TestRunResult = {
    * for tool-call tests and for legacy rows (which fall back to a single
    * default-evaluator reasoning). */
   judgeResults?: JudgeResult[] | null;
+  /** This test's answer is being read. Only the detail pane reads it: the
+   * row keeps its own verdict, so it stays in its group and its group's
+   * count does not move while the answer is on its way. */
+  loading?: boolean;
 };
 
 type TestRunOutputsPanelProps = {
@@ -65,6 +70,8 @@ type TestRunOutputsPanelProps = {
   onToggleLabellingSelection?: (id: string) => void;
   /** Toggle select-all / deselect-all for the given ids. */
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Shown under the search box once tests are ticked (count, Run, Compare). */
+  selectionStrip?: React.ReactNode;
 };
 
 type StatusGroup = {
@@ -88,6 +95,7 @@ export function TestRunOutputsPanel({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,7 +105,12 @@ export function TestRunOutputsPanel({
   const selectedRowRef = useRef<HTMLDivElement>(null);
   // Both side columns start at their old fixed widths but are user-resizable,
   // so a long input/output pair in the middle can be given more room.
-  const listPanel = useResizableWidth(320, 240, 560, "grow-right");
+  const listPanel = useResizableWidth(
+    LIST_PANEL_MIN_WIDTH_FOR_WORDS,
+    240,
+    560,
+    "grow-right",
+  );
   const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   const toggleSection = (key: string) => {
@@ -245,6 +258,7 @@ export function TestRunOutputsPanel({
               {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
             </button>
           )}
+          {selectionStrip}
         </div>
         <div
           ref={listContainerRef}
@@ -308,7 +322,12 @@ export function TestRunOutputsPanel({
                     <div
                       key={result.id}
                       ref={selectedId === result.id ? selectedRowRef : undefined}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      // ponytail: the browser skips style/layout/paint for rows
+                      // off screen, but every row element is still created. 36px
+                      // is a row's real height (py-2 = 8+8 around a 20px line).
+                      // If element creation itself ever becomes the bottleneck,
+                      // the upgrade is real windowing: render only the visible slice.
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_36px] ${
                         selectedId === result.id ? "bg-muted" : "hover:bg-muted/50"
                       }`}
                     >
@@ -407,7 +426,10 @@ export function TestRunOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedResult && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
+      {/* While the test is still being read this panel stays away, so the one
+          spinner in the middle covers the whole area rather than sitting next
+          to a panel saying the test has no evaluators. */}
+      {selectedResult && !selectedResult.loading && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
         <>
           <ResizeHandle
             onMouseDown={verdictPanel.startDrag}
@@ -480,6 +502,17 @@ function TestResultDetail({
         <p className="text-muted-foreground text-center">
           This test was not run. The run was stopped before it got here.
         </p>
+      </div>
+    );
+  }
+
+  if (result.loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
       </div>
     );
   }

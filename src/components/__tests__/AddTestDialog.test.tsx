@@ -111,7 +111,10 @@ jest.mock("../tools/CreateToolFlow", () => ({
         onClick={() =>
           props.onCreated(
             { uuid: "tool-new", name: "get_forecast", config: {} },
-            [...props.knownTools, { uuid: "tool-new", name: "get_forecast", config: {} }],
+            [
+              ...props.knownTools,
+              { uuid: "tool-new", name: "get_forecast", config: {} },
+            ],
           )
         }
       >
@@ -239,12 +242,29 @@ afterEach(() => {
 // Pick a type on the intro picker and confirm it: tapping the option opens a
 // preview of what that test type looks like, and Next is what actually
 // enters the full editor.
-async function pickTestType(
-  user: ReturnType<typeof setupUser>,
-  title: string,
-) {
+async function pickTestType(user: ReturnType<typeof setupUser>, title: string) {
   await user.click(screen.getByText(title));
   await user.click(screen.getByRole("button", { name: "Next" }));
+}
+
+// A test written from scratch now opens with a worked example already in its
+// boxes, so any test that drives its own values empties them first.
+async function emptyTheExample(user: ReturnType<typeof setupUser>) {
+  const name = screen.queryByPlaceholderText("Your test name");
+  if (name) await user.clear(name);
+  const input = screen.queryByPlaceholderText(
+    "Enter the input given to the agent",
+  );
+  if (input) await user.clear(input);
+  for (const box of Array.from(
+    document.querySelectorAll("textarea[data-msg-id]"),
+  )) {
+    await user.clear(box as HTMLTextAreaElement);
+  }
+  const criteria = screen.queryByPlaceholderText(
+    "Enter value for {{criteria}}",
+  );
+  if (criteria) await user.clear(criteria);
 }
 
 // Drive a controlled `testName` prop from a stateful wrapper so typing in the
@@ -321,6 +341,138 @@ describe("AddTestDialog", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Test name")).toBeInTheDocument();
     expect(screen.getByText("Evaluators")).toBeInTheDocument();
+  });
+
+  describe("the worked example a new test opens with", () => {
+    it("fills the name, the conversation and the criteria once a type is picked", async () => {
+      const user = setupUser();
+      render(<ControlledDialog {...baseProps()} />);
+      await pickTestType(user, "Does the agent give the right reply?");
+
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("Gives the correct opening hours"),
+        ).toBeInTheDocument(),
+      );
+      const turns = Array.from(
+        document.querySelectorAll("textarea[data-msg-id]"),
+      ) as HTMLTextAreaElement[];
+      expect(turns.map((t) => t.value)).toEqual([
+        "I need to rebook my mother's check-up.",
+        "Of course. We have Friday 11 AM or Saturday 10 AM free.",
+        "Saturday. What time do you open that day?",
+      ]);
+      const criteria = await screen.findByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      expect((criteria as HTMLInputElement).value).toContain("Saturday");
+    });
+
+    it("saves the example as written, with no further typing", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(<ControlledDialog {...baseProps({ onSubmit })} />);
+      await pickTestType(user, "Does the agent give the right reply?");
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config, evaluators] = onSubmit.mock.calls[0];
+      expect(config.history).toHaveLength(3);
+      expect(config.history[0].content).toBe(
+        "I need to rebook my mother's check-up.",
+      );
+      expect(evaluators[0].variable_values.criteria).toContain("Saturday");
+    });
+
+    it("fills the criteria when the agent carries the built-in judge itself", async () => {
+      const user = setupUser();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            agentEvaluatorUuids: [CORRECTNESS_EVALUATOR.uuid],
+          })}
+        />,
+      );
+      await pickTestType(user, "Does the agent give the right reply?");
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      // Seeded from the agent's own list rather than the fallback, and it is
+      // still the judge that ships with the product, so it is still filled.
+      const criteria = (await screen.findByPlaceholderText(
+        "Enter value for {{criteria}}",
+      )) as HTMLInputElement;
+      expect(criteria.value).toContain("Saturday");
+    });
+
+    it("fills the single input box for a single response agent", async () => {
+      const user = setupUser();
+      render(<ControlledDialog {...baseProps({ agentNature: "general" })} />);
+      await pickTestType(user, "Does the agent give the right answer?");
+
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("Advises seeing a clinician"),
+        ).toBeInTheDocument(),
+      );
+      const input = screen.getByPlaceholderText(
+        "Enter the input given to the agent",
+      ) as HTMLTextAreaElement;
+      expect(input.value).toContain("fever");
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
+    });
+
+    it("closes without asking to discard when nothing but the example is there", async () => {
+      const user = setupUser();
+      const onClose = jest.fn();
+      const { container } = render(
+        <ControlledDialog {...baseProps({ onClose })} />,
+      );
+      await pickTestType(user, "Does the agent give the right reply?");
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      const backdrop = container.querySelector(
+        ".absolute.inset-0.bg-black\\/50",
+      ) as HTMLElement;
+      await user.click(backdrop);
+
+      expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves an existing test's own content alone when editing", async () => {
+      const initialConfig: TestConfig = {
+        history: [{ role: "user", content: "Where is my report?" }],
+        evaluation: { type: "response" },
+      };
+      render(
+        <ControlledDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            initialConfig,
+            testName: "My own test",
+          })}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.getByDisplayValue("Where is my report?"),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByDisplayValue("My own test")).toBeInTheDocument();
+      expect(
+        screen.queryByDisplayValue("Gives the correct opening hours"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("skips the intro picker when initialTab is provided (duplicate flow)", () => {
@@ -477,6 +629,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
+      await emptyTheExample(user);
 
       await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -499,6 +652,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
+      await emptyTheExample(user);
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
 
       const textareas = document.querySelectorAll("textarea[data-msg-id]");
@@ -533,6 +687,7 @@ describe("AddTestDialog", () => {
     async function fillRequiredNextReplyFields(
       user: ReturnType<typeof setupUser>,
     ) {
+      await emptyTheExample(user);
       await user.type(screen.getByPlaceholderText("Your test name"), "My test");
       const textareas = document.querySelectorAll("textarea[data-msg-id]");
       await user.type(textareas[0], "Hi there");
@@ -885,9 +1040,7 @@ describe("AddTestDialog", () => {
       );
 
       // Clicking the name on the attached card opens its prompt.
-      await user.click(
-        screen.getByRole("button", { name: /^Correctness/ }),
-      );
+      await user.click(screen.getByRole("button", { name: /^Correctness/ }));
       expect(
         screen.getByRole("heading", { name: "Correctness" }),
       ).toBeInTheDocument();
@@ -1078,9 +1231,7 @@ describe("AddTestDialog", () => {
       );
       await user.click(screen.getByRole("button", { name: "Create tool" }));
       expect(createToolFlowSlots[0].isOpen).toBe(true);
-      expect(
-        screen.queryByTestId("tool-picker"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("tool-picker")).not.toBeInTheDocument();
     });
 
     it("selects the newly created tool into the test's tool call, with no agent to attach to", async () => {
@@ -1679,7 +1830,9 @@ describe("AddTestDialog", () => {
       );
       await waitFor(() =>
         expect(
-          screen.getByText("Add at least one evaluator to grade the agent's next reply"),
+          screen.getByText(
+            "Add at least one evaluator to grade the agent's next reply",
+          ),
         ).toBeInTheDocument(),
       );
       expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
@@ -1695,7 +1848,9 @@ describe("AddTestDialog", () => {
           })}
         />,
       );
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
     });
 
     const GENERAL_EVALUATOR = {
@@ -1715,7 +1870,9 @@ describe("AddTestDialog", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByPlaceholderText("Enter the input given to the agent")).toBeInTheDocument(),
+        expect(
+          screen.getByPlaceholderText("Enter the input given to the agent"),
+        ).toBeInTheDocument(),
       );
       // The multi-turn chat-message builder is gone entirely for this case.
       expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
@@ -1736,8 +1893,14 @@ describe("AddTestDialog", () => {
           })}
         />,
       );
-      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
-      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+      await waitFor(() =>
+        expect(screen.getByText("Output check")).toBeInTheDocument(),
+      );
+      await emptyTheExample(user);
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "General test",
+      );
 
       await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -1759,8 +1922,14 @@ describe("AddTestDialog", () => {
           })}
         />,
       );
-      await waitFor(() => expect(screen.getByText("Output check")).toBeInTheDocument());
-      await user.type(screen.getByPlaceholderText("Your test name"), "General test");
+      await waitFor(() =>
+        expect(screen.getByText("Output check")).toBeInTheDocument(),
+      );
+      await emptyTheExample(user);
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "General test",
+      );
       await user.type(
         screen.getByPlaceholderText("Enter the input given to the agent"),
         "Summarize this article: ...",
@@ -1888,6 +2057,7 @@ describe("AddTestDialog", () => {
       );
       await user.click(screen.getByText("Pick get_weather"));
 
+      await emptyTheExample(user);
       await user.type(
         screen.getByPlaceholderText("Your test name"),
         "Weather tool test",
@@ -1940,6 +2110,7 @@ describe("AddTestDialog", () => {
       );
       await user.click(screen.getByText("Pick get_weather"));
 
+      await emptyTheExample(user);
       await user.type(
         screen.getByPlaceholderText("Your test name"),
         "Weather tool test",
@@ -1974,6 +2145,7 @@ describe("AddTestDialog", () => {
       );
       await user.click(screen.getByText("Pick get_weather"));
 
+      await emptyTheExample(user);
       await user.type(
         screen.getByPlaceholderText("Your test name"),
         "Weather tool test",
@@ -2031,5 +2203,75 @@ describe("AddTestDialog", () => {
       );
       expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
     });
+  });
+});
+
+describe("AddTestDialog — stepping to another test", () => {
+  const navProps = (overrides: Record<string, unknown> = {}) => ({
+    isEditing: true,
+    initialTab: "next-reply" as const,
+    testName: "Saved test",
+    onPrev: jest.fn(),
+    onNext: jest.fn(),
+    hasPrev: true,
+    hasNext: true,
+    position: { index: 2, total: 12 },
+    ...overrides,
+  });
+
+  it("shows the arrows and where the open test sits in the list", async () => {
+    render(<AddTestDialog {...baseProps(navProps())} />);
+    await screen.findByText("Test name");
+
+    expect(screen.getByText("3 of 12")).toBeInTheDocument();
+    expect(screen.getByLabelText("Previous test")).toBeEnabled();
+    expect(screen.getByLabelText("Next test")).toBeEnabled();
+  });
+
+  it("steps straight away when nothing has been edited", async () => {
+    const user = setupUser();
+    const props = navProps();
+    render(<AddTestDialog {...baseProps(props)} />);
+    await screen.findByText("Test name");
+
+    await user.click(screen.getByLabelText("Next test"));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+  });
+
+  it("asks before throwing away unsaved edits, and steps only on Discard", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    render(<ControlledDialog {...baseProps(props)} />);
+    // The form is only compared against a baseline once its evaluators have
+    // settled, so wait for the default one before editing anything.
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+
+    await user.click(screen.getByLabelText("Next test"));
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(props.onNext).not.toHaveBeenCalled();
+
+    await user.click(screen.getByLabelText("Previous test"));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(props.onPrev).toHaveBeenCalledTimes(1);
+    expect(props.onNext).not.toHaveBeenCalled();
+  });
+
+  it("hides the arrows when no stepping was offered", async () => {
+    render(
+      <AddTestDialog
+        {...baseProps({ isEditing: true, initialTab: "next-reply" })}
+      />,
+    );
+    await screen.findByText("Test name");
+
+    expect(screen.queryByLabelText("Next test")).not.toBeInTheDocument();
   });
 });

@@ -152,6 +152,74 @@ describe("Tooltip", () => {
     expect(await screen.findByText("Edge tip")).toBeInTheDocument();
   });
 
+  it("drops below the trigger when there is no room above it", async () => {
+    const user = setupUser();
+    // A trigger 10px from the top of the window, as in the app's top bar.
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 10,
+        bottom: 30,
+        left: 200,
+        right: 300,
+        width: 100,
+        height: 20,
+        x: 200,
+        y: 10,
+        toJSON: () => {},
+      } as DOMRect);
+
+    render(
+      <Tooltip content="Flipped tip" position="top">
+        <button>TopBarTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("TopBarTrigger"));
+    const popup = await screen.findByText("Flipped tip");
+
+    // The arrow sits on the popup's top edge, pointing up at the trigger,
+    // and the popup itself starts below the trigger.
+    const arrow = popup.querySelector("div.absolute");
+    expect(arrow?.className).toContain("bottom-full");
+    expect(arrow?.className).not.toContain("top-full");
+    const box = popup.closest("div.fixed") as HTMLElement;
+    expect(parseFloat(box.style.top)).toBeGreaterThanOrEqual(30);
+
+    rectSpy.mockRestore();
+  });
+
+  it("stays above the trigger when there is room above it", async () => {
+    const user = setupUser();
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 400,
+        bottom: 420,
+        left: 200,
+        right: 300,
+        width: 100,
+        height: 20,
+        x: 200,
+        y: 400,
+        toJSON: () => {},
+      } as DOMRect);
+
+    render(
+      <Tooltip content="Upward tip" position="top">
+        <button>MidPageTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("MidPageTrigger"));
+    const popup = await screen.findByText("Upward tip");
+    expect(popup.querySelector("div.absolute")?.className).toContain(
+      "top-full",
+    );
+
+    rectSpy.mockRestore();
+  });
+
   it("clamps horizontal position for a right-positioned tooltip overflowing the viewport", async () => {
     const user = setupUser();
     const rectSpy = jest

@@ -3,18 +3,16 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import {
   useAccessToken,
   useAgentTests,
   useDialogUrlParam,
+  useItemPager,
   usePageSize,
 } from "@/hooks";
-import {
-  fetchAgentTestsPage,
-  fetchAllAgentTests,
-  unlinkTestsFromAgent,
-} from "@/lib/agentTestsApi";
+import { fetchAgentTestsPage, fetchAllAgentTests } from "@/lib/agentTestsApi";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
@@ -23,19 +21,15 @@ import {
 } from "@/components/ui/SearchModeInput";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
-import { startTestRunOrNotify } from "@/lib/testRunApi";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
-import { VerifyConnectionDialog } from "@/components/VerifyConnectionDialog";
-import { BenchmarkDialog } from "@/components/BenchmarkDialog";
-import {
-  BenchmarkRerunDialog,
-  useBenchmarkRerun,
-} from "@/components/BenchmarkRerunDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
-import { EnableBenchmarkDialog } from "@/components/agent-tabs/EnableBenchmarkDialog";
-import { SpinnerIcon } from "@/components/icons";
+import {
+  useAgentRunLaunchers,
+  type AgentRunLauncherSettings,
+} from "@/components/agent-tabs/useAgentRunLaunchers";
+import { SpinnerIcon, CopyIcon, TrashIcon } from "@/components/icons";
 import {
   AddTestDialog,
   TestConfig,
@@ -148,6 +142,7 @@ type TestsTabContentProps = {
   agentDefaultInputTypes?: Record<string, InputFieldType>;
   // Called after a passing endpoint check so the parent flips connectionVerified true.
   onConnectionVerified?: () => void;
+  onBenchmarkModelVerified?: AgentRunLauncherSettings["onBenchmarkModelVerified"];
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
   onGoToConnectionSettings?: () => void;
   // Called when someone turns benchmarking on from here by picking a provider.
@@ -182,6 +177,89 @@ const SHOW_ADD_EXISTING_TEST = false;
 const carriesEvaluators = (type: string) =>
   type === "response" || type === "conversation" || type === "general";
 
+// The actions on one test's row: a small Run and Delete pair; Duplicate takes the bordered
+// style the labelling task's items use for Edit.
+function TestRowActions({
+  onRun,
+  running,
+  runDisabled,
+  onDuplicate,
+  duplicating,
+  duplicateDisabled,
+  onDelete,
+}: {
+  onRun: () => void;
+  running: boolean;
+  runDisabled: boolean;
+  onDuplicate: () => void;
+  duplicating: boolean;
+  duplicateDisabled: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className="flex items-center justify-end gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onRun}
+        disabled={runDisabled}
+        aria-busy={running}
+        // Said out loud it needs the object, and it keeps this apart from
+        // the toolbar's Run, which runs the whole selection.
+        aria-label="Run test"
+        className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
+          runDisabled ? "cursor-not-allowed" : "hover:opacity-90 cursor-pointer"
+        }`}
+      >
+        {running ? (
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+            />
+          </svg>
+        )}
+        Run
+      </button>
+      <button
+        type="button"
+        onClick={onDuplicate}
+        disabled={duplicating || duplicateDisabled}
+        aria-busy={duplicating}
+        aria-label="Duplicate test"
+        className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {duplicating ? (
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <CopyIcon className="w-3.5 h-3.5" />
+        )}
+        Duplicate
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete test"
+        className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
+        Delete
+      </button>
+    </div>
+  );
+}
+
 export function TestsTabContent({
   agentUuid,
   isActive = true,
@@ -194,6 +272,7 @@ export function TestsTabContent({
   agentDefaultInputs,
   agentDefaultInputTypes,
   onConnectionVerified,
+  onBenchmarkModelVerified,
   onGoToConnectionSettings,
   onEnableBenchmark,
   onRunStarted,
@@ -249,6 +328,8 @@ export function TestsTabContent({
     total: agentTestsTotal,
     loadedQ: loadedTestsSearch,
     offset: testsOffset,
+    setOffset: setTestsOffset,
+    loadedOffset: loadedTestsOffset,
     isLoading: agentTestsLoading,
     error: agentTestsError,
     refetch: fetchAgentTests,
@@ -267,6 +348,16 @@ export function TestsTabContent({
     type: typeFilter,
   });
 
+  // The first request owns the whole view because there is nothing useful to
+  // show yet. Later requests only refresh the list, so keep the search and
+  // filters mounted while that part loads; otherwise the focused input is
+  // removed after every debounced search.
+  const hasLoadedAgentTestsRef = useRef(false);
+  if (!agentTestsLoading && !agentTestsError) {
+    hasLoadedAgentTestsRef.current = true;
+  }
+  const hasLoadedAgentTests = hasLoadedAgentTestsRef.current;
+
   // How many tests this agent has in all. `agentTestsTotal` counts only the
   // ones matching the search and the type, so it cannot answer "does this
   // agent have any tests" or "how many would Run all run": both of those are
@@ -274,7 +365,7 @@ export function TestsTabContent({
   // that number, so it is remembered while a filter is on.
   const isFiltered = typeFilter !== "all" || testsSearch.trim() !== "";
   const linkedTestsTotalRef = useRef(0);
-  if (!isFiltered && !agentTestsLoading) {
+  if (!isFiltered && !agentTestsLoading && !agentTestsError) {
     linkedTestsTotalRef.current = agentTestsTotal;
   }
   const linkedTestsTotal = isFiltered
@@ -335,6 +426,9 @@ export function TestsTabContent({
   // endpoint with agent_uuids: [agentUuid].
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
+  // The test whose duplicate button is waiting on its fetch, so that row's
+  // button can show a spinner while the dialog stays closed.
+  const [duplicatingUuid, setDuplicatingUuid] = useState<string | null>(null);
   const [initialTab, setInitialTab] = useState<
     "next-reply" | "tool-invocation" | "conversation" | undefined
   >(undefined);
@@ -356,6 +450,21 @@ export function TestsTabContent({
     onClose: () => closeTestDialogAfterSave(),
   });
 
+  // Previous / next across every test the filters match, not just the page
+  // on screen: stepping off either end of the page turns it and opens the
+  // test at the far edge of the page that arrives.
+  const testPager = useItemPager({
+    items: agentTests,
+    openUuid: editingTestUuid,
+    pageStart: loadedTestsOffset,
+    pageSize,
+    total: agentTestsTotal,
+    onOpen: (uuid) => {
+      void openEditTest(uuid);
+    },
+    onPageStartChange: setTestsOffset,
+  });
+
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
     new Set(),
@@ -366,14 +475,9 @@ export function TestsTabContent({
   const [testToDelete, setTestToDelete] = useState<TestData | null>(null);
   const [testsToDeleteBulk, setTestsToDeleteBulk] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  /**
-   * "remove": detach test from this agent only
-   * (POST /agent-tests/bulk-unlink).
-   * "permanent": delete the test record itself (DELETE /tests/{uuid}); affects all agents.
-   */
-  const [deleteMode, setDeleteMode] = useState<"remove" | "permanent">(
-    "remove",
-  );
+  // Shown inside the confirmation window when the delete itself fails, so the
+  // reader is not left looking at an unchanged window.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
@@ -398,42 +502,64 @@ export function TestsTabContent({
     setRunIdParam(null);
     onRunWindowClosed?.();
   };
-  // Key of the run control whose "create run" call is in flight ("all",
-  // "bulk", or a test uuid). Non-null disables every run control.
-  const [startingRun, setStartingRun] = useState<string | null>(null);
-  // Set when a Run was clicked on an unverified connection agent: holds the
-  // run the user asked for so it can start once the verify dialog passes.
-  const [pendingRun, setPendingRun] = useState<{
-    tests: TestData[];
-    allLinked: boolean;
-    runKey: string;
-  } | null>(null);
 
-  // Benchmark dialog state
-  const [runAllConfirmOpen, setRunAllConfirmOpen] = useState(false);
-  const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
-  // The tests the benchmark dialog compares the models on: the ticked rows
-  // for the "Compare" bulk action, and nothing for the header's "Compare
-  // models", which means every test linked to the agent. The backend runs
-  // them all when it is sent no test ids, so comparing every test never needs
-  // the list itself.
-  const [benchmarkTests, setBenchmarkTests] = useState<TestData[]>([]);
-
-  const isConnectionUnverified =
-    agentType === "connection" && connectionVerified === false;
-  const isBenchmarkDisabled =
-    agentType === "connection" && supportsBenchmark !== true;
-  // Benchmarking is off, but it can be turned on from here: Compare models
-  // stays clickable and asks for the provider first instead of sending the
-  // reader to the Connection tab.
-  const canEnableBenchmarkHere = isBenchmarkDisabled && !!onEnableBenchmark;
-  // Set when Compare models was clicked with benchmarking off: holds the tests
-  // to compare so they survive the provider question.
-  const [enableBenchmarkOpen, setEnableBenchmarkOpen] = useState(false);
-
-  // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
-  // models + test subset as a completed run and shows it live.
-  const benchmarkRerun = useBenchmarkRerun();
+  // Starting a run and opening the model picker, with their gates and
+  // dialogs, shared with the Evaluations tab.
+  const {
+    isConnectionUnverified,
+    isBenchmarkDisabled,
+    startingRun,
+    launchTestRun,
+    confirmTestRun,
+    openCompare,
+    dialogs: launcherDialogs,
+  } = useAgentRunLaunchers({
+    agentUuid,
+    agentName,
+    agentNature,
+    agentType,
+    connectionVerified,
+    supportsBenchmark,
+    benchmarkModelsVerified,
+    benchmarkProvider,
+    onConnectionVerified,
+    onBenchmarkModelVerified,
+    onGoToConnectionSettings,
+    onEnableBenchmark,
+    linkedTestsTotal,
+    onRunCreated: (taskId, runKey) => {
+      onRunStarted?.();
+      openTestRun(taskId);
+      // A run of the ticked tests clears the ticks only now, once it has
+      // started: through the confirmation, and on a connection agent through
+      // the connection check as well. A refused run keeps them for a retry.
+      if (runKey === "bulk") {
+        clearSelection();
+      }
+    },
+    onComparisonCreated: () => {
+      onRunStarted?.();
+      // A comparison of the ticked tests clears the ticks only now, once it
+      // has started. Closing the model picker without starting keeps them.
+      clearSelection();
+      // The comparison was asked for from inside a run window: that window
+      // gives way to the comparison's own. Only the window closes here, not
+      // the tab: switching to Evaluations would hide this tab, and the
+      // comparison window is drawn inside it. The switch happens when the
+      // comparison window closes, through onComparisonClosed.
+      if (openTestRunId) {
+        setOpenTestRunId(null);
+        setRunIdParam(null);
+      }
+    },
+    // Closing a comparison window that started a run lands on Evaluations,
+    // where the run is listed, the same way closing a plain run window does.
+    // Cancelling the picker without starting anything leaves the reader where
+    // they were.
+    onComparisonClosed: (started) => {
+      if (started) onRunWindowClosed?.();
+    },
+  });
 
   // Load the agent's attached evaluators (best-effort; failure just means new
   // tests fall back to the default seed and the post-save prompt is skipped).
@@ -487,7 +613,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -619,11 +745,6 @@ export function TestsTabContent({
   // fewer tests than the count promises. "Every test matching" is the way to
   // act on more than one page, and it is dropped here too, because a filter
   // change redefines what it stands for.
-  useEffect(() => {
-    setSelectedTestUuids(new Set());
-    setSelectAllMatching(false);
-  }, [testsOffset, testsSearch, testsSearchMode, typeFilter, pageSize]);
-
   /**
    * Every test matching the search and the type is selected, not just the
    * ticked rows on this page. Offered once every row on the page is ticked
@@ -631,6 +752,22 @@ export function TestsTabContent({
    * actions cannot say "all of them except this one".
    */
   const [selectAllMatching, setSelectAllMatching] = useState(false);
+  // The one way the ticks are dropped: every row on this page, and "every
+  // test matching" with them.
+  const clearSelection = useCallback(() => {
+    setSelectedTestUuids(new Set());
+    setSelectAllMatching(false);
+  }, []);
+  useEffect(() => {
+    clearSelection();
+  }, [
+    clearSelection,
+    testsOffset,
+    testsSearch,
+    testsSearchMode,
+    typeFilter,
+    pageSize,
+  ]);
   const selectedTestCount = selectAllMatching
     ? agentTestsTotal
     : selectedTestUuids.size;
@@ -762,7 +899,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -860,7 +997,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -949,62 +1086,9 @@ export function TestsTabContent({
   };
 
   const closeTestDialogAfterSave = () => {
+    testPager.cancel();
     setCreateDialogOpen(false);
     resetTestDialog();
-  };
-
-  // The one place a run is started from this tab: create it, show its pending
-  // row, then open the dialog on the new run id. Pass `allLinked` to run every
-  // test linked to the agent rather than the given subset.
-  // `runKey` identifies the control that was clicked ("all", "bulk", or a test
-  // uuid) so only that one shows a spinner while every run control is disabled.
-  // Returns the new run id, or null if nothing started. Callers use that to
-  // hold their state (e.g. keep the bulk selection) until the run is created.
-  // Actually create and open the run. No verification check — the gate lives
-  // in `launchTestRun` (and in the verify dialog's success handler).
-  const startRunNow = async (
-    tests: TestData[],
-    allLinked = false,
-    runKey = "all",
-  ): Promise<string | null> => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return null;
-    // Creating a run is a real, billed call. Ignore repeat clicks until the
-    // in-flight one settles.
-    if (startingRun !== null) return null;
-    setStartingRun(runKey);
-    try {
-      const taskId = await startTestRunOrNotify(
-        backendUrl,
-        backendAccessToken,
-        agentUuid,
-        allLinked ? null : tests.map((t) => t.uuid),
-        // `tests` is only a page (or empty, for "every matching test with no
-        // filter applied") whenever allLinked is true — the real count is the
-        // server-reported total, not this page's length.
-        allLinked ? linkedTestsTotal : tests.length,
-      );
-      if (!taskId) return null;
-      onRunStarted?.();
-      openTestRun(taskId);
-      return taskId;
-    } finally {
-      setStartingRun(null);
-    }
-  };
-
-  // The one gate every Run action funnels through. On an unverified connection
-  // agent it holds the intent and opens the verify dialog instead of running.
-  const launchTestRun = async (
-    tests: TestData[],
-    allLinked = false,
-    runKey = "all",
-  ): Promise<string | null> => {
-    if (isConnectionUnverified) {
-      setPendingRun({ tests, allLinked, runKey });
-      return null;
-    }
-    return startRunNow(tests, allLinked, runKey);
   };
 
   // Open the test runner for a single just-saved test. Backing the dialog's
@@ -1028,6 +1112,13 @@ export function TestsTabContent({
       setCreateDialogOpen(true);
       setCreateError(null);
       setNameConflictError(null);
+      // Stepping from one test to another remounts the dialog on the new
+      // uuid; clearing these keeps the test just left from seeding the form
+      // for the moment before the new one arrives.
+      setNewTestName("");
+      setInitialTab(undefined);
+      setInitialConfig(undefined);
+      setInitialEvaluators(undefined);
       // Reflect the open test in the URL (shareable / reload-stable).
       setTestIdParam(uuid);
 
@@ -1042,7 +1133,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1095,9 +1186,8 @@ export function TestsTabContent({
   // via POST /tests/bulk — nothing is persisted until the user submits.
   const openDuplicateTest = async (test: TestData) => {
     try {
-      setIsLoadingTest(true);
+      setDuplicatingUuid(test.uuid);
       setEditingTestUuid(null);
-      setCreateDialogOpen(true);
       setCreateError(null);
       setNameConflictError(null);
       setValidationAttempted(false);
@@ -1113,7 +1203,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1127,9 +1217,10 @@ export function TestsTabContent({
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply",
       );
-      if (testData.config) {
-        setInitialConfig(testData.config as TestConfig);
-      }
+      // Always hand the dialog a config, even for a test that carries none:
+      // an absent one reads as a test written from scratch, which fills the
+      // form with the example instead of this test's content.
+      setInitialConfig((testData.config ?? {}) as TestConfig);
       if (Array.isArray(testData.evaluators)) {
         setInitialEvaluators(
           testData.evaluators.map((e) => ({
@@ -1144,13 +1235,18 @@ export function TestsTabContent({
       } else {
         setInitialEvaluators([]);
       }
+
+      // Open only now that the copied test is in hand. Opening first and
+      // filling in afterwards leaves the dialog holding nothing for a moment,
+      // which it reads as a test written from scratch: it fills in the example
+      // and settles its evaluators before this test's own arrive.
+      setCreateDialogOpen(true);
     } catch (err) {
       reportError("Error duplicating test:", err);
-      setCreateError(
-        err instanceof Error ? err.message : "Failed to load test",
-      );
+      // The dialog never opened, so its own error slot has nowhere to show.
+      toast.error("Could not open a copy of this test. Please try again.");
     } finally {
-      setIsLoadingTest(false);
+      setDuplicatingUuid(null);
     }
   };
 
@@ -1203,7 +1299,7 @@ export function TestsTabContent({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1275,34 +1371,40 @@ export function TestsTabContent({
 
   const toggleSelectAll = () => {
     if (selectAllMatching || selectedTestUuids.size === agentTests.length) {
-      setSelectedTestUuids(new Set());
-      setSelectAllMatching(false);
+      clearSelection();
     } else {
       setSelectedTestUuids(new Set(agentTests.map((t) => t.uuid)));
     }
   };
 
   // Open delete confirmation dialog (single)
-  const openDeleteDialog = (
-    test: TestData,
-    mode: "remove" | "permanent" = "remove",
-  ) => {
+  const openDeleteDialog = (test: TestData) => {
     setTestToDelete(test);
     setTestsToDeleteBulk([]);
-    setDeleteMode(mode);
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
   // Open bulk delete confirmation dialog
-  const openBulkDeleteDialog = async (
-    mode: "remove" | "permanent" = "remove",
-  ) => {
+  const openBulkDeleteDialog = async () => {
     if (selectedTestCount === 0) return;
-    const uuids = await selectedTestUuidsForRemoval();
+    // When the reader chose every matching test, the ids come from the server
+    // rather than the rows on screen, so this step can fail on its own.
+    // Without the catch the click would open nothing and say nothing.
+    let uuids: string[];
+    try {
+      uuids = await selectedTestUuidsForRemoval();
+    } catch (err) {
+      reportError("Error reading which tests to delete:", err);
+      toast.error(
+        "Could not get the list of tests to delete. Please try again.",
+      );
+      return;
+    }
     if (uuids.length === 0) return;
     setTestToDelete(null);
     setTestsToDeleteBulk(uuids);
-    setDeleteMode(mode);
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
@@ -1312,12 +1414,12 @@ export function TestsTabContent({
       setDeleteDialogOpen(false);
       setTestToDelete(null);
       setTestsToDeleteBulk([]);
-      setDeleteMode("remove");
+      setDeleteError(null);
     }
   };
 
-  // Remove test(s) from agent OR delete them permanently from the user's
-  // entire test library, depending on `deleteMode`.
+  // Delete the test(s) from the workspace. This tab has no detach-only
+  // action: deleting a test here takes it off every agent that uses it.
   const handleRemoveTest = async () => {
     const uuidsToRemove =
       testsToDeleteBulk.length > 0
@@ -1329,72 +1431,59 @@ export function TestsTabContent({
 
     try {
       setIsDeleting(true);
+      setDeleteError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      // Track which uuids the backend actually deleted in permanent mode —
-      // tests not owned by the caller are skipped server-side.
-      let actuallyDeleted: string[] = uuidsToRemove;
-
-      if (deleteMode === "permanent") {
-        // Single bulk call: handles 1 or many uuids; backend soft-deletes the
-        // test rows and cascades to every agent_tests link.
-        const response = await fetch(
-          `${backendUrl}/agent-tests/bulk-delete-tests`,
-          {
-            method: "POST",
-            headers: {
-              ...getDefaultHeaders(backendAccessToken),
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              agent_uuid: agentUuid,
-              test_uuids: uuidsToRemove,
-            }),
+      // Single bulk call: handles 1 or many uuids; backend soft-deletes the
+      // test rows and cascades to every agent_tests link.
+      const response = await fetch(
+        `${backendUrl}/agent-tests/bulk-delete-tests`,
+        {
+          method: "POST",
+          headers: {
+            ...getDefaultHeaders(backendAccessToken),
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            agent_uuid: agentUuid,
+            test_uuids: uuidsToRemove,
+          }),
+        },
+      );
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to delete test(s)");
-        }
-
-        const data: {
-          deleted_count: number;
-          deleted_test_uuids?: string[];
-        } = await response.json();
-        actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
-      } else {
-        // One call for the whole selection, however many were ticked.
-        await unlinkTestsFromAgent(
-          backendAccessToken as string,
-          agentUuid,
-          uuidsToRemove,
-        );
+      if (response.status === 401) {
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error("Failed to delete test(s)");
+      }
+
+      const data: {
+        deleted_count: number;
+        deleted_test_uuids?: string[];
+      } = await response.json();
+      // Tests not owned by the caller are skipped server-side, so only the
+      // ones the backend names have gone.
+      const actuallyDeleted = data.deleted_test_uuids ?? uuidsToRemove;
 
       const removedSet = new Set(actuallyDeleted);
       handleTestsRemoved(actuallyDeleted.length);
-      // When deleting permanently, also drop the test from the "all tests"
-      // dropdown so it doesn't reappear as available to add.
-      if (deleteMode === "permanent") {
-        setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
-      }
-      setSelectedTestUuids(new Set());
-      setSelectAllMatching(false);
+      // Also drop the test from the "add an existing test" list so it does
+      // not reappear as available to add.
+      setAllTests((prev) => prev.filter((t) => !removedSet.has(t.uuid)));
+      clearSelection();
       closeDeleteDialog();
     } catch (err) {
-      reportError(
-        deleteMode === "permanent"
-          ? "Error deleting test(s):"
-          : "Error removing test(s) from agent:",
-        err,
+      reportError("Error deleting test(s):", err);
+      setDeleteError(
+        uuidsToRemove.length > 1
+          ? "Could not delete these tests. Please try again."
+          : "Could not delete this test. Please try again.",
       );
     } finally {
       setIsDeleting(false);
@@ -1599,14 +1688,37 @@ export function TestsTabContent({
     </div>
   );
 
+  // With rows ticked, the header's Run and Compare act on the ticked tests
+  // instead of every linked test, so there is one Run and one Compare on
+  // screen rather than a second pair in the selection strip.
+  const hasSelection = selectedTestUuids.size > 0 || selectAllMatching;
+  const runSelected = async () => {
+    // `selectedTestCount` is already known: check it before resolving the
+    // selection.
+    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+      return;
+    }
+    const { tests, allLinked } = await selectedTestsForAction();
+    if (!allLinked && tests.length === 0) return;
+    // Asks first, the same as Run all tests; the ticks clear in onRunCreated.
+    await confirmTestRun(tests, allLinked, "bulk");
+  };
+  const compareSelected = async () => {
+    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+      return;
+    }
+    const { tests, allLinked } = await selectedTestsForAction();
+    if (!allLinked && tests.length === 0) return;
+    await openCompare(tests, allLinked);
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header — only shown when the agent has at least one test
           attached. Split into two groups: page-level "act on the tests"
-          actions (Run all / Compare models) on the left, and "add more
-          tests" actions (Add / Create / Bulk upload) on the right.
-          Multi-select bulk actions (Run / Remove / Delete subset) live
-          above the table in their own toolbar, not here. */}
+          actions (Run all / Compare models, acting on the ticked tests when
+          there are any, plus Delete selected) on the left, and "add more
+          tests" actions (Add / Create / Bulk upload) on the right. */}
       {linkedTestsTotal > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* Left group: act-on-the-tests buttons. */}
@@ -1615,30 +1727,20 @@ export function TestsTabContent({
             <div>
               <button
                 data-tour="tests-run-all"
-                onClick={async () => {
-                  // Checked here as well as in the function that starts the
-                  // run, so the reader is not asked to confirm a run that
-                  // cannot start.
-                  if (
-                    await overEvalLimit(
-                      backendAccessToken,
-                      linkedTestsTotal,
-                      "tests",
-                    )
-                  ) {
-                    return;
-                  }
-                  setRunAllConfirmOpen(true);
-                }}
+                onClick={() =>
+                  void (hasSelection
+                    ? runSelected()
+                    : confirmTestRun(agentTests, true, "all"))
+                }
                 disabled={startingRun !== null}
-                aria-busy={startingRun === "all"}
+                aria-busy={startingRun === "all" || startingRun === "bulk"}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 disabled:opacity-50 ${
                   startingRun !== null
                     ? "cursor-not-allowed"
                     : "hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
                 }`}
               >
-                {startingRun === "all" ? (
+                {startingRun === "all" || startingRun === "bulk" ? (
                   <SpinnerIcon className="w-4 h-4 animate-spin" />
                 ) : (
                   <svg
@@ -1655,14 +1757,25 @@ export function TestsTabContent({
                     />
                   </svg>
                 )}
-                <span className="hidden sm:inline">Run all tests</span>
-                <span className="sm:hidden">Run all</span>
+                {hasSelection ? (
+                  <>
+                    <span className="hidden sm:inline">
+                      Run {selectedTestCount}{" "}
+                      {selectedTestCount === 1 ? "test" : "tests"}
+                    </span>
+                    <span className="sm:hidden">Run {selectedTestCount}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Run all tests</span>
+                    <span className="sm:hidden">Run all</span>
+                  </>
+                )}
               </button>
             </div>
 
             {/* Compare models — amber tint, "analyse" semantic. */}
             <CompareModelsButton
-              size="header"
               label={
                 <>
                   <span className="hidden sm:inline">Compare models</span>
@@ -1670,31 +1783,23 @@ export function TestsTabContent({
                 </>
               }
               isConnectionUnverified={isConnectionUnverified}
-              isBenchmarkDisabled={
-                isBenchmarkDisabled && !canEnableBenchmarkHere
+              isBenchmarkDisabled={isBenchmarkDisabled}
+              // No tests named means every test linked to the agent.
+              onClick={() =>
+                void (hasSelection ? compareSelected() : openCompare([], true))
               }
-              onClick={async () => {
-                // Comparing against even one model already runs every
-                // linked test once, so the test count alone can rule a
-                // run out before the model picker even opens.
-                if (
-                  await overEvalLimit(
-                    backendAccessToken,
-                    linkedTestsTotal,
-                    "tests",
-                  )
-                ) {
-                  return;
-                }
-                // No tests named means every test linked to the agent.
-                setBenchmarkTests([]);
-                if (canEnableBenchmarkHere) {
-                  setEnableBenchmarkOpen(true);
-                  return;
-                }
-                setBenchmarkDialogOpen(true);
-              }}
             />
+
+            {hasSelection && (
+              <button
+                onClick={() => void openBulkDeleteDialog()}
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 cursor-pointer"
+              >
+                <TrashIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Delete selected</span>
+                <span className="sm:hidden">Delete</span>
+              </button>
+            )}
           </div>
 
           {/* Right group: add-more-tests buttons. */}
@@ -1713,7 +1818,7 @@ export function TestsTabContent({
           prefetch (which only starts once we know the agent list is empty),
           so showing the empty state before it resolves makes it briefly look
           like there are no tests available to add. */}
-      {agentTestsLoading ||
+      {(!hasLoadedAgentTests && agentTestsLoading) ||
       (!agentTestsError && linkedTestsTotal === 0 && !allTestsAttempted) ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="flex items-center gap-3">
@@ -1738,7 +1843,7 @@ export function TestsTabContent({
             </svg>
           </div>
         </div>
-      ) : agentTestsError ? (
+      ) : !hasLoadedAgentTests && agentTestsError ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <p className="text-sm md:text-base text-red-500 mb-2">
             {agentTestsError}
@@ -1750,7 +1855,7 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : linkedTestsTotal === 0 ? (
+      ) : !agentTestsError && linkedTestsTotal === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -1822,13 +1927,10 @@ export function TestsTabContent({
               <TestTypeFilter value={typeFilter} onChange={setTypeFilter} />
             </div>
 
-            {/* Bulk-action toolbar — sits immediately above the table when
-                at least one row is selected. Modelled on the same pattern
-                as the human-alignment items table so the two surfaces
-                feel consistent: a muted strip with an "N selected"
-                count on the left and unprefixed action buttons on the
-                right (count is on the strip, not duplicated per button). */}
-            {(selectedTestUuids.size > 0 || selectAllMatching) && (
+            {/* Selection strip above the table: the count, "select every
+                match", and Clear. The actions on the selection are the
+                header's Run / Compare / Delete selected. */}
+            {hasSelection && (
               <div
                 className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border px-3 py-2 mb-3 md:mb-4 transition-colors ${
                   selectAllMatching
@@ -1871,112 +1973,11 @@ export function TestsTabContent({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => {
-                      setSelectedTestUuids(new Set());
-                      setSelectAllMatching(false);
-                    }}
+                    onClick={clearSelection}
                     className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
                     Clear
                   </button>
-                  <button
-                    onClick={() => void openBulkDeleteDialog("remove")}
-                    title="Detach from this agent only — the test stays in your library"
-                    className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                  <CompareModelsButton
-                    size="bulk"
-                    label="Compare"
-                    isConnectionUnverified={isConnectionUnverified}
-                    isBenchmarkDisabled={
-                      isBenchmarkDisabled && !canEnableBenchmarkHere
-                    }
-                    onClick={async () => {
-                      // `selectedTestCount` is already known — check it before
-                      // resolving the selection or opening any dialog.
-                      if (
-                        await overEvalLimit(
-                          backendAccessToken,
-                          selectedTestCount,
-                          "tests",
-                        )
-                      ) {
-                        return;
-                      }
-                      const { tests, allLinked } =
-                        await selectedTestsForAction();
-                      // No tests named means every test linked to the agent.
-                      if (!allLinked && tests.length === 0) return;
-                      setBenchmarkTests(allLinked ? [] : tests);
-                      if (canEnableBenchmarkHere) {
-                        setEnableBenchmarkOpen(true);
-                      } else {
-                        setBenchmarkDialogOpen(true);
-                      }
-                      setSelectedTestUuids(new Set());
-                      setSelectAllMatching(false);
-                    }}
-                  />
-                  <div>
-                    <button
-                      onClick={async () => {
-                        // `selectedTestCount` is already known — check it
-                        // before resolving the selection.
-                        if (
-                          await overEvalLimit(
-                            backendAccessToken,
-                            selectedTestCount,
-                            "tests",
-                          )
-                        ) {
-                          return;
-                        }
-                        const { tests, allLinked } =
-                          await selectedTestsForAction();
-                        if (!allLinked && tests.length === 0) return;
-                        // Clear the ticks only once the run has started, so the
-                        // bar and its spinner stay up during the wait. A failed
-                        // run keeps the selection so it can be retried.
-                        const taskId = await launchTestRun(
-                          tests,
-                          allLinked,
-                          "bulk",
-                        );
-                        if (taskId) {
-                          setSelectedTestUuids(new Set());
-                          setSelectAllMatching(false);
-                        }
-                      }}
-                      disabled={startingRun !== null}
-                      aria-busy={startingRun === "bulk"}
-                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
-                        startingRun !== null
-                          ? "cursor-not-allowed"
-                          : "hover:opacity-90 cursor-pointer"
-                      }`}
-                    >
-                      {startingRun === "bulk" ? (
-                        <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                          />
-                        </svg>
-                      )}
-                      Run
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -1998,7 +1999,27 @@ export function TestsTabContent({
               />
 
               {/* Tests Table */}
-              {agentTests.length === 0 ? (
+              {agentTestsLoading ? (
+                <div
+                  data-testid="tests-list-loading"
+                  className="flex-1 min-h-40 border border-border rounded-xl flex items-center justify-center bg-muted/20"
+                >
+                  <SpinnerIcon className="w-5 h-5 animate-spin" />
+                  <span className="sr-only">Loading tests</span>
+                </div>
+              ) : agentTestsError ? (
+                <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                  <p className="text-sm md:text-base text-red-500 mb-2">
+                    {agentTestsError}
+                  </p>
+                  <button
+                    onClick={() => void fetchAgentTests()}
+                    className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : agentTests.length === 0 ? (
                 <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
                   <p className="text-sm md:text-base text-muted-foreground">
                     {loadedTestsSearch || typeFilter !== "all"
@@ -2016,7 +2037,7 @@ export function TestsTabContent({
                       given an opaque background so rows don't show through. */}
                     <div className="overflow-y-auto max-h-[60vh]">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
+                      <div className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
                           <button
                             type="button"
@@ -2039,16 +2060,14 @@ export function TestsTabContent({
                         <div className="text-sm font-medium text-muted-foreground">
                           Type
                         </div>
-                        <div className="w-8"></div>
-                        <div className="w-8"></div>
-                        <div className="w-8"></div>
+                        <div></div>
                       </div>
                       {/* Table Body */}
                       {agentTests.map((test) => (
                         <div
                           key={test.uuid}
-                          onClick={() => openEditTest(test.uuid)}
-                          className="grid grid-cols-[40px_minmax(0,2fr)_minmax(0,1fr)_32px_32px_32px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          onClick={() => testPager.open(test.uuid)}
+                          className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                         >
                           {/* Checkbox */}
                           <div className="flex items-center">
@@ -2108,92 +2127,18 @@ export function TestsTabContent({
                               {testTypeLabel(test.type)}
                             </span>
                           </div>
-                          {/* Run Button */}
-                          <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void launchTestRun([test], false, test.uuid);
-                              }}
-                              disabled={startingRun !== null}
-                              aria-busy={startingRun === test.uuid}
-                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                                startingRun !== null
-                                  ? "cursor-not-allowed"
-                                  : "cursor-pointer"
-                              }`}
-                              title="Run test"
-                            >
-                              {startingRun === test.uuid ? (
-                                <SpinnerIcon className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.5}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          {/* Duplicate Button — opens the create dialog pre-filled
-                          from this test; nothing is saved until submit. */}
-                          <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDuplicateTest(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                              title="Duplicate test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                          {/* Delete Button — opens a dialog whose checkbox upgrades the
-                          remove-from-agent action to a permanent library delete. */}
-                          <div className="flex items-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(test, "remove");
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                              title="Delete test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
+                          <div>
+                            <TestRowActions
+                              onRun={() =>
+                                void launchTestRun([test], false, test.uuid)
+                              }
+                              running={startingRun === test.uuid}
+                              runDisabled={startingRun !== null}
+                              onDuplicate={() => openDuplicateTest(test)}
+                              duplicating={duplicatingUuid === test.uuid}
+                              duplicateDisabled={!!duplicatingUuid}
+                              onDelete={() => openDeleteDialog(test)}
+                            />
                           </div>
                         </div>
                       ))}
@@ -2204,7 +2149,7 @@ export function TestsTabContent({
                     {agentTests.map((test) => (
                       <div
                         key={test.uuid}
-                        onClick={() => openEditTest(test.uuid)}
+                        onClick={() => testPager.open(test.uuid)}
                         className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -2232,83 +2177,18 @@ export function TestsTabContent({
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void launchTestRun([test], false, test.uuid);
-                              }}
-                              disabled={startingRun !== null}
-                              aria-busy={startingRun === test.uuid}
-                              className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
-                                startingRun !== null
-                                  ? "cursor-not-allowed"
-                                  : "cursor-pointer"
-                              }`}
-                              title="Run test"
-                            >
-                              {startingRun === test.uuid ? (
-                                <SpinnerIcon className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.5}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDuplicateTest(test);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                              title="Duplicate test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(test, "remove");
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                              title="Delete test"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
+                          <div className="flex-shrink-0">
+                            <TestRowActions
+                              onRun={() =>
+                                void launchTestRun([test], false, test.uuid)
+                              }
+                              running={startingRun === test.uuid}
+                              runDisabled={startingRun !== null}
+                              onDuplicate={() => openDuplicateTest(test)}
+                              duplicating={duplicatingUuid === test.uuid}
+                              duplicateDisabled={!!duplicatingUuid}
+                              onDelete={() => openDeleteDialog(test)}
+                            />
                           </div>
                         </div>
                       </div>
@@ -2328,28 +2208,23 @@ export function TestsTabContent({
         }
         onClose={closeDeleteDialog}
         onConfirm={handleRemoveTest}
-        title={
-          deleteMode === "permanent"
-            ? testsToDeleteBulk.length > 0
-              ? "Delete tests permanently"
-              : "Delete test"
-            : testsToDeleteBulk.length > 0
-              ? "Remove tests"
-              : "Remove test"
-        }
+        title={testsToDeleteBulk.length > 0 ? "Delete tests" : "Delete test"}
         message={
-          deleteMode === "permanent"
-            ? testsToDeleteBulk.length > 0
-              ? `Are you sure you want to permanently delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from your library? This will remove them from every agent and cannot be undone.`
-              : `Permanently deleting this test will remove it from every agent that uses it and cannot be undone.`
-            : testsToDeleteBulk.length > 0
-              ? `Are you sure you want to remove ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from this agent?`
-              : `Are you sure you want to remove this test from this agent? It will stay in your test library and on any other agents that use it.`
+          testsToDeleteBulk.length > 0
+            ? `Are you sure you want to delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""}? This cannot be undone.`
+            : `Are you sure you want to delete this test? This cannot be undone.`
         }
         // Keep confirmText a single word — the dialog auto-suffixes "ing..." while
         // submitting by stripping a trailing 'e', which only works on one-token labels.
-        confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
+        confirmText="Delete"
         isDeleting={isDeleting}
+        extraContent={
+          deleteError ? (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {deleteError}
+            </p>
+          ) : null
+        }
       />
 
       {/* Create/edit test dialog. In create mode, submits via POST
@@ -2358,12 +2233,21 @@ export function TestsTabContent({
           editingTestUuid is set), submits via PUT /tests/{uuid}. */}
       {createDialogOpen && (
         <AddTestDialog
+          // Remounted per test so a step to another one starts the form from
+          // scratch instead of holding the last test's state.
+          key={editingTestUuid ?? "new"}
           agentUuid={agentUuid}
           isOpen={createDialogOpen}
           onClose={() => {
+            testPager.cancel();
             setCreateDialogOpen(false);
             resetTestDialog();
           }}
+          onPrev={editingTestUuid ? testPager.prev : undefined}
+          onNext={editingTestUuid ? testPager.next : undefined}
+          hasPrev={testPager.hasPrev}
+          hasNext={testPager.hasNext}
+          position={testPager.position}
           isEditing={!!editingTestUuid}
           isLoading={isLoadingTest}
           isCreating={isCreating}
@@ -2437,94 +2321,12 @@ export function TestsTabContent({
           agentName={agentName}
           taskId={openTestRunId}
           onNewRun={(taskId) => openTestRun(taskId)}
+          onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+          onCompareTests={(tests) => void openCompare(tests, false)}
         />
       )}
 
-      {/* Shown when a Run is clicked on an unverified connection agent. On a
-          passing check it flips the parent's verified state and starts the
-          held run; otherwise it offers a jump to the Connection settings. */}
-      {pendingRun && (
-        <VerifyConnectionDialog
-          isOpen
-          agentUuid={agentUuid}
-          onClose={() => setPendingRun(null)}
-          onVerified={() => {
-            const p = pendingRun;
-            setPendingRun(null);
-            onConnectionVerified?.();
-            void startRunNow(p.tests, p.allLinked, p.runKey);
-          }}
-          onGoToConnectionSettings={() => {
-            setPendingRun(null);
-            onGoToConnectionSettings?.();
-          }}
-        />
-      )}
-
-      {/* Confirm before starting a run of every linked test. */}
-      <ConfirmDialog
-        isOpen={runAllConfirmOpen}
-        onClose={() => setRunAllConfirmOpen(false)}
-        onConfirm={() => {
-          setRunAllConfirmOpen(false);
-          void launchTestRun(agentTests, true, "all");
-        }}
-        title="Run every test on this agent"
-        message={`${
-          isConnectionUnverified
-            ? "Your agent's connection is checked first. Once it works, this"
-            : "This"
-        } will start the evaluation on ${linkedTestsTotal} ${linkedTestsTotal === 1 ? "test" : "tests"}. Each test calls your agent, evaluates its response against the evaluation criteria and reports the metrics.`}
-        confirmText="Start the run"
-      />
-
-      {/* Provider question, shown when Compare models is used on an agent that
-          has benchmarking turned off. Saving it opens the benchmark dialog. */}
-      <EnableBenchmarkDialog
-        isOpen={enableBenchmarkOpen}
-        onClose={() => {
-          setEnableBenchmarkOpen(false);
-          setBenchmarkTests([]);
-        }}
-        currentProvider={benchmarkProvider}
-        onConfirm={async (provider) => {
-          await onEnableBenchmark?.(provider);
-          setEnableBenchmarkOpen(false);
-          setBenchmarkDialogOpen(true);
-        }}
-      />
-
-      {/* Benchmark Dialog. Rendered only while it is open, so every open starts
-          from scratch: the models picked and the checks that failed last time
-          belong to that window, not to the next one. */}
-      {benchmarkDialogOpen && (
-        <BenchmarkDialog
-          isOpen
-          onClose={() => {
-            setBenchmarkDialogOpen(false);
-            setBenchmarkTests([]);
-          }}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          agentNature={agentNature}
-          tests={benchmarkTests}
-          totalTests={linkedTestsTotal}
-          onBenchmarkCreated={() => onRunStarted?.()}
-          agentType={agentType}
-          benchmarkModelsVerified={benchmarkModelsVerified}
-          benchmarkProvider={benchmarkProvider}
-        />
-      )}
-
-      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
-          test subset, skipping the model picker. */}
-      <BenchmarkRerunDialog
-        config={benchmarkRerun.config}
-        rerunKey={benchmarkRerun.key}
-        onClose={benchmarkRerun.clear}
-        onBenchmarkCreated={() => onRunStarted?.()}
-        onRerun={benchmarkRerun.start}
-      />
+      {launcherDialogs}
     </div>
   );
 }

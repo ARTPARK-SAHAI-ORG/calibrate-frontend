@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { reportError } from "@/lib/reportError";
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import {
@@ -79,7 +80,7 @@ export function DuplicateEvaluatorDialog({
       );
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 

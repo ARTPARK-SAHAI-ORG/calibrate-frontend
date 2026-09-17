@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
 import { createRequestCache } from "@/lib/requestCache";
+import type { InviteLink } from "@/lib/invites";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
   ORGANIZATIONS_CHANGED_EVENT,
@@ -338,7 +339,12 @@ export function useOrgMembers(
 
   const addMember = useCallback(
     async (email: string): Promise<OrganizationMember | null> => {
-      if (!accessToken || !orgUuid) return null;
+      // Throws rather than answering null, the way removeMember below does.
+      // A null came back looking exactly like a member who was added, so a
+      // caller counted it as done and told the reader everybody was in.
+      if (!accessToken || !orgUuid) {
+        throw new Error("Not signed in");
+      }
       const created = await apiPost<OrganizationMember>(
         `/organizations/${orgUuid}/members`,
         accessToken,
@@ -373,6 +379,128 @@ export function useOrgMembers(
   );
 
   return { members, isLoading, error, refetch, addMember, removeMember };
+}
+
+type UseOrgInviteLinkReturn = {
+  /** The workspace's link, or null when it has none. */
+  inviteLink: InviteLink | null;
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  /** Make a link, replacing any existing one. */
+  createInviteLink: () => Promise<InviteLink>;
+};
+
+// Module-level cache + in-flight dedup for a workspace's invite link, keyed by
+// `${accessToken}:${orgUuid}`, the same as the member list above. `null` is a
+// real answer here (the workspace has no link), so it is cached like any other.
+const inviteLinkCache = createRequestCache<InviteLink | null>({
+  ttlMs: 30_000,
+});
+const inviteLinkKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
+/**
+ * The one invite link a workspace hands out: read it, make it, turn it off.
+ *
+ * A workspace has at most one link. Making a link when one already exists
+ * replaces it, so the old address stops working, and the backend answers with
+ * the new one. The backend answers 404 when there is no link, which is not an
+ * error to show: it is the ordinary state of a workspace nobody has made a
+ * link for.
+ */
+export function useOrgInviteLink(
+  accessToken: string | null | undefined,
+  orgUuid: string | null,
+): UseOrgInviteLinkReturn {
+  const cached =
+    accessToken && orgUuid
+      ? inviteLinkCache.peek(inviteLinkKey(accessToken, orgUuid))
+      : undefined;
+  const [inviteLink, setInviteLink] = useState<InviteLink | null>(
+    cached ?? null,
+  );
+  const [isLoading, setIsLoading] = useState(cached === undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!accessToken || !orgUuid) {
+      setInviteLink(null);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await inviteLinkCache.fetch(
+        inviteLinkKey(accessToken, orgUuid),
+        async () => {
+          try {
+            const answer = await apiGet<InviteLink>(
+              `/organizations/${orgUuid}/invite-link`,
+              accessToken,
+            );
+            // An empty answer is no link, not a link with nothing in it.
+            // apiClient turns a 204 or an empty body into `{}`, which is
+            // truthy, and the panel would have shown and copied an address
+            // ending in "undefined".
+            return answer?.token ? answer : null;
+          } catch (err) {
+            // No link made yet. That is the starting state, not a failure.
+            if (
+              err instanceof Error &&
+              err.message.startsWith("Request failed: 404")
+            ) {
+              return null;
+            }
+            throw err;
+          }
+        },
+      );
+      setInviteLink(data);
+    } catch (err) {
+      reportError("Error fetching invite link:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load the invite link",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, orgUuid]);
+
+  useEffect(() => {
+    if (accessToken && orgUuid) {
+      const hit = inviteLinkCache.peek(inviteLinkKey(accessToken, orgUuid));
+      if (hit !== undefined) {
+        setInviteLink(hit);
+        setIsLoading(false);
+        return;
+      }
+    }
+    refetch();
+  }, [accessToken, orgUuid, refetch]);
+
+  const createInviteLink = useCallback(async (): Promise<InviteLink> => {
+    if (!accessToken || !orgUuid) {
+      throw new Error("Not signed in");
+    }
+    const created = await apiPost<InviteLink>(
+      `/organizations/${orgUuid}/invite-link`,
+      accessToken,
+      {},
+    );
+    inviteLinkCache.set(inviteLinkKey(accessToken, orgUuid), created);
+    setInviteLink(created);
+    return created;
+  }, [accessToken, orgUuid]);
+
+  return {
+    inviteLink,
+    isLoading,
+    error,
+    refetch,
+    createInviteLink,
+  };
 }
 
 type UseWorkspaceApiKeysReturn = {

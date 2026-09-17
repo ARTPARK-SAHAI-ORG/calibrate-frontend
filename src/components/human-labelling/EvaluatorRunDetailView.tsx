@@ -13,7 +13,6 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   binaryScaleFor,
-  getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
 } from "@/lib/binaryLabels";
@@ -1074,8 +1073,6 @@ export function EvaluatorResultsPane({
               scaleMax={scaleMax}
               trueLabel={getBinaryLabel(binaryScale, true)}
               falseLabel={getBinaryLabel(binaryScale, false)}
-              trueDescription={getBinaryDescription(binaryScale, true)}
-              falseDescription={getBinaryDescription(binaryScale, false)}
               ratingScale={toRatingScale(
                 jobEvaluator?.output_config?.scale,
               )}
@@ -1399,8 +1396,6 @@ function GroupedEvaluatorCard({
         scaleMax={scaleMax}
         trueLabel={getBinaryLabel(binaryScale, true)}
         falseLabel={getBinaryLabel(binaryScale, false)}
-        trueDescription={getBinaryDescription(binaryScale, true)}
-        falseDescription={getBinaryDescription(binaryScale, false)}
         ratingScale={toRatingScale(jobEvaluator?.output_config?.scale)}
         reasoning={displayReasoning}
       />

@@ -1,9 +1,11 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import type { AgentRunLauncherSettings } from "@/components/agent-tabs/useAgentRunLaunchers";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
+import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
@@ -34,7 +36,7 @@ import {
   CopyIcon,
   SaveIcon,
 } from "@/components/icons";
-import { NotFoundState } from "@/components/ui";
+import { NotFoundState, InteractionTypePill } from "@/components/ui";
 import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
@@ -46,6 +48,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 
 export type AgentDetailHeaderState = {
   agentName: string;
+  interactionType?: "conversation" | "general";
   activeTab: string;
   isLoading: boolean;
   hasError: boolean;
@@ -600,7 +603,7 @@ export function AgentDetail({
         );
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -645,7 +648,7 @@ export function AgentDetail({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return;
         }
 
@@ -734,7 +737,7 @@ export function AgentDetail({
         });
 
         if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
+          await signOut({ callbackUrl: loginPathAfterSignOut() });
           return false;
         }
 
@@ -960,7 +963,7 @@ export function AgentDetail({
       });
 
       if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: loginPathAfterSignOut() });
         return;
       }
 
@@ -1031,6 +1034,7 @@ export function AgentDetail({
     if (onHeaderStateChange) {
       onHeaderStateChange({
         agentName: agent?.name || "Loading...",
+        interactionType: agent?.interaction_type,
         activeTab,
         isLoading,
         hasError: errorCode !== null,
@@ -1048,6 +1052,7 @@ export function AgentDetail({
     }
   }, [
     agent?.name,
+    agent?.interaction_type,
     errorCode,
     activeTab,
     isLoading,
@@ -1103,6 +1108,54 @@ export function AgentDetail({
     );
   }
 
+  // The Tests and Evaluations tabs can both start a run or a model comparison,
+  // so both get the same agent settings. A passing connection check is recorded
+  // here, and turning benchmarking on is persisted by the auto-save effects
+  // above for both verified and unverified agents.
+  const isConnection = agent?.type === "connection";
+  const launcherSettings: AgentRunLauncherSettings = {
+    agentUuid,
+    agentName: agent?.name ?? "",
+    agentType: agent?.type,
+    agentNature: agent?.interaction_type ?? "conversation",
+    connectionVerified: isConnection
+      ? connectionConfig.connection_verified === true
+      : undefined,
+    supportsBenchmark: isConnection
+      ? connectionConfig.supports_benchmark === true
+      : undefined,
+    benchmarkModelsVerified: isConnection
+      ? connectionConfig.benchmark_models_verified
+      : undefined,
+    benchmarkProvider: isConnection
+      ? connectionConfig.benchmark_provider
+      : undefined,
+    onConnectionVerified: () =>
+      setConnectionConfig((prev) => ({
+        ...prev,
+        connection_verified: true,
+        connection_verified_at: new Date().toISOString(),
+        connection_verified_error: null,
+      })),
+    onBenchmarkModelVerified: (modelId, entry) =>
+      setConnectionConfig((prev) => ({
+        ...prev,
+        benchmark_models_verified: {
+          ...prev.benchmark_models_verified,
+          [modelId]: entry,
+        },
+      })),
+    onGoToConnectionSettings: () => performTabSwitch("connection"),
+    onEnableBenchmark: isConnection
+      ? (provider: string) =>
+          setConnectionConfig((prev) => ({
+            ...prev,
+            supports_benchmark: true,
+            benchmark_provider: provider,
+          }))
+      : undefined,
+  };
+
   if (!agent) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1143,6 +1196,10 @@ export function AgentDetail({
             >
               {agent.name}
             </h1>
+            <InteractionTypePill
+              interactionType={agent.interaction_type}
+              className="px-1.5 py-0.5 rounded flex-shrink-0"
+            />
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -1299,31 +1356,8 @@ export function AgentDetail({
               // Adding traces to tests creates tests linked to this agent. The
               // Tests tab loads its list once, so remount it to pick them up.
               key={testsReloadKey}
-              agentUuid={agentUuid}
-              agentName={agent.name}
-              agentType={agent.type}
+              {...launcherSettings}
               isActive={activeTab === "tests"}
-              agentNature={agent.interaction_type ?? "conversation"}
-              connectionVerified={
-                agent.type === "connection"
-                  ? connectionConfig.connection_verified === true
-                  : undefined
-              }
-              supportsBenchmark={
-                agent.type === "connection"
-                  ? connectionConfig.supports_benchmark === true
-                  : undefined
-              }
-              benchmarkModelsVerified={
-                agent.type === "connection"
-                  ? connectionConfig.benchmark_models_verified
-                  : undefined
-              }
-              benchmarkProvider={
-                agent.type === "connection"
-                  ? connectionConfig.benchmark_provider
-                  : undefined
-              }
               agentDefaultInputs={
                 agent.type === "connection"
                   ? connectionConfig.default_inputs
@@ -1332,28 +1366,6 @@ export function AgentDetail({
               agentDefaultInputTypes={
                 agent.type === "connection"
                   ? connectionConfig.default_input_types
-                  : undefined
-              }
-              onConnectionVerified={() =>
-                setConnectionConfig((prev) => ({
-                  ...prev,
-                  connection_verified: true,
-                  connection_verified_at: new Date().toISOString(),
-                  connection_verified_error: null,
-                }))
-              }
-              onGoToConnectionSettings={() => performTabSwitch("connection")}
-              // Turning benchmarking on from the Tests tab. Setting it here is
-              // enough to persist it: the auto-save effects above save the
-              // benchmarking toggle for both verified and unverified agents.
-              onEnableBenchmark={
-                agent.type === "connection"
-                  ? (provider: string) =>
-                      setConnectionConfig((prev) => ({
-                        ...prev,
-                        supports_benchmark: true,
-                        benchmark_provider: provider,
-                      }))
                   : undefined
               }
               onRunStarted={() => {
@@ -1379,8 +1391,7 @@ export function AgentDetail({
           <div className={activeTab === "runs" ? undefined : "hidden"}>
             <RunsTabContent
               key={runsReloadKey}
-              agentUuid={agentUuid}
-              agentName={agent.name}
+              {...launcherSettings}
               isActive={activeTab === "runs"}
             />
           </div>
@@ -1440,6 +1451,7 @@ export function AgentDetail({
         <DuplicateAgentDialog
           agentUuid={agentUuid}
           agentName={agent.name}
+          interactionType={agent.interaction_type}
           onClose={() => setIsDuplicateDialogOpen(false)}
           onDuplicated={(newAgentUuid) =>
             router.push(`/agents/${newAgentUuid}`)

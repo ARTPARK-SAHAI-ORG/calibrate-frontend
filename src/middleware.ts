@@ -1,13 +1,27 @@
 import { auth } from "@/auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
 import { isPublicPath, orgFromPath } from "@/lib/routes";
 import { OPENING_PATH } from "@/lib/opening";
+import { isCanonicalHost } from "@/lib/site";
 
 // Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 
 export default auth((req) => {
+  const response = route(req);
+  // A copy of this site served from any other address asks search engines to
+  // leave it out, so only ours appears in results. Google and Bing read this
+  // header the same way they read a noindex tag on the page itself. See
+  // CANONICAL_HOST in src/lib/site.ts for why a copy exists at all.
+  if (!isCanonicalHost(req.headers.get("host"))) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+});
+
+/** Which page a request is answered with. */
+function route(req: NextRequest & { auth: unknown }): NextResponse {
   const isHomePage = req.nextUrl.pathname === "/";
   const isApiRoute = req.nextUrl.pathname.startsWith("/api/");
 
@@ -40,9 +54,16 @@ export default auth((req) => {
     req.nextUrl.pathname === "/sitemap.xml";
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
+  // An invite link is opened by someone who may have no account yet, so the
+  // page has to render signed out and offer to sign in or sign up. Match the
+  // real shape of the page, "/invite/" plus exactly one more part: a plain
+  // "starts with" would let "/invite/agents/<uuid>" through, and Next would
+  // read "invite" as the workspace and serve the agent page to a visitor who
+  // has not signed in.
+  const isInviteRoute = /^\/invite\/[^/]+\/?$/.test(req.nextUrl.pathname);
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
     return NextResponse.next();
   }
 
@@ -86,7 +107,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],

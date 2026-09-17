@@ -12,6 +12,8 @@ type DuplicateIconButtonProps = {
   tooltip?: string;
   /** Shows a spinner and disables the button while the source data loads. */
   loading?: boolean;
+  /** Disables the button with no spinner, e.g. while another row is loading. */
+  disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
 };
@@ -27,22 +29,23 @@ export function DuplicateIconButton({
   onClick,
   tooltip = "Duplicate",
   loading = false,
+  disabled = false,
   className = "",
 }: DuplicateIconButtonProps) {
   return (
     <Tooltip content={tooltip}>
       <button
         type="button"
-        disabled={loading}
+        disabled={loading || disabled}
         onClick={(e) => {
           e.stopPropagation();
-          if (loading) return;
+          if (loading || disabled) return;
           onClick();
         }}
         aria-label={tooltip}
         aria-busy={loading}
         className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          loading ? "cursor-not-allowed" : "cursor-pointer"
+          loading || disabled ? "cursor-not-allowed" : "cursor-pointer"
         } ${className}`}
       >
         {loading ? (

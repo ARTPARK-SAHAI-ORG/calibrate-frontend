@@ -122,7 +122,7 @@ export function ShareButton({
 
   const copyLink = async () => {
     if (!publicUrl) return;
-    await copyToClipboard(publicUrl);
+    if (!(await copyToClipboard(publicUrl))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

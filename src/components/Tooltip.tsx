@@ -17,7 +17,14 @@ export function Tooltip({
   className = "",
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  // `side` is the side the popup ended up on, which is not always the one
+  // asked for: near the top or bottom of the window it flips to the other
+  // side rather than sliding over the thing it describes.
+  const [tooltipPosition, setTooltipPosition] = useState({
+    top: 0,
+    left: 0,
+    side: position,
+  });
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Closing is delayed so the pointer can cross the 8px gap between the
@@ -56,7 +63,22 @@ export function Tooltip({
     let top = 0;
     let left = 0;
 
-    switch (position) {
+    // Flip to the opposite side when the popup would not fit, and only when
+    // it does fit there. Sliding it back into view instead would park it on
+    // top of the thing it describes, hiding it and leaving the arrow
+    // pointing at nothing.
+    const fitsAbove = rect.top - tooltipHeight - 8 >= padding;
+    const fitsBelow = rect.bottom + 8 + tooltipHeight <= window.innerHeight - padding;
+    const fitsLeft = rect.left - tooltipWidth - 8 >= padding;
+    const fitsRight = rect.right + 8 + tooltipWidth <= window.innerWidth - padding;
+
+    let side = position;
+    if (position === "top" && !fitsAbove && fitsBelow) side = "bottom";
+    else if (position === "bottom" && !fitsBelow && fitsAbove) side = "top";
+    else if (position === "left" && !fitsLeft && fitsRight) side = "right";
+    else if (position === "right" && !fitsRight && fitsLeft) side = "left";
+
+    switch (side) {
       case "top":
         top = rect.top - tooltipHeight - 8;
         left = rect.left + rect.width / 2;
@@ -76,7 +98,7 @@ export function Tooltip({
     }
 
     // Clamp horizontal position to keep tooltip within viewport
-    if (position === "top" || position === "bottom") {
+    if (side === "top" || side === "bottom") {
       const halfWidth = tooltipWidth / 2;
       const minLeft = halfWidth + padding;
       const maxLeft = window.innerWidth - halfWidth - padding;
@@ -97,7 +119,7 @@ export function Tooltip({
       top = window.innerHeight - tooltipHeight - padding;
     }
 
-    setTooltipPosition({ top, left });
+    setTooltipPosition({ top, left, side });
   };
 
   useEffect(() => {
@@ -144,13 +166,18 @@ export function Tooltip({
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,
-        transform: position === "top" || position === "bottom" ? "translateX(-50%)" : "translateY(-50%)",
+        transform:
+          tooltipPosition.side === "top" || tooltipPosition.side === "bottom"
+            ? "translateX(-50%)"
+            : "translateY(-50%)",
       }}
     >
       <div className="px-3 py-2 text-xs text-gray-900 bg-white rounded-lg shadow-lg whitespace-normal break-words max-w-64 w-max">
         {content}
         {/* Arrow */}
-        <div className={`absolute ${arrowClasses[position]}`}></div>
+        <div
+          className={`absolute ${arrowClasses[tooltipPosition.side]}`}
+        ></div>
       </div>
     </div>
   );
