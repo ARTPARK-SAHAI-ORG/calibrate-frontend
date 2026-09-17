@@ -1,5 +1,6 @@
 ## September 2026
 
+- A run is now marked partially complete instead of finished when one of its tests could not be run, and its summary only shows pass rate, latency, cost and token cards when there are actual numbers to show ([#602](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/602))
 - You can now tick tests and run or compare them from inside any model comparison window, not just the one opened from the Evaluations tab ([#600](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/600))
 - When a test could not be run, the reason it failed is now hidden behind a View details button instead of shown right away ([#595](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/595))
 - A test run or model comparison that fails now shows the actual reason it failed instead of a generic message ([#585](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/585))
