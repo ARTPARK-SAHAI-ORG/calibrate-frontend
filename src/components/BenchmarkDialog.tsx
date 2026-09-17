@@ -46,6 +46,12 @@ type BenchmarkDialogProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  /** Called when a model passes its check, so the agent page can remember it
+   *  and the next comparison does not ask again before a reload. */
+  onModelVerified?: (
+    modelId: string,
+    entry: { verified: boolean; verified_at: string; error: string | null },
+  ) => void;
 };
 
 type ModelVerifications = Record<
@@ -76,6 +82,7 @@ export function BenchmarkDialog({
   agentType,
   benchmarkModelsVerified: initialBenchmarkModelsVerified,
   benchmarkProvider,
+  onModelVerified,
 }: BenchmarkDialogProps) {
   useHideFloatingButton(isOpen);
   const { providers: llmProviders } = useOpenRouterModels();
@@ -161,14 +168,9 @@ export function BenchmarkDialog({
       const verified: boolean = result.success ?? false;
       const error: string | null = result.error ?? null;
 
-      setBenchmarkModelsVerified((prev) => ({
-        ...prev,
-        [modelId]: {
-          verified,
-          verified_at: new Date().toISOString(),
-          error,
-        },
-      }));
+      const entry = { verified, verified_at: new Date().toISOString(), error };
+      setBenchmarkModelsVerified((prev) => ({ ...prev, [modelId]: entry }));
+      if (verified) onModelVerified?.(modelId, entry);
       if (result.sample_response) {
         setModelSampleResponses((prev) => ({
           ...prev,

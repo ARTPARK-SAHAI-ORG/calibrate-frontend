@@ -32,6 +32,10 @@ export type AgentRunLauncherOptions = {
   >;
   benchmarkProvider?: string;
   onConnectionVerified?: () => void;
+  /** A model passed its check inside the comparison window. */
+  onBenchmarkModelVerified?: React.ComponentProps<
+    typeof BenchmarkDialog
+  >["onModelVerified"];
   onGoToConnectionSettings?: () => void;
   onEnableBenchmark?: (provider: string) => void | Promise<void>;
   /** How many tests "every linked test" is; only the Tests tab knows it. */
@@ -63,6 +67,7 @@ export function useAgentRunLaunchers({
   benchmarkModelsVerified,
   benchmarkProvider,
   onConnectionVerified,
+  onBenchmarkModelVerified,
   onGoToConnectionSettings,
   onEnableBenchmark,
   linkedTestsTotal,
@@ -277,6 +282,7 @@ export function useAgentRunLaunchers({
           }}
           agentType={agentType}
           benchmarkModelsVerified={benchmarkModelsVerified}
+          onModelVerified={onBenchmarkModelVerified}
           benchmarkProvider={benchmarkProvider}
         />
       )}

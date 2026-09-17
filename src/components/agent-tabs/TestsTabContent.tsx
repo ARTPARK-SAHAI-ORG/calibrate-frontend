@@ -25,7 +25,10 @@ import { buildTestToRun } from "@/lib/testRun";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
-import { useAgentRunLaunchers } from "@/components/agent-tabs/useAgentRunLaunchers";
+import {
+  useAgentRunLaunchers,
+  type AgentRunLauncherSettings,
+} from "@/components/agent-tabs/useAgentRunLaunchers";
 import { SpinnerIcon, CopyIcon, TrashIcon } from "@/components/icons";
 import {
   AddTestDialog,
@@ -139,6 +142,7 @@ type TestsTabContentProps = {
   agentDefaultInputTypes?: Record<string, InputFieldType>;
   // Called after a passing endpoint check so the parent flips connectionVerified true.
   onConnectionVerified?: () => void;
+  onBenchmarkModelVerified?: AgentRunLauncherSettings["onBenchmarkModelVerified"];
   // Called when the user opts to fix the connection; parent switches to the Connection tab.
   onGoToConnectionSettings?: () => void;
   // Called when someone turns benchmarking on from here by picking a provider.
@@ -269,6 +273,7 @@ export function TestsTabContent({
   agentDefaultInputs,
   agentDefaultInputTypes,
   onConnectionVerified,
+  onBenchmarkModelVerified,
   onGoToConnectionSettings,
   onEnableBenchmark,
   onRunStarted,
@@ -519,6 +524,7 @@ export function TestsTabContent({
     benchmarkModelsVerified,
     benchmarkProvider,
     onConnectionVerified,
+    onBenchmarkModelVerified,
     onGoToConnectionSettings,
     onEnableBenchmark,
     linkedTestsTotal,

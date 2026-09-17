@@ -1136,6 +1136,14 @@ export function AgentDetail({
         connection_verified_at: new Date().toISOString(),
         connection_verified_error: null,
       })),
+    onBenchmarkModelVerified: (modelId, entry) =>
+      setConnectionConfig((prev) => ({
+        ...prev,
+        benchmark_models_verified: {
+          ...prev.benchmark_models_verified,
+          [modelId]: entry,
+        },
+      })),
     onGoToConnectionSettings: () => performTabSwitch("connection"),
     onEnableBenchmark: isConnection
       ? (provider: string) =>

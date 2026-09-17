@@ -89,6 +89,20 @@ jest.mock("../agent-tabs", () => ({
       <button onClick={() => props.onEnableBenchmark?.("google")}>
         EnableBenchmarkFromTests
       </button>
+      <button
+        onClick={() =>
+          props.onBenchmarkModelVerified?.("openai/gpt-4o", {
+            verified: true,
+            verified_at: "2024-02-02T00:00:00.000Z",
+            error: null,
+          })
+        }
+      >
+        VerifyModelFromTests
+      </button>
+      <span data-testid="tests-verified-models">
+        {Object.keys(props.benchmarkModelsVerified ?? {}).join(",")}
+      </span>
     </div>
   ),
   RunsTabContent: (props: any) => (
@@ -1462,5 +1476,24 @@ describe("AgentDetail — turning benchmarking on from the Tests tab", () => {
     expect(
       screen.getByTestId("connection-benchmark-provider"),
     ).toHaveTextContent("google");
+  });
+
+  it("remembers a model the comparison window verified, so the next comparison does not ask again", async () => {
+    mockFetchSequenceForAgent(connectionAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Tests"));
+    expect(screen.getByTestId("tests-verified-models")).toHaveTextContent("");
+
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(connectionAgent));
+    await user.click(screen.getByText("VerifyModelFromTests"));
+
+    expect(screen.getByTestId("tests-verified-models")).toHaveTextContent(
+      "openai/gpt-4o",
+    );
   });
 });
