@@ -1030,4 +1030,217 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("results-compare-ticked"));
     expect(onCompareTests).toHaveBeenCalledWith(mockTickedTests);
   });
+
+  describe("opening with the models a past comparison ran", () => {
+    it("names those models once the model list has arrived", async () => {
+      // The list of models comes from the backend, so it is empty on the first
+      // render, the way it is in the app.
+      mockUseOpenRouterModels.mockReturnValue({ providers: [] });
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+
+      mockUseOpenRouterModels.mockReturnValue({ providers: providersFixture });
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getByText("Claude 3 Haiku")).toBeInTheDocument();
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+    });
+
+    it("still shows a row for a model that is no longer offered, named by its id", async () => {
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "openai/gpt-retired"],
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("openai/gpt-retired")).toBeInTheDocument();
+      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+    });
+
+    it("ignores a repeated model and stops at five", async () => {
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: [
+              "openai/gpt-4o",
+              "openai/gpt-4o",
+              "openai/gpt-4o-mini",
+              "anthropic/claude-3-5-sonnet",
+              "anthropic/claude-3-haiku",
+              "google/gemini-pro",
+              "openai/gpt-retired",
+            ],
+          })}
+        />,
+      );
+
+      await screen.findByText("GPT-4o");
+      // Five rows, so no blank row is left to pick a sixth in.
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(5);
+      expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
+      expect(screen.queryByText("openai/gpt-retired")).not.toBeInTheDocument();
+    });
+
+    it("leaves the models alone once the reader has changed them", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o"],
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(screen.getByTitle("Remove model"));
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+
+      // A new array of the same ids, the way a parent re-rendering passes it.
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o"],
+          })}
+        />,
+      );
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+    });
+
+    it("runs the comparison on the models it opened with", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual([
+        "openai/gpt-4o",
+        "anthropic/claude-3-haiku",
+      ]);
+    });
+
+    it("connection agent: opens on Sequential when that is what ran before, and sends it", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(
+        screen.getByRole("button", { name: "Advanced settings" }),
+      );
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.parallelModels).toBe(false);
+      expect(payload.models).toEqual(["openai/gpt-4o"]);
+    });
+
+    it("closing puts Sequential back, not Parallel, and fills the models in again on the next open", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(
+        screen.getByRole("button", { name: "Advanced settings" }),
+      );
+      await user.click(screen.getByRole("radio", { name: "Parallel" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+            isOpen: false,
+          })}
+        />,
+      );
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "Advanced settings" }),
+      );
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+    });
+  });
 });

@@ -56,29 +56,6 @@ jest.mock("../useAgentRunLaunchers", () => ({
   },
 }));
 
-// Kept stateful, the way the real hook is, so a rerun window that opens can
-// also be seen to close again.
-const rerunStart = jest.fn();
-let rerunDialogProps: any = null;
-jest.mock("../../BenchmarkRerunDialog", () => ({
-  BenchmarkRerunDialog: (props: any) => {
-    rerunDialogProps = props;
-    return props.config ? <div data-testid="benchmark-rerun">rerun</div> : null;
-  },
-  useBenchmarkRerun: () => {
-    const [config, setConfig] = React.useState<any>(null);
-    return {
-      config,
-      key: 0,
-      start: (next: any) => {
-        rerunStart(next);
-        setConfig(next);
-      },
-      clear: () => setConfig(null),
-    };
-  },
-}));
-
 function jsonResponse(data: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => data };
 }
@@ -167,7 +144,6 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   runnerProps = null;
   benchmarkResultsProps = null;
-  rerunDialogProps = null;
   launcherOptions = null;
   state = { runs: [unitRun, benchmarkRun] };
   installFetch();
@@ -586,7 +562,7 @@ describe("RunsTabContent", () => {
     );
   });
 
-  it("starts a fresh comparison when the benchmark window asks to rerun", async () => {
+  it("reopens the model picker filled in when the comparison window asks to rerun", async () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
@@ -594,13 +570,91 @@ describe("RunsTabContent", () => {
     await screen.findByTestId("benchmark-results");
 
     await act(async () => {
-      benchmarkResultsProps.onRerun(["gpt-4"], ["t1"], ["A"]);
+      benchmarkResultsProps.onRerun({
+        models: ["gpt-4", "claude"],
+        testUuids: ["t1", "t2"],
+        testNames: ["A", "B"],
+        parallelModels: false,
+      });
     });
 
-    expect(rerunStart).toHaveBeenCalledWith(
-      expect.objectContaining({ models: ["gpt-4"], testUuids: ["t1"] }),
+    expect(openCompare).toHaveBeenCalledWith(
+      [
+        { uuid: "t1", name: "A" },
+        { uuid: "t2", name: "B" },
+      ],
+      false,
+      { models: ["gpt-4", "claude"], parallelModels: false },
     );
+  });
+
+  it("keeps the comparison on screen until a new one actually exists", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    await act(async () => {
+      benchmarkResultsProps.onRerun({
+        models: ["gpt-4"],
+        testUuids: ["t1"],
+        testNames: ["A"],
+      });
+    });
+
+    // Backing out of the picker, or having it refused, must leave the reader
+    // where they were. The window closes when a comparison is created.
+    expect(screen.getByTestId("benchmark-results")).toBeInTheDocument();
+
+    await act(async () => {
+      launcherOptions!.onComparisonCreated!();
+    });
     expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+  });
+
+  it("carries no way-to-run choice when the comparison never recorded one", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    await act(async () => {
+      benchmarkResultsProps.onRerun({
+        models: ["gpt-4"],
+        testUuids: ["t1"],
+        testNames: ["A"],
+      });
+    });
+
+    expect(openCompare).toHaveBeenCalledWith([{ uuid: "t1", name: "A" }], false, {
+      models: ["gpt-4"],
+      parallelModels: undefined,
+    });
+  });
+
+  it("keeps a test whose name the comparison did not carry", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    await act(async () => {
+      benchmarkResultsProps.onRerun({
+        models: ["gpt-4"],
+        testUuids: ["t1", "t2"],
+        testNames: ["A"],
+      });
+    });
+
+    // The second test still goes to the picker, so the rerun covers the same
+    // tests even when the run carried no name for it.
+    expect(openCompare.mock.calls[0][0]).toEqual([
+      { uuid: "t1", name: "A" },
+      { uuid: "t2", name: "" },
+    ]);
   });
 
   it("points the run window at the rerun it reports", async () => {
@@ -966,60 +1020,4 @@ describe("running tests from an open results window", () => {
     await waitFor(() => expect(runsListCalls()).toBe(before + 1));
   });
 
-  /** Open a past comparison, then rerun it, so the rerun window is on screen. */
-  async function openRerunWindow() {
-    state.runs = [benchmarkRun];
-    const user = setupUser();
-    renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
-    await screen.findByTestId("benchmark-results");
-    await act(async () => {
-      benchmarkResultsProps.onRerun(["gpt-4"], ["t1"], ["A"]);
-    });
-    await screen.findByTestId("benchmark-rerun");
-  }
-
-  it("runs or compares the ticked tests from the rerun window", async () => {
-    await openRerunWindow();
-
-    rerunDialogProps.onRunTests(tests);
-    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
-    rerunDialogProps.onCompareTests(tests);
-    expect(openCompare).toHaveBeenCalledWith(tests, false);
-  });
-
-  it("closes the rerun window and opens the run it started", async () => {
-    await openRerunWindow();
-
-    await act(async () => {
-      launcherOptions?.onRunCreated("run-new", "window");
-    });
-    expect(screen.queryByTestId("benchmark-rerun")).not.toBeInTheDocument();
-    expect(screen.getByTestId("test-runner")).toHaveTextContent(
-      "runner:run-new",
-    );
-  });
-
-  it("draws the launcher's dialogs on top of the rerun window", async () => {
-    await openRerunWindow();
-
-    // The confirmation for a run asked for inside the rerun window is one of
-    // the launcher's dialogs, and both are full-screen boxes at the same
-    // depth, so the one written later is the one the reader sees.
-    const rerunWindow = screen.getByTestId("benchmark-rerun");
-    const launcherDialogs = screen.getByTestId("launcher-dialogs");
-    expect(
-      rerunWindow.compareDocumentPosition(launcherDialogs) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("closes the rerun window once a comparison is created", async () => {
-    await openRerunWindow();
-
-    await act(async () => {
-      launcherOptions?.onComparisonCreated?.();
-    });
-    expect(screen.queryByTestId("benchmark-rerun")).not.toBeInTheDocument();
-  });
 });

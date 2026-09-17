@@ -16,6 +16,9 @@ export type BenchmarkRerunConfig = {
   models: string[];
   testUuids: string[];
   testNames: string[];
+  /** How the run being rerun ran its models, so the rerun runs them the same
+   * way. Absent when the run predates the backend recording it. */
+  parallelModels?: boolean;
 };
 
 /**
@@ -79,10 +82,9 @@ export function BenchmarkRerunDialog({
       testUuids={config.testUuids}
       testNames={config.testNames}
       models={config.models}
+      parallelModels={config.parallelModels}
       onBenchmarkCreated={(taskId) => onBenchmarkCreated(taskId, config)}
-      onRerun={(models, testUuids, testNames) =>
-        onRerun({ ...config, models, testUuids, testNames })
-      }
+      onRerun={(request) => onRerun({ ...config, ...request })}
       onRunTests={onRunTests}
       onCompareTests={onCompareTests}
     />

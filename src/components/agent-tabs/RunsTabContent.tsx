@@ -35,10 +35,6 @@ import {
   useAgentRunLaunchers,
   type AgentRunLauncherSettings,
 } from "./useAgentRunLaunchers";
-import {
-  BenchmarkRerunDialog,
-  useBenchmarkRerun,
-} from "@/components/BenchmarkRerunDialog";
 import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
 import { displayModelName } from "@/lib/modelName";
 
@@ -405,8 +401,6 @@ export function RunsTabContent({
     setRunIdParam(run.uuid);
   };
 
-  const benchmarkRerun = useBenchmarkRerun();
-
   // Run or compare the tests ticked inside an open results window, the same
   // way the Tests tab does it. A new plain run replaces the open window; a
   // comparison closes it once the picker has created the comparison.
@@ -417,16 +411,12 @@ export function RunsTabContent({
       ...launcherOpts,
       onRunCreated: (taskId) => {
         void refetch();
-        // The rerun window is closed too, so the run it just started is not
-        // opened behind it.
-        benchmarkRerun.clear();
         openTestRun(taskId);
       },
       onComparisonCreated: () => {
         void refetch();
         closeTestRun();
         closeBenchmarkRun();
-        benchmarkRerun.clear();
       },
     });
 
@@ -731,15 +721,20 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
-          onRerun={(models, testUuids, testNames) => {
-            closeBenchmarkRun();
-            benchmarkRerun.start({
-              agentUuid,
-              agentName,
-              models,
-              testUuids,
-              testNames,
-            });
+          // The window stays open until a comparison actually exists, the
+          // way Compare on the ticked rows above does it: onComparisonCreated
+          // closes it. Closing here threw away the comparison the reader was
+          // reading the moment they clicked, so backing out of the picker,
+          // or having it refused, left them on a bare list.
+          onRerun={({ models, testUuids, testNames, parallelModels }) => {
+            void openCompare(
+              testUuids.map((uuid, index) => ({
+                uuid,
+                name: testNames[index] ?? "",
+              })),
+              false,
+              { models, parallelModels },
+            );
           }}
         />
       )}
@@ -758,20 +753,6 @@ export function RunsTabContent({
           isDeleting={isDeleting}
         />
       )}
-
-      {/* Before the launcher's dialogs, so the confirmation for a run asked
-          for from inside this window is drawn on top of it rather than
-          behind. Both are the same kind of full-screen box, and the one
-          written later is the one the reader sees. */}
-      <BenchmarkRerunDialog
-        config={benchmarkRerun.config}
-        rerunKey={benchmarkRerun.key}
-        onClose={benchmarkRerun.clear}
-        onBenchmarkCreated={() => void refetch()}
-        onRerun={benchmarkRerun.start}
-        onRunTests={(tests) => confirmTestRun(tests, false, "window")}
-        onCompareTests={(tests) => void openCompare(tests, false)}
-      />
 
       {launcherDialogs}
     </div>

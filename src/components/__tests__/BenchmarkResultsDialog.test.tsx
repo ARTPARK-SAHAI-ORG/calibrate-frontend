@@ -1460,9 +1460,14 @@ describe("BenchmarkResultsDialog", () => {
       expect(onGoBack).toHaveBeenCalledTimes(1);
     });
 
-    it("prefers onRerun (direct rerun) over onGoBack and passes derived models/testNames", async () => {
-      // Viewing a past run: `models` prop is empty, so the rerun config must be
-      // recovered from the loaded model_results.
+    /** Opens a finished comparison and clicks Rerun. The `models`/`testUuids`
+     * props are empty, as they are for any past run, so the rerun config has to
+     * be recovered from what the run itself carries. `detail` adds to the
+     * comparison the backend replies with. */
+    async function clickRerunOnPastRun(
+      detail: Record<string, unknown> = {},
+      props: Record<string, unknown> = {},
+    ) {
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
         if (isBenchmarkDetail(url, "task-rerun")) {
           return Promise.resolve(
@@ -1497,6 +1502,7 @@ describe("BenchmarkResultsDialog", () => {
                   ],
                 },
               ],
+              ...detail,
             }),
           );
         }
@@ -1515,6 +1521,7 @@ describe("BenchmarkResultsDialog", () => {
           taskId="task-rerun"
           onGoBack={onGoBack}
           onRerun={onRerun}
+          {...props}
         />,
       );
       await waitFor(() =>
@@ -1523,14 +1530,52 @@ describe("BenchmarkResultsDialog", () => {
 
       const user = setupUser();
       await user.click(screen.getByRole("button", { name: /Rerun/ }));
+      return { onRerun, onGoBack };
+    }
+
+    it("prefers onRerun (direct rerun) over onGoBack and passes derived models/testNames", async () => {
+      const { onRerun, onGoBack } = await clickRerunOnPastRun();
 
       expect(onRerun).toHaveBeenCalledTimes(1);
-      expect(onRerun).toHaveBeenCalledWith(
-        ["gpt-4", "claude"],
-        ["tu-1", "tu-2"],
-        ["Test One", "Test Two"],
-      );
+      expect(onRerun).toHaveBeenCalledWith({
+        models: ["gpt-4", "claude"],
+        testUuids: ["tu-1", "tu-2"],
+        testNames: ["Test One", "Test Two"],
+        parallelModels: undefined,
+      });
       expect(onGoBack).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])(
+      "hands the rerun parallelModels: %s, as the comparison ran",
+      async (parallelModels) => {
+        const { onRerun } = await clickRerunOnPastRun({
+          parallel_models: parallelModels,
+        });
+
+        expect(onRerun.mock.calls[0][0].parallelModels).toBe(parallelModels);
+      },
+    );
+
+    it.each([
+      ["the comparison predates it", {}],
+      ["the backend sent nothing for it", { parallel_models: null }],
+    ])(
+      "hands the rerun no parallelModels when %s",
+      async (_name, detail: Record<string, unknown>) => {
+        const { onRerun } = await clickRerunOnPastRun(detail);
+
+        expect(onRerun.mock.calls[0][0].parallelModels).toBeUndefined();
+      },
+    );
+
+    it("falls back to how this window started the run when it comes back without it", async () => {
+      const { onRerun } = await clickRerunOnPastRun(
+        {},
+        { parallelModels: false },
+      );
+
+      expect(onRerun.mock.calls[0][0].parallelModels).toBe(false);
     });
 
     it("hides the Rerun button on a legacy benchmark with no test_uuids (no onGoBack fallback)", async () => {
