@@ -976,6 +976,20 @@ describe("running tests from an open results window", () => {
     );
   });
 
+  it("draws the launcher's dialogs on top of the rerun window", async () => {
+    await openRerunWindow();
+
+    // The confirmation for a run asked for inside the rerun window is one of
+    // the launcher's dialogs, and both are full-screen boxes at the same
+    // depth, so the one written later is the one the reader sees.
+    const rerunWindow = screen.getByTestId("benchmark-rerun");
+    const launcherDialogs = screen.getByTestId("launcher-dialogs");
+    expect(
+      rerunWindow.compareDocumentPosition(launcherDialogs) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("closes the rerun window once a comparison is created", async () => {
     await openRerunWindow();
 

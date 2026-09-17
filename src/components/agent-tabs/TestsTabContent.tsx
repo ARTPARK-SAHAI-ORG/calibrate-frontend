@@ -557,7 +557,14 @@ export function TestsTabContent({
     // Cancelling the picker without starting anything leaves the reader where
     // they were.
     onComparisonClosed: (started) => {
-      if (started) onRunWindowClosed?.();
+      if (!started) return;
+      // A run started from inside that window was opened here a moment ago.
+      // Evaluations opens the same run from the address once it is on screen,
+      // so let go of the copy here: left open it would be hidden behind that
+      // tab and still read the same run over and over. The address keeps the
+      // run id, which is what Evaluations opens it from.
+      setOpenTestRunId(null);
+      onRunWindowClosed?.();
     },
   });
 

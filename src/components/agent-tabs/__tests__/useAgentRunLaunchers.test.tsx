@@ -424,6 +424,30 @@ describe("useAgentRunLaunchers", () => {
       expect(mockBenchmarkMounts.count).toBe(mountsBefore + 1);
     });
 
+    it("draws the confirmation on top of the comparison window", async () => {
+      const { hook, redraw } = setup();
+      await act(async () => {
+        await hook.result.current.openCompare(tests, false);
+      });
+      redraw();
+      await act(async () => {
+        await benchmarkProps?.onRunTests?.([tests[0]]);
+      });
+      redraw();
+
+      // Both are full-screen boxes at the same depth, so the one written
+      // later is the one the reader sees. The confirmation has to come after
+      // the comparison window, or clicking Run looks like nothing happened.
+      const comparisonWindow = screen.getByTestId("benchmark-dialog");
+      const confirmation = screen.getByRole("button", {
+        name: "Start the run",
+      });
+      expect(
+        comparisonWindow.compareDocumentPosition(confirmation) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
     it("reports a cancelled picker as not started", async () => {
       const onComparisonClosed = jest.fn();
       const { hook, redraw } = setup({ onComparisonClosed });

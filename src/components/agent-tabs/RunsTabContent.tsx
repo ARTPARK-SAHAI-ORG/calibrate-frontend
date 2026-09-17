@@ -759,8 +759,10 @@ export function RunsTabContent({
         />
       )}
 
-      {launcherDialogs}
-
+      {/* Before the launcher's dialogs, so the confirmation for a run asked
+          for from inside this window is drawn on top of it rather than
+          behind. Both are the same kind of full-screen box, and the one
+          written later is the one the reader sees. */}
       <BenchmarkRerunDialog
         config={benchmarkRerun.config}
         rerunKey={benchmarkRerun.key}
@@ -770,6 +772,8 @@ export function RunsTabContent({
         onRunTests={(tests) => confirmTestRun(tests, false, "window")}
         onCompareTests={(tests) => void openCompare(tests, false)}
       />
+
+      {launcherDialogs}
     </div>
   );
 }
