@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  render,
-  screen,
-  setupUser,
-  act,
-  waitFor,
-  within,
-} from "@/test-utils";
+import { render, screen, setupUser, act, waitFor, within } from "@/test-utils";
 import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
 import type { AgentRunLauncherOptions } from "../useAgentRunLaunchers";
@@ -131,8 +124,11 @@ function installFetch() {
       });
     }
     if (url.includes("/agent-tests/job/")) {
-      return jsonResponse(state.deleteOk === false ? {} : { message: "ok" },
-        state.deleteOk !== false, state.deleteOk === false ? 500 : 200);
+      return jsonResponse(
+        state.deleteOk === false ? {} : { message: "ok" },
+        state.deleteOk !== false,
+        state.deleteOk === false ? 500 : 200,
+      );
     }
     return jsonResponse({});
   }) as jest.Mock;
@@ -297,7 +293,10 @@ describe("RunsTabContent", () => {
     // An older backend sends `evaluators` as plain strings. The names still
     // show; there is just no id, so nothing to open.
     state.runs = [
-      { ...unitRun, evaluators: ["Correctness", "Script Fidelity", "Tool call"] },
+      {
+        ...unitRun,
+        evaluators: ["Correctness", "Script Fidelity", "Tool call"],
+      },
     ];
     renderTab();
     await screen.findAllByText("1 Success");
@@ -356,7 +355,11 @@ describe("RunsTabContent", () => {
     renderTab();
     // The mark sits with the run's name, not among the result pills.
     expect(
-      (await screen.findAllByLabelText("Someone stopped the evaluation before it finished")).length,
+      (
+        await screen.findAllByLabelText(
+          "Someone stopped the evaluation before it finished",
+        )
+      ).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("3 Success").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
@@ -365,30 +368,52 @@ describe("RunsTabContent", () => {
 
   it("marks each run by how the run itself went", async () => {
     state.runs = [
-      unitRun,
+      { ...unitRun, passed: 2, unanswered_tests: 0 },
       { ...benchmarkRun, uuid: "run-going", status: "in_progress" },
       { ...benchmarkRun, uuid: "run-broke", status: "failed" },
       { ...unitRun, uuid: "run-stopped", aborted: true },
     ];
     renderTab();
     // Desktop table and mobile cards both render, so each mark appears twice.
-    expect((await screen.findAllByLabelText("The evaluation ran every test")).length).toBe(2);
+    expect(
+      (await screen.findAllByLabelText("The evaluation ran every test")).length,
+    ).toBe(2);
     expect(
       screen.getAllByLabelText(
         "Someone stopped the evaluation before it finished",
       ).length,
     ).toBe(2);
     expect(
-      screen.getAllByLabelText("The evaluation broke before it could finish").length,
+      screen.getAllByLabelText("The evaluation broke before it could finish")
+        .length,
     ).toBe(2);
     // A run still going says so in the results instead.
     expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
   });
 
+  it("does not call a run complete when a test produced no answer", async () => {
+    // The same run the tally test uses: one test gave no answer, so the run
+    // did not cover every test and must not carry the green tick.
+    state.runs = [unitRun];
+    renderTab();
+    expect(
+      (
+        await screen.findAllByLabelText(
+          "Partially complete as some tests could not be run",
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("The evaluation ran every test"),
+    ).not.toBeInTheDocument();
+  });
+
   it("says there are no results when the run was stopped before any test ran", async () => {
     state.runs = [{ ...unitRun, aborted: true, total_tests: null }];
     renderTab();
-    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.queryByText("Complete")).not.toBeInTheDocument();
   });
 
@@ -505,9 +530,7 @@ describe("RunsTabContent", () => {
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() =>
-      expect(new URLSearchParams(window.location.search).get("page")).toBe(
-        "2",
-      ),
+      expect(new URLSearchParams(window.location.search).get("page")).toBe("2"),
     );
 
     await user.click(screen.getByRole("button", { name: "Previous page" }));
@@ -621,9 +644,12 @@ describe("RunsTabContent", () => {
         String(url).includes("/runs?"),
       ).length;
     const before = listCalls();
-    await waitFor(() => expect(listCalls()).toBeGreaterThanOrEqual(before + 2), {
-      timeout: 8000,
-    });
+    await waitFor(
+      () => expect(listCalls()).toBeGreaterThanOrEqual(before + 2),
+      {
+        timeout: 8000,
+      },
+    );
     expect(existsCalls()).toBe(1);
   }, 12000);
 
@@ -923,9 +949,7 @@ describe("running tests from an open results window", () => {
     });
     expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
-    expect(
-      new URLSearchParams(window.location.search).get("runId"),
-    ).toBeNull();
+    expect(new URLSearchParams(window.location.search).get("runId")).toBeNull();
     await waitFor(() => expect(runsListCalls()).toBe(before + 1));
   });
 });

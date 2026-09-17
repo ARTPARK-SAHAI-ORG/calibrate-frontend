@@ -180,6 +180,8 @@ export type RunStatusLike = {
   aborted?: boolean | null;
   /** True when the run gave up before it started every test. */
   stopped_early?: boolean | null;
+  /** How many tests were tried but produced no answer. */
+  unanswered_tests?: number | null;
 };
 
 /**
@@ -230,7 +232,12 @@ export function runStateOf(run: RunStatusLike): RunState | null {
   if (isRunStopped(run)) return "stopped";
   if (isRunErrored(run)) return "error";
   if (isRunInProgress(run)) return null;
-  if (run.stopped_early === true) return "gave_up";
+  // Two ways a run can end without covering every test: it gave up before
+  // starting them all, or it started a test that never produced an answer.
+  // Both read as partly done, so neither gets the green tick that says every
+  // test ran.
+  if (run.stopped_early === true || (run.unanswered_tests ?? 0) > 0)
+    return "gave_up";
   return "finished";
 }
 

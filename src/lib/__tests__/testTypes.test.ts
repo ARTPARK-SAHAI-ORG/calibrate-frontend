@@ -236,8 +236,13 @@ describe("runStateOf", () => {
   });
 
   it("says a run gave up when it stopped before starting every test", () => {
-    expect(runStateOf({ status: "done", stopped_early: true })).toBe(
-      "gave_up",
+    expect(runStateOf({ status: "done", stopped_early: true })).toBe("gave_up");
+  });
+
+  it("says a run gave up when a test produced no answer", () => {
+    expect(runStateOf({ status: "done", unanswered_tests: 1 })).toBe("gave_up");
+    expect(runStateOf({ status: "done", unanswered_tests: 0 })).toBe(
+      "finished",
     );
   });
 
@@ -245,9 +250,7 @@ describe("runStateOf", () => {
     expect(
       runStateOf({ status: "done", aborted: true, stopped_early: true }),
     ).toBe("stopped");
-    expect(runStateOf({ status: "failed", stopped_early: true })).toBe(
-      "error",
-    );
+    expect(runStateOf({ status: "failed", stopped_early: true })).toBe("error");
   });
 
   it("says nothing while the run is still going", () => {
