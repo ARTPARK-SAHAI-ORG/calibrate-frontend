@@ -13,7 +13,6 @@ import {
   CloseIcon,
   ChevronDownIcon,
   TrashIcon,
-  PlusIcon,
   PlayIcon,
 } from "@/components/icons";
 import { Button, ConfirmDialog } from "@/components/ui";
@@ -88,9 +87,7 @@ export function BenchmarkDialog({
   const { providers: llmProviders } = useOpenRouterModels();
   const backendAccessToken = useAccessToken();
 
-  const [selectedModels, setSelectedModels] = useState<(LLMModel | null)[]>([
-    null,
-  ]);
+  const [selectedModels, setSelectedModels] = useState<LLMModel[]>([]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -120,7 +117,7 @@ export function BenchmarkDialog({
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setSelectedModels([null]);
+    setSelectedModels([]);
     setShowResults(false);
     setRunModelsTogether(true);
     setSettingsOpen(false);
@@ -255,10 +252,6 @@ export function BenchmarkDialog({
     setShowResults(false);
   };
 
-  const handleAddModel = () => {
-    setSelectedModels((prev) => [...prev, null]);
-  };
-
   const handleSelectModel = (index: number, model: LLMModel) => {
     setSelectedModels((prev) => {
       const newModels = [...prev];
@@ -268,10 +261,7 @@ export function BenchmarkDialog({
   };
 
   const handleRemoveModel = (index: number) => {
-    setSelectedModels((prev) => {
-      if (prev.length === 1) return prev;
-      return prev.filter((_, i) => i !== index);
-    });
+    setSelectedModels((prev) => prev.filter((_, i) => i !== index));
   };
 
   const openModelSelector = (index: number) => {
@@ -343,7 +333,12 @@ export function BenchmarkDialog({
   const showStatusColumn =
     agentType === "connection" && selectedModels.some((m) => m !== null);
   const maxModels = 5;
-  const canAddMore = selectedModels.length < maxModels;
+  // The chosen models, then one blank row to pick the next in, until five
+  // are chosen. Picking a model fills the blank and a new blank appears.
+  const rows: (LLMModel | null)[] =
+    selectedModels.length < maxModels
+      ? [...selectedModels, null]
+      : selectedModels;
 
   const getModelVerificationBadge = (modelId: string) => {
     if (agentType !== "connection") return null;
@@ -452,7 +447,7 @@ export function BenchmarkDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-xl w-full max-w-lg h-[38rem] max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="relative bg-background rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4">
           <div>
@@ -477,20 +472,26 @@ export function BenchmarkDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-1 space-y-4">
-          <div className="space-y-3">
+        <div className="flex-1 px-6 pb-6 pt-1 space-y-4">
+          {/* Sized for the label and five rows, so Advanced settings below
+              stays put however many models are chosen. */}
+          <div className="space-y-3 h-[17.5rem]">
             <label className="block text-sm font-medium text-foreground mb-3">
               Select Models
             </label>
 
             {/* Model Rows */}
-            {selectedModels.map((selectedModel, index) => (
+            {rows.map((selectedModel, index) => (
               <div key={index} className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2">
                     <button
                       onClick={() => openModelSelector(index)}
-                      className="flex-1 h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors"
+                      className={`flex-1 h-10 px-4 rounded-md text-sm border border-border flex items-center cursor-pointer transition-colors ${
+                        selectedModel
+                          ? "bg-muted font-medium hover:bg-muted/70"
+                          : "border-dashed bg-background hover:bg-muted/50"
+                      }`}
                     >
                       <span
                         className={
@@ -501,22 +502,21 @@ export function BenchmarkDialog({
                       >
                         {selectedModel ? selectedModel.name : "Select a model"}
                       </span>
-                      <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
                     {/* Verification badge for connections, once a model is
                         picked. It sits right after the picker, and is as wide
-                        as the longest wording so every picker is the same size
-                        and none of them stops short. */}
-                    {showStatusColumn && (
+                        as the longest wording so every chosen row's picker is
+                        the same size. The blank row has no badge and no
+                        remove button, so its picker runs the full width. */}
+                    {showStatusColumn && selectedModel && (
                       <div className="min-w-20 shrink-0 flex items-center">
-                        {selectedModel &&
-                          getModelVerificationBadge(selectedModel.id)}
+                        {getModelVerificationBadge(selectedModel.id)}
                       </div>
                     )}
                   </div>
 
                   {/* Remove Button */}
-                  {selectedModels.length > 1 && (
+                  {selectedModel && (
                     <button
                       onClick={() => handleRemoveModel(index)}
                       className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
@@ -555,51 +555,42 @@ export function BenchmarkDialog({
                   )}
               </div>
             ))}
-
-            {/* Add Model Button */}
-            {canAddMore && (
-              <button
-                onClick={handleAddModel}
-                className="w-full h-10 px-4 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
-              >
-                <PlusIcon className="w-4 h-4" />
-                Add model
-              </button>
-            )}
           </div>
 
           {/* Only a connection agent has a server of its own to overload;
-              a build agent's models are called by the platform. */}
+              a build agent's models are called by the platform. The setting
+              stays behind a link for the few who need it, and opens in a
+              small panel beside the box so the box itself never changes
+              size. On a narrow screen there is no room beside it, so the
+              panel sits under the link instead. */}
           {agentType === "connection" && (
-            <div className="border border-border rounded-xl">
+            <div className="relative">
               <button
                 type="button"
                 onClick={() => setSettingsOpen((open) => !open)}
                 aria-expanded={settingsOpen}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer"
+                className={`w-full h-10 px-4 rounded-md text-sm font-medium border border-border flex items-center justify-between cursor-pointer transition-colors focus:outline-none ${
+                  settingsOpen ? "bg-muted" : "bg-background hover:bg-muted/50"
+                }`}
               >
-                <span className="flex-1 text-sm font-medium text-foreground">
-                  Settings
-                </span>
-                <ChevronDownIcon
-                  className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
-                    settingsOpen ? "" : "-rotate-90"
-                  }`}
-                />
+                Advanced settings
+                <ChevronDownIcon className="w-4 h-4 text-muted-foreground -rotate-90" />
               </button>
+              {/* Beside the link, past the box's own side padding (px-6) plus
+                  a gap, its bottom level with the link so it grows upward and stays
+                  within the box.s height. */}
               {settingsOpen && (
-                <div className="grid grid-cols-2 gap-4 px-4 pb-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Run the models in parallel or one after another
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Running them in parallel puts more load on your agent
-                      server. Choose sequential if you do not want to overload
-                      it.
-                    </p>
-                  </div>
-                  <div>
+                <fieldset className="mt-3 space-y-1 rounded-xl border border-border bg-background p-4 md:mt-0 md:absolute md:left-full md:bottom-0 md:ml-9 md:w-72 md:shadow-2xl md:border-0">
+                  <legend className="sr-only">How to run the models</legend>
+                  <p className="text-sm font-medium text-foreground">
+                    How to run the models
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Running multiple models will increase the load on your agent
+                    server. Choose to run them sequentially to prevent
+                    overloading it.
+                  </p>
+                  <div className="pt-1">
                     {[
                       { value: "parallel", label: "Parallel" },
                       { value: "sequential", label: "Sequential" },
@@ -624,7 +615,7 @@ export function BenchmarkDialog({
                       </label>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               )}
             </div>
           )}
@@ -693,7 +684,7 @@ export function BenchmarkDialog({
             setModelSelectorOpen(false);
             setEditingIndex(null);
           }}
-          selectedLLM={selectedModels[editingIndex]}
+          selectedLLM={rows[editingIndex] ?? null}
           onSelect={handleModelSelected}
           availableProviders={getAvailableProviders(editingIndex)}
         />
