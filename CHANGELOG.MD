@@ -1,5 +1,6 @@
 ## September 2026
 
+- You can now tick tests and run or compare them from inside any model comparison window, not just the one opened from the Evaluations tab ([#600](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/600))
 - When a test could not be run, the reason it failed is now hidden behind a View details button instead of shown right away ([#595](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/595))
 - A test run or model comparison that fails now shows the actual reason it failed instead of a generic message ([#585](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/585))
 - In the model picker, opening See why on a failed model now shows the reason in a panel beside the box instead of moving the rows around ([#589](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/589))
