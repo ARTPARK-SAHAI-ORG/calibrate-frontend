@@ -21,18 +21,11 @@ import {
 } from "@/components/ui/SearchModeInput";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
-import { startTestRunOrNotify } from "@/lib/testRunApi";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
-import { VerifyConnectionDialog } from "@/components/VerifyConnectionDialog";
-import { BenchmarkDialog } from "@/components/BenchmarkDialog";
-import {
-  BenchmarkRerunDialog,
-  useBenchmarkRerun,
-} from "@/components/BenchmarkRerunDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
-import { EnableBenchmarkDialog } from "@/components/agent-tabs/EnableBenchmarkDialog";
+import { useAgentRunLaunchers } from "@/components/agent-tabs/useAgentRunLaunchers";
 import { SpinnerIcon, CopyIcon, TrashIcon } from "@/components/icons";
 import {
   AddTestDialog,
@@ -505,52 +498,54 @@ export function TestsTabContent({
     setRunIdParam(null);
     onRunWindowClosed?.();
   };
-  // Key of the run control whose "create run" call is in flight ("all",
-  // "bulk", or a test uuid). Non-null disables every run control.
-  const [startingRun, setStartingRun] = useState<string | null>(null);
-  // Set when a Run was clicked on an unverified connection agent: holds the
-  // run the user asked for so it can start once the verify dialog passes.
-  const [pendingRun, setPendingRun] = useState<{
-    tests: TestData[];
-    allLinked: boolean;
-    runKey: string;
-  } | null>(null);
 
-  // Benchmark dialog state
-  const [runAllConfirmOpen, setRunAllConfirmOpen] = useState(false);
-  const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
-  // Whether the comparison window that is open actually started a run.
-  // Closing it then lands on Evaluations, where the run is listed, the same
-  // way closing a plain run window does. Cancelling the model picker without
-  // starting anything leaves the reader where they were.
-  const startedComparisonRef = useRef(false);
-  const closeComparison = () => {
-    const started = startedComparisonRef.current;
-    startedComparisonRef.current = false;
-    if (started) onRunWindowClosed?.();
-  };
-  // The tests the benchmark dialog compares the models on: the ticked rows
-  // for the "Compare" bulk action, and nothing for the header's "Compare
-  // models", which means every test linked to the agent. The backend runs
-  // them all when it is sent no test ids, so comparing every test never needs
-  // the list itself.
-  const [benchmarkTests, setBenchmarkTests] = useState<TestData[]>([]);
-
-  const isConnectionUnverified =
-    agentType === "connection" && connectionVerified === false;
-  const isBenchmarkDisabled =
-    agentType === "connection" && supportsBenchmark !== true;
-  // Benchmarking is off, but it can be turned on from here: Compare models
-  // stays clickable and asks for the provider first instead of sending the
-  // reader to the Connection tab.
-  const canEnableBenchmarkHere = isBenchmarkDisabled && !!onEnableBenchmark;
-  // Set when Compare models was clicked with benchmarking off: holds the tests
-  // to compare so they survive the provider question.
-  const [enableBenchmarkOpen, setEnableBenchmarkOpen] = useState(false);
-
-  // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
-  // models + test subset as a completed run and shows it live.
-  const benchmarkRerun = useBenchmarkRerun();
+  // Starting a run and opening the model picker, with their gates and
+  // dialogs, shared with the Evaluations tab.
+  const {
+    isConnectionUnverified,
+    isBenchmarkDisabled,
+    startingRun,
+    launchTestRun,
+    confirmTestRun,
+    openCompare,
+    dialogs: launcherDialogs,
+  } = useAgentRunLaunchers({
+    agentUuid,
+    agentName,
+    agentNature,
+    agentType,
+    connectionVerified,
+    supportsBenchmark,
+    benchmarkModelsVerified,
+    benchmarkProvider,
+    onConnectionVerified,
+    onGoToConnectionSettings,
+    onEnableBenchmark,
+    linkedTestsTotal,
+    onRunCreated: (taskId) => {
+      onRunStarted?.();
+      openTestRun(taskId);
+    },
+    onComparisonCreated: () => {
+      onRunStarted?.();
+      // The comparison was asked for from inside a run window: that window
+      // gives way to the comparison's own. Only the window closes here, not
+      // the tab: switching to Evaluations would hide this tab, and the
+      // comparison window is drawn inside it. The switch happens when the
+      // comparison window closes, through onComparisonClosed.
+      if (openTestRunId) {
+        setOpenTestRunId(null);
+        setRunIdParam(null);
+      }
+    },
+    // Closing a comparison window that started a run lands on Evaluations,
+    // where the run is listed, the same way closing a plain run window does.
+    // Cancelling the picker without starting anything leaves the reader where
+    // they were.
+    onComparisonClosed: (started) => {
+      if (started) onRunWindowClosed?.();
+    },
+  });
 
   // Load the agent's attached evaluators (best-effort; failure just means new
   // tests fall back to the default seed and the post-save prompt is skipped).
@@ -1069,60 +1064,6 @@ export function TestsTabContent({
     testPager.cancel();
     setCreateDialogOpen(false);
     resetTestDialog();
-  };
-
-  // The one place a run is started from this tab: create it, show its pending
-  // row, then open the dialog on the new run id. Pass `allLinked` to run every
-  // test linked to the agent rather than the given subset.
-  // `runKey` identifies the control that was clicked ("all", "bulk", or a test
-  // uuid) so only that one shows a spinner while every run control is disabled.
-  // Returns the new run id, or null if nothing started. Callers use that to
-  // hold their state (e.g. keep the bulk selection) until the run is created.
-  // Actually create and open the run. No verification check — the gate lives
-  // in `launchTestRun` (and in the verify dialog's success handler).
-  const startRunNow = async (
-    tests: TestData[],
-    allLinked = false,
-    runKey = "all",
-  ): Promise<string | null> => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return null;
-    // Creating a run is a real, billed call. Ignore repeat clicks until the
-    // in-flight one settles.
-    if (startingRun !== null) return null;
-    setStartingRun(runKey);
-    try {
-      const taskId = await startTestRunOrNotify(
-        backendUrl,
-        backendAccessToken,
-        agentUuid,
-        allLinked ? null : tests.map((t) => t.uuid),
-        // `tests` is only a page (or empty, for "every matching test with no
-        // filter applied") whenever allLinked is true — the real count is the
-        // server-reported total, not this page's length.
-        allLinked ? linkedTestsTotal : tests.length,
-      );
-      if (!taskId) return null;
-      onRunStarted?.();
-      openTestRun(taskId);
-      return taskId;
-    } finally {
-      setStartingRun(null);
-    }
-  };
-
-  // The one gate every Run action funnels through. On an unverified connection
-  // agent it holds the intent and opens the verify dialog instead of running.
-  const launchTestRun = async (
-    tests: TestData[],
-    allLinked = false,
-    runKey = "all",
-  ): Promise<string | null> => {
-    if (isConnectionUnverified) {
-      setPendingRun({ tests, allLinked, runKey });
-      return null;
-    }
-    return startRunNow(tests, allLinked, runKey);
   };
 
   // Open the test runner for a single just-saved test. Backing the dialog's
@@ -1740,21 +1681,7 @@ export function TestsTabContent({
             <div>
               <button
                 data-tour="tests-run-all"
-                onClick={async () => {
-                  // Checked here as well as in the function that starts the
-                  // run, so the reader is not asked to confirm a run that
-                  // cannot start.
-                  if (
-                    await overEvalLimit(
-                      backendAccessToken,
-                      linkedTestsTotal,
-                      "tests",
-                    )
-                  ) {
-                    return;
-                  }
-                  setRunAllConfirmOpen(true);
-                }}
+                onClick={() => void confirmTestRun(agentTests, true, "all")}
                 disabled={startingRun !== null}
                 aria-busy={startingRun === "all"}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 disabled:opacity-50 ${
@@ -1795,30 +1722,9 @@ export function TestsTabContent({
                 </>
               }
               isConnectionUnverified={isConnectionUnverified}
-              isBenchmarkDisabled={
-                isBenchmarkDisabled && !canEnableBenchmarkHere
-              }
-              onClick={async () => {
-                // Comparing against even one model already runs every
-                // linked test once, so the test count alone can rule a
-                // run out before the model picker even opens.
-                if (
-                  await overEvalLimit(
-                    backendAccessToken,
-                    linkedTestsTotal,
-                    "tests",
-                  )
-                ) {
-                  return;
-                }
-                // No tests named means every test linked to the agent.
-                setBenchmarkTests([]);
-                if (canEnableBenchmarkHere) {
-                  setEnableBenchmarkOpen(true);
-                  return;
-                }
-                setBenchmarkDialogOpen(true);
-              }}
+              isBenchmarkDisabled={isBenchmarkDisabled}
+              // No tests named means every test linked to the agent.
+              onClick={() => void openCompare([], true)}
             />
           </div>
 
@@ -2016,12 +1922,12 @@ export function TestsTabContent({
                     size="bulk"
                     label="Compare"
                     isConnectionUnverified={isConnectionUnverified}
-                    isBenchmarkDisabled={
-                      isBenchmarkDisabled && !canEnableBenchmarkHere
-                    }
+                    isBenchmarkDisabled={isBenchmarkDisabled}
                     onClick={async () => {
-                      // `selectedTestCount` is already known — check it before
-                      // resolving the selection or opening any dialog.
+                      // `selectedTestCount` is already known: check it before
+                      // fetching the selection, which can be every matching
+                      // test. Over the size limit the ticks stay, so the
+                      // reader can untick some and try again.
                       if (
                         await overEvalLimit(
                           backendAccessToken,
@@ -2033,14 +1939,8 @@ export function TestsTabContent({
                       }
                       const { tests, allLinked } =
                         await selectedTestsForAction();
-                      // No tests named means every test linked to the agent.
                       if (!allLinked && tests.length === 0) return;
-                      setBenchmarkTests(allLinked ? [] : tests);
-                      if (canEnableBenchmarkHere) {
-                        setEnableBenchmarkOpen(true);
-                      } else {
-                        setBenchmarkDialogOpen(true);
-                      }
+                      if (!(await openCompare(tests, allLinked))) return;
                       setSelectedTestUuids(new Set());
                       setSelectAllMatching(false);
                     }}
@@ -2446,104 +2346,13 @@ export function TestsTabContent({
           agentName={agentName}
           taskId={openTestRunId}
           onNewRun={(taskId) => openTestRun(taskId)}
+          onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+          onCompareTests={(tests) => void openCompare(tests, false)}
         />
       )}
 
-      {/* Shown when a Run is clicked on an unverified connection agent. On a
-          passing check it flips the parent's verified state and starts the
-          held run; otherwise it offers a jump to the Connection settings. */}
-      {pendingRun && (
-        <VerifyConnectionDialog
-          isOpen
-          agentUuid={agentUuid}
-          onClose={() => setPendingRun(null)}
-          onVerified={() => {
-            const p = pendingRun;
-            setPendingRun(null);
-            onConnectionVerified?.();
-            void startRunNow(p.tests, p.allLinked, p.runKey);
-          }}
-          onGoToConnectionSettings={() => {
-            setPendingRun(null);
-            onGoToConnectionSettings?.();
-          }}
-        />
-      )}
+      {launcherDialogs}
 
-      {/* Confirm before starting a run of every linked test. */}
-      <ConfirmDialog
-        isOpen={runAllConfirmOpen}
-        onClose={() => setRunAllConfirmOpen(false)}
-        onConfirm={() => {
-          setRunAllConfirmOpen(false);
-          void launchTestRun(agentTests, true, "all");
-        }}
-        title="Run every test on this agent"
-        message={`${
-          isConnectionUnverified
-            ? "Your agent's connection is checked first. Once it works, this"
-            : "This"
-        } will start the evaluation on ${linkedTestsTotal} ${linkedTestsTotal === 1 ? "test" : "tests"}. Each test calls your agent, evaluates its response against the evaluation criteria and reports the metrics.`}
-        confirmText="Start the run"
-      />
-
-      {/* Provider question, shown when Compare models is used on an agent that
-          has benchmarking turned off. Saving it opens the benchmark dialog. */}
-      <EnableBenchmarkDialog
-        isOpen={enableBenchmarkOpen}
-        onClose={() => {
-          setEnableBenchmarkOpen(false);
-          setBenchmarkTests([]);
-        }}
-        currentProvider={benchmarkProvider}
-        onConfirm={async (provider) => {
-          await onEnableBenchmark?.(provider);
-          setEnableBenchmarkOpen(false);
-          setBenchmarkDialogOpen(true);
-        }}
-      />
-
-      {/* Benchmark Dialog. Rendered only while it is open, so every open starts
-          from scratch: the models picked and the checks that failed last time
-          belong to that window, not to the next one. */}
-      {benchmarkDialogOpen && (
-        <BenchmarkDialog
-          isOpen
-          onClose={() => {
-            setBenchmarkDialogOpen(false);
-            setBenchmarkTests([]);
-            closeComparison();
-          }}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          agentNature={agentNature}
-          tests={benchmarkTests}
-          totalTests={linkedTestsTotal}
-          onBenchmarkCreated={() => {
-            startedComparisonRef.current = true;
-            onRunStarted?.();
-          }}
-          agentType={agentType}
-          benchmarkModelsVerified={benchmarkModelsVerified}
-          benchmarkProvider={benchmarkProvider}
-        />
-      )}
-
-      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
-          test subset, skipping the model picker. */}
-      <BenchmarkRerunDialog
-        config={benchmarkRerun.config}
-        rerunKey={benchmarkRerun.key}
-        onClose={() => {
-          benchmarkRerun.clear();
-          closeComparison();
-        }}
-        onBenchmarkCreated={() => {
-          startedComparisonRef.current = true;
-          onRunStarted?.();
-        }}
-        onRerun={benchmarkRerun.start}
-      />
     </div>
   );
 }

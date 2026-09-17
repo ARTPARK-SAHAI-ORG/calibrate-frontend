@@ -21,6 +21,7 @@ import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSum
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { LIST_PANEL_MIN_WIDTH_FOR_WORDS } from "./SelectedTestsStrip";
 import { isUnanswered } from "@/lib/testTypes";
 import { displayModelName } from "@/lib/modelName";
 
@@ -106,6 +107,8 @@ type BenchmarkOutputsPanelProps = {
   onToggleLabellingSelection?: (key: string) => void;
   /** Toggle select-all / deselect-all for the given keys. */
   onLabellingBulkToggle?: (ids: string[]) => void;
+  /** Shown under the search box once tests are ticked (count, Run, Compare). */
+  selectionStrip?: React.ReactNode;
 };
 
 export function benchmarkLabellingKey(model: string, testIndex: number): string {
@@ -128,7 +131,7 @@ function benchmarkTestStatus(
 
 // Display name for a benchmark test row (falls back to the placeholder name
 // when the result hasn't arrived yet).
-function benchmarkTestName(
+export function benchmarkTestName(
   tr: BenchmarkTestResult | undefined,
   index: number,
   testNames: string[],
@@ -197,6 +200,7 @@ export function BenchmarkOutputsPanel({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  selectionStrip,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,7 +265,7 @@ export function BenchmarkOutputsPanel({
   // "hasn't been manually resized yet" flag if that turns out to matter.
   const defaultListWidth = Math.min(
     512,
-    Math.max(288, longestModelNameChars * 8 + 176),
+    Math.max(LIST_PANEL_MIN_WIDTH_FOR_WORDS, longestModelNameChars * 8 + 176),
   );
   const listPanel = useResizableWidth(defaultListWidth, 288, 512, "grow-right");
   const verdictPanel = useResizableWidth(512, 320, 720, "grow-left");
@@ -421,12 +425,13 @@ export function BenchmarkOutputsPanel({
       >
         {/* Search */}
         {modelResults.length > 0 && (
-          <div className="shrink-0 p-3 border-b border-border">
+          <div className="shrink-0 p-3 border-b border-border space-y-2">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search tests"
             />
+            {selectionStrip}
           </div>
         )}
         {(showBulkSelect || showBulkExpand) && (

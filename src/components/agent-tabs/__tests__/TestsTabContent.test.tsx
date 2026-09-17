@@ -183,6 +183,20 @@ jest.mock("../../TestRunnerDialog", () => ({
         <button onClick={() => props.onNewRun?.("task-rerun", ["t1", "t2"])}>
           TriggerNewRun
         </button>
+        <button
+          onClick={() =>
+            props.onRunTests?.([{ uuid: "t2", name: "Tool call test" }])
+          }
+        >
+          RunTestsFromWindow
+        </button>
+        <button
+          onClick={() =>
+            props.onCompareTests?.([{ uuid: "t2", name: "Tool call test" }])
+          }
+        >
+        CompareTestsFromWindow
+        </button>
         <button onClick={props.onClose}>CloseRunner</button>
       </div>
     ) : null;
@@ -1376,6 +1390,91 @@ describe("TestsTabContent — populated table", () => {
         String(url).endsWith("/agent-tests/agent/agent-1/run"),
       ),
     ).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Running or comparing again from inside an open run window.
+// ---------------------------------------------------------------------------
+
+describe("TestsTabContent: run and compare from the run window", () => {
+  beforeEach(() => {
+    state.agentTests = [responseTest, toolCallTest];
+  });
+
+  async function openRunWindow(user: ReturnType<typeof setupUser>) {
+    await user.click(screen.getAllByRole("button", { name: "Run test" })[0]);
+    await screen.findByTestId("test-runner-dialog");
+  }
+
+  it("opens the model picker on the window's tests, hands the window over to the comparison, and switches tabs only when the comparison closes", async () => {
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+    setRunIdParamMock.mockClear();
+
+    await user.click(screen.getByText("CompareTestsFromWindow"));
+    await screen.findByTestId("benchmark-dialog");
+    expect(benchmarkProps.tests).toEqual([
+      { uuid: "t2", name: "Tool call test" },
+    ]);
+    // The picker sits over the run window until a comparison is created.
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith(null);
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText("CloseBenchmark"));
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
+    expect(onRunWindowClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelling the picker from the window keeps the window and switches no tab", async () => {
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+
+    await user.click(screen.getByText("CompareTestsFromWindow"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("CloseBenchmark"));
+
+    expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(onRunWindowClosed).not.toHaveBeenCalled();
+  });
+
+  it("asks before running the window's tests, then points the window at the new run", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+    await openRunWindow(user);
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("task-new");
+    state.startRun = { task_id: "task-from-window" };
+
+    await user.click(screen.getByText("RunTestsFromWindow"));
+    expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
+    expect(screen.getByText(/start the evaluation on 1 test\./)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
+        "task-from-window",
+      ),
+    );
+    const posts = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url, init]) =>
+        init?.method === "POST" &&
+        String(url).endsWith("/agent-tests/agent/agent-1/run"),
+    );
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[1][1].body)).toEqual({ test_uuids: ["t2"] });
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith("task-from-window");
   });
 });
 

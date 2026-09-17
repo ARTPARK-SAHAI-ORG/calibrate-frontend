@@ -23,16 +23,6 @@ import {
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
 
-type TestData = {
-  uuid: string;
-  name: string;
-  description: string;
-  type: "response" | "tool_call" | "conversation" | "general";
-  config: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-};
-
 type ModelVerificationStatus =
   "unverified" | "verifying" | "verified" | "failed";
 
@@ -46,7 +36,7 @@ type BenchmarkDialogProps = {
   /** The tests to compare the models on. Empty means every test linked to the
    *  agent: the backend runs them all when it is sent no uuids, so comparing
    *  every test does not need the list. */
-  tests: TestData[];
+  tests: { uuid: string; name: string }[];
   /** How many tests an empty `tests` stands for, for the progress numbers. */
   totalTests?: number;
   onBenchmarkCreated?: (taskId: string) => void;
@@ -117,12 +107,6 @@ export function BenchmarkDialog({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
-  const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(
-    null,
-  );
-  const [pendingVerifyAction, setPendingVerifyAction] = useState<
-    { type: "run-comparison" } | { type: "retry-all" } | null
-  >(null);
 
   if (!isOpen) return null;
 
@@ -138,8 +122,6 @@ export function BenchmarkDialog({
     setExpandedModelError(null);
     setConfirmOpen(false);
     setVerifyDialogOpen(false);
-    setVerifyMessages(null);
-    setPendingVerifyAction(null);
     onClose();
   };
 
@@ -232,7 +214,6 @@ export function BenchmarkDialog({
         });
 
       if (modelsToVerify.length > 0) {
-        setPendingVerifyAction({ type: "run-comparison" });
         setVerifyDialogOpen(true);
         return;
       }
@@ -242,9 +223,6 @@ export function BenchmarkDialog({
   };
 
   const runVerificationWithMessages = async (messages: MessageRow[]) => {
-    setVerifyMessages(messages);
-    const action = pendingVerifyAction;
-
     const modelsToVerify = selectedModels
       .filter((m): m is LLMModel => m !== null)
       .filter((m) => {
@@ -257,7 +235,6 @@ export function BenchmarkDialog({
     );
     const anyFailed = results.some((r) => !r.verified);
     setVerifyDialogOpen(false);
-    setPendingVerifyAction(null);
     if (!anyFailed) {
       setShowResults(true);
     }
@@ -594,7 +571,6 @@ export function BenchmarkDialog({
           {hasFailedModels && !isVerifying && (
             <button
               onClick={() => {
-                setPendingVerifyAction({ type: "retry-all" });
                 setVerifyDialogOpen(true);
               }}
               className="h-9 px-4 rounded-md text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-2"
@@ -690,10 +666,7 @@ export function BenchmarkDialog({
       <VerifyRequestPreviewDialog
         agentNature={agentNature}
         open={verifyDialogOpen}
-        onClose={() => {
-          setVerifyDialogOpen(false);
-          setPendingVerifyAction(null);
-        }}
+        onClose={() => setVerifyDialogOpen(false)}
         onConfirm={runVerificationWithMessages}
         isVerifying={isVerifying}
       />

@@ -9,6 +9,7 @@ import {
 } from "@/test-utils";
 import { RunsTabContent, runTestCount, runModels } from "../RunsTabContent";
 import type { AgentRun } from "@/hooks";
+import type { AgentRunLauncherOptions } from "../useAgentRunLaunchers";
 
 const BACKEND = "http://test-backend";
 const AGENT_UUID = "agent-1";
@@ -45,6 +46,20 @@ jest.mock("../../BenchmarkResultsDialog", () => ({
     return props.isOpen ? (
       <div data-testid="benchmark-results">bench:{props.taskId}</div>
     ) : null;
+  },
+}));
+
+let launcherOptions: AgentRunLauncherOptions | null = null;
+const confirmTestRun = jest.fn();
+const openCompare = jest.fn().mockResolvedValue(true);
+jest.mock("../useAgentRunLaunchers", () => ({
+  useAgentRunLaunchers: (options: AgentRunLauncherOptions) => {
+    launcherOptions = options;
+    return {
+      confirmTestRun,
+      openCompare,
+      dialogs: <div data-testid="launcher-dialogs" />,
+    };
   },
 }));
 
@@ -144,6 +159,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   runnerProps = null;
   benchmarkResultsProps = null;
+  launcherOptions = null;
   state = { runs: [unitRun, benchmarkRun] };
   installFetch();
 });
@@ -813,4 +829,103 @@ describe("the Run column width", () => {
     });
     expect(header).toHaveStyle({ width: "560px" });
   }, 10000);
+});
+
+describe("running tests from an open results window", () => {
+  const tests = [{ uuid: "t1", name: "A" }];
+  const runsListCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes("/runs?"),
+    ).length;
+
+  it("passes the agent's launcher settings through and draws the launcher dialogs", async () => {
+    render(
+      <RunsTabContent
+        agentUuid={AGENT_UUID}
+        agentName="Test agent"
+        agentType="connection"
+        connectionVerified={false}
+        supportsBenchmark
+        benchmarkProvider="google"
+      />,
+    );
+    await screen.findAllByText("1 Success");
+    expect(screen.getByTestId("launcher-dialogs")).toBeInTheDocument();
+    expect(launcherOptions).toMatchObject({
+      agentUuid: AGENT_UUID,
+      agentName: "Test agent",
+      agentType: "connection",
+      connectionVerified: false,
+      supportsBenchmark: true,
+      benchmarkProvider: "google",
+    });
+  });
+
+  it("runs or compares the ticked tests from the run window", async () => {
+    state.runs = [unitRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await screen.findByTestId("test-runner");
+
+    runnerProps.onRunTests(tests);
+    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
+    runnerProps.onCompareTests(tests);
+    expect(openCompare).toHaveBeenCalledWith(tests, false);
+  });
+
+  it("runs or compares the ticked tests from the model comparison window", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    benchmarkResultsProps.onRunTests(tests);
+    expect(confirmTestRun).toHaveBeenCalledWith(tests, false, "window");
+    benchmarkResultsProps.onCompareTests(tests);
+    expect(openCompare).toHaveBeenCalledWith(tests, false);
+  });
+
+  it("opens the new run in the window and reads the list again once it is created", async () => {
+    state.runs = [unitRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await screen.findByTestId("test-runner");
+    const before = runsListCalls();
+
+    await act(async () => {
+      launcherOptions?.onRunCreated("run-new");
+    });
+    expect(screen.getByTestId("test-runner")).toHaveTextContent(
+      "runner:run-new",
+    );
+    expect(new URLSearchParams(window.location.search).get("runId")).toBe(
+      "run-new",
+    );
+    await waitFor(() => expect(runsListCalls()).toBe(before + 1));
+  });
+
+  it("closes the open window and reads the list again once a comparison is created", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+    expect(new URLSearchParams(window.location.search).get("runId")).toBe(
+      "run-bench",
+    );
+    const before = runsListCalls();
+
+    await act(async () => {
+      launcherOptions?.onComparisonCreated?.();
+    });
+    expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+    expect(
+      new URLSearchParams(window.location.search).get("runId"),
+    ).toBeNull();
+    await waitFor(() => expect(runsListCalls()).toBe(before + 1));
+  });
 });

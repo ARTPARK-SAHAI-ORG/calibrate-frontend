@@ -32,6 +32,10 @@ import {
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
+  useAgentRunLaunchers,
+  type AgentRunLauncherSettings,
+} from "./useAgentRunLaunchers";
+import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
@@ -287,9 +291,8 @@ export function RunsTabContent({
   agentUuid,
   agentName,
   isActive = true,
-}: {
-  agentUuid: string;
-  agentName: string;
+  ...launcherOpts
+}: AgentRunLauncherSettings & {
   /**
    * Whether this tab is the one showing. Only the tab on screen acts on
    * `?runId=`: the Tests tab names its own open run the same way, and a run
@@ -404,6 +407,25 @@ export function RunsTabContent({
 
   const benchmarkRerun = useBenchmarkRerun();
 
+  // Run or compare the tests ticked inside an open results window, the same
+  // way the Tests tab does it. A new plain run replaces the open window; a
+  // comparison closes it once the picker has created the comparison.
+  const { confirmTestRun, openCompare, dialogs: launcherDialogs } =
+    useAgentRunLaunchers({
+      agentUuid,
+      agentName,
+      ...launcherOpts,
+      onRunCreated: (taskId) => {
+        void refetch();
+        openTestRun(taskId);
+      },
+      onComparisonCreated: () => {
+        void refetch();
+        closeTestRun();
+        closeBenchmarkRun();
+      },
+    });
+
   // The Run column starts at the width that fits the longest automatic name
   // ("Model comparison 999"), and can be dragged wider for runs people have
   // renamed to something longer.
@@ -480,7 +502,7 @@ export function RunsTabContent({
   };
 
   return (
-    <div className="flex flex-col space-y-4 md:space-y-6">
+    <div className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-wrap items-center gap-1.5">
         <FilterChips
           options={RESULT_FILTERS}
@@ -687,6 +709,8 @@ export function RunsTabContent({
             openTestRun(taskId);
           }}
           onRenamed={() => void refetch()}
+          onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+          onCompareTests={(tests) => void openCompare(tests, false)}
         />
       )}
 
@@ -701,6 +725,8 @@ export function RunsTabContent({
           models={[]}
           taskId={openBenchmarkRun.uuid}
           onRenamed={() => void refetch()}
+          onRunTests={(tests) => confirmTestRun(tests, false, "window")}
+          onCompareTests={(tests) => void openCompare(tests, false)}
           onRerun={(models, testUuids, testNames) => {
             closeBenchmarkRun();
             benchmarkRerun.start({
@@ -728,6 +754,8 @@ export function RunsTabContent({
           isDeleting={isDeleting}
         />
       )}
+
+      {launcherDialogs}
 
       <BenchmarkRerunDialog
         config={benchmarkRerun.config}
