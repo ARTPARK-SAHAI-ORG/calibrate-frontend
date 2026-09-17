@@ -181,12 +181,28 @@ describe("BenchmarkDialog", () => {
     render(<BenchmarkDialog {...baseProps()} />);
     expect(screen.getByText("Compare different models")).toBeInTheDocument();
     expect(
-      screen.getByText("Select up to 5 models to benchmark on the tests"),
+      screen.getByText(
+        `Select up to 5 models to benchmark on the ${tests.length} tests`,
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
     expect(screen.getByText("Add model")).toBeInTheDocument();
     // remove button hidden with single row
     expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+  });
+
+  it("counts every linked test in the subtitle when no tests are picked", () => {
+    render(<BenchmarkDialog {...baseProps({ tests: [], totalTests: 7 })} />);
+    expect(
+      screen.getByText("Select up to 5 models to benchmark on the 7 tests"),
+    ).toBeInTheDocument();
+  });
+
+  it("says one test in the singular", () => {
+    render(<BenchmarkDialog {...baseProps({ tests: tests.slice(0, 1) })} />);
+    expect(
+      screen.getByText("Select up to 5 models to benchmark on the test"),
+    ).toBeInTheDocument();
   });
 
   it("opens the LLM selector modal and selects a model, filling the row", async () => {
@@ -323,9 +339,7 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByRole("button", { name: /Run comparison/i }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(
-      screen.queryByText("Compare the models"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Compare the models")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -485,7 +499,9 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("Confirm"));
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
     });
     expect(
       screen.queryByTestId("benchmark-results-dialog"),
