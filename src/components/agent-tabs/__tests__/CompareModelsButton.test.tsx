@@ -8,12 +8,11 @@ describe("CompareModelsButton", () => {
     const onClick = jest.fn();
     render(
       <CompareModelsButton
-        size="header"
         label="Compare"
         isConnectionUnverified={false}
         isBenchmarkDisabled={false}
         onClick={onClick}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /compare/i }));
@@ -25,12 +24,11 @@ describe("CompareModelsButton", () => {
     const onClick = jest.fn();
     render(
       <CompareModelsButton
-        size="bulk"
         label="Compare"
         isConnectionUnverified={false}
         isBenchmarkDisabled={false}
         onClick={onClick}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /compare/i }));
@@ -42,12 +40,11 @@ describe("CompareModelsButton", () => {
     const onClick = jest.fn();
     render(
       <CompareModelsButton
-        size="header"
         label="Compare"
         isConnectionUnverified={true}
         isBenchmarkDisabled={false}
         onClick={onClick}
-      />
+      />,
     );
 
     const button = screen.getByRole("button", { name: /compare/i });
@@ -55,7 +52,7 @@ describe("CompareModelsButton", () => {
     await user.click(button);
     expect(onClick).not.toHaveBeenCalled();
     expect(
-      screen.getByText("Verify agent connection first")
+      screen.getByText("Verify agent connection first"),
     ).toBeInTheDocument();
   });
 
@@ -64,12 +61,11 @@ describe("CompareModelsButton", () => {
     const onClick = jest.fn();
     render(
       <CompareModelsButton
-        size="header"
         label="Compare"
         isConnectionUnverified={false}
         isBenchmarkDisabled={true}
         onClick={onClick}
-      />
+      />,
     );
 
     const button = screen.getByRole("button", { name: /compare/i });
@@ -77,10 +73,10 @@ describe("CompareModelsButton", () => {
     await user.click(button);
     expect(onClick).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/turned off benchmarking models/i)
+      screen.getByText(/turned off benchmarking models/i),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Verify agent connection first")
+      screen.queryByText("Verify agent connection first"),
     ).not.toBeInTheDocument();
   });
 
@@ -89,12 +85,11 @@ describe("CompareModelsButton", () => {
     const onClick = jest.fn();
     render(
       <CompareModelsButton
-        size="bulk"
         label="Compare"
         isConnectionUnverified={true}
         isBenchmarkDisabled={false}
         onClick={onClick}
-      />
+      />,
     );
 
     const button = screen.getByRole("button", { name: /compare/i });
@@ -106,19 +101,18 @@ describe("CompareModelsButton", () => {
   it("prioritizes the connection tooltip when both disabled reasons apply", () => {
     render(
       <CompareModelsButton
-        size="header"
         label="Compare"
         isConnectionUnverified={true}
         isBenchmarkDisabled={true}
         onClick={jest.fn()}
-      />
+      />,
     );
 
     expect(
-      screen.getByText("Verify agent connection first")
+      screen.getByText("Verify agent connection first"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/turned off benchmarking models/i)
+      screen.queryByText(/turned off benchmarking models/i),
     ).not.toBeInTheDocument();
   });
 });

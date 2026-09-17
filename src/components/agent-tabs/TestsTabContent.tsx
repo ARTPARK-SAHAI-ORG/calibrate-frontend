@@ -177,8 +177,7 @@ const SHOW_ADD_EXISTING_TEST = false;
 const carriesEvaluators = (type: string) =>
   type === "response" || type === "conversation" || type === "general";
 
-// The actions on one test's row, drawn exactly like the bulk toolbar's Run
-// and Delete so the two read as the same thing; Duplicate takes the bordered
+// The actions on one test's row: a small Run and Delete pair; Duplicate takes the bordered
 // style the labelling task's items use for Edit.
 function TestRowActions({
   onRun,
@@ -1671,14 +1670,45 @@ export function TestsTabContent({
     </div>
   );
 
+  // With rows ticked, the header's Run and Compare act on the ticked tests
+  // instead of every linked test, so there is one Run and one Compare on
+  // screen rather than a second pair in the selection strip.
+  const hasSelection = selectedTestUuids.size > 0 || selectAllMatching;
+  const clearSelection = () => {
+    setSelectedTestUuids(new Set());
+    setSelectAllMatching(false);
+  };
+  const runSelected = async () => {
+    // `selectedTestCount` is already known: check it before resolving the
+    // selection.
+    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+      return;
+    }
+    const { tests, allLinked } = await selectedTestsForAction();
+    if (!allLinked && tests.length === 0) return;
+    // Clear the ticks only once the run has started, so the button and its
+    // spinner stay up during the wait. A failed run keeps the selection so
+    // it can be retried.
+    const taskId = await launchTestRun(tests, allLinked, "bulk");
+    if (taskId) clearSelection();
+  };
+  const compareSelected = async () => {
+    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+      return;
+    }
+    const { tests, allLinked } = await selectedTestsForAction();
+    if (!allLinked && tests.length === 0) return;
+    if (!(await openCompare(tests, allLinked))) return;
+    clearSelection();
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header — only shown when the agent has at least one test
           attached. Split into two groups: page-level "act on the tests"
-          actions (Run all / Compare models) on the left, and "add more
-          tests" actions (Add / Create / Bulk upload) on the right.
-          Multi-select bulk actions (Run / Remove / Delete subset) live
-          above the table in their own toolbar, not here. */}
+          actions (Run all / Compare models, acting on the ticked tests when
+          there are any, plus Delete selected) on the left, and "add more
+          tests" actions (Add / Create / Bulk upload) on the right. */}
       {linkedTestsTotal > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* Left group: act-on-the-tests buttons. */}
@@ -1687,16 +1717,20 @@ export function TestsTabContent({
             <div>
               <button
                 data-tour="tests-run-all"
-                onClick={() => void confirmTestRun(agentTests, true, "all")}
+                onClick={() =>
+                  void (hasSelection
+                    ? runSelected()
+                    : confirmTestRun(agentTests, true, "all"))
+                }
                 disabled={startingRun !== null}
-                aria-busy={startingRun === "all"}
+                aria-busy={startingRun === "all" || startingRun === "bulk"}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 disabled:opacity-50 ${
                   startingRun !== null
                     ? "cursor-not-allowed"
                     : "hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
                 }`}
               >
-                {startingRun === "all" ? (
+                {startingRun === "all" || startingRun === "bulk" ? (
                   <SpinnerIcon className="w-4 h-4 animate-spin" />
                 ) : (
                   <svg
@@ -1713,14 +1747,25 @@ export function TestsTabContent({
                     />
                   </svg>
                 )}
-                <span className="hidden sm:inline">Run all tests</span>
-                <span className="sm:hidden">Run all</span>
+                {hasSelection ? (
+                  <>
+                    <span className="hidden sm:inline">
+                      Run {selectedTestCount}{" "}
+                      {selectedTestCount === 1 ? "test" : "tests"}
+                    </span>
+                    <span className="sm:hidden">Run {selectedTestCount}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Run all tests</span>
+                    <span className="sm:hidden">Run all</span>
+                  </>
+                )}
               </button>
             </div>
 
             {/* Compare models — amber tint, "analyse" semantic. */}
             <CompareModelsButton
-              size="header"
               label={
                 <>
                   <span className="hidden sm:inline">Compare models</span>
@@ -1730,8 +1775,21 @@ export function TestsTabContent({
               isConnectionUnverified={isConnectionUnverified}
               isBenchmarkDisabled={isBenchmarkDisabled}
               // No tests named means every test linked to the agent.
-              onClick={() => void openCompare([], true)}
+              onClick={() =>
+                void (hasSelection ? compareSelected() : openCompare([], true))
+              }
             />
+
+            {hasSelection && (
+              <button
+                onClick={() => void openBulkDeleteDialog()}
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 cursor-pointer"
+              >
+                <TrashIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Delete selected</span>
+                <span className="sm:hidden">Delete</span>
+              </button>
+            )}
           </div>
 
           {/* Right group: add-more-tests buttons. */}
@@ -1859,13 +1917,10 @@ export function TestsTabContent({
               <TestTypeFilter value={typeFilter} onChange={setTypeFilter} />
             </div>
 
-            {/* Bulk-action toolbar — sits immediately above the table when
-                at least one row is selected. Modelled on the same pattern
-                as the human-alignment items table so the two surfaces
-                feel consistent: a muted strip with an "N selected"
-                count on the left and unprefixed action buttons on the
-                right (count is on the strip, not duplicated per button). */}
-            {(selectedTestUuids.size > 0 || selectAllMatching) && (
+            {/* Selection strip above the table: the count, "select every
+                match", and Clear. The actions on the selection are the
+                header's Run / Compare / Delete selected. */}
+            {hasSelection && (
               <div
                 className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border px-3 py-2 mb-3 md:mb-4 transition-colors ${
                   selectAllMatching
@@ -1908,107 +1963,11 @@ export function TestsTabContent({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => {
-                      setSelectedTestUuids(new Set());
-                      setSelectAllMatching(false);
-                    }}
+                    onClick={clearSelection}
                     className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
                     Clear
                   </button>
-                  <button
-                    onClick={() => void openBulkDeleteDialog()}
-                    title="Delete the selected tests"
-                    className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <TrashIcon className="w-3.5 h-3.5" />
-                    Delete
-                  </button>
-                  <CompareModelsButton
-                    size="bulk"
-                    label="Compare"
-                    isConnectionUnverified={isConnectionUnverified}
-                    isBenchmarkDisabled={isBenchmarkDisabled}
-                    onClick={async () => {
-                      // `selectedTestCount` is already known: check it before
-                      // fetching the selection, which can be every matching
-                      // test. Over the size limit the ticks stay, so the
-                      // reader can untick some and try again.
-                      if (
-                        await overEvalLimit(
-                          backendAccessToken,
-                          selectedTestCount,
-                          "tests",
-                        )
-                      ) {
-                        return;
-                      }
-                      const { tests, allLinked } =
-                        await selectedTestsForAction();
-                      if (!allLinked && tests.length === 0) return;
-                      if (!(await openCompare(tests, allLinked))) return;
-                      setSelectedTestUuids(new Set());
-                      setSelectAllMatching(false);
-                    }}
-                  />
-                  <div>
-                    <button
-                      onClick={async () => {
-                        // `selectedTestCount` is already known — check it
-                        // before resolving the selection.
-                        if (
-                          await overEvalLimit(
-                            backendAccessToken,
-                            selectedTestCount,
-                            "tests",
-                          )
-                        ) {
-                          return;
-                        }
-                        const { tests, allLinked } =
-                          await selectedTestsForAction();
-                        if (!allLinked && tests.length === 0) return;
-                        // Clear the ticks only once the run has started, so the
-                        // bar and its spinner stay up during the wait. A failed
-                        // run keeps the selection so it can be retried.
-                        const taskId = await launchTestRun(
-                          tests,
-                          allLinked,
-                          "bulk",
-                        );
-                        if (taskId) {
-                          setSelectedTestUuids(new Set());
-                          setSelectAllMatching(false);
-                        }
-                      }}
-                      disabled={startingRun !== null}
-                      aria-busy={startingRun === "bulk"}
-                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
-                        startingRun !== null
-                          ? "cursor-not-allowed"
-                          : "hover:opacity-90 cursor-pointer"
-                      }`}
-                    >
-                      {startingRun === "bulk" ? (
-                        <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                          />
-                        </svg>
-                      )}
-                      Run
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -2210,16 +2169,16 @@ export function TestsTabContent({
                           </div>
                           <div className="flex-shrink-0">
                             <TestRowActions
-                                onRun={() =>
-                                  void launchTestRun([test], false, test.uuid)
-                                }
-                                running={startingRun === test.uuid}
-                                runDisabled={startingRun !== null}
-                                onDuplicate={() => openDuplicateTest(test)}
-                                duplicating={duplicatingUuid === test.uuid}
-                                duplicateDisabled={!!duplicatingUuid}
-                                onDelete={() => openDeleteDialog(test)}
-                              />
+                              onRun={() =>
+                                void launchTestRun([test], false, test.uuid)
+                              }
+                              running={startingRun === test.uuid}
+                              runDisabled={startingRun !== null}
+                              onDuplicate={() => openDuplicateTest(test)}
+                              duplicating={duplicatingUuid === test.uuid}
+                              duplicateDisabled={!!duplicatingUuid}
+                              onDelete={() => openDeleteDialog(test)}
+                            />
                           </div>
                         </div>
                       </div>
@@ -2358,7 +2317,6 @@ export function TestsTabContent({
       )}
 
       {launcherDialogs}
-
     </div>
   );
 }
