@@ -197,7 +197,7 @@ jest.mock("../../TestRunnerDialog", () => ({
             props.onCompareTests?.([{ uuid: "t2", name: "Tool call test" }])
           }
         >
-        CompareTestsFromWindow
+          CompareTestsFromWindow
         </button>
         <button onClick={props.onClose}>CloseRunner</button>
       </div>
@@ -826,7 +826,7 @@ describe("TestsTabContent — paging", () => {
     expect(runPostCall()).toBeFalsy();
   });
 
-  it("blocks the bulk Run button before resolving the selection when it exceeds the limit", async () => {
+  it("blocks Run N tests before resolving the selection when it exceeds the limit", async () => {
     getMaxRowsPerEvalMock.mockResolvedValue(1);
     const user = setupUser();
     renderComponent();
@@ -916,6 +916,7 @@ describe("TestsTabContent — paging", () => {
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     expect(JSON.parse(runPostCall()![1].body)).toEqual({});
@@ -935,6 +936,7 @@ describe("TestsTabContent — paging", () => {
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await waitFor(() => expect(runPostCall()).toBeTruthy());
     // Not every linked test, so the run has to name the 12 that match.
@@ -1357,6 +1359,7 @@ describe("TestsTabContent — populated table", () => {
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
     await screen.findByTestId("test-runner-dialog");
     expect(JSON.parse(runPostCall()[1].body)).toEqual({
       test_uuids: ["t1", "t2"],
@@ -1474,7 +1477,9 @@ describe("TestsTabContent: run and compare from the run window", () => {
 
     await user.click(screen.getByText("RunTestsFromWindow"));
     expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
-    expect(screen.getByText(/start the evaluation on 1 test\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(/start the evaluation on 1 test\./),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Start the run" }));
     await waitFor(() =>
@@ -1649,7 +1654,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps the bulk toolbar up and spins its own button while the bulk run starts", async () => {
+  it("keeps the selection and spins the header Run button while the run of the ticked tests starts", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
@@ -1658,6 +1663,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     // The ticks are not cleared yet, so the bar is still shown and its own
     // button is marked busy while the single POST is in flight.
@@ -1682,7 +1688,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     );
   });
 
-  it("keeps the selection when the bulk run fails", async () => {
+  it("keeps the selection when the run of the ticked tests fails", async () => {
     state.startRunInit = { ok: false, status: 500 };
     const user = setupUser();
     renderComponent();
@@ -1692,6 +1698,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
 
     await release();
     await waitFor(() => expect(toast.error).toHaveBeenCalled());

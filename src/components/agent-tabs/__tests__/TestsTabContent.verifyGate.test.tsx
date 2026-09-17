@@ -16,8 +16,13 @@ jest.mock("../../../hooks", () => ({
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 
 jest.mock("../../TestRunnerDialog", () => ({
-  TestRunnerDialog: ({ isOpen, taskId }: { isOpen: boolean; taskId: string }) =>
-    isOpen ? <div data-testid="test-runner">runner:{taskId}</div> : null,
+  TestRunnerDialog: ({
+    isOpen,
+    taskId,
+  }: {
+    isOpen: boolean;
+    taskId: string;
+  }) => (isOpen ? <div data-testid="test-runner">runner:{taskId}</div> : null),
 }));
 jest.mock("../../BenchmarkDialog", () => ({ BenchmarkDialog: () => null }));
 jest.mock("../../BenchmarkResultsDialog", () => ({
@@ -27,7 +32,9 @@ jest.mock("../../BulkUploadTestsModal", () => ({
   BulkUploadTestsModal: () => null,
 }));
 jest.mock("../../AddTestDialog", () => ({ AddTestDialog: () => null }));
-jest.mock("../CompareModelsButton", () => ({ CompareModelsButton: () => null }));
+jest.mock("../CompareModelsButton", () => ({
+  CompareModelsButton: () => null,
+}));
 
 // The verify window is stubbed so the gate can be driven directly: a pass
 // button fires onVerified, a settings button fires onGoToConnectionSettings.
@@ -115,9 +122,7 @@ beforeEach(() => {
 });
 
 function runAllButton() {
-  return document.querySelector(
-    '[data-tour="tests-run-all"]',
-  ) as HTMLElement;
+  return document.querySelector('[data-tour="tests-run-all"]') as HTMLElement;
 }
 
 describe("TestsTabContent verify-before-run gate", () => {
@@ -166,6 +171,36 @@ describe("TestsTabContent verify-before-run gate", () => {
     );
     expect(runPosts).toBe(1);
     expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
+  });
+
+  it("asks first, then clears the ticked tests once the check passes and the run starts", async () => {
+    const user = setupUser();
+    render(
+      <TestsTabContent
+        agentUuid={AGENT_UUID}
+        agentType="connection"
+        connectionVerified={false}
+      />,
+    );
+
+    await waitFor(() => expect(runAllButton()).toBeInTheDocument());
+    await user.click(screen.getByTitle("Select all"));
+    expect(runAllButton()).toHaveTextContent("Run 1 test");
+    await user.click(runAllButton());
+    // The same confirmation as Run all tests, worded for the ticked tests.
+    expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+    // The check comes first; the ticks stay until the run has started.
+    expect(runPosts).toBe(0);
+    expect(runAllButton()).toHaveTextContent("Run 1 test");
+    await user.click(screen.getByRole("button", { name: "pass-verify" }));
+
+    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
+      "runner:task-99",
+    );
+    expect(runPosts).toBe(1);
+    expect(runAllButton()).toHaveTextContent("Run all tests");
+    expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
   });
 
   it("routes to Connection settings from the verify window", async () => {

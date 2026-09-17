@@ -527,9 +527,16 @@ export function TestsTabContent({
     onGoToConnectionSettings,
     onEnableBenchmark,
     linkedTestsTotal,
-    onRunCreated: (taskId) => {
+    onRunCreated: (taskId, runKey) => {
       onRunStarted?.();
       openTestRun(taskId);
+      // A run of the ticked tests clears the ticks only now, once it has
+      // started: through the confirmation, and on a connection agent through
+      // the connection check as well. A refused run keeps them for a retry.
+      if (runKey === "bulk") {
+        setSelectedTestUuids(new Set());
+        setSelectAllMatching(false);
+      }
     },
     onComparisonCreated: () => {
       onRunStarted?.();
@@ -1686,11 +1693,8 @@ export function TestsTabContent({
     }
     const { tests, allLinked } = await selectedTestsForAction();
     if (!allLinked && tests.length === 0) return;
-    // Clear the ticks only once the run has started, so the button and its
-    // spinner stay up during the wait. A failed run keeps the selection so
-    // it can be retried.
-    const taskId = await launchTestRun(tests, allLinked, "bulk");
-    if (taskId) clearSelection();
+    // Asks first, the same as Run all tests; the ticks clear in onRunCreated.
+    await confirmTestRun(tests, allLinked, "bulk");
   };
   const compareSelected = async () => {
     if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {

@@ -98,7 +98,7 @@ describe("useAgentRunLaunchers", () => {
       ["t1", "t2"],
       2,
     );
-    expect(onRunCreated).toHaveBeenCalledWith("task-1");
+    expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
     expect(taskId).toBe("task-1");
   });
 
@@ -212,7 +212,7 @@ describe("useAgentRunLaunchers", () => {
       ["t1", "t2"],
       2,
     );
-    expect(onRunCreated).toHaveBeenCalledWith("task-1");
+    expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
     expect(screen.queryByTestId("verify-dialog")).toBeNull();
   });
 
@@ -239,7 +239,7 @@ describe("useAgentRunLaunchers", () => {
         null,
         7,
       );
-      expect(onRunCreated).toHaveBeenCalledWith("task-1");
+      expect(onRunCreated).toHaveBeenCalledWith("task-1", "all");
       expect(screen.queryByText("Run every test on this agent")).toBeNull();
     });
 
@@ -277,7 +277,7 @@ describe("useAgentRunLaunchers", () => {
         ["t1", "t2"],
         2,
       );
-      expect(onRunCreated).toHaveBeenCalledWith("task-1");
+      expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
     });
 
     it("does not ask when the run is over the limit", async () => {
