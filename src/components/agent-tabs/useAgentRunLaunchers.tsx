@@ -12,7 +12,6 @@ import { EnableBenchmarkDialog } from "@/components/agent-tabs/EnableBenchmarkDi
 
 export type LaunchableTest = { uuid: string; name: string };
 
-
 /**
  * The two ways a tab starts work on an agent's tests: a plain run and a model
  * comparison. Shared by the Tests tab and the Evaluations tab so both gate the
@@ -41,7 +40,9 @@ export type AgentRunLauncherOptions = {
   /** How many tests "every linked test" is; only the Tests tab knows it. */
   linkedTestsTotal?: number;
   /** A plain run was created. The caller points its run window at it. */
-  onRunCreated: (taskId: string) => void;
+  // `runKey` is the control the run was asked from ("all", "bulk" for the
+  // ticked tests, "window", or a test uuid).
+  onRunCreated: (taskId: string, runKey: string) => void;
   /** A model comparison was created (the picker opened its own results window). */
   onComparisonCreated?: () => void;
   /** The picker (or the comparison window it opened) was closed. `started`
@@ -52,10 +53,17 @@ export type AgentRunLauncherOptions = {
 /** The agent settings the hook needs; what a tab takes from the agent page. */
 export type AgentRunLauncherSettings = Omit<
   AgentRunLauncherOptions,
-  "onRunCreated" | "onComparisonCreated" | "onComparisonClosed" | "linkedTestsTotal"
+  | "onRunCreated"
+  | "onComparisonCreated"
+  | "onComparisonClosed"
+  | "linkedTestsTotal"
 >;
 
-type RunIntent = { tests: LaunchableTest[]; allLinked: boolean; runKey: string };
+type RunIntent = {
+  tests: LaunchableTest[];
+  allLinked: boolean;
+  runKey: string;
+};
 
 export function useAgentRunLaunchers({
   agentUuid,
@@ -128,7 +136,7 @@ export function useAgentRunLaunchers({
         countOf(tests, allLinked),
       );
       if (!taskId) return null;
-      onRunCreated(taskId);
+      onRunCreated(taskId, runKey);
       return taskId;
     } finally {
       setStartingRun(null);
@@ -192,7 +200,9 @@ export function useAgentRunLaunchers({
     return true;
   };
 
-  const runToConfirmCount = runToConfirm ? countOf(runToConfirm.tests, runToConfirm.allLinked) : 0;
+  const runToConfirmCount = runToConfirm
+    ? countOf(runToConfirm.tests, runToConfirm.allLinked)
+    : 0;
   // The overlays here are fixed to the viewport. The tabs that mount them lay
   // their children out with flex gap, never space-y: a margin would shrink a
   // fixed overlay and show the page under it.
