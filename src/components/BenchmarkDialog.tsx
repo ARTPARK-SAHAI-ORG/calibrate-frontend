@@ -13,7 +13,6 @@ import {
   CloseIcon,
   ChevronDownIcon,
   TrashIcon,
-  PlusIcon,
   PlayIcon,
 } from "@/components/icons";
 import { Button, ConfirmDialog } from "@/components/ui";
@@ -88,9 +87,7 @@ export function BenchmarkDialog({
   const { providers: llmProviders } = useOpenRouterModels();
   const backendAccessToken = useAccessToken();
 
-  const [selectedModels, setSelectedModels] = useState<(LLMModel | null)[]>([
-    null,
-  ]);
+  const [selectedModels, setSelectedModels] = useState<LLMModel[]>([]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -120,7 +117,7 @@ export function BenchmarkDialog({
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setSelectedModels([null]);
+    setSelectedModels([]);
     setShowResults(false);
     setRunModelsTogether(true);
     setSettingsOpen(false);
@@ -255,10 +252,6 @@ export function BenchmarkDialog({
     setShowResults(false);
   };
 
-  const handleAddModel = () => {
-    setSelectedModels((prev) => [...prev, null]);
-  };
-
   const handleSelectModel = (index: number, model: LLMModel) => {
     setSelectedModels((prev) => {
       const newModels = [...prev];
@@ -268,10 +261,7 @@ export function BenchmarkDialog({
   };
 
   const handleRemoveModel = (index: number) => {
-    setSelectedModels((prev) => {
-      if (prev.length === 1) return prev;
-      return prev.filter((_, i) => i !== index);
-    });
+    setSelectedModels((prev) => prev.filter((_, i) => i !== index));
   };
 
   const openModelSelector = (index: number) => {
@@ -343,7 +333,12 @@ export function BenchmarkDialog({
   const showStatusColumn =
     agentType === "connection" && selectedModels.some((m) => m !== null);
   const maxModels = 5;
-  const canAddMore = selectedModels.length < maxModels;
+  // The chosen models, then one blank row to pick the next in, until five
+  // are chosen. Picking a model fills the blank and a new blank appears.
+  const rows: (LLMModel | null)[] =
+    selectedModels.length < maxModels
+      ? [...selectedModels, null]
+      : selectedModels;
 
   const getModelVerificationBadge = (modelId: string) => {
     if (agentType !== "connection") return null;
@@ -484,13 +479,13 @@ export function BenchmarkDialog({
             </label>
 
             {/* Model Rows */}
-            {selectedModels.map((selectedModel, index) => (
+            {rows.map((selectedModel, index) => (
               <div key={index} className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2">
                     <button
                       onClick={() => openModelSelector(index)}
-                      className="flex-1 h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors"
+                      className="flex-1 h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center cursor-pointer transition-colors"
                     >
                       <span
                         className={
@@ -501,22 +496,21 @@ export function BenchmarkDialog({
                       >
                         {selectedModel ? selectedModel.name : "Select a model"}
                       </span>
-                      <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
                     </button>
                     {/* Verification badge for connections, once a model is
                         picked. It sits right after the picker, and is as wide
-                        as the longest wording so every picker is the same size
-                        and none of them stops short. */}
-                    {showStatusColumn && (
+                        as the longest wording so every chosen row's picker is
+                        the same size. The blank row has no badge and no
+                        remove button, so its picker runs the full width. */}
+                    {showStatusColumn && selectedModel && (
                       <div className="min-w-20 shrink-0 flex items-center">
-                        {selectedModel &&
-                          getModelVerificationBadge(selectedModel.id)}
+                        {getModelVerificationBadge(selectedModel.id)}
                       </div>
                     )}
                   </div>
 
                   {/* Remove Button */}
-                  {selectedModels.length > 1 && (
+                  {selectedModel && (
                     <button
                       onClick={() => handleRemoveModel(index)}
                       className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
@@ -555,32 +549,19 @@ export function BenchmarkDialog({
                   )}
               </div>
             ))}
-
-            {/* Add Model Button */}
-            {canAddMore && (
-              <button
-                onClick={handleAddModel}
-                className="w-full h-10 px-4 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
-              >
-                <PlusIcon className="w-4 h-4" />
-                Add model
-              </button>
-            )}
           </div>
 
           {/* Only a connection agent has a server of its own to overload;
               a build agent's models are called by the platform. */}
           {agentType === "connection" && (
-            <div className="border border-border rounded-xl">
+            <div className="border-t border-border pt-3">
               <button
                 type="button"
                 onClick={() => setSettingsOpen((open) => !open)}
                 aria-expanded={settingsOpen}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer"
+                className="w-full flex items-center gap-2 py-1 text-left cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               >
-                <span className="flex-1 text-sm font-medium text-foreground">
-                  Settings
-                </span>
+                <span className="flex-1 text-sm font-medium">Settings</span>
                 <ChevronDownIcon
                   className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
                     settingsOpen ? "" : "-rotate-90"
@@ -588,7 +569,7 @@ export function BenchmarkDialog({
                 />
               </button>
               {settingsOpen && (
-                <div className="grid grid-cols-2 gap-4 px-4 pb-4">
+                <div className="grid grid-cols-2 gap-4 pt-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       Run the models in parallel or one after another
@@ -693,7 +674,7 @@ export function BenchmarkDialog({
             setModelSelectorOpen(false);
             setEditingIndex(null);
           }}
-          selectedLLM={selectedModels[editingIndex]}
+          selectedLLM={rows[editingIndex] ?? null}
           onSelect={handleModelSelected}
           availableProviders={getAvailableProviders(editingIndex)}
         />
