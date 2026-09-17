@@ -423,22 +423,9 @@ export function BenchmarkDialog({
               setExpandedModelError(isExpanded ? null : modelId);
             }}
             aria-expanded={isExpanded}
-            className="flex items-center gap-0.5 rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
+            className="rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
           >
             See why
-            <svg
-              className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-              />
-            </svg>
           </button>
         )}
       </span>
