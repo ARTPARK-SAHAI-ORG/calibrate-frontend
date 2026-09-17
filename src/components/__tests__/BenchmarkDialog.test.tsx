@@ -201,7 +201,7 @@ describe("BenchmarkDialog", () => {
   it("says one test in the singular", () => {
     render(<BenchmarkDialog {...baseProps({ tests: tests.slice(0, 1) })} />);
     expect(
-      screen.getByText("Select up to 5 models to benchmark on the 1 test"),
+      screen.getByText("Select up to 5 models to benchmark on the test"),
     ).toBeInTheDocument();
   });
 

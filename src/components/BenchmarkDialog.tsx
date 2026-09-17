@@ -480,7 +480,9 @@ export function BenchmarkDialog({
               Select up to 5 models to benchmark on{" "}
               {benchmarkTestCount === undefined
                 ? "the tests"
-                : `the ${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`}
+                : benchmarkTestCount === 1
+                  ? "the test"
+                  : `the ${benchmarkTestCount} tests`}
             </p>
           </div>
           <button
