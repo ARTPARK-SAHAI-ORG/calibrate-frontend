@@ -390,6 +390,42 @@ describe("BenchmarkResultsDialog", () => {
     return body!;
   }
 
+  it("marks a finished comparison whose test produced no answer", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-unanswered")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-unanswered",
+            status: "done",
+            model_results: [
+              {
+                model: "openai/gpt-4o",
+                test_results: [
+                  { test_case_id: "t1", passed: true },
+                  { test_case_id: "t2", passed: false, unanswered: true },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={["openai/gpt-4o"]}
+        taskId="task-unanswered"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("gave_up"),
+    );
+  });
+
   it.each([
     [
       "sends parallel_models: false when the models run one after another",

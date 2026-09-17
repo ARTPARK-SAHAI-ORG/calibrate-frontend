@@ -34,6 +34,21 @@ const MARKS: Record<
       </>
     ),
   },
+  none_run: {
+    tooltip: "None of the tests could be run",
+    className: "text-amber-500",
+    glyph: (
+      <>
+        <path
+          d="M12 7v6"
+          stroke="white"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="16.5" r="1.3" fill="white" />
+      </>
+    ),
+  },
   stopped: {
     tooltip: "Someone stopped the evaluation before it finished",
     className: "text-amber-500",

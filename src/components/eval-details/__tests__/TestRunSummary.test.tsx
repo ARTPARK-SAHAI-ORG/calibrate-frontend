@@ -53,15 +53,45 @@ beforeEach(() => {
 });
 
 describe("TestRunSummary", () => {
-  it("renders pass rate, latency, cost, tokens with null aggregates as em dashes", () => {
-    render(<TestRunSummary passed={0} total={0} />);
+  it("renders pass rate, latency, cost and tokens when the run has them", () => {
+    render(
+      <TestRunSummary
+        passed={1}
+        total={2}
+        latency={{ p50: 900, count: 2 }}
+        cost={{ mean: 0.02, min: 0.01, max: 0.03, count: 2 }}
+        tokens={{ mean: 120, min: 100, max: 140, count: 2 }}
+      />,
+    );
     expect(screen.getByText("Pass rate")).toBeInTheDocument();
     expect(screen.getByText("Latency")).toBeInTheDocument();
     expect(screen.getByText("Average cost")).toBeInTheDocument();
     expect(screen.getByText("Average tokens")).toBeInTheDocument();
-    // total=0 -> rate is null -> "—"
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-    expect(screen.getByText("0/0")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+  });
+
+  it("leaves out a card the run has no number for", () => {
+    render(
+      <TestRunSummary passed={1} total={2} latency={{ p50: 900, count: 2 }} />,
+    );
+    expect(screen.getByText("Pass rate")).toBeInTheDocument();
+    expect(screen.getByText("Latency")).toBeInTheDocument();
+    expect(screen.queryByText("Average cost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Average tokens")).not.toBeInTheDocument();
+  });
+
+  it("shows no cards when no test produced an answer", () => {
+    render(
+      <TestRunSummary passed={0} total={0} unanswered={1} runTotalTests={1} />,
+    );
+    expect(screen.queryByText("Pass rate")).not.toBeInTheDocument();
+    expect(screen.queryByText("Latency")).not.toBeInTheDocument();
+    expect(screen.queryByText("Average cost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Average tokens")).not.toBeInTheDocument();
+    expect(screen.queryByText("0/0")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/None of the tests could be run/),
+    ).toBeInTheDocument();
   });
 
   it("computes pass rate percentage and progress bar width", () => {
