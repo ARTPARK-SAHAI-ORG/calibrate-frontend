@@ -34,6 +34,8 @@ type BenchmarkStatusResponse = {
   error?: string;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
 };
 
 export default function PublicBenchmarkPage() {
@@ -141,6 +143,7 @@ export default function PublicBenchmarkPage() {
           leaderboardSummary={data.leaderboard_summary}
           evaluators={data.evaluators}
           runStopped={isRunStopped(data)}
+          runStoppedEarly={data.stopped_early === true}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           fetchCase={fetchCase}

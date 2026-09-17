@@ -32,7 +32,12 @@ import {
   RunStateMark,
 } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
-import { abortRunOrNotify, fetchTestCase } from "@/lib/testRunApi";
+import {
+  abortRunOrNotify,
+  fetchTestCase,
+  runErrorText,
+  RUN_FAILED_GENERIC_MESSAGE,
+} from "@/lib/testRunApi";
 import { modelComparisonName, isRunStopped } from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -66,7 +71,11 @@ type BenchmarkStatusResponse = {
    * benchmarks that predate the backend snapshot. */
   test_uuids?: string[];
   results_s3_prefix?: string;
-  error?: string;
+  /** Why the run could not be carried out, as text. Older runs carry true or
+   * false instead. */
+  error?: string | boolean | null;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
   is_public?: boolean;
   share_token?: string | null;
   /** True when someone stopped the run before it finished. */
@@ -148,6 +157,7 @@ export function BenchmarkResultsDialog({
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [stoppedEarly, setStoppedEarly] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
@@ -424,9 +434,14 @@ export function BenchmarkResultsDialog({
           pollingIntervalRef.current = null;
         }
 
+        setStoppedEarly(result.stopped_early === true);
         if (result.error) {
-          reportError("Benchmark error:", result.error);
-          setError(result.error);
+          const reason = runErrorText(result.error);
+          reportError(
+            "Model comparison failed",
+            new Error(reason ?? "unknown reason"),
+          );
+          setError(reason ?? RUN_FAILED_GENERIC_MESSAGE);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
           // A comparison that had already finished when the window opened
@@ -439,7 +454,7 @@ export function BenchmarkResultsDialog({
       reportError("Error polling benchmark status:", err);
       setIsInitialLoading(false);
       setTaskStatus("failed");
-      setError(err instanceof Error ? err.message : "Failed to poll status");
+      setError(RUN_FAILED_GENERIC_MESSAGE);
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -807,10 +822,7 @@ export function BenchmarkResultsDialog({
                   Something went wrong
                 </span>
               </div>
-              <p className="text-sm text-red-400 mb-4">
-                We&apos;re looking into it. Please reach out to us if this issue
-                persists.
-              </p>
+              <p className="text-sm text-red-400 mb-4">{error}</p>
               {onGoBack && (
                 <button
                   onClick={onGoBack}
@@ -845,6 +857,7 @@ export function BenchmarkResultsDialog({
             leaderboardSummary={leaderboardSummary}
             evaluators={runEvaluators}
             runStopped={wasStopped}
+            runStoppedEarly={stoppedEarly}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             fetchCase={fetchCase}

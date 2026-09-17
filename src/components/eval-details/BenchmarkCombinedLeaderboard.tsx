@@ -36,6 +36,8 @@ type BenchmarkCombinedLeaderboardProps = {
   onReviewUnanswered?: () => void;
   /** True when someone stopped the run before it finished. */
   runStopped?: boolean;
+  /** True when the run gave up before it started every test. */
+  stoppedEarly?: boolean;
 };
 
 /**
@@ -47,9 +49,11 @@ type BenchmarkCombinedLeaderboardProps = {
 function UnansweredNote({
   modelResults,
   onReviewUnanswered,
+  stoppedEarly = false,
 }: {
   modelResults: BenchmarkModelLike[];
   onReviewUnanswered?: () => void;
+  stoppedEarly?: boolean;
 }) {
   const perModel = modelResults
     .map((m) => benchmarkAnsweredPassFail(m))
@@ -84,6 +88,7 @@ function UnansweredNote({
           : answered === 0
             ? "None of the tests could be run. "
             : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
+      {stoppedEarly && "The run stopped before it started every test. "}
       Review the tests that could not be run in the {tab}.
     </RunNote>
   );
@@ -247,6 +252,7 @@ export function BenchmarkCombinedLeaderboard({
   className,
   onReviewUnanswered,
   runStopped = false,
+  stoppedEarly = false,
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -295,6 +301,7 @@ export function BenchmarkCombinedLeaderboard({
       <UnansweredNote
         modelResults={modelResults}
         onReviewUnanswered={onReviewUnanswered}
+        stoppedEarly={stoppedEarly && !runStopped}
       />
       <LeaderboardTab
         className={className}

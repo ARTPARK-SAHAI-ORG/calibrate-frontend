@@ -21,6 +21,21 @@ jest.mock("../test-results/shared", () => ({
   ),
 }));
 
+jest.mock("../eval-details/BenchmarkResultView", () => {
+  const actual = jest.requireActual("../eval-details/BenchmarkResultView");
+  return {
+    ...actual,
+    BenchmarkResultView: (props: { runStoppedEarly?: boolean }) => (
+      <>
+        <div data-testid="run-stopped-early">
+          {String(props.runStoppedEarly)}
+        </div>
+        <actual.BenchmarkResultView {...props} />
+      </>
+    ),
+  };
+});
+
 jest.mock("../eval-details", () => {
   const actual = jest.requireActual("../eval-details/BenchmarkOutputsPanel");
   return {
@@ -784,7 +799,73 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
-    expect(reportError).toHaveBeenCalledWith("Benchmark error:", "boom");
+    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(reportError).toHaveBeenCalledWith(
+      "Model comparison failed",
+      expect.objectContaining({ message: "boom" }),
+    );
+  });
+
+  it("shows the generic sentence when an older run carries error: true", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-err-bool")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-err-bool",
+            status: "failed",
+            error: true,
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-err-bool"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "We're looking into it. Please reach out to us if this issue persists.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("true")).not.toBeInTheDocument();
+  });
+
+  it("passes stopped_early on a finished run to the result view", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-stopped-early")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-stopped-early",
+            status: "done",
+            stopped_early: true,
+            model_results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-stopped-early"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-stopped-early")).toHaveTextContent("true"),
+    );
   });
 
   it("stops polling, reports the error, and sets status failed when the poll fetch rejects", async () => {

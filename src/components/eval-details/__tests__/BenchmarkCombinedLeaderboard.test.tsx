@@ -227,6 +227,39 @@ describe("tests that could not be run", () => {
   });
 });
 
+describe("a run that gave up before it started every test", () => {
+  const unansweredRun = (props: { stoppedEarly?: boolean; runStopped?: boolean }) => (
+    <BenchmarkCombinedLeaderboard
+      leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+      modelResults={[
+        {
+          model: "a",
+          total_tests: 2,
+          test_results: [{ passed: true }, { passed: false, unanswered: true }],
+        },
+      ]}
+      filename="x"
+      {...props}
+    />
+  );
+  const sentence = /The run stopped before it started every test\./;
+
+  it("says so in the note about the tests that could not be run", () => {
+    render(unansweredRun({ stoppedEarly: true }));
+    expect(screen.getByText(sentence)).toBeInTheDocument();
+  });
+
+  it("says nothing when the run started every test", () => {
+    render(unansweredRun({ stoppedEarly: false }));
+    expect(screen.queryByText(sentence)).not.toBeInTheDocument();
+  });
+
+  it("says nothing when someone stopped the run, since that note covers it", () => {
+    render(unansweredRun({ stoppedEarly: true, runStopped: true }));
+    expect(screen.queryByText(sentence)).not.toBeInTheDocument();
+  });
+});
+
 describe("a run someone stopped", () => {
   it("says how far the run got, in the same amber note the run window uses", () => {
     render(

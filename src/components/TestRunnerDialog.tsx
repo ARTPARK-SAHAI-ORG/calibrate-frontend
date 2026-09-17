@@ -58,6 +58,8 @@ import {
   fetchTestRun,
   getCachedTestRun,
   isTerminalRunStatus,
+  runErrorText,
+  RUN_FAILED_GENERIC_MESSAGE,
   UnauthorizedError,
   type TestCaseResult,
   type TestRunStatusResponse,
@@ -803,8 +805,7 @@ export function TestRunnerDialog({
                 </span>
               </div>
               <p className="text-sm text-red-400">
-                We&apos;re looking into it. Please reach out to us if this issue
-                persists.
+                {runErrorText(run?.error) ?? RUN_FAILED_GENERIC_MESSAGE}
               </p>
             </div>
           </div>

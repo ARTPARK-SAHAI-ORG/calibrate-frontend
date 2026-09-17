@@ -138,6 +138,17 @@ describe("PublicBenchmarkPage", () => {
     expect(address).toBe("http://backend.test/public/benchmark/tok-1?mode=summary");
   });
 
+  it("tells the leaderboard when the run gave up before it started every test", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, stopped_early: true })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ stoppedEarly: true }),
+    );
+  });
+
   it("names the two charts after what each one shows", async () => {
     const user = setupUser();
     render(<PublicBenchmarkPage />);

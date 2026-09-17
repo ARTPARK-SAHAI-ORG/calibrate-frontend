@@ -1031,6 +1031,45 @@ describe("TestRunnerDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
+    expect(screen.getByText("boom")).toBeInTheDocument();
+  });
+
+  it("shows the generic sentence when an older failed run carries error: true", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-err-bool")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-err-bool",
+            status: "failed",
+            error: true,
+            results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-err-bool"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "We're looking into it. Please reach out to us if this issue persists.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("true")).not.toBeInTheDocument();
   });
 
   it("keeps partial results visible when a run fails after some cases passed", async () => {

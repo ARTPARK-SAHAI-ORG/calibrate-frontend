@@ -97,12 +97,21 @@ export type TestRunStatusResponse = {
    * Read it through `runEvaluatorSummary`, so a missing list reads as none.
    * `pass_rate` is out of 100, the same as a benchmark's. */
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  /** True when the run itself broke. `status` says the same thing; nothing
-   * reads this. */
-  error?: boolean;
+  /** Why the run could not be carried out, as text. Older runs carry true or
+   * false instead. */
+  error?: string | boolean | null;
   is_public?: boolean;
   share_token?: string | null;
 };
+
+/** Shown when a run failed and the backend gave no reason. */
+export const RUN_FAILED_GENERIC_MESSAGE =
+  "We're looking into it. Please reach out to us if this issue persists.";
+
+/** The failure reason a run carries, or null when it has none in text. */
+export function runErrorText(error: unknown): string | null {
+  return typeof error === "string" && error.trim() ? error.trim() : null;
+}
 
 /** Thrown on a 401 so callers can sign the user out. */
 export class UnauthorizedError extends Error {
