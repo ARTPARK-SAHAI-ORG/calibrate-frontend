@@ -447,7 +447,7 @@ export function BenchmarkDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-xl w-full max-w-lg h-[38rem] max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="relative bg-background rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4">
           <div>
@@ -472,8 +472,10 @@ export function BenchmarkDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-1 space-y-4">
-          <div className="space-y-3">
+        <div className="flex-1 px-6 pb-6 pt-1 space-y-4">
+          {/* Sized for the label and five rows, so Advanced settings below
+              stays put however many models are chosen. */}
+          <div className="space-y-3 h-[17.5rem]">
             <label className="block text-sm font-medium text-foreground mb-3">
               Select Models
             </label>
@@ -485,7 +487,11 @@ export function BenchmarkDialog({
                   <div className="flex-1 flex items-center gap-2">
                     <button
                       onClick={() => openModelSelector(index)}
-                      className="flex-1 h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center cursor-pointer transition-colors"
+                      className={`flex-1 h-10 px-4 rounded-md text-sm border border-border flex items-center cursor-pointer transition-colors ${
+                        selectedModel
+                          ? "bg-muted font-medium hover:bg-muted/70"
+                          : "border-dashed bg-background hover:bg-muted/50"
+                      }`}
                     >
                       <span
                         className={
@@ -552,35 +558,39 @@ export function BenchmarkDialog({
           </div>
 
           {/* Only a connection agent has a server of its own to overload;
-              a build agent's models are called by the platform. */}
+              a build agent's models are called by the platform. The setting
+              stays behind a link for the few who need it, and opens in a
+              small panel beside the box so the box itself never changes
+              size. On a narrow screen there is no room beside it, so the
+              panel sits under the link instead. */}
           {agentType === "connection" && (
-            <div className="border-t border-border pt-3">
+            <div className="relative">
               <button
                 type="button"
                 onClick={() => setSettingsOpen((open) => !open)}
                 aria-expanded={settingsOpen}
-                className="w-full flex items-center gap-2 py-1 text-left cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                className={`w-full h-10 px-4 rounded-md text-sm font-medium border border-border flex items-center justify-between cursor-pointer transition-colors focus:outline-none ${
+                  settingsOpen ? "bg-muted" : "bg-background hover:bg-muted/50"
+                }`}
               >
-                <span className="flex-1 text-sm font-medium">Settings</span>
-                <ChevronDownIcon
-                  className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${
-                    settingsOpen ? "" : "-rotate-90"
-                  }`}
-                />
+                Advanced settings
+                <ChevronDownIcon className="w-4 h-4 text-muted-foreground -rotate-90" />
               </button>
+              {/* Beside the link, past the box's own side padding (px-6) plus
+                  a gap, its bottom level with the link so it grows upward and stays
+                  within the box.s height. */}
               {settingsOpen && (
-                <div className="grid grid-cols-2 gap-4 pt-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Run the models in parallel or one after another
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Running them in parallel puts more load on your agent
-                      server. Choose sequential if you do not want to overload
-                      it.
-                    </p>
-                  </div>
-                  <div>
+                <fieldset className="mt-3 space-y-1 rounded-xl border border-border bg-background p-4 md:mt-0 md:absolute md:left-full md:bottom-0 md:ml-9 md:w-72 md:shadow-2xl md:border-0">
+                  <legend className="sr-only">How to run the models</legend>
+                  <p className="text-sm font-medium text-foreground">
+                    How to run the models
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Running multiple models will increase the load on your agent
+                    server. Choose to run them sequentially to prevent
+                    overloading it.
+                  </p>
+                  <div className="pt-1">
                     {[
                       { value: "parallel", label: "Parallel" },
                       { value: "sequential", label: "Sequential" },
@@ -605,7 +615,7 @@ export function BenchmarkDialog({
                       </label>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               )}
             </div>
           )}

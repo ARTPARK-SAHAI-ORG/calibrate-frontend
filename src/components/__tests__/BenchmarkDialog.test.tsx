@@ -904,12 +904,12 @@ describe("BenchmarkDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("build agent: has no Settings and sends no run order", async () => {
+  it("build agent: has no Advanced settings and sends no run order", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
 
     expect(
-      screen.queryByRole("button", { name: "Settings" }),
+      screen.queryByRole("button", { name: "Advanced settings" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Select a model"));
@@ -938,9 +938,9 @@ describe("BenchmarkDialog", () => {
     });
     render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
 
-    // Settings starts closed, so the options are not on screen yet.
+    // Advanced settings starts closed, so the options are not on screen yet.
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
     expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
     if (pickOrder) {
