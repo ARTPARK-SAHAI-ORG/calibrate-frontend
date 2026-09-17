@@ -5,10 +5,6 @@ export const formatStatus = (status: string): string => {
   switch (status.toLowerCase()) {
     case "queued":
       return "Queued";
-    case "pending":
-      return "Waiting";
-    case "processing":
-      return "Scoring";
     case "in_progress":
       return "Running";
     case "done":
@@ -17,8 +13,6 @@ export const formatStatus = (status: string): string => {
       return "Completed";
     case "failed":
       return "Failed";
-    case "skipped":
-      return "Skipped";
     default:
       return status;
   }
@@ -34,14 +28,12 @@ export const getStatusBadgeClass = (status: string): string => {
       return "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
     case "running":
     case "in_progress":
-    case "processing":
       return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
     case "failed":
     case "error":
       return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
     case "pending":
     case "queued":
-    case "skipped":
       return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
     default:
       return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
@@ -53,11 +45,5 @@ export const getStatusBadgeClass = (status: string): string => {
  */
 export const isActiveStatus = (status: string): boolean => {
   const s = status.toLowerCase();
-  return (
-    s === "queued" ||
-    s === "in_progress" ||
-    s === "running" ||
-    s === "pending" ||
-    s === "processing"
-  );
+  return s === "queued" || s === "in_progress" || s === "running";
 };

@@ -3,8 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
-import { useDialogNavKeys } from "@/hooks";
+import { useDialogNavKeys, useResizableWidth } from "@/hooks";
 import {
+  ResizeHandle,
   TestDetailView,
   ToolCallCard,
   normalizeToolCall,
@@ -201,7 +202,7 @@ function MetaBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** IDs (when present), created time, labels, and ingest metadata — the right
+/** IDs (when present), created time, labels, and ingest metadata — the left
  *  column. */
 function TraceMetaPanel({
   messageId,
@@ -270,7 +271,8 @@ function TraceMetaPanel({
 /**
  * Read-only detail view for one trace. Reuses the test-results conversation
  * renderer so history + the agent's final output look the same as a run;
- * ids, created time, and metadata sit in the right-hand column.
+ * ids, created time, and metadata sit in the left column and the latest
+ * scores in the right one, like the evaluators column of a test run.
  */
 export function TraceDetailDialog({
   isOpen,
@@ -367,6 +369,8 @@ export function TraceDetailDialog({
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRuns]);
 
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
+  // Same width and limits as the evaluators column of the test results window.
+  const scoresPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   const history = useMemo(
     () => (trace ? turnsToHistory(trace.input) : []),
@@ -446,6 +450,17 @@ export function TraceDetailDialog({
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
+          {trace && (
+            <div className="md:w-80 border-b md:border-b-0 md:border-r border-border overflow-y-auto shrink-0">
+              <TraceMetaPanel
+                messageId={trace.message_id}
+                conversationId={trace.conversation_id}
+                createdAt={trace.created_at}
+                labels={trace.labels ?? null}
+                metadata={trace.metadata}
+              />
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto min-w-0">
             {isLoading && (
               <div className="p-5 md:p-6">
@@ -468,11 +483,10 @@ export function TraceDetailDialog({
                   showVerdict={false}
                 />
               ))}
+            {/* Scores under the conversation on mobile only; on desktop
+                they sit in the right column, the way a test run's do. */}
             {trace && (
-              <div className="p-5 md:p-6 border-t border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">
-                  Scores
-                </h3>
+              <div className="md:hidden border-t border-border">
                 <TraceScoreHistory
                   runs={visibleScoreRuns}
                   isLoading={scoresLoading}
@@ -482,15 +496,28 @@ export function TraceDetailDialog({
             )}
           </div>
           {trace && (
-            <div className="md:w-96 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
-              <TraceMetaPanel
-                messageId={trace.message_id}
-                conversationId={trace.conversation_id}
-                createdAt={trace.created_at}
-                labels={trace.labels ?? null}
-                metadata={trace.metadata}
+            <>
+              <ResizeHandle
+                onMouseDown={scoresPanel.startDrag}
+                label="Resize scores panel"
               />
-            </div>
+              <div
+                style={
+                  {
+                    "--verdict-w": `${scoresPanel.width}px`,
+                  } as React.CSSProperties
+                }
+                className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
+              >
+                <div className="flex-1 overflow-y-auto">
+                  <TraceScoreHistory
+                    runs={visibleScoreRuns}
+                    isLoading={scoresLoading}
+                    error={scoresError}
+                  />
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

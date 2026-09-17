@@ -2,7 +2,6 @@ import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
   pageHasOpenTraceScoring,
-  parseAutoScoreEnableError,
   scoringResultCounts,
   scoringRunErrorCopy,
   scoringStatusLabel,
@@ -75,79 +74,5 @@ describe("copy", () => {
     expect(scoringResultCounts(2, undefined)).toBeNull();
     expect(scoringResultCounts(-1, 3)).toEqual({ passed: 0, failed: 3 });
     expect(scoringResultCounts(5, 3)).toEqual({ passed: 5, failed: 0 });
-  });
-});
-
-describe("parseAutoScoreEnableError", () => {
-  it("reads the 422 partition when enabling is refused", () => {
-    const err = new Error(
-      `Request failed: 422 - ${JSON.stringify({
-        detail: {
-          error: "There are no eligible evaluators configured for this agent",
-          ineligible: [
-            {
-              evaluator_uuid: "ev-1",
-              name: "Correctness",
-              reason: "declares_variables",
-            },
-          ],
-        },
-      })}`,
-    );
-    expect(parseAutoScoreEnableError(err)).toEqual({
-      message: "There are no evaluators that can score this agent's traces",
-      ineligible: [
-        {
-          evaluator_uuid: "ev-1",
-          name: "Correctness",
-          reason: "declares_variables",
-        },
-      ],
-    });
-  });
-
-  it("returns null for other failures", () => {
-    expect(parseAutoScoreEnableError("not-an-error")).toBeNull();
-    expect(parseAutoScoreEnableError(new Error("network"))).toBeNull();
-    expect(
-      parseAutoScoreEnableError(
-        new Error("Request failed: 422 - {not-json"),
-      ),
-    ).toBeNull();
-    expect(
-      parseAutoScoreEnableError(
-        new Error(`Request failed: 422 - ${JSON.stringify({ detail: "nope" })}`),
-      ),
-    ).toBeNull();
-    expect(
-      parseAutoScoreEnableError(
-        new Error(
-          `Request failed: 422 - ${JSON.stringify({
-            detail: [{ loc: ["body"], msg: "Field required", type: "missing" }],
-          })}`,
-        ),
-      ),
-    ).toBeNull();
-    expect(
-      parseAutoScoreEnableError(
-        new Error(
-          `Request failed: 422 - ${JSON.stringify({
-            detail: { error: "There are no eligible evaluators configured for this agent" },
-          })}`,
-        ),
-      ),
-    ).toBeNull();
-    expect(
-      parseAutoScoreEnableError(
-        new Error(
-          `Request failed: 422 - ${JSON.stringify({
-            detail: { ineligible: [null, { name: 1 }, { name: "X", reason: "declares_variables" }] },
-          })}`,
-        ),
-      ),
-    ).toEqual({
-      message: "There are no evaluators that can score this agent's traces",
-      ineligible: [{ evaluator_uuid: "", name: "X", reason: "declares_variables" }],
-    });
   });
 });

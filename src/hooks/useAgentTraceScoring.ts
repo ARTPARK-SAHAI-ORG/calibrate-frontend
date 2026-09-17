@@ -6,7 +6,6 @@ import {
   setAgentAutoScoreTraces,
   type TraceScoringEligibility,
 } from "@/lib/tracesApi";
-import { parseAutoScoreEnableError } from "@/lib/traceScoring";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import { reportError } from "@/lib/reportError";
 
@@ -17,11 +16,23 @@ type UseAgentTraceScoringArgs = {
   enabled: boolean;
   onEnabledChange?: (enabled: boolean) => void;
   /**
-   * The traces tab is on screen. Eligibility is fetched when this becomes
-   * true so linking an evaluator on another tab unblocks the switch without
-   * a full reload. While false, no eligibility request is started.
+   * A tab showing the switch or the banner is on screen. Eligibility is
+   * fetched when this becomes true so linking an evaluator on another tab
+   * unblocks the switch without a full reload.
    */
   isActive?: boolean;
+};
+
+export type TraceScoringControls = {
+  enabled: boolean;
+  saving: boolean;
+  setEnabled: (enabled: boolean) => Promise<void>;
+  /** null until the eligibility call answers */
+  eligibility: TraceScoringEligibility | null;
+  eligibilityError: string | null;
+  saveError: string | null;
+  /** true when scoring is off and no linked evaluator can score */
+  enableBlocked: boolean;
 };
 
 /**
@@ -36,16 +47,13 @@ export function useAgentTraceScoring({
   enabled,
   onEnabledChange,
   isActive = true,
-}: UseAgentTraceScoringArgs) {
+}: UseAgentTraceScoringArgs): TraceScoringControls {
   const [isEnabled, setIsEnabled] = useState(enabled);
   const [eligibility, setEligibility] = useState<TraceScoringEligibility | null>(
     null,
   );
-  const [isLoadingEligibility, setIsLoadingEligibility] = useState(
-    () => Boolean(accessToken) && isActive,
-  );
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
@@ -53,20 +61,9 @@ export function useAgentTraceScoring({
     setIsEnabled(enabled);
   }, [enabled]);
 
-  useEffect(() => {
-    requestIdRef.current += 1;
-    setEligibility(null);
-    setEligibilityError(null);
-    setSaveError(null);
-    setIsLoadingEligibility(Boolean(accessToken) && isActive);
-    // Tab visibility must not wipe a successful GET; only identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- isActive is read from this render
-  }, [agentUuid, accessToken]);
-
   const loadEligibility = useCallback(async () => {
     if (!accessToken) return;
     const requestId = ++requestIdRef.current;
-    setIsLoadingEligibility(true);
     setEligibilityError(null);
     try {
       const next = await fetchTraceScoringEligibility(accessToken, agentUuid);
@@ -79,26 +76,31 @@ export function useAgentTraceScoring({
       setEligibilityError(
         "Could not check which evaluators can score this agent's traces.",
       );
-    } finally {
-      if (requestId === requestIdRef.current) setIsLoadingEligibility(false);
     }
   }, [accessToken, agentUuid]);
+
+  // A new agent or token drops the old answer; a tab going off screen does not.
+  useEffect(() => {
+    requestIdRef.current += 1;
+    setEligibility(null);
+    setEligibilityError(null);
+    setSaveError(null);
+  }, [agentUuid, accessToken]);
 
   useEffect(() => {
     if (!isActive) return;
     void loadEligibility();
   }, [isActive, loadEligibility]);
 
-  const hasEligibility = eligibility !== null;
   const canEnable = (eligibility?.eligible.length ?? 0) > 0;
-  const enableBlocked = !isEnabled && hasEligibility && !canEnable;
+  const enableBlocked = !isEnabled && eligibility !== null && !canEnable;
 
   const setEnabled = useCallback(
     async (next: boolean) => {
       if (!accessToken) return;
       if (next === isEnabled) return;
       if (next && !canEnable) return;
-      setIsSaving(true);
+      setSaving(true);
       setSaveError(null);
       try {
         const updated = await setAgentAutoScoreTraces(
@@ -109,31 +111,20 @@ export function useAgentTraceScoring({
         const live = !!updated.auto_score_traces;
         setIsEnabled(live);
         onEnabledChange?.(live);
-        if (next) void loadEligibility();
       } catch (err) {
         reportError("Error updating automatic trace scoring:", err);
-        const enableError = parseAutoScoreEnableError(err);
-        if (enableError) {
-          setSaveError(enableError.message);
-          setEligibility({
-            eligible: [],
-            ineligible: enableError.ineligible.map((item) => ({
-              evaluator_uuid: item.evaluator_uuid,
-              name: item.name,
-              reason: item.reason as TraceScoringEligibility["ineligible"][number]["reason"],
-            })),
-          });
-        } else {
-          setSaveError(
-            parseBackendErrorMessage(
-              err,
-              "Could not update automatic scoring. Please try again.",
-            ),
-          );
-        }
+        setSaveError(
+          parseBackendErrorMessage(
+            err,
+            "Could not update automatic scoring. Please try again.",
+          ),
+        );
       } finally {
-        setIsSaving(false);
+        setSaving(false);
       }
+      // Turning on, or being refused, both mean the linked evaluators may
+      // have changed since the last check.
+      if (next) void loadEligibility();
     },
     [
       accessToken,
@@ -146,15 +137,12 @@ export function useAgentTraceScoring({
   );
 
   return {
-    isEnabled,
-    eligibility,
-    isLoadingEligibility,
-    eligibilityError,
-    canEnable,
-    enableBlocked,
-    isSaving,
-    saveError,
+    enabled: isEnabled,
+    saving,
     setEnabled,
-    reloadEligibility: loadEligibility,
+    eligibility,
+    eligibilityError,
+    saveError,
+    enableBlocked,
   };
 }

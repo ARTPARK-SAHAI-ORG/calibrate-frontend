@@ -171,7 +171,7 @@ describe("TracesTable", () => {
 
     expect(screen.getByText("Input")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
-    expect(screen.getAllByText("Scores")).toHaveLength(2);
+    expect(screen.queryByText("Scores")).not.toBeInTheDocument();
     expect(screen.queryByText("Response")).not.toBeInTheDocument();
     for (const name of ["Conversation", "Turns", "Tools"]) {
       expect(screen.queryByText(name)).not.toBeInTheDocument();
@@ -180,20 +180,69 @@ describe("TracesTable", () => {
     expect(screen.queryByText("3 turns")).not.toBeInTheDocument();
   });
 
-  it("shows the latest-run pass count on the row, never an average", () => {
+  const columns = [
+    { evaluator_uuid: "ev-1", name: "Tone" },
+    { evaluator_uuid: "ev-2", name: "Accuracy" },
+  ];
+
+  it("shows no evaluator columns when no evaluator can score", () => {
     renderTable({
+      traces: [trace({ latest_run_status: "completed", scores: [] })],
+    });
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Scoring")).not.toBeInTheDocument();
+  });
+
+  it("shows one column per evaluator, with the verdict or the score in each", () => {
+    renderTable({
+      scoreColumns: columns,
       traces: [
         trace({
           latest_run_status: "completed",
-          passed: false,
-          n_passed: 1,
-          n_total: 2,
+          scores: [
+            { evaluator_uuid: "ev-1", output_type: "binary", value: 1, passed: true },
+            { evaluator_uuid: "ev-2", output_type: "rating", value: 4, passed: true },
+          ],
+        }),
+        trace({
+          uuid: "t2",
+          latest_run_status: "completed",
+          scores: [
+            { evaluator_uuid: "ev-1", output_type: "binary", value: 0, passed: false },
+          ],
         }),
       ],
     });
-    expect(screen.getAllByText("1 Success").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/passed/i)).not.toBeInTheDocument();
+    // Desktop header once, mobile block label once per card.
+    expect(screen.getAllByText("Tone")).toHaveLength(3);
+    expect(screen.getAllByText("Accuracy")).toHaveLength(3);
+    // Desktop cell and mobile block for each row.
+    expect(screen.getAllByText("Success")).toHaveLength(2);
+    expect(screen.getAllByText("4")).toHaveLength(2);
+    expect(screen.getAllByText("Fail")).toHaveLength(2);
+    // The second row has no Accuracy score.
+    expect(screen.getAllByText("—")).toHaveLength(2);
+  });
+
+  it("shows one spinner across the evaluator columns while scoring runs", () => {
+    renderTable({
+      scoreColumns: columns,
+      traces: [trace({ latest_run_status: "processing" })],
+    });
+    const spinners = screen.getAllByLabelText("Scoring");
+    expect(spinners).toHaveLength(2);
+    expect(spinners[0].parentElement).toHaveStyle({ gridColumn: "span 2" });
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("shows one Failed pill across the evaluator columns, and dashes with no run", () => {
+    renderTable({
+      scoreColumns: columns,
+      traces: [trace({ latest_run_status: "failed" }), trace({ uuid: "t2" })],
+    });
+    expect(screen.getAllByText("Failed")).toHaveLength(2);
+    // Two columns, desktop and mobile, for the never-scored row.
+    expect(screen.getAllByText("—")).toHaveLength(4);
   });
 
   it("opens a trace when its row is clicked", async () => {

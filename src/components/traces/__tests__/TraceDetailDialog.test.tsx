@@ -541,7 +541,7 @@ it("surfaces an error when the fetch fails", async () => {
   );
 });
 
-it("fetches and shows scoring history, newest first", async () => {
+it("fetches scores and draws only the latest run in the right column, meta on the left", async () => {
   mockFetchTrace.mockResolvedValue(detail);
   mockFetchTraceScores.mockResolvedValue({
     runs: [
@@ -584,11 +584,39 @@ it("fetches and shows scoring history, newest first", async () => {
   );
 
   await waitFor(() =>
-    expect(screen.getByText("Latest scores")).toBeInTheDocument(),
+    expect(screen.getAllByText("Tone").length).toBeGreaterThan(0),
   );
   expect(mockFetchTraceScores).toHaveBeenCalledWith("tok", "t1");
-  expect(screen.getByText("Earlier scores")).toBeInTheDocument();
-  expect(screen.getByText("Tone")).toBeInTheDocument();
+  // Drawn twice: the right column on desktop and under the conversation on
+  // mobile, the same way a test run's evaluators are.
+  const scoreHeadings = screen.getAllByRole("heading", { name: "Scores" });
+  expect(scoreHeadings).toHaveLength(2);
+  expect(scoreHeadings[0].closest(".md\\:hidden")).not.toBeNull();
+  expect(scoreHeadings[1].closest(".md\\:flex")).not.toBeNull();
+  expect(
+    screen.getByRole("separator", { name: "Resize scores panel" }),
+  ).toBeInTheDocument();
+  // Column order in the DOM: meta, then the conversation, then the scores.
+  const meta = screen.getByText("msg-1");
+  const conversation = screen.getByText("When is the next vaccination?");
+  const scores = scoreHeadings[1];
+  expect(
+    meta.compareDocumentPosition(conversation) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    conversation.compareDocumentPosition(scores) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  // Only the latest run: no run headings, no status pill, no earlier run's reason.
+  expect(
+    screen.queryByText(/Latest scores|Earlier scores/),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("No evaluators could score this trace"),
+  ).not.toBeInTheDocument();
 });
 
 it("refetches scores while a run is still in progress", async () => {
@@ -613,11 +641,11 @@ it("refetches scores while a run is still in progress", async () => {
     />,
   );
   await waitFor(() =>
-    expect(screen.getByText("Scoring this trace now.")).toBeInTheDocument(),
+    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
+      0,
+    ),
   );
-  const pollCall = setIntervalSpy.mock.calls.find(
-    (call) => call[1] === 3000,
-  );
+  const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
   expect(pollCall).toBeDefined();
   mockFetchTraceScores.mockResolvedValue({
     runs: [
@@ -634,7 +662,7 @@ it("refetches scores while a run is still in progress", async () => {
     (pollCall![0] as () => void)();
   });
   await waitFor(() =>
-    expect(screen.queryByText("Scoring this trace now.")).not.toBeInTheDocument(),
+    expect(screen.queryByText("Scoring this trace.")).not.toBeInTheDocument(),
   );
   setIntervalSpy.mockRestore();
 });
@@ -651,11 +679,13 @@ it("still shows the trace when scores cannot be loaded", async () => {
     />,
   );
   await waitFor(() =>
-    expect(screen.getByText("When is the next vaccination?")).toBeInTheDocument(),
+    expect(
+      screen.getByText("When is the next vaccination?"),
+    ).toBeInTheDocument(),
   );
   expect(
-    screen.getByText("Could not load scores for this trace."),
-  ).toBeInTheDocument();
+    screen.getAllByText("Could not load scores for this trace."),
+  ).toHaveLength(2);
 });
 
 it("keeps the last scores if a later poll fails", async () => {
@@ -680,16 +710,16 @@ it("keeps the last scores if a later poll fails", async () => {
     />,
   );
   await waitFor(() =>
-    expect(screen.getByText("Waiting to be scored.")).toBeInTheDocument(),
+    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
+      0,
+    ),
   );
-  const pollCall = setIntervalSpy.mock.calls.find(
-    (call) => call[1] === 3000,
-  );
+  const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
   mockFetchTraceScores.mockRejectedValue(new Error("poll failed"));
   await act(async () => {
     (pollCall![0] as () => void)();
   });
-  expect(screen.getByText("Waiting to be scored.")).toBeInTheDocument();
+  expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(0);
   setIntervalSpy.mockRestore();
 });
 

@@ -7,6 +7,7 @@ import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
+import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
   AgentTabContent,
@@ -176,6 +177,16 @@ export function AgentDetail({
     captureResponse,
   } = usePageErrorState();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+  const traceScoring = useAgentTraceScoring({
+    accessToken: backendAccessToken,
+    agentUuid,
+    enabled: !!agent?.auto_score_traces,
+    onEnabledChange: (enabled) =>
+      setAgent((current) =>
+        current ? { ...current, auto_score_traces: enabled } : current,
+      ),
+    isActive: activeTab === "traces" || activeTab === "settings",
+  });
   // Keep-alive: track which tabs have been opened. Each tab is mounted the
   // first time it's opened and then hidden (not unmounted) when switching
   // away, so its fetched data and in-tab UI state (search, filters,
@@ -1403,14 +1414,8 @@ export function AgentDetail({
             <TracesTabContent
               agentUuid={agentUuid}
               agentNature={agent.interaction_type ?? "conversation"}
-              autoScoreTraces={!!agent.auto_score_traces}
-              onAutoScoreTracesChange={(enabled) =>
-                setAgent((current) =>
-                  current
-                    ? { ...current, auto_score_traces: enabled }
-                    : current,
-                )
-              }
+              traceScoring={traceScoring}
+              onGoToSettings={() => performTabSwitch("settings")}
               isActive={activeTab === "traces"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
@@ -1441,6 +1446,7 @@ export function AgentDetail({
               setAgentSpeaksFirst={setAgentSpeaksFirst}
               maxAssistantTurns={maxAssistantTurns}
               setMaxAssistantTurns={setMaxAssistantTurns}
+              traceScoring={traceScoring}
             />
           </div>
         )}

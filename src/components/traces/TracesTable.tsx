@@ -4,8 +4,9 @@ import React from "react";
 import { ToolIcon } from "@/components/icons";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
+import { Tooltip } from "@/components/Tooltip";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
-import { TraceScoringSummary } from "./TraceScoringSummary";
+import { TraceScoreCells, type TraceScoreColumn } from "./TraceScoringSummary";
 
 type CheckboxProps = {
   checked: boolean;
@@ -26,6 +27,9 @@ type TracesTableProps = {
   onOpen: (traceUuid: string) => void;
   /** Ask to delete a single trace. */
   onDelete: (trace: TraceSummary) => void;
+  /** One column per evaluator that scores this agent's traces. None hides
+   *  the score columns altogether. */
+  scoreColumns?: TraceScoreColumn[];
 };
 
 export function formatTraceDate(value: string): string {
@@ -124,8 +128,10 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-const ROW_GRID =
-  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_minmax(7.5rem,0.7fr)_160px_auto] gap-4 px-4";
+function rowGrid(scoreColumnCount: number) {
+  const scores = "_minmax(6rem,0.5fr)".repeat(scoreColumnCount);
+  return `grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)${scores}_160px_auto] gap-4 px-4`;
+}
 
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
@@ -140,7 +146,9 @@ export function TracesTable({
   onToggleSelectAll,
   onOpen,
   onDelete,
+  scoreColumns = [],
 }: TracesTableProps) {
+  const ROW_GRID = rowGrid(scoreColumns.length);
   return (
     <>
       {/* Desktop table */}
@@ -156,7 +164,18 @@ export function TracesTable({
           </div>
           <div className="text-sm font-medium text-muted-foreground">Input</div>
           <div className="text-sm font-medium text-muted-foreground">Output</div>
-          <div className="text-sm font-medium text-muted-foreground">Scores</div>
+          {scoreColumns.map((column) => (
+            <Tooltip
+              key={column.evaluator_uuid}
+              content={column.name}
+              position="top"
+              className="min-w-0"
+            >
+              <div className="text-sm font-medium text-muted-foreground truncate">
+                {column.name}
+              </div>
+            </Tooltip>
+          ))}
           <div className="text-sm font-medium text-muted-foreground">Created</div>
           <div className="w-8" />
         </div>
@@ -180,9 +199,11 @@ export function TracesTable({
               <div className="min-w-0">
                 <TraceOutputCell trace={trace} />
               </div>
-              <div className="min-w-0">
-                <TraceScoringSummary trace={trace} />
-              </div>
+              <TraceScoreCells
+                trace={trace}
+                columns={scoreColumns}
+                layout="row"
+              />
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 {formatTraceDate(trace.created_at)}
               </div>
@@ -219,12 +240,11 @@ export function TracesTable({
             <div className="mt-2">
               <TraceOutputCell trace={trace} />
             </div>
-            <div className="mt-2">
-              <div className="text-xs font-medium text-muted-foreground">
-                Scores
-              </div>
-              <TraceScoringSummary trace={trace} />
-            </div>
+            <TraceScoreCells
+              trace={trace}
+              columns={scoreColumns}
+              layout="card"
+            />
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-muted-foreground">
                 {formatTraceDate(trace.created_at)}

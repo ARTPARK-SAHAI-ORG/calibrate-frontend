@@ -1,40 +1,122 @@
 "use client";
 
-import { PassFailCountPills, StatusBadge } from "@/components/ui";
-import { scoringResultCounts } from "@/lib/traceScoring";
+import { SpinnerIcon } from "@/components/icons";
+import { getStatusBadgeClass } from "@/lib/status";
+import { isTraceScoringInProgress, scoringStatusLabel } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 
-type TraceScoringSummaryProps = {
-  trace: Pick<
-    TraceSummary,
-    "latest_run_status" | "n_passed" | "n_total"
-  >;
+export type TraceScoreColumn = { evaluator_uuid: string; name: string };
+
+// The same pill PassFailCountPills draws, for one evaluator's verdict.
+const PILL_CLASS =
+  "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
+const DASH = <span className="text-sm text-muted-foreground">—</span>;
+
+type Props = {
+  trace: Pick<TraceSummary, "latest_run_status" | "scores">;
+  columns: TraceScoreColumn[];
+  /** "row" is one grid cell per evaluator; "card" is a labelled block each. */
+  layout: "row" | "card";
 };
 
 /**
- * Compact latest-run cell: status, or the same Success / Fail count pills
- * completed evaluations use. Never averages binary and rating results.
+ * One evaluator's result on the latest completed run: a Success or Fail pill
+ * for a binary evaluator, the number for a rating one.
  */
-export function TraceScoringSummary({ trace }: TraceScoringSummaryProps) {
-  const status = trace.latest_run_status;
-  if (!status) {
-    return <span className="text-sm text-muted-foreground">—</span>;
+function ScoreValue({
+  trace,
+  evaluatorUuid,
+}: {
+  trace: Props["trace"];
+  evaluatorUuid: string;
+}) {
+  const score = trace.scores?.find((s) => s.evaluator_uuid === evaluatorUuid);
+  if (!score) return DASH;
+  if (score.output_type === "rating") {
+    return <span className="text-sm text-foreground">{score.value}</span>;
   }
+  return score.passed ? (
+    <span
+      className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
+    >
+      Success
+    </span>
+  ) : (
+    <span
+      className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
+    >
+      Fail
+    </span>
+  );
+}
 
-  if (status === "completed") {
-    const counts = scoringResultCounts(trace.n_passed, trace.n_total);
-    if (!counts) {
-      return <span className="text-sm text-muted-foreground">—</span>;
-    }
+/**
+ * The evaluator cells of one trace row. A run still going, or one that failed
+ * or was skipped, is one cell across every evaluator column; a finished run
+ * is one cell per evaluator.
+ */
+export function TraceScoreCells({ trace, columns, layout }: Props) {
+  if (columns.length === 0) return null;
+  const status = trace.latest_run_status;
+  const spanning =
+    status && status !== "completed" ? (
+      isTraceScoringInProgress(status) ? (
+        <span role="img" aria-label="Scoring" className="inline-flex">
+          <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
+        </span>
+      ) : (
+        <span
+          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
+        >
+          {scoringStatusLabel(status)}
+        </span>
+      )
+    ) : null;
+
+  if (layout === "card") {
+    if (spanning) return <div className="mt-2">{spanning}</div>;
     return (
-      <PassFailCountPills passed={counts.passed} failed={counts.failed} />
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        {columns.map((column) => (
+          <div key={column.evaluator_uuid}>
+            <div className="text-xs font-medium text-muted-foreground">
+              {column.name}
+            </div>
+            {status === "completed" ? (
+              <ScoreValue
+                trace={trace}
+                evaluatorUuid={column.evaluator_uuid}
+              />
+            ) : (
+              DASH
+            )}
+          </div>
+        ))}
+      </div>
     );
   }
 
+  if (spanning) {
+    return (
+      <div
+        className="min-w-0 flex items-center"
+        style={{ gridColumn: `span ${columns.length}` }}
+      >
+        {spanning}
+      </div>
+    );
+  }
   return (
-    <StatusBadge
-      status={status}
-      showSpinner={status === "pending" || status === "processing"}
-    />
+    <>
+      {columns.map((column) => (
+        <div key={column.evaluator_uuid} className="min-w-0">
+          {status === "completed" ? (
+            <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
+          ) : (
+            DASH
+          )}
+        </div>
+      ))}
+    </>
   );
 }

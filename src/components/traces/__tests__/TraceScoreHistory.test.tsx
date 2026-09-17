@@ -11,6 +11,7 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     reasoning,
     scaleMax,
     versionLabel,
+    enableLink,
   }: {
     name: string;
     outputType: string;
@@ -19,10 +20,12 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     reasoning?: string | null;
     scaleMax?: number;
     versionLabel?: string | null;
+    enableLink?: boolean;
   }) => (
     <div data-testid={`verdict-${name}`}>
       {name} {outputType} match:{String(match)} score:{String(score)} max:
-      {String(scaleMax)} {reasoning} {versionLabel}
+      {String(scaleMax)} {reasoning} version:{String(versionLabel)} link:
+      {String(enableLink)}
     </div>
   ),
 }));
@@ -68,14 +71,10 @@ const prior: TraceScoringRun = {
   results: [],
 };
 
-it("renders newest first, splitting each stored value back into its own type", () => {
+it("draws one card per evaluator of the latest run only, with no id pill", () => {
   render(<TraceScoreHistory runs={[completed, prior]} />);
 
-  expect(screen.getByText("Latest scores")).toBeInTheDocument();
-  expect(screen.getByText("Earlier scores")).toBeInTheDocument();
-  expect(screen.getByText("1 Success")).toBeInTheDocument();
-  expect(screen.getByText("1 Fail")).toBeInTheDocument();
-  expect(screen.queryByText(/passed/i)).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Scores" })).toBeInTheDocument();
   // A binary value 1 reaches the verdict card as a true match; a rating
   // value reaches it as the score. Neither field carries the other type.
   expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
@@ -85,40 +84,22 @@ it("renders newest first, splitting each stored value back into its own type", (
     "rating match:undefined score:4",
   );
   expect(screen.getByTestId("verdict-Helpfulness")).toHaveTextContent("max:5");
-  expect(screen.getByText("Failed")).toBeInTheDocument();
-  expect(
-    screen.getByText("This scoring run could not be completed"),
-  ).toBeInTheDocument();
-});
-
-it("falls back to the version id when it has no compact form", () => {
-  render(
-    <TraceScoreHistory
-      runs={[
-        {
-          run_uuid: "r-hyphen",
-          status: "completed",
-          created_at: "2026-08-29T12:00:00Z",
-          results: [
-            {
-              evaluator_uuid: "ev-3",
-              name: "Fallback",
-              evaluator_type: "llm",
-              output_type: "binary",
-              value: 1,
-              passed: true,
-              evaluator_version_id: "--------",
-            },
-          ],
-        },
-      ]}
-    />,
+  expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
+    "version:undefined link:true",
   );
-  expect(screen.getByTestId("verdict-Fallback")).toHaveTextContent("--------");
+  expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
+  // The earlier, failed run is not drawn.
+  expect(
+    screen.queryByText(/Latest scores|Earlier scores/),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/Completed|Scored/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("This scoring run could not be completed"),
+  ).not.toBeInTheDocument();
 });
 
-it("shows waiting, scoring, skipped, and empty-result states", () => {
-  const { rerender } = render(
+it("shows a spinner while scoring, the reason when it failed, and empty results", () => {
+  const { rerender, container } = render(
     <TraceScoreHistory
       runs={[
         {
@@ -130,7 +111,8 @@ it("shows waiting, scoring, skipped, and empty-result states", () => {
       ]}
     />,
   );
-  expect(screen.getByText("Waiting to be scored.")).toBeInTheDocument();
+  expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
+  expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
     <TraceScoreHistory
@@ -144,7 +126,8 @@ it("shows waiting, scoring, skipped, and empty-result states", () => {
       ]}
     />,
   );
-  expect(screen.getByText("Scoring this trace now.")).toBeInTheDocument();
+  expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
+  expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
     <TraceScoreHistory
@@ -161,6 +144,12 @@ it("shows waiting, scoring, skipped, and empty-result states", () => {
   );
   expect(
     screen.getByText("No evaluators could score this trace"),
+  ).toBeInTheDocument();
+  expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
+
+  rerender(<TraceScoreHistory runs={[prior]} />);
+  expect(
+    screen.getByText("This scoring run could not be completed"),
   ).toBeInTheDocument();
 
   rerender(
@@ -183,7 +172,7 @@ it("shows waiting, scoring, skipped, and empty-result states", () => {
 
 it("shows loading, error, and empty copy", () => {
   const { rerender } = render(<TraceScoreHistory runs={[]} isLoading />);
-  expect(screen.getByText("Loading scores...")).toBeInTheDocument();
+  expect(screen.getByText("Loading scores…")).toBeInTheDocument();
 
   rerender(<TraceScoreHistory runs={[]} error="Could not load scores." />);
   expect(screen.getByText("Could not load scores.")).toBeInTheDocument();

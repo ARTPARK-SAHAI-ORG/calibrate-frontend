@@ -52,13 +52,21 @@ export type TraceSummary = {
   created_at: string;
   /** Latest scoring run for this trace. Absent when scoring has never run. */
   latest_run_status?: TraceScoringStatus | null;
-  /** Whether every evaluator on the latest completed run passed. Never an
-   *  average: binary passes on 1, rating at the top of its scale. */
-  passed?: boolean | null;
+  /** One entry per evaluator on the latest completed run. Absent until the
+   *  backend sends it. */
+  scores?: TraceSummaryScore[] | null;
   /** How many evaluators passed on the latest completed run. */
   n_passed?: number | null;
   /** How many evaluators the latest completed run scored. */
   n_total?: number | null;
+};
+
+export type TraceSummaryScore = {
+  evaluator_uuid: string;
+  output_type: "binary" | "rating";
+  /** 0 or 1 for binary, the numeric score for rating. */
+  value: number;
+  passed: boolean;
 };
 
 /** Status of one durable trace-scoring run. */
@@ -239,6 +247,18 @@ export async function setAgentAutoScoreTraces(
     `/agents/${encodeURIComponent(agentUuid)}`,
     accessToken,
     { auto_score_traces: enabled },
+  );
+}
+
+/** Queue every trace of this agent that has not been scored yet. */
+export async function scoreAgentTraces(
+  accessToken: string,
+  agentUuid: string,
+): Promise<{ queued: number }> {
+  return apiPost<{ queued: number }>(
+    `/agents/${encodeURIComponent(agentUuid)}/score-traces`,
+    accessToken,
+    {},
   );
 }
 

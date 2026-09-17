@@ -34,9 +34,12 @@ jest.mock("../../../hooks", () => ({
 
 const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
+const scoreAgentTraces = jest.fn<Promise<{ queued: number }>, [string, string]>();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
+  scoreAgentTraces: (token: string, agent: string) =>
+    scoreAgentTraces(token, agent),
   MAX_TRACES_PAGE_SIZE: 200,
 }));
 
@@ -257,22 +260,6 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
       </div>
     ) : null,
 }));
-jest.mock("../../traces/TraceScoringToggle", () => ({
-  TraceScoringToggle: ({
-    agentUuid,
-    enabled,
-    isActive,
-  }: {
-    agentUuid: string;
-    enabled: boolean;
-    isActive?: boolean;
-  }) => (
-    <div data-testid="trace-scoring-toggle">
-      {agentUuid}:{enabled ? "on" : "off"}:{isActive === false ? "hidden" : "active"}
-    </div>
-  ),
-}));
-
 // The labels the agent's traces carry, which the filter offers. Most tests
 // have none, so the picker stays out of the way.
 const refetchLabels = jest.fn();
@@ -296,6 +283,7 @@ const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
 });
 
 const refetch = jest.fn();
+const refetchSilently = jest.fn();
 
 function tracesResult(
   items: TraceSummary[],
@@ -314,6 +302,7 @@ function tracesResult(
     error: null,
     handleDeleted,
     refetch,
+    refetchSilently,
     hasPrev: false,
     hasNext: false,
     prevPage: jest.fn(),
@@ -326,7 +315,30 @@ function tracesResult(
 // callbacks: one to reload the Tests tab, one to open it.
 const onTestsCreated = jest.fn();
 const onViewTests = jest.fn();
-const tabProps = { agentUuid: "agent-1", onTestsCreated, onViewTests };
+const onGoToSettings = jest.fn();
+const setEnabled = jest.fn(async () => {});
+// Scoring off, with one evaluator able to score, unless a test says otherwise.
+const traceScoring = {
+  enabled: false,
+  saving: false,
+  setEnabled,
+  eligibility: {
+    eligible: [
+      { evaluator_uuid: "ev-1", evaluator_version_id: "v1", name: "Tone" },
+    ],
+    ineligible: [],
+  },
+  eligibilityError: null,
+  saveError: null,
+  enableBlocked: false,
+};
+const tabProps = {
+  agentUuid: "agent-1",
+  onTestsCreated,
+  onViewTests,
+  onGoToSettings,
+  traceScoring,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -381,7 +393,7 @@ describe("TracesTabContent", () => {
     // The setup steps are gone at this point, so this is the only way back to
     // the request: no selection needed.
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Integration Guide" }));
+    await user.click(screen.getByRole("button", { name: "Integration guide" }));
 
     expect(
       screen.getByRole("heading", { name: "Send your first trace" }),
@@ -395,7 +407,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} agentNature="general" />);
 
-    await user.click(screen.getByRole("button", { name: "Integration Guide" }));
+    await user.click(screen.getByRole("button", { name: "Integration guide" }));
 
     const snippet = document.querySelector("pre")?.textContent ?? "";
     expect(snippet).toContain('"input": "When is the next vaccination?"');
@@ -426,18 +438,204 @@ describe("TracesTabContent", () => {
     );
   });
 
-  it("shows the scoring toggle and pauses polling while the tab is hidden", () => {
-    render(
-      <TracesTabContent
-        {...tabProps}
-        autoScoreTraces
-        isActive={false}
-      />,
-    );
-    expect(screen.getByTestId("trace-scoring-toggle")).toHaveTextContent(
-      "agent-1:on:hidden",
-    );
+  it("pauses polling while the tab is hidden", () => {
+    render(<TracesTabContent {...tabProps} isActive={false} />);
     expect(lastTracesArgs().poll).toBe(false);
+  });
+
+  describe("the scoring line above the list", () => {
+    it("says new traces are not scored and sends the reader to Settings", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+      expect(screen.getByText("New traces are not scored.")).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "Turn on in Settings" }),
+      );
+      expect(onGoToSettings).toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: "Score past traces" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says new traces are scored, and Turn off stays loading until the save answers", async () => {
+      const user = setupUser();
+      let finish: () => void = () => {};
+      setEnabled.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "New traces are scored automatically with this agent's evaluators.",
+        ),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Turn off" }));
+      expect(setEnabled).toHaveBeenCalledWith(false);
+      // The parent reports the save in flight, and the button waits on it.
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true, saving: true }}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Turn off" })).toBeDisabled();
+      finish();
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled: true,
+            saveError: "Could not save.",
+          }}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Turn off" })).toBeEnabled();
+      expect(screen.getByText("Could not save.")).toBeInTheDocument();
+    });
+
+    it("still offers Settings when turning on is blocked", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enableBlocked: true }}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Turn on in Settings" }),
+      ).toBeInTheDocument();
+    });
+
+    it("queues the past traces for scoring and reads the list again", async () => {
+      const user = setupUser();
+      let finish: (value: { queued: number }) => void = () => {};
+      scoreAgentTraces.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Score past traces" }));
+      expect(scoreAgentTraces).toHaveBeenCalledWith("test-token", "agent-1");
+      expect(
+        screen.getByRole("button", { name: "Score past traces" }),
+      ).toBeDisabled();
+      await act(async () => finish({ queued: 3 }));
+      expect(toast.success).toHaveBeenCalledWith("Queued 3 traces for scoring");
+      expect(refetchSilently).toHaveBeenCalled();
+      expect(
+        screen.getByRole("button", { name: "Score past traces" }),
+      ).toBeEnabled();
+    });
+
+    it("says so when every trace was already scored", async () => {
+      const user = setupUser();
+      scoreAgentTraces.mockResolvedValueOnce({ queued: 0 });
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Score past traces" }));
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith(
+          "Every trace has already been scored",
+        ),
+      );
+    });
+
+    it("reports a failure to queue the past traces", async () => {
+      const user = setupUser();
+      scoreAgentTraces.mockRejectedValueOnce(new Error("boom"));
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Score past traces" }));
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Could not queue the traces for scoring. Please try again.",
+        ),
+      );
+      expect(reportError).toHaveBeenCalled();
+      expect(refetchSilently).not.toHaveBeenCalled();
+    });
+
+    it("names the evaluators that cannot score traces, with the reason", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-2",
+                  name: "Old judge",
+                  reason: "no_live_version",
+                },
+              ],
+            },
+          }}
+        />,
+      );
+      expect(
+        screen.getByText("These evaluators cannot score traces:"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Old judge")).toBeInTheDocument();
+      expect(
+        screen.getByText("Has no current version to run"),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps both lines off the setup steps", () => {
+      mockUseTraces.mockReturnValue(tracesResult([]));
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-2",
+                  name: "Old judge",
+                  reason: "wrong_type_for_agent",
+                },
+              ],
+            },
+          }}
+        />,
+      );
+      expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+      expect(screen.queryByText("New traces are not scored.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Old judge")).not.toBeInTheDocument();
+    });
+
+    it("hands the table one column per evaluator that can score", () => {
+      render(<TracesTabContent {...tabProps} />);
+      // The desktop header and the mobile card both name the column.
+      expect(screen.getAllByText("Tone")).toHaveLength(2);
+    });
   });
 
   it("hides the per page choice while every trace fits on one page", () => {
@@ -987,7 +1185,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
     expect(screen.queryByText("1 trace")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Integration Guide" }),
+      screen.queryByRole("button", { name: "Integration guide" }),
     ).not.toBeInTheDocument();
   });
 

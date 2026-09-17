@@ -22,7 +22,7 @@ import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
-import { TraceScoringToggle } from "@/components/traces/TraceScoringToggle";
+import { EvaluatorPillList } from "@/components/EvaluatorPillList";
 import {
   Button,
   LoadingState,
@@ -40,9 +40,12 @@ import {
   useTraceLabels,
   useTraces,
 } from "@/hooks";
+import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
+import { ineligibleReasonCopy } from "@/lib/traceScoring";
 import {
   fetchTrace,
   fetchTraces,
+  scoreAgentTraces,
   type TraceDetail,
   type TraceOutputFilter,
   type TraceSummary,
@@ -76,8 +79,8 @@ function traceRowOutputFacts(trace: TraceSummary): TraceOutputFacts {
 export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
-  autoScoreTraces = false,
-  onAutoScoreTracesChange,
+  traceScoring,
+  onGoToSettings,
   isActive = true,
   onTestsCreated,
   onViewTests,
@@ -87,9 +90,10 @@ export function TracesTabContent({
   /** A general agent answers one input at a time, so the sending code shows a
    * single piece of text rather than a conversation history. */
   agentNature?: "conversation" | "general";
-  /** Whether newly ingested traces are scored automatically. */
-  autoScoreTraces?: boolean;
-  onAutoScoreTracesChange?: (enabled: boolean) => void;
+  /** Automatic scoring of new traces: on or off, and which evaluators can do it. */
+  traceScoring: TraceScoringControls;
+  /** Opens the Settings tab, where scoring is turned on. */
+  onGoToSettings: () => void;
   /** The traces tab is on screen. Polling pauses when this is false. */
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
@@ -144,6 +148,7 @@ export function TracesTabContent({
     prevPage,
     nextPage,
     refetch,
+    refetchSilently,
   } = useTraces({
     accessToken,
     agentId: agentUuid,
@@ -412,6 +417,29 @@ export function TracesTabContent({
   const [integrationGuideOpen, setIntegrationGuideOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Score every trace that arrived before scoring was turned on. The rows go
+  // to waiting once the list is read again, so the reader sees them queued.
+  const [isScoringPast, setIsScoringPast] = useState(false);
+  const scorePastTraces = async () => {
+    if (!accessToken) return;
+    setIsScoringPast(true);
+    try {
+      const { queued } = await scoreAgentTraces(accessToken, agentUuid);
+      toast.success(
+        queued === 0
+          ? "Every trace has already been scored"
+          : `Queued ${queued} trace${queued === 1 ? "" : "s"} for scoring`,
+      );
+      await refetchSilently();
+    } catch (err) {
+      reportError("Error scoring past traces:", err);
+      toast.error("Could not queue the traces for scoring. Please try again.");
+    } finally {
+      setIsScoringPast(false);
+    }
+  };
+  const ineligible = traceScoring.eligibility?.ineligible ?? [];
+
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
     // before it would not know about.
@@ -497,13 +525,64 @@ export function TracesTabContent({
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      <TraceScoringToggle
-        agentUuid={agentUuid}
-        accessToken={accessToken}
-        enabled={autoScoreTraces}
-        onEnabledChange={onAutoScoreTracesChange}
-        isActive={isActive}
-      />
+      {hasLoaded && !showEmptyState && (
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <span className="text-sm text-muted-foreground">
+                {traceScoring.enabled
+                  ? "New traces are scored automatically with this agent's evaluators."
+                  : "New traces are not scored."}
+                {traceScoring.saveError && (
+                  <span className="text-red-600 dark:text-red-400">
+                    {" "}
+                    {traceScoring.saveError}
+                  </span>
+                )}
+              </span>
+              {traceScoring.enabled ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  isLoading={traceScoring.saving}
+                  onClick={() => void traceScoring.setEnabled(false)}
+                >
+                  Turn off
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={onGoToSettings}>
+                  Turn on in Settings
+                </Button>
+              )}
+            </div>
+            {traceScoring.enabled && (
+              <Button
+                size="sm"
+                variant="secondary"
+                isLoading={isScoringPast}
+                onClick={() => void scorePastTraces()}
+              >
+                Score past traces
+              </Button>
+            )}
+          </div>
+          {ineligible.length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                These evaluators cannot score traces:
+              </p>
+              <EvaluatorPillList
+                layout="flow"
+                evaluators={ineligible.map((item) => ({
+                  uuid: item.evaluator_uuid,
+                  name: item.name,
+                  detail: ineligibleReasonCopy(item.reason),
+                }))}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
@@ -554,7 +633,7 @@ export function TracesTabContent({
             onClick={() => void handleRefresh()}
           />
           <Button variant="secondary" onClick={() => setIntegrationGuideOpen(true)}>
-            Integration Guide
+            Integration guide
           </Button>
         </div>
       )}
@@ -711,6 +790,7 @@ export function TracesTabContent({
                 onToggleSelectAll={deletion.toggleSelectAll}
                 onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
+                scoreColumns={traceScoring.eligibility?.eligible ?? []}
               />
             </div>
           )}

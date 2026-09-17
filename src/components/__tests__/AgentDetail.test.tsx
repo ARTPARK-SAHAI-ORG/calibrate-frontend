@@ -133,18 +133,23 @@ jest.mock("../agent-tabs", () => ({
   },
   TracesTabContent: (props: any) => (
     <div data-testid="traces-tab-content">
-      TracesTabContent-{props.agentUuid}-{props.autoScoreTraces ? "scoring" : "off"}-{props.isActive ? "active" : "hidden"}
-      <button
-        type="button"
-        onClick={() => props.onAutoScoreTracesChange?.(!props.autoScoreTraces)}
-      >
-        ToggleScoring
+      TracesTabContent-{props.agentUuid}-{props.traceScoring?.enabled ? "scoring" : "off"}-{props.isActive ? "active" : "hidden"}
+      <button type="button" onClick={() => props.onGoToSettings?.()}>
+        GoToSettings
       </button>
     </div>
   ),
-  SettingsTabContent: () => (
-    <div data-testid="settings-tab-content">SettingsTabContent</div>
+  SettingsTabContent: (props: any) => (
+    <div data-testid="settings-tab-content">
+      SettingsTabContent-{props.traceScoring?.enabled ? "scoring" : "off"}
+    </div>
   ),
+}));
+
+const useAgentTraceScoringMock = jest.fn();
+jest.mock("../../hooks/useAgentTraceScoring", () => ({
+  __esModule: true,
+  useAgentTraceScoring: (args: any) => useAgentTraceScoringMock(args),
 }));
 
 jest.mock("../VerifyErrorPopover", () => ({
@@ -289,6 +294,16 @@ beforeEach(() => {
     hasRuns: true,
     markHasRuns: jest.fn(),
   });
+  useAgentTraceScoringMock.mockReset();
+  useAgentTraceScoringMock.mockImplementation((args: any) => ({
+    enabled: args.enabled,
+    saving: false,
+    setEnabled: jest.fn(),
+    eligibility: null,
+    eligibilityError: null,
+    saveError: null,
+    enableBlocked: false,
+  }));
   (signOut as jest.Mock).mockClear();
   jest.useRealTimers();
 });
@@ -508,7 +523,7 @@ describe("AgentDetail", () => {
     expectVisibleTab("agent-tab-content", "settings-tab-content");
   });
 
-  it("keeps automatic scoring on the traces tab in sync with the agent", async () => {
+  it("hands one trace scoring control to the Traces and Settings tabs", async () => {
     mockFetchSequenceForAgent({ ...buildAgent, auto_score_traces: true });
     const user = setupUser();
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
@@ -516,15 +531,37 @@ describe("AgentDetail", () => {
     await waitFor(() =>
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        agentUuid: buildAgent.uuid,
+        enabled: true,
+        isActive: false,
+      }),
+    );
 
     await user.click(screen.getByText("Traces"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${buildAgent.uuid}-scoring-active`,
     );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isActive: true }),
+    );
 
-    await user.click(screen.getByText("ToggleScoring"));
-    expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
-      `TracesTabContent-${buildAgent.uuid}-off-active`,
+    // The banner's link lands on Settings, which shows the same control.
+    await user.click(screen.getByText("GoToSettings"));
+    expectVisibleTab("settings-tab-content", "traces-tab-content");
+    expect(screen.getByTestId("settings-tab-content")).toHaveTextContent(
+      "SettingsTabContent-scoring",
+    );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isActive: true }),
+    );
+
+    // A toggle reports back through onEnabledChange and the agent follows.
+    const { onEnabledChange } = useAgentTraceScoringMock.mock.calls.at(-1)[0];
+    act(() => onEnabledChange(false));
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
     );
   });
 

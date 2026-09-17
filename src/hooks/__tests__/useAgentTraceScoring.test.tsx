@@ -65,15 +65,14 @@ beforeEach(() => {
 
 it("loads eligibility and allows enabling when at least one evaluator can score", async () => {
   const { result } = setup(false);
-  await waitFor(() => expect(result.current.isLoadingEligibility).toBe(false));
-  expect(result.current.canEnable).toBe(true);
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
   expect(result.current.enableBlocked).toBe(false);
 
   await act(async () => {
     await result.current.setEnabled(true);
   });
   expect(mockSetFlag).toHaveBeenCalledWith("tok", "ag-1", true);
-  expect(result.current.isEnabled).toBe(true);
+  expect(result.current.enabled).toBe(true);
 });
 
 it("hard-blocks enabling when no evaluator is eligible", async () => {
@@ -85,21 +84,21 @@ it("hard-blocks enabling when no evaluator is eligible", async () => {
     await result.current.setEnabled(true);
   });
   expect(mockSetFlag).not.toHaveBeenCalled();
-  expect(result.current.isEnabled).toBe(false);
+  expect(result.current.enabled).toBe(false);
 });
 
 it("still allows turning scoring off after eligibility drifts", async () => {
   mockEligibility.mockResolvedValue(blocked);
   mockSetFlag.mockResolvedValue({ auto_score_traces: false });
   const { result } = setup(true);
-  await waitFor(() => expect(result.current.isEnabled).toBe(true));
+  await waitFor(() => expect(result.current.enabled).toBe(true));
   expect(result.current.enableBlocked).toBe(false);
 
   await act(async () => {
     await result.current.setEnabled(false);
   });
   expect(mockSetFlag).toHaveBeenCalledWith("tok", "ag-1", false);
-  expect(result.current.isEnabled).toBe(false);
+  expect(result.current.enabled).toBe(false);
 });
 
 it("surfaces a generic error when enabling fails for another reason", async () => {
@@ -107,7 +106,7 @@ it("surfaces a generic error when enabling fails for another reason", async () =
     new Error("Request failed: 500 - {\"detail\":\"boom\"}"),
   );
   const { result } = setup(false);
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
 
   await act(async () => {
     await result.current.setEnabled(true);
@@ -124,63 +123,38 @@ it("records when eligibility cannot be loaded", async () => {
   await waitFor(() =>
     expect(result.current.eligibilityError).toMatch(/Could not check/),
   );
-  expect(result.current.canEnable).toBe(false);
   expect(result.current.enableBlocked).toBe(false);
   expect(mockReportError).toHaveBeenCalled();
 });
 
-it("surfaces a 422 with ineligible reasons when enabling is refused", async () => {
+it("shows the backend message and rechecks eligibility when enabling is refused", async () => {
   mockSetFlag.mockRejectedValue(
     new Error(
       `Request failed: 422 - ${JSON.stringify({
-        detail: {
-          error: "There are no eligible evaluators configured for this agent",
-          ineligible: [
-            {
-              evaluator_uuid: "ev-2",
-              name: "Correctness",
-              reason: "declares_variables",
-            },
-          ],
-        },
+        detail: "There are no eligible evaluators configured for this agent",
       })}`,
     ),
   );
   const { result } = setup(false);
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
+  mockEligibility.mockResolvedValue(blocked);
 
   await act(async () => {
     await result.current.setEnabled(true);
   });
-  expect(result.current.saveError).toMatch(/no evaluators/);
-  expect(result.current.eligibility?.eligible).toEqual([]);
-  expect(result.current.eligibility?.ineligible[0]).toEqual({
-    evaluator_uuid: "ev-2",
-    name: "Correctness",
-    reason: "declares_variables",
-  });
-  expect(result.current.enableBlocked).toBe(true);
-  expect(result.current.canEnable).toBe(false);
+  expect(result.current.saveError).toMatch(/no eligible evaluators/);
+  await waitFor(() => expect(result.current.enableBlocked).toBe(true));
+  expect(mockEligibility).toHaveBeenCalledTimes(2);
   expect(mockReportError).toHaveBeenCalled();
 });
 
 it("does not PUT when scoring is already in the requested state", async () => {
   const { result } = setup(true);
-  await waitFor(() => expect(result.current.isEnabled).toBe(true));
+  await waitFor(() => expect(result.current.enabled).toBe(true));
   await act(async () => {
     await result.current.setEnabled(true);
   });
   expect(mockSetFlag).not.toHaveBeenCalled();
-});
-
-it("reloads eligibility on demand", async () => {
-  const { result } = setup(false);
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
-  mockEligibility.mockResolvedValue(blocked);
-  await act(async () => {
-    await result.current.reloadEligibility();
-  });
-  await waitFor(() => expect(result.current.enableBlocked).toBe(true));
 });
 
 it("notifies the parent after a successful toggle", async () => {
@@ -193,7 +167,7 @@ it("notifies the parent after a successful toggle", async () => {
       onEnabledChange,
     }),
   );
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
   await act(async () => {
     await result.current.setEnabled(true);
   });
@@ -210,7 +184,6 @@ it("does nothing without an access token", async () => {
   );
   await act(async () => {
     await result.current.setEnabled(true);
-    await result.current.reloadEligibility();
   });
   expect(mockEligibility).not.toHaveBeenCalled();
   expect(mockSetFlag).not.toHaveBeenCalled();
@@ -224,10 +197,8 @@ it("does not treat a missing eligibility payload as blocked while the first chec
     }),
   );
   const { result } = setup(false);
-  expect(result.current.isLoadingEligibility).toBe(true);
   expect(result.current.eligibility).toBeNull();
   expect(result.current.enableBlocked).toBe(false);
-  expect(result.current.canEnable).toBe(false);
 
   await act(async () => {
     resolveEligibility(blocked);
@@ -279,12 +250,11 @@ it("ignores a slower eligibility response after the agent changes", async () => 
   );
 
   rerender({ agentUuid: "ag-b" });
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
 
   await act(async () => {
     resolveFirst(blocked);
   });
-  expect(result.current.canEnable).toBe(true);
   expect(result.current.enableBlocked).toBe(false);
   expect(result.current.eligibility?.eligible[0].name).toBe("Tone");
 });
@@ -311,16 +281,16 @@ it("ignores a slower eligibility failure after the agent changes", async () => {
   );
 
   rerender({ agentUuid: "ag-b" });
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
 
   await act(async () => {
     rejectFirst(new Error("offline"));
   });
-  expect(result.current.canEnable).toBe(true);
+  expect(result.current.eligibility?.eligible[0].name).toBe("Tone");
   expect(result.current.eligibilityError).toBeNull();
 });
 
-it("does not treat a validation 422 as an empty eligibility partition", async () => {
+it("keeps eligibility as checked when a validation 422 refuses the save", async () => {
   mockSetFlag.mockRejectedValue(
     new Error(
       `Request failed: 422 - ${JSON.stringify({
@@ -331,13 +301,12 @@ it("does not treat a validation 422 as an empty eligibility partition", async ()
     ),
   );
   const { result } = setup(false);
-  await waitFor(() => expect(result.current.canEnable).toBe(true));
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
 
   await act(async () => {
     await result.current.setEnabled(true);
   });
   expect(result.current.enableBlocked).toBe(false);
-  expect(result.current.canEnable).toBe(true);
   expect(result.current.eligibility?.eligible).toHaveLength(1);
   expect(result.current.saveError).toMatch(/Field required/);
 });
