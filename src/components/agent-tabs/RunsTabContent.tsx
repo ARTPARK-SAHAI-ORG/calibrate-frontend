@@ -721,12 +721,12 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
-          // Running a comparison again reopens the model picker filled in
-          // with what this one ran, so models can be changed or removed
-          // first. Going through openCompare also puts the rerun behind the
-          // same checks a comparison started from the Tests tab passes.
+          // The window stays open until a comparison actually exists, the
+          // way Compare on the ticked rows above does it: onComparisonCreated
+          // closes it. Closing here threw away the comparison the reader was
+          // reading the moment they clicked, so backing out of the picker,
+          // or having it refused, left them on a bare list.
           onRerun={({ models, testUuids, testNames, parallelModels }) => {
-            closeBenchmarkRun();
             void openCompare(
               testUuids.map((uuid, index) => ({
                 uuid,

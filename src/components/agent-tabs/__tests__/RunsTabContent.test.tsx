@@ -563,6 +563,30 @@ describe("RunsTabContent", () => {
       false,
       { models: ["gpt-4", "claude"], parallelModels: false },
     );
+  });
+
+  it("keeps the comparison on screen until a new one actually exists", async () => {
+    state.runs = [benchmarkRun];
+    const user = setupUser();
+    renderTab();
+    await user.click((await screen.findAllByText("Complete"))[0]);
+    await screen.findByTestId("benchmark-results");
+
+    await act(async () => {
+      benchmarkResultsProps.onRerun({
+        models: ["gpt-4"],
+        testUuids: ["t1"],
+        testNames: ["A"],
+      });
+    });
+
+    // Backing out of the picker, or having it refused, must leave the reader
+    // where they were. The window closes when a comparison is created.
+    expect(screen.getByTestId("benchmark-results")).toBeInTheDocument();
+
+    await act(async () => {
+      launcherOptions!.onComparisonCreated!();
+    });
     expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
   });
 
