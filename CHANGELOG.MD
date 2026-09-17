@@ -1,5 +1,6 @@
 ## September 2026
 
+- When comparing models you can now choose to run them one after another instead of all at the same time ([#581](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/581))
 - Once a model passes its connection check in a comparison, calibrate does not ask to verify it again for the rest of the session ([#579](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/579))
 - Inside a finished test run or model comparison, you can now tick specific tests and run or compare just those, right from the same window ([#575](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/575))
 - The Compare models dialog now shows how many tests will run before you start a benchmark ([#577](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/577))
