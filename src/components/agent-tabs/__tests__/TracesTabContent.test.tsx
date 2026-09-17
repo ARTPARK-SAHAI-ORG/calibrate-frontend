@@ -381,7 +381,7 @@ describe("TracesTabContent", () => {
     // The setup steps are gone at this point, so this is the only way back to
     // the request: no selection needed.
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "View code" }));
+    await user.click(screen.getByRole("button", { name: "Integration Guide" }));
 
     expect(
       screen.getByRole("heading", { name: "Send your first trace" }),
@@ -395,7 +395,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} agentNature="general" />);
 
-    await user.click(screen.getByRole("button", { name: "View code" }));
+    await user.click(screen.getByRole("button", { name: "Integration Guide" }));
 
     const snippet = document.querySelector("pre")?.textContent ?? "";
     expect(snippet).toContain('"input": "When is the next vaccination?"');
@@ -987,7 +987,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
     expect(screen.queryByText("1 trace")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "View code" }),
+      screen.queryByRole("button", { name: "Integration Guide" }),
     ).not.toBeInTheDocument();
   });
 

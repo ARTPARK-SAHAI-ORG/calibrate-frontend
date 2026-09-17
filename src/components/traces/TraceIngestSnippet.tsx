@@ -201,6 +201,7 @@ export function TraceIngestSnippet({
         <FieldList optional={false} agentNature={agentNature} />
         <div className="space-y-2">
           <p className="text-xs font-medium text-foreground">Optional</p>
+          <FieldList optional agentNature={agentNature} />
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <button
               type="button"
@@ -221,7 +222,6 @@ export function TraceIngestSnippet({
               Include optional fields in snippet
             </span>
           </label>
-          <FieldList optional agentNature={agentNature} />
         </div>
       </div>
     </div>
