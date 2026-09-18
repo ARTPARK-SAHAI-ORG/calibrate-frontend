@@ -12,6 +12,7 @@ import {
   type OrganizationApiKey,
   type OrganizationApiKeyWithSecret,
   type OrganizationMember,
+  type OrganizationSettings,
   getRememberedOrgUuid,
   notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
@@ -39,7 +40,7 @@ type UseOrganizationsReturn = {
 /** What can be changed about a workspace. */
 export type OrganizationChanges = {
   name?: string;
-  benchmark_parallel_models?: boolean;
+  settings?: OrganizationSettings;
 };
 
 /**

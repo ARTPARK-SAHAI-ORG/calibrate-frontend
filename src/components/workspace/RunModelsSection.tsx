@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAccessToken, useOrganizations } from "@/hooks";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
-import type { Organization } from "@/lib/orgs";
+import { workspaceRunModelsInParallel, type Organization } from "@/lib/orgs";
 import { RunModelsChoice } from "./RunModelsChoice";
 
 /**
@@ -23,7 +23,7 @@ export function RunModelsSection({ org }: { org: Organization }) {
   // one behind this section only catches up after it has been read again.
   // Reading straight off it would snap the rows back to the old choice for as
   // long as that takes, which reads as the save having failed.
-  const [value, setValue] = useState(org.benchmark_parallel_models ?? true);
+  const [value, setValue] = useState(workspaceRunModelsInParallel(org) ?? true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +33,9 @@ export function RunModelsSection({ org }: { org: Organization }) {
     setIsSaving(true);
     setValue(next);
     try {
-      await updateOrganization(org.uuid, { benchmark_parallel_models: next });
+      await updateOrganization(org.uuid, {
+        settings: { model_benchmarking: { run_models_in_parallel: next } },
+      });
       toast.success("Saved how the models run in a comparison");
     } catch (err) {
       // Never leave the screen claiming a choice that did not save.

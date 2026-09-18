@@ -8,6 +8,7 @@ import {
   setActiveOrgUuid,
   clearActiveOrgUuid,
   pickDefaultOrg,
+  workspaceRunModelsInParallel,
   type Organization,
 } from "@/lib/orgs";
 
@@ -129,11 +130,9 @@ describe("getRememberedOrgUuid", () => {
   });
 
   it("returns null when localStorage throws", () => {
-    jest
-      .spyOn(window.localStorage.__proto__, "getItem")
-      .mockImplementation(() => {
-        throw new Error("blocked");
-      });
+    jest.spyOn(window.localStorage.__proto__, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
     expect(getRememberedOrgUuid()).toBeNull();
   });
 
@@ -230,5 +229,39 @@ describe("pickDefaultOrg", () => {
     const a = org({ uuid: "a" });
     const b = org({ uuid: "b" });
     expect(pickDefaultOrg([a, b])).toBe(a);
+  });
+});
+
+describe("workspaceRunModelsInParallel", () => {
+  it("reads the saved choice", () => {
+    expect(
+      workspaceRunModelsInParallel(
+        org({
+          settings: { model_benchmarking: { run_models_in_parallel: true } },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a saved one after another rather than reading it as not known", () => {
+    expect(
+      workspaceRunModelsInParallel(
+        org({
+          settings: { model_benchmarking: { run_models_in_parallel: false } },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is not known on a backend that carries no settings at all", () => {
+    expect(workspaceRunModelsInParallel(org())).toBeUndefined();
+  });
+
+  it("is not known when the settings carry no model comparison section", () => {
+    expect(workspaceRunModelsInParallel(org({ settings: {} }))).toBeUndefined();
+  });
+
+  it("is not known when there is no workspace yet", () => {
+    expect(workspaceRunModelsInParallel(undefined)).toBeUndefined();
   });
 });

@@ -61,20 +61,45 @@ export function isWorkspaceFreePath(path: string): boolean {
 
 export type OrganizationRole = "owner" | "admin";
 
+/**
+ * Everything a workspace carries beyond its name, in named sections. The
+ * backend always sends this filled in with its own defaults. Every part of it
+ * is optional here because a backend that does not carry these settings yet
+ * sends nothing at all, which reads as "not known".
+ *
+ * A `PATCH /organizations/{uuid}` is merged two levels deep, so sending one
+ * setting never clears another.
+ */
+export type OrganizationSettings = {
+  model_benchmarking?: {
+    /** How this workspace runs the models in a comparison by default: true
+     *  runs them at the same time, false one after another. It applies to
+     *  agents you connect, whose own server answers each call. */
+    run_models_in_parallel?: boolean;
+  };
+};
+
 export type Organization = {
   uuid: string;
   name: string;
   is_personal: boolean;
-  /** How this workspace runs the models in a comparison by default: true runs
-   *  them at the same time, false one after another. It applies to agents you
-   *  connect, whose own server answers each call. Absent from a backend that
-   *  does not carry the setting yet, which reads as "run them together". */
-  benchmark_parallel_models?: boolean;
+  settings?: OrganizationSettings;
   created_by_user_id: string;
   member_role: OrganizationRole;
   created_at: string;
   updated_at: string;
 };
+
+/**
+ * Whether this workspace runs the models in a comparison at the same time.
+ * Undefined when the workspace is not known yet, or when it came from a
+ * backend that does not carry the setting: both read as "run them together".
+ */
+export function workspaceRunModelsInParallel(
+  org: Organization | undefined,
+): boolean | undefined {
+  return org?.settings?.model_benchmarking?.run_models_in_parallel;
+}
 
 export type OrganizationMember = {
   user_id: string;

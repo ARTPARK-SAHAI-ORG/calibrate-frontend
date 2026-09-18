@@ -300,19 +300,18 @@ describe("useOrganizations hooks", () => {
       const { result } = renderHook(() => useOrganizations("tok"));
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-      const changed = { ...org1, benchmark_parallel_models: false };
+      const settings = { model_benchmarking: { run_models_in_parallel: false } };
+      const changed = { ...org1, settings };
       mockApiClient.mockResolvedValueOnce(changed);
       await act(async () => {
-        await result.current.updateOrganization("org-1", {
-          benchmark_parallel_models: false,
-        });
+        await result.current.updateOrganization("org-1", { settings });
       });
 
       // The name must not travel with it: sending one thing cannot overwrite
       // another.
       expect(mockApiClient).toHaveBeenCalledWith("/organizations/org-1", "tok", {
         method: "PATCH",
-        body: { benchmark_parallel_models: false },
+        body: { settings },
       });
       expect(result.current.organizations).toEqual([changed, org2]);
     });

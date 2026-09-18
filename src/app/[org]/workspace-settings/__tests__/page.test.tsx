@@ -52,6 +52,11 @@ jest.mock("../../../../hooks", () => ({
   seedOrgsCache: jest.fn(),
 }));
 
+/** A workspace saved as running the models one after another. */
+const RUNS_ONE_AFTER_ANOTHER: Partial<Organization> = {
+  settings: { model_benchmarking: { run_models_in_parallel: false } },
+};
+
 function makeOrg(overrides: Partial<Organization> = {}): Organization {
   return {
     uuid: "org-1",
@@ -103,7 +108,7 @@ it("has a Settings tab that opens from a click", async () => {
 });
 
 it("shows the workspace's saved choice", () => {
-  mockOrganizations = [makeOrg({ benchmark_parallel_models: false })];
+  mockOrganizations = [makeOrg(RUNS_ONE_AFTER_ANOTHER)];
   openSettingsTab();
 
   expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
@@ -111,16 +116,14 @@ it("shows the workspace's saved choice", () => {
 
 it("saves one after another and says so", async () => {
   const user = setupUser();
-  updateOrganizationMock.mockResolvedValue(
-    makeOrg({ benchmark_parallel_models: false }),
-  );
+  updateOrganizationMock.mockResolvedValue(makeOrg(RUNS_ONE_AFTER_ANOTHER));
   openSettingsTab();
 
   await user.click(screen.getByRole("radio", { name: "Sequential" }));
 
   await waitFor(() =>
     expect(updateOrganizationMock).toHaveBeenCalledWith("org-1", {
-      benchmark_parallel_models: false,
+      settings: { model_benchmarking: { run_models_in_parallel: false } },
     }),
   );
   await waitFor(() =>
@@ -132,9 +135,7 @@ it("saves one after another and says so", async () => {
 
 it("keeps the saved choice on screen while the workspace catches up", async () => {
   const user = setupUser();
-  updateOrganizationMock.mockResolvedValue(
-    makeOrg({ benchmark_parallel_models: false }),
-  );
+  updateOrganizationMock.mockResolvedValue(makeOrg(RUNS_ONE_AFTER_ANOTHER));
   openSettingsTab();
 
   await user.click(screen.getByRole("radio", { name: "Sequential" }));
@@ -170,7 +171,7 @@ it("keeps the choice disabled until the save answers", async () => {
   // The row the user clicked is the one shown while it is being saved.
   expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
 
-  finishSave(makeOrg({ benchmark_parallel_models: false }));
+  finishSave(makeOrg(RUNS_ONE_AFTER_ANOTHER));
   await waitFor(() =>
     expect(screen.getByRole("radio", { name: "Sequential" })).toBeEnabled(),
   );

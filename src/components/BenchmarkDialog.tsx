@@ -13,6 +13,7 @@ import {
   useActiveOrgUuid,
   useOrganizations,
 } from "@/hooks";
+import { workspaceRunModelsInParallel } from "@/lib/orgs";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
 import { getDefaultHeaders } from "@/lib/api";
@@ -117,9 +118,9 @@ export function BenchmarkDialog({
     useOrganizations(backendAccessToken);
   // Undefined until the workspaces have been read, so it can be told apart
   // from someone actually choosing to run the models together.
-  const workspaceDefault = organizations.find(
-    (org) => org.uuid === activeOrgUuid,
-  )?.benchmark_parallel_models;
+  const workspaceDefault = workspaceRunModelsInParallel(
+    organizations.find((org) => org.uuid === activeOrgUuid),
+  );
 
   // What a comparison ran before wins; otherwise the workspace default; and
   // with neither, the models run at the same time, which is what a comparison
@@ -288,7 +289,9 @@ export function BenchmarkDialog({
     if (!saveAsWorkspaceDefault || !activeOrgUuid) return;
     if (runModelsTogether === workspaceDefault) return;
     updateOrganization(activeOrgUuid, {
-      benchmark_parallel_models: runModelsTogether,
+      settings: {
+        model_benchmarking: { run_models_in_parallel: runModelsTogether },
+      },
     }).catch((err) => {
       reportError("Error saving the workspace model run order:", err);
       toast.error("The workspace default was not saved.");

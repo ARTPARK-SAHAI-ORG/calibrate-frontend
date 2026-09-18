@@ -22,7 +22,11 @@ jest.mock("../../hooks", () => ({
     organizations: [
       {
         uuid: "org-1",
-        benchmark_parallel_models: mockUseBenchmarkParallelDefault(),
+        settings: {
+          model_benchmarking: {
+            run_models_in_parallel: mockUseBenchmarkParallelDefault(),
+          },
+        },
       },
     ],
     updateOrganization: mockUpdateOrganization,
@@ -1357,7 +1361,7 @@ describe("BenchmarkDialog", () => {
 
       await waitFor(() =>
         expect(mockUpdateOrganization).toHaveBeenCalledWith("org-1", {
-          benchmark_parallel_models: false,
+          settings: { model_benchmarking: { run_models_in_parallel: false } },
         }),
       );
     });
