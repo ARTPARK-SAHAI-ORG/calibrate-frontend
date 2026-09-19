@@ -34,15 +34,31 @@ export type AgentRun = {
    */
   evaluators?:
     (string | { uuid?: string | null; name?: string | null })[] | null;
+  /**
+   * One entry per test, name and verdict only: the heavy per-case detail
+   * lives on the run-detail endpoints. A verdict of null on a run that has
+   * ended means that test never ran, which the run's own counts do not say.
+   */
+  results?: { name?: string | null; passed?: boolean | null }[] | null;
   model_results?:
     | {
         model: string;
         /**
-         * How many tests this model was tried on. The runs list carries this
-         * count but not the per-case `test_results` behind it, which only the
-         * run-detail endpoints return.
+         * How many tests this model was tried on, and how many it passed. The
+         * runs list carries these counts but not the per-case `test_results`
+         * behind them, which only the run-detail endpoints return.
          */
         total_tests?: number | null;
+        passed?: number | null;
+        /**
+         * Worked out as `total - passed` for a model that finished, so it
+         * holds the tests that produced no answer too; `unanswered_tests`
+         * takes them back out.
+         */
+        failed?: number | null;
+        unanswered_tests?: number | null;
+        /** False when this model's run could not be carried out at all. */
+        success?: boolean | null;
         test_results?: unknown[];
       }[]
     | null;

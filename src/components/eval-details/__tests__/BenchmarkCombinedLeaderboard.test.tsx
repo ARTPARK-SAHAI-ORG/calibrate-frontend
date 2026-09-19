@@ -250,6 +250,116 @@ describe("tests that could not be run", () => {
   });
 });
 
+describe("a comparison where no model answered anything", () => {
+  const nothingRan = (
+    <BenchmarkCombinedLeaderboard
+      leaderboardSummary={[
+        { model: "a", passed: "0", total: "0", pass_rate: "0" },
+        { model: "b", passed: "0", total: "0", pass_rate: "0" },
+      ]}
+      modelResults={[
+        {
+          model: "a",
+          total_tests: 2,
+          test_results: [
+            { passed: false, unanswered: true },
+            { passed: false, unanswered: true },
+          ],
+        },
+        {
+          model: "b",
+          total_tests: 2,
+          test_results: [
+            { passed: false, unanswered: true },
+            { passed: false, unanswered: true },
+          ],
+        },
+      ]}
+      filename="x"
+    />
+  );
+
+  it("shows the note on its own, with no table of zeroes and no empty chart", () => {
+    render(nothingRan);
+    expect(
+      screen.getByText(/None of the tests could be run\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Download CSV/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Nothing says why the rows carry no verdict: the run was not stopped, it
+  // did not break, and no test is marked as one that could not be run. Hiding
+  // the table would leave the tab blank with nothing to read.
+  it("keeps the table when no note says why there is nothing to show", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", passed: "0", total: "2", pass_rate: "0" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: null }, { passed: null }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("a comparison where every model could not be run", () => {
+  it("says so and points at the tests, instead of a bare no-data line", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", success: false, total_tests: 2, test_results: [] },
+          { model: "b", success: false, total_tests: 2, test_results: [] },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/None of the models could be run\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Tests tab")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("counts the models that could not be run when only some could not", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", success: false, total_tests: 2, test_results: [] },
+          {
+            model: "b",
+            success: true,
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/1 of 2 models could not be run\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("a run that gave up before it started every test", () => {
   const unansweredRun = (props: {
     stoppedEarly?: boolean;
@@ -287,7 +397,7 @@ describe("a run that gave up before it started every test", () => {
 });
 
 describe("a run someone stopped", () => {
-  it("says how far the run got, in the same amber note the run window uses", () => {
+  it("says the run was stopped, and points at the tests that did run", () => {
     render(
       <BenchmarkCombinedLeaderboard
         modelResults={[
@@ -306,7 +416,44 @@ describe("a run someone stopped", () => {
       />,
     );
     expect(
-      screen.getByText(/This run was stopped after 2 of 6 tests ran/),
+      screen.getByText(/This run was stopped before it finished\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The tests that did run are in the/),
+    ).toBeInTheDocument();
+  });
+
+  // Every test is run once per model, so adding the models up would say 30
+  // tests for a comparison of 10 tests across three models, while the run's
+  // own Tests column says 10.
+  it("counts no tests, so it cannot count one test once per model", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 10,
+            test_results: [{ passed: true }, { passed: false }],
+          },
+          {
+            model: "b",
+            total_tests: 10,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+          {
+            model: "c",
+            total_tests: 10,
+            test_results: [{ passed: true }],
+          },
+        ]}
+        filename="x"
+        runStopped
+      />,
+    );
+    expect(screen.queryByText(/of 30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/5 of/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/This run was stopped before it finished\./),
     ).toBeInTheDocument();
   });
 
@@ -336,8 +483,58 @@ describe("a run someone stopped", () => {
       />,
     );
     expect(
-      screen.getByText("This run was stopped before any test ran"),
+      screen.getByText("This run was stopped before any test ran."),
     ).toBeInTheDocument();
+  });
+
+  it("shows why the run broke as well as the fact it was stopped", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", total_tests: 2, test_results: [{ passed: null }] },
+        ]}
+        filename="x"
+        runStopped
+        failureReason="calibrate-agent process killed by signal 15"
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped before any test ran\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByText("calibrate-agent process killed by signal 15"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("a comparison where nothing could be run", () => {
+  it("says so even though the run itself did not break", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [
+              { passed: false, unanswered: true },
+              { passed: false, unanswered: true },
+            ],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/None of the tests could be run\./),
+    ).toBeInTheDocument();
+    // The note already says why there is nothing to show, so the bare line
+    // would only repeat it back with less to go on.
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -428,8 +625,8 @@ describe("a run that failed after finishing some tests", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("boom")).toBeInTheDocument();
     expect(
-      screen.getByText("No leaderboard data available"),
-    ).toBeInTheDocument();
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
   });
 
   it("gives no count when the models got different distances", () => {
@@ -487,5 +684,46 @@ describe("a run that failed before any model produced a row", () => {
     // Nothing ran, so there is no Tests tab worth pointing at.
     expect(screen.queryByText(/Review the tests/)).not.toBeInTheDocument();
     expect(screen.getByText("ValueError: boom")).toBeInTheDocument();
+  });
+});
+
+describe("a finished comparison that left a test with no verdict", () => {
+  it("says so above the table, the same way the mark by the name does", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        runOver
+      />,
+    );
+    expect(
+      screen.getByText(/tests could not be run and were ignored/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing while the run is still going", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.queryByText(/tests could not be run and were ignored/),
+    ).not.toBeInTheDocument();
   });
 });

@@ -436,6 +436,42 @@ describe("tests that could not be run", () => {
     expect(screen.getByText("Tests tab")).toBeInTheDocument();
   });
 
+  it("counts the tests the run ended without a verdict for", () => {
+    // Three tests, one of which the run never got a verdict for: the pass rate
+    // is 1 of 2, and the note has to say the third could not be run rather
+    // than leaving it unexplained.
+    render(<TestRunSummary passed={1} total={2} notRun={1} />);
+    expect(
+      screen.getByText(
+        /1 of 3 tests could not be run and were ignored for calculating the metrics/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("counts tests with no answer and tests that never ran together", () => {
+    render(<TestRunSummary passed={4} total={5} unanswered={2} notRun={3} />);
+    expect(
+      screen.getByText(
+        /5 of 10 tests could not be run and were ignored for calculating the metrics/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not count tests that never ran as tests the stopped run got through", () => {
+    render(
+      <TestRunSummary
+        passed={1}
+        total={2}
+        notRun={3}
+        stopped
+        runTotalTests={5}
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped after 2 of 5 tests ran\./),
+    ).toBeInTheDocument();
+  });
+
   it("says when the run gave up before starting every test", () => {
     render(<TestRunSummary passed={9} total={10} stoppedEarly />);
     expect(
@@ -446,8 +482,19 @@ describe("tests that could not be run", () => {
   it("says how many of the run's tests ran when it was stopped", () => {
     render(<TestRunSummary passed={4} total={5} stopped runTotalTests={12} />);
     expect(
-      screen.getByText("This run was stopped after 5 of 12 tests ran"),
+      screen.getByText("This run was stopped after 5 of 12 tests ran."),
     ).toBeInTheDocument();
+  });
+
+  it("ends the stopped sentence even when nothing follows it", () => {
+    // With no test left unanswered there is no second sentence to carry the
+    // full stop, and the note used to stop dead.
+    const { container } = render(
+      <TestRunSummary passed={3} total={3} stopped runTotalTests={10} />,
+    );
+    expect(container.textContent).toContain(
+      "This run was stopped after 3 of 10 tests ran.",
+    );
   });
 
   it("counts the tests that gave no answer among the ones that ran", () => {
@@ -468,14 +515,14 @@ describe("tests that could not be run", () => {
   it("says nothing ran when the run was stopped straight away", () => {
     render(<TestRunSummary passed={0} total={0} stopped runTotalTests={12} />);
     expect(
-      screen.getByText("This run was stopped before any test ran"),
+      screen.getByText("This run was stopped before any test ran."),
     ).toBeInTheDocument();
   });
 
   it("just says the run was stopped when it does not carry its own size", () => {
     render(<TestRunSummary passed={4} total={5} stopped />);
     expect(
-      screen.getByText("This run was stopped before it finished"),
+      screen.getByText("This run was stopped before it finished."),
     ).toBeInTheDocument();
   });
 
@@ -484,7 +531,7 @@ describe("tests that could not be run", () => {
     // both reads as two separate things having gone wrong.
     render(<TestRunSummary passed={4} total={5} stopped stoppedEarly />);
     expect(
-      screen.getByText("This run was stopped before it finished"),
+      screen.getByText("This run was stopped before it finished."),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(

@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
+import { STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
   benchmarkAnsweredPassFail,
@@ -24,9 +24,21 @@ import {
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { displayModelName } from "@/lib/modelName";
 
+/**
+ * A model as this table reads it: the shared shape, plus whether the run could
+ * be carried out for it at all. A model that could not be run has no rows, so
+ * nothing counted off its rows says anything about it.
+ */
+type LeaderboardModel = BenchmarkModelLike & { success?: boolean | null };
+
+/** How many of the models could not be run at all. */
+function couldNotRunCount(modelResults: LeaderboardModel[]): number {
+  return modelResults.filter((m) => m.success === false).length;
+}
+
 type BenchmarkCombinedLeaderboardProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
-  modelResults: BenchmarkModelLike[];
+  modelResults: LeaderboardModel[];
   /** Table/chart labels for `model`; defaults to the model without its company. */
   formatModelName?: (model: string) => string;
   filename: string;
@@ -41,6 +53,8 @@ type BenchmarkCombinedLeaderboardProps = {
   stoppedEarly?: boolean;
   /** Why the run failed after finishing some tests. */
   failureReason?: string | null;
+  /** True once the run has ended, whichever way it ended. */
+  runOver?: boolean;
 };
 
 /**
@@ -54,19 +68,23 @@ function UnansweredNote({
   onReviewUnanswered,
   stoppedEarly = false,
   failureReason = null,
+  runOver = false,
 }: {
-  modelResults: BenchmarkModelLike[];
+  modelResults: LeaderboardModel[];
   onReviewUnanswered?: () => void;
   stoppedEarly?: boolean;
   failureReason?: string | null;
+  /** True once the run has ended: a row with no verdict then never ran. */
+  runOver?: boolean;
 }) {
   const perModel = modelResults
-    .map((m) => benchmarkAnsweredPassFail(m))
+    .map((m) => benchmarkAnsweredPassFail(m, runOver))
     .filter((c) => c !== null);
   const failed = failureReason !== null;
-  if (perModel.length === 0 && !failed) return null;
+  const couldNotRun = couldNotRunCount(modelResults);
+  if (perModel.length === 0 && !failed && couldNotRun === 0) return null;
   const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
-  if (totalUnanswered === 0 && !failed) return null;
+  if (totalUnanswered === 0 && !failed && couldNotRun === 0) return null;
 
   const tab = onReviewUnanswered ? (
     <button
@@ -115,19 +133,22 @@ function UnansweredNote({
     />
   ) : null;
   // A broken run still says how many tests could not be run, under the box.
-  if (failed && totalUnanswered === 0) return failureBox;
-
-  const { unanswered, answered } = perModel[0];
+  if (failed && totalUnanswered === 0 && couldNotRun === 0) return failureBox;
 
   return (
     <>
       {failureBox}
       <RunNote>
-        {!sameForEveryModel
-          ? "Some tests could not be run and were ignored for calculating the metrics. "
-          : answered === 0
-            ? "None of the tests could be run. "
-            : `${unanswered} of ${unanswered + answered} tests could not be run and were ignored for calculating the metrics. `}
+        {couldNotRun > 0 &&
+          (couldNotRun === modelResults.length
+            ? "None of the models could be run. "
+            : `${couldNotRun} of ${modelResults.length} models could not be run. `)}
+        {totalUnanswered > 0 &&
+          (!sameForEveryModel
+            ? "Some tests could not be run and were ignored for calculating the metrics. "
+            : perModel[0].answered === 0
+              ? "None of the tests could be run. "
+              : `${perModel[0].unanswered} of ${perModel[0].unanswered + perModel[0].answered} tests could not be run and were ignored for calculating the metrics. `)}
         {stoppedEarly && STOPPED_EARLY_SENTENCE}
         Review the tests that could not be run in the {tab}.
       </RunNote>
@@ -136,23 +157,25 @@ function UnansweredNote({
 }
 
 /**
- * The note above the table when someone stopped the run. Says how far it got,
- * counted across every model, the same way the run window's summary says it.
+ * The note above the table when someone stopped the run. It gives no counts:
+ * every test is run once per model, so adding the models up would report 30
+ * tests for a comparison of 10 tests across three models, while the run's own
+ * Tests column says 10.
  */
 function StoppedNote({
   modelResults,
   onReviewUnanswered,
 }: {
-  modelResults: BenchmarkModelLike[];
+  modelResults: LeaderboardModel[];
   onReviewUnanswered?: () => void;
 }) {
-  let ran = 0;
-  let total = 0;
-  for (const model of modelResults) {
+  // Only the tests the run actually tried: one it answered, or one it tried
+  // and got no answer from. A row it never reached does not count as a test
+  // that ran, which is the whole point of this sentence.
+  const ranAnyTest = modelResults.some((model) => {
     const counts = benchmarkAnsweredPassFail(model);
-    if (counts) ran += counts.answered + counts.unanswered;
-    total += model.total_tests ?? model.test_results?.length ?? 0;
-  }
+    return !!counts && counts.answered + counts.unanswered > 0;
+  });
 
   const tab = onReviewUnanswered ? (
     <button
@@ -166,12 +189,16 @@ function StoppedNote({
     <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
   );
 
-  // The same sentence the run window's summary says, counted across every
-  // model rather than over one run's tests.
   return (
     <RunNote>
-      {stoppedRunSentence(ran, total)}
-      {ran > 0 ? <>. The tests that did run are in the {tab}.</> : null}
+      {ranAnyTest ? (
+        <>
+          This run was stopped before it finished. The tests that did run are in
+          the {tab}.
+        </>
+      ) : (
+        "This run was stopped before any test ran."
+      )}
     </RunNote>
   );
 }
@@ -302,6 +329,7 @@ export function BenchmarkCombinedLeaderboard({
   runStopped = false,
   stoppedEarly = false,
   failureReason = null,
+  runOver = false,
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -323,34 +351,55 @@ export function BenchmarkCombinedLeaderboard({
     [payload, formatModelName, benchmarkScoreLabel],
   );
 
+  // What the notes above already say. Worked out once, because it decides two
+  // things: whether the bare "no data" line is the only thing left to show,
+  // and whether the table can be left out.
+  const counted = modelResults.map((m) => benchmarkAnsweredPassFail(m, runOver));
+  const noteExplainsIt =
+    runStopped ||
+    failureReason !== null ||
+    couldNotRunCount(modelResults) > 0 ||
+    counted.some((c) => (c?.unanswered ?? 0) > 0);
+
+  // No table to draw, so the notes are the whole story. A run can have been
+  // stopped and have broken, so both are said, and the note about the tests
+  // that could not be run is said whenever it applies.
   if (!payload || payload.rows.length === 0) {
-    if (runStopped) {
-      return (
-        <div className={className}>
-          <StoppedNote
-            modelResults={modelResults}
-            onReviewUnanswered={onReviewUnanswered}
-          />
-        </div>
-      );
-    }
     return (
       <div className={className}>
-        {failureReason !== null && (
+        <div className="space-y-4">
+          {runStopped && (
+            <StoppedNote
+              modelResults={modelResults}
+              onReviewUnanswered={onReviewUnanswered}
+            />
+          )}
           <UnansweredNote
             modelResults={modelResults}
             onReviewUnanswered={onReviewUnanswered}
+            stoppedEarly={stoppedEarly && !runStopped}
             failureReason={failureReason}
+            runOver={runOver}
           />
-        )}
-        <div className="text-center py-12">
-          <p className="text-sm text-muted-foreground">
-            No leaderboard data available
-          </p>
         </div>
+        {!noteExplainsIt && (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">
+              No leaderboard data available
+            </p>
+          </div>
+        )}
       </div>
     );
   }
+
+  // No model answered a single test, so the table would be rows of zeroes and
+  // the chart a blank box. Left out only when a note above says why there is
+  // nothing to show, since otherwise the tab would be empty.
+  const hideTable =
+    counted.length > 0 &&
+    counted.every((c) => c !== null && c.answered === 0) &&
+    noteExplainsIt;
 
   return (
     <div className="space-y-4">
@@ -365,16 +414,19 @@ export function BenchmarkCombinedLeaderboard({
         onReviewUnanswered={onReviewUnanswered}
         stoppedEarly={stoppedEarly && !runStopped}
         failureReason={failureReason}
+        runOver={runOver}
       />
-      <LeaderboardTab
-        className={className}
-        columns={columns}
-        data={payload.rows}
-        charts={payload.chartRows}
-        filename={filename}
-        getLabel={(key) => formatModelName(key)}
-        nameKey="model"
-      />
+      {hideTable ? null : (
+        <LeaderboardTab
+          className={className}
+          columns={columns}
+          data={payload.rows}
+          charts={payload.chartRows}
+          filename={filename}
+          getLabel={(key) => formatModelName(key)}
+          nameKey="model"
+        />
+      )}
     </div>
   );
 }

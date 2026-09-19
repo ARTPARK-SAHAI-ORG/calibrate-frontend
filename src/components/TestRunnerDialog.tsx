@@ -1,9 +1,9 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import {
-  isNotRun,
   isRunStopped,
   isUnanswered,
+  rowVerdict,
   runStateOf,
   stoppedRunSentence,
 } from "@/lib/testTypes";
@@ -108,19 +108,16 @@ const LABELLABLE_TEST_TYPES = new Set(["response", "general", "tool_call"]);
 /** Turn a run's cases into the rows the window works from. The same rule for
  * the run read without each case's detail and for the full read Export and
  * Submit for labelling ask for, so the two can never disagree. */
-function toRows(results: TestCaseResult[], runStopped: boolean): Row[] {
+function toRows(
+  results: TestCaseResult[],
+  runStopped: boolean,
+  runOver: boolean,
+): Row[] {
   return results.map((r, i): Row => {
-    // A missing verdict means the test has not finished — unless the run was
-    // stopped, in which case it never started and nothing more is coming. A
-    // test that produced no answer says so itself and comes back with
-    // `passed: false`.
-    const status: Row["status"] = isNotRun(r, runStopped)
-      ? "not_run"
-      : r.passed === null || r.passed === undefined
-        ? "running"
-        : r.passed === true
-          ? "passed"
-          : "failed";
+    // One shared rule reads the row. A missing verdict means the test has not
+    // finished only while the run is still going: once the run has ended,
+    // whichever way, the test never ran.
+    const status: Row["status"] = rowVerdict(r, runStopped, runOver);
     return {
       id: rowTestUuid(r) ?? `idx-${i}`,
       testUuid: rowTestUuid(r) ?? undefined,
@@ -376,9 +373,18 @@ export function TestRunnerDialog({
       return "queued";
     }, [run]);
 
+  // Someone stopped this run before it finished. The tests already answered
+  // are kept; the rest were never started.
+  const wasStopped = run ? isRunStopped(run) : false;
+  // The run is finished either way; a failed one still has rows to read.
+  const isFinished = runStatus === "done" || runStatus === "failed";
+  // The run has ended, however it ended: it finished, it broke, or someone
+  // stopped it. Nothing more is coming for a test that has no verdict yet.
+  const runOver = isFinished || wasStopped;
+
   const rows: Row[] = useMemo(
-    () => toRows(run?.results ?? [], run ? isRunStopped(run) : false),
-    [run],
+    () => toRows(run?.results ?? [], wasStopped, runOver),
+    [run, wasStopped, runOver],
   );
   const selectedTestUuid =
     selectedIndex === null ? null : (rows[selectedIndex]?.id ?? null);
@@ -421,10 +427,16 @@ export function TestRunnerDialog({
   // How many produced no answer, and whether the run gave up before starting
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
+  // Every test the run has no answer for: the ones it says produced none, and
+  // the rows it ended without a verdict for. The rows are the fuller reading,
+  // and a run from before the backend flagged an unanswered test reports it in
+  // its own count and again as a row with no verdict, so take the larger of
+  // the two rather than adding them and counting it twice.
+  const notRunRows = rows.filter(
+    (r) => r.unanswered || r.status === "not_run",
+  ).length;
+  const couldNotRunCount = Math.max(unansweredCount, notRunRows);
   const stoppedEarly = run?.stopped_early === true;
-  // Someone stopped this run before it finished. The tests already answered
-  // are kept; the rest were never started.
-  const wasStopped = run ? isRunStopped(run) : false;
   // Tool-call pass/fail split for the Results tab's dedicated card. Keyed off
   // the kind of test the row itself reports.
   const toolCall = toolCallPassFail(
@@ -440,8 +452,6 @@ export function TestRunnerDialog({
   // The row checkboxes exist only to feed the "Submit for labelling" button,
   // so they appear exactly when it does — never on a run with nothing that
   // can be labelled.
-  // The run is finished either way; a failed one still has rows to read.
-  const isFinished = runStatus === "done" || runStatus === "failed";
   const showLabelling =
     isFinished && rows.length > 0 && hasLabellingEligibleTests;
   // The ticked tests, for the Run / Compare strip. A legacy row with no test
@@ -602,8 +612,8 @@ export function TestRunnerDialog({
   // The same rows again, from the full read. Empty until Export or Submit for
   // labelling has asked for it.
   const fullRows = useMemo(
-    () => toRows(fullResults ?? [], run ? isRunStopped(run) : false),
-    [fullResults, run],
+    () => toRows(fullResults ?? [], wasStopped, runOver),
+    [fullResults, wasStopped, runOver],
   );
 
   // Stop a run that is still going, then read it back, since the stop itself
@@ -653,6 +663,12 @@ export function TestRunnerDialog({
     }
   };
 
+  // The run broke: it either says so outright or left an error behind. The
+  // shared pages read the same two signals, so a run cannot look broken on one
+  // screen and finished on another. Older runs carry `error: true` or `false`,
+  // which `runErrorText` gives no words for.
+  const runFailed = !!run && (run.status === "failed" || Boolean(run.error));
+
   // Show the error card only when the failed run left NO rows at all. When it
   // has rows, every one of them carries its own reason, and the summary is
   // where the reader learns the run stopped early — an error card would hide
@@ -660,7 +676,7 @@ export function TestRunnerDialog({
   // Either the run failed and left nothing to read, or it never arrived at
   // all. Both leave the reader with no rows, so both get the error card.
   const isOverallError =
-    (runStatus === "failed" && rows.length === 0) || (loadFailed && !run);
+    (runFailed && rows.length === 0) || (loadFailed && !run);
 
   // Nothing is written at the top of the window until the run itself is here:
   // an unloaded run would show the automatic name, which is not necessarily
@@ -691,7 +707,19 @@ export function TestRunnerDialog({
                 {run &&
                   !isLoading &&
                   (() => {
-                    const state = runStateOf(run);
+                    const state = runStateOf({
+                      status: runFailed ? "failed" : run.status,
+                      aborted: run.aborted,
+                      stopped_early: run.stopped_early,
+                      // The rows the window is sitting above, not just the
+                      // run's own count, so the mark cannot say every test
+                      // ran while a row below reads "Not run".
+                      unanswered_tests: couldNotRunCount,
+                      // The total the count is read against: without it, one
+                      // test that could not be run would read as none of them
+                      // having run.
+                      total_tests: run.total_tests ?? rows.length,
+                    });
                     return state ? <RunStateMark state={state} /> : null;
                   })()}
                 {runHasArrived && (
@@ -763,7 +791,7 @@ export function TestRunnerDialog({
                       return { columns: [], rows: [] };
                     }
                     return buildTestRunCsv(
-                      toRows(results, wasStopped).map((r) => ({
+                      toRows(results, wasStopped, runOver).map((r) => ({
                         name: r.name,
                         status: r.unanswered ? "error" : r.status,
                         output: r.output,
@@ -834,7 +862,9 @@ export function TestRunnerDialog({
                 />
               </div>
             )}
-            {!isFinished && !isLoading && (
+            {/* Once the run has been stopped there is nothing left to stop,
+                even if the backend still calls it in progress. */}
+            {!runOver && !isLoading && (
               <StopRunButton onStop={stopRun} noun="run" className="shrink-0" />
             )}
             <button
@@ -883,12 +913,11 @@ export function TestRunnerDialog({
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
+                  notRun={couldNotRunCount - unansweredCount}
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
                   failureDetails={
-                    run?.status === "failed"
-                      ? (runErrorText(run.error) ?? "")
-                      : null
+                    runFailed ? (runErrorText(run?.error) ?? "") : null
                   }
                   runTotalTests={run?.total_tests ?? rows.length}
                   onReviewUnanswered={() => setActiveTab("tests")}
@@ -932,7 +961,7 @@ export function TestRunnerDialog({
                   evaluatorsByUuid={evaluatorsByUuid}
                   emptyMessage={
                     wasStopped
-                      ? stoppedRunSentence(0, run?.total_tests ?? null)
+                      ? `${stoppedRunSentence(0, run?.total_tests ?? null)}.`
                       : "No tests to show"
                   }
                   legacyDefaultEvaluator={defaultNextReplyEvaluator}

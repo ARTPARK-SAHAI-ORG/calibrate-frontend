@@ -38,7 +38,13 @@ import {
   fetchTestCase,
   runErrorText,
 } from "@/lib/testRunApi";
-import { modelComparisonName, isRunStopped, runStateOf } from "@/lib/testTypes";
+import {
+  modelComparisonName,
+  isRunStopped,
+  isUnanswered,
+  rowVerdict,
+  runStateOf,
+} from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -57,10 +63,7 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import {
-  benchmarkAnsweredPassFail,
-  type BenchmarkLeaderboardSummaryRow,
-} from "@/lib/benchmarkEvaluatorSummary";
+import { type BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -98,6 +101,29 @@ export type BenchmarkRerunRequest = {
    * predates the backend recording it. */
   parallelModels?: boolean;
 };
+
+/**
+ * One model's tests split into the ones it answered and the ones it could not
+ * run: a test that gave no answer, or a row the run ended without a verdict
+ * for. Counted per model, the way the mark's own total is, so a comparison of
+ * 10 tests across three models is read out of 30 and not out of 10.
+ */
+export function benchmarkAnswerCounts(
+  modelResults: BenchmarkModelRows[],
+  wasStopped: boolean,
+  isDone: boolean,
+): { unanswered: number; answered: number } {
+  let unanswered = 0;
+  let answered = 0;
+  for (const model of modelResults) {
+    for (const row of model.test_results ?? []) {
+      const verdict = rowVerdict(row, wasStopped, isDone);
+      if (isUnanswered(row) || verdict === "not_run") unanswered += 1;
+      else if (verdict === "passed" || verdict === "failed") answered += 1;
+    }
+  }
+  return { unanswered, answered };
+}
 
 type BenchmarkResultsDialogProps = {
   isOpen: boolean;
@@ -685,12 +711,8 @@ export function BenchmarkResultsDialog({
   // test either, so its mark reads the same as a plain run's. The counts are
   // per model, and one test that could not be run under two models counts
   // under each, which is also how the total is counted.
-  const answerCounts = modelResults.map((m) => benchmarkAnsweredPassFail(m));
-  const unansweredTests = answerCounts.reduce(
-    (n, c) => n + (c?.unanswered ?? 0),
-    0,
-  );
-  const scoredTests = answerCounts.reduce((n, c) => n + (c?.answered ?? 0), 0);
+  const { unanswered: unansweredTests, answered: scoredTests } =
+    benchmarkAnswerCounts(modelResults, wasStopped, isDone);
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -769,6 +791,9 @@ export function BenchmarkResultsDialog({
                       stopped_early: stoppedEarly,
                       unanswered_tests: unansweredTests,
                       total_tests: unansweredTests + scoredTests,
+                      // The models' own counts, the same ones the runs list
+                      // reads, so the two marks cannot differ.
+                      model_results: modelResults,
                     }) ?? "finished"
                   }
                 />
