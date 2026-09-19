@@ -12,14 +12,14 @@ import React, {
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogNavKeys } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import {
   DEFAULT_LLM_GENERAL_SLUG,
   isDefaultLLMNextReplyEvaluator,
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
-import { DialogNavHeader } from "@/components/ui";
+import { DialogNavRow, showsDialogNav } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -3264,6 +3264,12 @@ export function AddTestDialog({
   // baseline hasn't been captured yet — e.g. an existing test is still
   // loading — keep the prompt to err on the side of not losing edits.
   const confirmDiscard = (action: () => void) => {
+    // The prompt on screen belongs to whatever raised it. Asking again while
+    // it is up would swap that action out, so Discard would do something the
+    // reader never asked for: press an arrow key behind the prompt raised by
+    // closing the window, and Discard stepped to the next test instead of
+    // closing.
+    if (showCloseConfirmation) return;
     if (
       baselineRef.current !== null &&
       serializeFormState() === baselineRef.current
@@ -3293,6 +3299,30 @@ export function AddTestDialog({
   // does, so both go through the same prompt.
   const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
   const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
+
+  // Whether the stepping row is drawn, which is what the close button above
+  // it is centred on. The row itself is desktop only, so below that width the
+  // close button keeps lining up with the banner that is the first row there.
+  const stepsBetweenTests = showsDialogNav({
+    onPrev: navPrev,
+    onNext: navNext,
+    position,
+  });
+
+  // The left and right arrow keys step too, the same as the buttons. No
+  // Escape: this window holds edits that have not been saved, and a stray
+  // press would throw them away.
+  // The save-or-discard prompt for running a test is the other thing that can
+  // be on top of this window. Its own question is not the discard question, so
+  // `confirmDiscard` does not know about it, and a key press behind it would
+  // raise a second prompt underneath the one on screen.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev,
+    onPrev: showRunUnsavedConfirm ? undefined : navPrev,
+    hasNext,
+    onNext: showRunUnsavedConfirm ? undefined : navNext,
+  });
 
   if (!isOpen) return null;
 
@@ -3414,12 +3444,16 @@ export function AddTestDialog({
           }`}
         >
           {/* Close — floats in the dialog's top-right, vertically centred
-              on the first row (the type header / info banner) instead of
-              taking a whole row of its own. */}
+              on the first row instead of taking a whole row of its own. That
+              row is the stepping row when there is one (48px tall, so 8px of
+              space above a 32px button), and the type header / info banner
+              otherwise. */}
           <button
             onClick={onClose}
             disabled={isCreating || isLoading}
-            className="absolute top-2.5 md:top-3 right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`absolute ${
+              stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
+            } right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
             aria-label="Close"
           >
             <svg
@@ -3440,20 +3474,14 @@ export function AddTestDialog({
           {/* Previous / next test: a thin row of its own across the top, so
               nothing sits on the information banner below it. The close
               button floats in this row's right-hand end. */}
-          {(navPrev || navNext) && (
-            <div className="relative shrink-0 h-12 border-b border-border hidden md:block" data-testid="test-nav-row">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <DialogNavHeader
-                  noun={itemNoun}
-                  onPrev={navPrev}
-                  onNext={navNext}
-                  hasPrev={hasPrev}
-                  hasNext={hasNext}
-                  position={position}
-                />
-              </div>
-            </div>
-          )}
+          <DialogNavRow
+            noun={itemNoun}
+            onPrev={navPrev}
+            onNext={navNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}

@@ -23,7 +23,7 @@ export { PassFailCountPills } from "./PassFailCountPills";
 export { RunStateMark } from "./RunStateMark";
 export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
-export { DialogNavHeader } from "./DialogNavHeader";
+export { DialogNavHeader, DialogNavRow, showsDialogNav } from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
 export { ViewMoreToggle } from "./ViewMoreToggle";
 export { CopyLinkButton } from "./CopyLinkButton";

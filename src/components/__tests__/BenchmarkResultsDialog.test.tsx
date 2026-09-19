@@ -146,6 +146,9 @@ jest.mock("../ui", () => ({
   RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
   // The real rename box, so renaming a run is exercised end to end here.
   RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
+  // The real previous/next run row, so its arrows and position are what the
+  // tests below read.
+  DialogNavHeader: jest.requireActual("../ui/DialogNavHeader").DialogNavHeader,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -197,6 +200,9 @@ const useAccessTokenMock = jest.fn(() => "test-token");
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+  // The real arrow-key handling, so the key tests below exercise it.
+  useDialogNavKeys: jest.requireActual("../../hooks/useDialogNavKeys")
+    .useDialogNavKeys,
 }));
 
 // The run size limit, read through `overEvalLimit`, which imports this module
@@ -2182,5 +2188,270 @@ describe("running or comparing the ticked tests", () => {
     expect(stripLabel("1 test selected")).toBeNull();
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Compare" })).toBeNull();
+  });
+});
+
+describe("stepping from run to run", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    useAccessTokenMock.mockReturnValue("test-token");
+    isLabellingEligibleRawMock.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    delete process.env.NEXT_PUBLIC_BACKEND_URL;
+  });
+
+  const navProps = {
+    onPrevRun: jest.fn(),
+    onNextRun: jest.fn(),
+    hasPrevRun: true,
+    hasNextRun: true,
+    runPosition: { index: 11, total: 341 },
+  };
+
+  function renderNav(
+    props: Partial<React.ComponentProps<typeof BenchmarkResultsDialog>> = {},
+  ) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-nav")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-nav",
+            status: "completed",
+            model_results: [
+              {
+                model: "gpt-4",
+                success: true,
+                message: "",
+                total_tests: 1,
+                passed: 1,
+                failed: 0,
+                test_results: [
+                  { name: "Test One", passed: true, test_uuid: "t1" },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    return render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-nav"
+        {...props}
+      />,
+    );
+  }
+
+  /** A promise this test resolves by hand, so a read can be held in flight
+   * while the window is pointed at another comparison. */
+  function deferred() {
+    let release: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { promise, release: () => release() };
+  }
+
+  /** Two finished comparisons, with the full read of `bench-a` held open until
+   * `releaseFullA` is called, so the window can be pointed at `bench-b` while
+   * that read is still in flight. `fullReads` records which comparisons were
+   * read in full, in order. */
+  function renderTwoRuns(
+    props: Partial<React.ComponentProps<typeof BenchmarkResultsDialog>> = {},
+  ) {
+    const fullA = deferred();
+    const fullReads: string[] = [];
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      const address = String(url);
+      for (const id of ["bench-a", "bench-b"]) {
+        if (!isBenchmarkDetail(address, id)) continue;
+        const body = {
+          task_id: id,
+          status: "completed",
+          name: `Run ${id}`,
+          model_results: [
+            {
+              model: "gpt-4",
+              success: true,
+              message: "",
+              total_tests: 1,
+              passed: 1,
+              failed: 0,
+              test_results: [{ name: `${id} One`, passed: true }],
+            },
+          ],
+        };
+        if (address.includes("mode=summary")) {
+          return Promise.resolve(jsonResponse(body));
+        }
+        fullReads.push(id);
+        return id === "bench-a"
+          ? fullA.promise.then(() => jsonResponse(body))
+          : Promise.resolve(jsonResponse(body));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${address}`));
+    });
+
+    const element = (taskId: string) => (
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId={taskId}
+        {...props}
+      />
+    );
+    const view = render(element("bench-a"));
+    return {
+      fullReads,
+      releaseFullA: async () => {
+        await act(async () => {
+          fullA.release();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      },
+      showRun: async (taskId: string) => {
+        view.rerender(element(taskId));
+        await flush();
+      },
+    };
+  }
+
+  // What the arrows look like at each end of the list, and that they are not
+  // drawn for a single run, is proved once in
+  // src/components/ui/__tests__/DialogNavHeader.test.tsx. All this window has
+  // to prove is that its own run stepping reaches that header.
+  it("hands this comparison's place in the list and its stepping to the header", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next evaluation" }));
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+    await user.click(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    );
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("steps run to run with the left and right arrow keys", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.keyboard("{ArrowLeft}");
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+    await user.keyboard("{ArrowRight}");
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close the window on Escape", async () => {
+    const onClose = jest.fn();
+    renderNav({ ...navProps, onClose });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("gives the middle of the header to the open test's own stepping", async () => {
+    renderNav(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    // With no test open, the arrows step from this comparison to the next.
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("setnav"));
+
+    // Reading one test, that test's own Previous / Next takes the middle.
+    expect(await screen.findByTestId("result-pager")).toBeInTheDocument();
+    expect(screen.queryByText("12 of 341")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not open the labelling window for a comparison the reader has stepped away from", async () => {
+    const { showRun, releaseFullA } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("togglelabel0"));
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    expect(screen.getByRole("button", { name: "Preparing…" })).toBeDisabled();
+
+    // The reader steps to the next comparison while the read is still going.
+    await showRun("bench-b");
+    await releaseFullA();
+
+    expect(screen.queryByTestId("add-to-task-dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not keep one comparison's full results for the one stepped to next", async () => {
+    const { showRun, releaseFullA, fullReads } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.click(screen.getByTestId("export-button"));
+    expect(fullReads).toEqual(["bench-a"]);
+
+    await showRun("bench-b");
+    await releaseFullA();
+
+    await user.click(screen.getByTestId("export-button"));
+    await flush();
+    expect(fullReads).toEqual(["bench-a", "bench-b"]);
+  });
+
+  it("does not step run to run while the labelling window is open", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    const { releaseFullA } = renderTwoRuns({
+      ...navProps,
+      onPrevRun,
+      onNextRun,
+    });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("togglelabel0"));
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    await releaseFullA();
+    expect(await screen.findByTestId("add-to-task-dialog")).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Previous evaluation" }),
+    ).not.toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}");
+    await user.keyboard("{ArrowLeft}");
+    expect(onNextRun).not.toHaveBeenCalled();
+    expect(onPrevRun).not.toHaveBeenCalled();
   });
 });

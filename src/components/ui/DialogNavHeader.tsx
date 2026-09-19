@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 import { Tooltip } from "@/components/Tooltip";
 
 /**
@@ -15,6 +17,7 @@ export function DialogNavHeader({
   hasPrev,
   hasNext,
   position,
+  inline = false,
 }: {
   /** Singular noun for the aria-labels/tooltips, e.g. "trace" or "item". */
   noun: string;
@@ -23,11 +26,20 @@ export function DialogNavHeader({
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** Draw the arrows where they are put, instead of centring them over the
+   * header. For a caller that places them itself. */
+  inline?: boolean;
 }) {
-  if (!(onPrev || onNext) || (position && position.total <= 1)) return null;
+  if (!showsDialogNav({ onPrev, onNext, position })) return null;
 
   return (
-    <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
+    <div
+      className={
+        inline
+          ? "hidden md:flex items-center gap-2"
+          : "hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none"
+      }
+    >
       <div className="pointer-events-auto">
         <Tooltip position="bottom" content={`Previous ${noun}`}>
           <button
@@ -76,6 +88,44 @@ export function DialogNavHeader({
             </svg>
           </button>
         </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Whether the arrows are drawn at all: nothing to step through, or only the
+ * open item itself, and there is nothing to show. One rule, so a caller
+ * laying out around the arrows cannot disagree with the arrows themselves.
+ */
+export function showsDialogNav({
+  onPrev,
+  onNext,
+  position,
+}: {
+  onPrev?: () => void;
+  onNext?: () => void;
+  position?: { index: number; total: number };
+}): boolean {
+  if (!(onPrev || onNext)) return false;
+  return !(position && position.total <= 1);
+}
+
+/**
+ * The same arrows in a thin row of their own across the top of a dialog, for
+ * a window whose header row is already full (the test window, the run
+ * windows). Nothing is drawn when there is nothing to step through, so the
+ * window never carries an empty bar.
+ */
+export function DialogNavRow(props: React.ComponentProps<typeof DialogNavHeader>) {
+  if (!showsDialogNav(props)) return null;
+  return (
+    <div
+      className="relative shrink-0 h-12 border-b border-border hidden md:block"
+      data-testid="dialog-nav-row"
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <DialogNavHeader {...props} />
       </div>
     </div>
   );

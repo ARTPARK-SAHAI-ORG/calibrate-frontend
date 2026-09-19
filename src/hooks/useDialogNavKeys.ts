@@ -7,6 +7,10 @@ import { useEffect } from "react";
  * dialog (the trace dialog, the labelling item dialog). Skips the arrow keys
  * while focus is in a text field, so typing a hyphen or arrow-navigating text
  * doesn't also step the dialog.
+ *
+ * `onClose` is optional: leave it out for a dialog that holds unsaved work or
+ * opens windows of its own, where Escape closing the whole thing would throw
+ * away what the reader was doing. The arrow keys work either way.
  */
 export function useDialogNavKeys({
   isOpen,
@@ -17,7 +21,7 @@ export function useDialogNavKeys({
   onNext,
 }: {
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   hasPrev?: boolean;
   onPrev?: () => void;
   hasNext?: boolean;
@@ -27,7 +31,7 @@ export function useDialogNavKeys({
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        if (onClose) onClose();
         return;
       }
       const target = e.target as HTMLElement | null;

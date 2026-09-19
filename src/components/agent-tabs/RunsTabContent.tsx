@@ -6,6 +6,7 @@ import {
   useAccessToken,
   useAgentRuns,
   useDialogUrlParam,
+  useItemPager,
   usePageSize,
   useResizableWidth,
   type AgentRun,
@@ -318,6 +319,10 @@ export function RunsTabContent({
     enabled: isActive,
     onOpen: (uuid) => setPendingRunId(uuid),
     onClose: () => {
+      // Back closes the window. Forget a step that has not landed too, or
+      // the page it asked for arrives afterwards and opens a run again,
+      // undoing the Back the reader just pressed.
+      runPager.cancel();
       setPendingRunId(null);
       setOpenTestRunId(null);
       setOpenBenchmarkRun(null);
@@ -328,6 +333,8 @@ export function RunsTabContent({
     items,
     total,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     aroundNotFound,
@@ -367,15 +374,21 @@ export function RunsTabContent({
     setRunIdParam(uuid);
   };
   const closeTestRun = () => {
+    runPager.cancel();
     setOpenTestRunId(null);
     setRunIdParam(null);
   };
   const closeBenchmarkRun = () => {
+    runPager.cancel();
     setOpenBenchmarkRun(null);
     setRunIdParam(null);
   };
 
   const openRun = (run: AgentRun) => {
+    // Whatever opened this run wins over a step still waiting for its page:
+    // that page arriving later would otherwise pull the reader off the run
+    // they are looking at.
+    runPager.cancel();
     if (run.type === "llm-unit-test") {
       openTestRun(run.uuid);
       return;
@@ -386,24 +399,64 @@ export function RunsTabContent({
     setRunIdParam(run.uuid);
   };
 
+  // Previous / next across every run the filters match, not just the page on
+  // screen, the same way the Tests tab steps from one test to the next:
+  // stepping off either end of the page turns it and opens the run at the far
+  // edge of the page that arrives. A comparison and a plain run open in
+  // different windows, so a step between the two kinds swaps the window.
+  const runPager = useItemPager({
+    items,
+    openUuid: openTestRunId ?? openBenchmarkRun?.uuid ?? null,
+    pageStart: loadedOffset,
+    pageSize,
+    total,
+    onOpen: (uuid) => {
+      const run = items.find((item) => item.uuid === uuid);
+      if (run) openRun(run);
+    },
+    onPageStartChange: setOffset,
+  });
+
   // Run or compare the tests ticked inside an open results window, the same
   // way the Tests tab does it. A new plain run replaces the open window; a
   // comparison closes it once the picker has created the comparison.
-  const { confirmTestRun, openCompare, dialogs: launcherDialogs } =
+  // A run that has just been created is the newest one, so it is on the first
+  // page. Go there, so it is in the list the arrows step through rather than
+  // leaving them dead until the window is closed.
+  const showNewRun = (taskId: string) => {
+    if (offset === 0) void refetch();
+    else setOffset(0);
+    openTestRun(taskId);
+  };
+
+  const { isDialogOpen, confirmTestRun, openCompare, dialogs: launcherDialogs } =
     useAgentRunLaunchers({
       agentUuid,
       agentName,
       ...launcherOpts,
-      onRunCreated: (taskId) => {
-        void refetch();
-        openTestRun(taskId);
-      },
+      onRunCreated: showNewRun,
       onComparisonCreated: () => {
         void refetch();
         closeTestRun();
         closeBenchmarkRun();
       },
     });
+
+  // Stepping is offered only while this tab is the one on screen and no
+  // launcher dialog is covering the window. The tab stays mounted when the
+  // reader moves to another one, and the keys listen on the whole window, so
+  // without this a hidden run window stepped runs while the reader was
+  // stepping tests on the Tests tab.
+  const runNav =
+    isActive && !isDialogOpen
+      ? {
+          onPrevRun: runPager.prev,
+          onNextRun: runPager.next,
+          hasPrevRun: runPager.hasPrev,
+          hasNextRun: runPager.hasNext,
+          runPosition: runPager.position,
+        }
+      : {};
 
   // The Run column starts at the width that fits the longest automatic name
   // ("Model comparison 999"), and can be dragged wider for runs people have
@@ -683,13 +736,11 @@ export function RunsTabContent({
           agentUuid={agentUuid}
           agentName={agentName}
           taskId={openTestRunId}
-          onNewRun={(taskId) => {
-            void refetch();
-            openTestRun(taskId);
-          }}
+          onNewRun={showNewRun}
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
+          {...runNav}
         />
       )}
 
@@ -706,6 +757,7 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
+          {...runNav}
           // The window stays open until a comparison actually exists, the
           // way Compare on the ticked rows above does it: onComparisonCreated
           // closes it. Closing here threw away the comparison the reader was
