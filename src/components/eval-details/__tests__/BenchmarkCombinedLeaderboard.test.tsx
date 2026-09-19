@@ -773,3 +773,58 @@ describe("a comparison someone stopped before any test ran", () => {
     ).toBeInTheDocument();
   });
 });
+
+// The reader had two amber boxes stacked on a stopped comparison: one saying
+// it was stopped, one saying some tests could not be run. A single run says
+// both in one note, and so does this.
+describe("a stopped comparison that also left tests unanswered", () => {
+  const modelResults: BenchmarkModelLike[] = [
+    {
+      model: "a",
+      total_tests: 4,
+      test_results: [{ passed: true }, { passed: true }, { unanswered: true }],
+    },
+    {
+      model: "b",
+      total_tests: 4,
+      test_results: [{ passed: true }, { passed: null }],
+    },
+  ];
+
+  it("says both in one note", () => {
+    const { container } = render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={modelResults}
+        filename="x"
+        runStopped
+        runOver
+      />,
+    );
+    expect(
+      screen.getByText(/tests could not be run and were ignored/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/This run was stopped before it finished\./),
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll(".border-amber-500\\/40")).toHaveLength(1);
+  });
+
+  // The backend sends no leaderboard for a run that did not finish, and the
+  // whole table was dropped with it, even though two models had passing tests.
+  it("still shows the table for the tests that did finish", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={modelResults}
+        filename="x"
+        runStopped
+        runOver
+      />,
+    );
+    expect(screen.getAllByText("a").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("b").length).toBeGreaterThan(0);
+    expect(screen.getByText("Passed")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Test pass rate (%)").length,
+    ).toBeGreaterThan(0);
+  });
+});

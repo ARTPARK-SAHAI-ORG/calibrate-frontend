@@ -58,12 +58,13 @@ type BenchmarkCombinedLeaderboardProps = {
 };
 
 /**
- * The note above the table when some tests produced no answer. Says how many
- * were left out, since the pass rate covers only the tests each model
- * answered. When the models did not all lose the same tests, it says so
- * without a count rather than picking one model's number.
+ * The notes above the table: everything the reader has to know about the run
+ * itself before reading the numbers. A run that broke shows the red box with
+ * what the backend recorded; everything else is ONE amber note, the same way
+ * a single run's summary says it, so a run that was both stopped and left
+ * tests unanswered does not stack two boxes saying half the story each.
  */
-function UnansweredNote({
+function RunNotes({
   modelResults,
   onReviewUnanswered,
   stoppedEarly = false,
@@ -77,7 +78,7 @@ function UnansweredNote({
   failureReason?: string | null;
   /** True once the run has ended: a row with no verdict then never ran. */
   runOver?: boolean;
-  /** True when someone stopped the run: the note about that says it already. */
+  /** True when someone stopped the run before it finished. */
   runStopped?: boolean;
 }) {
   const perModel = modelResults
@@ -85,14 +86,24 @@ function UnansweredNote({
     .filter((c) => c !== null);
   const failed = failureReason !== null;
   const couldNotRun = couldNotRunCount(modelResults);
-  if (perModel.length === 0 && !failed && couldNotRun === 0) return null;
   const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
-  if (totalUnanswered === 0 && !failed && couldNotRun === 0) return null;
   const answeredAny = perModel.some((c) => c.answered > 0);
-  // Someone stopped the run and it answered nothing: the note about being
-  // stopped says that, so a second box saying none of the tests could be run
-  // only repeats it.
-  if (runStopped && !answeredAny && !failed) return null;
+  // Only the tests the run actually tried: one it answered, or one it tried
+  // and got no answer from. A row it never reached does not count as a test
+  // that ran, which is the whole point of the stopped sentence, so this one
+  // count is read without `runOver`.
+  const ranAnyTest = modelResults.some((m) => {
+    const c = benchmarkAnsweredPassFail(m);
+    return !!c && c.answered + c.unanswered > 0;
+  });
+
+  // Someone stopped the run and it answered nothing: saying it was stopped
+  // covers it, so counting what could not be run only repeats it.
+  const showCouldNotRun =
+    (totalUnanswered > 0 || couldNotRun > 0) &&
+    !(runStopped && !answeredAny && !failed);
+
+  if (!failed && !runStopped && !stoppedEarly && !showCouldNotRun) return null;
 
   const tab = onReviewUnanswered ? (
     <button
@@ -110,11 +121,13 @@ function UnansweredNote({
     <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
   );
 
-  const sameForEveryModel = perModel.every(
-    (c) =>
-      c.unanswered === perModel[0].unanswered &&
-      c.answered === perModel[0].answered,
-  );
+  const sameForEveryModel =
+    perModel.length > 0 &&
+    perModel.every(
+      (c) =>
+        c.unanswered === perModel[0].unanswered &&
+        c.answered === perModel[0].answered,
+    );
 
   // How far the models got. They can differ, so the sentence gives a count
   // only when every model reached the same point.
@@ -140,74 +153,39 @@ function UnansweredNote({
       details={failureReason.trim() || null}
     />
   ) : null;
-  // A broken run still says how many tests could not be run, under the box.
-  if (failed && totalUnanswered === 0 && couldNotRun === 0) return failureBox;
+
+  const showStoppedEarly = stoppedEarly && !runStopped;
+  if (!showCouldNotRun && !runStopped && !showStoppedEarly) return failureBox;
 
   return (
     <>
       {failureBox}
       <RunNote>
-        {couldNotRun > 0 &&
+        {showCouldNotRun &&
+          couldNotRun > 0 &&
           (couldNotRun === modelResults.length
             ? "None of the models could be run. "
             : `${couldNotRun} of ${modelResults.length} models could not be run. `)}
-        {totalUnanswered > 0 &&
+        {showCouldNotRun &&
+          totalUnanswered > 0 &&
           (!sameForEveryModel
             ? "Some tests could not be run and were ignored for calculating the metrics. "
             : perModel[0].answered === 0
               ? "None of the tests could be run. "
               : `${perModel[0].unanswered} of ${perModel[0].unanswered + perModel[0].answered} tests could not be run and were ignored for calculating the metrics. `)}
-        {stoppedEarly && STOPPED_EARLY_SENTENCE}
-        Review the tests that could not be run in the {tab}.
+        {runStopped &&
+          (ranAnyTest
+            ? "This run was stopped before it finished. "
+            : "This run was stopped before any test ran. ")}
+        {showStoppedEarly && STOPPED_EARLY_SENTENCE}
+        {showCouldNotRun ? (
+          <>Review the tests that could not be run in the {tab}.</>
+        ) : (
+          runStopped &&
+          ranAnyTest && <>The tests that did run are in the {tab}.</>
+        )}
       </RunNote>
     </>
-  );
-}
-
-/**
- * The note above the table when someone stopped the run. It gives no counts:
- * every test is run once per model, so adding the models up would report 30
- * tests for a comparison of 10 tests across three models, while the run's own
- * Tests column says 10.
- */
-function StoppedNote({
-  modelResults,
-  onReviewUnanswered,
-}: {
-  modelResults: LeaderboardModel[];
-  onReviewUnanswered?: () => void;
-}) {
-  // Only the tests the run actually tried: one it answered, or one it tried
-  // and got no answer from. A row it never reached does not count as a test
-  // that ran, which is the whole point of this sentence.
-  const ranAnyTest = modelResults.some((model) => {
-    const counts = benchmarkAnsweredPassFail(model);
-    return !!counts && counts.answered + counts.unanswered > 0;
-  });
-
-  const tab = onReviewUnanswered ? (
-    <button
-      type="button"
-      onClick={onReviewUnanswered}
-      className="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 cursor-pointer"
-    >
-      {RESULT_TAB_LABELS.tests} tab
-    </button>
-  ) : (
-    <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
-  );
-
-  return (
-    <RunNote>
-      {ranAnyTest ? (
-        <>
-          This run was stopped before it finished. The tests that did run are in
-          the {tab}.
-        </>
-      ) : (
-        "This run was stopped before any test ran."
-      )}
-    </RunNote>
   );
 }
 
@@ -345,10 +323,18 @@ export function BenchmarkCombinedLeaderboard({
         leaderboardSummary,
         modelResults,
         benchmarkScoreLabel,
-        // A failed run has no summary from the backend; count what finished.
-        failureReason !== null,
+        // A run that did not finish normally (it broke, or someone stopped
+        // it) has no summary from the backend; count what did finish, so the
+        // table is left out only when there is nothing to put in it.
+        failureReason !== null || runOver,
       ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel, failureReason],
+    [
+      leaderboardSummary,
+      modelResults,
+      benchmarkScoreLabel,
+      failureReason,
+      runOver,
+    ],
   );
 
   const columns = useMemo(
@@ -376,16 +362,10 @@ export function BenchmarkCombinedLeaderboard({
     return (
       <div className={className}>
         <div className="space-y-4">
-          {runStopped && (
-            <StoppedNote
-              modelResults={modelResults}
-              onReviewUnanswered={onReviewUnanswered}
-            />
-          )}
-          <UnansweredNote
+          <RunNotes
             modelResults={modelResults}
             onReviewUnanswered={onReviewUnanswered}
-            stoppedEarly={stoppedEarly && !runStopped}
+            stoppedEarly={stoppedEarly}
             failureReason={failureReason}
             runOver={runOver}
             runStopped={runStopped}
@@ -412,16 +392,10 @@ export function BenchmarkCombinedLeaderboard({
 
   return (
     <div className="space-y-4">
-      {runStopped && (
-        <StoppedNote
-          modelResults={modelResults}
-          onReviewUnanswered={onReviewUnanswered}
-        />
-      )}
-      <UnansweredNote
+      <RunNotes
         modelResults={modelResults}
         onReviewUnanswered={onReviewUnanswered}
-        stoppedEarly={stoppedEarly && !runStopped}
+        stoppedEarly={stoppedEarly}
         failureReason={failureReason}
         runOver={runOver}
         runStopped={runStopped}
