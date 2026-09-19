@@ -1,5 +1,6 @@
 ## September 2026
 
+- A test run or model comparison now shows the same pass rate and status everywhere it appears, including its shared link, instead of disagreeing between screens ([#616](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/616))
 - On the Evaluations tab, you can now step from one run to the next with arrows in the window header or the left and right arrow keys, instead of closing the window to open another run ([#614](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/614))
 - When setting up a rating scale for an evaluator, the highest number is now marked as the best score and the lowest as the worst, so it cannot be read backwards ([#608](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/608))
 - The browser tab icon now shows up clearly whether the browser is set to a light or dark tab strip ([#607](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/607))
