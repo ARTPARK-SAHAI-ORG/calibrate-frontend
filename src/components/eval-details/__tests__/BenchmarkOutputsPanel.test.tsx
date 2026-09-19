@@ -278,6 +278,175 @@ describe("BenchmarkOutputsPanel", () => {
     });
   });
 
+  describe("a comparison that has ended", () => {
+    it("reads a test with no verdict as never run instead of leaving it spinning", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      const icons = screen.getAllByTestId("status-icon").map((n) => n.textContent);
+      expect(icons).toEqual(["passed", "queued"]);
+    });
+
+    it("says the run ended with no result for the test that is open", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          selectedTest={{ model: "model-b", testIndex: 1 }}
+          onToggleModel={jest.fn()}
+          onSelectTest={jest.fn()}
+          runOver
+          showRunningSpinner
+        />,
+      );
+      expect(
+        screen.getByText(
+          "This test was not run. The run ended without a result for it.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Running test...")).not.toBeInTheDocument();
+    });
+
+    it("keeps the spinner while the run is still going", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          selectedTest={{ model: "model-b", testIndex: 1 }}
+          onToggleModel={jest.fn()}
+          onSelectTest={jest.fn()}
+          showRunningSpinner
+        />,
+      );
+      expect(screen.getByText("Running test...")).toBeInTheDocument();
+    });
+
+    it("does not call a model still working when the run is over", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(screen.getByText("1 of 2 ran")).toBeInTheDocument();
+      expect(screen.queryByText(/of 2 done/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a model that could not be run", () => {
+    const brokenModel = makeModel({
+      model: "model-e",
+      success: false,
+      message: "openrouter: model not available",
+      total_tests: 2,
+      passed: 0,
+      failed: 0,
+      test_results: null,
+    });
+
+    it("says so instead of showing it as finished with nothing", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[brokenModel]}
+          expandedModels={new Set(["model-e"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(screen.getByText("Could not be run")).toBeInTheDocument();
+      expect(screen.queryByText("0 passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("0 failed")).not.toBeInTheDocument();
+    });
+
+    it("shows the reason it carries", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[brokenModel]}
+          expandedModels={new Set(["model-e"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(
+        screen.getByText("This model could not be run."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("openrouter: model not available"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("No test results")).not.toBeInTheDocument();
+    });
+
+    // A model can be marked as failed and still have produced rows. Those rows
+    // are real results, so the header reads like any other model's.
+    describe("but which did produce results", () => {
+      const partlyRan = makeModel({
+        model: "model-g",
+        success: false,
+        message: "openrouter: rate limited",
+        total_tests: 2,
+        passed: 1,
+        failed: 1,
+        test_results: [
+          { name: "Gamma Passed", passed: true, reasoning: "good" },
+          { name: "Gamma Failed", passed: false, reasoning: "bad" },
+        ],
+      });
+
+      it("keeps its counts instead of saying it could not be run", () => {
+        render(
+          <BenchmarkOutputsPanel
+            modelResults={[partlyRan]}
+            expandedModels={new Set(["model-g"])}
+            onToggleModel={jest.fn()}
+            selectedTest={null}
+            onSelectTest={jest.fn()}
+            runOver
+          />,
+        );
+        expect(screen.queryByText("Could not be run")).not.toBeInTheDocument();
+        expect(screen.getByText("1 passed")).toBeInTheDocument();
+        expect(screen.getByText("1 failed")).toBeInTheDocument();
+        expect(screen.getByText("Gamma Passed")).toBeInTheDocument();
+        expect(
+          screen.queryByText("This model could not be run."),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("says it could not be run even with no reason recorded", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[
+            makeModel({ model: "model-f", success: false, message: "" }),
+          ]}
+          expandedModels={new Set(["model-f"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(
+        screen.getByText("This model could not be run."),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("reads the backend's own not-run flag even when the run says nothing about stopping", () => {
     const flagged = makeModel({
       model: "model-d",
@@ -867,6 +1036,42 @@ describe("BenchmarkOutputsPanel", () => {
         />,
       );
       expect(screen.getByTitle("Deselect all model-a tests")).toBeInTheDocument();
+    });
+
+    // Select all reads each row's status the same way the rows on screen do,
+    // so a run that has ended never ticks a different set from the one shown.
+    it("reads the rows of a finished run the same way the rows on screen do", async () => {
+      const user = setupUser();
+      const onLabellingBulkToggle = jest.fn();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[
+            makeModel({
+              model: "model-h",
+              success: true,
+              total_tests: 2,
+              passed: 1,
+              failed: 0,
+              test_results: [
+                { name: "Delta Passed", passed: true },
+                { name: "Delta No Verdict", passed: null },
+              ],
+            }),
+          ]}
+          expandedModels={new Set(["model-h"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          onToggleLabellingSelection={jest.fn()}
+          onLabellingBulkToggle={onLabellingBulkToggle}
+          runOver
+        />,
+      );
+      await user.click(screen.getByTitle("Select all model-h tests"));
+      expect(onLabellingBulkToggle).toHaveBeenCalledWith([
+        "model-h:0",
+        "model-h:1",
+      ]);
     });
   });
 

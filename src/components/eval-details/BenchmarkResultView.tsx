@@ -365,6 +365,7 @@ export function BenchmarkResultView({
       runStopped={runStopped}
       stoppedEarly={runStoppedEarly}
       failureReason={runFailureReason}
+      runOver={isDone}
     />
   );
 
@@ -394,10 +395,13 @@ export function BenchmarkResultView({
     </>
   );
 
+  // A run that has ended keeps no spinners: a test with no result never ran,
+  // and there is nothing left to wait for.
   const outputs = (
     <BenchmarkOutputsPanel
       runStopped={runStopped}
       runFailed={runFailureReason !== null}
+      runOver={isDone}
       modelResults={rows}
       expandedModels={expandedModels}
       onToggleModel={toggleModel}
@@ -408,7 +412,7 @@ export function BenchmarkResultView({
       onNavChange={handleNavChange}
       testNames={testNames}
       showControls={isDone}
-      showRunningSpinner={surface === "window"}
+      showRunningSpinner={surface === "window" && !isDone}
       evaluatorsByUuid={evaluatorsByUuid(evaluators)}
       enableEvaluatorLinks={surface === "window"}
       legacyDefaultEvaluator={legacyDefaultEvaluator}

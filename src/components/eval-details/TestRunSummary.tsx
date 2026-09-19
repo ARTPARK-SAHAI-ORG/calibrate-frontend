@@ -28,9 +28,14 @@ type TestRunSummaryProps = {
   /** Total tests scored (excludes tests that produced no answer; the
    * pass-rate denominator). */
   total: number;
-  /** How many tests produced no answer. Above zero, a note says the pass rate
-   * does not cover them. */
+  /** How many tests were tried and produced no answer. Above zero, a note says
+   * the pass rate does not cover them. */
   unanswered?: number;
+  /** How many tests the run ended without a verdict for. The pass rate leaves
+   * them out too, so the note counts them alongside `unanswered`. They are not
+   * part of the tests the run got through, which is why the stopped and failed
+   * sentences do not count them. */
+  notRun?: number;
   /** True when the run gave up before it started every test. */
   stoppedEarly?: boolean;
   /** True when someone stopped the run before it finished. */
@@ -208,6 +213,7 @@ export function TestRunSummary({
   passed,
   total,
   unanswered = 0,
+  notRun = 0,
   stoppedEarly = false,
   stopped = false,
   failureDetails = null,
@@ -296,6 +302,9 @@ export function TestRunSummary({
   // were tried and gave no answer; the rest were never started. The wording
   // itself is shared with the model comparison's leaderboard.
   const stoppedSentence = stoppedRunSentence(total + unanswered, runTotalTests);
+  // Every test the pass rate does not cover: tried and unanswered, or left
+  // without a verdict when the run ended.
+  const couldNotRun = unanswered + notRun;
 
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
@@ -323,16 +332,18 @@ export function TestRunSummary({
             details={failureDetails.trim() || null}
           />
         )}
-        {(unanswered > 0 || stoppedEarly || stopped) && (
+        {(couldNotRun > 0 || stoppedEarly || stopped) && (
           <div className="mb-4">
             <RunNote>
-              {unanswered > 0 &&
+              {couldNotRun > 0 &&
                 (total === 0
                   ? "None of the tests could be run. "
-                  : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
-              {stopped && `${stoppedSentence}${unanswered > 0 ? ". " : ""}`}
+                  : `${couldNotRun} of ${couldNotRun + total} tests could not be run and were ignored for calculating the metrics. `)}
+              {/* The shared wording carries no full stop, so it is ended
+                  here whether or not another sentence follows it. */}
+              {stopped && `${stoppedSentence}. `}
               {stoppedEarly && !stopped && STOPPED_EARLY_SENTENCE}
-              {unanswered > 0 && (
+              {couldNotRun > 0 && (
                 <>
                   Review the tests that could not be run in the{" "}
                   {onReviewUnanswered ? (

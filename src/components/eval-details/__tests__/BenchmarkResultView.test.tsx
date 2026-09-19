@@ -35,6 +35,7 @@ jest.mock("../../eval-details", () => {
             showControls: !!props.showControls,
             evaluatorLinks: !!props.enableEvaluatorLinks,
             spinner: !!props.showRunningSpinner,
+            runOver: !!props.runOver,
             labelling: props.labellingSelection
               ? Array.from(props.labellingSelection)
               : null,
@@ -342,6 +343,36 @@ describe("BenchmarkResultView", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("panel-flags")).toHaveTextContent(
       '"showControls":false',
+    );
+  });
+
+  it("waits for no test once the run has ended", () => {
+    render(<Harness surface="window" initialTab="tests" />);
+    expect(screen.getByTestId("panel-flags")).toHaveTextContent(
+      '"spinner":false',
+    );
+    expect(screen.getByTestId("panel-flags")).toHaveTextContent(
+      '"runOver":true',
+    );
+  });
+
+  it("waits for the tests still to come while the run is going", () => {
+    render(
+      <BenchmarkResultView
+        surface="window"
+        isDone={false}
+        modelResults={MODELS}
+        activeTab="tests"
+        onTabChange={jest.fn()}
+        fetchCase={() => new Promise(() => {})}
+        filenameKey="k"
+      />,
+    );
+    expect(screen.getByTestId("panel-flags")).toHaveTextContent(
+      '"spinner":true',
+    );
+    expect(screen.getByTestId("panel-flags")).toHaveTextContent(
+      '"runOver":false',
     );
   });
 

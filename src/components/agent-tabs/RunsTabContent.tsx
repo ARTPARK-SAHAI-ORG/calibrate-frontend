@@ -14,19 +14,17 @@ import {
   type RunTypeFilter,
 } from "@/hooks";
 import {
+  getModelPassRange,
   getRunBreakdown,
   isRunErrored,
   isRunInProgress,
   isRunStopped,
+  modelsUnansweredCount,
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
-import {
-  PassFailCountPills,
-  RunStateMark,
-  ServerPaginatedListBar,
-} from "@/components/ui";
+import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -41,7 +39,10 @@ import {
   useAgentRunLaunchers,
   type AgentRunLauncherSettings,
 } from "./useAgentRunLaunchers";
-import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
+import {
+  readUrlParam,
+  writeUrlParam,
+} from "@/components/human-labelling/valueFilterUrl";
 import { displayModelName } from "@/lib/modelName";
 
 // Which page of results is open, so a reload reopens on the same one instead
@@ -54,8 +55,8 @@ const PAGE_PARAM = "page";
 const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "all", label: "All results" },
   { value: "passed", label: "All passed" },
-  { value: "failed", label: "All failed" },
-  { value: "error", label: "Error" },
+  { value: "failed", label: "Any failed" },
+  { value: "error", label: "Any error" },
 ];
 
 // A run that tried the tests against several models at once is rare next to
@@ -77,7 +78,8 @@ const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
 export function runTestCount(run: AgentRun): number | null {
   if (typeof run.total_tests === "number") return run.total_tests;
   const firstModel = run.model_results?.[0];
-  if (typeof firstModel?.total_tests === "number") return firstModel.total_tests;
+  if (typeof firstModel?.total_tests === "number")
+    return firstModel.total_tests;
   if (firstModel?.test_results) return firstModel.test_results.length;
   return null;
 }
@@ -92,9 +94,28 @@ export function runModels(run: AgentRun): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The run as its row should read it. The list carries one slim entry per test,
+ * and a test left without a verdict on a run that has ended never ran, which
+ * the run's own counts do not say: a run that gave up part way reports those
+ * tests inside `failed`. Counting them here is what keeps the row and the
+ * window that opens from it saying the same thing.
+ */
+function withRowCounts(run: AgentRun): AgentRun {
+  if (isRunInProgress(run)) return run;
+  const neverRan = (run.results ?? []).filter(
+    (r) => r.passed === null || r.passed === undefined,
+  ).length;
+  if (neverRan === 0) return run;
+  return {
+    ...run,
+    unanswered_tests: (run.unanswered_tests ?? 0) + neverRan,
+  };
+}
+
 /** One run's name, with the mark for how the run itself went. */
 function RunName({ run }: { run: AgentRun }) {
-  const state = runStateOf(run);
+  const state = runStateOf(withRowCounts(run));
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       {state && <RunStateMark state={state} />}
@@ -110,10 +131,84 @@ function RunResultPlaceholder() {
   return <span className="text-sm text-muted-foreground/70">No results</span>;
 }
 
+/** How many of a run's tests never ran, in the same words for both kinds. */
+function NotRunPill({ count }: { count: number }) {
+  return (
+    <span
+      className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+    >
+      {count} Not run
+    </span>
+  );
+}
 
-/** The result pills for one run: running, error, or the per-test tally. */
-function RunResult({ run }: { run: AgentRun }) {
+/**
+ * The share of a run's tests that passed, coloured by how good that share is:
+ * red below half, amber below nine in ten, green at or above it. A comparison
+ * is coloured by its best model, so the colour says what the agent managed at
+ * its best rather than what its weakest model dragged it to.
+ */
+function PassRatePill({ label, rate }: { label: string; rate: number }) {
+  const colour =
+    rate < 50
+      ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500"
+      : rate < 90
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500"
+        : "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500";
+  return <span className={`${PILL_CLASS} ${colour}`}>{label}</span>;
+}
+
+/**
+ * How a model comparison went: the share of tests the models passed, as one
+ * number when they all agree and as a spread when they do not, plus the models
+ * that could not be run at all.
+ */
+function ModelPassRange({
+  lowest,
+  highest,
+  failedModels,
+  notRun,
+}: {
+  lowest: number | null;
+  highest: number | null;
+  failedModels: number;
+  notRun: number;
+}) {
+  const rate =
+    lowest === null || highest === null
+      ? null
+      : Math.round(lowest) === Math.round(highest)
+        ? `${Math.round(lowest)}% passed`
+        : `${Math.round(lowest)}\u2013${Math.round(highest)}% passed`;
+  return (
+    <>
+      {rate && highest !== null && <PassRatePill label={rate} rate={highest} />}
+      {notRun > 0 && <NotRunPill count={notRun} />}
+      {failedModels > 0 && (
+        <span
+          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+        >
+          {failedModels} model{failedModels === 1 ? "" : "s"} failed
+        </span>
+      )}
+    </>
+  );
+}
+
+/** The result pills for one run: running, error, or how the tests went. */
+function RunResult({ run: rawRun }: { run: AgentRun }) {
+  const run = withRowCounts(rawRun);
   if (isRunInProgress(run)) {
+    // Someone pressed Stop and the run has not wound down yet. Saying
+    // "Running" here would argue with the stopped mark beside the name.
+    if (isRunStopped(run))
+      return (
+        <span
+          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+        >
+          Stopping
+        </span>
+      );
     return (
       <span
         className={`${PILL_CLASS} bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-500`}
@@ -142,39 +237,55 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
-  // A run where some tests produced no answer reads better as
-  // "N Success / N Fail / N Not run" than as a single blanket Error, so prefer
-  // the tally when the run reports one.
-  const breakdown =
-    run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
-
-  if (!breakdown) {
-    // A stopped run has nothing to tally: it never got to a test, or it is a
-    // model comparison, which carries no counts either way. Say so in the same
-    // words the models cell says "Default", rather than calling it complete or
-    // leaving the reader with a blank.
-    if (isRunStopped(run)) return <RunResultPlaceholder />;
-    return isRunErrored(run) ? (
+  // A run that broke says so and nothing else, whichever kind of run it is.
+  // Its own counts cannot be trusted to say how the tests went: a run that
+  // fell over before it asked anything still carries a count for every test it
+  // was meant to run. The run window explains what actually happened.
+  if (isRunErrored(run))
+    return (
       <span
         className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
       >
         Error
       </span>
-    ) : (
-      <span
-        className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
-      >
-        Complete
-      </span>
     );
+
+  // How the tests themselves went. A plain run carries one set of counts; a
+  // comparison carries one set per model.
+  const breakdown = run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
+
+  if (!breakdown) {
+    // A comparison tried every test against every model, so its counts only
+    // make sense as the share each model passed. Adding them up would report
+    // 1,410 tests for a 470-test comparison tried against three models.
+    const range = getModelPassRange(run.model_results);
+    if (range)
+      return (
+        <ModelPassRange
+          {...range}
+          notRun={modelsUnansweredCount(run.model_results)}
+        />
+      );
+    // Nothing to tally: the run was stopped before it got to a test, or it is
+    // a comparison whose models never said how they did. Say so in the same
+    // words the models cell says "Default", rather than calling it complete,
+    // which would claim a result nobody has.
+    return <RunResultPlaceholder />;
   }
 
+  // The same two pills a comparison shows, so both kinds of run read alike. A
+  // test that produced no answer is left out of the share, since counting it
+  // as a wrong answer would blame the agent for a run that never reached it.
+  const answered = breakdown.passed + breakdown.failed;
+  // Nothing was answered, so there is no share to give: a run of tests that
+  // all failed to run is not a run that scored zero.
+  if (answered === 0) return <RunResultPlaceholder />;
+  const rate = (breakdown.passed / answered) * 100;
   return (
-    <PassFailCountPills
-      passed={breakdown.passed}
-      failed={breakdown.failed}
-      unanswered={breakdown.unanswered}
-    />
+    <>
+      <PassRatePill label={`${Math.round(rate)}% passed`} rate={rate} />
+      {breakdown.unanswered > 0 && <NotRunPill count={breakdown.unanswered} />}
+    </>
   );
 }
 
@@ -429,18 +540,22 @@ export function RunsTabContent({
     openTestRun(taskId);
   };
 
-  const { isDialogOpen, confirmTestRun, openCompare, dialogs: launcherDialogs } =
-    useAgentRunLaunchers({
-      agentUuid,
-      agentName,
-      ...launcherOpts,
-      onRunCreated: showNewRun,
-      onComparisonCreated: () => {
-        void refetch();
-        closeTestRun();
-        closeBenchmarkRun();
-      },
-    });
+  const {
+    isDialogOpen,
+    confirmTestRun,
+    openCompare,
+    dialogs: launcherDialogs,
+  } = useAgentRunLaunchers({
+    agentUuid,
+    agentName,
+    ...launcherOpts,
+    onRunCreated: showNewRun,
+    onComparisonCreated: () => {
+      void refetch();
+      closeTestRun();
+      closeBenchmarkRun();
+    },
+  });
 
   // Stepping is offered only while this tab is the one on screen and no
   // launcher dialog is covering the window. The tab stays mounted when the
@@ -504,7 +619,13 @@ export function RunsTabContent({
       setPendingRunId(null);
       setRunIdParam(null);
       toast.error("That run could not be found.");
+      return;
     }
+    // The list answered and the run is not on it, without the backend saying
+    // so outright. Let it go quietly rather than leaving the tab waiting on a
+    // run that is never coming, which would also keep the old rows on screen
+    // through every later filter change.
+    if (items.length > 0) setPendingRunId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRunId, isLoading, items, aroundNotFound]);
 
@@ -555,7 +676,11 @@ export function RunsTabContent({
         </div>
       )}
 
-      {isLoading && items.length === 0 ? (
+      {/* A fetch the reader asked for takes the rows away at once, rather than
+          leaving the old filter's runs on screen until the new ones answer.
+          Resolving a `?runId=` link is the exception: it is read against the
+          rows already on screen, so they stay unless there are none yet. */}
+      {isLoading && (!pendingRunId || items.length === 0) ? (
         <div className="flex items-center justify-center py-10">
           <svg
             className="w-5 h-5 animate-spin text-muted-foreground"

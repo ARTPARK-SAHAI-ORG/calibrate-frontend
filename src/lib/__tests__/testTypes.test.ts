@@ -9,6 +9,8 @@ import {
   isNotRun,
   isRunInProgress,
   runStateOf,
+  getModelPassRange,
+  modelsUnansweredCount,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -252,10 +254,11 @@ describe("runStateOf", () => {
     expect(
       runStateOf({ status: "done", total_tests: 1, unanswered_tests: 1 }),
     ).toBe("none_run");
-    // A run that carries no size of its own still says nothing was run.
-    expect(runStateOf({ status: "done", unanswered_tests: 2 })).toBe(
-      "none_run",
-    );
+    // With no size to read the count against, "some could not be run" is true
+    // either way, while "none of them ran" can be flatly wrong: a comparison
+    // row carries no total of its own, so two unanswered tests out of 470
+    // would otherwise read as a run that did nothing.
+    expect(runStateOf({ status: "done", unanswered_tests: 2 })).toBe("gave_up");
   });
 
   it("lets stopped and broken win over gave up", () => {
@@ -269,5 +272,152 @@ describe("runStateOf", () => {
     expect(runStateOf({ status: "in_progress", stopped_early: true })).toBe(
       null,
     );
+  });
+});
+
+describe("getModelPassRange", () => {
+  it("gives the spread of what the models passed", () => {
+    expect(
+      getModelPassRange([
+        { model: "a", total_tests: 100, passed: 88, failed: 12 },
+        { model: "b", total_tests: 100, passed: 96, failed: 4 },
+        { model: "c", total_tests: 100, passed: 90, failed: 10 },
+      ] as never),
+    ).toEqual({ lowest: 88, highest: 96, failedModels: 0 });
+  });
+
+  it("gives one number when every model passed the same share", () => {
+    const range = getModelPassRange([
+      { total_tests: 50, passed: 47, failed: 3 },
+      { total_tests: 100, passed: 94, failed: 6 },
+    ]);
+    expect(range?.lowest).toBe(94);
+    expect(range?.highest).toBe(94);
+  });
+
+  it("counts the models that could not be run and leaves them out of the spread", () => {
+    expect(
+      getModelPassRange([
+        { total_tests: 10, passed: 5, failed: 5 },
+        { success: false, total_tests: 10, passed: 0, failed: 0 },
+      ]),
+    ).toEqual({ lowest: 50, highest: 50, failedModels: 1 });
+  });
+
+  it("still reports the failed models when no model carries counts", () => {
+    expect(getModelPassRange([{ success: false }])).toEqual({
+      lowest: null,
+      highest: null,
+      failedModels: 1,
+    });
+  });
+
+  it("says nothing when there are no counts and nothing failed", () => {
+    expect(getModelPassRange([{ model: "a" } as never])).toBeNull();
+    expect(getModelPassRange(null)).toBeNull();
+    expect(getModelPassRange([{ total_tests: 0, passed: 0, failed: 0 }])).toBeNull();
+    // A model that ran nothing is still listed with every test it was given.
+    expect(getModelPassRange([{ total_tests: 20, passed: 0 }])).toBeNull();
+  });
+});
+
+describe("runStateOf and tests that never ran", () => {
+  it("does not call a run finished when a test produced no answer", () => {
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 1 }),
+    ).toBe("gave_up");
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 0 }),
+    ).toBe("finished");
+    // Every test in it: that reads as none of them having run, not as some.
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 3 }),
+    ).toBe("none_run");
+  });
+
+  it("reads the same off a comparison's models", () => {
+    expect(
+      runStateOf({
+        status: "done",
+        model_results: [{ total_tests: 10, passed: 4, failed: 3 }],
+      }),
+    ).toBe("gave_up");
+    expect(
+      runStateOf({
+        status: "done",
+        model_results: [{ total_tests: 10, passed: 6, failed: 4 }],
+      }),
+    ).toBe("finished");
+  });
+
+  it("leaves a model that does not say how it did out of it", () => {
+    // Every model is listed with the tests it was given, answered or not, so
+    // a count of its own is the only thing that says any were skipped.
+    expect(
+      runStateOf({ status: "done", model_results: [{ total_tests: 10 }] }),
+    ).toBe("finished");
+  });
+});
+
+describe("a run that broke and was also stopped", () => {
+  it("says it broke, since that is what the reader has to act on", () => {
+    expect(runStateOf({ status: "failed", aborted: true })).toBe("error");
+  });
+});
+
+describe("a model that could not be run at all", () => {
+  it("means the run did not run everything", () => {
+    expect(
+      runStateOf({ status: "done", model_results: [{ success: false }] }),
+    ).toBe("gave_up");
+  });
+});
+
+describe("modelsUnansweredCount", () => {
+  it("counts tests, not tests times models", () => {
+    // Two models of 10 tests each: one left 2 untouched, the other 4. The run
+    // is still 10 tests, so the answer is 4, never 6.
+    expect(
+      modelsUnansweredCount([
+        { total_tests: 10, passed: 5, failed: 3 },
+        { total_tests: 10, passed: 4, failed: 2 },
+      ]),
+    ).toBe(4);
+  });
+
+  it("leaves a model that could not be run to the models count", () => {
+    // The cell says "1 model failed" beside this, so counting its tests here
+    // as well would say the same thing twice.
+    expect(modelsUnansweredCount([{ total_tests: 10, success: false }])).toBe(0);
+  });
+
+  it("counts the tests that produced no answer, not only the ones never reached", () => {
+    // A model that finished carries `failed = total - passed`, so its two
+    // unanswered tests are inside that 5 until they are taken back out.
+    expect(
+      modelsUnansweredCount([
+        { total_tests: 10, passed: 5, failed: 5, unanswered_tests: 2 },
+      ]),
+    ).toBe(2);
+  });
+
+  it("is zero when the models answered everything or say nothing", () => {
+    expect(
+      modelsUnansweredCount([{ total_tests: 10, passed: 6, failed: 4 }]),
+    ).toBe(0);
+    expect(modelsUnansweredCount([{ total_tests: 10 }])).toBe(0);
+    expect(modelsUnansweredCount(null)).toBe(0);
+  });
+});
+
+describe("a comparison where some tests produced no answer", () => {
+  it("scores the model on what it answered, not on what it was given", () => {
+    // The backend gives a finished model failed = total - passed, so without
+    // taking the unanswered tests out this would read 50% instead of 100%.
+    expect(
+      getModelPassRange([
+        { total_tests: 10, passed: 5, failed: 5, unanswered_tests: 5 },
+      ]),
+    ).toEqual({ lowest: 100, highest: 100, failedModels: 0 });
   });
 });

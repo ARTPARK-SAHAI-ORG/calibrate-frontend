@@ -24,6 +24,37 @@ describe("buildTestRunCsv", () => {
     expect(rows.map((r) => r.name)).toEqual(["a", "e", "f"]);
   });
 
+  it("keeps a test the run could not run, as not run", () => {
+    // Three tests on screen, three lines in the file. The row the run ended
+    // without a verdict for used to be dropped, so the file was shorter than
+    // the list with nothing to say why.
+    const results: ExportTestRow[] = [
+      { name: "a", status: "passed" },
+      { name: "b", status: "failed" },
+      { name: "c", status: "not_run" },
+    ];
+    const { rows } = buildTestRunCsv(results);
+    expect(rows.map((r) => r.name)).toEqual(["a", "b", "c"]);
+    expect(rows[2].status).toBe("not run");
+  });
+
+  it("leaves the tool-call verdict empty on a test that never ran", () => {
+    const results: ExportTestRow[] = [
+      {
+        name: "a",
+        status: "passed",
+        testCase: { evaluation: { type: "tool_call" } },
+      },
+      {
+        name: "b",
+        status: "not_run",
+        testCase: { evaluation: { type: "tool_call" } },
+      },
+    ];
+    const { rows } = buildTestRunCsv(results);
+    expect(rows[1].tool_call_result).toBe("");
+  });
+
   it("has the base columns with no tool-call and no evaluator data", () => {
     const results: ExportTestRow[] = [{ name: "a", status: "passed" }];
     const { columns } = buildTestRunCsv(results);
