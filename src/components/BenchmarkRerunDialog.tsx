@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
+import type { SelectedTest } from "./eval-details/SelectedTestsStrip";
 
 /**
  * A "direct benchmark rerun": start a fresh benchmark of the same models and
@@ -15,6 +16,9 @@ export type BenchmarkRerunConfig = {
   models: string[];
   testUuids: string[];
   testNames: string[];
+  /** How the run being rerun ran its models, so the rerun runs them the same
+   * way. Absent when the run predates the backend recording it. */
+  parallelModels?: boolean;
 };
 
 /**
@@ -45,6 +49,11 @@ type BenchmarkRerunDialogProps = {
   onBenchmarkCreated: (taskId: string, config: BenchmarkRerunConfig) => void;
   /** Rerun again from the completed rerun (same shape as start). */
   onRerun: (config: BenchmarkRerunConfig) => void;
+  /** Start a plain run of the tests ticked inside this window. Without it the
+   *  window shows no Run button for a ticked test. */
+  onRunTests?: (tests: SelectedTest[]) => Promise<unknown> | void;
+  /** Open the model picker on the tests ticked inside this window. */
+  onCompareTests?: (tests: SelectedTest[]) => void;
 };
 
 /**
@@ -58,6 +67,8 @@ export function BenchmarkRerunDialog({
   onClose,
   onBenchmarkCreated,
   onRerun,
+  onRunTests,
+  onCompareTests,
 }: BenchmarkRerunDialogProps) {
   if (!config) return null;
 
@@ -71,10 +82,11 @@ export function BenchmarkRerunDialog({
       testUuids={config.testUuids}
       testNames={config.testNames}
       models={config.models}
+      parallelModels={config.parallelModels}
       onBenchmarkCreated={(taskId) => onBenchmarkCreated(taskId, config)}
-      onRerun={(models, testUuids, testNames) =>
-        onRerun({ ...config, models, testUuids, testNames })
-      }
+      onRerun={(request) => onRerun({ ...config, ...request })}
+      onRunTests={onRunTests}
+      onCompareTests={onCompareTests}
     />
   );
 }

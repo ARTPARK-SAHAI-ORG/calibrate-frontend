@@ -253,6 +253,45 @@ export function TestRunSummary({
       ? `${formatTokens(tokens.min)} – ${formatTokens(tokens.max)}`
       : undefined;
 
+  // One card per number the run actually has. A card with nothing behind it
+  // says nothing, so it is left out rather than shown as a dash, and a run
+  // where no test produced an answer drops the whole row.
+  const cards: (React.ComponentProps<typeof MetricCard> & { key: string })[] =
+    [];
+  if (rate !== null)
+    cards.push({
+      key: "pass-rate",
+      label: "Pass rate",
+      value: formatPercent(rate),
+      subtitle: `${passed}/${total}`,
+      progress: rate,
+    });
+  const latencyValue = latencyP50(latency);
+  if (latencyValue != null)
+    cards.push({
+      key: "latency",
+      label: METRIC_LABELS.latency,
+      value: formatLatencyMs(latencyValue),
+      subtitle: latencyCaption,
+      info: "Median (p50) agent response time across all tests",
+    });
+  if (cost?.mean != null)
+    cards.push({
+      key: "cost",
+      label: METRIC_LABELS.cost,
+      value: formatCostUsd(cost.mean),
+      subtitle: costSubtitle,
+      info: "Average cost per test across all tests",
+    });
+  if (tokens?.mean != null)
+    cards.push({
+      key: "tokens",
+      label: METRIC_LABELS.tokens,
+      value: formatTokens(tokens.mean),
+      subtitle: tokensSubtitle,
+      info: "Average total input + output tokens per test across all tests",
+    });
+
   // How many tests ran covers the ones that were scored plus the ones that
   // were tried and gave no answer; the rest were never started. The wording
   // itself is shared with the model comparison's leaderboard.
@@ -315,32 +354,13 @@ export function TestRunSummary({
             </RunNote>
           </div>
         )}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard
-            label="Pass rate"
-            value={formatPercent(rate)}
-            subtitle={`${passed}/${total}`}
-            progress={rate ?? undefined}
-          />
-          <MetricCard
-            label={METRIC_LABELS.latency}
-            value={formatLatencyMs(latencyP50(latency))}
-            subtitle={latencyCaption}
-            info="Median (p50) agent response time across all tests"
-          />
-          <MetricCard
-            label={METRIC_LABELS.cost}
-            value={formatCostUsd(cost?.mean)}
-            subtitle={costSubtitle}
-            info="Average cost per test across all tests"
-          />
-          <MetricCard
-            label={METRIC_LABELS.tokens}
-            value={formatTokens(tokens?.mean)}
-            subtitle={tokensSubtitle}
-            info="Average total input + output tokens per test across all tests"
-          />
-        </div>
+        {cards.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {cards.map(({ key, ...card }) => (
+              <MetricCard key={key} {...card} />
+            ))}
+          </div>
+        )}
       </div>
 
       {(evaluators.length > 0 ||

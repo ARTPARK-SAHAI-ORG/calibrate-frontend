@@ -51,15 +51,6 @@ jest.mock("../../BenchmarkResultsDialog", () => ({
       </div>
     ) : null,
 }));
-jest.mock("../../BenchmarkRerunDialog", () => ({
-  BenchmarkRerunDialog: () => null,
-  useBenchmarkRerun: () => ({
-    config: null,
-    key: 0,
-    start: jest.fn(),
-    clear: jest.fn(),
-  }),
-}));
 
 const pastRun = {
   uuid: "run-7",

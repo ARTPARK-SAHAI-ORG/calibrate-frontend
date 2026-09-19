@@ -40,10 +40,6 @@ import {
   useAgentRunLaunchers,
   type AgentRunLauncherSettings,
 } from "./useAgentRunLaunchers";
-import {
-  BenchmarkRerunDialog,
-  useBenchmarkRerun,
-} from "@/components/BenchmarkRerunDialog";
 import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
 import { displayModelName } from "@/lib/modelName";
 
@@ -390,8 +386,6 @@ export function RunsTabContent({
     setRunIdParam(run.uuid);
   };
 
-  const benchmarkRerun = useBenchmarkRerun();
-
   // Run or compare the tests ticked inside an open results window, the same
   // way the Tests tab does it. A new plain run replaces the open window; a
   // comparison closes it once the picker has created the comparison.
@@ -712,15 +706,20 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
-          onRerun={(models, testUuids, testNames) => {
-            closeBenchmarkRun();
-            benchmarkRerun.start({
-              agentUuid,
-              agentName,
-              models,
-              testUuids,
-              testNames,
-            });
+          // The window stays open until a comparison actually exists, the
+          // way Compare on the ticked rows above does it: onComparisonCreated
+          // closes it. Closing here threw away the comparison the reader was
+          // reading the moment they clicked, so backing out of the picker,
+          // or having it refused, left them on a bare list.
+          onRerun={({ models, testUuids, testNames, parallelModels }) => {
+            void openCompare(
+              testUuids.map((uuid, index) => ({
+                uuid,
+                name: testNames[index] ?? "",
+              })),
+              false,
+              { models, parallelModels },
+            );
           }}
         />
       )}
@@ -741,14 +740,6 @@ export function RunsTabContent({
       )}
 
       {launcherDialogs}
-
-      <BenchmarkRerunDialog
-        config={benchmarkRerun.config}
-        rerunKey={benchmarkRerun.key}
-        onClose={benchmarkRerun.clear}
-        onBenchmarkCreated={() => void refetch()}
-        onRerun={benchmarkRerun.start}
-      />
     </div>
   );
 }

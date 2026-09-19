@@ -12,6 +12,7 @@ import {
   type OrganizationApiKey,
   type OrganizationApiKeyWithSecret,
   type OrganizationMember,
+  type OrganizationSettings,
   getRememberedOrgUuid,
   notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
@@ -28,6 +29,18 @@ type UseOrganizationsReturn = {
     uuid: string,
     name: string,
   ) => Promise<Organization | null>;
+  /** Change any part of a workspace. Only what is passed is changed, so
+   *  setting one thing never clears another. */
+  updateOrganization: (
+    uuid: string,
+    changes: OrganizationChanges,
+  ) => Promise<Organization | null>;
+};
+
+/** What can be changed about a workspace. */
+export type OrganizationChanges = {
+  name?: string;
+  settings?: OrganizationSettings;
 };
 
 /**
@@ -202,14 +215,17 @@ export function useOrganizations(
     [accessToken],
   );
 
-  const renameOrganization = useCallback(
-    async (uuid: string, name: string): Promise<Organization | null> => {
+  const updateOrganization = useCallback(
+    async (
+      uuid: string,
+      changes: OrganizationChanges,
+    ): Promise<Organization | null> => {
       if (!accessToken) return null;
       try {
         const updated = await apiClient<Organization>(
           `/organizations/${uuid}`,
           accessToken,
-          { method: "PATCH", body: { name } },
+          { method: "PATCH", body: changes },
         );
         setOrganizations((prev) => {
           const next = prev.map((o) => (o.uuid === uuid ? updated : o));
@@ -220,11 +236,16 @@ export function useOrganizations(
         notifyOrganizationsChanged(instanceRef.current);
         return updated;
       } catch (err) {
-        reportError("Error renaming organization:", err);
+        reportError("Error updating organization:", err);
         throw err;
       }
     },
     [accessToken],
+  );
+
+  const renameOrganization = useCallback(
+    (uuid: string, name: string) => updateOrganization(uuid, { name }),
+    [updateOrganization],
   );
 
   return {
@@ -234,6 +255,7 @@ export function useOrganizations(
     refetch,
     createOrganization,
     renameOrganization,
+    updateOrganization,
   };
 }
 

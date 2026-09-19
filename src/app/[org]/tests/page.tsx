@@ -19,7 +19,10 @@ import {
 } from "@/components/ToolPicker";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
-import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  BenchmarkResultsDialog,
+  type BenchmarkRerunRequest,
+} from "@/components/BenchmarkResultsDialog";
 import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
@@ -715,14 +718,12 @@ function LLMPageInner() {
   const handleRerunBenchmark = (
     agentUuid: string,
     agentName: string,
-    models: string[],
-    testUuids: string[],
-    testNames: string[],
+    request: BenchmarkRerunRequest,
   ) => {
     setViewingRunBenchmark(false);
     setSelectedRun(null);
     clearRunIdFromUrl();
-    benchmarkRerun.start({ agentUuid, agentName, models, testUuids, testNames });
+    benchmarkRerun.start({ agentUuid, agentName, ...request });
   };
 
   // Create test via POST /tests/bulk (used for both single and bulk flows for
@@ -2027,13 +2028,11 @@ function LLMPageInner() {
           models={[]}
           taskId={selectedRun.uuid}
           onRenamed={(name) => renameRunInList(selectedRun.uuid, name)}
-          onRerun={(models, testUuids, testNames) =>
+          onRerun={(request) =>
             handleRerunBenchmark(
               selectedRun.agent_id,
               selectedRun.agent_name,
-              models,
-              testUuids,
-              testNames,
+              request,
             )
           }
         />

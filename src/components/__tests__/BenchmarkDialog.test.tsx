@@ -8,11 +8,34 @@ import { toast } from "sonner";
 
 const mockUseOpenRouterModels = jest.fn();
 const mockUseAccessToken = jest.fn();
+const mockUseBenchmarkParallelDefault = jest.fn();
+const mockUpdateOrganization = jest.fn();
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useOpenRouterModels: (...args: unknown[]) => mockUseOpenRouterModels(...args),
   useAccessToken: (...args: unknown[]) => mockUseAccessToken(...args),
+  useActiveOrgUuid: () => ["org-1", jest.fn()],
+  // The dialog reads the workspace's own choice off this list. Undefined
+  // stands for a workspace whose choice has not been read yet.
+  useOrganizations: () => ({
+    organizations: [
+      {
+        uuid: "org-1",
+        settings: {
+          model_benchmarking: {
+            run_models_in_parallel: mockUseBenchmarkParallelDefault(),
+          },
+        },
+      },
+    ],
+    updateOrganization: mockUpdateOrganization,
+  }),
+}));
+
+jest.mock("../../lib/reportError", () => ({
+  __esModule: true,
+  reportError: jest.fn(),
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -72,10 +95,19 @@ jest.mock("../BenchmarkResultsDialog", () => ({
         })}
         <button onClick={props.onClose}>results-close</button>
         <button onClick={props.onGoBack}>results-go-back</button>
+        <button onClick={() => props.onRunTests?.(mockTickedTests)}>
+          results-run-ticked
+        </button>
+        <button onClick={() => props.onCompareTests?.(mockTickedTests)}>
+          results-compare-ticked
+        </button>
       </div>
     );
   },
 }));
+
+// What the reader ticked inside the comparison window.
+const mockTickedTests = [{ uuid: "test-2", name: "Test Two" }];
 
 jest.mock("../VerifyRequestPreviewDialog", () => ({
   __esModule: true,
@@ -167,6 +199,10 @@ describe("BenchmarkDialog", () => {
   beforeEach(() => {
     mockUseOpenRouterModels.mockReturnValue({ providers: providersFixture });
     mockUseAccessToken.mockReturnValue("test-token");
+    // The workspaces have not loaded yet, which is what the very first render
+    // sees in the app.
+    mockUseBenchmarkParallelDefault.mockReturnValue(undefined);
+    mockUpdateOrganization.mockResolvedValue({});
     process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";
     global.fetch = jest.fn();
     (signOut as jest.Mock).mockClear();
@@ -527,12 +563,12 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
 
     // Both panels open beside the box, so opening one closes the other.
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
@@ -913,12 +949,12 @@ describe("BenchmarkDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("build agent: has no Advanced settings and sends no run order", async () => {
+  it("build agent: has no way to run the models and sends no run order", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
 
     expect(
-      screen.queryByRole("button", { name: "Advanced settings" }),
+      screen.queryByRole("button", { name: "How to run the models" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Select a model"));
@@ -947,9 +983,9 @@ describe("BenchmarkDialog", () => {
     });
     render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
 
-    // Advanced settings starts closed, so the options are not on screen yet.
+    // The panel starts closed, so the options are not on screen yet.
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
     if (pickOrder) {
@@ -996,5 +1032,448 @@ describe("BenchmarkDialog", () => {
     expect(
       screen.getByText(/This will start the comparison on 7 tests with GPT-4o/),
     ).toBeInTheDocument();
+  });
+
+  it("hands Run and Compare on the ticked tests to the comparison window", async () => {
+    const user = setupUser();
+    const onRunTests = jest.fn();
+    const onCompareTests = jest.fn();
+    render(
+      <BenchmarkDialog
+        {...baseProps({ agentType: "agent", onRunTests, onCompareTests })}
+      />,
+    );
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await screen.findByTestId("benchmark-results-dialog");
+
+    await user.click(screen.getByText("results-run-ticked"));
+    expect(onRunTests).toHaveBeenCalledWith(mockTickedTests);
+    await user.click(screen.getByText("results-compare-ticked"));
+    expect(onCompareTests).toHaveBeenCalledWith(mockTickedTests);
+  });
+
+  describe("opening with the models a past comparison ran", () => {
+    it("names those models once the model list has arrived", async () => {
+      // The list of models comes from the backend, so it is empty on the first
+      // render, the way it is in the app.
+      mockUseOpenRouterModels.mockReturnValue({ providers: [] });
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+
+      mockUseOpenRouterModels.mockReturnValue({ providers: providersFixture });
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getByText("Claude 3 Haiku")).toBeInTheDocument();
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+    });
+
+    it("still shows a row for a model that is no longer offered, named by its id", async () => {
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "openai/gpt-retired"],
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("openai/gpt-retired")).toBeInTheDocument();
+      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+    });
+
+    it("ignores a repeated model and stops at five", async () => {
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: [
+              "openai/gpt-4o",
+              "openai/gpt-4o",
+              "openai/gpt-4o-mini",
+              "anthropic/claude-3-5-sonnet",
+              "anthropic/claude-3-haiku",
+              "google/gemini-pro",
+              "openai/gpt-retired",
+            ],
+          })}
+        />,
+      );
+
+      await screen.findByText("GPT-4o");
+      // Five rows, so no blank row is left to pick a sixth in.
+      expect(screen.getAllByTitle("Remove model")).toHaveLength(5);
+      expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
+      expect(screen.queryByText("openai/gpt-retired")).not.toBeInTheDocument();
+    });
+
+    it("leaves the models alone once the reader has changed them", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o"],
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(screen.getByTitle("Remove model"));
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+
+      // A new array of the same ids, the way a parent re-rendering passes it.
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o"],
+          })}
+        />,
+      );
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+    });
+
+    it("runs the comparison on the models it opened with", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o", "anthropic/claude-3-haiku"],
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual([
+        "openai/gpt-4o",
+        "anthropic/claude-3-haiku",
+      ]);
+    });
+
+    it("connection agent: opens on Sequential when that is what ran before, and sends it", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.parallelModels).toBe(false);
+      expect(payload.models).toEqual(["openai/gpt-4o"]);
+    });
+
+    it("closing puts Sequential back, not Parallel, and fills the models in again on the next open", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+      await user.click(screen.getByRole("radio", { name: "Parallel" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+            isOpen: false,
+          })}
+        />,
+      );
+      rerender(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: ["openai/gpt-4o"],
+            initialParallelModels: false,
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+    });
+  });
+
+  describe("the workspace default for how the models run", () => {
+    const connectionProps = { agentType: "connection" as const };
+
+    async function openAdvancedSettings(
+      user: ReturnType<typeof setupUser>,
+    ): Promise<void> {
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+    }
+
+    it("opens on the workspace default once it has loaded", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog {...baseProps(connectionProps)} />,
+      );
+
+      // The workspaces arrive after the first render.
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      rerender(<BenchmarkDialog {...baseProps(connectionProps)} />);
+
+      await openAdvancedSettings(user);
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
+    });
+
+    it("what a past comparison ran wins over the workspace default", async () => {
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({ ...connectionProps, initialParallelModels: true })}
+        />,
+      );
+
+      await openAdvancedSettings(user);
+      expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
+    });
+
+    it("a default that arrives late does not move a choice already made", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog {...baseProps(connectionProps)} />,
+      );
+
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Sequential" }));
+
+      mockUseBenchmarkParallelDefault.mockReturnValue(true);
+      rerender(<BenchmarkDialog {...baseProps(connectionProps)} />);
+
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+    });
+
+    async function pickSequentialAndRun(
+      user: ReturnType<typeof setupUser>,
+      { save }: { save: boolean },
+    ) {
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Sequential" }));
+      if (save) {
+        await user.click(
+          screen.getByRole("checkbox", {
+            name: "Save this as default",
+          }),
+        );
+      }
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    }
+
+    it("saves the choice for the workspace when the box is ticked", async () => {
+      // A connection agent checks its connection with each model before the
+      // comparison starts, so the save is only right once that has passed.
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() =>
+        expect(mockUpdateOrganization).toHaveBeenCalledWith("org-1", {
+          settings: { model_benchmarking: { run_models_in_parallel: false } },
+        }),
+      );
+    });
+
+    it("saves nothing when the connection check is cancelled", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      // Start the comparison on a connection agent opens the connection
+      // check, it does not start the comparison. Backing out here means no
+      // comparison ever ran, so the workspace must be left alone.
+      const check = screen.getByTestId("verify-dialog");
+      // Scoped: the picker's own footer has a Cancel too.
+      await user.click(within(check).getByText("Cancel"));
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing when a model fails its connection check", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: false, error: "no" }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("benchmark-results-dialog"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing when the box is left unticked", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: false });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("does not offer to save a choice the workspace already makes", async () => {
+      // Nothing to save, so the box is not there to tick.
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(
+        screen.queryByRole("checkbox", { name: "Save this as default" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers to save once the choice differs from the workspace", async () => {
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Parallel" }));
+
+      expect(
+        screen.getByRole("checkbox", { name: "Save this as default" }),
+      ).toBeInTheDocument();
+    });
+
+    it("saves nothing when the reader cancels before starting", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getAllByRole("button", { name: "Cancel" }).slice(-1)[0],
+      );
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("starts the comparison even when the default cannot be saved", async () => {
+      mockUpdateOrganization.mockRejectedValue(new Error("save failed"));
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.parallelModels).toBe(false);
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "The workspace default was not saved.",
+        ),
+      );
+    });
   });
 });

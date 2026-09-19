@@ -56,7 +56,10 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
+import {
+  benchmarkAnsweredPassFail,
+  type BenchmarkLeaderboardSummaryRow,
+} from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -70,6 +73,9 @@ type BenchmarkStatusResponse = {
    * models — not repeated per model). Used to rerun the same subset. Absent on
    * benchmarks that predate the backend snapshot. */
   test_uuids?: string[];
+  /** Whether this comparison ran its models at the same time. Absent on
+   * comparisons made before the backend recorded it. */
+  parallel_models?: boolean | null;
   results_s3_prefix?: string;
   /** Why the run could not be carried out, as text. Older runs carry true or
    * false instead. */
@@ -80,6 +86,16 @@ type BenchmarkStatusResponse = {
   share_token?: string | null;
   /** True when someone stopped the run before it finished. */
   aborted?: boolean;
+};
+
+/** What a rerun of a finished comparison needs to start the same run again. */
+export type BenchmarkRerunRequest = {
+  models: string[];
+  testUuids: string[];
+  testNames: string[];
+  /** How the original comparison ran its models. Absent when the comparison
+   * predates the backend recording it. */
+  parallelModels?: boolean;
 };
 
 type BenchmarkResultsDialogProps = {
@@ -103,14 +119,10 @@ type BenchmarkResultsDialogProps = {
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
   // Called when the user clicks "Rerun" on a completed benchmark. Hands the
-  // parent the models, the executed test uuids (the subset to rerun), and the
-  // test names (for progress display) so it can start a fresh benchmark and
-  // open it in a new dialog. Takes precedence over `onGoBack` when provided.
-  onRerun?: (
-    models: string[],
-    testUuids: string[],
-    testNames: string[],
-  ) => void;
+  // parent everything a fresh benchmark of the same run needs, so it can start
+  // one and open it in a new dialog. Takes precedence over `onGoBack` when
+  // provided.
+  onRerun?: (request: BenchmarkRerunRequest) => void;
   /** Called after the run is renamed, with the name as it now reads, so the
    * list behind this window shows it too. */
   onRenamed?: (name: string) => void;
@@ -174,6 +186,12 @@ export function BenchmarkResultsDialog({
   // The test uuids this benchmark executed, from the status response. Drives
   // the rerun subset; empty on legacy benchmarks that predate the snapshot.
   const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
+  // Whether this run's models ran at the same time, from the status response.
+  // Handed to a rerun so it runs them the same way; undefined on comparisons
+  // that predate the backend recording it.
+  const [runParallelModels, setRunParallelModels] = useState<
+    boolean | undefined
+  >(undefined);
   // Someone stopped this run before it finished. The results already collected
   // are kept; the models and tests not reached were never run.
   const [wasStopped, setWasStopped] = useState(false);
@@ -420,6 +438,13 @@ export function BenchmarkResultsDialog({
       setRunTestUuids(
         Array.isArray(result.test_uuids) ? result.test_uuids : [],
       );
+      // Read as a boolean on purpose: a stored `false` (the models ran one
+      // after another) has to survive, and only a missing value is undefined.
+      setRunParallelModels(
+        typeof result.parallel_models === "boolean"
+          ? result.parallel_models
+          : undefined,
+      );
 
       // Update model results (intermediate or final)
       if (result.model_results) {
@@ -610,6 +635,16 @@ export function BenchmarkResultsDialog({
   const hasAnyResults = modelResults.some(
     (m) => m.test_results && m.test_results.length > 0,
   );
+  // A comparison that ran a test which produced no answer did not cover every
+  // test either, so its mark reads the same as a plain run's. The counts are
+  // per model, and one test that could not be run under two models counts
+  // under each, which is also how the total is counted.
+  const answerCounts = modelResults.map((m) => benchmarkAnsweredPassFail(m));
+  const unansweredTests = answerCounts.reduce(
+    (n, c) => n + (c?.unanswered ?? 0),
+    0,
+  );
+  const scoredTests = answerCounts.reduce((n, c) => n + (c?.answered ?? 0), 0);
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -660,7 +695,15 @@ export function BenchmarkResultsDialog({
   // Try again. A failed run that kept rows shows the header's Rerun as usual.
   const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
   const handleRerunClick = canDirectRerun
-    ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)
+    ? () =>
+        onRerun!({
+          models: rerunModels,
+          testUuids: rerunTestUuids,
+          testNames: rerunTestNames,
+          // The run itself is the truth; the prop covers a run this window
+          // started that came back without the field.
+          parallelModels: runParallelModels ?? parallelModels,
+        })
     : onGoBack;
 
   return (
@@ -678,6 +721,8 @@ export function BenchmarkResultsDialog({
                         error || failureReason !== null ? "failed" : taskStatus,
                       aborted: wasStopped,
                       stopped_early: stoppedEarly,
+                      unanswered_tests: unansweredTests,
+                      total_tests: unansweredTests + scoredTests,
                     }) ?? "finished"
                   }
                 />

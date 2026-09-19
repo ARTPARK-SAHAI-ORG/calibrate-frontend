@@ -216,6 +216,13 @@ jest.mock("../../BenchmarkDialog", () => ({
         <button onClick={() => props.onBenchmarkCreated?.("bench-1")}>
           TriggerBenchmarkCreated
         </button>
+        <button
+          onClick={() =>
+            props.onRunTests?.([{ uuid: "t2", name: "Tool call test" }])
+          }
+        >
+          RunTestsFromComparison
+        </button>
         <button onClick={props.onClose}>CloseBenchmark</button>
       </div>
     ) : null;
@@ -1479,6 +1486,30 @@ describe("TestsTabContent: run and compare from the run window", () => {
     await user.click(screen.getByText("CloseBenchmark"));
     expect(screen.queryByTestId("benchmark-dialog")).not.toBeInTheDocument();
     expect(onRunWindowClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves no second copy of a run started from inside the comparison window", async () => {
+    const onRunWindowClosed = jest.fn();
+    const user = setupUser();
+    renderComponent({ onRunWindowClosed });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTestId("compare-header"));
+    await screen.findByTestId("benchmark-dialog");
+    await user.click(screen.getByText("TriggerBenchmarkCreated"));
+    state.startRun = { task_id: "task-from-comparison" };
+
+    await user.click(screen.getByText("RunTestsFromComparison"));
+    await user.click(screen.getByRole("button", { name: "Start the run" }));
+
+    // Closing the comparison window lands the reader on Evaluations, which
+    // opens the run from the address. A copy left open here would be hidden
+    // behind that tab and still read the same run over and over.
+    await waitFor(() =>
+      expect(onRunWindowClosed).toHaveBeenCalledTimes(1),
+    );
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(setRunIdParamMock).toHaveBeenLastCalledWith("task-from-comparison");
   });
 
   it("cancelling the picker from the window keeps the window and switches no tab", async () => {

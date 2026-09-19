@@ -16,6 +16,7 @@ import {
   isTypingTarget,
   ResultPager,
   TestStats,
+  TestCouldNotRunNotice,
   type JudgeResult,
   type TestRunEvaluator,
   type TestCaseHistory,
@@ -1175,5 +1176,29 @@ describe("EvaluationCriteriaPanel", () => {
       />,
     );
     expect(screen.getByText("Expected Tool Calls")).toBeInTheDocument();
+  });
+});
+
+describe("TestCouldNotRunNotice", () => {
+  const reason = "Could not connect to agent at https://x.example/agents/1";
+
+  it("keeps the reason behind View details until it is opened", async () => {
+    const user = setupUser();
+    render(<TestCouldNotRunNotice reason={reason} />);
+
+    // The long connection error is not on screen to start with.
+    const details = screen.getByText(reason).closest("details");
+    expect(details).not.toHaveAttribute("open");
+
+    await user.click(screen.getByText("View details"));
+    expect(details).toHaveAttribute("open");
+  });
+
+  it("shows no View details button when the backend gave no reason", () => {
+    render(<TestCouldNotRunNotice />);
+    expect(
+      screen.getByText("This test could not be run"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("View details")).not.toBeInTheDocument();
   });
 });

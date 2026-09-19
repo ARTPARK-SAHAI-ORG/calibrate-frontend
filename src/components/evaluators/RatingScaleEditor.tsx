@@ -6,6 +6,28 @@ export type RatingScaleRow = {
   description: string;
 };
 
+function numericValue(value: number | string) {
+  return typeof value === "number" ? value : Number(value) || 0;
+}
+
+const RANKS = {
+  best: {
+    box: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
+    label: "Best",
+    labelClass: "text-green-700 dark:text-green-400",
+  },
+  middle: {
+    box: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    label: "",
+    labelClass: "",
+  },
+  worst: {
+    box: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+    label: "Worst",
+    labelClass: "text-red-700 dark:text-red-400",
+  },
+} as const;
+
 type RatingScaleEditorProps<T extends RatingScaleRow> = {
   rows: T[];
   onChange: (rows: T[]) => void;
@@ -28,16 +50,19 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
   };
 
   const addRow = () => {
-    const maxVal = rows.reduce((max, row) => {
-      const numeric =
-        typeof row.value === "number" ? row.value : Number(row.value) || 0;
-      return Math.max(max, numeric);
-    }, 0);
+    const maxVal = rows.reduce(
+      (max, row) => Math.max(max, numericValue(row.value)),
+      0,
+    );
     onChange([
       ...rows,
       { value: maxVal + 1, name: "", description: "" } as T,
     ]);
   };
+
+  const values = rows.map((row) => numericValue(row.value));
+  const highest = Math.max(...values);
+  const lowest = Math.min(...values);
 
   return (
     <div>
@@ -47,24 +72,59 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
       <p className="text-xs md:text-sm text-muted-foreground mb-2">
         {description}
       </p>
+      <div className="flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 p-3 mb-4 text-xs md:text-sm text-blue-700 dark:text-blue-300">
+        <svg
+          className="w-4 h-4 mt-0.5 flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.75}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+          />
+        </svg>
+        <span>The highest number is the best and the lowest number is the worst</span>
+      </div>
       <div className="space-y-4">
         {rows.map((row, idx) => {
           const missingLabel = validationAttempted && !row.name.trim();
+          const rank =
+            highest === lowest
+              ? null
+              : values[idx] === highest
+                ? "best"
+                : values[idx] === lowest
+                  ? "worst"
+                  : "middle";
           return (
             <div key={idx}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={
-                    typeof row.value === "number"
-                      ? row.value
-                      : Number(row.value) || 0
-                  }
-                  onChange={(e) =>
-                    updateRow(idx, { value: Number(e.target.value) } as Partial<T>)
-                  }
-                  className="w-20 h-9 md:h-10 px-2 rounded-md text-sm md:text-base border border-border bg-background dark:bg-accent text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center"
-                />
+              <div className="flex items-start gap-2">
+                <div className="w-20 flex-shrink-0">
+                  <input
+                    type="number"
+                    value={values[idx]}
+                    onChange={(e) =>
+                      updateRow(idx, {
+                        value: Number(e.target.value),
+                      } as Partial<T>)
+                    }
+                    className={`w-full h-9 md:h-10 px-2 rounded-md text-sm md:text-base font-medium border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center ${
+                      rank
+                        ? RANKS[rank].box
+                        : "border-border bg-background dark:bg-accent text-foreground"
+                    }`}
+                  />
+                  {rank && RANKS[rank].label && (
+                    <p
+                      className={`mt-1 text-center text-xs font-medium ${RANKS[rank].labelClass}`}
+                    >
+                      {RANKS[rank].label}
+                    </p>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={row.name}
