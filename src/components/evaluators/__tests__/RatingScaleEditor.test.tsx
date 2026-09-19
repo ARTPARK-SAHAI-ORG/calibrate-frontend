@@ -223,3 +223,62 @@ describe("RatingScaleEditor", () => {
     expect(screen.getByDisplayValue("7")).toBeInTheDocument();
   });
 });
+
+describe("RatingScaleEditor score direction", () => {
+  function renderRows(rows: RatingScaleRow[]) {
+    render(
+      <RatingScaleEditor
+        rows={rows}
+        onChange={jest.fn()}
+        validationAttempted={false}
+        description="Describe the scale"
+        descriptionPlaceholder="Criteria placeholder"
+      />,
+    );
+  }
+
+  it("says which end of the scale is best and which is worst", () => {
+    renderRows(baseRows());
+    expect(
+      screen.getByText(
+        "The highest number is the best and the lowest number is the worst",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("marks the highest number Best and the lowest Worst", () => {
+    renderRows(baseRows());
+    expect(screen.getByText("Best")).toBeInTheDocument();
+    expect(screen.getByText("Worst")).toBeInTheDocument();
+  });
+
+  it("reads the ends from the number, not the row order", () => {
+    renderRows([
+      { value: 3, name: "", description: "" },
+      { value: 1, name: "", description: "" },
+      { value: 2, name: "", description: "" },
+    ]);
+    expect(screen.getByDisplayValue("3").className).toContain("green");
+    expect(screen.getByDisplayValue("1").className).toContain("red");
+    expect(screen.getByDisplayValue("2").className).toContain("amber");
+  });
+
+  it("colours the ends green and red and everything between amber", () => {
+    renderRows(baseRows());
+    expect(screen.getByDisplayValue("1").className).toContain("bg-red-500/10");
+    expect(screen.getByDisplayValue("2").className).toContain("bg-amber-500/10");
+    expect(screen.getByDisplayValue("3").className).toContain("bg-green-500/10");
+  });
+
+  it("colours nothing when every row holds the same number", () => {
+    renderRows([
+      { value: 1, name: "", description: "" },
+      { value: 1, name: "", description: "" },
+    ]);
+    expect(screen.queryByText("Best")).not.toBeInTheDocument();
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+    expect(screen.getAllByDisplayValue("1")[0].className).toContain(
+      "border-border",
+    );
+  });
+});
