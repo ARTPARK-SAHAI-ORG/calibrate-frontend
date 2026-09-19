@@ -184,17 +184,6 @@ export function TestRunnerDialog({
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
 
-  // The left and right arrow keys step from run to run, the same as the
-  // buttons above. No Escape: this window opens windows of its own, and a
-  // press meant for one of those would close everything underneath it.
-  useDialogNavKeys({
-    isOpen,
-    hasPrev: hasPrevRun,
-    onPrev: onPrevRun,
-    hasNext: hasNextRun,
-    onNext: onNextRun,
-  });
-
   const backendAccessToken = useAccessToken();
   // The last server response. The only source of truth for run content.
   const [run, setRun] = useState<TestRunStatusResponse | null>(null);
@@ -219,6 +208,7 @@ export function TestRunnerDialog({
     "tests",
   );
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+
   // Tests read in full, keyed by test id. The run itself is read without each
   // case's conversation, reply and verdicts, so the one the reader opens is
   // asked for on its own.
@@ -235,6 +225,25 @@ export function TestRunnerDialog({
   // only when clicked, so it is read then rather than with the run.
   const [fullResults, setFullResults] = useState<TestCaseResult[] | null>(null);
   const [isPreparingLabelling, setIsPreparingLabelling] = useState(false);
+
+  // Stepping to another run is off while this window is busy with the run on
+  // screen or has a dialog of its own on top: the reader's next click or key
+  // belongs to that, and the run underneath must not change beneath it.
+  const runStepBusy = addToTaskOpen || isPreparingLabelling;
+  const stepPrevRun = runStepBusy ? undefined : onPrevRun;
+  const stepNextRun = runStepBusy ? undefined : onNextRun;
+
+  // The left and right arrow keys step from run to run, the same as the
+  // buttons above. No Escape: this window opens windows of its own, and a
+  // press meant for one of those would close everything underneath it.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev: hasPrevRun,
+    onPrev: stepPrevRun,
+    hasNext: hasNextRun,
+    onNext: stepNextRun,
+  });
+
   // Guards the rerun POST: a test run is billed, so a second click while the
   // first request is in flight must not start a second run.
   const [isStartingRun, setIsStartingRun] = useState(false);
@@ -557,6 +566,11 @@ export function TestRunnerDialog({
     [rows, openedCases, loadingCaseId],
   );
 
+  // The run the window is showing right now, readable from inside a request
+  // that started before the reader stepped to another run.
+  const taskIdRef = useRef(taskId);
+  taskIdRef.current = taskId;
+
   // Every case in full, read once and kept. Export and Submit for labelling
   // both need each test's conversation, reply and verdicts, which the run
   // itself leaves out. Null when it could not be read.
@@ -572,6 +586,11 @@ export function TestRunnerDialog({
         "full",
       );
       const results = full.results ?? [];
+      // The window can be pointed at another run while this read is in
+      // flight (rerun, or stepping to the next run). Keeping the answer then
+      // would hand these results to whoever asks next, under the other run's
+      // name, so it is used once and not kept.
+      if (taskIdRef.current !== taskId) return results;
       setFullResults(results);
       return results;
     } catch (error) {
@@ -701,35 +720,31 @@ export function TestRunnerDialog({
               )}
             </div>
           </div>
-          {/* Previous / next run, in the middle of the header. The stepping
-              through this run's own tests takes that spot while a test is
-              open, since that is what the reader is reading right then; the
-              arrow keys still step run to run either way. */}
-          {!(activeTab === "tests" && nav && selectedTestUuid) && (
-            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <DialogNavHeader
-                inline
-                noun="evaluation"
-                onPrev={onPrevRun}
-                onNext={onNextRun}
-                hasPrev={hasPrevRun}
-                hasNext={hasNextRun}
-                position={runPosition}
-              />
-            </div>
-          )}
-          {/* Previous/Next pager - centered, desktop only. Tests tab only. */}
-          {activeTab === "tests" && nav && selectedTestUuid && (
-            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          {/* The middle of the header holds one of two things: stepping
+              through this run's own tests while one is open, since that is
+              what the reader is reading right then, and otherwise stepping
+              from this run to the next. The arrow keys step run to run
+              either way. */}
+          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            {activeTab === "tests" && nav && selectedTestUuid ? (
               <ResultPager
                 currentIndex={nav.currentIndex}
                 total={nav.total}
                 onPrev={nav.goPrev}
                 onNext={nav.goNext}
               />
-            </div>
-          )}
-          {/* Right: action buttons + close */}
+            ) : (
+              <DialogNavHeader
+                inline
+                noun="evaluation"
+                onPrev={stepPrevRun}
+                onNext={stepNextRun}
+                hasPrev={hasPrevRun}
+                hasNext={hasNextRun}
+                position={runPosition}
+              />
+            )}
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Export results — only shown when run is done */}
             {isFinished && rows.length > 0 && (
@@ -778,6 +793,7 @@ export function TestRunnerDialog({
                       return;
                     }
                     if (isPreparingLabelling) return;
+                    const startedOn = taskId;
                     setIsPreparingLabelling(true);
                     try {
                       // Each test goes over as its conversation, the agent's
@@ -790,6 +806,11 @@ export function TestRunnerDialog({
                         );
                         return;
                       }
+                      // The window can be pointed at another run while
+                      // that read is in flight. These results and ticks
+                      // belong to the run it started on, so they are dropped
+                      // rather than submitted under the run now on screen.
+                      if (taskIdRef.current !== startedOn) return;
                       setAddToTaskOpen(true);
                     } finally {
                       setIsPreparingLabelling(false);

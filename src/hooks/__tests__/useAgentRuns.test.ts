@@ -279,6 +279,33 @@ describe("useAgentRuns loadedOffset", () => {
     await waitFor(() => expect(result.current.loadedOffset).toBe(50));
     expect(result.current.offset).toBe(50);
   });
+
+  it("keeps the page in hand and the page it moves to the same when an around answer names no page", async () => {
+    // An older backend answers the `around` read without saying which page it
+    // sent, so the hook falls back to page one. The page it moves to and the
+    // page the rows came from have to be that same page: a caller stepping
+    // item by item counts from one and the list pages from the other.
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ items: [runB], total: 200 }),
+    ) as jest.Mock;
+
+    const { result } = renderHook(() =>
+      useAgentRuns({
+        agentUuid: AGENT_UUID,
+        accessToken: "tok",
+        pageSize: 50,
+        filter: "all",
+        aroundRunId: "run-b",
+        // Started on a later page, so falling back really does move.
+        initialOffset: 50,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.items).toEqual([runB]));
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(result.current.loadedOffset).toBe(0);
+    expect(result.current.loadedOffset).toBe(result.current.offset);
+  });
 });
 
 describe("useAgentRuns background refresh", () => {

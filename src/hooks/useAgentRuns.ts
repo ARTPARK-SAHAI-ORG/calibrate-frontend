@@ -212,14 +212,17 @@ export function useAgentRuns({
         const data = await response.json();
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
-        setLoadedOffset(
-          useAround && typeof data?.offset === "number"
+        // Where the rows just read actually start. An `around` read lands
+        // wherever that run's page is, which the backend answers with; a
+        // plain read lands on what it asked for. Read once, so the page the
+        // list moves to and the page the rows came from cannot disagree.
+        const landedOffset = useAround
+          ? typeof data?.offset === "number"
             ? data.offset
-            : targetOffset,
-        );
+            : 0
+          : targetOffset;
+        setLoadedOffset(landedOffset);
         if (useAround) {
-          const landedOffset =
-            typeof data?.offset === "number" ? data.offset : 0;
           // Already have this page's rows right here — only bother the
           // fetch effect if landing actually moves `offset` off of what it
           // was, and tell it to skip the request that move would trigger.

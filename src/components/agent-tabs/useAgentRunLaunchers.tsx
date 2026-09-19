@@ -343,6 +343,17 @@ export function useAgentRunLaunchers({
   );
 
   return {
+    /**
+     * Whether one of these dialogs is on top right now. A window underneath
+     * must not act on a key press meant for the dialog covering it: stepping
+     * the run under an open model picker swapped the window out from under
+     * the reader mid-choice.
+     */
+    isDialogOpen:
+      benchmarkDialogOpen ||
+      enableBenchmarkOpen ||
+      runToConfirm !== null ||
+      pendingRun !== null,
     isConnectionUnverified,
     // Greyed out only when nothing here can turn benchmarking on.
     isBenchmarkDisabled: isBenchmarkDisabled && !canEnableBenchmarkHere,

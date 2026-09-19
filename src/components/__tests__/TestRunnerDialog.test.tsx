@@ -2519,65 +2519,111 @@ describe("stepping from run to run", () => {
     );
   }
 
-  it("shows the arrows and where this run sits in the list", async () => {
-    renderNav(navProps);
-    await screen.findByTestId("summary-panel");
+  /** A promise this test resolves by hand, so a read can be held in flight
+   * while the window is pointed at another run. */
+  function deferred() {
+    let release: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { promise, release: () => release() };
+  }
 
-    expect(
-      screen.getByRole("button", { name: "Previous evaluation" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Next evaluation" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("12 of 341")).toBeInTheDocument();
-  });
+  /** Two finished runs, with the full read of `task-a` held open until
+   * `releaseFullA` is called, so the window can be pointed at `task-b` while
+   * that read is still in flight. `fullReads` records which runs were read in
+   * full, in order. */
+  function renderTwoRuns(
+    props: Partial<React.ComponentProps<typeof TestRunnerDialog>> = {},
+  ) {
+    const fullA = deferred();
+    const fullReads: string[] = [];
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      const address = String(url);
+      if (address.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      for (const id of ["task-a", "task-b"]) {
+        if (!isRunDetail(address, id)) continue;
+        const body = {
+          task_id: id,
+          status: "completed",
+          results: [
+            {
+              test_case_id: `${id}-one`,
+              name: `${id} One`,
+              passed: true,
+              test_case: { evaluation: { type: "response" } },
+            },
+          ],
+        };
+        if (address.includes("mode=summary")) {
+          return Promise.resolve(jsonResponse(body));
+        }
+        fullReads.push(id);
+        return id === "task-a"
+          ? fullA.promise.then(() => jsonResponse(body))
+          : Promise.resolve(jsonResponse(body));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${address}`));
+    });
 
-  it("steps to the run before and the run after", async () => {
+    const element = (taskId: string) => (
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId={taskId}
+        {...props}
+      />
+    );
+    const view = render(element("task-a"));
+    return {
+      fullReads,
+      releaseFullA: async () => {
+        await act(async () => {
+          fullA.release();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      },
+      showRun: async (taskId: string) => {
+        view.rerender(element(taskId));
+        await flush();
+      },
+    };
+  }
+
+  /** Open the run's tests and tick its one labellable row. */
+  async function tickFirstTest(
+    user: ReturnType<typeof setupUser>,
+    taskId: string,
+  ) {
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(
+      screen.getByRole("button", { name: `toggle-labelling-${taskId}-one` }),
+    );
+  }
+
+  // What the arrows look like at each end of the list, and that they are not
+  // drawn for a single run, is proved once in
+  // src/components/ui/__tests__/DialogNavHeader.test.tsx. All this window has
+  // to prove is that its own run stepping reaches that header.
+  it("hands this run's place in the list and its stepping to the header", async () => {
     const onPrevRun = jest.fn();
     const onNextRun = jest.fn();
     renderNav({ ...navProps, onPrevRun, onNextRun });
     const user = setupUser();
     await screen.findByTestId("summary-panel");
 
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next evaluation" }));
     expect(onNextRun).toHaveBeenCalledTimes(1);
     await user.click(
       screen.getByRole("button", { name: "Previous evaluation" }),
     );
     expect(onPrevRun).toHaveBeenCalledTimes(1);
-  });
-
-  it("greys out each arrow at its end of the list", async () => {
-    renderNav({ ...navProps, hasPrevRun: false, hasNextRun: true });
-    await screen.findByTestId("summary-panel");
-
-    expect(
-      screen.getByRole("button", { name: "Previous evaluation" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Next evaluation" }),
-    ).toBeEnabled();
-  });
-
-  it("draws no arrows when nothing is stepping through runs", async () => {
-    renderNav();
-    await screen.findByTestId("summary-panel");
-
-    expect(
-      screen.queryByRole("button", { name: "Previous evaluation" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Next evaluation" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("draws no arrows when the list holds only this run", async () => {
-    renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
-    await screen.findByTestId("summary-panel");
-
-    expect(
-      screen.queryByRole("button", { name: "Next evaluation" }),
-    ).not.toBeInTheDocument();
   });
 
   it("steps run to run with the left and right arrow keys", async () => {
@@ -2621,5 +2667,70 @@ describe("stepping from run to run", () => {
 
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not open the labelling window for a run the reader has stepped away from", async () => {
+    const { showRun, releaseFullA } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+    await tickFirstTest(user, "task-a");
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    expect(screen.getByRole("button", { name: "Preparing…" })).toBeDisabled();
+
+    // The reader steps to the next run while the read is still going.
+    await showRun("task-b");
+    await releaseFullA();
+
+    expect(screen.queryByTestId("labelling-dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not keep one run's full results for the run stepped to next", async () => {
+    const { showRun, releaseFullA, fullReads } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    expect(fullReads).toEqual(["task-a"]);
+
+    await showRun("task-b");
+    await releaseFullA();
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await flush();
+    expect(fullReads).toEqual(["task-a", "task-b"]);
+  });
+
+  it("does not step run to run while the labelling window is open", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    const { releaseFullA } = renderTwoRuns({
+      ...navProps,
+      onPrevRun,
+      onNextRun,
+    });
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+    await tickFirstTest(user, "task-a");
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    await releaseFullA();
+    expect(await screen.findByTestId("labelling-dialog")).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Previous evaluation" }),
+    ).not.toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}");
+    await user.keyboard("{ArrowLeft}");
+    expect(onNextRun).not.toHaveBeenCalled();
+    expect(onPrevRun).not.toHaveBeenCalled();
   });
 });

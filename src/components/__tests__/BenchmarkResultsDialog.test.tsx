@@ -2250,65 +2250,100 @@ describe("stepping from run to run", () => {
     );
   }
 
-  it("shows the arrows and where this comparison sits in the list", async () => {
-    renderNav(navProps);
-    await screen.findByTestId("leaderboard");
+  /** A promise this test resolves by hand, so a read can be held in flight
+   * while the window is pointed at another comparison. */
+  function deferred() {
+    let release: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { promise, release: () => release() };
+  }
 
-    expect(
-      screen.getByRole("button", { name: "Previous evaluation" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Next evaluation" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("12 of 341")).toBeInTheDocument();
-  });
+  /** Two finished comparisons, with the full read of `bench-a` held open until
+   * `releaseFullA` is called, so the window can be pointed at `bench-b` while
+   * that read is still in flight. `fullReads` records which comparisons were
+   * read in full, in order. */
+  function renderTwoRuns(
+    props: Partial<React.ComponentProps<typeof BenchmarkResultsDialog>> = {},
+  ) {
+    const fullA = deferred();
+    const fullReads: string[] = [];
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      const address = String(url);
+      for (const id of ["bench-a", "bench-b"]) {
+        if (!isBenchmarkDetail(address, id)) continue;
+        const body = {
+          task_id: id,
+          status: "completed",
+          name: `Run ${id}`,
+          model_results: [
+            {
+              model: "gpt-4",
+              success: true,
+              message: "",
+              total_tests: 1,
+              passed: 1,
+              failed: 0,
+              test_results: [{ name: `${id} One`, passed: true }],
+            },
+          ],
+        };
+        if (address.includes("mode=summary")) {
+          return Promise.resolve(jsonResponse(body));
+        }
+        fullReads.push(id);
+        return id === "bench-a"
+          ? fullA.promise.then(() => jsonResponse(body))
+          : Promise.resolve(jsonResponse(body));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${address}`));
+    });
 
-  it("steps to the run before and the run after", async () => {
+    const element = (taskId: string) => (
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId={taskId}
+        {...props}
+      />
+    );
+    const view = render(element("bench-a"));
+    return {
+      fullReads,
+      releaseFullA: async () => {
+        await act(async () => {
+          fullA.release();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      },
+      showRun: async (taskId: string) => {
+        view.rerender(element(taskId));
+        await flush();
+      },
+    };
+  }
+
+  // What the arrows look like at each end of the list, and that they are not
+  // drawn for a single run, is proved once in
+  // src/components/ui/__tests__/DialogNavHeader.test.tsx. All this window has
+  // to prove is that its own run stepping reaches that header.
+  it("hands this comparison's place in the list and its stepping to the header", async () => {
     const onPrevRun = jest.fn();
     const onNextRun = jest.fn();
     renderNav({ ...navProps, onPrevRun, onNextRun });
     const user = setupUser();
     await screen.findByTestId("leaderboard");
 
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next evaluation" }));
     expect(onNextRun).toHaveBeenCalledTimes(1);
     await user.click(
       screen.getByRole("button", { name: "Previous evaluation" }),
     );
     expect(onPrevRun).toHaveBeenCalledTimes(1);
-  });
-
-  it("greys out each arrow at its end of the list", async () => {
-    renderNav({ ...navProps, hasPrevRun: true, hasNextRun: false });
-    await screen.findByTestId("leaderboard");
-
-    expect(
-      screen.getByRole("button", { name: "Previous evaluation" }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Next evaluation" }),
-    ).toBeDisabled();
-  });
-
-  it("draws no arrows when nothing is stepping through runs", async () => {
-    renderNav();
-    await screen.findByTestId("leaderboard");
-
-    expect(
-      screen.queryByRole("button", { name: "Previous evaluation" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Next evaluation" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("draws no arrows when the list holds only this run", async () => {
-    renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
-    await screen.findByTestId("leaderboard");
-
-    expect(
-      screen.queryByRole("button", { name: "Next evaluation" }),
-    ).not.toBeInTheDocument();
   });
 
   it("steps run to run with the left and right arrow keys", async () => {
@@ -2332,5 +2367,91 @@ describe("stepping from run to run", () => {
 
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("gives the middle of the header to the open test's own stepping", async () => {
+    renderNav(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    // With no test open, the arrows step from this comparison to the next.
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("setnav"));
+
+    // Reading one test, that test's own Previous / Next takes the middle.
+    expect(await screen.findByTestId("result-pager")).toBeInTheDocument();
+    expect(screen.queryByText("12 of 341")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not open the labelling window for a comparison the reader has stepped away from", async () => {
+    const { showRun, releaseFullA } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("togglelabel0"));
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    expect(screen.getByRole("button", { name: "Preparing…" })).toBeDisabled();
+
+    // The reader steps to the next comparison while the read is still going.
+    await showRun("bench-b");
+    await releaseFullA();
+
+    expect(screen.queryByTestId("add-to-task-dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not keep one comparison's full results for the one stepped to next", async () => {
+    const { showRun, releaseFullA, fullReads } = renderTwoRuns(navProps);
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.click(screen.getByTestId("export-button"));
+    expect(fullReads).toEqual(["bench-a"]);
+
+    await showRun("bench-b");
+    await releaseFullA();
+
+    await user.click(screen.getByTestId("export-button"));
+    await flush();
+    expect(fullReads).toEqual(["bench-a", "bench-b"]);
+  });
+
+  it("does not step run to run while the labelling window is open", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    const { releaseFullA } = renderTwoRuns({
+      ...navProps,
+      onPrevRun,
+      onNextRun,
+    });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByText("togglelabel0"));
+
+    await user.click(
+      screen.getByRole("button", { name: "Submit for labelling" }),
+    );
+    await releaseFullA();
+    expect(await screen.findByTestId("add-to-task-dialog")).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Previous evaluation" }),
+    ).not.toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}");
+    await user.keyboard("{ArrowLeft}");
+    expect(onNextRun).not.toHaveBeenCalled();
+    expect(onPrevRun).not.toHaveBeenCalled();
   });
 });

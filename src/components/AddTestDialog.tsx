@@ -3284,6 +3284,12 @@ export function AddTestDialog({
   // baseline hasn't been captured yet — e.g. an existing test is still
   // loading — keep the prompt to err on the side of not losing edits.
   const confirmDiscard = (action: () => void) => {
+    // The prompt on screen belongs to whatever raised it. Asking again while
+    // it is up would swap that action out, so Discard would do something the
+    // reader never asked for: press an arrow key behind the prompt raised by
+    // closing the window, and Discard stepped to the next test instead of
+    // closing.
+    if (showCloseConfirmation) return;
     if (
       baselineRef.current !== null &&
       serializeFormState() === baselineRef.current
@@ -3315,7 +3321,8 @@ export function AddTestDialog({
   const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
 
   // Whether the stepping row is drawn, which is what the close button above
-  // it is centred on.
+  // it is centred on. The row itself is desktop only, so below that width the
+  // close button keeps lining up with the banner that is the first row there.
   const stepsBetweenTests = showsDialogNav({
     onPrev: navPrev,
     onNext: navNext,
@@ -3325,12 +3332,16 @@ export function AddTestDialog({
   // The left and right arrow keys step too, the same as the buttons. No
   // Escape: this window holds edits that have not been saved, and a stray
   // press would throw them away.
+  // The save-or-discard prompt for running a test is the other thing that can
+  // be on top of this window. Its own question is not the discard question, so
+  // `confirmDiscard` does not know about it, and a key press behind it would
+  // raise a second prompt underneath the one on screen.
   useDialogNavKeys({
     isOpen,
     hasPrev,
-    onPrev: navPrev,
+    onPrev: showRunUnsavedConfirm ? undefined : navPrev,
     hasNext,
-    onNext: navNext,
+    onNext: showRunUnsavedConfirm ? undefined : navNext,
   });
 
   if (!isOpen) return null;
@@ -3461,7 +3472,7 @@ export function AddTestDialog({
             onClick={onClose}
             disabled={isCreating || isLoading}
             className={`absolute ${
-              stepsBetweenTests ? "top-2" : "top-2.5 md:top-3"
+              stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
             } right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
             aria-label="Close"
           >

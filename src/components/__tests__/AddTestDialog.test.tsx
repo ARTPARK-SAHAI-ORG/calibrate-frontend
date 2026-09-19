@@ -2336,6 +2336,73 @@ describe("AddTestDialog — stepping to another test", () => {
     expect(screen.getByText("Test name")).toBeInTheDocument();
   });
 
+  it("the close prompt still closes when an arrow key is pressed behind it", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    const dialogProps = await renderSettled(props);
+
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+    const backdrop = document.querySelector(
+      ".absolute.inset-0.bg-black\\/50",
+    ) as HTMLElement;
+    await user.click(backdrop);
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+
+    // The prompt belongs to the click that raised it, which was a close. The
+    // arrow keys are off while it is up, and pressing one must not swap that
+    // close out for a step, nor raise a second prompt.
+    await user.keyboard("{ArrowRight}{ArrowLeft}");
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+    expect(screen.getAllByText("Discard changes?")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(dialogProps.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+  });
+
+  it("leaves the arrow keys off while the save-or-discard-before-running prompt is on screen", async () => {
+    const user = setupUser();
+    const props = navProps({
+      isEditing: true,
+      testName: "Existing",
+      showRunAfterSave: true,
+      onRun: jest.fn(),
+      initialConfig: {
+        history: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+          { role: "user", content: "How are you?" },
+        ],
+        evaluation: { type: "response" },
+      } as TestConfig,
+      initialEvaluators: [
+        {
+          evaluator_uuid: "eval-correctness",
+          name: "Correctness",
+          slug: "default-llm-next-reply",
+          variables: [{ name: "criteria" }],
+          variable_values: { criteria: "Reply is polite" },
+        },
+      ],
+    });
+    render(<ControlledDialog {...baseProps(props)} />);
+
+    const criteria = await screen.findByDisplayValue("Reply is polite");
+    await user.type(criteria, "!");
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}{ArrowLeft}");
+
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
   it("hides the arrows when no stepping was offered", async () => {
     render(
       <AddTestDialog
