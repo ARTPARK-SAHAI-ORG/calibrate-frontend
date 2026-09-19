@@ -263,6 +263,149 @@ describe("PublicBenchmarkPage", () => {
     );
   });
 
+  it("treats a run with an error behind it as failed, even when it says done", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, error: "judge unreachable" })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ failureReason: "judge unreachable" }),
+    );
+    expect(
+      screen.getByLabelText("The evaluation broke before it could finish"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows how the run itself went beside its name", async () => {
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText("The evaluation ran every test"),
+    ).toBeInTheDocument();
+  });
+
+  it("marks a run that could not run every test", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, stopped_early: true })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+  });
+
+  it("marks a run where only some tests produced no answer", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        jsonResponse({
+          ...LIGHT_RUN,
+          model_results: LIGHT_RUN.model_results.map((m) => ({
+            ...m,
+            test_results: [
+              { name: "First test", passed: false, unanswered: true },
+              { name: "Second test", passed: true },
+            ],
+          })),
+        }),
+      ),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+  });
+
+  it("marks a run where no test produced an answer", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        jsonResponse({
+          ...LIGHT_RUN,
+          model_results: LIGHT_RUN.model_results.map((m) => ({
+            ...m,
+            test_results: [
+              { name: "First test", passed: false, unanswered: true },
+            ],
+          })),
+        }),
+      ),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText("None of the tests could be run"),
+    ).toBeInTheDocument();
+  });
+
+  it("marks a comparison with a model that could not be run", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        jsonResponse({
+          ...LIGHT_RUN,
+          model_results: [
+            LIGHT_RUN.model_results[0],
+            {
+              model: "openai__gpt-4.1",
+              success: false,
+              message: "model not available",
+              total_tests: 1,
+              passed: null,
+              failed: null,
+              test_results: null,
+            },
+          ],
+        }),
+      ),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    // The app says the same thing about this run, so the shared link cannot
+    // call it finished.
+    expect(
+      screen.getByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("The evaluation ran every test"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks a comparison that ended without a verdict for a test", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        jsonResponse({
+          ...LIGHT_RUN,
+          model_results: LIGHT_RUN.model_results.map((m) => ({
+            ...m,
+            test_results: [
+              { name: "First test", passed: true },
+              { name: "Second test", passed: null },
+            ],
+          })),
+        }),
+      ),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+  });
+
+  it("marks a run someone stopped", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(jsonResponse({ ...LIGHT_RUN, aborted: true })),
+    ) as unknown as typeof fetch;
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(
+      screen.getByLabelText(
+        "Someone stopped the evaluation before it finished",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("says the run is not there while it is still going", async () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(jsonResponse({ task_id: "r", status: "in_progress" })),

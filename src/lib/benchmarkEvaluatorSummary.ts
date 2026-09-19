@@ -66,8 +66,15 @@ export type BenchmarkModelLike = {
  * How many of a model's tests produced no answer, and how many it was given.
  * The backend's leaderboard row counts a test that never answered as a
  * failure, so the pass rate on screen is worked out from these instead.
+ *
+ * `runOver` says the run has ended, whichever way it ended. A row left with no
+ * verdict then produced no answer either, rather than still being on its way,
+ * which is the rule the marks and the test rows read.
  */
-export function benchmarkAnsweredPassFail(model: BenchmarkModelLike): {
+export function benchmarkAnsweredPassFail(
+  model: BenchmarkModelLike,
+  runOver = false,
+): {
   passed: number;
   answered: number;
   unanswered: number;
@@ -82,7 +89,10 @@ export function benchmarkAnsweredPassFail(model: BenchmarkModelLike): {
       unanswered++;
       continue;
     }
-    if (tr.passed === null || tr.passed === undefined) continue;
+    if (tr.passed === null || tr.passed === undefined) {
+      if (runOver) unanswered++;
+      continue;
+    }
     answered++;
     if (tr.passed) passed++;
   }

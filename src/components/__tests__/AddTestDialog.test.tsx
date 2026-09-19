@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor, within } from "@/test-utils";
+import { act, render, screen, setupUser, waitFor, within } from "@/test-utils";
 import { AddTestDialog, TestConfig } from "../AddTestDialog";
 
 // jsdom has neither ResizeObserver nor scrollIntoView; the dialog uses both
@@ -2219,6 +2219,22 @@ describe("AddTestDialog — stepping to another test", () => {
     ...overrides,
   });
 
+  // The form is only compared against a baseline once the dialog has finished
+  // loading, and the arrow keys step straight away only when the form matches
+  // that baseline. So every keyboard test waits for the default evaluator to
+  // land and then lets the baseline capture that follows it settle.
+  const renderSettled = async (props: Record<string, unknown>) => {
+    const dialogProps = baseProps(props);
+    render(<ControlledDialog {...dialogProps} />);
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    await act(async () => {
+      for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    return dialogProps;
+  };
+
   it("shows the arrows and where the open test sits in the list", async () => {
     render(<AddTestDialog {...baseProps(navProps())} />);
     await screen.findByText("Test name");
@@ -2262,6 +2278,129 @@ describe("AddTestDialog — stepping to another test", () => {
     await user.click(screen.getByRole("button", { name: "Discard" }));
     expect(props.onPrev).toHaveBeenCalledTimes(1);
     expect(props.onNext).not.toHaveBeenCalled();
+  });
+
+  it("steps with the left and right arrow keys, the same as the buttons", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    await renderSettled(props);
+
+    await user.keyboard("{ArrowRight}");
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+
+    await user.keyboard("{ArrowLeft}");
+    expect(props.onPrev).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+  });
+
+  it("asks before the arrow keys throw away unsaved edits", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    await renderSettled(props);
+
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+    // Typing leaves the caret in the name box, where the arrow keys move
+    // through the text instead of stepping. Step away from it first.
+    await user.click(screen.getByText("Test name"));
+
+    await user.keyboard("{ArrowRight}");
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the arrow keys to the box being typed in", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    await renderSettled(props);
+
+    await user.click(screen.getByPlaceholderText("Your test name"));
+    await user.keyboard("{ArrowRight}{ArrowLeft}");
+
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+  });
+
+  it("does not close on Escape, so unsaved edits are not thrown away", async () => {
+    const user = setupUser();
+    const dialogProps = await renderSettled(
+      navProps({ isEditing: false, testName: "" }),
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(dialogProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Test name")).toBeInTheDocument();
+  });
+
+  it("the close prompt still closes when an arrow key is pressed behind it", async () => {
+    const user = setupUser();
+    const props = navProps({ isEditing: false, testName: "" });
+    const dialogProps = await renderSettled(props);
+
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+    const backdrop = document.querySelector(
+      ".absolute.inset-0.bg-black\\/50",
+    ) as HTMLElement;
+    await user.click(backdrop);
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+
+    // The prompt belongs to the click that raised it, which was a close. The
+    // arrow keys are off while it is up, and pressing one must not swap that
+    // close out for a step, nor raise a second prompt.
+    await user.keyboard("{ArrowRight}{ArrowLeft}");
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+    expect(screen.getAllByText("Discard changes?")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(dialogProps.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+  });
+
+  it("leaves the arrow keys off while the save-or-discard-before-running prompt is on screen", async () => {
+    const user = setupUser();
+    const props = navProps({
+      isEditing: true,
+      testName: "Existing",
+      showRunAfterSave: true,
+      onRun: jest.fn(),
+      initialConfig: {
+        history: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+          { role: "user", content: "How are you?" },
+        ],
+        evaluation: { type: "response" },
+      } as TestConfig,
+      initialEvaluators: [
+        {
+          evaluator_uuid: "eval-correctness",
+          name: "Correctness",
+          slug: "default-llm-next-reply",
+          variables: [{ name: "criteria" }],
+          variable_values: { criteria: "Reply is polite" },
+        },
+      ],
+    });
+    render(<ControlledDialog {...baseProps(props)} />);
+
+    const criteria = await screen.findByDisplayValue("Reply is polite");
+    await user.type(criteria, "!");
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}{ArrowLeft}");
+
+    expect(props.onNext).not.toHaveBeenCalled();
+    expect(props.onPrev).not.toHaveBeenCalled();
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
   });
 
   it("hides the arrows when no stepping was offered", async () => {

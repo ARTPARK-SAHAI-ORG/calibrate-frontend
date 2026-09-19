@@ -20,7 +20,7 @@ const MARKS: Record<
     ),
   },
   gave_up: {
-    tooltip: "Partially complete as some tests could not be run",
+    tooltip: "Some of the tests could not be run",
     className: "text-amber-500",
     glyph: (
       <>

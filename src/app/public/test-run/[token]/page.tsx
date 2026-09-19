@@ -23,7 +23,7 @@ import {
   evaluatorSummaryToAbout,
 } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { ResultTabs } from "@/components/ui";
+import { ResultTabs, RunStateMark } from "@/components/ui";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
@@ -35,12 +35,12 @@ import {
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import {
-  isNotRun,
   isRunStopped,
   isUnanswered,
+  rowVerdict,
   runDisplayName,
+  runStateOf,
 } from "@/lib/testTypes";
-import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
@@ -100,12 +100,23 @@ type TestRunStatusResponse = {
   error?: string | boolean | null;
 };
 
-function getStatus(
-  r: TestCaseResult,
-  runStopped: boolean,
-): "passed" | "failed" | "not_run" {
-  if (isNotRun(r, runStopped)) return "not_run";
-  return r.passed === true ? "passed" : "failed";
+/** The run broke: it either says so outright or left an error behind. The same
+ * two signals the run window and the shared comparison page read, so a run
+ * cannot look broken on one screen and finished on another. */
+function runBroke(run: TestRunStatusResponse): boolean {
+  return run.status === "failed" || Boolean(run.error);
+}
+
+/** Has the run ended, whichever way it ended? A test with no verdict is still
+ * going only while the run is; once the run is over nothing more is coming for
+ * it, so it never ran. */
+function isRunOver(run: TestRunStatusResponse): boolean {
+  return (
+    run.status === "done" ||
+    run.status === "completed" ||
+    runBroke(run) ||
+    isRunStopped(run)
+  );
 }
 
 export default function PublicTestRunPage() {
@@ -246,22 +257,45 @@ export default function PublicTestRunPage() {
   // Someone stopped this run before it finished, so the tests it never started
   // are neither passes nor failures.
   const wasStopped = isRunStopped(data);
-  const passed = results.filter(
-    (r) => getStatus(r, wasStopped) === "passed",
-  ).length;
+  const runOver = isRunOver(data);
+  // How one row reads. The one rule, so this page and the run window in the app
+  // cannot show two different pass rates for the same run.
+  const statusOf = (r: TestCaseResult) => rowVerdict(r, wasStopped, runOver);
+  const passed = results.filter((r) => statusOf(r) === "passed").length;
   // A test that produced no answer was never scored; keep it out of the
   // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
-    (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
+    (r) => statusOf(r) === "failed" && !isUnanswered(r),
   ).length;
   // Tool-call pass/fail split for the Results tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: isToolCallRow(r),
-      passed: getStatus(r, wasStopped) === "passed",
-      failed: getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
+      passed: statusOf(r) === "passed",
+      failed: statusOf(r) === "failed" && !isUnanswered(r),
     })),
   );
+  const runFailed = runBroke(data);
+  // Every test the run has no answer for: the ones it says produced none, and
+  // the rows it ended without a verdict for. They are left out of the pass
+  // rate, so the mark by the name and the note above the numbers have to count
+  // them. A run from before the backend flagged an unanswered test reports it
+  // in its own count and again as a row with no verdict, so take the larger of
+  // the two rather than adding them and counting it twice.
+  const unansweredCount = data.unanswered_tests ?? 0;
+  const notRunRows = results.filter(
+    (r) => isUnanswered(r) || statusOf(r) === "not_run",
+  ).length;
+  const couldNotRun = Math.max(unansweredCount, notRunRows);
+  const runState = runStateOf({
+    status: runFailed ? "failed" : data.status,
+    aborted: data.aborted,
+    stopped_early: data.stopped_early,
+    unanswered_tests: couldNotRun,
+    // The total the count is read against: without it, one test that could
+    // not be run would read as none of them having run.
+    total_tests: data.total_tests ?? results.length,
+  });
   const evaluatorsByUuid = Object.fromEntries(
     (data.evaluators ?? []).map((e) => [e.uuid, e]),
   );
@@ -292,7 +326,7 @@ export default function PublicTestRunPage() {
           ? runDisplayName("llm-unit-test", data.name)
           : "LLM component test"
       }
-      pills={wasStopped ? <StoppedRunPill /> : undefined}
+      pills={runState ? <RunStateMark state={runState} /> : undefined}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">
@@ -325,7 +359,7 @@ export default function PublicTestRunPage() {
                       name: r.name || r.test_case?.name || r.test_name,
                       status: isUnanswered(r)
                         ? "error"
-                        : getStatus(r, wasStopped),
+                        : statusOf(r),
                       output: r.output,
                       testCase: r.test_case,
                       reasoning: r.reasoning,
@@ -344,12 +378,11 @@ export default function PublicTestRunPage() {
           <TestRunSummary
             passed={passed}
             total={passed + failed}
-            unanswered={data.unanswered_tests ?? 0}
+            unanswered={unansweredCount}
+            notRun={couldNotRun - unansweredCount}
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
-            failureDetails={
-              data.status === "failed" ? (runErrorText(data.error) ?? "") : null
-            }
+            failureDetails={runFailed ? (runErrorText(data.error) ?? "") : null}
             runTotalTests={data.total_tests ?? results.length}
             onReviewUnanswered={() => setActiveTab("tests")}
             latency={data.latency_ms ?? null}
@@ -378,7 +411,7 @@ export default function PublicTestRunPage() {
                 id: `test-${i}`,
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
-                status: getStatus(r, wasStopped),
+                status: statusOf(r),
                 unanswered: isUnanswered(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,

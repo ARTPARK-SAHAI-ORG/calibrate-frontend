@@ -34,15 +34,31 @@ export type AgentRun = {
    */
   evaluators?:
     (string | { uuid?: string | null; name?: string | null })[] | null;
+  /**
+   * One entry per test, name and verdict only: the heavy per-case detail
+   * lives on the run-detail endpoints. A verdict of null on a run that has
+   * ended means that test never ran, which the run's own counts do not say.
+   */
+  results?: { name?: string | null; passed?: boolean | null }[] | null;
   model_results?:
     | {
         model: string;
         /**
-         * How many tests this model was tried on. The runs list carries this
-         * count but not the per-case `test_results` behind it, which only the
-         * run-detail endpoints return.
+         * How many tests this model was tried on, and how many it passed. The
+         * runs list carries these counts but not the per-case `test_results`
+         * behind them, which only the run-detail endpoints return.
          */
         total_tests?: number | null;
+        passed?: number | null;
+        /**
+         * Worked out as `total - passed` for a model that finished, so it
+         * holds the tests that produced no answer too; `unanswered_tests`
+         * takes them back out.
+         */
+        failed?: number | null;
+        unanswered_tests?: number | null;
+        /** False when this model's run could not be carried out at all. */
+        success?: boolean | null;
         test_results?: unknown[];
       }[]
     | null;
@@ -116,6 +132,10 @@ export function useAgentRuns({
   const [items, setItems] = useState<AgentRun[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(initialOffset);
+  // The offset `items` actually came from. `offset` itself moves the instant a
+  // page turn is asked for, before the rows for it arrive, so a caller
+  // stepping run by run (useItemPager) reads this one instead.
+  const [loadedOffset, setLoadedOffset] = useState(initialOffset);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The run was not among the current results (wrong filter, or it doesn't
@@ -208,9 +228,17 @@ export function useAgentRuns({
         const data = await response.json();
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
+        // Where the rows just read actually start. An `around` read lands
+        // wherever that run's page is, which the backend answers with; a
+        // plain read lands on what it asked for. Read once, so the page the
+        // list moves to and the page the rows came from cannot disagree.
+        const landedOffset = useAround
+          ? typeof data?.offset === "number"
+            ? data.offset
+            : 0
+          : targetOffset;
+        setLoadedOffset(landedOffset);
         if (useAround) {
-          const landedOffset =
-            typeof data?.offset === "number" ? data.offset : 0;
           // Already have this page's rows right here — only bother the
           // fetch effect if landing actually moves `offset` off of what it
           // was, and tell it to skip the request that move would trigger.
@@ -306,6 +334,8 @@ export function useAgentRuns({
     items,
     total,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     aroundNotFound,

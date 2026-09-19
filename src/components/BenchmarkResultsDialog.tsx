@@ -27,6 +27,7 @@ import {
 import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   StatusBadge,
+  DialogNavHeader,
   RerunIconButton,
   StopRunButton,
   RunStateMark,
@@ -37,7 +38,13 @@ import {
   fetchTestCase,
   runErrorText,
 } from "@/lib/testRunApi";
-import { modelComparisonName, isRunStopped, runStateOf } from "@/lib/testTypes";
+import {
+  modelComparisonName,
+  isRunStopped,
+  isUnanswered,
+  rowVerdict,
+  runStateOf,
+} from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -50,16 +57,13 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogNavKeys } from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import {
-  benchmarkAnsweredPassFail,
-  type BenchmarkLeaderboardSummaryRow,
-} from "@/lib/benchmarkEvaluatorSummary";
+import { type BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -98,6 +102,29 @@ export type BenchmarkRerunRequest = {
   parallelModels?: boolean;
 };
 
+/**
+ * One model's tests split into the ones it answered and the ones it could not
+ * run: a test that gave no answer, or a row the run ended without a verdict
+ * for. Counted per model, the way the mark's own total is, so a comparison of
+ * 10 tests across three models is read out of 30 and not out of 10.
+ */
+export function benchmarkAnswerCounts(
+  modelResults: BenchmarkModelRows[],
+  wasStopped: boolean,
+  isDone: boolean,
+): { unanswered: number; answered: number } {
+  let unanswered = 0;
+  let answered = 0;
+  for (const model of modelResults) {
+    for (const row of model.test_results ?? []) {
+      const verdict = rowVerdict(row, wasStopped, isDone);
+      if (isUnanswered(row) || verdict === "not_run") unanswered += 1;
+      else if (verdict === "passed" || verdict === "failed") answered += 1;
+    }
+  }
+  return { unanswered, answered };
+}
+
 type BenchmarkResultsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -132,6 +159,14 @@ type BenchmarkResultsDialogProps = {
   /** Open the model picker on these tests. The parent closes this window once
    * the comparison is created. */
   onCompareTests?: (tests: SelectedTest[]) => void;
+  /** Step to the run before or after this one in the Evaluations list. Left
+   * out when nothing is stepping through runs. */
+  onPrevRun?: () => void;
+  onNextRun?: () => void;
+  hasPrevRun?: boolean;
+  hasNextRun?: boolean;
+  /** Where this run sits in the whole list, for "12 of 341". */
+  runPosition?: { index: number; total: number };
 };
 
 export function BenchmarkResultsDialog({
@@ -151,6 +186,11 @@ export function BenchmarkResultsDialog({
   onRenamed,
   onRunTests,
   onCompareTests,
+  onPrevRun,
+  onNextRun,
+  hasPrevRun,
+  hasNextRun,
+  runPosition,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -196,6 +236,29 @@ export function BenchmarkResultsDialog({
   // are kept; the models and tests not reached were never run.
   const [wasStopped, setWasStopped] = useState(false);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  // Set while the whole comparison is being read for labelling. The read is
+  // several megabytes on a large comparison, so the button says it is working
+  // and nothing steps the run out from under it.
+  const [isPreparingLabelling, setIsPreparingLabelling] = useState(false);
+
+  // Stepping to another run is off while this window is busy with the run on
+  // screen or has a dialog of its own on top: the reader's next click or key
+  // belongs to that, and the run underneath must not change beneath it.
+  const runStepBusy = addToTaskOpen || isPreparingLabelling;
+  const stepPrevRun = runStepBusy ? undefined : onPrevRun;
+  const stepNextRun = runStepBusy ? undefined : onNextRun;
+
+  // The left and right arrow keys step from run to run, the same as the
+  // buttons above. No Escape: this window opens windows of its own, and a
+  // press meant for one of those would close everything underneath it.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev: hasPrevRun,
+    onPrev: stepPrevRun,
+    hasNext: hasNextRun,
+    onNext: stepNextRun,
+  });
+
   const {
     selected: labellingSelectedKeys,
     toggle: toggleLabellingSelection,
@@ -228,6 +291,10 @@ export function BenchmarkResultsDialog({
    * since a finished run does not change.
    */
   const fullModelResultsRef = useRef<BenchmarkModelRows[] | null>(null);
+  // The comparison the window is showing right now, readable from inside a
+  // request that started before the reader stepped to another run.
+  const currentTaskIdRef = useRef(currentTaskId);
+  currentTaskIdRef.current = currentTaskId;
   const fetchFullModelResults = async (): Promise<BenchmarkModelRows[]> => {
     if (fullModelResultsRef.current) return fullModelResultsRef.current;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -239,6 +306,11 @@ export function BenchmarkResultsDialog({
     if (!response.ok) throw new Error("Failed to fetch the model comparison");
     const result: BenchmarkStatusResponse = await response.json();
     const rows = result.model_results ?? [];
+    // The window can be pointed at another comparison while this read is in
+    // flight (rerun, or stepping to the next run). Keeping the answer then
+    // would hand these rows to whoever asks next, under the other
+    // comparison's name, so it is used once and not kept.
+    if (currentTaskIdRef.current !== currentTaskId) return rows;
     fullModelResultsRef.current = rows;
     return rows;
   };
@@ -639,12 +711,8 @@ export function BenchmarkResultsDialog({
   // test either, so its mark reads the same as a plain run's. The counts are
   // per model, and one test that could not be run under two models counts
   // under each, which is also how the total is counted.
-  const answerCounts = modelResults.map((m) => benchmarkAnsweredPassFail(m));
-  const unansweredTests = answerCounts.reduce(
-    (n, c) => n + (c?.unanswered ?? 0),
-    0,
-  );
-  const scoredTests = answerCounts.reduce((n, c) => n + (c?.answered ?? 0), 0);
+  const { unanswered: unansweredTests, answered: scoredTests } =
+    benchmarkAnswerCounts(modelResults, wasStopped, isDone);
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -723,6 +791,9 @@ export function BenchmarkResultsDialog({
                       stopped_early: stoppedEarly,
                       unanswered_tests: unansweredTests,
                       total_tests: unansweredTests + scoredTests,
+                      // The models' own counts, the same ones the runs list
+                      // reads, so the two marks cannot differ.
+                      model_results: modelResults,
                     }) ?? "finished"
                   }
                 />
@@ -761,17 +832,31 @@ export function BenchmarkResultsDialog({
               </p>
             )}
           </div>
-          {/* Previous/Next pager - centered, desktop only, tests tab */}
-          {activeTab === "tests" && nav && nav.currentIndex >= 0 && (
-            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          {/* The middle of the header holds one of two things: stepping
+              through this run's own tests while one is open, since that is
+              what the reader is reading right then, and otherwise stepping
+              from this run to the next. The arrow keys step run to run
+              either way. */}
+          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            {activeTab === "tests" && nav && nav.currentIndex >= 0 ? (
               <ResultPager
                 currentIndex={nav.currentIndex}
                 total={nav.total}
                 onPrev={nav.goPrev}
                 onNext={nav.goNext}
               />
-            </div>
-          )}
+            ) : (
+              <DialogNavHeader
+                inline
+                noun="evaluation"
+                onPrev={stepPrevRun}
+                onNext={stepNextRun}
+                hasPrev={hasPrevRun}
+                hasNext={hasNextRun}
+                position={runPosition}
+              />
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {/* Export results — only shown when benchmark is done */}
             {isDone && !error && hasAnyResults && (
@@ -802,6 +887,7 @@ export function BenchmarkResultsDialog({
             {/* Submit for labelling — only shown when benchmark is done */}
             {showLabelling && currentTaskId && (
               <button
+                disabled={isPreparingLabelling}
                 onClick={async () => {
                   if (activeTab !== "tests") {
                     setActiveTab("tests");
@@ -812,9 +898,12 @@ export function BenchmarkResultsDialog({
                     );
                     return;
                   }
+                  if (isPreparingLabelling) return;
                   // The labelling dialog needs each test's conversation and
                   // reply, which the window itself does not hold.
+                  const startedOn = currentTaskId;
                   let full: BenchmarkModelRows[];
+                  setIsPreparingLabelling(true);
                   try {
                     full = await fetchFullModelResults();
                   } catch (err) {
@@ -823,7 +912,14 @@ export function BenchmarkResultsDialog({
                       "Could not load the results. Please try again.",
                     );
                     return;
+                  } finally {
+                    setIsPreparingLabelling(false);
                   }
+                  // The window can be pointed at another comparison while
+                  // that read is in flight. These rows and ticks belong to
+                  // the one it started on, so they are dropped rather than
+                  // submitted under the comparison now on screen.
+                  if (currentTaskIdRef.current !== startedOn) return;
                   setLabellingRows(
                     full
                       .map((mr) => ({
@@ -839,9 +935,9 @@ export function BenchmarkResultsDialog({
                   );
                   setAddToTaskOpen(true);
                 }}
-                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
               >
-                Submit for labelling
+                {isPreparingLabelling ? "Preparing…" : "Submit for labelling"}
               </button>
             )}
             {!isDone && !isInitialLoading && currentTaskId && (

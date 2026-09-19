@@ -2250,8 +2250,15 @@ export function TestsTabContent({
             setCreateDialogOpen(false);
             resetTestDialog();
           }}
-          onPrev={editingTestUuid ? testPager.prev : undefined}
-          onNext={editingTestUuid ? testPager.next : undefined}
+          // Not while the "add these evaluators to the agent?" prompt is up:
+          // it covers this window, and an arrow key meant for it would step
+          // the test underneath it.
+          onPrev={
+            editingTestUuid && !agentDefaults.prompt ? testPager.prev : undefined
+          }
+          onNext={
+            editingTestUuid && !agentDefaults.prompt ? testPager.next : undefined
+          }
           hasPrev={testPager.hasPrev}
           hasNext={testPager.hasNext}
           position={testPager.position}

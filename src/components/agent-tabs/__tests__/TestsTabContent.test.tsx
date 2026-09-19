@@ -697,6 +697,29 @@ describe("TestsTabContent — paging", () => {
     expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
   });
 
+  it("withholds the stepping props while the attach-evaluators prompt is up", async () => {
+    // The agent has no evaluators, so saving a test that uses one raises the
+    // "attach this evaluator to the agent?" prompt over the test window.
+    state.agentEvaluators = [];
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Paged test 1");
+
+    await user.click(screen.getAllByText("Paged test 1")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-editing")).toHaveTextContent("editing");
+    expect(typeof addTestDialogProps.onNext).toBe("function");
+
+    await user.click(screen.getByText("SubmitResponse"));
+    await screen.findByText("Attach this evaluator to the agent?");
+
+    // The prompt covers the test window, so an arrow key meant for it must
+    // not step the test underneath.
+    expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
+    expect(addTestDialogProps.onPrev).toBeUndefined();
+    expect(addTestDialogProps.onNext).toBeUndefined();
+  });
+
   it("offers no stepping past the last test in the list", async () => {
     const user = setupUser();
     renderComponent();
