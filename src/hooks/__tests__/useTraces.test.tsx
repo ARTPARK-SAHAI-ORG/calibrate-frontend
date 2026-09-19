@@ -353,6 +353,28 @@ describe("useTraces", () => {
     expect(result.current.total).toBe(0);
   });
 
+  it("re-reads the page quietly, without the loading state or dropping the rows", async () => {
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a", latest_run_status: null }], 1),
+    );
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a", latest_run_status: "pending" }], 1),
+    );
+    const seenLoading: boolean[] = [];
+    await act(async () => {
+      const pending = result.current.refetchSilently();
+      seenLoading.push(result.current.isLoading);
+      await pending;
+    });
+    expect(seenLoading).toEqual([false]);
+    expect(result.current.items[0].latest_run_status).toBe("pending");
+  });
+
   it("ignores a superseded response so stale data never clobbers newer state", async () => {
     let resolveFirst: (v: unknown) => void = () => {};
     const first = new Promise((resolve) => {
@@ -511,19 +533,12 @@ describe("useTraces", () => {
     setIntervalSpy.mockRestore();
   });
 
-  it("clears the spinner when a poll overtakes a normal load", async () => {
-    const setIntervalSpy = jest.spyOn(window, "setInterval");
-    mockFetchTraces.mockResolvedValue(
-      page([{ uuid: "t1", latest_run_status: "pending" }], 1),
-    );
-    const { result, unmount } = renderHook(() =>
+  it("clears the spinner when a silent re-read overtakes a normal load", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+    const { result } = renderHook(() =>
       useTraces({ accessToken: "tok", agentId: "ag-1" }),
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    const pollCall = setIntervalSpy.mock.calls.find(
-      (call) => call[1] === POLLING_INTERVAL_MS,
-    );
-    expect(pollCall).toBeDefined();
 
     let resolveSlow: (value: unknown) => void = () => {};
     mockFetchTraces.mockReturnValueOnce(
@@ -531,20 +546,18 @@ describe("useTraces", () => {
         resolveSlow = resolve;
       }),
     );
+    mockFetchTraces.mockResolvedValueOnce(page([{ uuid: "t1" }], 1));
     act(() => {
       void result.current.refetch();
     });
     expect(result.current.isLoading).toBe(true);
-    // A poll tick scheduled before the refresh still fires and answers first.
     await act(async () => {
-      (pollCall![0] as () => void)();
+      await result.current.refetchSilently();
     });
     await act(async () => {
-      resolveSlow(page([{ uuid: "t1", latest_run_status: "pending" }], 1));
+      resolveSlow(page([{ uuid: "t1" }], 1));
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    unmount();
-    setIntervalSpy.mockRestore();
   });
 
   it("does not let a slower silent poll overwrite a newer status", async () => {
