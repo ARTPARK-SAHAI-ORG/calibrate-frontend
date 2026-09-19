@@ -53,7 +53,7 @@ cp env.example .env.local
 | Variable                         | Description                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_APP_URL`            | Same as `AUTH_URL`. Used by client code for absolute links.                       |
-| `NEXT_PUBLIC_DOCS_URL`           | Best to point it to the actual docs site: https://calibrate.artpark.ai/docs       |
+| `NEXT_PUBLIC_DOCS_URL`           | Best to point it to the actual docs site: https://docs.calibrate.artpark.ai       |
 | `NEXT_PUBLIC_SENTRY_DSN`         | Sentry project DSN for error monitoring. Leave empty to disable.                  |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production`, `preview`, or `development`. Not needed if Sentry is not enabled.   |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID`  | Google Analytics 4 ID (`G-...`). Leave empty to disable analytics.                |
