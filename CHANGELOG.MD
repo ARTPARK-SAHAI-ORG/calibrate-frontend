@@ -1,5 +1,6 @@
 ## September 2026
 
+- On the Evaluations tab, you can now step from one run to the next with arrows in the window header or the left and right arrow keys, instead of closing the window to open another run ([#614](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/614))
 - When setting up a rating scale for an evaluator, the highest number is now marked as the best score and the lowest as the worst, so it cannot be read backwards ([#608](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/608))
 - The browser tab icon now shows up clearly whether the browser is set to a light or dark tab strip ([#607](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/607))
 - A workspace can now set whether model comparisons for connected agents run one at a time or together, as a default in workspace settings or saved directly from the model picker when starting a comparison ([#598](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/598))
