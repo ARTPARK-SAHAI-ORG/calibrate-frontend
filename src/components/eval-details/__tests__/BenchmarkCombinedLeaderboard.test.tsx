@@ -686,3 +686,44 @@ describe("a run that failed before any model produced a row", () => {
     expect(screen.getByText("ValueError: boom")).toBeInTheDocument();
   });
 });
+
+describe("a finished comparison that left a test with no verdict", () => {
+  it("says so above the table, the same way the mark by the name does", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        runOver
+      />,
+    );
+    expect(
+      screen.getByText(/tests could not be run and were ignored/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing while the run is still going", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.queryByText(/tests could not be run and were ignored/),
+    ).not.toBeInTheDocument();
+  });
+});

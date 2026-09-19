@@ -53,6 +53,8 @@ type BenchmarkCombinedLeaderboardProps = {
   stoppedEarly?: boolean;
   /** Why the run failed after finishing some tests. */
   failureReason?: string | null;
+  /** True once the run has ended, whichever way it ended. */
+  runOver?: boolean;
 };
 
 /**
@@ -66,14 +68,17 @@ function UnansweredNote({
   onReviewUnanswered,
   stoppedEarly = false,
   failureReason = null,
+  runOver = false,
 }: {
   modelResults: LeaderboardModel[];
   onReviewUnanswered?: () => void;
   stoppedEarly?: boolean;
   failureReason?: string | null;
+  /** True once the run has ended: a row with no verdict then never ran. */
+  runOver?: boolean;
 }) {
   const perModel = modelResults
-    .map((m) => benchmarkAnsweredPassFail(m))
+    .map((m) => benchmarkAnsweredPassFail(m, runOver))
     .filter((c) => c !== null);
   const failed = failureReason !== null;
   const couldNotRun = couldNotRunCount(modelResults);
@@ -164,6 +169,9 @@ function StoppedNote({
   modelResults: LeaderboardModel[];
   onReviewUnanswered?: () => void;
 }) {
+  // Only the tests the run actually tried: one it answered, or one it tried
+  // and got no answer from. A row it never reached does not count as a test
+  // that ran, which is the whole point of this sentence.
   const ranAnyTest = modelResults.some((model) => {
     const counts = benchmarkAnsweredPassFail(model);
     return !!counts && counts.answered + counts.unanswered > 0;
@@ -321,6 +329,7 @@ export function BenchmarkCombinedLeaderboard({
   runStopped = false,
   stoppedEarly = false,
   failureReason = null,
+  runOver = false,
 }: BenchmarkCombinedLeaderboardProps) {
   const payload = useMemo(
     () =>
@@ -345,7 +354,7 @@ export function BenchmarkCombinedLeaderboard({
   // What the notes above already say. Worked out once, because it decides two
   // things: whether the bare "no data" line is the only thing left to show,
   // and whether the table can be left out.
-  const counted = modelResults.map((m) => benchmarkAnsweredPassFail(m));
+  const counted = modelResults.map((m) => benchmarkAnsweredPassFail(m, runOver));
   const noteExplainsIt =
     runStopped ||
     failureReason !== null ||
@@ -370,6 +379,7 @@ export function BenchmarkCombinedLeaderboard({
             onReviewUnanswered={onReviewUnanswered}
             stoppedEarly={stoppedEarly && !runStopped}
             failureReason={failureReason}
+            runOver={runOver}
           />
         </div>
         {!noteExplainsIt && (
@@ -404,6 +414,7 @@ export function BenchmarkCombinedLeaderboard({
         onReviewUnanswered={onReviewUnanswered}
         stoppedEarly={stoppedEarly && !runStopped}
         failureReason={failureReason}
+        runOver={runOver}
       />
       {hideTable ? null : (
         <LeaderboardTab

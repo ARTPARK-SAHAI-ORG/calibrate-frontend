@@ -276,17 +276,22 @@ export default function PublicTestRunPage() {
     })),
   );
   const runFailed = runBroke(data);
-  // Rows the run ended without a verdict for. They are left out of the pass
+  // Every test the run has no answer for: the ones it says produced none, and
+  // the rows it ended without a verdict for. They are left out of the pass
   // rate, so the mark by the name and the note above the numbers have to count
-  // them: the run's own total does not.
-  const notRun = results.filter(
-    (r) => !isUnanswered(r) && statusOf(r) === "not_run",
+  // them. A run from before the backend flagged an unanswered test reports it
+  // in its own count and again as a row with no verdict, so take the larger of
+  // the two rather than adding them and counting it twice.
+  const unansweredCount = data.unanswered_tests ?? 0;
+  const notRunRows = results.filter(
+    (r) => isUnanswered(r) || statusOf(r) === "not_run",
   ).length;
+  const couldNotRun = Math.max(unansweredCount, notRunRows);
   const runState = runStateOf({
     status: runFailed ? "failed" : data.status,
     aborted: data.aborted,
     stopped_early: data.stopped_early,
-    unanswered_tests: (data.unanswered_tests ?? 0) + notRun,
+    unanswered_tests: couldNotRun,
     // The total the count is read against: without it, one test that could
     // not be run would read as none of them having run.
     total_tests: data.total_tests ?? results.length,
@@ -373,8 +378,8 @@ export default function PublicTestRunPage() {
           <TestRunSummary
             passed={passed}
             total={passed + failed}
-            unanswered={data.unanswered_tests ?? 0}
-            notRun={notRun}
+            unanswered={unansweredCount}
+            notRun={couldNotRun - unansweredCount}
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
             failureDetails={runFailed ? (runErrorText(data.error) ?? "") : null}

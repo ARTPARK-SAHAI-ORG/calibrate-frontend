@@ -427,12 +427,15 @@ export function TestRunnerDialog({
   // How many produced no answer, and whether the run gave up before starting
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
-  // Rows the run ended without a verdict for. The run's own counts do not
-  // include them, so the mark by the name and the note above the numbers
-  // would otherwise say every test ran while the list below reads "Not run".
-  const notRunCount = rows.filter(
-    (r) => !r.unanswered && r.status === "not_run",
+  // Every test the run has no answer for: the ones it says produced none, and
+  // the rows it ended without a verdict for. The rows are the fuller reading,
+  // and a run from before the backend flagged an unanswered test reports it in
+  // its own count and again as a row with no verdict, so take the larger of
+  // the two rather than adding them and counting it twice.
+  const notRunRows = rows.filter(
+    (r) => r.unanswered || r.status === "not_run",
   ).length;
+  const couldNotRunCount = Math.max(unansweredCount, notRunRows);
   const stoppedEarly = run?.stopped_early === true;
   // Tool-call pass/fail split for the Results tab's dedicated card. Keyed off
   // the kind of test the row itself reports.
@@ -711,7 +714,7 @@ export function TestRunnerDialog({
                       // The rows the window is sitting above, not just the
                       // run's own count, so the mark cannot say every test
                       // ran while a row below reads "Not run".
-                      unanswered_tests: unansweredCount + notRunCount,
+                      unanswered_tests: couldNotRunCount,
                       // The total the count is read against: without it, one
                       // test that could not be run would read as none of them
                       // having run.
@@ -910,7 +913,7 @@ export function TestRunnerDialog({
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
-                  notRun={notRunCount}
+                  notRun={couldNotRunCount - unansweredCount}
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
                   failureDetails={

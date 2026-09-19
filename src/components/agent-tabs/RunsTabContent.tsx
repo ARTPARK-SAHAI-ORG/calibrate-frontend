@@ -39,7 +39,10 @@ import {
   useAgentRunLaunchers,
   type AgentRunLauncherSettings,
 } from "./useAgentRunLaunchers";
-import { readUrlParam, writeUrlParam } from "@/components/human-labelling/valueFilterUrl";
+import {
+  readUrlParam,
+  writeUrlParam,
+} from "@/components/human-labelling/valueFilterUrl";
 import { displayModelName } from "@/lib/modelName";
 
 // Which page of results is open, so a reload reopens on the same one instead
@@ -91,9 +94,28 @@ export function runModels(run: AgentRun): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The run as its row should read it. The list carries one slim entry per test,
+ * and a test left without a verdict on a run that has ended never ran, which
+ * the run's own counts do not say: a run that gave up part way reports those
+ * tests inside `failed`. Counting them here is what keeps the row and the
+ * window that opens from it saying the same thing.
+ */
+function withRowCounts(run: AgentRun): AgentRun {
+  if (isRunInProgress(run)) return run;
+  const neverRan = (run.results ?? []).filter(
+    (r) => r.passed === null || r.passed === undefined,
+  ).length;
+  if (neverRan === 0) return run;
+  return {
+    ...run,
+    unanswered_tests: (run.unanswered_tests ?? 0) + neverRan,
+  };
+}
+
 /** One run's name, with the mark for how the run itself went. */
 function RunName({ run }: { run: AgentRun }) {
-  const state = runStateOf(run);
+  const state = runStateOf(withRowCounts(run));
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       {state && <RunStateMark state={state} />}
@@ -108,7 +130,6 @@ function RunName({ run }: { run: AgentRun }) {
 function RunResultPlaceholder() {
   return <span className="text-sm text-muted-foreground/70">No results</span>;
 }
-
 
 /** How many of a run's tests never ran, in the same words for both kinds. */
 function NotRunPill({ count }: { count: number }) {
@@ -175,7 +196,8 @@ function ModelPassRange({
 }
 
 /** The result pills for one run: running, error, or how the tests went. */
-function RunResult({ run }: { run: AgentRun }) {
+function RunResult({ run: rawRun }: { run: AgentRun }) {
+  const run = withRowCounts(rawRun);
   if (isRunInProgress(run)) {
     // Someone pressed Stop and the run has not wound down yet. Saying
     // "Running" here would argue with the stopped mark beside the name.
@@ -518,18 +540,22 @@ export function RunsTabContent({
     openTestRun(taskId);
   };
 
-  const { isDialogOpen, confirmTestRun, openCompare, dialogs: launcherDialogs } =
-    useAgentRunLaunchers({
-      agentUuid,
-      agentName,
-      ...launcherOpts,
-      onRunCreated: showNewRun,
-      onComparisonCreated: () => {
-        void refetch();
-        closeTestRun();
-        closeBenchmarkRun();
-      },
-    });
+  const {
+    isDialogOpen,
+    confirmTestRun,
+    openCompare,
+    dialogs: launcherDialogs,
+  } = useAgentRunLaunchers({
+    agentUuid,
+    agentName,
+    ...launcherOpts,
+    onRunCreated: showNewRun,
+    onComparisonCreated: () => {
+      void refetch();
+      closeTestRun();
+      closeBenchmarkRun();
+    },
+  });
 
   // Stepping is offered only while this tab is the one on screen and no
   // launcher dialog is covering the window. The tab stays mounted when the

@@ -34,6 +34,12 @@ export type AgentRun = {
    */
   evaluators?:
     (string | { uuid?: string | null; name?: string | null })[] | null;
+  /**
+   * One entry per test, name and verdict only: the heavy per-case detail
+   * lives on the run-detail endpoints. A verdict of null on a run that has
+   * ended means that test never ran, which the run's own counts do not say.
+   */
+  results?: { name?: string | null; passed?: boolean | null }[] | null;
   model_results?:
     | {
         model: string;

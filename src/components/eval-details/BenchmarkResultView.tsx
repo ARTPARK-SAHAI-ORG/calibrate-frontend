@@ -365,6 +365,7 @@ export function BenchmarkResultView({
       runStopped={runStopped}
       stoppedEarly={runStoppedEarly}
       failureReason={runFailureReason}
+      runOver={isDone}
     />
   );
 

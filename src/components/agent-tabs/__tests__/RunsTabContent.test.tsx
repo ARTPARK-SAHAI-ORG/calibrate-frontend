@@ -535,6 +535,45 @@ describe("RunsTabContent", () => {
     expect((await screen.findAllByText("2 Not run")).length).toBeGreaterThan(0);
   });
 
+  it("counts a test the run left without a verdict, like the window does", async () => {
+    // A run that gave up part way reports those tests inside `failed`, so the
+    // row would otherwise score them as wrong answers and call the run
+    // finished.
+    state.runs = [
+      {
+        ...unitRun,
+        total_tests: 4,
+        passed: 3,
+        failed: 1,
+        unanswered_tests: 0,
+        results: [
+          { name: "a", passed: true },
+          { name: "b", passed: true },
+          { name: "c", passed: true },
+          { name: "d", passed: null },
+        ],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("100% passed")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("Some of the tests could not be run").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("leaves a test with no verdict alone while the run is still going", async () => {
+    state.runs = [
+      {
+        ...unitRun,
+        status: "in_progress",
+        results: [{ name: "a", passed: null }],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("Running")).length).toBeGreaterThan(0);
+  });
+
   it("shows Running while a run has not finished", async () => {
     state.runs = [{ ...unitRun, status: "in_progress" }];
     renderTab();

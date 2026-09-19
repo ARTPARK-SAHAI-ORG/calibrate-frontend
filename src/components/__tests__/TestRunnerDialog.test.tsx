@@ -2966,3 +2966,61 @@ describe("a test with no verdict once the run has ended", () => {
     );
   });
 });
+
+describe("a run that reports an unanswered test and a row to match", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    clearTestRunCache();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  it("counts it once, not twice", async () => {
+    // A run from before the backend flagged unanswered rows reports its own
+    // count and leaves the row without a verdict. Counting both would say two
+    // of its two tests could not be run, and the mark would read "None of the
+    // tests could be run".
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-legacy")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-legacy",
+            status: "completed",
+            total_tests: 2,
+            unanswered_tests: 1,
+            results: [
+              { test_uuid: "t-1", name: "Answered", passed: true },
+              { test_uuid: "t-2", name: "No verdict", passed: null },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({}, false, 500));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-legacy"
+      />,
+    );
+
+    expect(
+      await screen.findByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+  });
+});

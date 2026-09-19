@@ -254,10 +254,11 @@ describe("runStateOf", () => {
     expect(
       runStateOf({ status: "done", total_tests: 1, unanswered_tests: 1 }),
     ).toBe("none_run");
-    // A run that carries no size of its own still says nothing was run.
-    expect(runStateOf({ status: "done", unanswered_tests: 2 })).toBe(
-      "none_run",
-    );
+    // With no size to read the count against, "some could not be run" is true
+    // either way, while "none of them ran" can be flatly wrong: a comparison
+    // row carries no total of its own, so two unanswered tests out of 470
+    // would otherwise read as a run that did nothing.
+    expect(runStateOf({ status: "done", unanswered_tests: 2 })).toBe("gave_up");
   });
 
   it("lets stopped and broken win over gave up", () => {

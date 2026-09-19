@@ -233,9 +233,11 @@ export function isRunStopped(run: { aborted?: boolean | null }): boolean {
  * What a stopped run says about itself: how many of its tests ran before it
  * was stopped, out of how many it set out to do.
  *
- * The ONE wording. The run window's summary and the model comparison's
- * leaderboard both say it, so it lives here and neither writes its own. No
- * full stop: a caller that follows it with another sentence adds one.
+ * The run window's summary says it. A comparison does not: every test is run
+ * once per model, so a count across the models reads out of a bigger total
+ * than the run's own Tests column, and its note says only that the run was
+ * stopped. No full stop: a caller that follows it with another sentence adds
+ * one.
  */
 /** Added to the could-not-be-run note when the run gave up before starting
  * every test. Shared by the run summary and the model comparison note. */
@@ -260,22 +262,16 @@ export type RunState =
   "finished" | "gave_up" | "none_run" | "stopped" | "error";
 
 /**
- * Did any test in the run produce no answer? Read off the counts: a single run
- * says so outright, and each model of a comparison answers fewer tests than it
- * was given. A model that does not say how many it passed and failed is left
- * out, since its total covers every test it was meant to run either way.
+ * Did any test in the run go unanswered? A single run says so outright; a
+ * comparison is read off its models, by the same count the row's "N Not run"
+ * is, so the mark and the pill beside it cannot tell different stories. A
+ * model that could not be run at all counts too, since it ran none of its
+ * tests.
  */
 function someTestNeverRan(run: RunStatusLike): boolean {
   if ((run.unanswered_tests ?? 0) > 0) return true;
-  return (run.model_results ?? []).some((model) => {
-    // A model that could not be run at all ran none of its tests, whether or
-    // not it left any counts behind.
-    if (model.success === false) return true;
-    const total = model.total_tests ?? 0;
-    if (typeof model.passed !== "number" || typeof model.failed !== "number")
-      return false;
-    return total > 0 && model.passed + model.failed < total;
-  });
+  if (modelsUnansweredCount(run.model_results) > 0) return true;
+  return (run.model_results ?? []).some((model) => model.success === false);
 }
 
 /**
@@ -295,7 +291,10 @@ export function runStateOf(run: RunStatusLike): RunState | null {
   const unanswered = run.unanswered_tests ?? 0;
   // Nothing was scored at all when every test the run set out to do produced
   // no answer, which reads differently from a run that got part of the way.
-  if (unanswered > 0 && unanswered >= (run.total_tests ?? 0)) return "none_run";
+  // Read against a total the run actually carries: without one there is no
+  // way to tell every test from one of them.
+  const total = run.total_tests ?? 0;
+  if (unanswered > 0 && total > 0 && unanswered >= total) return "none_run";
   if (run.stopped_early === true || someTestNeverRan(run)) return "gave_up";
   return "finished";
 }
@@ -419,10 +418,11 @@ export function modelsUnansweredCount(
 ): number {
   let worst = 0;
   for (const model of models ?? []) {
-    const total = model.total_tests ?? 0;
     // A model that could not be run at all is counted as models, not as
     // tests: the cell says "1 model failed" beside this, and turning it into
     // every test as well would count the same thing twice.
+    if (model.success === false) continue;
+    const total = model.total_tests ?? 0;
     if (total <= 0) continue;
     if (typeof model.passed !== "number" || typeof model.failed !== "number")
       continue;

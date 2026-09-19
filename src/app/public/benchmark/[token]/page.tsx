@@ -22,9 +22,7 @@ import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { RunStateMark } from "@/components/ui";
 import {
   isRunStopped,
-  isUnanswered,
   modelComparisonName,
-  rowVerdict,
   runStateOf,
 } from "@/lib/testTypes";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
@@ -127,17 +125,16 @@ export default function PublicBenchmarkPage() {
   // reports more than ten.
   const { unanswered: unansweredTests, answered: scoredTests } =
     benchmarkAnswerCounts(modelResults, wasStopped, true);
-  const runState =
-    runStateOf({
-      status: runFailed ? "failed" : data.status,
-      aborted: data.aborted,
-      stopped_early: data.stopped_early,
-      unanswered_tests: unansweredTests,
-      total_tests: unansweredTests + scoredTests,
-      // The models' own counts, the same ones the runs list and the run window
-      // read, so a model that could not be run is not called finished here.
-      model_results: modelResults,
-    }) ?? "finished";
+  const runState = runStateOf({
+    status: runFailed ? "failed" : data.status,
+    aborted: data.aborted,
+    stopped_early: data.stopped_early,
+    unanswered_tests: unansweredTests,
+    total_tests: unansweredTests + scoredTests,
+    // The models' own counts, the same ones the runs list and the run window
+    // read, so a model that could not be run is not called finished here.
+    model_results: modelResults,
+  });
 
   /** One test read in full, for the model whose answer is on screen. */
   const fetchCase = async (
@@ -169,7 +166,7 @@ export default function PublicBenchmarkPage() {
   return (
     <PublicPageLayout
       title={data.name ? modelComparisonName(data.name) : "LLM benchmark"}
-      pills={<RunStateMark state={runState} />}
+      pills={runState ? <RunStateMark state={runState} /> : undefined}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">
