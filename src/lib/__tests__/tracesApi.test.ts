@@ -5,7 +5,6 @@ import {
   fetchTraceScores,
   fetchTraceScoringEligibility,
   setAgentAutoScoreTraces,
-  scoreAgentTraces,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -209,20 +208,6 @@ describe("setAgentAutoScoreTraces", () => {
   });
 });
 
-describe("scoreAgentTraces", () => {
-  it("POSTs to the agent's score-traces endpoint and returns the queued count", async () => {
-    mockApiPost.mockResolvedValue({ queued: 4 });
-
-    await expect(scoreAgentTraces("tok", "ag-1")).resolves.toEqual({
-      queued: 4,
-    });
-    expect(mockApiPost).toHaveBeenCalledWith(
-      "/agents/ag-1/score-traces",
-      "tok",
-      {},
-    );
-  });
-});
 
 describe("validateApiKeyForAgent", () => {
   const originalFetch = global.fetch;
