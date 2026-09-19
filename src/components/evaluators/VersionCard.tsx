@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ViewMoreToggle } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
@@ -264,51 +265,21 @@ export function VersionCard({
             </pre>
             {clampPrompt && !promptExpanded && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
-                <button
-                  type="button"
+                <ViewMoreToggle
+                  expanded={false}
                   onClick={() => setPromptExpanded(true)}
-                  className="pointer-events-auto mb-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
-                >
-                  View more
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </button>
+                  className="pointer-events-auto mb-2 shadow-sm"
+                />
               </div>
             )}
           </div>
           {clampPrompt && promptExpanded && (
             <div className="flex justify-center">
-              <button
-                type="button"
+              <ViewMoreToggle
+                expanded
                 onClick={() => setPromptExpanded(false)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm"
-              >
-                View less
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                  />
-                </svg>
-              </button>
+                className="shadow-sm"
+              />
             </div>
           )}
         </div>
