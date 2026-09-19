@@ -16,9 +16,24 @@ jest.mock("../eval-details", () => ({
     labellingSelection,
     onToggleLabellingSelection,
     selectionStrip,
+    onNavChange,
   }: any) => (
     <div data-testid="outputs-panel">
       {selectionStrip}
+      {/* The real panel reports which test is open so the window can draw the
+          stepping through this run's own tests. */}
+      <button
+        onClick={() =>
+          onNavChange?.({
+            currentIndex: 0,
+            total: 2,
+            goPrev: jest.fn(),
+            goNext: jest.fn(),
+          })
+        }
+      >
+        report-test-nav
+      </button>
       <div data-testid="results-count">{results.length}</div>
       {results.map((r: any) => (
         <div key={r.id}>
@@ -2544,11 +2559,10 @@ describe("stepping from run to run", () => {
     ).toBeEnabled();
   });
 
-  it("draws no row when nothing is stepping through runs", async () => {
+  it("draws no arrows when nothing is stepping through runs", async () => {
     renderNav();
     await screen.findByTestId("summary-panel");
 
-    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Previous evaluation" }),
     ).not.toBeInTheDocument();
@@ -2557,11 +2571,10 @@ describe("stepping from run to run", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("draws no row when the list holds only this run", async () => {
+  it("draws no arrows when the list holds only this run", async () => {
     renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
     await screen.findByTestId("summary-panel");
 
-    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Next evaluation" }),
     ).not.toBeInTheDocument();
@@ -2578,6 +2591,26 @@ describe("stepping from run to run", () => {
     expect(onPrevRun).toHaveBeenCalledTimes(1);
     await user.keyboard("{ArrowRight}");
     expect(onNextRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the middle of the header to the open test's own stepping", async () => {
+    renderNav(navProps);
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+
+    // With no test open, the arrows step from this run to the next.
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tests" }));
+    await user.click(screen.getByRole("button", { name: "report-test-nav" }));
+    await user.click(screen.getByRole("button", { name: /Alpha/ }));
+
+    // Reading one test, that test's own Previous / Next takes the middle.
+    expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not close the window on Escape", async () => {

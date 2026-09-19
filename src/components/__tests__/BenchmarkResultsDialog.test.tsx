@@ -148,7 +148,7 @@ jest.mock("../ui", () => ({
   RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
   // The real previous/next run row, so its arrows and position are what the
   // tests below read.
-  DialogNavRow: jest.requireActual("../ui/DialogNavHeader").DialogNavRow,
+  DialogNavHeader: jest.requireActual("../ui/DialogNavHeader").DialogNavHeader,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -2290,11 +2290,10 @@ describe("stepping from run to run", () => {
     ).toBeDisabled();
   });
 
-  it("draws no row when nothing is stepping through runs", async () => {
+  it("draws no arrows when nothing is stepping through runs", async () => {
     renderNav();
     await screen.findByTestId("leaderboard");
 
-    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Previous evaluation" }),
     ).not.toBeInTheDocument();
@@ -2303,11 +2302,10 @@ describe("stepping from run to run", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("draws no row when the list holds only this run", async () => {
+  it("draws no arrows when the list holds only this run", async () => {
     renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
     await screen.findByTestId("leaderboard");
 
-    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Next evaluation" }),
     ).not.toBeInTheDocument();

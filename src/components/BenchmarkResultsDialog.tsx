@@ -27,7 +27,7 @@ import {
 import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   StatusBadge,
-  DialogNavRow,
+  DialogNavHeader,
   RerunIconButton,
   StopRunButton,
   RunStateMark,
@@ -734,17 +734,6 @@ export function BenchmarkResultsDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
-        {/* Previous / next run: a thin row of its own across the top, since
-            the header below already holds the stepping through this run's own
-            tests. */}
-        <DialogNavRow
-          noun="evaluation"
-          onPrev={onPrevRun}
-          onNext={onNextRun}
-          hasPrev={hasPrevRun}
-          hasNext={hasNextRun}
-          position={runPosition}
-        />
         {/* Header */}
         <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">
@@ -797,6 +786,23 @@ export function BenchmarkResultsDialog({
               </p>
             )}
           </div>
+          {/* Previous / next run, in the middle of the header. The stepping
+              through this run's own tests takes that spot while a test is
+              open, since that is what the reader is reading right then; the
+              arrow keys still step run to run either way. */}
+          {!(activeTab === "tests" && nav && nav.currentIndex >= 0) && (
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              <DialogNavHeader
+                inline
+                noun="evaluation"
+                onPrev={onPrevRun}
+                onNext={onNextRun}
+                hasPrev={hasPrevRun}
+                hasNext={hasNextRun}
+                position={runPosition}
+              />
+            </div>
+          )}
           {/* Previous/Next pager - centered, desktop only, tests tab */}
           {activeTab === "tests" && nav && nav.currentIndex >= 0 && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

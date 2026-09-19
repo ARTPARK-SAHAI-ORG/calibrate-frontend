@@ -22,7 +22,7 @@ export { StoppedRunPill } from "./StoppedRunPill";
 export { RunStateMark } from "./RunStateMark";
 export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
-export { DialogNavHeader, DialogNavRow } from "./DialogNavHeader";
+export { DialogNavHeader, DialogNavRow, showsDialogNav } from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
 export { CopyLinkButton } from "./CopyLinkButton";
 export { Switch } from "./Switch";

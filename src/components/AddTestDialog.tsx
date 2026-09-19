@@ -19,7 +19,7 @@ import {
   isDefaultLLMNextReplyEvaluator,
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
-import { DialogNavRow } from "@/components/ui";
+import { DialogNavRow, showsDialogNav } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -3314,6 +3314,14 @@ export function AddTestDialog({
   const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
   const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
 
+  // Whether the stepping row is drawn, which is what the close button above
+  // it is centred on.
+  const stepsBetweenTests = showsDialogNav({
+    onPrev: navPrev,
+    onNext: navNext,
+    position,
+  });
+
   // The left and right arrow keys step too, the same as the buttons. No
   // Escape: this window holds edits that have not been saved, and a stray
   // press would throw them away.
@@ -3445,12 +3453,16 @@ export function AddTestDialog({
           }`}
         >
           {/* Close — floats in the dialog's top-right, vertically centred
-              on the first row (the type header / info banner) instead of
-              taking a whole row of its own. */}
+              on the first row instead of taking a whole row of its own. That
+              row is the stepping row when there is one (48px tall, so 8px of
+              space above a 32px button), and the type header / info banner
+              otherwise. */}
           <button
             onClick={onClose}
             disabled={isCreating || isLoading}
-            className="absolute top-2.5 md:top-3 right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`absolute ${
+              stepsBetweenTests ? "top-2" : "top-2.5 md:top-3"
+            } right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
             aria-label="Close"
           >
             <svg
