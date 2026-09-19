@@ -176,6 +176,11 @@ function readDetail(body: DetailObject): string | undefined {
   if (typeof detail === "string" && detail.trim().length > 0) {
     return detail;
   }
+  // A refusal with more to say: detail is { error: "...", ... }.
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const error = (detail as { error?: unknown }).error;
+    if (typeof error === "string" && error.trim().length > 0) return error;
+  }
   // FastAPI 422 validation shape: detail is an array of { loc, msg, type }.
   if (Array.isArray(detail)) {
     const messages = detail

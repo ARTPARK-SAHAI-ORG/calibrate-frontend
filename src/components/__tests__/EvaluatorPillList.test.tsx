@@ -110,6 +110,67 @@ describe("EvaluatorPillList", () => {
     );
   });
 
+  it("shows every evaluator as a wrapping pill in flow layout, with no +N chip", () => {
+    render(
+      <EvaluatorPillList
+        layout="flow"
+        evaluators={[
+          { uuid: "1", name: "Conciseness" },
+          { uuid: "2", name: "Correctness" },
+          { uuid: "3", name: "Helpfulness" },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Conciseness" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Correctness" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Helpfulness" })).toBeInTheDocument();
+    expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+
+  it("shows optional detail next to a flow pill", () => {
+    render(
+      <EvaluatorPillList
+        layout="flow"
+        evaluators={[
+          {
+            uuid: "1",
+            name: "Correctness",
+            detail: "Needs extra details that are not set for this agent",
+          },
+          { uuid: "2", name: "Tone" },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Correctness" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tone" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Needs extra details that are not set for this agent"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders nothing when a flow list is empty", () => {
+    render(<EvaluatorPillList layout="flow" evaluators={[]} />);
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("opens a preview from a flow pill", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorPillList
+        layout="flow"
+        evaluators={[{ uuid: "1", name: "Conciseness" }]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Conciseness" }));
+
+    expect(
+      await screen.findByText("Judge whether the reply is concise."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("1", "tok");
+  });
+
   it("shows each visible evaluator as a button, not a link", () => {
     render(
       <EvaluatorPillList

@@ -4,7 +4,9 @@ import React from "react";
 import { ToolIcon } from "@/components/icons";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
+import { Tooltip } from "@/components/Tooltip";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
+import { TraceScoreCells, type TraceScoreColumn } from "./TraceScoringSummary";
 
 type CheckboxProps = {
   checked: boolean;
@@ -25,6 +27,9 @@ type TracesTableProps = {
   onOpen: (traceUuid: string) => void;
   /** Ask to delete a single trace. */
   onDelete: (trace: TraceSummary) => void;
+  /** One column per evaluator that scores this agent's traces. None hides
+   *  the score columns altogether. */
+  scoreColumns?: TraceScoreColumn[];
 };
 
 export function formatTraceDate(value: string): string {
@@ -123,8 +128,6 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-const ROW_GRID =
-  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_160px_auto] gap-4 px-4";
 
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
@@ -139,12 +142,22 @@ export function TracesTable({
   onToggleSelectAll,
   onOpen,
   onDelete,
+  scoreColumns = [],
 }: TracesTableProps) {
+  // Tailwind only compiles class names it can read in the source, so a grid
+  // whose column count depends on the evaluators has to be an inline style.
+  const ROW_CLASS = "grid gap-4 px-4";
+  const ROW_STYLE = {
+    gridTemplateColumns: `40px minmax(0,1fr) minmax(0,1fr)${" minmax(6rem,0.5fr)".repeat(scoreColumns.length)} 160px auto`,
+  };
   return (
     <>
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className={`${ROW_GRID} py-2 border-b border-border bg-muted/30 items-center`}>
+        <div
+          style={ROW_STYLE}
+          className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
+        >
           <div className="flex items-center">
             <SelectCheckbox
               checked={allSelected}
@@ -155,6 +168,18 @@ export function TracesTable({
           </div>
           <div className="text-sm font-medium text-muted-foreground">Input</div>
           <div className="text-sm font-medium text-muted-foreground">Output</div>
+          {scoreColumns.map((column) => (
+            <Tooltip
+              key={column.evaluator_uuid}
+              content={column.name}
+              position="top"
+              className="min-w-0"
+            >
+              <div className="text-sm font-medium text-muted-foreground truncate">
+                {column.name}
+              </div>
+            </Tooltip>
+          ))}
           <div className="text-sm font-medium text-muted-foreground">Created</div>
           <div className="w-8" />
         </div>
@@ -163,7 +188,8 @@ export function TracesTable({
             <div
               key={trace.uuid}
               onClick={() => onOpen(trace.uuid)}
-              className={`${ROW_GRID} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              style={ROW_STYLE}
+              className={`${ROW_CLASS} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
             >
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />
@@ -178,6 +204,11 @@ export function TracesTable({
               <div className="min-w-0">
                 <TraceOutputCell trace={trace} />
               </div>
+              <TraceScoreCells
+                trace={trace}
+                columns={scoreColumns}
+                layout="row"
+              />
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 {formatTraceDate(trace.created_at)}
               </div>
@@ -214,6 +245,11 @@ export function TracesTable({
             <div className="mt-2">
               <TraceOutputCell trace={trace} />
             </div>
+            <TraceScoreCells
+              trace={trace}
+              columns={scoreColumns}
+              layout="card"
+            />
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-muted-foreground">
                 {formatTraceDate(trace.created_at)}

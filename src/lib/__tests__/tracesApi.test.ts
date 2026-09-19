@@ -2,6 +2,9 @@ import {
   fetchTraces,
   fetchTrace,
   fetchTraceLabels,
+  fetchTraceScores,
+  fetchTraceScoringEligibility,
+  setAgentAutoScoreTraces,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -9,21 +12,24 @@ import {
   traceInputTurns,
   MAX_TRACES_PAGE_SIZE,
 } from "../tracesApi";
-import { apiGet, apiPost } from "../api";
+import { apiGet, apiPost, apiPut } from "../api";
 
 jest.mock("../api", () => ({
   __esModule: true,
   apiGet: jest.fn(),
   apiPost: jest.fn(),
+  apiPut: jest.fn(),
   getBackendUrl: jest.fn(() => "https://api.example.com"),
 }));
 
 const mockApiGet = apiGet as jest.Mock;
 const mockApiPost = apiPost as jest.Mock;
+const mockApiPut = apiPut as jest.Mock;
 
 beforeEach(() => {
   mockApiGet.mockReset();
   mockApiPost.mockReset();
+  mockApiPut.mockReset();
 });
 
 describe("fetchTraces", () => {
@@ -163,6 +169,45 @@ describe("fetchTrace", () => {
     expect(result).toEqual({ uuid: "t1" });
   });
 });
+
+describe("fetchTraceScores", () => {
+  it("GETs the full scoring history, newest first", async () => {
+    const payload = { runs: [{ run_uuid: "r1", status: "completed" }] };
+    mockApiGet.mockResolvedValue(payload);
+
+    await expect(fetchTraceScores("tok", "t1")).resolves.toBe(payload);
+    expect(mockApiGet).toHaveBeenCalledWith("/traces/t1/scores", "tok");
+  });
+});
+
+describe("fetchTraceScoringEligibility", () => {
+  it("GETs the JWT eligibility partition for the agent", async () => {
+    const payload = { eligible: [], ineligible: [] };
+    mockApiGet.mockResolvedValue(payload);
+
+    await expect(fetchTraceScoringEligibility("tok", "ag-1")).resolves.toBe(
+      payload,
+    );
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/agents/ag-1/trace-scoring-eligibility",
+      "tok",
+    );
+  });
+});
+
+describe("setAgentAutoScoreTraces", () => {
+  it("PUTs only the scoring flag so other agent fields are left alone", async () => {
+    mockApiPut.mockResolvedValue({ auto_score_traces: true });
+
+    await expect(setAgentAutoScoreTraces("tok", "ag-1", true)).resolves.toEqual({
+      auto_score_traces: true,
+    });
+    expect(mockApiPut).toHaveBeenCalledWith("/agents/ag-1", "tok", {
+      auto_score_traces: true,
+    });
+  });
+});
+
 
 describe("validateApiKeyForAgent", () => {
   const originalFetch = global.fetch;

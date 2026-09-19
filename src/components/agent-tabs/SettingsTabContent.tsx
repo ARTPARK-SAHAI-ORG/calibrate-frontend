@@ -1,12 +1,14 @@
 "use client";
 
 import React from "react";
+import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 
 type SettingsTabContentProps = {
   agentSpeaksFirst: boolean;
   setAgentSpeaksFirst: (value: boolean) => void;
   maxAssistantTurns: number;
   setMaxAssistantTurns: (value: number) => void;
+  traceScoring: TraceScoringControls;
 };
 
 export function SettingsTabContent({
@@ -14,7 +16,12 @@ export function SettingsTabContent({
   setAgentSpeaksFirst,
   maxAssistantTurns,
   setMaxAssistantTurns,
+  traceScoring,
 }: SettingsTabContentProps) {
+  const scoringDisabled =
+    traceScoring.saving ||
+    (!traceScoring.enabled &&
+      (traceScoring.eligibility === null || traceScoring.enableBlocked));
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="border border-border rounded-xl overflow-hidden">
@@ -70,6 +77,50 @@ export function SettingsTabContent({
               <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
                 Maximum number of assistant turns before ending the call.
               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="px-3 md:px-4 py-3 md:py-4 flex items-start md:items-center justify-between gap-3">
+          <div className="flex flex-col-reverse md:flex-row items-start md:items-center gap-2 md:gap-4">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={traceScoring.enabled}
+              aria-label="Score new traces automatically"
+              disabled={scoringDisabled}
+              onClick={() => void traceScoring.setEnabled(!traceScoring.enabled)}
+              className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 border-2 flex-shrink-0 ${
+                traceScoring.enabled
+                  ? "bg-green-500 border-green-500"
+                  : "bg-muted border-muted-foreground/30"
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-4 md:w-5 h-4 md:h-5 rounded-full bg-white shadow-md transition-transform ${
+                  traceScoring.enabled ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+            <div>
+              <h3 className="text-sm md:text-base font-medium text-foreground">
+                Score new traces automatically
+              </h3>
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                New traces this agent receives are scored with its evaluators.
+              </p>
+              {traceScoring.saveError || traceScoring.eligibilityError ? (
+                <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
+                  {traceScoring.saveError ?? traceScoring.eligibilityError}
+                </p>
+              ) : traceScoring.enableBlocked ? (
+                <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                  Scoring cannot be turned on because none of this agent&apos;s
+                  evaluators can score traces.
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

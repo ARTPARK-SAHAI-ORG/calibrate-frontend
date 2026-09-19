@@ -11,6 +11,8 @@ export type EvaluatorPillItem = {
    */
   uuid?: string | null;
   name: string;
+  /** Extra copy next to the pill in `flow` layout, e.g. why it cannot score. */
+  detail?: string;
 };
 
 const EVALUATOR_PILL_CLASSES =
@@ -88,34 +90,88 @@ function NamePill({
   );
 }
 
+function pillKey(ev: EvaluatorPillItem, index: number) {
+  // Keyed by position: a list with no ids can hold the same name twice,
+  // and two pills with the same key confuse React.
+  return ev.uuid ?? `${index}-${ev.name}`;
+}
+
 /**
- * Fixed-width evaluators cell: shows up to `maxVisible` pills (each opens how that
- * evaluator judges in a preview), and folds the rest into a "+N" chip whose
- * tooltip lists the remaining evaluators as the same pills on hover. One
- * instance renders per table row, so the preview modal is owned here rather
- * than lifted to the row's parent — only one can be open per row anyway, and
- * it mounts/unmounts with the row.
+ * Fixed-width evaluators cell by default: shows up to `maxVisible` pills (each
+ * opens how that evaluator judges in a preview), and folds the rest into a
+ * "+N" chip whose tooltip lists the remaining evaluators as the same pills on
+ * hover. `flow` is the same pills wrapping in a card, with optional `detail`
+ * next to each name. One instance owns the preview modal rather than lifting
+ * it to the parent — only one can be open per list anyway.
  */
 export function EvaluatorPillList({
   evaluators,
   maxVisible = 2,
+  layout = "cell",
 }: {
   evaluators: EvaluatorPillItem[];
   /**
    * How many names the cell shows when they all fit. Above that it always
    * keeps one pill fewer, to leave room for the "+N" chip, and never fewer
-   * than one.
+   * than one. Ignored in `flow` layout, which shows every name.
    */
   maxVisible?: number;
+  /** `cell` fits a table column; `flow` wraps every pill in a card. */
+  layout?: "cell" | "flow";
 }) {
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
     name: string;
   } | null>(null);
 
+  const openFor = (ev: EvaluatorPillItem) =>
+    ev.uuid
+      ? (e: React.MouseEvent) => {
+          e.stopPropagation();
+          setPreviewEvaluator({
+            uuid: ev.uuid as string,
+            name: ev.name,
+          });
+        }
+      : undefined;
+
+  const modal = (
+    <EvaluatorPreviewModal
+      evaluatorUuid={previewEvaluator?.uuid ?? null}
+      evaluatorName={previewEvaluator?.name}
+      onClose={() => setPreviewEvaluator(null)}
+    />
+  );
+
   if (evaluators.length === 0) {
-    return <span className="text-sm text-muted-foreground">—</span>;
+    return layout === "flow" ? null : (
+      <span className="text-sm text-muted-foreground">—</span>
+    );
   }
+
+  if (layout === "flow") {
+    return (
+      <>
+        <div className="flex flex-col items-start gap-1.5 min-w-0">
+          {evaluators.map((ev, index) => (
+            <div
+              key={pillKey(ev, index)}
+              className="flex flex-wrap items-center gap-2 min-w-0"
+            >
+              <NamePill name={ev.name} wrap onOpen={openFor(ev)} />
+              {ev.detail ? (
+                <span className="text-xs md:text-sm text-muted-foreground">
+                  {ev.detail}
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        {modal}
+      </>
+    );
+  }
+
   const fits = evaluators.length <= maxVisible;
   const shown = Math.max(1, maxVisible - 1);
   const visible = fits ? evaluators : evaluators.slice(0, shown);
@@ -123,22 +179,10 @@ export function EvaluatorPillList({
   return (
     <div className="flex items-center gap-1 min-w-0">
       {visible.map((ev, index) => (
-        // Keyed by position: a list with no ids can hold the same name twice,
-        // and two pills with the same key confuse React.
         <NamePill
-          key={ev.uuid ?? `${index}-${ev.name}`}
+          key={pillKey(ev, index)}
           name={ev.name}
-          onOpen={
-            ev.uuid
-              ? (e) => {
-                  e.stopPropagation();
-                  setPreviewEvaluator({
-                    uuid: ev.uuid as string,
-                    name: ev.name,
-                  });
-                }
-              : undefined
-          }
+          onOpen={openFor(ev)}
         />
       ))}
       {rest.length > 0 && (
@@ -150,20 +194,10 @@ export function EvaluatorPillList({
             <div className="flex flex-wrap gap-1 max-w-64">
               {rest.map((ev, index) => (
                 <NamePill
-                  key={ev.uuid ?? `${index}-${ev.name}`}
+                  key={pillKey(ev, index)}
                   name={ev.name}
                   wrap
-                  onOpen={
-                    ev.uuid
-                      ? (e) => {
-                          e.stopPropagation();
-                          setPreviewEvaluator({
-                            uuid: ev.uuid as string,
-                            name: ev.name,
-                          });
-                        }
-                      : undefined
-                  }
+                  onOpen={openFor(ev)}
                 />
               ))}
             </div>
@@ -177,11 +211,7 @@ export function EvaluatorPillList({
           </span>
         </Tooltip>
       )}
-      <EvaluatorPreviewModal
-        evaluatorUuid={previewEvaluator?.uuid ?? null}
-        evaluatorName={previewEvaluator?.name}
-        onClose={() => setPreviewEvaluator(null)}
-      />
+      {modal}
     </div>
   );
 }

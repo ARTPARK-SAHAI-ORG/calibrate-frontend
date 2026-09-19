@@ -231,6 +231,15 @@ describe("parseBackendErrorMessage", () => {
     expect(parseBackendErrorMessage("oops", "fallback")).toBe("fallback");
   });
 
+  it("reads the error line out of an object detail", () => {
+    const body = JSON.stringify({
+      detail: { error: "No evaluator can score", ineligible: [] },
+    });
+    expect(
+      parseBackendErrorMessage(new Error(`Request failed: 422 - ${body}`), "fallback"),
+    ).toBe("No evaluator can score");
+  });
+
   it("returns err.message when it doesn't match the pattern", () => {
     expect(parseBackendErrorMessage(new Error("network down"), "fallback")).toBe(
       "network down",

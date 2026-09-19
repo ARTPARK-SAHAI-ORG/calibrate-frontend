@@ -1,6 +1,22 @@
 import React from "react";
 import { render, screen, setupUser, fireEvent } from "@/test-utils";
 import { SettingsTabContent } from "../SettingsTabContent";
+import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
+
+const eligible = { eligible: [{ evaluator_uuid: "ev-1", evaluator_version_id: "v1", name: "Tone" }], ineligible: [] };
+
+function scoring(overrides: Partial<TraceScoringControls> = {}): TraceScoringControls {
+  return {
+    enabled: false,
+    saving: false,
+    setEnabled: jest.fn(),
+    eligibility: eligible,
+    eligibilityError: null,
+    saveError: null,
+    enableBlocked: false,
+    ...overrides,
+  };
+}
 
 describe("SettingsTabContent", () => {
   it("toggles agent speaks first", async () => {
@@ -12,6 +28,7 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={setAgentSpeaksFirst}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        traceScoring={scoring()}
       />
     );
 
@@ -29,6 +46,7 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={setAgentSpeaksFirst}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        traceScoring={scoring()}
       />
     );
 
@@ -45,6 +63,7 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        traceScoring={scoring()}
       />
     );
 
@@ -61,6 +80,7 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        traceScoring={scoring()}
       />
     );
 
@@ -78,6 +98,7 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        traceScoring={scoring()}
       />
     );
 
@@ -93,8 +114,84 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        traceScoring={scoring()}
       />
     );
     expect(screen.getByText("Max assistant turns")).toBeInTheDocument();
+  });
+
+  function renderScoring(overrides: Partial<TraceScoringControls> = {}) {
+    const controls = scoring(overrides);
+    render(
+      <SettingsTabContent
+        agentSpeaksFirst={false}
+        setAgentSpeaksFirst={jest.fn()}
+        maxAssistantTurns={5}
+        setMaxAssistantTurns={jest.fn()}
+        traceScoring={controls}
+      />
+    );
+    return {
+      controls,
+      switchEl: screen.getByRole("switch", {
+        name: "Score new traces automatically",
+      }),
+    };
+  }
+
+  it("shows automatic trace scoring off and turns it on", async () => {
+    const user = setupUser();
+    const { controls, switchEl } = renderScoring();
+    expect(switchEl).toHaveAttribute("aria-checked", "false");
+    expect(switchEl).not.toBeDisabled();
+    expect(
+      screen.getByText(
+        "New traces this agent receives are scored with its evaluators."
+      )
+    ).toBeInTheDocument();
+    await user.click(switchEl);
+    expect(controls.setEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it("shows automatic trace scoring on and turns it off", async () => {
+    const user = setupUser();
+    const { controls, switchEl } = renderScoring({ enabled: true });
+    expect(switchEl).toHaveAttribute("aria-checked", "true");
+    await user.click(switchEl);
+    expect(controls.setEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it("cannot be turned on before eligibility is known", () => {
+    expect(renderScoring({ eligibility: null }).switchEl).toBeDisabled();
+  });
+
+  it("can still be turned off while eligibility is unknown", () => {
+    expect(
+      renderScoring({ enabled: true, eligibility: null }).switchEl
+    ).not.toBeDisabled();
+  });
+
+  it("is disabled while saving", () => {
+    expect(renderScoring({ enabled: true, saving: true }).switchEl).toBeDisabled();
+  });
+
+  it("is disabled and explains why when no evaluator can score", () => {
+    const { switchEl } = renderScoring({
+      eligibility: { eligible: [], ineligible: [] },
+      enableBlocked: true,
+    });
+    expect(switchEl).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Scoring cannot be turned on because none of this agent's evaluators can score traces."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows the save error", () => {
+    renderScoring({ saveError: "Could not update automatic scoring." });
+    expect(
+      screen.getByText("Could not update automatic scoring.")
+    ).toHaveClass("text-red-600");
   });
 });
