@@ -49,24 +49,26 @@ export function RunModelsSection({ org }: { org: Organization }) {
   };
 
   return (
-    <section className="space-y-3">
-      <div>
+    <section className="flex flex-col gap-3 md:flex-row md:items-center md:gap-10">
+      <div className="md:max-w-2xl">
         <h2 className="text-base md:text-lg font-semibold text-foreground">
-          How to run the models in a comparison
+          Benchmarking
         </h2>
         <p className="text-sm text-muted-foreground">
-          Running the models at the same time is quicker, but it puts more load
-          on your agent server. Choose one after another to keep that load down.
-          This only applies to agents you connect. For agents built in
-          Calibrate, Calibrate calls the models itself.
+          Running models in parallel is quicker, but it will increase the load
+          on your agent server. Choose to run them sequentially to prevent
+          overloading it.
         </p>
+        {error && <p className="text-[13px] text-red-500 mt-1">{error}</p>}
       </div>
-      <RunModelsChoice
-        value={value}
-        onChange={handleChange}
-        disabled={isSaving}
-      />
-      {error && <p className="text-[13px] text-red-500">{error}</p>}
+      <div className="md:flex-shrink-0">
+        <RunModelsChoice
+          value={value}
+          onChange={handleChange}
+          disabled={isSaving}
+          inline
+        />
+      </div>
     </section>
   );
 }

@@ -17,14 +17,18 @@ export function RunModelsChoice({
   value,
   onChange,
   disabled = false,
+  inline = false,
 }: {
   /** true = the models run at the same time. */
   value: boolean;
   onChange: (next: boolean) => void;
   disabled?: boolean;
+  /** Side by side instead of one above the other, for somewhere with the
+   *  width for it. The picker's panel is too narrow, so it stays stacked. */
+  inline?: boolean;
 }) {
   return (
-    <div>
+    <div className={inline ? "flex items-center gap-6" : undefined}>
       {OPTIONS.map((option) => (
         <label
           key={option.value}

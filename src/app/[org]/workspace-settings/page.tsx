@@ -36,7 +36,7 @@ import {
 const SETTINGS_TABS = [
   { id: "admin", label: "Admin" },
   { id: "api-keys", label: "API keys" },
-  { id: "settings", label: "Settings" },
+  { id: "general", label: "General" },
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
@@ -217,8 +217,8 @@ export default function WorkspaceSettingsPage() {
                   orgName={activeOrg.name}
                 />
               </div>
-            ) : activeTab === "settings" ? (
-              <div className="max-w-2xl space-y-8">
+            ) : activeTab === "general" ? (
+              <div className="space-y-8">
                 <RunModelsSection org={activeOrg} />
               </div>
             ) : (

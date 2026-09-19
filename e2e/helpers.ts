@@ -60,7 +60,7 @@ export async function waitForOrgReady(page: Page): Promise<void> {
  */
 export async function openWorkspaceSettings(
   page: Page,
-  tab: "Admin" | "API keys" | "Settings" = "Admin",
+  tab: "Admin" | "API keys" | "General" = "Admin",
 ): Promise<void> {
   await page.goto("/workspace-settings");
   await waitForOrgReady(page);

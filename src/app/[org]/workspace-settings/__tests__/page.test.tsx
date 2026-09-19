@@ -1,5 +1,5 @@
 /**
- * The Settings tab on the workspace settings page: how a model comparison
+ * The General tab on the workspace settings page: how a model comparison
  * runs its models for every agent in this workspace.
  *
  * The page's hooks are mocked so the test drives one workspace and watches the
@@ -70,9 +70,9 @@ function makeOrg(overrides: Partial<Organization> = {}): Organization {
   };
 }
 
-/** Land on the Settings tab, the way a shared link does. */
+/** Land on the General tab, the way a shared link does. */
 function openSettingsTab() {
-  window.history.replaceState(null, "", "?tab=settings");
+  window.history.replaceState(null, "", "?tab=general");
   render(<WorkspaceSettingsPage />);
 }
 
@@ -82,27 +82,27 @@ beforeEach(() => {
   (toast.success as jest.Mock).mockReset();
 });
 
-it("opens the Settings tab from the address", () => {
+it("opens the General tab from the address", () => {
   openSettingsTab();
 
   expect(
     screen.getByRole("heading", {
-      name: "How to run the models in a comparison",
+      name: "Benchmarking",
     }),
   ).toBeInTheDocument();
   expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
 });
 
-it("has a Settings tab that opens from a click", async () => {
+it("has a General tab that opens from a click", async () => {
   const user = setupUser();
   window.history.replaceState(null, "", "/");
   render(<WorkspaceSettingsPage />);
 
-  await user.click(screen.getByRole("button", { name: "Settings" }));
+  await user.click(screen.getByRole("button", { name: "General" }));
 
   expect(
     screen.getByRole("heading", {
-      name: "How to run the models in a comparison",
+      name: "Benchmarking",
     }),
   ).toBeInTheDocument();
 });

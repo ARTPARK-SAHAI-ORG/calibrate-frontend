@@ -35,3 +35,16 @@ it("cannot be changed while it is disabled", async () => {
   await user.click(sequential);
   expect(onChange).not.toHaveBeenCalled();
 });
+
+it("sits the two side by side when it is given the room", () => {
+  const { rerender } = render(
+    <RunModelsChoice value={true} onChange={jest.fn()} />,
+  );
+  // Stacked by default, which is what the narrow picker panel needs.
+  expect(screen.getByRole("radio", { name: "Parallel" }).closest("div"))
+    .not.toHaveClass("flex");
+
+  rerender(<RunModelsChoice value={true} onChange={jest.fn()} inline />);
+  expect(screen.getByRole("radio", { name: "Parallel" }).closest("div"))
+    .toHaveClass("flex");
+});

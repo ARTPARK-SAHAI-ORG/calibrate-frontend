@@ -19,9 +19,11 @@ import { reportError } from "@/lib/reportError";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
+import { Tooltip } from "@/components/Tooltip";
 import {
   CloseIcon,
   ChevronDownIcon,
+  GearIcon,
   TrashIcon,
   PlayIcon,
 } from "@/components/icons";
@@ -135,6 +137,10 @@ export function BenchmarkDialog({
   // first render still shows, and can never move a choice already made.
   const [pickedRunOrder, setPickedRunOrder] = useState<boolean | null>(null);
   const runModelsTogether = pickedRunOrder ?? openingRunOrder ?? true;
+  // A workspace that has said nothing runs them together, so that is what the
+  // choice on screen is measured against.
+  const differsFromWorkspaceDefault =
+    runModelsTogether !== (workspaceDefault ?? true);
   const [saveAsWorkspaceDefault, setSaveAsWorkspaceDefault] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -287,7 +293,7 @@ export function BenchmarkDialog({
   // the reader can still cancel.
   const saveWorkspaceDefault = () => {
     if (!saveAsWorkspaceDefault || !activeOrgUuid) return;
-    if (runModelsTogether === workspaceDefault) return;
+    if (!differsFromWorkspaceDefault) return;
     updateOrganization(activeOrgUuid, {
       settings: {
         model_benchmarking: { run_models_in_parallel: runModelsTogether },
@@ -532,8 +538,8 @@ export function BenchmarkDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative bg-background rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto pt-[12vh] pb-10 bg-black/50 backdrop-blur-sm">
+      <div className="relative bg-background rounded-xl w-full max-w-lg flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4">
           <div>
@@ -559,12 +565,77 @@ export function BenchmarkDialog({
 
         {/* Content */}
         <div className="flex-1 px-6 pb-6 pt-1 space-y-4">
-          {/* Sized for the label and five rows, so Advanced settings below
-              stays put however many models are chosen. */}
-          <div className="space-y-3 h-[17.5rem]">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Select Models
-            </label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-foreground">
+                Select Models
+              </label>
+              {/* Only a connection agent has a server of its own to overload;
+                  a build agent's models are called by the platform. It stays
+                  behind the gear for the few who need it, and opens beside
+                  the box so it covers none of the models and the box itself
+                  never changes size. On a narrow screen there is no room
+                  beside it, so it drops under the gear instead. */}
+              {agentType === "connection" && (
+                <div className="relative">
+                  <Tooltip content="How to run the models" position="top">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsOpen((open) => !open);
+                        if (!settingsOpen) setExpandedModelError(null);
+                      }}
+                      aria-expanded={settingsOpen}
+                      aria-label="How to run the models"
+                      className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-colors focus:outline-none ${
+                        settingsOpen
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <GearIcon className="w-4 h-4" />
+                    </button>
+                  </Tooltip>
+                  {settingsOpen && (
+                    <fieldset className="absolute z-10 w-72 space-y-1 rounded-xl border border-border bg-background p-4 shadow-2xl right-0 top-full mt-2 md:right-auto md:left-full md:top-0 md:mt-0 md:ml-9">
+                      <legend className="sr-only">How to run the models</legend>
+                      <p className="text-sm font-medium text-foreground">
+                        How to run the models
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Running multiple models will increase the load on your
+                        agent server. Choose to run them sequentially to prevent
+                        overloading it.
+                      </p>
+                      <div className="pt-1">
+                        {/* The same two rows the workspace settings page
+                            shows, so the two cannot drift apart. */}
+                        <RunModelsChoice
+                          value={runModelsTogether}
+                          onChange={setPickedRunOrder}
+                        />
+                      </div>
+                      {/* Only worth offering when the choice differs from what
+                          the workspace already does. Otherwise it would save
+                          what is saved already. */}
+                      {differsFromWorkspaceDefault && (
+                        <label className="mt-4 flex items-center gap-3 rounded-lg border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 px-3 py-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={saveAsWorkspaceDefault}
+                            onChange={(e) =>
+                              setSaveAsWorkspaceDefault(e.target.checked)
+                            }
+                            className="w-4 h-4 cursor-pointer accent-foreground"
+                          />
+                          <span className="text-sm">Save this as default</span>
+                        </label>
+                      )}
+                    </fieldset>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Model Rows */}
             {rows.map((selectedModel, index) => (
@@ -612,8 +683,8 @@ export function BenchmarkDialog({
                     </button>
                   )}
                 </div>
-                {/* Why the check failed. Beside the box on a wide screen, the
-                    same way Advanced settings opens, so the rows never move.
+                {/* Why the check failed. Beside the box on a wide screen, so
+                    the rows never move.
                     On a narrow screen it sits under the row instead. */}
                 {selectedModel &&
                   expandedModelError === selectedModel.id &&
@@ -644,68 +715,6 @@ export function BenchmarkDialog({
               </div>
             ))}
           </div>
-
-          {/* Only a connection agent has a server of its own to overload;
-              a build agent's models are called by the platform. The setting
-              stays behind a link for the few who need it, and opens in a
-              small panel beside the box so the box itself never changes
-              size. On a narrow screen there is no room beside it, so the
-              panel sits under the link instead. */}
-          {agentType === "connection" && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsOpen((open) => !open);
-                  if (!settingsOpen) setExpandedModelError(null);
-                }}
-                aria-expanded={settingsOpen}
-                className={`w-full h-10 px-4 rounded-md text-sm font-medium border border-border flex items-center justify-between cursor-pointer transition-colors focus:outline-none ${
-                  settingsOpen ? "bg-muted" : "bg-background hover:bg-muted/50"
-                }`}
-              >
-                Advanced settings
-                <ChevronDownIcon className="w-4 h-4 text-muted-foreground -rotate-90" />
-              </button>
-              {/* Beside the link, past the box's own side padding (px-6) plus
-                  a gap, its bottom level with the link so it grows upward and stays
-                  within the box.s height. */}
-              {settingsOpen && (
-                <fieldset className="mt-3 space-y-1 rounded-xl border border-border bg-background p-4 md:mt-0 md:absolute md:left-full md:bottom-0 md:ml-9 md:w-72 md:shadow-2xl md:border-0">
-                  <legend className="sr-only">How to run the models</legend>
-                  <p className="text-sm font-medium text-foreground">
-                    How to run the models
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Running multiple models will increase the load on your agent
-                    server. Choose to run them sequentially to prevent
-                    overloading it.
-                  </p>
-                  <div className="pt-1">
-                    {/* The same two rows the workspace settings page shows, so
-                        the two cannot drift apart. */}
-                    <RunModelsChoice
-                      value={runModelsTogether}
-                      onChange={setPickedRunOrder}
-                    />
-                    <label className="flex items-center gap-3 py-1 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={saveAsWorkspaceDefault}
-                        onChange={(e) =>
-                          setSaveAsWorkspaceDefault(e.target.checked)
-                        }
-                        className="w-4 h-4 cursor-pointer accent-foreground"
-                      />
-                      <span className="text-sm">
-                        Also save this as the workspace default
-                      </span>
-                    </label>
-                  </div>
-                </fieldset>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Footer */}

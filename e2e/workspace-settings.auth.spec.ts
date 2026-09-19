@@ -77,14 +77,14 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
   });
 
-  test("the Settings tab says how the models run in a comparison", async ({
+  test("the General tab says how the models run in a comparison", async ({
     page,
   }) => {
-    await openWorkspaceSettings(page, "Settings");
+    await openWorkspaceSettings(page, "General");
 
     await expect(
       page.getByRole("heading", {
-        name: "How to run the models in a comparison",
+        name: "Benchmarking",
       }),
     ).toBeVisible({ timeout: 15000 });
 

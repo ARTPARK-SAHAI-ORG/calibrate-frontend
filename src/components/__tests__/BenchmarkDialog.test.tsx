@@ -563,12 +563,12 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
 
     // Both panels open beside the box, so opening one closes the other.
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
@@ -949,12 +949,12 @@ describe("BenchmarkDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("build agent: has no Advanced settings and sends no run order", async () => {
+  it("build agent: has no way to run the models and sends no run order", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
 
     expect(
-      screen.queryByRole("button", { name: "Advanced settings" }),
+      screen.queryByRole("button", { name: "How to run the models" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Select a model"));
@@ -983,9 +983,9 @@ describe("BenchmarkDialog", () => {
     });
     render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
 
-    // Advanced settings starts closed, so the options are not on screen yet.
+    // The panel starts closed, so the options are not on screen yet.
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
     if (pickOrder) {
@@ -1204,7 +1204,7 @@ describe("BenchmarkDialog", () => {
       await screen.findByText("GPT-4o");
 
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
       expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
@@ -1238,7 +1238,7 @@ describe("BenchmarkDialog", () => {
       await screen.findByText("GPT-4o");
 
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       await user.click(screen.getByRole("radio", { name: "Parallel" }));
       await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -1265,7 +1265,7 @@ describe("BenchmarkDialog", () => {
 
       expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
     });
@@ -1278,7 +1278,7 @@ describe("BenchmarkDialog", () => {
       user: ReturnType<typeof setupUser>,
     ): Promise<void> {
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
     }
 
@@ -1335,7 +1335,7 @@ describe("BenchmarkDialog", () => {
       if (save) {
         await user.click(
           screen.getByRole("checkbox", {
-            name: "Also save this as the workspace default",
+            name: "Save this as default",
           }),
         );
       }
@@ -1414,15 +1414,29 @@ describe("BenchmarkDialog", () => {
       expect(mockUpdateOrganization).not.toHaveBeenCalled();
     });
 
-    it("saves nothing when the choice already is the workspace default", async () => {
+    it("does not offer to save a choice the workspace already makes", async () => {
+      // Nothing to save, so the box is not there to tick.
       mockUseBenchmarkParallelDefault.mockReturnValue(false);
       const user = setupUser();
-      await pickSequentialAndRun(user, { save: true });
-      await user.click(
-        screen.getByRole("button", { name: "Start the comparison" }),
-      );
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
 
-      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(
+        screen.queryByRole("checkbox", { name: "Save this as default" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers to save once the choice differs from the workspace", async () => {
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Parallel" }));
+
+      expect(
+        screen.getByRole("checkbox", { name: "Save this as default" }),
+      ).toBeInTheDocument();
     });
 
     it("saves nothing when the reader cancels before starting", async () => {
