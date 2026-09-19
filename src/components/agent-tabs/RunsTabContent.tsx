@@ -74,7 +74,8 @@ const TYPE_FILTERS: { value: RunTypeFilter; label: string }[] = [
 export function runTestCount(run: AgentRun): number | null {
   if (typeof run.total_tests === "number") return run.total_tests;
   const firstModel = run.model_results?.[0];
-  if (typeof firstModel?.total_tests === "number") return firstModel.total_tests;
+  if (typeof firstModel?.total_tests === "number")
+    return firstModel.total_tests;
   if (firstModel?.test_results) return firstModel.test_results.length;
   return null;
 }
@@ -146,9 +147,7 @@ function ModelPassRange({
         : `${Math.round(lowest)}\u2013${Math.round(highest)}% passed`;
   return (
     <>
-      {rate && highest !== null && (
-        <PassRatePill label={rate} rate={highest} />
-      )}
+      {rate && highest !== null && <PassRatePill label={rate} rate={highest} />}
       {failedModels > 0 && (
         <span
           className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
@@ -191,32 +190,35 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
-  // A run where some tests produced no answer reads better as its pass rate
-  // and a count of the tests never run than as a single blanket Error, so
-  // prefer the counts when the run reports them.
-  const breakdown =
-    run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
-
-  if (!breakdown) {
-    // A stopped run has nothing to tally: it never got to a test, or it is a
-    // model comparison that carries no counts. Say so in the same words the
-    // models cell says "Default", rather than calling it complete or leaving
-    // the reader with a blank. A stopped comparison stays here too: its models
-    // still count every test they were meant to run, so a share of them would
-    // read as a poor score rather than an unfinished one.
-    if (isRunStopped(run)) return <RunResultPlaceholder />;
-    // A comparison tried every test against every model, so its counts only
-    // make sense as the share each model passed. Adding them up would report
-    // 1,410 tests for a 470-test comparison tried against three models.
-    const range = getModelPassRange(run.model_results);
-    if (range) return <ModelPassRange {...range} />;
-    return isRunErrored(run) ? (
+  // A run that broke says so and nothing else, whichever kind of run it is.
+  // Its own counts cannot be trusted to say how the tests went: a run that
+  // fell over before it asked anything still carries a count for every test it
+  // was meant to run. The run window explains what actually happened.
+  if (isRunErrored(run))
+    return (
       <span
         className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
       >
         Error
       </span>
-    ) : (
+    );
+
+  // How the tests themselves went. A plain run carries one set of counts; a
+  // comparison carries one set per model.
+  const breakdown = run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
+
+  if (!breakdown) {
+    // A comparison tried every test against every model, so its counts only
+    // make sense as the share each model passed. Adding them up would report
+    // 1,410 tests for a 470-test comparison tried against three models.
+    const range = getModelPassRange(run.model_results);
+    if (range) return <ModelPassRange {...range} />;
+    // A run with nothing to tally: it was stopped before it got to a test, or
+    // it is a comparison that carries no counts. Say so in the same words the
+    // models cell says "Default", rather than calling it complete or leaving
+    // the reader with a blank.
+    if (isRunStopped(run)) return <RunResultPlaceholder />;
+    return (
       <span
         className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
       >
@@ -229,14 +231,13 @@ function RunResult({ run }: { run: AgentRun }) {
   // test that produced no answer is left out of the share, since counting it
   // as a wrong answer would blame the agent for a run that never reached it.
   const answered = breakdown.passed + breakdown.failed;
+  // Nothing was answered, so there is no share to give: a run of tests that
+  // all failed to run is not a run that scored zero.
+  if (answered === 0) return <RunResultPlaceholder />;
+  const rate = (breakdown.passed / answered) * 100;
   return (
     <>
-      {answered > 0 && (
-        <PassRatePill
-          label={`${Math.round((breakdown.passed / answered) * 100)}% passed`}
-          rate={(breakdown.passed / answered) * 100}
-        />
-      )}
+      <PassRatePill label={`${Math.round(rate)}% passed`} rate={rate} />
       {breakdown.unanswered > 0 && (
         <span
           className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}

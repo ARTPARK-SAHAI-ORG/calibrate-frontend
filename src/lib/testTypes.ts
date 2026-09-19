@@ -285,6 +285,7 @@ export type ModelRunCountsLike = {
   success?: boolean | null;
   total_tests?: number | null;
   passed?: number | null;
+  failed?: number | null;
 };
 
 /**
@@ -306,9 +307,17 @@ export function getModelPassRange(
       failedModels += 1;
       continue;
     }
-    const total = model.total_tests ?? 0;
-    if (total <= 0 || typeof model.passed !== "number") continue;
-    rates.push((Math.max(model.passed, 0) / total) * 100);
+    if (typeof model.passed !== "number") continue;
+    // Out of the tests that ran, the same way a single run reads. A stopped
+    // comparison still carries every test its models were meant to run, so
+    // going by that total would report it as a poor score rather than an
+    // unfinished one.
+    const answered =
+      typeof model.failed === "number"
+        ? Math.max(model.passed, 0) + Math.max(model.failed, 0)
+        : (model.total_tests ?? 0);
+    if (answered <= 0) continue;
+    rates.push((Math.max(model.passed, 0) / answered) * 100);
   }
   if (rates.length === 0) {
     return failedModels > 0 ? { lowest: null, highest: null, failedModels } : null;

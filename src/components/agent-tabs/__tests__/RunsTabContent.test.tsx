@@ -348,11 +348,30 @@ describe("RunsTabContent", () => {
     }
   });
 
-  it("shows only the tests never run when a run answered none of them", async () => {
+  it("says a run that answered nothing has no results, rather than scoring it zero", async () => {
     state.runs = [{ ...unitRun, passed: 0, failed: 0, unanswered_tests: 3 }];
     renderTab();
-    expect((await screen.findAllByText("3 Not run")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
     expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
+  });
+
+  it("says only Error for a run that broke, whichever kind of run it is", async () => {
+    state.runs = [
+      { ...unitRun, uuid: "broke-plain", status: "failed" },
+      {
+        ...benchmarkRun,
+        uuid: "broke-comparison",
+        status: "failed",
+        model_results: [{ model: "a", total_tests: 20, passed: 0, failed: 20 }],
+      },
+    ];
+    renderTab();
+    // Both rows say Error and neither is scored: a run that fell over before
+    // it asked anything still carries a count for every test it was meant to
+    // run, so its own counts cannot say how the tests went.
+    expect((await screen.findAllByText("Error")).length).toBe(4);
+    expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not run/)).not.toBeInTheDocument();
   });
 
   it("says a run was stopped, alongside what it managed to do", async () => {
