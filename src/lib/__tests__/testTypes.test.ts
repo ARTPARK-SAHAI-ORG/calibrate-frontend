@@ -9,6 +9,7 @@ import {
   isNotRun,
   isRunInProgress,
   runStateOf,
+  getModelPassRange,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -269,5 +270,49 @@ describe("runStateOf", () => {
     expect(runStateOf({ status: "in_progress", stopped_early: true })).toBe(
       null,
     );
+  });
+});
+
+describe("getModelPassRange", () => {
+  it("gives the spread of what the models passed", () => {
+    expect(
+      getModelPassRange([
+        { model: "a", total_tests: 100, passed: 88 },
+        { model: "b", total_tests: 100, passed: 96 },
+        { model: "c", total_tests: 100, passed: 90 },
+      ] as never),
+    ).toEqual({ lowest: 88, highest: 96, failedModels: 0 });
+  });
+
+  it("gives one number when every model passed the same share", () => {
+    const range = getModelPassRange([
+      { total_tests: 50, passed: 47 },
+      { total_tests: 100, passed: 94 },
+    ]);
+    expect(range?.lowest).toBe(94);
+    expect(range?.highest).toBe(94);
+  });
+
+  it("counts the models that could not be run and leaves them out of the spread", () => {
+    expect(
+      getModelPassRange([
+        { total_tests: 10, passed: 5 },
+        { success: false, total_tests: 10, passed: 0 },
+      ]),
+    ).toEqual({ lowest: 50, highest: 50, failedModels: 1 });
+  });
+
+  it("still reports the failed models when no model carries counts", () => {
+    expect(getModelPassRange([{ success: false }])).toEqual({
+      lowest: null,
+      highest: null,
+      failedModels: 1,
+    });
+  });
+
+  it("says nothing when there are no counts and nothing failed", () => {
+    expect(getModelPassRange([{ model: "a" } as never])).toBeNull();
+    expect(getModelPassRange(null)).toBeNull();
+    expect(getModelPassRange([{ total_tests: 0, passed: 0 }])).toBeNull();
   });
 });

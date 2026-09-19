@@ -14,6 +14,7 @@ import {
   type RunTypeFilter,
 } from "@/hooks";
 import {
+  getModelPassRange,
   getRunBreakdown,
   isRunErrored,
   isRunInProgress,
@@ -54,8 +55,8 @@ const PAGE_PARAM = "page";
 const RESULT_FILTERS: { value: RunResultFilter; label: string }[] = [
   { value: "all", label: "All results" },
   { value: "passed", label: "All passed" },
-  { value: "failed", label: "All failed" },
-  { value: "error", label: "Error" },
+  { value: "failed", label: "Any failed" },
+  { value: "error", label: "Any error" },
 ];
 
 // A run that tried the tests against several models at once is rare next to
@@ -111,6 +112,44 @@ function RunResultPlaceholder() {
 }
 
 
+/**
+ * How a model comparison went: the share of tests the models passed, as one
+ * number when they all agree and as a spread when they do not, plus the models
+ * that could not be run at all.
+ */
+function ModelPassRange({
+  lowest,
+  highest,
+  failedModels,
+}: {
+  lowest: number | null;
+  highest: number | null;
+  failedModels: number;
+}) {
+  const rate =
+    lowest === null || highest === null
+      ? null
+      : Math.round(lowest) === Math.round(highest)
+        ? `${Math.round(lowest)}% passed`
+        : `${Math.round(lowest)}\u2013${Math.round(highest)}% passed`;
+  return (
+    <>
+      {rate && (
+        <span className={`${PILL_CLASS} bg-muted text-muted-foreground`}>
+          {rate}
+        </span>
+      )}
+      {failedModels > 0 && (
+        <span
+          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+        >
+          {failedModels} model{failedModels === 1 ? "" : "s"} failed
+        </span>
+      )}
+    </>
+  );
+}
+
 /** The result pills for one run: running, error, or the per-test tally. */
 function RunResult({ run }: { run: AgentRun }) {
   if (isRunInProgress(run)) {
@@ -150,10 +189,17 @@ function RunResult({ run }: { run: AgentRun }) {
 
   if (!breakdown) {
     // A stopped run has nothing to tally: it never got to a test, or it is a
-    // model comparison, which carries no counts either way. Say so in the same
-    // words the models cell says "Default", rather than calling it complete or
-    // leaving the reader with a blank.
+    // model comparison that carries no counts. Say so in the same words the
+    // models cell says "Default", rather than calling it complete or leaving
+    // the reader with a blank. A stopped comparison stays here too: its models
+    // still count every test they were meant to run, so a share of them would
+    // read as a poor score rather than an unfinished one.
     if (isRunStopped(run)) return <RunResultPlaceholder />;
+    // A comparison tried every test against every model, so its counts only
+    // make sense as the share each model passed. Adding them up would report
+    // 1,410 tests for a 470-test comparison tried against three models.
+    const range = getModelPassRange(run.model_results);
+    if (range) return <ModelPassRange {...range} />;
     return isRunErrored(run) ? (
       <span
         className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
@@ -555,7 +601,11 @@ export function RunsTabContent({
         </div>
       )}
 
-      {isLoading && items.length === 0 ? (
+      {/* A fetch the reader asked for takes the rows away at once, rather than
+          leaving the old filter's runs on screen until the new ones answer.
+          Resolving a `?runId=` link is the exception: it is read against the
+          rows already on screen, so they stay unless there are none yet. */}
+      {isLoading && (!pendingRunId || items.length === 0) ? (
         <div className="flex items-center justify-center py-10">
           <svg
             className="w-5 h-5 animate-spin text-muted-foreground"

@@ -423,6 +423,48 @@ describe("RunsTabContent", () => {
     expect(firstRow.querySelectorAll("td")[1].textContent).toBe("No results");
   });
 
+  it("shows what a comparison's models passed instead of a bare Complete", async () => {
+    state.runs = [
+      {
+        ...benchmarkRun,
+        model_results: [
+          { model: "a", total_tests: 100, passed: 88 },
+          { model: "b", total_tests: 100, passed: 96 },
+        ],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("88\u201396% passed")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+  });
+
+  it("names the models a comparison could not run at all", async () => {
+    state.runs = [
+      {
+        ...benchmarkRun,
+        model_results: [
+          { model: "a", total_tests: 100, passed: 94 },
+          { model: "b", success: false },
+        ],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("94% passed")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 model failed").length).toBeGreaterThan(0);
+  });
+
+  it("says only that the models failed when none of them carries counts", async () => {
+    state.runs = [
+      {
+        ...benchmarkRun,
+        model_results: [{ model: "a", success: false }, { model: "b", success: false }],
+      },
+    ];
+    renderTab();
+    expect((await screen.findAllByText("2 models failed")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
+  });
+
   it("shows Running while a run has not finished", async () => {
     state.runs = [{ ...unitRun, status: "in_progress" }];
     renderTab();
@@ -445,12 +487,12 @@ describe("RunsTabContent", () => {
       expect(lastRunsQuery().get("has_failures")).toBe("false"),
     );
 
-    await user.click(screen.getByRole("button", { name: "All failed" }));
+    await user.click(screen.getByRole("button", { name: "Any failed" }));
     await waitFor(() =>
       expect(lastRunsQuery().get("has_failures")).toBe("true"),
     );
 
-    await user.click(screen.getByRole("button", { name: "Error" }));
+    await user.click(screen.getByRole("button", { name: "Any error" }));
     await waitFor(() => expect(lastRunsQuery().get("status")).toBe("failed"));
 
     await user.click(screen.getByRole("button", { name: "All results" }));
@@ -459,6 +501,27 @@ describe("RunsTabContent", () => {
       expect(q.get("has_failures")).toBeNull();
       expect(q.get("status")).toBeNull();
     });
+  });
+
+  it("takes the runs off screen while a new filter is being fetched", async () => {
+    const user = setupUser();
+    renderTab();
+    await screen.findAllByText("1 Success");
+
+    let releaseList: () => void = () => {};
+    state.holdList = new Promise<void>((resolve) => {
+      releaseList = resolve;
+    });
+    await user.click(screen.getByRole("button", { name: "All passed" }));
+
+    // The rows of the old filter are gone the moment the button is clicked,
+    // rather than sitting there until the new ones arrive.
+    await waitFor(() =>
+      expect(screen.queryByText("1 Success")).not.toBeInTheDocument(),
+    );
+
+    releaseList();
+    await screen.findAllByText("1 Success");
   });
 
   it("asks the backend for model comparisons only when that filter is on", async () => {

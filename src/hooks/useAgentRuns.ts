@@ -38,11 +38,15 @@ export type AgentRun = {
     | {
         model: string;
         /**
-         * How many tests this model was tried on. The runs list carries this
-         * count but not the per-case `test_results` behind it, which only the
-         * run-detail endpoints return.
+         * How many tests this model was tried on, and how many it passed. The
+         * runs list carries these counts but not the per-case `test_results`
+         * behind them, which only the run-detail endpoints return.
          */
         total_tests?: number | null;
+        passed?: number | null;
+        failed?: number | null;
+        /** False when this model's run could not be carried out at all. */
+        success?: boolean | null;
         test_results?: unknown[];
       }[]
     | null;

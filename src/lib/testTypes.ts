@@ -278,3 +278,40 @@ export function isRunAnyFailed(run: RunStatusLike): boolean {
     run.failed > 0
   );
 }
+
+/** One model's results as a runs-list row carries them. */
+export type ModelRunCountsLike = {
+  /** False when this model's run could not be carried out at all. */
+  success?: boolean | null;
+  total_tests?: number | null;
+  passed?: number | null;
+};
+
+/**
+ * How a comparison went, as the share of tests each model passed rather than
+ * a count. Adding the counts up would report 1,410 tests for a 470-test
+ * comparison tried against three models, which is why this reads as a rate.
+ *
+ * `lowest` and `highest` are the same number when every model passed the same
+ * share, and both are null when no model carries counts. Null altogether when
+ * there is nothing to say: no counts and no model that failed outright.
+ */
+export function getModelPassRange(
+  models: ModelRunCountsLike[] | null | undefined,
+): { lowest: number | null; highest: number | null; failedModels: number } | null {
+  const rates: number[] = [];
+  let failedModels = 0;
+  for (const model of models ?? []) {
+    if (model.success === false) {
+      failedModels += 1;
+      continue;
+    }
+    const total = model.total_tests ?? 0;
+    if (total <= 0 || typeof model.passed !== "number") continue;
+    rates.push((Math.max(model.passed, 0) / total) * 100);
+  }
+  if (rates.length === 0) {
+    return failedModels > 0 ? { lowest: null, highest: null, failedModels } : null;
+  }
+  return { lowest: Math.min(...rates), highest: Math.max(...rates), failedModels };
+}
