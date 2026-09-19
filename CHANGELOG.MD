@@ -1,5 +1,6 @@
 ## September 2026
 
+- The browser tab icon now shows up clearly whether the browser is set to a light or dark tab strip ([#607](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/607))
 - A workspace can now set whether model comparisons for connected agents run one at a time or together, as a default in workspace settings or saved directly from the model picker when starting a comparison ([#598](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/598))
 - Rerunning a model comparison from the Evaluations tab now reopens the model picker with the same models and how they ran, so you can change them before starting it again ([#596](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/596))
 - A run is now marked partially complete instead of finished when one of its tests could not be run, and its summary only shows pass rate, latency, cost and token cards when there are actual numbers to show ([#602](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/602))
