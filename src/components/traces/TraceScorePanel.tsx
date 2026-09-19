@@ -8,8 +8,9 @@ import {
 } from "@/lib/traceScoring";
 import type { TraceScoreResult, TraceScoringRun } from "@/lib/tracesApi";
 
-type TraceScoreHistoryProps = {
-  runs: TraceScoringRun[];
+type TraceScorePanelProps = {
+  /** The newest scoring run for this trace, or null when it has none. */
+  run: TraceScoringRun | null;
   isLoading?: boolean;
   error?: string | null;
 };
@@ -76,12 +77,11 @@ function RunBody({ run }: { run: TraceScoringRun }) {
  * The latest scoring run for one trace, laid out like the evaluators column
  * of the test results window: a heading, then one verdict card per evaluator.
  */
-export function TraceScoreHistory({
-  runs,
+export function TraceScorePanel({
+  run,
   isLoading = false,
   error = null,
-}: TraceScoreHistoryProps) {
-  const latest = runs[0];
+}: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Scores</h3>
@@ -89,12 +89,12 @@ export function TraceScoreHistory({
         <p className="text-sm text-muted-foreground">Loading scores…</p>
       ) : error ? (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      ) : !latest ? (
+      ) : !run ? (
         <p className="text-sm text-muted-foreground">
           This trace has not been scored.
         </p>
       ) : (
-        <RunBody run={latest} />
+        <RunBody run={run} />
       )}
     </div>
   );

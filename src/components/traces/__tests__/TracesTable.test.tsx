@@ -200,15 +200,15 @@ describe("TracesTable", () => {
         trace({
           latest_run_status: "completed",
           results: [
-            { evaluator_uuid: "ev-1", name: "ev-1", evaluator_version_id: "v-ev-1", output_type: "binary", value: 1, passed: true },
-            { evaluator_uuid: "ev-2", name: "ev-2", evaluator_version_id: "v-ev-2", output_type: "rating", value: 4, passed: true },
+            { evaluator_uuid: "ev-1", name: "ev-1", output_type: "binary", value: 1, passed: true },
+            { evaluator_uuid: "ev-2", name: "ev-2", output_type: "rating", value: 4, passed: true },
           ],
         }),
         trace({
           uuid: "t2",
           latest_run_status: "completed",
           results: [
-            { evaluator_uuid: "ev-1", name: "ev-1", evaluator_version_id: "v-ev-1", output_type: "binary", value: 0, passed: false },
+            { evaluator_uuid: "ev-1", name: "ev-1", output_type: "binary", value: 0, passed: false },
           ],
         }),
       ],

@@ -27,7 +27,7 @@ import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 import { formatTraceDate } from "./TracesTable";
-import { TraceScoreHistory } from "./TraceScoreHistory";
+import { TraceScorePanel } from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -299,14 +299,12 @@ export function TraceDetailDialog({
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scoreRuns, setScoreRuns] = useState<TraceScoringRun[]>([]);
-  const [scoresLoading, setScoresLoading] = useState(false);
+  // Only the newest run is drawn, so only that one is kept.
+  const [latestRun, setLatestRun] = useState<TraceScoringRun | null>(null);
   const [scoresError, setScoresError] = useState<string | null>(null);
   const trace = isOpen && loaded?.uuid === traceUuid ? loaded.trace : null;
-  const visibleScoreRuns = loaded?.uuid === traceUuid ? scoreRuns : [];
-  const hasOpenScoreRuns = visibleScoreRuns.some((run) =>
-    isTraceScoringInProgress(run.status),
-  );
+  const visibleRun = loaded?.uuid === traceUuid ? latestRun : null;
+  const hasOpenScoreRun = isTraceScoringInProgress(visibleRun?.status);
 
   useEffect(() => {
     if (!isOpen || !traceUuid || !accessToken) return;
@@ -315,9 +313,8 @@ export function TraceDetailDialog({
       setIsLoading(true);
       setError(null);
       setLoaded(null);
-      setScoreRuns([]);
+      setLatestRun(null);
       setScoresError(null);
-      setScoresLoading(true);
       try {
         const [data, scores] = await Promise.all([
           fetchTrace(accessToken, traceUuid),
@@ -331,17 +328,14 @@ export function TraceDetailDialog({
         ]);
         if (!cancelled) {
           setLoaded({ uuid: traceUuid, trace: data });
-          setScoreRuns(scores.runs ?? []);
+          setLatestRun(scores.runs?.[0] ?? null);
         }
       } catch (err) {
         reportError("Error fetching trace:", err);
         if (!cancelled)
           setError("Failed to load this trace. Please try again.");
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-          setScoresLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     };
     load();
@@ -351,12 +345,12 @@ export function TraceDetailDialog({
   }, [isOpen, traceUuid, accessToken]);
 
   useEffect(() => {
-    if (!isOpen || !traceUuid || !accessToken || !hasOpenScoreRuns) return;
+    if (!isOpen || !traceUuid || !accessToken || !hasOpenScoreRun) return;
     let cancelled = false;
     const poll = async () => {
       try {
         const scores = await fetchTraceScores(accessToken, traceUuid);
-        if (!cancelled) setScoreRuns(scores.runs ?? []);
+        if (!cancelled) setLatestRun(scores.runs?.[0] ?? null);
       } catch (err) {
         reportError("Error polling trace scores:", err);
       }
@@ -366,7 +360,7 @@ export function TraceDetailDialog({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [isOpen, traceUuid, accessToken, hasOpenScoreRuns]);
+  }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
 
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
   // Same width and limits as the evaluators column of the test results window.
@@ -487,9 +481,9 @@ export function TraceDetailDialog({
                 they sit in the right column, the way a test run's do. */}
             {trace && (
               <div className="md:hidden border-t border-border">
-                <TraceScoreHistory
-                  runs={visibleScoreRuns}
-                  isLoading={scoresLoading}
+                <TraceScorePanel
+                  run={visibleRun}
+                  isLoading={isLoading}
                   error={scoresError}
                 />
               </div>
@@ -510,9 +504,9 @@ export function TraceDetailDialog({
                 className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
               >
                 <div className="flex-1 overflow-y-auto">
-                  <TraceScoreHistory
-                    runs={visibleScoreRuns}
-                    isLoading={scoresLoading}
+                  <TraceScorePanel
+                    run={visibleRun}
+                    isLoading={isLoading}
                     error={scoresError}
                   />
                 </div>

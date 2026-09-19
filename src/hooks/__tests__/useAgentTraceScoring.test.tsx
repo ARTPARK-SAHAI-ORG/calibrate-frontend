@@ -42,17 +42,26 @@ const blocked = {
   ],
 };
 
+// The agent page is the only copy of the flag: it saves the new value and
+// feeds it straight back in, which is what moves the switch. The helper does
+// the same so the tests exercise the real round trip.
 function setup(enabled = false, isActive = true) {
-  return renderHook(
+  const onEnabledChange = jest.fn();
+  const view = renderHook(
     (props: { enabled: boolean; isActive: boolean }) =>
       useAgentTraceScoring({
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: props.enabled,
+        onEnabledChange,
         isActive: props.isActive,
       }),
     { initialProps: { enabled, isActive } },
   );
+  onEnabledChange.mockImplementation((next: boolean) =>
+    view.rerender({ enabled: next, isActive }),
+  );
+  return { ...view, onEnabledChange };
 }
 
 beforeEach(() => {
@@ -131,6 +140,7 @@ it("drops the refusal message when the reader comes back to the tab", async () =
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: false,
+        onEnabledChange: jest.fn(),
         isActive: props.isActive,
       }),
     { initialProps: { isActive: true } },
@@ -209,6 +219,7 @@ it("does nothing without an access token", async () => {
       accessToken: null,
       agentUuid: "ag-1",
       enabled: false,
+    onEnabledChange: jest.fn(),
     }),
   );
   await act(async () => {
@@ -242,6 +253,7 @@ it("does not fetch until the traces tab is on screen, then refetches when it ret
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: false,
+        onEnabledChange: jest.fn(),
         isActive: props.isActive,
       }),
     { initialProps: { isActive: false } },
@@ -274,6 +286,7 @@ it("ignores a slower eligibility response after the agent changes", async () => 
         accessToken: "tok",
         agentUuid: props.agentUuid,
         enabled: false,
+      onEnabledChange: jest.fn(),
       }),
     { initialProps: { agentUuid: "ag-a" } },
   );
@@ -305,6 +318,7 @@ it("ignores a slower eligibility failure after the agent changes", async () => {
         accessToken: "tok",
         agentUuid: props.agentUuid,
         enabled: false,
+      onEnabledChange: jest.fn(),
       }),
     { initialProps: { agentUuid: "ag-a" } },
   );

@@ -68,14 +68,12 @@ export type TraceScoringStatus =
 export type TraceScoreResult = {
   evaluator_uuid: string;
   name: string;
-  evaluator_type?: string | null;
   output_type: "binary" | "rating";
   scale_min?: number | null;
   scale_max?: number | null;
   /** The judged result: 0 or 1 for binary, the numeric score for rating. */
   value: number;
   reasoning?: string | null;
-  evaluator_version_id: string;
   passed: boolean;
 };
 
@@ -88,10 +86,6 @@ export type TraceScoringRun = {
   results: TraceScoreResult[];
 };
 
-export type TraceScoresResponse = {
-  runs: TraceScoringRun[];
-};
-
 export type TraceScoringIneligibleReason =
   | "wrong_type_for_agent"
   | "no_live_version"
@@ -99,7 +93,6 @@ export type TraceScoringIneligibleReason =
 
 export type TraceScoringEligibleEvaluator = {
   evaluator_uuid: string;
-  evaluator_version_id: string;
   name: string;
 };
 
@@ -207,8 +200,8 @@ export async function fetchTrace(
 export async function fetchTraceScores(
   accessToken: string,
   traceUuid: string,
-): Promise<TraceScoresResponse> {
-  return apiGet<TraceScoresResponse>(
+): Promise<{ runs: TraceScoringRun[] }> {
+  return apiGet<{ runs: TraceScoringRun[] }>(
     `/traces/${encodeURIComponent(traceUuid)}/scores`,
     accessToken,
   );

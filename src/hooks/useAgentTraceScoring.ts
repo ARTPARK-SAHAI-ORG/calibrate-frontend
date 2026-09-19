@@ -14,7 +14,9 @@ type UseAgentTraceScoringArgs = {
   agentUuid: string;
   /** Current flag from the agent record. The hook keeps a live copy after a toggle. */
   enabled: boolean;
-  onEnabledChange?: (enabled: boolean) => void;
+  /** Required: the agent page saves the new value and feeds it back in as
+   *  `enabled`, which is the only copy of the flag. */
+  onEnabledChange: (enabled: boolean) => void;
   /**
    * A tab showing the switch or the banner is on screen. Eligibility is
    * fetched when this becomes true so linking an evaluator on another tab
@@ -48,7 +50,6 @@ export function useAgentTraceScoring({
   onEnabledChange,
   isActive = true,
 }: UseAgentTraceScoringArgs): TraceScoringControls {
-  const [isEnabled, setIsEnabled] = useState(enabled);
   const [eligibility, setEligibility] = useState<TraceScoringEligibility | null>(
     null,
   );
@@ -56,10 +57,6 @@ export function useAgentTraceScoring({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    setIsEnabled(enabled);
-  }, [enabled]);
 
   const loadEligibility = useCallback(async () => {
     if (!accessToken) return;
@@ -95,12 +92,12 @@ export function useAgentTraceScoring({
   }, [isActive, loadEligibility]);
 
   const canEnable = (eligibility?.eligible.length ?? 0) > 0;
-  const enableBlocked = !isEnabled && eligibility !== null && !canEnable;
+  const enableBlocked = !enabled && eligibility !== null && !canEnable;
 
   const setEnabled = useCallback(
     async (next: boolean) => {
       if (!accessToken) return;
-      if (next === isEnabled) return;
+      if (next === enabled) return;
       if (next && !canEnable) return;
       setSaving(true);
       setSaveError(null);
@@ -110,9 +107,7 @@ export function useAgentTraceScoring({
           agentUuid,
           next,
         );
-        const live = !!updated.auto_score_traces;
-        setIsEnabled(live);
-        onEnabledChange?.(live);
+        onEnabledChange(!!updated.auto_score_traces);
       } catch (err) {
         reportError("Error updating automatic trace scoring:", err);
         setSaveError(
@@ -132,14 +127,14 @@ export function useAgentTraceScoring({
       accessToken,
       agentUuid,
       canEnable,
-      isEnabled,
+      enabled,
       loadEligibility,
       onEnabledChange,
     ],
   );
 
   return {
-    enabled: isEnabled,
+    enabled,
     saving,
     setEnabled,
     eligibility,

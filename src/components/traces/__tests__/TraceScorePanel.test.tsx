@@ -1,5 +1,5 @@
 import { render, screen } from "@/test-utils";
-import { TraceScoreHistory } from "../TraceScoreHistory";
+import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
 
 jest.mock("../../EvaluatorVerdictCard", () => ({
@@ -40,23 +40,19 @@ const completed: TraceScoringRun = {
     {
       evaluator_uuid: "ev-1",
       name: "Tone",
-      evaluator_type: "llm",
       output_type: "binary",
       value: 1,
       reasoning: "Greeting was present.",
-      evaluator_version_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       passed: true,
     },
     {
       evaluator_uuid: "ev-2",
       name: "Helpfulness",
-      evaluator_type: "llm",
       output_type: "rating",
       scale_min: 1,
       scale_max: 5,
       value: 4,
       reasoning: "Almost complete.",
-      evaluator_version_id: "11111111-2222-3333-4444-555555555555",
       passed: false,
     },
   ],
@@ -71,8 +67,8 @@ const prior: TraceScoringRun = {
   results: [],
 };
 
-it("draws one card per evaluator of the latest run only, with no id pill", () => {
-  render(<TraceScoreHistory runs={[completed, prior]} />);
+it("draws one card per evaluator of the run it is given, with no id pill", () => {
+  render(<TraceScorePanel run={completed} />);
 
   expect(screen.getByRole("heading", { name: "Scores" })).toBeInTheDocument();
   // A binary result reaches the verdict card as its passed flag; a rating
@@ -87,59 +83,49 @@ it("draws one card per evaluator of the latest run only, with no id pill", () =>
   expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
     "version:undefined link:true",
   );
-  expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
-  // The earlier, failed run is not drawn.
+  // No run headings, no status pill, no version id beside the name.
   expect(
     screen.queryByText(/Latest scores|Earlier scores/),
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/Completed|Scored/)).not.toBeInTheDocument();
-  expect(
-    screen.queryByText("This scoring run could not be completed"),
-  ).not.toBeInTheDocument();
 });
 
 it("shows a spinner while scoring, the reason when it failed, and empty results", () => {
   const { rerender, container } = render(
-    <TraceScoreHistory
-      runs={[
-        {
+    <TraceScorePanel
+      run={{
           run_uuid: "r1",
           status: "pending",
           created_at: "2026-08-29T12:00:00Z",
           results: [],
-        },
-      ]}
+        }}
     />,
   );
   expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
-    <TraceScoreHistory
-      runs={[
-        {
+    <TraceScorePanel
+      run={{
           run_uuid: "r2",
           status: "processing",
           created_at: "2026-08-29T12:00:00Z",
           results: [],
-        },
-      ]}
+        }}
     />,
   );
   expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
-    <TraceScoreHistory
-      runs={[
-        {
+    <TraceScorePanel
+      run={{
           run_uuid: "r3",
           status: "skipped",
           created_at: "2026-08-29T12:00:00Z",
           error: "no_usable_evaluators",
           results: [],
-        },
-      ]}
+        }}
     />,
   );
   expect(
@@ -147,22 +133,20 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
 
-  rerender(<TraceScoreHistory runs={[prior]} />);
+  rerender(<TraceScorePanel run={prior} />);
   expect(
     screen.getByText("This scoring run could not be completed"),
   ).toBeInTheDocument();
 
   rerender(
-    <TraceScoreHistory
-      runs={[
-        {
+    <TraceScorePanel
+      run={{
           run_uuid: "r4",
           status: "completed",
           created_at: "2026-08-29T12:00:00Z",
           completed_at: "2026-08-29T12:01:00Z",
           results: [],
-        },
-      ]}
+        }}
     />,
   );
   expect(
@@ -171,13 +155,13 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
 });
 
 it("shows loading, error, and empty copy", () => {
-  const { rerender } = render(<TraceScoreHistory runs={[]} isLoading />);
+  const { rerender } = render(<TraceScorePanel run={null} isLoading />);
   expect(screen.getByText("Loading scores…")).toBeInTheDocument();
 
-  rerender(<TraceScoreHistory runs={[]} error="Could not load scores." />);
+  rerender(<TraceScorePanel run={null} error="Could not load scores." />);
   expect(screen.getByText("Could not load scores.")).toBeInTheDocument();
 
-  rerender(<TraceScoreHistory runs={[]} />);
+  rerender(<TraceScorePanel run={null} />);
   expect(
     screen.getByText("This trace has not been scored."),
   ).toBeInTheDocument();

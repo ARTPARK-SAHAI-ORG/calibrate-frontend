@@ -56,23 +56,35 @@ function ScoreValue({
 export function TraceScoreCells({ trace, columns, layout }: Props) {
   if (columns.length === 0) return null;
   const status = trace.latest_run_status;
-  const spanning =
-    status && status !== "completed" ? (
-      isTraceScoringInProgress(status) ? (
-        <span role="img" aria-label="Scoring" className="inline-flex">
-          <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
-        </span>
-      ) : (
-        <span
-          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
-        >
-          {status === "failed" ? "Failed" : "Skipped"}
-        </span>
-      )
-    ) : null;
 
+  // A run that has not finished says so once, across every evaluator column.
+  if (status && status !== "completed") {
+    const mark = isTraceScoringInProgress(status) ? (
+      <span role="img" aria-label="Scoring" className="inline-flex">
+        <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
+      </span>
+    ) : (
+      <span
+        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
+      >
+        {status === "failed" ? "Failed" : "Skipped"}
+      </span>
+    );
+    return layout === "card" ? (
+      <div className="mt-2">{mark}</div>
+    ) : (
+      <div
+        className="min-w-0 flex items-center"
+        style={{ gridColumn: `span ${columns.length}` }}
+      >
+        {mark}
+      </div>
+    );
+  }
+
+  // Finished, or never scored: one cell each. ScoreValue draws the dash when
+  // there is nothing for that evaluator, which is every cell of an unscored row.
   if (layout === "card") {
-    if (spanning) return <div className="mt-2">{spanning}</div>;
     return (
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
         {columns.map((column) => (
@@ -80,27 +92,9 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
             <div className="text-xs font-medium text-muted-foreground">
               {column.name}
             </div>
-            {status === "completed" ? (
-              <ScoreValue
-                trace={trace}
-                evaluatorUuid={column.evaluator_uuid}
-              />
-            ) : (
-              DASH
-            )}
+            <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
           </div>
         ))}
-      </div>
-    );
-  }
-
-  if (spanning) {
-    return (
-      <div
-        className="min-w-0 flex items-center"
-        style={{ gridColumn: `span ${columns.length}` }}
-      >
-        {spanning}
       </div>
     );
   }
@@ -108,11 +102,7 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
     <>
       {columns.map((column) => (
         <div key={column.evaluator_uuid} className="min-w-0">
-          {status === "completed" ? (
-            <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
-          ) : (
-            DASH
-          )}
+          <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
         </div>
       ))}
     </>
