@@ -1,9 +1,13 @@
 "use client";
 
+import { Tooltip } from "@/components/Tooltip";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import { getStatusBadgeClass } from "@/lib/status";
-import { isTraceScoringInProgress } from "@/lib/traceScoring";
+import {
+  isTraceScoringInProgress,
+  scoringRunErrorCopy,
+} from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 
 export type TraceScoreColumn = { evaluator_uuid: string; name: string };
@@ -11,7 +15,10 @@ export type TraceScoreColumn = { evaluator_uuid: string; name: string };
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 type Props = {
-  trace: Pick<TraceSummary, "latest_run_status" | "results">;
+  trace: Pick<
+    TraceSummary,
+    "latest_run_status" | "latest_run_error" | "results"
+  >;
   columns: TraceScoreColumn[];
   /** "row" is one grid cell per evaluator; "card" is a labelled block each. */
   layout: "row" | "card";
@@ -64,11 +71,16 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
         <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
       </span>
     ) : (
-      <span
-        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
+      <Tooltip
+        content={scoringRunErrorCopy(trace.latest_run_error)}
+        position="top"
       >
-        {status === "failed" ? "Failed" : "Skipped"}
-      </span>
+        <span
+          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
+        >
+          {status === "failed" ? "Failed" : "Skipped"}
+        </span>
+      </Tooltip>
     );
     return layout === "card" ? (
       <div className="mt-2">{mark}</div>

@@ -537,6 +537,28 @@ describe("TracesTabContent", () => {
       ).toBeInTheDocument();
     });
 
+    it("says the workspace hit its scoring limit, with a way to ask for more", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({ latest_run_status: "skipped", latest_run_error: "over_limit" }),
+        ]),
+      );
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        screen.getByText(/this workspace has scored as many traces/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Click here" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says nothing about a limit when no trace was refused for one", () => {
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        screen.queryByText(/this workspace has scored as many traces/i),
+      ).not.toBeInTheDocument();
+    });
+
     it("keeps both lines off the setup steps", () => {
       mockUseTraces.mockReturnValue(tracesResult([]));
       render(

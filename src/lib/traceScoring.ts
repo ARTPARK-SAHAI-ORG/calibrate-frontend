@@ -30,6 +30,8 @@ export function ineligibleReasonCopy(
 /** Why a scoring run was skipped or failed. */
 export function scoringRunErrorCopy(error: string | null | undefined): string {
   switch (error) {
+    case "over_limit":
+      return "This workspace has scored as many traces as its limit allows";
     case "no_usable_evaluators":
       return "No evaluators could score this trace";
     case "trace_deleted":
@@ -44,5 +46,3 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
       return "Scoring did not finish";
   }
 }
-
-

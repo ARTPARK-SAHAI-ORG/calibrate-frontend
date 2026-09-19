@@ -44,6 +44,9 @@ describe("copy", () => {
     );
     expect(scoringRunErrorCopy("")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy(null)).toBe("Scoring did not finish");
+    expect(scoringRunErrorCopy("over_limit")).toBe(
+      "This workspace has scored as many traces as its limit allows",
+    );
     expect(scoringRunErrorCopy("unknown-code")).toBe("Scoring did not finish");
   });
 

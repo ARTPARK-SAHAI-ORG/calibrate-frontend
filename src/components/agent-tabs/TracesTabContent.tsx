@@ -42,6 +42,7 @@ import {
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { ineligibleReasonCopy } from "@/lib/traceScoring";
+import { CONTACT_LINK } from "@/constants/limits";
 import {
   fetchTrace,
   fetchTraces,
@@ -416,6 +417,9 @@ export function TracesTabContent({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const ineligible = traceScoring.eligibility?.ineligible ?? [];
+  // The backend marks a trace it could not score for the workspace cap, so the
+  // page can say so without asking for the limit itself.
+  const overLimit = items.some((t) => t.latest_run_error === "over_limit");
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
@@ -533,6 +537,23 @@ export function TracesTabContent({
               )}
             </div>
           </div>
+          {overLimit && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Some traces were not scored because this workspace has scored as
+                many traces as its limit allows.{" "}
+                <a
+                  href={CONTACT_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold underline"
+                >
+                  Click here
+                </a>{" "}
+                to contact us to extend your limits.
+              </p>
+            </div>
+          )}
           {ineligible.length > 0 && (
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 space-y-2">
               <p className="text-sm text-muted-foreground">
@@ -599,7 +620,10 @@ export function TracesTabContent({
             loading={isRefreshing}
             onClick={() => void handleRefresh()}
           />
-          <Button variant="secondary" onClick={() => setIntegrationGuideOpen(true)}>
+          <Button
+            variant="secondary"
+            onClick={() => setIntegrationGuideOpen(true)}
+          >
             Integration guide
           </Button>
         </div>
@@ -758,10 +782,10 @@ export function TracesTabContent({
                 onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
                 scoreColumns={
-                traceScoring.enabled || items.some((t) => t.latest_run_status)
-                  ? (traceScoring.eligibility?.eligible ?? [])
-                  : []
-              }
+                  traceScoring.enabled || items.some((t) => t.latest_run_status)
+                    ? (traceScoring.eligibility?.eligible ?? [])
+                    : []
+                }
               />
             </div>
           )}

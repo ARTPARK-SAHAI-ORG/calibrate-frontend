@@ -52,6 +52,8 @@ export type TraceSummary = {
   created_at: string;
   /** Latest scoring run for this trace. Absent when scoring has never run. */
   latest_run_status?: TraceScoringStatus | null;
+  /** Why the latest run was skipped or failed, e.g. "over_limit". */
+  latest_run_error?: string | null;
   /** One entry per evaluator on the latest completed run, the same shape a
    *  scoring run carries. Empty until the run finishes. */
   results?: TraceScoreResult[] | null;
@@ -59,11 +61,7 @@ export type TraceSummary = {
 
 /** Status of one durable trace-scoring run. */
 export type TraceScoringStatus =
-  | "pending"
-  | "processing"
-  | "completed"
-  | "failed"
-  | "skipped";
+  "pending" | "processing" | "completed" | "failed" | "skipped";
 
 export type TraceScoreResult = {
   evaluator_uuid: string;
@@ -87,9 +85,7 @@ export type TraceScoringRun = {
 };
 
 export type TraceScoringIneligibleReason =
-  | "wrong_type_for_agent"
-  | "no_live_version"
-  | "declares_variables";
+  "wrong_type_for_agent" | "no_live_version" | "declares_variables";
 
 export type TraceScoringEligibleEvaluator = {
   evaluator_uuid: string;
@@ -230,7 +226,6 @@ export async function setAgentAutoScoreTraces(
     { auto_score_traces: enabled },
   );
 }
-
 
 /**
  * The labels sent with this agent's traces, so the filter can offer them.

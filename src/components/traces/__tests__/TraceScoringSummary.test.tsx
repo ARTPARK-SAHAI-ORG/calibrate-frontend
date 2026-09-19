@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { TraceScoreCells } from "../TraceScoringSummary";
 
 const columns = [
@@ -88,7 +88,8 @@ it("shows one Failed or Skipped pill across every column", () => {
       layout="row"
     />,
   );
-  expect(screen.getByText("Failed").parentElement).toHaveStyle({
+  // The pill sits in a tooltip now, so the grid cell is the nearest styled box.
+  expect(screen.getByText("Failed").closest("div[style]")).toHaveStyle({
     gridColumn: "span 2",
   });
   rerender(
@@ -130,4 +131,21 @@ it("shows one spinner and no labels on a mobile card while scoring runs", () => 
   );
   expect(screen.getByLabelText("Scoring")).toBeInTheDocument();
   expect(screen.queryByText("Tone")).not.toBeInTheDocument();
+});
+
+it("says why on the pill when the workspace has hit its scoring limit", async () => {
+  const user = setupUser();
+  render(
+    <TraceScoreCells
+      trace={{ latest_run_status: "skipped", latest_run_error: "over_limit" }}
+      columns={columns}
+      layout="row"
+    />,
+  );
+  await user.hover(screen.getByText("Skipped"));
+  expect(
+    await screen.findByText(
+      "This workspace has scored as many traces as its limit allows",
+    ),
+  ).toBeInTheDocument();
 });
