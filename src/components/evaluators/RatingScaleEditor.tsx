@@ -6,6 +6,25 @@ export type RatingScaleRow = {
   description: string;
 };
 
+function numericValue(value: number | string) {
+  return typeof value === "number" ? value : Number(value) || 0;
+}
+
+const RANK_CLASSES = {
+  best: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
+  middle:
+    "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  worst: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+} as const;
+
+const RANK_TEXT_CLASSES = {
+  best: "text-green-700 dark:text-green-400",
+  middle: "",
+  worst: "text-red-700 dark:text-red-400",
+} as const;
+
+const RANK_LABELS = { best: "Best", middle: "", worst: "Worst" } as const;
+
 type RatingScaleEditorProps<T extends RatingScaleRow> = {
   rows: T[];
   onChange: (rows: T[]) => void;
@@ -28,43 +47,68 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
   };
 
   const addRow = () => {
-    const maxVal = rows.reduce((max, row) => {
-      const numeric =
-        typeof row.value === "number" ? row.value : Number(row.value) || 0;
-      return Math.max(max, numeric);
-    }, 0);
+    const maxVal = rows.reduce(
+      (max, row) => Math.max(max, numericValue(row.value)),
+      0,
+    );
     onChange([
       ...rows,
       { value: maxVal + 1, name: "", description: "" } as T,
     ]);
   };
 
+  const values = rows.map((row) => numericValue(row.value));
+  const highest = Math.max(...values);
+  const lowest = Math.min(...values);
+
   return (
     <div>
       <label className="block text-xs md:text-sm font-medium mb-1">
         Rating scale <span className="text-red-500">*</span>
       </label>
-      <p className="text-xs md:text-sm text-muted-foreground mb-2">
+      <p className="text-xs md:text-sm text-muted-foreground mb-1">
         {description}
+      </p>
+      <p className="text-xs md:text-sm text-muted-foreground mb-2">
+        The highest number is the best score.
       </p>
       <div className="space-y-4">
         {rows.map((row, idx) => {
           const missingLabel = validationAttempted && !row.name.trim();
+          const rank =
+            highest === lowest
+              ? null
+              : values[idx] === highest
+                ? "best"
+                : values[idx] === lowest
+                  ? "worst"
+                  : "middle";
           return (
             <div key={idx}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={
-                    typeof row.value === "number"
-                      ? row.value
-                      : Number(row.value) || 0
-                  }
-                  onChange={(e) =>
-                    updateRow(idx, { value: Number(e.target.value) } as Partial<T>)
-                  }
-                  className="w-20 h-9 md:h-10 px-2 rounded-md text-sm md:text-base border border-border bg-background dark:bg-accent text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center"
-                />
+              <div className="flex items-start gap-2">
+                <div className="w-20 flex-shrink-0">
+                  <input
+                    type="number"
+                    value={values[idx]}
+                    onChange={(e) =>
+                      updateRow(idx, {
+                        value: Number(e.target.value),
+                      } as Partial<T>)
+                    }
+                    className={`w-full h-9 md:h-10 px-2 rounded-md text-sm md:text-base font-medium border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center ${
+                      rank
+                        ? RANK_CLASSES[rank]
+                        : "border-border bg-background dark:bg-accent text-foreground"
+                    }`}
+                  />
+                  {rank && RANK_LABELS[rank] && (
+                    <p
+                      className={`mt-1 text-center text-xs font-medium ${RANK_TEXT_CLASSES[rank]}`}
+                    >
+                      {RANK_LABELS[rank]}
+                    </p>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={row.name}
