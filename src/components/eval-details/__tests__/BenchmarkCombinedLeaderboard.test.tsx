@@ -727,3 +727,49 @@ describe("a finished comparison that left a test with no verdict", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("a comparison someone stopped before any test ran", () => {
+  it("says it once, not in two boxes", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: null }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        runStopped
+        runOver
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped before any test ran\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/None of the tests could be run\./),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still says how many could not be run when some did run", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", pass_rate: "50" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: null }],
+          },
+        ]}
+        filename="x"
+        runStopped
+        runOver
+      />,
+    );
+    expect(
+      screen.getByText(/tests could not be run and were ignored/),
+    ).toBeInTheDocument();
+  });
+});

@@ -69,6 +69,7 @@ function UnansweredNote({
   stoppedEarly = false,
   failureReason = null,
   runOver = false,
+  runStopped = false,
 }: {
   modelResults: LeaderboardModel[];
   onReviewUnanswered?: () => void;
@@ -76,6 +77,8 @@ function UnansweredNote({
   failureReason?: string | null;
   /** True once the run has ended: a row with no verdict then never ran. */
   runOver?: boolean;
+  /** True when someone stopped the run: the note about that says it already. */
+  runStopped?: boolean;
 }) {
   const perModel = modelResults
     .map((m) => benchmarkAnsweredPassFail(m, runOver))
@@ -85,6 +88,11 @@ function UnansweredNote({
   if (perModel.length === 0 && !failed && couldNotRun === 0) return null;
   const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
   if (totalUnanswered === 0 && !failed && couldNotRun === 0) return null;
+  const answeredAny = perModel.some((c) => c.answered > 0);
+  // Someone stopped the run and it answered nothing: the note about being
+  // stopped says that, so a second box saying none of the tests could be run
+  // only repeats it.
+  if (runStopped && !answeredAny && !failed) return null;
 
   const tab = onReviewUnanswered ? (
     <button
@@ -380,6 +388,7 @@ export function BenchmarkCombinedLeaderboard({
             stoppedEarly={stoppedEarly && !runStopped}
             failureReason={failureReason}
             runOver={runOver}
+            runStopped={runStopped}
           />
         </div>
         {!noteExplainsIt && (
@@ -415,6 +424,7 @@ export function BenchmarkCombinedLeaderboard({
         stoppedEarly={stoppedEarly && !runStopped}
         failureReason={failureReason}
         runOver={runOver}
+        runStopped={runStopped}
       />
       {hideTable ? null : (
         <LeaderboardTab
