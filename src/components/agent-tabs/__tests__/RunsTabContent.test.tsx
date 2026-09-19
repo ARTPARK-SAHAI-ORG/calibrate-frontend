@@ -315,7 +315,7 @@ describe("RunsTabContent", () => {
   it("shows a dash when the run does not say how many tests it covered", async () => {
     state.runs = [{ ...benchmarkRun, total_tests: null }];
     renderTab();
-    await screen.findAllByText("Complete");
+    await screen.findAllByText("No results");
     const firstRow = document.querySelector("tbody tr") as HTMLElement;
     expect(firstRow.querySelectorAll("td")[2].textContent).toBe("—");
   });
@@ -402,7 +402,10 @@ describe("RunsTabContent", () => {
 
   it("marks each run by how the run itself went", async () => {
     state.runs = [
-      { ...unitRun, passed: 2, unanswered_tests: 0 },
+      // Every test answered, so this is the only finished one: `unitRun` has
+      // a test that produced no answer.
+      { ...unitRun, uuid: "run-whole", passed: 2, failed: 1, unanswered_tests: 0 },
+      unitRun,
       { ...benchmarkRun, uuid: "run-going", status: "in_progress" },
       { ...benchmarkRun, uuid: "run-broke", status: "failed" },
       { ...unitRun, uuid: "run-stopped", aborted: true },
@@ -411,6 +414,9 @@ describe("RunsTabContent", () => {
     // Desktop table and mobile cards both render, so each mark appears twice.
     expect(
       (await screen.findAllByLabelText("The evaluation ran every test")).length,
+    ).toBe(2);
+    expect(
+      screen.getAllByLabelText("Some of the tests could not be run").length,
     ).toBe(2);
     expect(
       screen.getAllByLabelText(
@@ -445,10 +451,7 @@ describe("RunsTabContent", () => {
   it("says there are no results when the run was stopped before any test ran", async () => {
     state.runs = [{ ...unitRun, aborted: true, total_tests: null }];
     renderTab();
-    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
   });
 
   it("says a stopped model comparison was stopped rather than complete", async () => {
@@ -473,8 +476,8 @@ describe("RunsTabContent", () => {
       {
         ...benchmarkRun,
         model_results: [
-          { model: "a", total_tests: 100, passed: 88 },
-          { model: "b", total_tests: 100, passed: 96 },
+          { model: "a", total_tests: 100, passed: 88, failed: 12 },
+          { model: "b", total_tests: 100, passed: 96, failed: 4 },
         ],
       },
     ];
@@ -488,7 +491,7 @@ describe("RunsTabContent", () => {
       {
         ...benchmarkRun,
         model_results: [
-          { model: "a", total_tests: 100, passed: 94 },
+          { model: "a", total_tests: 100, passed: 94, failed: 6 },
           { model: "b", success: false },
         ],
       },
@@ -664,7 +667,7 @@ describe("RunsTabContent", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     expect(await screen.findByTestId("benchmark-results")).toHaveTextContent(
       "bench:run-bench",
     );
@@ -674,7 +677,7 @@ describe("RunsTabContent", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
 
     await act(async () => {
@@ -1079,7 +1082,7 @@ describe("running tests from an open results window", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
 
     benchmarkResultsProps.onRunTests(tests);
@@ -1112,7 +1115,7 @@ describe("running tests from an open results window", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
     expect(new URLSearchParams(window.location.search).get("runId")).toBe(
       "run-bench",

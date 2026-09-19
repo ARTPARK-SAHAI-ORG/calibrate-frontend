@@ -250,6 +250,47 @@ describe("tests that could not be run", () => {
   });
 });
 
+describe("a comparison where no model answered anything", () => {
+  const nothingRan = (
+    <BenchmarkCombinedLeaderboard
+      leaderboardSummary={[
+        { model: "a", passed: "0", total: "0" },
+        { model: "b", passed: "0", total: "0" },
+      ]}
+      modelResults={[
+        {
+          model: "a",
+          total_tests: 2,
+          test_results: [
+            { passed: false, unanswered: true },
+            { passed: false, unanswered: true },
+          ],
+        },
+        {
+          model: "b",
+          total_tests: 2,
+          test_results: [
+            { passed: false, unanswered: true },
+            { passed: false, unanswered: true },
+          ],
+        },
+      ]}
+      filename="x"
+    />
+  );
+
+  it("shows the note on its own, with no table of zeroes and no empty chart", () => {
+    render(nothingRan);
+    expect(
+      screen.getByText(/None of the tests could be run\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Download CSV/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("a run that gave up before it started every test", () => {
   const unansweredRun = (props: {
     stoppedEarly?: boolean;

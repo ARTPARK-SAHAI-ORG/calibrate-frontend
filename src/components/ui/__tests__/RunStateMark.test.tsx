@@ -5,7 +5,7 @@ import { RunStateMark } from "../RunStateMark";
 describe("RunStateMark", () => {
   it.each([
     ["finished", "The evaluation ran every test"],
-    ["gave_up", "Partially complete as some tests could not be run"],
+    ["gave_up", "Some of the tests could not be run"],
     ["none_run", "None of the tests could be run"],
     ["stopped", "Someone stopped the evaluation before it finished"],
     ["error", "The evaluation broke before it could finish"],

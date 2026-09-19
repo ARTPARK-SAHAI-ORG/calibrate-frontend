@@ -352,6 +352,12 @@ export function BenchmarkCombinedLeaderboard({
     );
   }
 
+  // No model answered a single test, so the table would be rows of zeroes and
+  // the chart a blank box. The note above them is the whole story.
+  const counted = modelResults.map((m) => benchmarkAnsweredPassFail(m));
+  const nothingAnswered =
+    counted.length > 0 && counted.every((c) => c !== null && c.answered === 0);
+
   return (
     <div className="space-y-4">
       {runStopped && (
@@ -366,15 +372,17 @@ export function BenchmarkCombinedLeaderboard({
         stoppedEarly={stoppedEarly && !runStopped}
         failureReason={failureReason}
       />
-      <LeaderboardTab
-        className={className}
-        columns={columns}
-        data={payload.rows}
-        charts={payload.chartRows}
-        filename={filename}
-        getLabel={(key) => formatModelName(key)}
-        nameKey="model"
-      />
+      {nothingAnswered ? null : (
+        <LeaderboardTab
+          className={className}
+          columns={columns}
+          data={payload.rows}
+          charts={payload.chartRows}
+          filename={filename}
+          getLabel={(key) => formatModelName(key)}
+          nameKey="model"
+        />
+      )}
     </div>
   );
 }

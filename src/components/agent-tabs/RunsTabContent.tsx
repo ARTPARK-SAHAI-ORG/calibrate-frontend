@@ -18,7 +18,6 @@ import {
   getRunBreakdown,
   isRunErrored,
   isRunInProgress,
-  isRunStopped,
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
@@ -213,18 +212,11 @@ function RunResult({ run }: { run: AgentRun }) {
     // 1,410 tests for a 470-test comparison tried against three models.
     const range = getModelPassRange(run.model_results);
     if (range) return <ModelPassRange {...range} />;
-    // A run with nothing to tally: it was stopped before it got to a test, or
-    // it is a comparison that carries no counts. Say so in the same words the
-    // models cell says "Default", rather than calling it complete or leaving
-    // the reader with a blank.
-    if (isRunStopped(run)) return <RunResultPlaceholder />;
-    return (
-      <span
-        className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
-      >
-        Complete
-      </span>
-    );
+    // Nothing to tally: the run was stopped before it got to a test, or it is
+    // a comparison whose models never said how they did. Say so in the same
+    // words the models cell says "Default", rather than calling it complete,
+    // which would claim a result nobody has.
+    return <RunResultPlaceholder />;
   }
 
   // The same two pills a comparison shows, so both kinds of run read alike. A
