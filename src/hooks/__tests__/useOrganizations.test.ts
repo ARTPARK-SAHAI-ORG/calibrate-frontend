@@ -290,9 +290,46 @@ describe("useOrganizations hooks", () => {
         }),
       ).rejects.toThrow("rename failed");
       expect(reportError).toHaveBeenCalledWith(
-        "Error renaming organization:",
+        "Error updating organization:",
         err,
       );
+    });
+
+    it("updateOrganization sends only what it was given", async () => {
+      mockApiGet.mockResolvedValueOnce([org1, org2]);
+      const { result } = renderHook(() => useOrganizations("tok"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const settings = { model_benchmarking: { run_models_in_parallel: false } };
+      const changed = { ...org1, settings };
+      mockApiClient.mockResolvedValueOnce(changed);
+      await act(async () => {
+        await result.current.updateOrganization("org-1", { settings });
+      });
+
+      // The name must not travel with it: sending one thing cannot overwrite
+      // another.
+      expect(mockApiClient).toHaveBeenCalledWith("/organizations/org-1", "tok", {
+        method: "PATCH",
+        body: { settings },
+      });
+      expect(result.current.organizations).toEqual([changed, org2]);
+    });
+
+    it("renameOrganization still sends only the name", async () => {
+      mockApiGet.mockResolvedValueOnce([org1]);
+      const { result } = renderHook(() => useOrganizations("tok"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      mockApiClient.mockResolvedValueOnce({ ...org1, name: "Renamed" });
+      await act(async () => {
+        await result.current.renameOrganization("org-1", "Renamed");
+      });
+
+      expect(mockApiClient).toHaveBeenCalledWith("/organizations/org-1", "tok", {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
     });
 
     it("refetches when another instance dispatches ORGANIZATIONS_CHANGED_EVENT with a different source", async () => {

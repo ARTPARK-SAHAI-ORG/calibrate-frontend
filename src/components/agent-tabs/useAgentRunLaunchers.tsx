@@ -15,7 +15,7 @@ export type LaunchableTest = { uuid: string; name: string };
 /** What the model picker opens with when a past comparison is being run
  *  again: the models it used, and whether it ran them at the same time. Both
  *  are only a starting point — the reader can change either before starting. */
-export type ComparePreset = {
+type ComparePreset = {
   models: string[];
   parallelModels?: boolean;
 };

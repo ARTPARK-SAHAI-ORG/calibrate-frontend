@@ -18,6 +18,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { InviteDialog } from "@/components/workspace/InviteDialog";
+import { RunModelsSection } from "@/components/workspace/RunModelsSection";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
@@ -35,6 +36,7 @@ import {
 const SETTINGS_TABS = [
   { id: "admin", label: "Admin" },
   { id: "api-keys", label: "API keys" },
+  { id: "general", label: "General" },
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
@@ -214,6 +216,10 @@ export default function WorkspaceSettingsPage() {
                   orgUuid={activeOrg.uuid}
                   orgName={activeOrg.name}
                 />
+              </div>
+            ) : activeTab === "general" ? (
+              <div className="space-y-8">
+                <RunModelsSection org={activeOrg} />
               </div>
             ) : (
               <ApiKeysSection orgUuid={activeOrg.uuid} />

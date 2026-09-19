@@ -8,11 +8,34 @@ import { toast } from "sonner";
 
 const mockUseOpenRouterModels = jest.fn();
 const mockUseAccessToken = jest.fn();
+const mockUseBenchmarkParallelDefault = jest.fn();
+const mockUpdateOrganization = jest.fn();
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useOpenRouterModels: (...args: unknown[]) => mockUseOpenRouterModels(...args),
   useAccessToken: (...args: unknown[]) => mockUseAccessToken(...args),
+  useActiveOrgUuid: () => ["org-1", jest.fn()],
+  // The dialog reads the workspace's own choice off this list. Undefined
+  // stands for a workspace whose choice has not been read yet.
+  useOrganizations: () => ({
+    organizations: [
+      {
+        uuid: "org-1",
+        settings: {
+          model_benchmarking: {
+            run_models_in_parallel: mockUseBenchmarkParallelDefault(),
+          },
+        },
+      },
+    ],
+    updateOrganization: mockUpdateOrganization,
+  }),
+}));
+
+jest.mock("../../lib/reportError", () => ({
+  __esModule: true,
+  reportError: jest.fn(),
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -176,6 +199,10 @@ describe("BenchmarkDialog", () => {
   beforeEach(() => {
     mockUseOpenRouterModels.mockReturnValue({ providers: providersFixture });
     mockUseAccessToken.mockReturnValue("test-token");
+    // The workspaces have not loaded yet, which is what the very first render
+    // sees in the app.
+    mockUseBenchmarkParallelDefault.mockReturnValue(undefined);
+    mockUpdateOrganization.mockResolvedValue({});
     process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";
     global.fetch = jest.fn();
     (signOut as jest.Mock).mockClear();
@@ -536,12 +563,12 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
 
     // Both panels open beside the box, so opening one closes the other.
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
@@ -922,12 +949,12 @@ describe("BenchmarkDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("build agent: has no Advanced settings and sends no run order", async () => {
+  it("build agent: has no way to run the models and sends no run order", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
 
     expect(
-      screen.queryByRole("button", { name: "Advanced settings" }),
+      screen.queryByRole("button", { name: "How to run the models" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Select a model"));
@@ -956,9 +983,9 @@ describe("BenchmarkDialog", () => {
     });
     render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
 
-    // Advanced settings starts closed, so the options are not on screen yet.
+    // The panel starts closed, so the options are not on screen yet.
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "How to run the models" }));
     expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
     if (pickOrder) {
@@ -1177,7 +1204,7 @@ describe("BenchmarkDialog", () => {
       await screen.findByText("GPT-4o");
 
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
       expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
@@ -1211,7 +1238,7 @@ describe("BenchmarkDialog", () => {
       await screen.findByText("GPT-4o");
 
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       await user.click(screen.getByRole("radio", { name: "Parallel" }));
       await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -1238,9 +1265,215 @@ describe("BenchmarkDialog", () => {
 
       expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
       await user.click(
-        screen.getByRole("button", { name: "Advanced settings" }),
+        screen.getByRole("button", { name: "How to run the models" }),
       );
       expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+    });
+  });
+
+  describe("the workspace default for how the models run", () => {
+    const connectionProps = { agentType: "connection" as const };
+
+    async function openAdvancedSettings(
+      user: ReturnType<typeof setupUser>,
+    ): Promise<void> {
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+    }
+
+    it("opens on the workspace default once it has loaded", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog {...baseProps(connectionProps)} />,
+      );
+
+      // The workspaces arrive after the first render.
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      rerender(<BenchmarkDialog {...baseProps(connectionProps)} />);
+
+      await openAdvancedSettings(user);
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Parallel" })).not.toBeChecked();
+    });
+
+    it("what a past comparison ran wins over the workspace default", async () => {
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({ ...connectionProps, initialParallelModels: true })}
+        />,
+      );
+
+      await openAdvancedSettings(user);
+      expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
+    });
+
+    it("a default that arrives late does not move a choice already made", async () => {
+      const user = setupUser();
+      const { rerender } = render(
+        <BenchmarkDialog {...baseProps(connectionProps)} />,
+      );
+
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Sequential" }));
+
+      mockUseBenchmarkParallelDefault.mockReturnValue(true);
+      rerender(<BenchmarkDialog {...baseProps(connectionProps)} />);
+
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+    });
+
+    async function pickSequentialAndRun(
+      user: ReturnType<typeof setupUser>,
+      { save }: { save: boolean },
+    ) {
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Sequential" }));
+      if (save) {
+        await user.click(
+          screen.getByRole("checkbox", {
+            name: "Save this as default",
+          }),
+        );
+      }
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    }
+
+    it("saves the choice for the workspace when the box is ticked", async () => {
+      // A connection agent checks its connection with each model before the
+      // comparison starts, so the save is only right once that has passed.
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() =>
+        expect(mockUpdateOrganization).toHaveBeenCalledWith("org-1", {
+          settings: { model_benchmarking: { run_models_in_parallel: false } },
+        }),
+      );
+    });
+
+    it("saves nothing when the connection check is cancelled", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      // Start the comparison on a connection agent opens the connection
+      // check, it does not start the comparison. Backing out here means no
+      // comparison ever ran, so the workspace must be left alone.
+      const check = screen.getByTestId("verify-dialog");
+      // Scoped: the picker's own footer has a Cancel too.
+      await user.click(within(check).getByText("Cancel"));
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing when a model fails its connection check", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: false, error: "no" }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("benchmark-results-dialog"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing when the box is left unticked", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: false });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("does not offer to save a choice the workspace already makes", async () => {
+      // Nothing to save, so the box is not there to tick.
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+
+      expect(screen.getByRole("radio", { name: "Sequential" })).toBeChecked();
+      expect(
+        screen.queryByRole("checkbox", { name: "Save this as default" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers to save once the choice differs from the workspace", async () => {
+      mockUseBenchmarkParallelDefault.mockReturnValue(false);
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps(connectionProps)} />);
+      await openAdvancedSettings(user);
+      await user.click(screen.getByRole("radio", { name: "Parallel" }));
+
+      expect(
+        screen.getByRole("checkbox", { name: "Save this as default" }),
+      ).toBeInTheDocument();
+    });
+
+    it("saves nothing when the reader cancels before starting", async () => {
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getAllByRole("button", { name: "Cancel" }).slice(-1)[0],
+      );
+
+      expect(mockUpdateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("starts the comparison even when the default cannot be saved", async () => {
+      mockUpdateOrganization.mockRejectedValue(new Error("save failed"));
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+      const user = setupUser();
+      await pickSequentialAndRun(user, { save: true });
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.parallelModels).toBe(false);
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "The workspace default was not saved.",
+        ),
+      );
     });
   });
 });
