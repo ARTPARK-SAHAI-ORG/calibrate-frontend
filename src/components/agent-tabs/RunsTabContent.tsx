@@ -23,11 +23,7 @@ import {
   runStateOf,
 } from "@/lib/testTypes";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
-import {
-  PassFailCountPills,
-  RunStateMark,
-  ServerPaginatedListBar,
-} from "@/components/ui";
+import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -113,6 +109,22 @@ function RunResultPlaceholder() {
 
 
 /**
+ * The share of a run's tests that passed, coloured by how good that share is:
+ * red below half, amber below nine in ten, green at or above it. A comparison
+ * is coloured by its best model, so the colour says what the agent managed at
+ * its best rather than what its weakest model dragged it to.
+ */
+function PassRatePill({ label, rate }: { label: string; rate: number }) {
+  const colour =
+    rate < 50
+      ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500"
+      : rate < 90
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500"
+        : "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500";
+  return <span className={`${PILL_CLASS} ${colour}`}>{label}</span>;
+}
+
+/**
  * How a model comparison went: the share of tests the models passed, as one
  * number when they all agree and as a spread when they do not, plus the models
  * that could not be run at all.
@@ -134,10 +146,8 @@ function ModelPassRange({
         : `${Math.round(lowest)}\u2013${Math.round(highest)}% passed`;
   return (
     <>
-      {rate && (
-        <span className={`${PILL_CLASS} bg-muted text-muted-foreground`}>
-          {rate}
-        </span>
+      {rate && highest !== null && (
+        <PassRatePill label={rate} rate={highest} />
       )}
       {failedModels > 0 && (
         <span
@@ -150,7 +160,7 @@ function ModelPassRange({
   );
 }
 
-/** The result pills for one run: running, error, or the per-test tally. */
+/** The result pills for one run: running, error, or how the tests went. */
 function RunResult({ run }: { run: AgentRun }) {
   if (isRunInProgress(run)) {
     return (
@@ -181,9 +191,9 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
-  // A run where some tests produced no answer reads better as
-  // "N Success / N Fail / N Not run" than as a single blanket Error, so prefer
-  // the tally when the run reports one.
+  // A run where some tests produced no answer reads better as its pass rate
+  // and a count of the tests never run than as a single blanket Error, so
+  // prefer the counts when the run reports them.
   const breakdown =
     run.type === "llm-unit-test" ? getRunBreakdown(run) : null;
 
@@ -215,12 +225,26 @@ function RunResult({ run }: { run: AgentRun }) {
     );
   }
 
+  // The same two pills a comparison shows, so both kinds of run read alike. A
+  // test that produced no answer is left out of the share, since counting it
+  // as a wrong answer would blame the agent for a run that never reached it.
+  const answered = breakdown.passed + breakdown.failed;
   return (
-    <PassFailCountPills
-      passed={breakdown.passed}
-      failed={breakdown.failed}
-      unanswered={breakdown.unanswered}
-    />
+    <>
+      {answered > 0 && (
+        <PassRatePill
+          label={`${Math.round((breakdown.passed / answered) * 100)}% passed`}
+          rate={(breakdown.passed / answered) * 100}
+        />
+      )}
+      {breakdown.unanswered > 0 && (
+        <span
+          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+        >
+          {breakdown.unanswered} Not run
+        </span>
+      )}
+    </>
   );
 }
 

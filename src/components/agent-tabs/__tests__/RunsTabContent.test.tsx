@@ -205,7 +205,7 @@ describe("RunsTabContent", () => {
       { ...unitRun, name: "Run 4", created_at: "2026-01-18 09:30:00" },
     ];
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     // The name the run is known by, not its id.
     expect(screen.getAllByText("Evaluation run 4").length).toBeGreaterThan(0);
     expect(screen.queryByText("run-unit")).not.toBeInTheDocument();
@@ -217,7 +217,7 @@ describe("RunsTabContent", () => {
     // Only created_at will do: updated_at moves as the run progresses.
     state.runs = [{ ...unitRun, created_at: undefined }];
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     const cells = Array.from(
       (document.querySelector("tbody tr") as HTMLElement).querySelectorAll(
         "td",
@@ -229,7 +229,7 @@ describe("RunsTabContent", () => {
 
   it("shows both run kinds in one table with their test and model counts", async () => {
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     const table = document.querySelector("table") as HTMLElement;
     const cells = Array.from(table.querySelectorAll("tbody tr")).map((row) =>
@@ -260,7 +260,7 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     const row = document.querySelector("tbody tr") as HTMLElement;
     const cells = Array.from(row.querySelectorAll("td")).map(
@@ -288,7 +288,7 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     const row = document.querySelector("tbody tr") as HTMLElement;
     const cells = Array.from(row.querySelectorAll("td")).map(
@@ -303,7 +303,7 @@ describe("RunsTabContent", () => {
   it("shows a dash when no evaluators judged the run", async () => {
     state.runs = [{ ...unitRun, evaluators: [] }];
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     const cells = Array.from(
       (document.querySelector("tbody tr") as HTMLElement).querySelectorAll(
         "td",
@@ -320,12 +320,39 @@ describe("RunsTabContent", () => {
     expect(firstRow.querySelectorAll("td")[2].textContent).toBe("—");
   });
 
-  it("shows the per-test tally for a finished run", async () => {
+  it("shows what a finished run passed, leaving the tests it never ran out of it", async () => {
+    // One passed, one answered wrongly, one never run: half of what was
+    // answered passed, and the third is counted on its own.
     state.runs = [unitRun];
     renderTab();
-    expect((await screen.findAllByText("1 Success")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("50% passed")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
+  });
+
+  it("colours the share by how good it is", async () => {
+    const bands = [
+      { total_tests: 4, passed: 1, label: "25% passed", colour: "bg-red-100" },
+      { total_tests: 4, passed: 3, label: "75% passed", colour: "bg-amber-100" },
+      { total_tests: 4, passed: 4, label: "100% passed", colour: "bg-green-100" },
+    ];
+    for (const band of bands) {
+      state.runs = [
+        { ...unitRun, ...band, failed: band.total_tests - band.passed, unanswered_tests: 0 },
+      ];
+      const view = render(
+        <RunsTabContent agentUuid={AGENT_UUID} agentName="Test agent" />,
+      );
+      const pill = (await screen.findAllByText(band.label))[0];
+      expect(pill.className).toContain(band.colour);
+      view.unmount();
+    }
+  });
+
+  it("shows only the tests never run when a run answered none of them", async () => {
+    state.runs = [{ ...unitRun, passed: 0, failed: 0, unanswered_tests: 3 }];
+    renderTab();
+    expect((await screen.findAllByText("3 Not run")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
   });
 
   it("says a run was stopped, alongside what it managed to do", async () => {
@@ -350,8 +377,7 @@ describe("RunsTabContent", () => {
         )
       ).length,
     ).toBeGreaterThan(0);
-    expect(screen.getAllByText("3 Success").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1 Fail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("75% passed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("6 Not run").length).toBeGreaterThan(0);
   });
 
@@ -480,7 +506,7 @@ describe("RunsTabContent", () => {
   it("asks the backend for the chosen result rather than filtering here", async () => {
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     await user.click(screen.getByRole("button", { name: "All passed" }));
     await waitFor(() =>
@@ -506,7 +532,7 @@ describe("RunsTabContent", () => {
   it("takes the runs off screen while a new filter is being fetched", async () => {
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     let releaseList: () => void = () => {};
     state.holdList = new Promise<void>((resolve) => {
@@ -517,17 +543,17 @@ describe("RunsTabContent", () => {
     // The rows of the old filter are gone the moment the button is clicked,
     // rather than sitting there until the new ones arrive.
     await waitFor(() =>
-      expect(screen.queryByText("1 Success")).not.toBeInTheDocument(),
+      expect(screen.queryByText("50% passed")).not.toBeInTheDocument(),
     );
 
     releaseList();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
   });
 
   it("asks the backend for model comparisons only when that filter is on", async () => {
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     expect(lastRunsQuery().get("type")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Model comparisons" }));
@@ -542,7 +568,7 @@ describe("RunsTabContent", () => {
   it("says a filter is hiding the runs when only model comparisons are asked for", async () => {
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     state.runs = [];
     state.total = 0;
@@ -552,7 +578,7 @@ describe("RunsTabContent", () => {
 
   it("asks for one page at a time", async () => {
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     const q = lastRunsQuery();
     expect(q.get("limit")).toBe("50");
     expect(q.get("offset")).toBe("0");
@@ -563,7 +589,7 @@ describe("RunsTabContent", () => {
     state.total = 120;
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
@@ -577,7 +603,7 @@ describe("RunsTabContent", () => {
     state.total = 120;
     const user = setupUser();
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     expect(new URLSearchParams(window.location.search).get("page")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -601,7 +627,7 @@ describe("RunsTabContent", () => {
     window.history.replaceState(null, "", "/?page=2");
     renderTab();
 
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
   });
 
@@ -609,7 +635,7 @@ describe("RunsTabContent", () => {
     state.runs = [unitRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await user.click((await screen.findAllByText("50% passed"))[0]);
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
       "runner:run-unit",
     );
@@ -724,7 +750,7 @@ describe("RunsTabContent", () => {
     state.runs = [unitRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await user.click((await screen.findAllByText("50% passed"))[0]);
     await screen.findByTestId("test-runner");
 
     await act(async () => {
@@ -840,7 +866,7 @@ describe("RunsTabContent", () => {
     renderTab();
     await screen.findAllByText("Running");
     expect(
-      (await screen.findAllByText("1 Success", {}, { timeout: 8000 })).length,
+      (await screen.findAllByText("100% passed", {}, { timeout: 8000 })).length,
     ).toBeGreaterThan(0);
   }, 12000);
 
@@ -857,7 +883,7 @@ describe("RunsTabContent", () => {
       const user = setupUser();
       state.runs = [{ ...unitRun, name: "Run 4" }];
       renderTab();
-      await screen.findAllByText("1 Success");
+      await screen.findAllByText("50% passed");
 
       await user.click(deleteButtons()[0]);
       // The window for the run must not open: the delete button swallows the
@@ -886,7 +912,7 @@ describe("RunsTabContent", () => {
       const user = setupUser();
       state.runs = [{ ...unitRun, name: "Run 4" }];
       renderTab();
-      await screen.findAllByText("1 Success");
+      await screen.findAllByText("50% passed");
 
       // Hold the list request that follows the delete, so the moment between
       // the delete answering and the fresh list arriving can be looked at.
@@ -918,7 +944,7 @@ describe("RunsTabContent", () => {
       state.runs = [{ ...unitRun, name: "Run 4" }];
       state.deleteOk = false;
       renderTab();
-      await screen.findAllByText("1 Success");
+      await screen.findAllByText("50% passed");
 
       await user.click(deleteButtons()[0]);
       await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -935,7 +961,7 @@ describe("RunsTabContent", () => {
       state.runs = [{ ...unitRun, name: "Run 4" }];
       state.total = 51;
       renderTab();
-      await screen.findAllByText("1 Success");
+      await screen.findAllByText("50% passed");
 
       await user.click(screen.getByRole("button", { name: "Next page" }));
       await waitFor(() => expect(lastRunsQuery().get("offset")).toBe("50"));
@@ -960,7 +986,7 @@ describe("RunsTabContent", () => {
 describe("the Run column width", () => {
   it("gets wider when its edge is dragged right, and stops at the widest", async () => {
     renderTab();
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     const header = screen.getByRole("columnheader", { name: /Run/ });
     const handle = screen.getByTestId("run-column-resize");
     expect(header).toHaveStyle({ width: "240px" });
@@ -1005,7 +1031,7 @@ describe("running tests from an open results window", () => {
         benchmarkProvider="google"
       />,
     );
-    await screen.findAllByText("1 Success");
+    await screen.findAllByText("50% passed");
     expect(screen.getByTestId("launcher-dialogs")).toBeInTheDocument();
     expect(launcherOptions).toMatchObject({
       agentUuid: AGENT_UUID,
@@ -1021,7 +1047,7 @@ describe("running tests from an open results window", () => {
     state.runs = [unitRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await user.click((await screen.findAllByText("50% passed"))[0]);
     await screen.findByTestId("test-runner");
 
     runnerProps.onRunTests(tests);
@@ -1047,7 +1073,7 @@ describe("running tests from an open results window", () => {
     state.runs = [unitRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("1 Success"))[0]);
+    await user.click((await screen.findAllByText("50% passed"))[0]);
     await screen.findByTestId("test-runner");
     const before = runsListCalls();
 
