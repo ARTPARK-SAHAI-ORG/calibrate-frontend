@@ -10,20 +10,23 @@ function numericValue(value: number | string) {
   return typeof value === "number" ? value : Number(value) || 0;
 }
 
-const RANK_CLASSES = {
-  best: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
-  middle:
-    "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  worst: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+const RANKS = {
+  best: {
+    box: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
+    label: "Best",
+    labelClass: "text-green-700 dark:text-green-400",
+  },
+  middle: {
+    box: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    label: "",
+    labelClass: "",
+  },
+  worst: {
+    box: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+    label: "Worst",
+    labelClass: "text-red-700 dark:text-red-400",
+  },
 } as const;
-
-const RANK_TEXT_CLASSES = {
-  best: "text-green-700 dark:text-green-400",
-  middle: "",
-  worst: "text-red-700 dark:text-red-400",
-} as const;
-
-const RANK_LABELS = { best: "Best", middle: "", worst: "Worst" } as const;
 
 type RatingScaleEditorProps<T extends RatingScaleRow> = {
   rows: T[];
@@ -110,15 +113,15 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                     }
                     className={`w-full h-9 md:h-10 px-2 rounded-md text-sm md:text-base font-medium border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center ${
                       rank
-                        ? RANK_CLASSES[rank]
+                        ? RANKS[rank].box
                         : "border-border bg-background dark:bg-accent text-foreground"
                     }`}
                   />
-                  {rank && RANK_LABELS[rank] && (
+                  {rank && RANKS[rank].label && (
                     <p
-                      className={`mt-1 text-center text-xs font-medium ${RANK_TEXT_CLASSES[rank]}`}
+                      className={`mt-1 text-center text-xs font-medium ${RANKS[rank].labelClass}`}
                     >
-                      {RANK_LABELS[rank]}
+                      {RANKS[rank].label}
                     </p>
                   )}
                 </div>
