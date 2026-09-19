@@ -237,10 +237,12 @@ describe("RatingScaleEditor score direction", () => {
     );
   }
 
-  it("says the highest number is the best score", () => {
+  it("says which end of the scale is best and which is worst", () => {
     renderRows(baseRows());
     expect(
-      screen.getByText("The highest number is the best score."),
+      screen.getByText(
+        "The highest number is the best and the lowest number is the worst",
+      ),
     ).toBeInTheDocument();
   });
 
