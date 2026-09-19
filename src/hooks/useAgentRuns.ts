@@ -116,6 +116,10 @@ export function useAgentRuns({
   const [items, setItems] = useState<AgentRun[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(initialOffset);
+  // The offset `items` actually came from. `offset` itself moves the instant a
+  // page turn is asked for, before the rows for it arrive, so a caller
+  // stepping run by run (useItemPager) reads this one instead.
+  const [loadedOffset, setLoadedOffset] = useState(initialOffset);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // The run was not among the current results (wrong filter, or it doesn't
@@ -208,6 +212,11 @@ export function useAgentRuns({
         const data = await response.json();
         setItems(unwrapList<AgentRun>(data));
         setTotal(typeof data?.total === "number" ? data.total : 0);
+        setLoadedOffset(
+          useAround && typeof data?.offset === "number"
+            ? data.offset
+            : targetOffset,
+        );
         if (useAround) {
           const landedOffset =
             typeof data?.offset === "number" ? data.offset : 0;
@@ -306,6 +315,8 @@ export function useAgentRuns({
     items,
     total,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     aroundNotFound,

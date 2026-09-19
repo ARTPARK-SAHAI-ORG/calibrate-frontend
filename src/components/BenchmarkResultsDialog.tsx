@@ -27,6 +27,7 @@ import {
 import { rowTestUuid } from "@/lib/testRunSummary";
 import {
   StatusBadge,
+  DialogNavRow,
   RerunIconButton,
   StopRunButton,
   RunStateMark,
@@ -50,7 +51,7 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogNavKeys } from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
@@ -132,6 +133,14 @@ type BenchmarkResultsDialogProps = {
   /** Open the model picker on these tests. The parent closes this window once
    * the comparison is created. */
   onCompareTests?: (tests: SelectedTest[]) => void;
+  /** Step to the run before or after this one in the Evaluations list. Left
+   * out when nothing is stepping through runs. */
+  onPrevRun?: () => void;
+  onNextRun?: () => void;
+  hasPrevRun?: boolean;
+  hasNextRun?: boolean;
+  /** Where this run sits in the whole list, for "12 of 341". */
+  runPosition?: { index: number; total: number };
 };
 
 export function BenchmarkResultsDialog({
@@ -151,9 +160,25 @@ export function BenchmarkResultsDialog({
   onRenamed,
   onRunTests,
   onCompareTests,
+  onPrevRun,
+  onNextRun,
+  hasPrevRun,
+  hasNextRun,
+  runPosition,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
+
+  // The left and right arrow keys step from run to run, the same as the
+  // buttons above. No Escape: this window opens windows of its own, and a
+  // press meant for one of those would close everything underneath it.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev: hasPrevRun,
+    onPrev: onPrevRun,
+    hasNext: hasNextRun,
+    onNext: onNextRun,
+  });
 
   const [activeTab, setActiveTab] = useState<BenchmarkTabId>("tests");
   const [nav, setNav] = useState<PagerNav | null>(null);
@@ -709,6 +734,17 @@ export function BenchmarkResultsDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
+        {/* Previous / next run: a thin row of its own across the top, since
+            the header below already holds the stepping through this run's own
+            tests. */}
+        <DialogNavRow
+          noun="evaluation"
+          onPrev={onPrevRun}
+          onNext={onNextRun}
+          hasPrev={hasPrevRun}
+          hasNext={hasNextRun}
+          position={runPosition}
+        />
         {/* Header */}
         <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">

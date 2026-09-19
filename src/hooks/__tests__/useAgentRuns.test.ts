@@ -233,6 +233,54 @@ describe("useAgentRuns initialOffset", () => {
   });
 });
 
+describe("useAgentRuns loadedOffset", () => {
+  it("stays on the page in hand until the next page's rows arrive", async () => {
+    let releaseSecondPage: (() => void) | undefined;
+    let calls = 0;
+    global.fetch = jest.fn(async (url: string) => {
+      const offset = Number(new URL(url).searchParams.get("offset"));
+      calls += 1;
+      if (calls > 1) {
+        await new Promise<void>((resolve) => {
+          releaseSecondPage = resolve;
+        });
+      }
+      return jsonResponse({ items: [runA], total: 200, offset });
+    }) as jest.Mock;
+
+    const { result } = setup(null);
+    await waitFor(() => expect(result.current.total).toBe(200));
+    expect(result.current.loadedOffset).toBe(0);
+
+    act(() => result.current.nextPage());
+
+    // The page turn moves `offset` straight away...
+    await waitFor(() => expect(result.current.offset).toBe(50));
+    // ...but the rows being shown are still page one's, so anything reading
+    // them by position must keep reading page one until the new rows land.
+    expect(result.current.loadedOffset).toBe(0);
+
+    await act(async () => {
+      releaseSecondPage?.();
+    });
+    await waitFor(() => expect(result.current.loadedOffset).toBe(50));
+  });
+
+  it("follows the page the backend answers with when the list lands via around", async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ items: [runB], total: 200, offset: 50 }),
+    ) as jest.Mock;
+
+    const { result } = setup("run-b");
+    await waitFor(() => expect(result.current.items).toEqual([runB]));
+
+    // The backend picked the page, not the hook, and the rows in hand are
+    // that page's.
+    await waitFor(() => expect(result.current.loadedOffset).toBe(50));
+    expect(result.current.offset).toBe(50);
+  });
+});
+
 describe("useAgentRuns background refresh", () => {
   const runningRun = {
     uuid: "run-live",

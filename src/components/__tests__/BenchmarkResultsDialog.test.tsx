@@ -146,6 +146,9 @@ jest.mock("../ui", () => ({
   RunStateMark: ({ state }: any) => <span data-testid="run-mark">{state}</span>,
   // The real rename box, so renaming a run is exercised end to end here.
   RenameDialog: jest.requireActual("../ui/RenameDialog").RenameDialog,
+  // The real previous/next run row, so its arrows and position are what the
+  // tests below read.
+  DialogNavRow: jest.requireActual("../ui/DialogNavHeader").DialogNavRow,
 }));
 
 jest.mock("../../lib/api", () => ({
@@ -197,6 +200,9 @@ const useAccessTokenMock = jest.fn(() => "test-token");
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+  // The real arrow-key handling, so the key tests below exercise it.
+  useDialogNavKeys: jest.requireActual("../../hooks/useDialogNavKeys")
+    .useDialogNavKeys,
 }));
 
 // The run size limit, read through `overEvalLimit`, which imports this module
@@ -2182,5 +2188,151 @@ describe("running or comparing the ticked tests", () => {
     expect(stripLabel("1 test selected")).toBeNull();
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Compare" })).toBeNull();
+  });
+});
+
+describe("stepping from run to run", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    useAccessTokenMock.mockReturnValue("test-token");
+    isLabellingEligibleRawMock.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    delete process.env.NEXT_PUBLIC_BACKEND_URL;
+  });
+
+  const navProps = {
+    onPrevRun: jest.fn(),
+    onNextRun: jest.fn(),
+    hasPrevRun: true,
+    hasNextRun: true,
+    runPosition: { index: 11, total: 341 },
+  };
+
+  function renderNav(
+    props: Partial<React.ComponentProps<typeof BenchmarkResultsDialog>> = {},
+  ) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-nav")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-nav",
+            status: "completed",
+            model_results: [
+              {
+                model: "gpt-4",
+                success: true,
+                message: "",
+                total_tests: 1,
+                passed: 1,
+                failed: 0,
+                test_results: [
+                  { name: "Test One", passed: true, test_uuid: "t1" },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    return render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-nav"
+        {...props}
+      />,
+    );
+  }
+
+  it("shows the arrows and where this comparison sits in the list", async () => {
+    renderNav(navProps);
+    await screen.findByTestId("leaderboard");
+
+    expect(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Next evaluation" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+  });
+
+  it("steps to the run before and the run after", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.click(screen.getByRole("button", { name: "Next evaluation" }));
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+    await user.click(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    );
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("greys out each arrow at its end of the list", async () => {
+    renderNav({ ...navProps, hasPrevRun: true, hasNextRun: false });
+    await screen.findByTestId("leaderboard");
+
+    expect(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Next evaluation" }),
+    ).toBeDisabled();
+  });
+
+  it("draws no row when nothing is stepping through runs", async () => {
+    renderNav();
+    await screen.findByTestId("leaderboard");
+
+    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Previous evaluation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("draws no row when the list holds only this run", async () => {
+    renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
+    await screen.findByTestId("leaderboard");
+
+    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("steps run to run with the left and right arrow keys", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.keyboard("{ArrowLeft}");
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+    await user.keyboard("{ArrowRight}");
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close the window on Escape", async () => {
+    const onClose = jest.fn();
+    renderNav({ ...navProps, onClose });
+    const user = setupUser();
+    await screen.findByTestId("leaderboard");
+
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

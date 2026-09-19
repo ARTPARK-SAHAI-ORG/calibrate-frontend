@@ -12,7 +12,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogNavKeys } from "@/hooks";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -25,6 +25,7 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import {
+  DialogNavRow,
   RerunIconButton,
   ResultTabs,
   RunStateMark,
@@ -154,6 +155,14 @@ type TestRunnerDialogProps = {
   /** Open the model picker on these tests. The parent closes this window once
    * the comparison is created. */
   onCompareTests?: (tests: SelectedTest[]) => void;
+  /** Step to the run before or after this one in the Evaluations list. Left
+   * out when nothing is stepping through runs. */
+  onPrevRun?: () => void;
+  onNextRun?: () => void;
+  hasPrevRun?: boolean;
+  hasNextRun?: boolean;
+  /** Where this run sits in the whole list, for "12 of 341". */
+  runPosition?: { index: number; total: number };
 };
 
 export function TestRunnerDialog({
@@ -166,9 +175,25 @@ export function TestRunnerDialog({
   onRenamed,
   onRunTests,
   onCompareTests,
+  onPrevRun,
+  onNextRun,
+  hasPrevRun,
+  hasNextRun,
+  runPosition,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
+
+  // The left and right arrow keys step from run to run, the same as the
+  // buttons above. No Escape: this window opens windows of its own, and a
+  // press meant for one of those would close everything underneath it.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev: hasPrevRun,
+    onPrev: onPrevRun,
+    hasNext: hasNextRun,
+    onNext: onNextRun,
+  });
 
   const backendAccessToken = useAccessToken();
   // The last server response. The only source of truth for run content.
@@ -628,6 +653,17 @@ export function TestRunnerDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
+        {/* Previous / next run: a thin row of its own across the top, since
+            the header below already holds the stepping through this run's own
+            tests. */}
+        <DialogNavRow
+          noun="evaluation"
+          onPrev={onPrevRun}
+          onNext={onNextRun}
+          hasPrev={hasPrevRun}
+          hasNext={hasNextRun}
+          position={runPosition}
+        />
         {/* Header */}
         <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4">
           {/* Left: title + agent name */}

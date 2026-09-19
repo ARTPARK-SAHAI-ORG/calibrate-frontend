@@ -12,14 +12,14 @@ import React, {
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogNavKeys } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import {
   DEFAULT_LLM_GENERAL_SLUG,
   isDefaultLLMNextReplyEvaluator,
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
-import { DialogNavHeader } from "@/components/ui";
+import { DialogNavRow } from "@/components/ui";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -3314,6 +3314,17 @@ export function AddTestDialog({
   const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
   const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
 
+  // The left and right arrow keys step too, the same as the buttons. No
+  // Escape: this window holds edits that have not been saved, and a stray
+  // press would throw them away.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev,
+    onPrev: navPrev,
+    hasNext,
+    onNext: navNext,
+  });
+
   if (!isOpen) return null;
 
   // During the intro picker nothing has been entered yet, so a backdrop
@@ -3460,20 +3471,14 @@ export function AddTestDialog({
           {/* Previous / next test: a thin row of its own across the top, so
               nothing sits on the information banner below it. The close
               button floats in this row's right-hand end. */}
-          {(navPrev || navNext) && (
-            <div className="relative shrink-0 h-12 border-b border-border hidden md:block" data-testid="test-nav-row">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <DialogNavHeader
-                  noun={itemNoun}
-                  onPrev={navPrev}
-                  onNext={navNext}
-                  hasPrev={hasPrev}
-                  hasNext={hasNext}
-                  position={position}
-                />
-              </div>
-            </div>
-          )}
+          <DialogNavRow
+            noun={itemNoun}
+            onPrev={navPrev}
+            onNext={navNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}

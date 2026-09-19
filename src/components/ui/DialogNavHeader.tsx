@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 import { Tooltip } from "@/components/Tooltip";
 
 /**
@@ -76,6 +78,27 @@ export function DialogNavHeader({
             </svg>
           </button>
         </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The same arrows in a thin row of their own across the top of a dialog, for
+ * a window whose header row is already full (the test window, the run
+ * windows). Nothing is drawn when there is nothing to step through, so the
+ * window never carries an empty bar.
+ */
+export function DialogNavRow(props: React.ComponentProps<typeof DialogNavHeader>) {
+  const { onPrev, onNext, position } = props;
+  if (!(onPrev || onNext) || (position && position.total <= 1)) return null;
+  return (
+    <div
+      className="relative shrink-0 h-12 border-b border-border hidden md:block"
+      data-testid="dialog-nav-row"
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <DialogNavHeader {...props} />
       </div>
     </div>
   );

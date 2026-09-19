@@ -2449,3 +2449,144 @@ describe("running or comparing the ticked tests", () => {
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
   });
 });
+
+describe("stepping from run to run", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    clearTestRunCache();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  const navProps = {
+    onPrevRun: jest.fn(),
+    onNextRun: jest.fn(),
+    hasPrevRun: true,
+    hasNextRun: true,
+    runPosition: { index: 11, total: 341 },
+  };
+
+  function renderNav(
+    props: Partial<React.ComponentProps<typeof TestRunnerDialog>> = {},
+  ) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-nav")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-nav",
+            status: "completed",
+            results: [{ test_uuid: "t-1", name: "Alpha", passed: true }],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+    return render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-nav"
+        {...props}
+      />,
+    );
+  }
+
+  it("shows the arrows and where this run sits in the list", async () => {
+    renderNav(navProps);
+    await screen.findByTestId("summary-panel");
+
+    expect(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Next evaluation" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("12 of 341")).toBeInTheDocument();
+  });
+
+  it("steps to the run before and the run after", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+
+    await user.click(screen.getByRole("button", { name: "Next evaluation" }));
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+    await user.click(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    );
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("greys out each arrow at its end of the list", async () => {
+    renderNav({ ...navProps, hasPrevRun: false, hasNextRun: true });
+    await screen.findByTestId("summary-panel");
+
+    expect(
+      screen.getByRole("button", { name: "Previous evaluation" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Next evaluation" }),
+    ).toBeEnabled();
+  });
+
+  it("draws no row when nothing is stepping through runs", async () => {
+    renderNav();
+    await screen.findByTestId("summary-panel");
+
+    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Previous evaluation" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("draws no row when the list holds only this run", async () => {
+    renderNav({ ...navProps, runPosition: { index: 0, total: 1 } });
+    await screen.findByTestId("summary-panel");
+
+    expect(screen.queryByTestId("dialog-nav-row")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next evaluation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("steps run to run with the left and right arrow keys", async () => {
+    const onPrevRun = jest.fn();
+    const onNextRun = jest.fn();
+    renderNav({ ...navProps, onPrevRun, onNextRun });
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+
+    await user.keyboard("{ArrowLeft}");
+    expect(onPrevRun).toHaveBeenCalledTimes(1);
+    await user.keyboard("{ArrowRight}");
+    expect(onNextRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close the window on Escape", async () => {
+    const onClose = jest.fn();
+    renderNav({ ...navProps, onClose });
+    const user = setupUser();
+    await screen.findByTestId("summary-panel");
+
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});

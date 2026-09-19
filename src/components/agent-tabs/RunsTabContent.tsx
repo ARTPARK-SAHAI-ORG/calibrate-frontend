@@ -6,6 +6,7 @@ import {
   useAccessToken,
   useAgentRuns,
   useDialogUrlParam,
+  useItemPager,
   usePageSize,
   useResizableWidth,
   type AgentRun,
@@ -343,6 +344,8 @@ export function RunsTabContent({
     items,
     total,
     offset,
+    setOffset,
+    loadedOffset,
     isLoading,
     error,
     aroundNotFound,
@@ -382,10 +385,12 @@ export function RunsTabContent({
     setRunIdParam(uuid);
   };
   const closeTestRun = () => {
+    runPager.cancel();
     setOpenTestRunId(null);
     setRunIdParam(null);
   };
   const closeBenchmarkRun = () => {
+    runPager.cancel();
     setOpenBenchmarkRun(null);
     setRunIdParam(null);
   };
@@ -400,6 +405,24 @@ export function RunsTabContent({
     setOpenBenchmarkRun(run);
     setRunIdParam(run.uuid);
   };
+
+  // Previous / next across every run the filters match, not just the page on
+  // screen, the same way the Tests tab steps from one test to the next:
+  // stepping off either end of the page turns it and opens the run at the far
+  // edge of the page that arrives. A comparison and a plain run open in
+  // different windows, so a step between the two kinds swaps the window.
+  const runPager = useItemPager({
+    items,
+    openUuid: openTestRunId ?? openBenchmarkRun?.uuid ?? null,
+    pageStart: loadedOffset,
+    pageSize,
+    total,
+    onOpen: (uuid) => {
+      const run = items.find((item) => item.uuid === uuid);
+      if (run) openRun(run);
+    },
+    onPageStartChange: setOffset,
+  });
 
   // Run or compare the tests ticked inside an open results window, the same
   // way the Tests tab does it. A new plain run replaces the open window; a
@@ -705,6 +728,11 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
+          onPrevRun={runPager.prev}
+          onNextRun={runPager.next}
+          hasPrevRun={runPager.hasPrev}
+          hasNextRun={runPager.hasNext}
+          runPosition={runPager.position}
         />
       )}
 
@@ -721,6 +749,11 @@ export function RunsTabContent({
           onRenamed={() => void refetch()}
           onRunTests={(tests) => confirmTestRun(tests, false, "window")}
           onCompareTests={(tests) => void openCompare(tests, false)}
+          onPrevRun={runPager.prev}
+          onNextRun={runPager.next}
+          hasPrevRun={runPager.hasPrev}
+          hasNextRun={runPager.hasNext}
+          runPosition={runPager.position}
           // The window stays open until a comparison actually exists, the
           // way Compare on the ticked rows above does it: onComparisonCreated
           // closes it. Closing here threw away the comparison the reader was
