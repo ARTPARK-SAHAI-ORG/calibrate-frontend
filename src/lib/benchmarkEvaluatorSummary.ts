@@ -289,8 +289,9 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   countFromRows = false,
 ): BenchmarkCombinedLeaderboardPayload | null {
   const keys = benchmarkMetricKeyOrder(modelResults);
-  // A run that failed part way has no summary from the backend, so count the
-  // tests each model did finish, the same numbers the table works out anyway.
+  // A run that did not finish normally, because it broke or someone stopped
+  // it, has no summary from the backend, so count the tests each model did
+  // finish, the same numbers the table works out anyway.
   if (countFromRows && !leaderboardSummary?.length) {
     leaderboardSummary = modelResults.flatMap((m) => {
       const c = benchmarkAnsweredPassFail(m);
