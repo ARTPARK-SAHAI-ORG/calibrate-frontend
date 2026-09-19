@@ -69,7 +69,7 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
       <p className="text-xs md:text-sm text-muted-foreground mb-2">
         {description}
       </p>
-      <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 mb-4 text-xs md:text-sm text-muted-foreground">
+      <div className="flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 p-3 mb-4 text-xs md:text-sm text-blue-700 dark:text-blue-300">
         <svg
           className="w-4 h-4 mt-0.5 flex-shrink-0"
           fill="none"
