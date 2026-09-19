@@ -205,8 +205,6 @@ export function getRunBreakdown(
 export type RunStatusLike = {
   status: string;
   failed?: number | null;
-  /** How many of the run's tests produced no answer. */
-  unanswered_tests?: number | null;
   /** One entry per model on a comparison. */
   model_results?: ModelRunCountsLike[] | null;
   /** True when someone stopped the run before it finished. */
