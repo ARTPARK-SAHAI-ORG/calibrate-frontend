@@ -100,6 +100,13 @@ type TestRunStatusResponse = {
   error?: string | boolean | null;
 };
 
+/** The run broke: it either says so outright or left an error behind. The same
+ * two signals the run window and the shared comparison page read, so a run
+ * cannot look broken on one screen and finished on another. */
+function runBroke(run: TestRunStatusResponse): boolean {
+  return run.status === "failed" || Boolean(run.error);
+}
+
 /** Has the run ended, whichever way it ended? A test with no verdict is still
  * going only while the run is; once the run is over nothing more is coming for
  * it, so it never ran. */
@@ -107,7 +114,7 @@ function isRunOver(run: TestRunStatusResponse): boolean {
   return (
     run.status === "done" ||
     run.status === "completed" ||
-    run.status === "failed" ||
+    runBroke(run) ||
     isRunStopped(run)
   );
 }
@@ -268,7 +275,22 @@ export default function PublicTestRunPage() {
       failed: statusOf(r) === "failed" && !isUnanswered(r),
     })),
   );
-  const runState = runStateOf(data);
+  const runFailed = runBroke(data);
+  // Rows the run ended without a verdict for. They are left out of the pass
+  // rate, so the mark by the name and the note above the numbers have to count
+  // them: the run's own total does not.
+  const notRun = results.filter(
+    (r) => !isUnanswered(r) && statusOf(r) === "not_run",
+  ).length;
+  const runState = runStateOf({
+    status: runFailed ? "failed" : data.status,
+    aborted: data.aborted,
+    stopped_early: data.stopped_early,
+    unanswered_tests: (data.unanswered_tests ?? 0) + notRun,
+    // The total the count is read against: without it, one test that could
+    // not be run would read as none of them having run.
+    total_tests: data.total_tests ?? results.length,
+  });
   const evaluatorsByUuid = Object.fromEntries(
     (data.evaluators ?? []).map((e) => [e.uuid, e]),
   );
@@ -352,11 +374,10 @@ export default function PublicTestRunPage() {
             passed={passed}
             total={passed + failed}
             unanswered={data.unanswered_tests ?? 0}
+            notRun={notRun}
             stoppedEarly={data.stopped_early === true}
             stopped={data.aborted === true}
-            failureDetails={
-              data.status === "failed" ? (runErrorText(data.error) ?? "") : null
-            }
+            failureDetails={runFailed ? (runErrorText(data.error) ?? "") : null}
             runTotalTests={data.total_tests ?? results.length}
             onReviewUnanswered={() => setActiveTab("tests")}
             latency={data.latency_ms ?? null}

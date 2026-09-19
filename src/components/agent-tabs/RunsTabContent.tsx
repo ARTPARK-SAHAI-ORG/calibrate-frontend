@@ -593,7 +593,13 @@ export function RunsTabContent({
       setPendingRunId(null);
       setRunIdParam(null);
       toast.error("That run could not be found.");
+      return;
     }
+    // The list answered and the run is not on it, without the backend saying
+    // so outright. Let it go quietly rather than leaving the tab waiting on a
+    // run that is never coming, which would also keep the old rows on screen
+    // through every later filter change.
+    if (items.length > 0) setPendingRunId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRunId, isLoading, items, aroundNotFound]);
 

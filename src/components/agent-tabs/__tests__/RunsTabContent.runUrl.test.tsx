@@ -274,6 +274,29 @@ describe("RunsTabContent run deep-link", () => {
     expect(runsCalls).toHaveLength(2);
   });
 
+  it("lets a run go when the list answers without it and without saying so", async () => {
+    // A backend that ignores `around` answers page one with a 200 and no such
+    // run. Waiting on it forever would keep the old rows on screen through
+    // every later filter change, so the tab lets it go quietly.
+    listedRuns = [pastRun];
+    global.fetch = jest.fn(async (url: string) => {
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
+        return jsonResponse({
+          items: listedRuns,
+          total: listedRuns.length,
+          offset: 0,
+        });
+      }
+      return jsonResponse({}, false, 404);
+    }) as jest.Mock;
+    window.history.replaceState(null, "", "/?runId=run-missing");
+    renderTab();
+
+    await screen.findAllByText("Evaluation run 7");
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("benchmark-results")).not.toBeInTheDocument();
+  });
+
   it("shows the error banner instead of guessing a dialog when the list can't be checked", async () => {
     global.fetch = jest.fn(async () => jsonResponse({}, false, 500)) as jest.Mock;
     window.history.replaceState(null, "", "/?runId=run-7");

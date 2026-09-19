@@ -436,6 +436,42 @@ describe("tests that could not be run", () => {
     expect(screen.getByText("Tests tab")).toBeInTheDocument();
   });
 
+  it("counts the tests the run ended without a verdict for", () => {
+    // Three tests, one of which the run never got a verdict for: the pass rate
+    // is 1 of 2, and the note has to say the third could not be run rather
+    // than leaving it unexplained.
+    render(<TestRunSummary passed={1} total={2} notRun={1} />);
+    expect(
+      screen.getByText(
+        /1 of 3 tests could not be run and were ignored for calculating the metrics/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("counts tests with no answer and tests that never ran together", () => {
+    render(<TestRunSummary passed={4} total={5} unanswered={2} notRun={3} />);
+    expect(
+      screen.getByText(
+        /5 of 10 tests could not be run and were ignored for calculating the metrics/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not count tests that never ran as tests the stopped run got through", () => {
+    render(
+      <TestRunSummary
+        passed={1}
+        total={2}
+        notRun={3}
+        stopped
+        runTotalTests={5}
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped after 2 of 5 tests ran\./),
+    ).toBeInTheDocument();
+  });
+
   it("says when the run gave up before starting every test", () => {
     render(<TestRunSummary passed={9} total={10} stoppedEarly />);
     expect(

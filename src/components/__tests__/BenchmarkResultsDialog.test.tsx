@@ -2,7 +2,11 @@ import { render, screen, setupUser, waitFor, act } from "../../test-utils";
 import { toast } from "sonner";
 import { reportError } from "../../lib/reportError";
 import { POLLING_INTERVAL_MS } from "../../constants/polling";
-import { BenchmarkResultsDialog } from "../BenchmarkResultsDialog";
+import {
+  BenchmarkResultsDialog,
+  benchmarkAnswerCounts,
+} from "../BenchmarkResultsDialog";
+import type { BenchmarkModelRows } from "../eval-details/BenchmarkResultView";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -2584,5 +2588,49 @@ describe("stepping from run to run", () => {
     await user.keyboard("{ArrowLeft}");
     expect(onNextRun).not.toHaveBeenCalled();
     expect(onPrevRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("benchmarkAnswerCounts", () => {
+  const model = (rows: unknown[]) =>
+    ({ model: "m", test_results: rows }) as never;
+
+  it("counts a test that gave no answer as one the run could not do", () => {
+    expect(
+      benchmarkAnswerCounts(
+        [model([{ passed: false, unanswered: true }, { passed: true }])],
+        false,
+        true,
+      ),
+    ).toEqual({ unanswered: 1, answered: 1 });
+  });
+
+  it("counts a row the run ended without a verdict for", () => {
+    expect(
+      benchmarkAnswerCounts([model([{ passed: null }])], false, true),
+    ).toEqual({ unanswered: 1, answered: 0 });
+  });
+
+  it("leaves a row still being worked on out of both counts", () => {
+    expect(
+      benchmarkAnswerCounts([model([{ passed: null }])], false, false),
+    ).toEqual({ unanswered: 0, answered: 0 });
+  });
+
+  it("counts every model, since each one runs every test", () => {
+    expect(
+      benchmarkAnswerCounts(
+        [model([{ passed: null }]), model([{ passed: null }])],
+        false,
+        true,
+      ),
+    ).toEqual({ unanswered: 2, answered: 0 });
+  });
+
+  it("counts nothing when there are no models", () => {
+    expect(benchmarkAnswerCounts([], false, true)).toEqual({
+      unanswered: 0,
+      answered: 0,
+    });
   });
 });

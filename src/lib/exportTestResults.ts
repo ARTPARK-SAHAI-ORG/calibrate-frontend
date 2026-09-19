@@ -16,6 +16,7 @@ export type ExportTestRow = {
     | "pending"
     | "queued"
     | "error"
+    | "not_run"
     | string;
   output?: TestCaseOutput | null;
   testCase?: TestCaseData | null;
@@ -40,7 +41,9 @@ export type ExportBenchmarkRow = {
 function statusLabel(status: string): string {
   if (status === "passed") return "passed";
   if (status === "failed") return "failed";
-  if (status === "error") return "not run";
+  // Two ways a test has no verdict: it was tried and gave no answer, or the
+  // run ended before it was started. Both read as not run.
+  if (status === "error" || status === "not_run") return "not run";
   return status;
 }
 
@@ -224,8 +227,15 @@ export function buildTestRunCsv(
   columns: ExportColumn[];
   rows: Record<string, unknown>[];
 } {
+  // Every test the run has an outcome for, including the ones it could not
+  // run: leaving those out gave a file with fewer lines than the screen had
+  // rows, with nothing to say why.
   const filtered = results.filter(
-    (r) => r.status === "passed" || r.status === "failed" || r.status === "error",
+    (r) =>
+      r.status === "passed" ||
+      r.status === "failed" ||
+      r.status === "error" ||
+      r.status === "not_run",
   );
 
   const flags = filtered.map((r) => isToolCallTest(r.testCase, r.output));

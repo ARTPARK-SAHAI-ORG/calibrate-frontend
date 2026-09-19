@@ -44,7 +44,13 @@ export type AgentRun = {
          */
         total_tests?: number | null;
         passed?: number | null;
+        /**
+         * Worked out as `total - passed` for a model that finished, so it
+         * holds the tests that produced no answer too; `unanswered_tests`
+         * takes them back out.
+         */
         failed?: number | null;
+        unanswered_tests?: number | null;
         /** False when this model's run could not be carried out at all. */
         success?: boolean | null;
         test_results?: unknown[];

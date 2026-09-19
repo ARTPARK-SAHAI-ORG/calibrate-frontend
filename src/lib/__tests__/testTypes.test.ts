@@ -322,8 +322,16 @@ describe("getModelPassRange", () => {
 
 describe("runStateOf and tests that never ran", () => {
   it("does not call a run finished when a test produced no answer", () => {
-    expect(runStateOf({ status: "done", unanswered_tests: 1 })).toBe("gave_up");
-    expect(runStateOf({ status: "done", unanswered_tests: 0 })).toBe("finished");
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 1 }),
+    ).toBe("gave_up");
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 0 }),
+    ).toBe("finished");
+    // Every test in it: that reads as none of them having run, not as some.
+    expect(
+      runStateOf({ status: "done", total_tests: 3, unanswered_tests: 3 }),
+    ).toBe("none_run");
   });
 
   it("reads the same off a comparison's models", () => {
@@ -376,8 +384,20 @@ describe("modelsUnansweredCount", () => {
     ).toBe(4);
   });
 
-  it("counts every test of a model that could not be run", () => {
-    expect(modelsUnansweredCount([{ total_tests: 10, success: false }])).toBe(10);
+  it("leaves a model that could not be run to the models count", () => {
+    // The cell says "1 model failed" beside this, so counting its tests here
+    // as well would say the same thing twice.
+    expect(modelsUnansweredCount([{ total_tests: 10, success: false }])).toBe(0);
+  });
+
+  it("counts the tests that produced no answer, not only the ones never reached", () => {
+    // A model that finished carries `failed = total - passed`, so its two
+    // unanswered tests are inside that 5 until they are taken back out.
+    expect(
+      modelsUnansweredCount([
+        { total_tests: 10, passed: 5, failed: 5, unanswered_tests: 2 },
+      ]),
+    ).toBe(2);
   });
 
   it("is zero when the models answered everything or say nothing", () => {
@@ -386,5 +406,17 @@ describe("modelsUnansweredCount", () => {
     ).toBe(0);
     expect(modelsUnansweredCount([{ total_tests: 10 }])).toBe(0);
     expect(modelsUnansweredCount(null)).toBe(0);
+  });
+});
+
+describe("a comparison where some tests produced no answer", () => {
+  it("scores the model on what it answered, not on what it was given", () => {
+    // The backend gives a finished model failed = total - passed, so without
+    // taking the unanswered tests out this would read 50% instead of 100%.
+    expect(
+      getModelPassRange([
+        { total_tests: 10, passed: 5, failed: 5, unanswered_tests: 5 },
+      ]),
+    ).toEqual({ lowest: 100, highest: 100, failedModels: 0 });
   });
 });

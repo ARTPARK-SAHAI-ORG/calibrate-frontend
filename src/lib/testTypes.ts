@@ -341,8 +341,29 @@ export type ModelRunCountsLike = {
   success?: boolean | null;
   total_tests?: number | null;
   passed?: number | null;
+  /**
+   * The backend works this out as `total - passed` for a model that finished,
+   * so it holds the tests that produced no answer as well as the ones answered
+   * wrongly. `unanswered_tests` is what takes them back out.
+   */
   failed?: number | null;
+  /** How many of this model's tests produced no answer. */
+  unanswered_tests?: number | null;
 };
+
+/**
+ * How many of one model's tests were answered, right or wrong. The backend
+ * gives a finished model `failed = total - passed`, so the tests that produced
+ * no answer sit inside `failed` and have to be taken back out; a model that
+ * was stopped part way has its own counts, and the tests it never reached are
+ * outside both.
+ */
+function modelAnsweredCount(model: ModelRunCountsLike): number {
+  const passed = Math.max(model.passed ?? 0, 0);
+  const failed = Math.max(model.failed ?? 0, 0);
+  const unanswered = Math.max(model.unanswered_tests ?? 0, 0);
+  return Math.max(passed + failed - unanswered, 0);
+}
 
 /**
  * How a comparison went, as the share of tests each model passed rather than
@@ -355,7 +376,11 @@ export type ModelRunCountsLike = {
  */
 export function getModelPassRange(
   models: ModelRunCountsLike[] | null | undefined,
-): { lowest: number | null; highest: number | null; failedModels: number } | null {
+): {
+  lowest: number | null;
+  highest: number | null;
+  failedModels: number;
+} | null {
   const rates: number[] = [];
   let failedModels = 0;
   for (const model of models ?? []) {
@@ -363,22 +388,27 @@ export function getModelPassRange(
       failedModels += 1;
       continue;
     }
-    // Out of the tests that ran, the same way a single run reads, and only
-    // when the model says how many of each it got. A model that ran nothing
-    // is still listed with every test it was meant to run, so reading its
-    // share against that total would score a run that never happened.
+    // Out of the tests that were answered, the same way a single run reads,
+    // and only when the model says how many of each it got. A model that ran
+    // nothing is still listed with every test it was meant to run, so reading
+    // its share against that total would score a run that never happened.
     if (typeof model.passed !== "number" || typeof model.failed !== "number")
       continue;
-    const answered = Math.max(model.passed, 0) + Math.max(model.failed, 0);
+    const answered = modelAnsweredCount(model);
     if (answered <= 0) continue;
     rates.push((Math.max(model.passed, 0) / answered) * 100);
   }
   if (rates.length === 0) {
-    return failedModels > 0 ? { lowest: null, highest: null, failedModels } : null;
+    return failedModels > 0
+      ? { lowest: null, highest: null, failedModels }
+      : null;
   }
-  return { lowest: Math.min(...rates), highest: Math.max(...rates), failedModels };
+  return {
+    lowest: Math.min(...rates),
+    highest: Math.max(...rates),
+    failedModels,
+  };
 }
-
 
 /**
  * How many tests a comparison never ran, counted per test rather than per
@@ -392,14 +422,22 @@ export function modelsUnansweredCount(
   let worst = 0;
   for (const model of models ?? []) {
     const total = model.total_tests ?? 0;
+    // A model that could not be run at all is counted as models, not as
+    // tests: the cell says "1 model failed" beside this, and turning it into
+    // every test as well would count the same thing twice.
     if (total <= 0) continue;
-    if (model.success === false) {
-      worst = Math.max(worst, total);
-      continue;
-    }
     if (typeof model.passed !== "number" || typeof model.failed !== "number")
       continue;
-    worst = Math.max(worst, total - model.passed - model.failed);
+    const neverReached = total - model.passed - model.failed;
+    worst = Math.max(
+      worst,
+      neverReached + Math.max(model.unanswered_tests ?? 0, 0),
+    );
   }
-  return Math.max(worst, 0);
+  return Math.max(Math.min(worst, biggestTotal(models)), 0);
+}
+
+/** The largest number of tests any model in a comparison was given. */
+function biggestTotal(models: ModelRunCountsLike[] | null | undefined): number {
+  return Math.max(0, ...(models ?? []).map((m) => m.total_tests ?? 0));
 }

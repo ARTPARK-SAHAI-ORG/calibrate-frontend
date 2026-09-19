@@ -439,7 +439,7 @@ describe("RunsTabContent", () => {
     expect(
       (
         await screen.findAllByLabelText(
-          "Partially complete as some tests could not be run",
+          "Some of the tests could not be run",
         )
       ).length,
     ).toBeGreaterThan(0);
@@ -725,7 +725,7 @@ describe("RunsTabContent", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
 
     await act(async () => {
@@ -750,7 +750,7 @@ describe("RunsTabContent", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
 
     await act(async () => {
@@ -771,7 +771,7 @@ describe("RunsTabContent", () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
     renderTab();
-    await user.click((await screen.findAllByText("Complete"))[0]);
+    await user.click((await screen.findAllByText("No results"))[0]);
     await screen.findByTestId("benchmark-results");
 
     await act(async () => {

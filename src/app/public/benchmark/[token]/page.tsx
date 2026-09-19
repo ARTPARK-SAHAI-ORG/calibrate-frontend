@@ -22,11 +22,13 @@ import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { RunStateMark } from "@/components/ui";
 import {
   isRunStopped,
+  isUnanswered,
   modelComparisonName,
+  rowVerdict,
   runStateOf,
 } from "@/lib/testTypes";
-import { benchmarkAnsweredPassFail } from "@/lib/benchmarkEvaluatorSummary";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
+import { benchmarkAnswerCounts } from "@/components/BenchmarkResultsDialog";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -118,19 +120,23 @@ export default function PublicBenchmarkPage() {
   // The run broke: it either says so outright or left an error behind, the
   // same two signals the run window reads.
   const runFailed = data.status === "failed" || Boolean(data.error);
-  // Tests that produced no answer, counted across every model, so the mark by
-  // the name says the run could not run everything rather than calling it
-  // finished.
-  const unansweredCount = modelResults.reduce(
-    (total, m) => total + (benchmarkAnsweredPassFail(m)?.unanswered ?? 0),
-    0,
-  );
+  const wasStopped = isRunStopped(data);
+  // Tests the comparison could not run: the ones tried that gave no answer,
+  // plus the rows it ended without a verdict for. Taken from the worst model
+  // rather than added up across them, so a comparison of ten tests never
+  // reports more than ten.
+  const { unanswered: unansweredTests, answered: scoredTests } =
+    benchmarkAnswerCounts(modelResults, wasStopped, true);
   const runState =
     runStateOf({
       status: runFailed ? "failed" : data.status,
       aborted: data.aborted,
       stopped_early: data.stopped_early,
-      unanswered_tests: unansweredCount,
+      unanswered_tests: unansweredTests,
+      total_tests: unansweredTests + scoredTests,
+      // The models' own counts, the same ones the runs list and the run window
+      // read, so a model that could not be run is not called finished here.
+      model_results: modelResults,
     }) ?? "finished";
 
   /** One test read in full, for the model whose answer is on screen. */
@@ -173,7 +179,7 @@ export default function PublicBenchmarkPage() {
           modelResults={modelResults}
           leaderboardSummary={data.leaderboard_summary}
           evaluators={data.evaluators}
-          runStopped={isRunStopped(data)}
+          runStopped={wasStopped}
           runStoppedEarly={data.stopped_early === true}
           runFailureReason={runFailed ? (runErrorText(data.error) ?? "") : null}
           activeTab={activeTab}

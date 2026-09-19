@@ -427,6 +427,12 @@ export function TestRunnerDialog({
   // How many produced no answer, and whether the run gave up before starting
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
+  // Rows the run ended without a verdict for. The run's own counts do not
+  // include them, so the mark by the name and the note above the numbers
+  // would otherwise say every test ran while the list below reads "Not run".
+  const notRunCount = rows.filter(
+    (r) => !r.unanswered && r.status === "not_run",
+  ).length;
   const stoppedEarly = run?.stopped_early === true;
   // Tool-call pass/fail split for the Results tab's dedicated card. Keyed off
   // the kind of test the row itself reports.
@@ -654,6 +660,12 @@ export function TestRunnerDialog({
     }
   };
 
+  // The run broke: it either says so outright or left an error behind. The
+  // shared pages read the same two signals, so a run cannot look broken on one
+  // screen and finished on another. Older runs carry `error: true` or `false`,
+  // which `runErrorText` gives no words for.
+  const runFailed = !!run && (run.status === "failed" || Boolean(run.error));
+
   // Show the error card only when the failed run left NO rows at all. When it
   // has rows, every one of them carries its own reason, and the summary is
   // where the reader learns the run stopped early — an error card would hide
@@ -661,7 +673,7 @@ export function TestRunnerDialog({
   // Either the run failed and left nothing to read, or it never arrived at
   // all. Both leave the reader with no rows, so both get the error card.
   const isOverallError =
-    (runStatus === "failed" && rows.length === 0) || (loadFailed && !run);
+    (runFailed && rows.length === 0) || (loadFailed && !run);
 
   // Nothing is written at the top of the window until the run itself is here:
   // an unloaded run would show the automatic name, which is not necessarily
@@ -692,7 +704,19 @@ export function TestRunnerDialog({
                 {run &&
                   !isLoading &&
                   (() => {
-                    const state = runStateOf(run);
+                    const state = runStateOf({
+                      status: runFailed ? "failed" : run.status,
+                      aborted: run.aborted,
+                      stopped_early: run.stopped_early,
+                      // The rows the window is sitting above, not just the
+                      // run's own count, so the mark cannot say every test
+                      // ran while a row below reads "Not run".
+                      unanswered_tests: unansweredCount + notRunCount,
+                      // The total the count is read against: without it, one
+                      // test that could not be run would read as none of them
+                      // having run.
+                      total_tests: run.total_tests ?? rows.length,
+                    });
                     return state ? <RunStateMark state={state} /> : null;
                   })()}
                 {runHasArrived && (
@@ -886,12 +910,11 @@ export function TestRunnerDialog({
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
                   unanswered={unansweredCount}
+                  notRun={notRunCount}
                   stoppedEarly={stoppedEarly}
                   stopped={wasStopped}
                   failureDetails={
-                    run?.status === "failed"
-                      ? (runErrorText(run.error) ?? "")
-                      : null
+                    runFailed ? (runErrorText(run?.error) ?? "") : null
                   }
                   runTotalTests={run?.total_tests ?? rows.length}
                   onReviewUnanswered={() => setActiveTab("tests")}

@@ -254,8 +254,8 @@ describe("a comparison where no model answered anything", () => {
   const nothingRan = (
     <BenchmarkCombinedLeaderboard
       leaderboardSummary={[
-        { model: "a", passed: "0", total: "0" },
-        { model: "b", passed: "0", total: "0" },
+        { model: "a", passed: "0", total: "0", pass_rate: "0" },
+        { model: "b", passed: "0", total: "0", pass_rate: "0" },
       ]}
       modelResults={[
         {
@@ -287,6 +287,75 @@ describe("a comparison where no model answered anything", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Download CSV/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Nothing says why the rows carry no verdict: the run was not stopped, it
+  // did not break, and no test is marked as one that could not be run. Hiding
+  // the table would leave the tab blank with nothing to read.
+  it("keeps the table when no note says why there is nothing to show", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[{ model: "a", passed: "0", total: "2", pass_rate: "0" }]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [{ passed: null }, { passed: null }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("a comparison where every model could not be run", () => {
+  it("says so and points at the tests, instead of a bare no-data line", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", success: false, total_tests: 2, test_results: [] },
+          { model: "b", success: false, total_tests: 2, test_results: [] },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/None of the models could be run\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Tests tab")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("counts the models that could not be run when only some could not", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", success: false, total_tests: 2, test_results: [] },
+          {
+            model: "b",
+            success: true,
+            total_tests: 2,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/1 of 2 models could not be run\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No leaderboard data available"),
     ).not.toBeInTheDocument();
   });
 });

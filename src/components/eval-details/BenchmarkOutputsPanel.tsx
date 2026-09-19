@@ -166,6 +166,7 @@ function collectModelLabellingKeys(
   statusFilter: "all" | "passed" | "failed" | "errored",
   searchQuery: string,
   runStopped = false,
+  runOver = runStopped,
 ): string[] {
   const query = searchQuery.trim().toLowerCase();
   const resultsCount = modelResult.test_results?.length ?? 0;
@@ -178,7 +179,7 @@ function collectModelLabellingKeys(
     // A test that would always be skipped on submission is not tickable and
     // must not be swept up by a select-all either.
     if (!isLabellingEligibleRaw(testResult)) continue;
-    const status = benchmarkTestStatus(testResult, runStopped);
+    const status = benchmarkTestStatus(testResult, runStopped, runOver);
     const testName = benchmarkTestName(testResult, index, testNames);
     if (!matchesBenchmarkFilters(status, testName, statusFilter, query)) continue;
     keys.push(benchmarkLabellingKey(modelResult.model, index));
@@ -214,16 +215,33 @@ export function BenchmarkOutputsPanel({
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const showLabellingCheckboxes = !!onToggleLabellingSelection;
+  // A run that failed part way is over the same way a stopped one is.
+  const runStopped = runStoppedProp || runFailed;
+  const runOver = runOverProp || runStopped;
 
   const visibleLabellingKeys = useMemo(() => {
     const keys: string[] = [];
     for (const mr of modelResults) {
       keys.push(
-        ...collectModelLabellingKeys(mr, testNames, statusFilter, searchQuery),
+        ...collectModelLabellingKeys(
+          mr,
+          testNames,
+          statusFilter,
+          searchQuery,
+          runStopped,
+          runOver,
+        ),
       );
     }
     return keys;
-  }, [modelResults, testNames, statusFilter, searchQuery]);
+  }, [
+    modelResults,
+    testNames,
+    statusFilter,
+    searchQuery,
+    runStopped,
+    runOver,
+  ]);
   const allVisibleLabellingSelected =
     visibleLabellingKeys.length > 0 &&
     visibleLabellingKeys.every((key) => labellingSelection?.has(key));
@@ -231,9 +249,6 @@ export function BenchmarkOutputsPanel({
   // navigation keeps the selection in view (a page at a time).
   const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLDivElement>(null);
-  // A run that failed part way is over the same way a stopped one is.
-  const runStopped = runStoppedProp || runFailed;
-  const runOver = runOverProp || runStopped;
 
   // Count how many tests fall in each filterable status across all models, so
   // we only render a pill when there's something to filter to. A pill is shown
@@ -734,10 +749,11 @@ function ModelSection({
   // ended: nothing more is coming for it.
   const isProcessing = modelResult.success === null && !runOver;
   const unfinished = modelResult.success === null && runOver;
-  // This model could not be run at all. It has no results of its own, and the
-  // reason it carries is the whole story.
-  const couldNotRun = modelResult.success === false;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
+  // This model could not be run at all. It has no results of its own, and the
+  // reason it carries is the whole story. A model that failed but still left
+  // rows behind is not this: it keeps its counts and its rows are listed.
+  const couldNotRun = modelResult.success === false && !hasResults;
   // Rows land one by one while the model runs, so count the ones that already
   // have a verdict (or errored) for the live "x of y done" header.
   const finishedCount = (modelResult.test_results ?? []).filter((t) => {
@@ -766,6 +782,8 @@ function ModelSection({
     testNames,
     statusFilter,
     searchQuery,
+    runStopped,
+    runOver,
   );
   const modelAllSelected =
     modelLabellingKeys.length > 0 &&
@@ -849,7 +867,7 @@ function ModelSection({
       {isExpanded && (
         <div className="px-4 pt-3 pb-3">
           {(() => {
-            if (couldNotRun && !hasResults) {
+            if (couldNotRun) {
               return (
                 <div className="px-3 py-2 text-sm text-muted-foreground space-y-1">
                   <p>This model could not be run.</p>
@@ -882,15 +900,14 @@ function ModelSection({
                   const testResult = modelResult.test_results?.[index];
                   const hasResult = !!testResult;
 
-                  // Skip placeholder rows for completed benchmarks — only show
-                  // running placeholders during in-progress, and the tests a
-                  // stopped run never got to.
-                  if (!hasResult && !showRunningSpinner && !runStopped)
-                    return null;
+                  // A test the backend sent no row for is still listed once
+                  // the run is over: it never ran, and the note above points
+                  // the reader here to find it.
+                  if (!hasResult && !showRunningSpinner && !runOver) return null;
 
                   const status = hasResult
                     ? benchmarkTestStatus(testResult, runStopped, runOver)
-                    : runStopped
+                    : runOver
                       ? "not_run"
                       : "running";
                   const testName = benchmarkTestName(testResult, index, testNames);

@@ -391,6 +391,43 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.queryByText("No test results")).not.toBeInTheDocument();
     });
 
+    // A model can be marked as failed and still have produced rows. Those rows
+    // are real results, so the header reads like any other model's.
+    describe("but which did produce results", () => {
+      const partlyRan = makeModel({
+        model: "model-g",
+        success: false,
+        message: "openrouter: rate limited",
+        total_tests: 2,
+        passed: 1,
+        failed: 1,
+        test_results: [
+          { name: "Gamma Passed", passed: true, reasoning: "good" },
+          { name: "Gamma Failed", passed: false, reasoning: "bad" },
+        ],
+      });
+
+      it("keeps its counts instead of saying it could not be run", () => {
+        render(
+          <BenchmarkOutputsPanel
+            modelResults={[partlyRan]}
+            expandedModels={new Set(["model-g"])}
+            onToggleModel={jest.fn()}
+            selectedTest={null}
+            onSelectTest={jest.fn()}
+            runOver
+          />,
+        );
+        expect(screen.queryByText("Could not be run")).not.toBeInTheDocument();
+        expect(screen.getByText("1 passed")).toBeInTheDocument();
+        expect(screen.getByText("1 failed")).toBeInTheDocument();
+        expect(screen.getByText("Gamma Passed")).toBeInTheDocument();
+        expect(
+          screen.queryByText("This model could not be run."),
+        ).not.toBeInTheDocument();
+      });
+    });
+
     it("says it could not be run even with no reason recorded", () => {
       render(
         <BenchmarkOutputsPanel
@@ -999,6 +1036,42 @@ describe("BenchmarkOutputsPanel", () => {
         />,
       );
       expect(screen.getByTitle("Deselect all model-a tests")).toBeInTheDocument();
+    });
+
+    // Select all reads each row's status the same way the rows on screen do,
+    // so a run that has ended never ticks a different set from the one shown.
+    it("reads the rows of a finished run the same way the rows on screen do", async () => {
+      const user = setupUser();
+      const onLabellingBulkToggle = jest.fn();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[
+            makeModel({
+              model: "model-h",
+              success: true,
+              total_tests: 2,
+              passed: 1,
+              failed: 0,
+              test_results: [
+                { name: "Delta Passed", passed: true },
+                { name: "Delta No Verdict", passed: null },
+              ],
+            }),
+          ]}
+          expandedModels={new Set(["model-h"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          onToggleLabellingSelection={jest.fn()}
+          onLabellingBulkToggle={onLabellingBulkToggle}
+          runOver
+        />,
+      );
+      await user.click(screen.getByTitle("Select all model-h tests"));
+      expect(onLabellingBulkToggle).toHaveBeenCalledWith([
+        "model-h:0",
+        "model-h:1",
+      ]);
     });
   });
 

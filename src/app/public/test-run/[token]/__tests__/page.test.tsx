@@ -401,6 +401,54 @@ describe("public test run page", () => {
     ).toBeInTheDocument();
   });
 
+  it("marks a run that ended without a verdict for one of its tests", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes("/results/")) return jsonResponse(CASE_ONE);
+        return jsonResponse({
+          ...RUN_SUMMARY,
+          unanswered_tests: 0,
+          results: [
+            { test_case_id: "case-1", name: "Refund window", passed: true },
+            { test_case_id: "case-9", name: "No verdict" },
+          ],
+        });
+      },
+    );
+    render(<PublicTestRunPage />);
+
+    await screen.findByTestId("summary-cards");
+    // The list on this page reads "Not run" for that test, so the mark cannot
+    // say the run got through all of them.
+    expect(
+      screen.getByLabelText("Some of the tests could not be run"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("The evaluation ran every test"),
+    ).not.toBeInTheDocument();
+    expect(summaryProps.mock.calls.at(-1)![0].notRun).toBe(1);
+  });
+
+  it("calls a run that recorded an error broken, whatever its status says", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes("/results/")) return jsonResponse(CASE_ONE);
+        return jsonResponse({ ...RUN_SUMMARY, status: "done", error: "boom" });
+      },
+    );
+    render(<PublicTestRunPage />);
+
+    await screen.findByTestId("summary-cards");
+    expect(
+      screen.getByLabelText("The evaluation broke before it could finish"),
+    ).toBeInTheDocument();
+    expect(summaryProps.mock.calls.at(-1)![0].failureDetails).toBe("boom");
+  });
+
   it("names the evaluator that judged the tool-call tests", async () => {
     render(<PublicTestRunPage />);
 

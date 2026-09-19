@@ -73,6 +73,7 @@ jest.mock("../eval-details", () => ({
         {JSON.stringify({ unanswered, stoppedEarly })}
       </span>
       <span data-testid="summary-stopped">{String(stopped === true)}</span>
+      <span data-testid="summary-not-run">{String(props.notRun ?? 0)}</span>
       <span data-testid="summary-failure">
         {JSON.stringify(props.failureDetails ?? null)}
       </span>
@@ -1018,6 +1019,85 @@ describe("TestRunnerDialog", () => {
     );
     await setupUser().click(screen.getByRole("button", { name: "Tests" }));
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+  });
+
+  it("treats a run that recorded an error as broken, whatever its status says", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-error-text")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-error-text",
+            status: "completed",
+            error: "calibrate-agent process killed by signal 15",
+            results: [
+              { test_case_id: "test-1", name: "Passed One", passed: true },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-error-text"
+      />,
+    );
+
+    // The shared pages call a run with recorded error text broken, so this
+    // window has to as well: the red box above the numbers and the red mark
+    // beside the name.
+    await waitFor(() =>
+      expect(screen.getByTestId("summary-failure")).toHaveTextContent(
+        JSON.stringify("calibrate-agent process killed by signal 15"),
+      ),
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "The evaluation broke before it could finish",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the error card when a run that recorded an error kept no rows", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-error-text-empty")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-error-text-empty",
+            status: "completed",
+            error: "boom",
+            results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-error-text-empty"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("boom").tagName).toBe("PRE");
   });
 
   it("shows the overall error state when the run fails before any case ran", async () => {
@@ -2851,6 +2931,29 @@ describe("a test with no verdict once the run has ended", () => {
     await screen.findByTestId("outputs-panel");
 
     expect(screen.getByText("No verdict:running")).toBeInTheDocument();
+  });
+
+  it("counts in the mark beside the run's name", async () => {
+    renderRun("completed");
+
+    // The list below reads "Not run" for that test, so the mark cannot say the
+    // run got through all of them.
+    expect(
+      await screen.findByRole("img", {
+        name: "Some of the tests could not be run",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "The evaluation ran every test" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("is counted in the note above the numbers", async () => {
+    renderRun("completed");
+
+    // Without this the pass rate read 1/2 out of three tests with nothing on
+    // screen to say where the third went.
+    expect(await screen.findByTestId("summary-not-run")).toHaveTextContent("1");
   });
 
   it("is left out of the pass rate", async () => {

@@ -102,6 +102,29 @@ export type BenchmarkRerunRequest = {
   parallelModels?: boolean;
 };
 
+/**
+ * One model's tests split into the ones it answered and the ones it could not
+ * run: a test that gave no answer, or a row the run ended without a verdict
+ * for. Counted per model, the way the mark's own total is, so a comparison of
+ * 10 tests across three models is read out of 30 and not out of 10.
+ */
+export function benchmarkAnswerCounts(
+  modelResults: BenchmarkModelRows[],
+  wasStopped: boolean,
+  isDone: boolean,
+): { unanswered: number; answered: number } {
+  let unanswered = 0;
+  let answered = 0;
+  for (const model of modelResults) {
+    for (const row of model.test_results ?? []) {
+      const verdict = rowVerdict(row, wasStopped, isDone);
+      if (isUnanswered(row) || verdict === "not_run") unanswered += 1;
+      else if (verdict === "passed" || verdict === "failed") answered += 1;
+    }
+  }
+  return { unanswered, answered };
+}
+
 type BenchmarkResultsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -688,27 +711,10 @@ export function BenchmarkResultsDialog({
   // test either, so its mark reads the same as a plain run's. The counts are
   // per model, and one test that could not be run under two models counts
   // under each, which is also how the total is counted.
-  const answerCounts = modelResults.map((m) => benchmarkAnsweredPassFail(m));
-  const unansweredTests = answerCounts.reduce(
-    (n, c) => n + (c?.unanswered ?? 0),
-    0,
-  );
-  const scoredTests = answerCounts.reduce((n, c) => n + (c?.answered ?? 0), 0);
+  const { unanswered: unansweredTests, answered: scoredTests } =
+    benchmarkAnswerCounts(modelResults, wasStopped, isDone);
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
-  );
-  // Tests the run did not answer, counted across every model, so the mark by
-  // the name says the run could not run everything rather than calling it
-  // finished. A row with no verdict on a run that has ended never ran either,
-  // which is what the runs list works out from each model's own counts.
-  const unansweredCount = modelResults.reduce(
-    (total, m) =>
-      total +
-      (m.test_results ?? []).filter(
-        (tr) =>
-          isUnanswered(tr) || rowVerdict(tr, wasStopped, isDone) === "not_run",
-      ).length,
-    0,
   );
   // The row checkboxes exist only to feed the "Submit for labelling" button,
   // so they appear exactly when it does — never on a benchmark with nothing
