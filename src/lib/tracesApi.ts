@@ -246,6 +246,17 @@ export async function setAgentAutoScoreTraces(
   );
 }
 
+/** Queue every trace of this agent that has not been scored yet. */
+export async function scoreAgentTraces(
+  accessToken: string,
+  agentUuid: string,
+): Promise<{ queued: number }> {
+  return apiPost<{ queued: number }>(
+    `/agents/${encodeURIComponent(agentUuid)}/score-traces`,
+    accessToken,
+    {},
+  );
+}
 
 /**
  * The labels sent with this agent's traces, so the filter can offer them.
