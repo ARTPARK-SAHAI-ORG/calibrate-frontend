@@ -23,7 +23,7 @@ import {
   evaluatorSummaryToAbout,
 } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { ResultTabs } from "@/components/ui";
+import { ResultTabs, RunStateMark } from "@/components/ui";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
@@ -35,12 +35,12 @@ import {
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import {
-  isNotRun,
   isRunStopped,
   isUnanswered,
+  rowVerdict,
   runDisplayName,
+  runStateOf,
 } from "@/lib/testTypes";
-import { StoppedRunPill } from "@/components/ui";
 
 type TestCaseResult = {
   test_case_id?: string;
@@ -100,12 +100,16 @@ type TestRunStatusResponse = {
   error?: string | boolean | null;
 };
 
-function getStatus(
-  r: TestCaseResult,
-  runStopped: boolean,
-): "passed" | "failed" | "not_run" {
-  if (isNotRun(r, runStopped)) return "not_run";
-  return r.passed === true ? "passed" : "failed";
+/** Has the run ended, whichever way it ended? A test with no verdict is still
+ * going only while the run is; once the run is over nothing more is coming for
+ * it, so it never ran. */
+function isRunOver(run: TestRunStatusResponse): boolean {
+  return (
+    run.status === "done" ||
+    run.status === "completed" ||
+    run.status === "failed" ||
+    isRunStopped(run)
+  );
 }
 
 export default function PublicTestRunPage() {
@@ -246,22 +250,25 @@ export default function PublicTestRunPage() {
   // Someone stopped this run before it finished, so the tests it never started
   // are neither passes nor failures.
   const wasStopped = isRunStopped(data);
-  const passed = results.filter(
-    (r) => getStatus(r, wasStopped) === "passed",
-  ).length;
+  const runOver = isRunOver(data);
+  // How one row reads. The one rule, so this page and the run window in the app
+  // cannot show two different pass rates for the same run.
+  const statusOf = (r: TestCaseResult) => rowVerdict(r, wasStopped, runOver);
+  const passed = results.filter((r) => statusOf(r) === "passed").length;
   // A test that produced no answer was never scored; keep it out of the
   // pass-rate denominator so the rate matches the tests that were.
   const failed = results.filter(
-    (r) => getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
+    (r) => statusOf(r) === "failed" && !isUnanswered(r),
   ).length;
   // Tool-call pass/fail split for the Results tab's dedicated card.
   const toolCall = toolCallPassFail(
     results.map((r) => ({
       toolCall: isToolCallRow(r),
-      passed: getStatus(r, wasStopped) === "passed",
-      failed: getStatus(r, wasStopped) === "failed" && !isUnanswered(r),
+      passed: statusOf(r) === "passed",
+      failed: statusOf(r) === "failed" && !isUnanswered(r),
     })),
   );
+  const runState = runStateOf(data);
   const evaluatorsByUuid = Object.fromEntries(
     (data.evaluators ?? []).map((e) => [e.uuid, e]),
   );
@@ -292,7 +299,7 @@ export default function PublicTestRunPage() {
           ? runDisplayName("llm-unit-test", data.name)
           : "LLM component test"
       }
-      pills={wasStopped ? <StoppedRunPill /> : undefined}
+      pills={runState ? <RunStateMark state={runState} /> : undefined}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">
@@ -325,7 +332,7 @@ export default function PublicTestRunPage() {
                       name: r.name || r.test_case?.name || r.test_name,
                       status: isUnanswered(r)
                         ? "error"
-                        : getStatus(r, wasStopped),
+                        : statusOf(r),
                       output: r.output,
                       testCase: r.test_case,
                       reasoning: r.reasoning,
@@ -378,7 +385,7 @@ export default function PublicTestRunPage() {
                 id: `test-${i}`,
                 name:
                   r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
-                status: getStatus(r, wasStopped),
+                status: statusOf(r),
                 unanswered: isUnanswered(r),
                 output: r.output ?? undefined,
                 testCase: r.test_case ?? undefined,

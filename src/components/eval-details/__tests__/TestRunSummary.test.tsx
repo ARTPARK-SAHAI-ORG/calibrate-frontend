@@ -446,8 +446,19 @@ describe("tests that could not be run", () => {
   it("says how many of the run's tests ran when it was stopped", () => {
     render(<TestRunSummary passed={4} total={5} stopped runTotalTests={12} />);
     expect(
-      screen.getByText("This run was stopped after 5 of 12 tests ran"),
+      screen.getByText("This run was stopped after 5 of 12 tests ran."),
     ).toBeInTheDocument();
+  });
+
+  it("ends the stopped sentence even when nothing follows it", () => {
+    // With no test left unanswered there is no second sentence to carry the
+    // full stop, and the note used to stop dead.
+    const { container } = render(
+      <TestRunSummary passed={3} total={3} stopped runTotalTests={10} />,
+    );
+    expect(container.textContent).toContain(
+      "This run was stopped after 3 of 10 tests ran.",
+    );
   });
 
   it("counts the tests that gave no answer among the ones that ran", () => {
@@ -468,14 +479,14 @@ describe("tests that could not be run", () => {
   it("says nothing ran when the run was stopped straight away", () => {
     render(<TestRunSummary passed={0} total={0} stopped runTotalTests={12} />);
     expect(
-      screen.getByText("This run was stopped before any test ran"),
+      screen.getByText("This run was stopped before any test ran."),
     ).toBeInTheDocument();
   });
 
   it("just says the run was stopped when it does not carry its own size", () => {
     render(<TestRunSummary passed={4} total={5} stopped />);
     expect(
-      screen.getByText("This run was stopped before it finished"),
+      screen.getByText("This run was stopped before it finished."),
     ).toBeInTheDocument();
   });
 
@@ -484,7 +495,7 @@ describe("tests that could not be run", () => {
     // both reads as two separate things having gone wrong.
     render(<TestRunSummary passed={4} total={5} stopped stoppedEarly />);
     expect(
-      screen.getByText("This run was stopped before it finished"),
+      screen.getByText("This run was stopped before it finished."),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(

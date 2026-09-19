@@ -18,6 +18,8 @@ import {
   getRunBreakdown,
   isRunErrored,
   isRunInProgress,
+  isRunStopped,
+  modelsUnansweredCount,
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
@@ -108,6 +110,17 @@ function RunResultPlaceholder() {
 }
 
 
+/** How many of a run's tests never ran, in the same words for both kinds. */
+function NotRunPill({ count }: { count: number }) {
+  return (
+    <span
+      className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+    >
+      {count} Not run
+    </span>
+  );
+}
+
 /**
  * The share of a run's tests that passed, coloured by how good that share is:
  * red below half, amber below nine in ten, green at or above it. A comparison
@@ -133,10 +146,12 @@ function ModelPassRange({
   lowest,
   highest,
   failedModels,
+  notRun,
 }: {
   lowest: number | null;
   highest: number | null;
   failedModels: number;
+  notRun: number;
 }) {
   const rate =
     lowest === null || highest === null
@@ -147,6 +162,7 @@ function ModelPassRange({
   return (
     <>
       {rate && highest !== null && <PassRatePill label={rate} rate={highest} />}
+      {notRun > 0 && <NotRunPill count={notRun} />}
       {failedModels > 0 && (
         <span
           className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
@@ -161,6 +177,16 @@ function ModelPassRange({
 /** The result pills for one run: running, error, or how the tests went. */
 function RunResult({ run }: { run: AgentRun }) {
   if (isRunInProgress(run)) {
+    // Someone pressed Stop and the run has not wound down yet. Saying
+    // "Running" here would argue with the stopped mark beside the name.
+    if (isRunStopped(run))
+      return (
+        <span
+          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
+        >
+          Stopping
+        </span>
+      );
     return (
       <span
         className={`${PILL_CLASS} bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-500`}
@@ -211,7 +237,13 @@ function RunResult({ run }: { run: AgentRun }) {
     // make sense as the share each model passed. Adding them up would report
     // 1,410 tests for a 470-test comparison tried against three models.
     const range = getModelPassRange(run.model_results);
-    if (range) return <ModelPassRange {...range} />;
+    if (range)
+      return (
+        <ModelPassRange
+          {...range}
+          notRun={modelsUnansweredCount(run.model_results)}
+        />
+      );
     // Nothing to tally: the run was stopped before it got to a test, or it is
     // a comparison whose models never said how they did. Say so in the same
     // words the models cell says "Default", rather than calling it complete,
@@ -230,13 +262,7 @@ function RunResult({ run }: { run: AgentRun }) {
   return (
     <>
       <PassRatePill label={`${Math.round(rate)}% passed`} rate={rate} />
-      {breakdown.unanswered > 0 && (
-        <span
-          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
-        >
-          {breakdown.unanswered} Not run
-        </span>
-      )}
+      {breakdown.unanswered > 0 && <NotRunPill count={breakdown.unanswered} />}
     </>
   );
 }

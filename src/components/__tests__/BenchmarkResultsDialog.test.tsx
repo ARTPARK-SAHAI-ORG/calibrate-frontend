@@ -984,6 +984,137 @@ describe("BenchmarkResultsDialog", () => {
     );
   });
 
+  it("marks a finished comparison that left a test with no result", async () => {
+    // The model's own counts say nothing is missing (no total), so the mark
+    // has to come from the row that never got a verdict.
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-no-verdict")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-no-verdict",
+            status: "done",
+            model_results: [
+              {
+                model: "gpt-4",
+                success: true,
+                message: "",
+                total_tests: null,
+                passed: 1,
+                failed: 0,
+                test_results: [
+                  { name: "Test One", passed: true },
+                  { name: "Test Two", passed: null },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-no-verdict"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("gave_up"),
+    );
+  });
+
+  it("marks a finished comparison in which one model could not be run", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-model-broke")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-model-broke",
+            status: "done",
+            model_results: [
+              {
+                model: "gpt-4",
+                success: true,
+                message: "",
+                total_tests: 1,
+                passed: 1,
+                failed: 0,
+                test_results: [{ name: "Test One", passed: true }],
+              },
+              {
+                model: "claude",
+                success: false,
+                message: "model not available",
+                total_tests: 1,
+                passed: null,
+                failed: null,
+                test_results: null,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-model-broke"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("gave_up"),
+    );
+  });
+
+  it("marks a comparison finished when every test has a verdict", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (isBenchmarkDetail(url, "task-clean")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-clean",
+            status: "done",
+            model_results: [
+              {
+                model: "gpt-4",
+                success: true,
+                message: "",
+                total_tests: 2,
+                passed: 1,
+                failed: 1,
+                test_results: [
+                  { name: "Test One", passed: true },
+                  { name: "Test Two", passed: false },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[]}
+        taskId="task-clean"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("run-mark")).toHaveTextContent("finished"),
+    );
+  });
+
   it.each([
     ["opening a past run", { taskId: "task-no-url" }],
     ["starting a new run", { models: ["gpt-4"] }],

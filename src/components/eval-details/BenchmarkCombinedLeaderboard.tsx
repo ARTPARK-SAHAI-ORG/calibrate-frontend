@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
-import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
+import { STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
   benchmarkAnsweredPassFail,
@@ -136,8 +136,10 @@ function UnansweredNote({
 }
 
 /**
- * The note above the table when someone stopped the run. Says how far it got,
- * counted across every model, the same way the run window's summary says it.
+ * The note above the table when someone stopped the run. It gives no counts:
+ * every test is run once per model, so adding the models up would report 30
+ * tests for a comparison of 10 tests across three models, while the run's own
+ * Tests column says 10.
  */
 function StoppedNote({
   modelResults,
@@ -146,13 +148,10 @@ function StoppedNote({
   modelResults: BenchmarkModelLike[];
   onReviewUnanswered?: () => void;
 }) {
-  let ran = 0;
-  let total = 0;
-  for (const model of modelResults) {
+  const ranAnyTest = modelResults.some((model) => {
     const counts = benchmarkAnsweredPassFail(model);
-    if (counts) ran += counts.answered + counts.unanswered;
-    total += model.total_tests ?? model.test_results?.length ?? 0;
-  }
+    return !!counts && counts.answered + counts.unanswered > 0;
+  });
 
   const tab = onReviewUnanswered ? (
     <button
@@ -166,12 +165,16 @@ function StoppedNote({
     <span className="font-medium">{RESULT_TAB_LABELS.tests} tab</span>
   );
 
-  // The same sentence the run window's summary says, counted across every
-  // model rather than over one run's tests.
   return (
     <RunNote>
-      {stoppedRunSentence(ran, total)}
-      {ran > 0 ? <>. The tests that did run are in the {tab}.</> : null}
+      {ranAnyTest ? (
+        <>
+          This run was stopped before it finished. The tests that did run are in
+          the {tab}.
+        </>
+      ) : (
+        "This run was stopped before any test ran."
+      )}
     </RunNote>
   );
 }
@@ -323,31 +326,41 @@ export function BenchmarkCombinedLeaderboard({
     [payload, formatModelName, benchmarkScoreLabel],
   );
 
+  // No table to draw, so the notes are the whole story. A run can have been
+  // stopped and have broken, so both are said, and the note about the tests
+  // that could not be run is said whenever it applies.
   if (!payload || payload.rows.length === 0) {
-    if (runStopped) {
-      return (
-        <div className={className}>
-          <StoppedNote
-            modelResults={modelResults}
-            onReviewUnanswered={onReviewUnanswered}
-          />
-        </div>
+    // Whatever went wrong is already said in a note, so the bare "no data"
+    // line would only repeat it back with less to go on.
+    const noteExplainsIt =
+      runStopped ||
+      failureReason !== null ||
+      modelResults.some(
+        (m) => (benchmarkAnsweredPassFail(m)?.unanswered ?? 0) > 0,
       );
-    }
     return (
       <div className={className}>
-        {failureReason !== null && (
+        <div className="space-y-4">
+          {runStopped && (
+            <StoppedNote
+              modelResults={modelResults}
+              onReviewUnanswered={onReviewUnanswered}
+            />
+          )}
           <UnansweredNote
             modelResults={modelResults}
             onReviewUnanswered={onReviewUnanswered}
+            stoppedEarly={stoppedEarly && !runStopped}
             failureReason={failureReason}
           />
-        )}
-        <div className="text-center py-12">
-          <p className="text-sm text-muted-foreground">
-            No leaderboard data available
-          </p>
         </div>
+        {!noteExplainsIt && (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">
+              No leaderboard data available
+            </p>
+          </div>
+        )}
       </div>
     );
   }

@@ -278,6 +278,138 @@ describe("BenchmarkOutputsPanel", () => {
     });
   });
 
+  describe("a comparison that has ended", () => {
+    it("reads a test with no verdict as never run instead of leaving it spinning", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      const icons = screen.getAllByTestId("status-icon").map((n) => n.textContent);
+      expect(icons).toEqual(["passed", "queued"]);
+    });
+
+    it("says the run ended with no result for the test that is open", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          selectedTest={{ model: "model-b", testIndex: 1 }}
+          onToggleModel={jest.fn()}
+          onSelectTest={jest.fn()}
+          runOver
+          showRunningSpinner
+        />,
+      );
+      expect(
+        screen.getByText(
+          "This test was not run. The run ended without a result for it.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Running test...")).not.toBeInTheDocument();
+    });
+
+    it("keeps the spinner while the run is still going", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          selectedTest={{ model: "model-b", testIndex: 1 }}
+          onToggleModel={jest.fn()}
+          onSelectTest={jest.fn()}
+          showRunningSpinner
+        />,
+      );
+      expect(screen.getByText("Running test...")).toBeInTheDocument();
+    });
+
+    it("does not call a model still working when the run is over", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[modelB]}
+          expandedModels={new Set(["model-b"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(screen.getByText("1 of 2 ran")).toBeInTheDocument();
+      expect(screen.queryByText(/of 2 done/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a model that could not be run", () => {
+    const brokenModel = makeModel({
+      model: "model-e",
+      success: false,
+      message: "openrouter: model not available",
+      total_tests: 2,
+      passed: 0,
+      failed: 0,
+      test_results: null,
+    });
+
+    it("says so instead of showing it as finished with nothing", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[brokenModel]}
+          expandedModels={new Set(["model-e"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(screen.getByText("Could not be run")).toBeInTheDocument();
+      expect(screen.queryByText("0 passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("0 failed")).not.toBeInTheDocument();
+    });
+
+    it("shows the reason it carries", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[brokenModel]}
+          expandedModels={new Set(["model-e"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(
+        screen.getByText("This model could not be run."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("openrouter: model not available"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("No test results")).not.toBeInTheDocument();
+    });
+
+    it("says it could not be run even with no reason recorded", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[
+            makeModel({ model: "model-f", success: false, message: "" }),
+          ]}
+          expandedModels={new Set(["model-f"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          runOver
+        />,
+      );
+      expect(
+        screen.getByText("This model could not be run."),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("reads the backend's own not-run flag even when the run says nothing about stopping", () => {
     const flagged = makeModel({
       model: "model-d",

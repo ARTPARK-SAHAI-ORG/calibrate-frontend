@@ -10,6 +10,7 @@ import {
   isRunInProgress,
   runStateOf,
   getModelPassRange,
+  modelsUnansweredCount,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -346,5 +347,44 @@ describe("runStateOf and tests that never ran", () => {
     expect(
       runStateOf({ status: "done", model_results: [{ total_tests: 10 }] }),
     ).toBe("finished");
+  });
+});
+
+describe("a run that broke and was also stopped", () => {
+  it("says it broke, since that is what the reader has to act on", () => {
+    expect(runStateOf({ status: "failed", aborted: true })).toBe("error");
+  });
+});
+
+describe("a model that could not be run at all", () => {
+  it("means the run did not run everything", () => {
+    expect(
+      runStateOf({ status: "done", model_results: [{ success: false }] }),
+    ).toBe("gave_up");
+  });
+});
+
+describe("modelsUnansweredCount", () => {
+  it("counts tests, not tests times models", () => {
+    // Two models of 10 tests each: one left 2 untouched, the other 4. The run
+    // is still 10 tests, so the answer is 4, never 6.
+    expect(
+      modelsUnansweredCount([
+        { total_tests: 10, passed: 5, failed: 3 },
+        { total_tests: 10, passed: 4, failed: 2 },
+      ]),
+    ).toBe(4);
+  });
+
+  it("counts every test of a model that could not be run", () => {
+    expect(modelsUnansweredCount([{ total_tests: 10, success: false }])).toBe(10);
+  });
+
+  it("is zero when the models answered everything or say nothing", () => {
+    expect(
+      modelsUnansweredCount([{ total_tests: 10, passed: 6, failed: 4 }]),
+    ).toBe(0);
+    expect(modelsUnansweredCount([{ total_tests: 10 }])).toBe(0);
+    expect(modelsUnansweredCount(null)).toBe(0);
   });
 });

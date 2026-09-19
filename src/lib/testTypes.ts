@@ -128,6 +128,35 @@ export function isNotRun(row: TestRowLike, runStopped: boolean): boolean {
   return runStopped && (row.passed === null || row.passed === undefined);
 }
 
+/** What one test row says once the run it belongs to has been read. */
+export type RowVerdict = "passed" | "failed" | "not_run" | "running";
+
+/**
+ * How one row reads: it passed, it was answered wrongly, it never ran, or it
+ * is still going.
+ *
+ * `runOver` is the part every surface used to get wrong. A row with no verdict
+ * means "not finished yet" only while the run is still going; once the run has
+ * ended, whichever way it ended, nothing more is coming for that row and it
+ * never ran. Reading it as a wrong answer scores the agent for a test it was
+ * never asked, and reading it as still running leaves a spinner on screen
+ * forever.
+ *
+ * This is the one rule, used by the run window, the comparison window and the
+ * shared links alike. A row that produced no answer (`isUnanswered`) is its
+ * own thing and is read first by the callers that separate it out.
+ */
+export function rowVerdict(
+  row: TestRowLike,
+  runStopped: boolean,
+  runOver: boolean,
+): RowVerdict {
+  if (isNotRun(row, runStopped)) return "not_run";
+  if (row.passed === null || row.passed === undefined)
+    return runOver ? "not_run" : "running";
+  return row.passed ? "passed" : "failed";
+}
+
 /** A finished run, trimmed to the counts the buckets need. */
 export type RunCountsLike = {
   total_tests?: number | null;
@@ -241,6 +270,9 @@ export type RunState =
 function someTestNeverRan(run: RunStatusLike): boolean {
   if ((run.unanswered_tests ?? 0) > 0) return true;
   return (run.model_results ?? []).some((model) => {
+    // A model that could not be run at all ran none of its tests, whether or
+    // not it left any counts behind.
+    if (model.success === false) return true;
     const total = model.total_tests ?? 0;
     if (typeof model.passed !== "number" || typeof model.failed !== "number")
       return false;
@@ -253,8 +285,11 @@ function someTestNeverRan(run: RunStatusLike): boolean {
  * that opens from it cannot disagree.
  */
 export function runStateOf(run: RunStatusLike): RunState | null {
-  if (isRunStopped(run)) return "stopped";
+  // A run that broke says so even when someone had stopped it first: what
+  // went wrong is the thing the reader has to act on, and the failure box
+  // below the mark says it too.
   if (isRunErrored(run)) return "error";
+  if (isRunStopped(run)) return "stopped";
   if (isRunInProgress(run)) return null;
   // Two ways a run can end without covering every test: it gave up before
   // starting them all, or it started a test that never produced an answer.
@@ -342,4 +377,29 @@ export function getModelPassRange(
     return failedModels > 0 ? { lowest: null, highest: null, failedModels } : null;
   }
   return { lowest: Math.min(...rates), highest: Math.max(...rates), failedModels };
+}
+
+
+/**
+ * How many tests a comparison never ran, counted per test rather than per
+ * model: the worst model's shortfall, so a run of 10 tests never reports more
+ * than 10. Models that do not say how they did are left out, since their
+ * total covers every test they were given either way.
+ */
+export function modelsUnansweredCount(
+  models: ModelRunCountsLike[] | null | undefined,
+): number {
+  let worst = 0;
+  for (const model of models ?? []) {
+    const total = model.total_tests ?? 0;
+    if (total <= 0) continue;
+    if (model.success === false) {
+      worst = Math.max(worst, total);
+      continue;
+    }
+    if (typeof model.passed !== "number" || typeof model.failed !== "number")
+      continue;
+    worst = Math.max(worst, total - model.passed - model.failed);
+  }
+  return Math.max(worst, 0);
 }

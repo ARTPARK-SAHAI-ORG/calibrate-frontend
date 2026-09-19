@@ -19,8 +19,13 @@ import {
 import type { TestRunEvaluator } from "@/components/test-results/shared";
 import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { StoppedRunPill } from "@/components/ui";
-import { isRunStopped, modelComparisonName } from "@/lib/testTypes";
+import { RunStateMark } from "@/components/ui";
+import {
+  isRunStopped,
+  modelComparisonName,
+  runStateOf,
+} from "@/lib/testTypes";
+import { benchmarkAnsweredPassFail } from "@/lib/benchmarkEvaluatorSummary";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
 type BenchmarkStatusResponse = {
@@ -109,6 +114,25 @@ export default function PublicBenchmarkPage() {
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
+  const modelResults = data.model_results ?? [];
+  // The run broke: it either says so outright or left an error behind, the
+  // same two signals the run window reads.
+  const runFailed = data.status === "failed" || Boolean(data.error);
+  // Tests that produced no answer, counted across every model, so the mark by
+  // the name says the run could not run everything rather than calling it
+  // finished.
+  const unansweredCount = modelResults.reduce(
+    (total, m) => total + (benchmarkAnsweredPassFail(m)?.unanswered ?? 0),
+    0,
+  );
+  const runState =
+    runStateOf({
+      status: runFailed ? "failed" : data.status,
+      aborted: data.aborted,
+      stopped_early: data.stopped_early,
+      unanswered_tests: unansweredCount,
+    }) ?? "finished";
+
   /** One test read in full, for the model whose answer is on screen. */
   const fetchCase = async (
     testUuid: string,
@@ -139,27 +163,25 @@ export default function PublicBenchmarkPage() {
   return (
     <PublicPageLayout
       title={data.name ? modelComparisonName(data.name) : "LLM benchmark"}
-      pills={isRunStopped(data) ? <StoppedRunPill /> : undefined}
+      pills={<RunStateMark state={runState} />}
       contentClassName="max-w-[92rem]"
     >
       <div className="space-y-4 md:space-y-6">
         <BenchmarkResultView
           surface="public"
           isDone
-          modelResults={data.model_results ?? []}
+          modelResults={modelResults}
           leaderboardSummary={data.leaderboard_summary}
           evaluators={data.evaluators}
           runStopped={isRunStopped(data)}
           runStoppedEarly={data.stopped_early === true}
-          runFailureReason={
-            data.status === "failed" ? (runErrorText(data.error) ?? "") : null
-          }
+          runFailureReason={runFailed ? (runErrorText(data.error) ?? "") : null}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           fetchCase={fetchCase}
           filenameKey={token}
           tabsRight={
-            data.model_results && data.model_results.length > 0 ? (
+            modelResults.length > 0 ? (
               <ExportResultsButton
                 filename={`benchmark-${token}`}
                 getRows={async () =>

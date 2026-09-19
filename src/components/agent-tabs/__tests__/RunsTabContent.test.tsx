@@ -513,6 +513,28 @@ describe("RunsTabContent", () => {
     expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
   });
 
+  it("says a run someone stopped is stopping, not running", async () => {
+    state.runs = [{ ...unitRun, status: "in_progress", aborted: true }];
+    renderTab();
+    expect((await screen.findAllByText("Stopping")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Running")).not.toBeInTheDocument();
+  });
+
+  it("counts a comparison's tests that never ran, the same as a single run", async () => {
+    state.runs = [
+      {
+        ...benchmarkRun,
+        model_results: [
+          { model: "a", total_tests: 10, passed: 5, failed: 3 },
+          { model: "b", total_tests: 10, passed: 6, failed: 4 },
+        ],
+      },
+    ];
+    renderTab();
+    // Two of the first model's tests never ran; the run is still 10 tests.
+    expect((await screen.findAllByText("2 Not run")).length).toBeGreaterThan(0);
+  });
+
   it("shows Running while a run has not finished", async () => {
     state.runs = [{ ...unitRun, status: "in_progress" }];
     renderTab();

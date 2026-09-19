@@ -1926,6 +1926,48 @@ describe("tests that produced no answer", () => {
         screen.queryByRole("button", { name: "Stop" }),
       ).not.toBeInTheDocument();
     });
+
+    it("takes Stop away even while the backend still calls the run in progress", async () => {
+      let stopped = false;
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes("/evaluators?include_defaults=true")) {
+          return Promise.resolve(jsonResponse([]));
+        }
+        if (url.endsWith("/agent-tests/run/task-stop/abort")) {
+          stopped = true;
+          return Promise.resolve(jsonResponse({ task_id: "task-stop" }));
+        }
+        if (isRunDetail(url, "task-stop")) {
+          // The backend has recorded the stop but has not moved the run's
+          // status on yet.
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-stop",
+              status: "in_progress",
+              aborted: stopped || undefined,
+              results: [
+                { test_case_id: "t-1", name: "Test One", passed: true },
+                { test_case_id: "t-2", name: "Test Two", passed: null },
+              ],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      const user = setupUser();
+      renderDialog();
+      await stopAndConfirm(user);
+
+      // Nothing left to stop, and the test that never started is not left
+      // spinning.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Stop" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Test Two:not_run/)).toBeInTheDocument();
+    });
   });
   describe("naming the run", () => {
     function mockRun(name: string | null) {
@@ -2732,5 +2774,92 @@ describe("stepping from run to run", () => {
     await user.keyboard("{ArrowLeft}");
     expect(onNextRun).not.toHaveBeenCalled();
     expect(onPrevRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("a test with no verdict once the run has ended", () => {
+  const originalBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND_URL;
+    localStorage.setItem("access_token", "test-token");
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    clearTestRunCache();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_BACKEND_URL = originalBackendUrl;
+  });
+
+  /** One test answered, one answered wrongly, one with no verdict at all. */
+  const THREE_TESTS = [
+    { test_uuid: "t-1", name: "Answered", passed: true },
+    { test_uuid: "t-2", name: "Wrong", passed: false },
+    { test_uuid: "t-3", name: "No verdict", passed: null },
+  ];
+
+  function renderRun(status: string) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-over")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-over",
+            status,
+            results: THREE_TESTS,
+          }),
+        );
+      }
+      // Reading one test in full is not what these tests are about.
+      return Promise.resolve(jsonResponse({}, false, 500));
+    });
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-over"
+      />,
+    );
+  }
+
+  it("says it never ran once the run has finished", async () => {
+    renderRun("completed");
+    const user = setupUser();
+    await user.click(await screen.findByRole("button", { name: "Tests" }));
+
+    expect(screen.getByText("No verdict:not_run")).toBeInTheDocument();
+    expect(screen.queryByText(/No verdict:running/)).not.toBeInTheDocument();
+  });
+
+  it("says it never ran once the run has broken", async () => {
+    renderRun("failed");
+    const user = setupUser();
+    await user.click(await screen.findByRole("button", { name: "Tests" }));
+
+    expect(screen.getByText("No verdict:not_run")).toBeInTheDocument();
+    expect(screen.queryByText(/No verdict:running/)).not.toBeInTheDocument();
+  });
+
+  it("is still going while the run is still going", async () => {
+    renderRun("in_progress");
+    await screen.findByTestId("outputs-panel");
+
+    expect(screen.getByText("No verdict:running")).toBeInTheDocument();
+  });
+
+  it("is left out of the pass rate", async () => {
+    renderRun("completed");
+
+    // One passed, one answered wrongly, and the one that never ran counts for
+    // neither.
+    expect(await screen.findByTestId("summary-panel")).toHaveTextContent(
+      "summary 1/2",
+    );
   });
 });

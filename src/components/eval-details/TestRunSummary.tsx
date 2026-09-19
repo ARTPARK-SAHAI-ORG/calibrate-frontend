@@ -330,7 +330,9 @@ export function TestRunSummary({
                 (total === 0
                   ? "None of the tests could be run. "
                   : `${unanswered} of ${unanswered + total} tests could not be run and were ignored for calculating the metrics. `)}
-              {stopped && `${stoppedSentence}${unanswered > 0 ? ". " : ""}`}
+              {/* The shared wording carries no full stop, so it is ended
+                  here whether or not another sentence follows it. */}
+              {stopped && `${stoppedSentence}. `}
               {stoppedEarly && !stopped && STOPPED_EARLY_SENTENCE}
               {unanswered > 0 && (
                 <>

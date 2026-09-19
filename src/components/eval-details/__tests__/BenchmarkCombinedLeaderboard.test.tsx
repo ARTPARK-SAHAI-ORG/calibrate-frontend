@@ -328,7 +328,7 @@ describe("a run that gave up before it started every test", () => {
 });
 
 describe("a run someone stopped", () => {
-  it("says how far the run got, in the same amber note the run window uses", () => {
+  it("says the run was stopped, and points at the tests that did run", () => {
     render(
       <BenchmarkCombinedLeaderboard
         modelResults={[
@@ -347,7 +347,44 @@ describe("a run someone stopped", () => {
       />,
     );
     expect(
-      screen.getByText(/This run was stopped after 2 of 6 tests ran/),
+      screen.getByText(/This run was stopped before it finished\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The tests that did run are in the/),
+    ).toBeInTheDocument();
+  });
+
+  // Every test is run once per model, so adding the models up would say 30
+  // tests for a comparison of 10 tests across three models, while the run's
+  // own Tests column says 10.
+  it("counts no tests, so it cannot count one test once per model", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 10,
+            test_results: [{ passed: true }, { passed: false }],
+          },
+          {
+            model: "b",
+            total_tests: 10,
+            test_results: [{ passed: true }, { passed: true }],
+          },
+          {
+            model: "c",
+            total_tests: 10,
+            test_results: [{ passed: true }],
+          },
+        ]}
+        filename="x"
+        runStopped
+      />,
+    );
+    expect(screen.queryByText(/of 30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/5 of/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/This run was stopped before it finished\./),
     ).toBeInTheDocument();
   });
 
@@ -377,8 +414,58 @@ describe("a run someone stopped", () => {
       />,
     );
     expect(
-      screen.getByText("This run was stopped before any test ran"),
+      screen.getByText("This run was stopped before any test ran."),
     ).toBeInTheDocument();
+  });
+
+  it("shows why the run broke as well as the fact it was stopped", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          { model: "a", total_tests: 2, test_results: [{ passed: null }] },
+        ]}
+        filename="x"
+        runStopped
+        failureReason="calibrate-agent process killed by signal 15"
+      />,
+    );
+    expect(
+      screen.getByText(/This run was stopped before any test ran\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.getByText("calibrate-agent process killed by signal 15"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("a comparison where nothing could be run", () => {
+  it("says so even though the run itself did not break", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={[]}
+        modelResults={[
+          {
+            model: "a",
+            total_tests: 2,
+            test_results: [
+              { passed: false, unanswered: true },
+              { passed: false, unanswered: true },
+            ],
+          },
+        ]}
+        filename="x"
+      />,
+    );
+    expect(
+      screen.getByText(/None of the tests could be run\./),
+    ).toBeInTheDocument();
+    // The note already says why there is nothing to show, so the bare line
+    // would only repeat it back with less to go on.
+    expect(
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -469,8 +556,8 @@ describe("a run that failed after finishing some tests", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("boom")).toBeInTheDocument();
     expect(
-      screen.getByText("No leaderboard data available"),
-    ).toBeInTheDocument();
+      screen.queryByText("No leaderboard data available"),
+    ).not.toBeInTheDocument();
   });
 
   it("gives no count when the models got different distances", () => {

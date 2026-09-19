@@ -18,7 +18,6 @@ export { DeleteIconButton } from "./DeleteIconButton";
 export { DuplicateIconButton } from "./DuplicateIconButton";
 export { RerunIconButton } from "./RerunIconButton";
 export { StopRunButton } from "./StopRunButton";
-export { StoppedRunPill } from "./StoppedRunPill";
 export { PassFailCountPills } from "./PassFailCountPills";
 export { RunStateMark } from "./RunStateMark";
 export { PageSizeSelect } from "./PageSizeSelect";

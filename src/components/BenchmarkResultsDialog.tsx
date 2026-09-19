@@ -38,7 +38,13 @@ import {
   fetchTestCase,
   runErrorText,
 } from "@/lib/testRunApi";
-import { modelComparisonName, isRunStopped, runStateOf } from "@/lib/testTypes";
+import {
+  modelComparisonName,
+  isRunStopped,
+  isUnanswered,
+  rowVerdict,
+  runStateOf,
+} from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -57,10 +63,7 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import {
-  benchmarkAnsweredPassFail,
-  type BenchmarkLeaderboardSummaryRow,
-} from "@/lib/benchmarkEvaluatorSummary";
+import { type BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -694,6 +697,19 @@ export function BenchmarkResultsDialog({
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
+  // Tests the run did not answer, counted across every model, so the mark by
+  // the name says the run could not run everything rather than calling it
+  // finished. A row with no verdict on a run that has ended never ran either,
+  // which is what the runs list works out from each model's own counts.
+  const unansweredCount = modelResults.reduce(
+    (total, m) =>
+      total +
+      (m.test_results ?? []).filter(
+        (tr) =>
+          isUnanswered(tr) || rowVerdict(tr, wasStopped, isDone) === "not_run",
+      ).length,
+    0,
+  );
   // The row checkboxes exist only to feed the "Submit for labelling" button,
   // so they appear exactly when it does — never on a benchmark with nothing
   // that can be labelled.
@@ -769,6 +785,9 @@ export function BenchmarkResultsDialog({
                       stopped_early: stoppedEarly,
                       unanswered_tests: unansweredTests,
                       total_tests: unansweredTests + scoredTests,
+                      // The models' own counts, the same ones the runs list
+                      // reads, so the two marks cannot differ.
+                      model_results: modelResults,
                     }) ?? "finished"
                   }
                 />
