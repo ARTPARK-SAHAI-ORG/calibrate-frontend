@@ -26,7 +26,7 @@ import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { toast } from "sonner";
-import { NestedContainer } from "@/components/ui/NestedContainer";
+import { NestedContainer, ViewMoreToggle } from "@/components/ui";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -580,30 +580,10 @@ function AddBackChips({
         ))}
       </div>
       {(overflowing || expanded) && (
-        <button
-          type="button"
+        <ViewMoreToggle
+          expanded={expanded}
           onClick={() => setExpanded((e) => !e)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer"
-        >
-          {expanded ? "View less" : "View more"}
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d={
-                expanded
-                  ? "M4.5 15.75l7.5-7.5 7.5 7.5"
-                  : "M19.5 8.25l-7.5 7.5-7.5-7.5"
-              }
-            />
-          </svg>
-        </button>
+        />
       )}
     </div>
   );

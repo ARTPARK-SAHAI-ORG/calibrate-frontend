@@ -20,7 +20,12 @@ import {
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
-import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
+import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
+import {
+  PassFailCountPills,
+  RunStateMark,
+  ServerPaginatedListBar,
+} from "@/components/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -104,8 +109,6 @@ function RunResultPlaceholder() {
   return <span className="text-sm text-muted-foreground/70">No results</span>;
 }
 
-const PILL_CLASS =
-  "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium";
 
 /** The result pills for one run: running, error, or the per-test tally. */
 function RunResult({ run }: { run: AgentRun }) {
@@ -166,29 +169,11 @@ function RunResult({ run }: { run: AgentRun }) {
   }
 
   return (
-    <>
-      {breakdown.passed > 0 && (
-        <span
-          className={`${PILL_CLASS} bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500`}
-        >
-          {breakdown.passed} Success
-        </span>
-      )}
-      {breakdown.failed > 0 && (
-        <span
-          className={`${PILL_CLASS} bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500`}
-        >
-          {breakdown.failed} Fail
-        </span>
-      )}
-      {breakdown.unanswered > 0 && (
-        <span
-          className={`${PILL_CLASS} bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500`}
-        >
-          {breakdown.unanswered} Not run
-        </span>
-      )}
-    </>
+    <PassFailCountPills
+      passed={breakdown.passed}
+      failed={breakdown.failed}
+      unanswered={breakdown.unanswered}
+    />
   );
 }
 
