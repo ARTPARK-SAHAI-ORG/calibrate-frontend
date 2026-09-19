@@ -52,17 +52,9 @@ export type TraceSummary = {
   created_at: string;
   /** Latest scoring run for this trace. Absent when scoring has never run. */
   latest_run_status?: TraceScoringStatus | null;
-  /** One entry per evaluator on the latest completed run. Absent until the
-   *  backend sends it. */
-  scores?: TraceSummaryScore[] | null;
-};
-
-export type TraceSummaryScore = {
-  evaluator_uuid: string;
-  output_type: "binary" | "rating";
-  /** 0 or 1 for binary, the numeric score for rating. */
-  value: number;
-  passed: boolean;
+  /** One entry per evaluator on the latest completed run, the same shape a
+   *  scoring run carries. Empty until the run finishes. */
+  results?: TraceScoreResult[] | null;
 };
 
 /** Status of one durable trace-scoring run. */

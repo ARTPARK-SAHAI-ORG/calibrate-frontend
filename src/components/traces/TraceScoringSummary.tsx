@@ -11,7 +11,7 @@ export type TraceScoreColumn = { evaluator_uuid: string; name: string };
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 type Props = {
-  trace: Pick<TraceSummary, "latest_run_status" | "scores">;
+  trace: Pick<TraceSummary, "latest_run_status" | "results">;
   columns: TraceScoreColumn[];
   /** "row" is one grid cell per evaluator; "card" is a labelled block each. */
   layout: "row" | "card";
@@ -28,7 +28,7 @@ function ScoreValue({
   trace: Props["trace"];
   evaluatorUuid: string;
 }) {
-  const score = trace.scores?.find((s) => s.evaluator_uuid === evaluatorUuid);
+  const score = trace.results?.find((s) => s.evaluator_uuid === evaluatorUuid);
   if (!score) return DASH;
   if (score.output_type === "rating") {
     return <span className="text-sm text-foreground">{score.value}</span>;
