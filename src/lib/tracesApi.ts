@@ -301,6 +301,18 @@ export async function fetchTraceUsage(
   return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
+/** Queue every trace of this agent that has not been scored yet. */
+export async function scoreAgentTraces(
+  accessToken: string,
+  agentUuid: string,
+): Promise<{ queued: number }> {
+  return apiPost<{ queued: number }>(
+    `/agents/${encodeURIComponent(agentUuid)}/score-traces`,
+    accessToken,
+    {},
+  );
+}
+
 /**
  * The labels sent with this agent's traces, so the filter can offer them.
  * The list is server-paginated and holds one page, so the labels on screen

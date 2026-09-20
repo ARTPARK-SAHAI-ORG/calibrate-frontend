@@ -54,6 +54,7 @@ import {
   fetchTrace,
   fetchTraceUsage,
   fetchTraces,
+  scoreAgentTraces,
   type TraceUsage,
   type TraceDetail,
   type TraceOutputFilter,
@@ -158,6 +159,7 @@ export function TracesTabContent({
     prevPage,
     nextPage,
     refetch,
+    refetchSilently,
   } = useTraces({
     accessToken,
     agentId: agentUuid,
@@ -426,6 +428,27 @@ export function TracesTabContent({
   const [integrationGuideOpen, setIntegrationGuideOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Score every trace that arrived before scoring was turned on. The rows go
+  // to waiting once the list is read again, so the reader sees them queued.
+  const [isScoringPast, setIsScoringPast] = useState(false);
+  const scorePastTraces = async () => {
+    if (!accessToken) return;
+    setIsScoringPast(true);
+    try {
+      const { queued } = await scoreAgentTraces(accessToken, agentUuid);
+      await refetchSilently();
+      toast.success(
+        queued === 0
+          ? "Every trace has already been scored"
+          : `Queued ${queued} trace${queued === 1 ? "" : "s"} for scoring`,
+      );
+    } catch (err) {
+      reportError("Error scoring past traces:", err);
+      toast.error("Could not queue the traces for scoring. Please try again.");
+    } finally {
+      setIsScoringPast(false);
+    }
+  };
   const ineligible = traceScoring.eligibility?.ineligible ?? [];
   const eligibility = traceScoring.eligibility;
   const nothingCanScore =
@@ -712,6 +735,15 @@ export function TracesTabContent({
           >
             Integration guide
           </Button>
+          {traceScoring.enabled && (
+            <Button
+              variant="secondary"
+              isLoading={isScoringPast}
+              onClick={() => void scorePastTraces()}
+            >
+              Score past traces
+            </Button>
+          )}
         </div>
       )}
 

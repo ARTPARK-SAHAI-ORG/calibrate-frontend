@@ -354,6 +354,28 @@ describe("useTraces", () => {
     expect(result.current.total).toBe(0);
   });
 
+  it("re-reads the page quietly, without the loading state or dropping the rows", async () => {
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a", latest_run_status: null }], 1),
+    );
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+    mockFetchTraces.mockResolvedValueOnce(
+      page([{ uuid: "a", latest_run_status: "pending" }], 1),
+    );
+    const seenLoading: boolean[] = [];
+    await act(async () => {
+      const pending = result.current.refetchSilently();
+      seenLoading.push(result.current.isLoading);
+      await pending;
+    });
+    expect(seenLoading).toEqual([false]);
+    expect(result.current.items[0].latest_run_status).toBe("pending");
+  });
+
   it("ignores a superseded response so stale data never clobbers newer state", async () => {
     let resolveFirst: (v: unknown) => void = () => {};
     const first = new Promise((resolve) => {

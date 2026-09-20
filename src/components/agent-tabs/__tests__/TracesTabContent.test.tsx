@@ -35,10 +35,16 @@ jest.mock("../../../hooks", () => ({
 const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
 const fetchTraceUsage = jest.fn();
+const scoreAgentTraces = jest.fn<
+  Promise<{ queued: number }>,
+  [string, string]
+>();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
+  scoreAgentTraces: (token: string, agent: string) =>
+    scoreAgentTraces(token, agent),
   MAX_TRACES_PAGE_SIZE: 200,
 }));
 
@@ -291,6 +297,7 @@ const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
 });
 
 const refetch = jest.fn();
+const refetchSilently = jest.fn();
 
 function tracesResult(
   items: TraceSummary[],
@@ -310,6 +317,7 @@ function tracesResult(
     error: null,
     handleDeleted,
     refetch,
+    refetchSilently,
     hasPrev: false,
     hasNext: false,
     prevPage: jest.fn(),
@@ -494,6 +502,83 @@ describe("TracesTabContent", () => {
       expect(shared).not.toContainElement(
         screen.getByPlaceholderText("Search traces"),
       );
+    });
+
+    it("queues the past traces for scoring and reads the list again", async () => {
+      const user = setupUser();
+      let finish: (value: { queued: number }) => void = () => {};
+      scoreAgentTraces.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Score past traces" }),
+      );
+      expect(scoreAgentTraces).toHaveBeenCalledWith("test-token", "agent-1");
+      expect(
+        screen.getByRole("button", { name: "Score past traces" }),
+      ).toBeDisabled();
+      await act(async () => finish({ queued: 3 }));
+      expect(toast.success).toHaveBeenCalledWith("Queued 3 traces for scoring");
+      expect(refetchSilently).toHaveBeenCalled();
+      expect(
+        screen.getByRole("button", { name: "Score past traces" }),
+      ).toBeEnabled();
+    });
+
+    it("says so when every trace was already scored", async () => {
+      const user = setupUser();
+      scoreAgentTraces.mockResolvedValueOnce({ queued: 0 });
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Score past traces" }),
+      );
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith(
+          "Every trace has already been scored",
+        ),
+      );
+    });
+
+    it("reports a failure to queue the past traces", async () => {
+      const user = setupUser();
+      scoreAgentTraces.mockRejectedValueOnce(new Error("boom"));
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Score past traces" }),
+      );
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Could not queue the traces for scoring. Please try again.",
+        ),
+      );
+      expect(reportError).toHaveBeenCalled();
+      expect(refetchSilently).not.toHaveBeenCalled();
+    });
+
+    it("hides Score past traces while monitoring is off", () => {
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        screen.queryByRole("button", { name: "Score past traces" }),
+      ).not.toBeInTheDocument();
     });
 
     it("says the workspace hit its scoring limit, naming the number, with a way to ask for more", async () => {

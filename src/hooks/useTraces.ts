@@ -156,6 +156,12 @@ export function useTraces({
     return nextTotal === 0;
   }, [load, offset]);
 
+  /** Re-read this page without the loading state, so rows that were just
+   *  queued for scoring show as waiting while the table stays on screen. */
+  const refetchSilently = useCallback(async () => {
+    await load(offset, { silent: true });
+  }, [load, offset]);
+
   /** Re-ask for this page while any visible row is still waiting to be scored.
    *  One list request, never one per row. */
   const hasOpenScoring = items.some((t) =>
@@ -212,6 +218,7 @@ export function useTraces({
     isLoading,
     error,
     refetch,
+    refetchSilently,
     handleDeleted,
     hasPrev,
     hasNext,

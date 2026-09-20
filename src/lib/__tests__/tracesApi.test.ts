@@ -7,6 +7,7 @@ import {
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
+  scoreAgentTraces,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -254,6 +255,21 @@ describe("fetchTraceUsage", () => {
       max_scored_traces: 100,
     });
     expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
+  });
+});
+
+describe("scoreAgentTraces", () => {
+  it("POSTs to the agent's score-traces endpoint and returns the queued count", async () => {
+    mockApiPost.mockResolvedValue({ queued: 4 });
+
+    await expect(scoreAgentTraces("tok", "ag-1")).resolves.toEqual({
+      queued: 4,
+    });
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/agents/ag-1/score-traces",
+      "tok",
+      {},
+    );
   });
 });
 
