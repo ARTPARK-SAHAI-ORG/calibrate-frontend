@@ -39,7 +39,10 @@ export async function readNameConflictMessage(
   if (response.status !== 409) return null;
   try {
     const data = (await response.clone().json()) as { detail?: unknown };
-    if (typeof data?.detail === "string" && /already exists/i.test(data.detail)) {
+    if (
+      typeof data?.detail === "string" &&
+      /already exists/i.test(data.detail)
+    ) {
       return data.detail;
     }
   } catch {
@@ -175,6 +178,11 @@ function readDetail(body: DetailObject): string | undefined {
   const detail = body?.detail;
   if (typeof detail === "string" && detail.trim().length > 0) {
     return detail;
+  }
+  // A refusal with more to say: detail is { error: "...", ... }.
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const error = (detail as { error?: unknown }).error;
+    if (typeof error === "string" && error.trim().length > 0) return error;
   }
   // FastAPI 422 validation shape: detail is an array of { loc, msg, type }.
   if (Array.isArray(detail)) {

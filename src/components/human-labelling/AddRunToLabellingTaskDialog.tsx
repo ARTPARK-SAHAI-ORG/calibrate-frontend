@@ -76,8 +76,8 @@ export type ConversationLabellingResult = {
 };
 
 /**
- * One trace, pre-mapped by the Traces tab. Deliberately not imported from the
- * traces module so this dialog stays independent of it (as with the stt / tts
+ * One trace, pre-mapped by the Monitoring tab. Deliberately not imported
+ * from the traces module so this dialog stays independent of it (as with the stt / tts
  * / simulation rows): the caller maps its own rows into this shape.
  */
 export type TraceLabellingItem = {

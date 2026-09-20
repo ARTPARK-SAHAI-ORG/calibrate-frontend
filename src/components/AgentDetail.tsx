@@ -7,6 +7,8 @@ import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
+import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
+import { configWithTraceScoring, traceScoringEnabled } from "@/lib/tracesApi";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
   AgentTabContent,
@@ -94,7 +96,7 @@ type TabType =
   | "data-extraction"
   | "tests"
   | "runs"
-  | "traces"
+  | "monitoring"
   | "evaluators"
   | "settings";
 
@@ -105,7 +107,7 @@ const tabLabels: Record<TabType, string> = {
   "data-extraction": "Data extraction",
   tests: "Tests",
   runs: "Evaluations",
-  traces: "Traces",
+  monitoring: "Monitoring",
   evaluators: "Evaluators",
   settings: "Settings",
 };
@@ -121,7 +123,7 @@ const calibrateTabs: TabType[] = [
   "runs",
   "tests",
   "evaluators",
-  "traces",
+  "monitoring",
   "settings",
 ];
 // Connection sits next to Settings: it is set up once, while evaluations,
@@ -132,7 +134,7 @@ const connectionTabs: TabType[] = [
   "runs",
   "tests",
   "evaluators",
-  "traces",
+  "monitoring",
   "connection",
   "tools",
   "settings",
@@ -175,6 +177,28 @@ export function AgentDetail({
     captureResponse,
   } = usePageErrorState();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+  const traceScoring = useAgentTraceScoring({
+    accessToken: backendAccessToken,
+    agentUuid,
+    enabled: traceScoringEnabled(agent?.config),
+    config: agent?.config ?? {},
+    onEnabledChange: (enabled) => {
+      setAgent((current) =>
+        current
+          ? {
+              ...current,
+              config: configWithTraceScoring(current.config, enabled),
+            }
+          : current,
+      );
+      // A connection agent's Save sends this copy of the config back, so it
+      // must not hold the value the switch has just replaced.
+      setConnectionConfig(
+        (prev) => configWithTraceScoring(prev, enabled) as ConnectionConfig,
+      );
+    },
+    isActive: activeTab === "monitoring" || activeTab === "settings",
+  });
   // Keep-alive: track which tabs have been opened. Each tab is mounted the
   // first time it's opened and then hidden (not unmounted) when switching
   // away, so its fetched data and in-tab UI state (search, filters,
@@ -202,7 +226,7 @@ export function AgentDetail({
     }
   }, [hasRuns, activeTab, agent]);
 
-  // Bumped when the Traces tab turns traces into tests, so the Tests tab shows
+  // Bumped when the Monitoring tab turns traces into tests, so the Tests tab shows
   // them even when it was already open earlier in this visit.
   const [testsReloadKey, setTestsReloadKey] = useState(0);
 
@@ -1397,11 +1421,14 @@ export function AgentDetail({
         )}
 
         {/* Traces Tab Content */}
-        {shouldRenderTab("traces") && (
-          <div className={activeTab === "traces" ? undefined : "hidden"}>
+        {shouldRenderTab("monitoring") && (
+          <div className={activeTab === "monitoring" ? undefined : "hidden"}>
             <TracesTabContent
               agentUuid={agentUuid}
               agentNature={agent.interaction_type ?? "conversation"}
+              traceScoring={traceScoring}
+              onGoToEvaluators={() => performTabSwitch("evaluators")}
+              isActive={activeTab === "monitoring"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
               onAgentDefaultsAttached={() =>
@@ -1431,6 +1458,8 @@ export function AgentDetail({
               setAgentSpeaksFirst={setAgentSpeaksFirst}
               maxAssistantTurns={maxAssistantTurns}
               setMaxAssistantTurns={setMaxAssistantTurns}
+              traceScoring={traceScoring}
+              onGoToEvaluators={() => performTabSwitch("evaluators")}
             />
           </div>
         )}

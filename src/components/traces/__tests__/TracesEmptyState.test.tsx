@@ -233,7 +233,7 @@ it("hides optional fields by default and can show them with a toggle", async () 
   }
 
   await user.click(
-    screen.getByRole("switch", { name: "Include optional fields" }),
+    screen.getByRole("switch", { name: "Include optional fields in the code" }),
   );
 
   for (const language of ["Python", "JavaScript"]) {
@@ -269,6 +269,16 @@ it("explains every part of the request beside it", async () => {
   expect(optional).toHaveTextContent("message_id");
   expect(optional).toHaveTextContent("conversation_id");
   expect(optional).not.toHaveTextContent("agent_id");
+
+  // The snippet toggle sits after that list, switch before the words, the
+  // same way other include-this-in-the-example switches are drawn.
+  const includeSwitch = screen.getByRole("switch", {
+    name: "Include optional fields in the code",
+  });
+  expect(
+    screen.getByText("metadata").compareDocumentPosition(includeSwitch) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
 
 it("creates a key in step one and fills it into the snippet", async () => {
@@ -423,7 +433,7 @@ it("keeps the address in the request as code, not as a greyed out note", async (
   }
 
   await user.click(
-    screen.getByRole("switch", { name: "Include optional fields" }),
+    screen.getByRole("switch", { name: "Include optional fields in the code" }),
   );
   for (const language of ["Python", "JavaScript"]) {
     await user.click(screen.getByRole("button", { name: language }));
@@ -439,7 +449,7 @@ it("uses fill-in ids in the two optional ids, not ones to ship as they are", asy
   await openStepTwo(user);
 
   await user.click(
-    screen.getByRole("switch", { name: "Include optional fields" }),
+    screen.getByRole("switch", { name: "Include optional fields in the code" }),
   );
 
   for (const language of ["Python", "JavaScript"]) {

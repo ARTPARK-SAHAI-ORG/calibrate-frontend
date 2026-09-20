@@ -3,8 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
-import { useDialogNavKeys } from "@/hooks";
+import { useDialogNavKeys, useResizableWidth } from "@/hooks";
 import {
+  ResizeHandle,
   TestDetailView,
   ToolCallCard,
   normalizeToolCall,
@@ -14,14 +15,19 @@ import {
 import { Section } from "@/components/human-labelling/item-panes/shared";
 import {
   fetchTrace,
+  fetchTraceScores,
   traceInputTurns,
   TraceDetail,
   TraceMetadataEntry,
   TraceOutput,
+  TraceScoringRun,
   TraceTurn,
 } from "@/lib/tracesApi";
+import { isTraceScoringInProgress } from "@/lib/traceScoring";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 import { formatTraceDate } from "./TracesTable";
+import { TraceScorePanel } from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -33,6 +39,10 @@ type TraceDetailDialogProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** What each evaluator is for, by evaluator id. The scores a trace carries
+   *  name the evaluator but not what it judges, so the words come from the
+   *  agent's own evaluator list. */
+  evaluatorDescriptions?: Record<string, string>;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -196,7 +206,7 @@ function MetaBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** IDs (when present), created time, labels, and ingest metadata — the right
+/** IDs (when present), created time, labels, and ingest metadata — the left
  *  column. */
 function TraceMetaPanel({
   messageId,
@@ -265,7 +275,8 @@ function TraceMetaPanel({
 /**
  * Read-only detail view for one trace. Reuses the test-results conversation
  * renderer so history + the agent's final output look the same as a run;
- * ids, created time, and metadata sit in the right-hand column.
+ * ids, created time, and metadata sit in the left column and the latest
+ * scores in the right one, like the evaluators column of a test run.
  */
 export function TraceDetailDialog({
   isOpen,
@@ -277,6 +288,7 @@ export function TraceDetailDialog({
   hasPrev = false,
   hasNext = false,
   position,
+  evaluatorDescriptions,
   isSelected = false,
   onToggleSelected,
   selectedCount = 0,
@@ -292,7 +304,15 @@ export function TraceDetailDialog({
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only the newest run is drawn, so only that one is kept.
+  const [latestRun, setLatestRun] = useState<TraceScoringRun | null>(null);
+  const [scoresError, setScoresError] = useState<string | null>(null);
   const trace = isOpen && loaded?.uuid === traceUuid ? loaded.trace : null;
+  const visibleRun = loaded?.uuid === traceUuid ? latestRun : null;
+  const hasOpenScoreRun = isTraceScoringInProgress(visibleRun?.status);
+  // Nothing has tried to score this trace, so it gets no scores column at all
+  // rather than a wide empty one saying so.
+  const showScores = !!trace && (visibleRun !== null || scoresError !== null);
 
   useEffect(() => {
     if (!isOpen || !traceUuid || !accessToken) return;
@@ -301,9 +321,23 @@ export function TraceDetailDialog({
       setIsLoading(true);
       setError(null);
       setLoaded(null);
+      setLatestRun(null);
+      setScoresError(null);
       try {
-        const data = await fetchTrace(accessToken, traceUuid);
-        if (!cancelled) setLoaded({ uuid: traceUuid, trace: data });
+        const [data, scores] = await Promise.all([
+          fetchTrace(accessToken, traceUuid),
+          fetchTraceScores(accessToken, traceUuid).catch((err) => {
+            reportError("Error fetching trace scores:", err);
+            if (!cancelled) {
+              setScoresError("Could not load scores for this trace.");
+            }
+            return { runs: [] as TraceScoringRun[] };
+          }),
+        ]);
+        if (!cancelled) {
+          setLoaded({ uuid: traceUuid, trace: data });
+          setLatestRun(scores.runs?.[0] ?? null);
+        }
       } catch (err) {
         reportError("Error fetching trace:", err);
         if (!cancelled)
@@ -318,7 +352,27 @@ export function TraceDetailDialog({
     };
   }, [isOpen, traceUuid, accessToken]);
 
+  useEffect(() => {
+    if (!isOpen || !traceUuid || !accessToken || !hasOpenScoreRun) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const scores = await fetchTraceScores(accessToken, traceUuid);
+        if (!cancelled) setLatestRun(scores.runs?.[0] ?? null);
+      } catch (err) {
+        reportError("Error polling trace scores:", err);
+      }
+    };
+    const timer = window.setInterval(poll, POLLING_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
+
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
+  // Same width and limits as the evaluators column of the test results window.
+  const scoresPanel = useResizableWidth(512, 320, 720, "grow-left");
 
   const history = useMemo(
     () => (trace ? turnsToHistory(trace.input) : []),
@@ -398,6 +452,17 @@ export function TraceDetailDialog({
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
+          {trace && (
+            <div className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border overflow-y-auto shrink-0">
+              <TraceMetaPanel
+                messageId={trace.message_id}
+                conversationId={trace.conversation_id}
+                createdAt={trace.created_at}
+                labels={trace.labels ?? null}
+                metadata={trace.metadata}
+              />
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto min-w-0">
             {isLoading && (
               <div className="p-5 md:p-6">
@@ -420,17 +485,41 @@ export function TraceDetailDialog({
                   showVerdict={false}
                 />
               ))}
+            {/* Scores under the conversation on mobile only; on desktop
+                they sit in the right column, the way a test run's do. */}
+            {showScores && (
+              <div className="md:hidden border-t border-border">
+                <TraceScorePanel
+                  run={visibleRun}
+                  error={scoresError}
+                  descriptions={evaluatorDescriptions}
+                />
+              </div>
+            )}
           </div>
-          {trace && (
-            <div className="md:w-96 border-t md:border-t-0 md:border-l border-border overflow-y-auto shrink-0">
-              <TraceMetaPanel
-                messageId={trace.message_id}
-                conversationId={trace.conversation_id}
-                createdAt={trace.created_at}
-                labels={trace.labels ?? null}
-                metadata={trace.metadata}
+          {showScores && (
+            <>
+              <ResizeHandle
+                onMouseDown={scoresPanel.startDrag}
+                label="Resize scores panel"
               />
-            </div>
+              <div
+                style={
+                  {
+                    "--verdict-w": `${scoresPanel.width}px`,
+                  } as React.CSSProperties
+                }
+                className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
+              >
+                <div className="flex-1 overflow-y-auto">
+                  <TraceScorePanel
+                    run={visibleRun}
+                    error={scoresError}
+                    descriptions={evaluatorDescriptions}
+                  />
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

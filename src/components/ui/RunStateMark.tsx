@@ -96,19 +96,23 @@ const MARKS: Record<
 export function RunStateMark({
   state,
   className,
+  tooltip,
 }: {
   state: RunState;
   className?: string;
+  /** Overrides the built-in words, for callers whose states read differently. */
+  tooltip?: string;
 }) {
   const mark = MARKS[state];
+  const words = tooltip ?? mark.tooltip;
   return (
-    <Tooltip content={mark.tooltip} position="top">
+    <Tooltip content={words} position="top">
       <svg
         className={`w-4 h-4 shrink-0 ${mark.className} ${className ?? ""}`}
         viewBox="0 0 24 24"
         fill="none"
         role="img"
-        aria-label={mark.tooltip}
+        aria-label={words}
       >
         <circle cx="12" cy="12" r="10" fill="currentColor" />
         {mark.glyph}

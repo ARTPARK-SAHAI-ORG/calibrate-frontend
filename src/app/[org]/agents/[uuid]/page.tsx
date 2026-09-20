@@ -12,11 +12,7 @@ import {
   SaveIcon,
 } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
-import {
-  Breadcrumbs,
-  InteractionTypePill,
-  type Crumb,
-} from "@/components/ui";
+import { Breadcrumbs, InteractionTypePill, type Crumb } from "@/components/ui";
 
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
@@ -25,7 +21,7 @@ const tabDisplayNames: Record<string, string> = {
   tools: "Tools",
   "data-extraction": "Data Extraction",
   tests: "Tests",
-  traces: "Traces",
+  monitoring: "Monitoring",
   evaluators: "Evaluators",
   settings: "Settings",
 };
@@ -36,7 +32,7 @@ export default function AgentDetailPage() {
   const uuid = params.uuid as string;
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [headerState, setHeaderState] = useState<AgentDetailHeaderState | null>(
-    null
+    null,
   );
 
   // Set page title when agent name or tab changes
@@ -53,7 +49,7 @@ export default function AgentDetailPage() {
     (state: AgentDetailHeaderState) => {
       setHeaderState(state);
     },
-    []
+    [],
   );
 
   const crumbs: Crumb[] = [
@@ -96,33 +92,34 @@ export default function AgentDetailPage() {
           <CopyIcon className="w-4 h-4" />
           Duplicate
         </button>
-        {headerState.isConnectionUnverified && headerState.activeTab !== "connection" && (
-          <div className="relative">
-            <button
-              onClick={() => headerState.onVerify()}
-              disabled={headerState.isVerifying}
-              className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {headerState.isVerifying ? (
-                <>
-                  <SpinnerIcon className="w-4 h-4 animate-spin" />
-                  <span>Verifying...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon className="w-4 h-4" />
-                  <span>Verify</span>
-                </>
-              )}
-            </button>
+        {headerState.isConnectionUnverified &&
+          headerState.activeTab !== "connection" && (
+            <div className="relative">
+              <button
+                onClick={() => headerState.onVerify()}
+                disabled={headerState.isVerifying}
+                className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {headerState.isVerifying ? (
+                  <>
+                    <SpinnerIcon className="w-4 h-4 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="w-4 h-4" />
+                    <span>Verify</span>
+                  </>
+                )}
+              </button>
 
-            <VerifyErrorPopover
-              error={headerState.verifyError}
-              sampleResponse={headerState.verifySampleResponse}
-              onDismiss={() => headerState.onDismissVerifyError()}
-            />
-          </div>
-        )}
+              <VerifyErrorPopover
+                error={headerState.verifyError}
+                sampleResponse={headerState.verifySampleResponse}
+                onDismiss={() => headerState.onDismissVerifyError()}
+              />
+            </div>
+          )}
         <button
           data-tour="agent-save"
           onClick={() => headerState.onSave()}

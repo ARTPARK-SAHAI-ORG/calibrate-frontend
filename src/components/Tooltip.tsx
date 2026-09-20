@@ -8,6 +8,12 @@ type TooltipProps = {
   children: React.ReactNode;
   position?: "top" | "bottom" | "left" | "right";
   className?: string;
+  /** Above or below, line the popup's right edge up with the trigger's own
+   *  instead of centring it. For a wide popup near the right of the window. */
+  alignEnd?: boolean;
+  /** Styles on the popup itself. Use this for width: a utility class would
+   *  fight the built-in cap and lose, depending on stylesheet order. */
+  contentStyle?: React.CSSProperties;
 };
 
 export function Tooltip({
@@ -15,6 +21,8 @@ export function Tooltip({
   children,
   position = "top",
   className = "",
+  alignEnd = false,
+  contentStyle,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   // `side` is the side the popup ended up on, which is not always the one
@@ -33,28 +41,41 @@ export function Tooltip({
   // links can be read and reached.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = () => {
+  // Cleared and forgotten together, so "is a close pending" stays truthful.
+  const cancelClose = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  const show = () => {
+    cancelClose();
     setIsVisible(true);
   };
   const hide = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setIsVisible(false), 150);
+    cancelClose();
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null;
+      setIsVisible(false);
+    }, 150);
   };
   const hideNow = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
+    cancelClose();
     setIsVisible(false);
   };
 
   useEffect(
     () => () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
+      closeTimer.current = null;
     },
     [],
   );
 
   const updateTooltipPosition = () => {
     if (!triggerRef.current) return;
+    // A click has already asked this to close and the popup is living out its
+    // grace period. Re-measuring now can catch the trigger mid-teardown, e.g.
+    // its tab being hidden, and park the popup in the corner on the way out.
+    if (closeTimer.current) return;
 
     const rect = triggerRef.current.getBoundingClientRect();
     const tooltipHeight = tooltipRef.current?.offsetHeight || 0;
@@ -68,9 +89,11 @@ export function Tooltip({
     // top of the thing it describes, hiding it and leaving the arrow
     // pointing at nothing.
     const fitsAbove = rect.top - tooltipHeight - 8 >= padding;
-    const fitsBelow = rect.bottom + 8 + tooltipHeight <= window.innerHeight - padding;
+    const fitsBelow =
+      rect.bottom + 8 + tooltipHeight <= window.innerHeight - padding;
     const fitsLeft = rect.left - tooltipWidth - 8 >= padding;
-    const fitsRight = rect.right + 8 + tooltipWidth <= window.innerWidth - padding;
+    const fitsRight =
+      rect.right + 8 + tooltipWidth <= window.innerWidth - padding;
 
     let side = position;
     if (position === "top" && !fitsAbove && fitsBelow) side = "bottom";
@@ -81,11 +104,11 @@ export function Tooltip({
     switch (side) {
       case "top":
         top = rect.top - tooltipHeight - 8;
-        left = rect.left + rect.width / 2;
+        left = alignEnd ? rect.right : rect.left + rect.width / 2;
         break;
       case "bottom":
         top = rect.bottom + 8;
-        left = rect.left + rect.width / 2;
+        left = alignEnd ? rect.right : rect.left + rect.width / 2;
         break;
       case "left":
         top = rect.top + rect.height / 2;
@@ -97,11 +120,13 @@ export function Tooltip({
         break;
     }
 
-    // Clamp horizontal position to keep tooltip within viewport
+    // Clamp horizontal position to keep tooltip within viewport. What `left`
+    // means depends on the alignment: the popup's centre, or its right edge.
     if (side === "top" || side === "bottom") {
-      const halfWidth = tooltipWidth / 2;
-      const minLeft = halfWidth + padding;
-      const maxLeft = window.innerWidth - halfWidth - padding;
+      const before = alignEnd ? tooltipWidth : tooltipWidth / 2;
+      const after = alignEnd ? 0 : tooltipWidth / 2;
+      const minLeft = before + padding;
+      const maxLeft = window.innerWidth - after - padding;
       left = Math.max(minLeft, Math.min(maxLeft, left));
     } else {
       // For left/right positions, ensure tooltip doesn't go off horizontally
@@ -126,7 +151,7 @@ export function Tooltip({
     if (isVisible) {
       // Initial position calculation
       updateTooltipPosition();
-      
+
       // Update position after tooltip renders to get accurate dimensions
       const timeoutId = setTimeout(() => {
         updateTooltipPosition();
@@ -134,7 +159,7 @@ export function Tooltip({
 
       window.addEventListener("scroll", updateTooltipPosition, true);
       window.addEventListener("resize", updateTooltipPosition);
-      
+
       return () => {
         clearTimeout(timeoutId);
         window.removeEventListener("scroll", updateTooltipPosition, true);
@@ -168,15 +193,26 @@ export function Tooltip({
         left: `${tooltipPosition.left}px`,
         transform:
           tooltipPosition.side === "top" || tooltipPosition.side === "bottom"
-            ? "translateX(-50%)"
+            ? alignEnd
+              ? "translateX(-100%)"
+              : "translateX(-50%)"
             : "translateY(-50%)",
       }}
     >
-      <div className="px-3 py-2 text-xs text-gray-900 bg-white rounded-lg shadow-lg whitespace-normal break-words max-w-64 w-max">
+      <div
+        className={`px-3 py-2 text-xs text-gray-900 bg-white rounded-lg shadow-lg whitespace-normal break-words max-w-64 w-max`}
+        style={contentStyle}
+      >
         {content}
         {/* Arrow */}
         <div
-          className={`absolute ${arrowClasses[tooltipPosition.side]}`}
+          className={`absolute ${arrowClasses[tooltipPosition.side]} ${
+            alignEnd &&
+            (tooltipPosition.side === "top" ||
+              tooltipPosition.side === "bottom")
+              ? "left-auto right-4 translate-x-0"
+              : ""
+          }`}
         ></div>
       </div>
     </div>

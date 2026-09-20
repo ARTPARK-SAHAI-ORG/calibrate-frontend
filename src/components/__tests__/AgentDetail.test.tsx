@@ -133,12 +133,25 @@ jest.mock("../agent-tabs", () => ({
   },
   TracesTabContent: (props: any) => (
     <div data-testid="traces-tab-content">
-      TracesTabContent-{props.agentUuid}
+      TracesTabContent-{props.agentUuid}-
+      {props.traceScoring?.enabled ? "scoring" : "off"}-
+      {props.isActive ? "active" : "hidden"}
+      <button type="button" onClick={() => props.onGoToSettings?.()}>
+        GoToSettings
+      </button>
     </div>
   ),
-  SettingsTabContent: () => (
-    <div data-testid="settings-tab-content">SettingsTabContent</div>
+  SettingsTabContent: (props: any) => (
+    <div data-testid="settings-tab-content">
+      SettingsTabContent-{props.traceScoring?.enabled ? "scoring" : "off"}
+    </div>
   ),
+}));
+
+const useAgentTraceScoringMock = jest.fn();
+jest.mock("../../hooks/useAgentTraceScoring", () => ({
+  __esModule: true,
+  useAgentTraceScoring: (args: any) => useAgentTraceScoringMock(args),
 }));
 
 jest.mock("../VerifyErrorPopover", () => ({
@@ -283,6 +296,16 @@ beforeEach(() => {
     hasRuns: true,
     markHasRuns: jest.fn(),
   });
+  useAgentTraceScoringMock.mockReset();
+  useAgentTraceScoringMock.mockImplementation((args: any) => ({
+    enabled: args.enabled,
+    saving: false,
+    setEnabled: jest.fn(),
+    eligibility: null,
+    eligibilityError: null,
+    saveError: null,
+    enableBlocked: false,
+  }));
   (signOut as jest.Mock).mockClear();
   jest.useRealTimers();
 });
@@ -307,7 +330,7 @@ describe("AgentDetail", () => {
     // Data extraction tab is temporarily hidden (extraction UI removed for now)
     expect(screen.queryByText("Data extraction")).not.toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
-    expect(screen.getByText("Traces")).toBeInTheDocument();
+    expect(screen.getByText("Monitoring")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
@@ -324,7 +347,7 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Verify")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
-    expect(screen.getByText("Traces")).toBeInTheDocument();
+    expect(screen.getByText("Monitoring")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
@@ -417,7 +440,7 @@ describe("AgentDetail", () => {
           "Evaluations",
           "Tests",
           "Evaluators",
-          "Traces",
+          "Monitoring",
           "Connection",
           "Tools",
           "Settings",
@@ -427,7 +450,7 @@ describe("AgentDetail", () => {
       "Evaluations",
       "Tests",
       "Evaluators",
-      "Traces",
+      "Monitoring",
       "Connection",
       "Tools",
       "Settings",
@@ -451,7 +474,7 @@ describe("AgentDetail", () => {
           "Evaluations",
           "Tests",
           "Evaluators",
-          "Traces",
+          "Monitoring",
           "Settings",
         ].includes(label ?? ""),
       );
@@ -461,7 +484,7 @@ describe("AgentDetail", () => {
       "Evaluations",
       "Tests",
       "Evaluators",
-      "Traces",
+      "Monitoring",
       "Settings",
     ]);
   });
@@ -485,9 +508,9 @@ describe("AgentDetail", () => {
     );
     expectVisibleTab("tests-tab-content", "tools-tab-content");
 
-    await user.click(screen.getByText("Traces"));
+    await user.click(screen.getByText("Monitoring"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
-      `TracesTabContent-${buildAgent.uuid}`,
+      `TracesTabContent-${buildAgent.uuid}-scoring-active`,
     );
     expectVisibleTab("traces-tab-content", "tests-tab-content");
 
@@ -500,6 +523,54 @@ describe("AgentDetail", () => {
     await user.click(screen.getByText("Agent"));
     expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument();
     expectVisibleTab("agent-tab-content", "settings-tab-content");
+  });
+
+  it("hands one trace scoring control to the Traces and Settings tabs", async () => {
+    mockFetchSequenceForAgent({
+      ...buildAgent,
+      config: {
+        ...buildAgent.config,
+        traces: { scoring: { enabled: true } },
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        agentUuid: buildAgent.uuid,
+        enabled: true,
+        isActive: false,
+      }),
+    );
+
+    await user.click(screen.getByText("Monitoring"));
+    expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
+      `TracesTabContent-${buildAgent.uuid}-scoring-active`,
+    );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isActive: true }),
+    );
+
+    // Settings shows the same control, with the switch on it.
+    await user.click(screen.getByText("Settings"));
+    expectVisibleTab("settings-tab-content", "traces-tab-content");
+    expect(screen.getByTestId("settings-tab-content")).toHaveTextContent(
+      "SettingsTabContent-scoring",
+    );
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isActive: true }),
+    );
+
+    // A toggle reports back through onEnabledChange and the agent follows.
+    const { onEnabledChange } = useAgentTraceScoringMock.mock.calls.at(-1)[0];
+    act(() => onEnabledChange(false));
+    expect(useAgentTraceScoringMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
   });
 
   it("passes the agent's nature down to the Tests and Evaluators tabs", async () => {
@@ -565,9 +636,9 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByText("Traces"));
+    await user.click(screen.getByText("Monitoring"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
-      `TracesTabContent-${connectionAgent.uuid}`,
+      `TracesTabContent-${connectionAgent.uuid}-scoring-active`,
     );
     expectVisibleTab("traces-tab-content", "runs-tab-content");
 
@@ -710,7 +781,9 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -742,7 +815,9 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -878,7 +953,9 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
 
     alertSpy.mockRestore();
@@ -970,7 +1047,9 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
 
     alertSpy.mockRestore();
@@ -1489,7 +1568,9 @@ describe("AgentDetail — turning benchmarking on from the Tests tab", () => {
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-verified-models")).toHaveTextContent("");
 
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(connectionAgent));
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(connectionAgent),
+    );
     await user.click(screen.getByText("VerifyModelFromTests"));
 
     expect(screen.getByTestId("tests-verified-models")).toHaveTextContent(

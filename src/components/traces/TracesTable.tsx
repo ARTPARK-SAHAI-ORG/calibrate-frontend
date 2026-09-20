@@ -5,6 +5,11 @@ import { ToolIcon } from "@/components/icons";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
+import {
+  TraceScoreCells,
+  TraceScoreMark,
+  type TraceScoreColumn,
+} from "./TraceScoringSummary";
 
 type CheckboxProps = {
   checked: boolean;
@@ -25,6 +30,9 @@ type TracesTableProps = {
   onOpen: (traceUuid: string) => void;
   /** Ask to delete a single trace. */
   onDelete: (trace: TraceSummary) => void;
+  /** One column per evaluator that scores this agent's traces. None hides
+   *  the score columns altogether. */
+  scoreColumns?: TraceScoreColumn[];
 };
 
 export function formatTraceDate(value: string): string {
@@ -123,14 +131,15 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-const ROW_GRID =
-  "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_160px_auto] gap-4 px-4";
-
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
  * detail view. Desktop markup matches the other resource lists (CSS grid,
  * not an HTML table).
  */
+// Tailwind only compiles class names it can read in the source, so the column
+// widths are an inline style; everything fixed stays a class.
+const ROW_CLASS = "grid gap-4 px-4 min-w-max";
+
 export function TracesTable({
   traces,
   checkboxProps,
@@ -139,12 +148,29 @@ export function TracesTable({
   onToggleSelectAll,
   onOpen,
   onDelete,
+  scoreColumns = [],
 }: TracesTableProps) {
+  // Each evaluator column is as wide as its own name, in the same template for
+  // every row, so nothing is cut and the columns still line up.
+  const evaluatorTracks = scoreColumns
+    .map((column) => `${Math.max(10, column.name.length + 1)}ch`)
+    .join(" ");
+  const ROW_STYLE = {
+    // Every track is a fixed width, because each row is its own grid: a track
+    // sized to its content would come out different on every row and the
+    // columns would not line up. The table scrolls sideways instead.
+    gridTemplateColumns: `40px 400px 400px${
+      evaluatorTracks ? ` ${evaluatorTracks}` : ""
+    } 160px auto`,
+  };
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className={`${ROW_GRID} py-2 border-b border-border bg-muted/30 items-center`}>
+      <div className="hidden md:block border border-border rounded-xl overflow-x-auto">
+        <div
+          style={ROW_STYLE}
+          className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
+        >
           <div className="flex items-center">
             <SelectCheckbox
               checked={allSelected}
@@ -154,8 +180,20 @@ export function TracesTable({
             />
           </div>
           <div className="text-sm font-medium text-muted-foreground">Input</div>
-          <div className="text-sm font-medium text-muted-foreground">Output</div>
-          <div className="text-sm font-medium text-muted-foreground">Created</div>
+          <div className="text-sm font-medium text-muted-foreground">
+            Output
+          </div>
+          {scoreColumns.map((column) => (
+            <div
+              key={column.evaluator_uuid}
+              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+            >
+              {column.name}
+            </div>
+          ))}
+          <div className="text-sm font-medium text-muted-foreground">
+            Created
+          </div>
           <div className="w-8" />
         </div>
         {traces.map((trace) => {
@@ -163,12 +201,14 @@ export function TracesTable({
             <div
               key={trace.uuid}
               onClick={() => onOpen(trace.uuid)}
-              className={`${ROW_GRID} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              style={ROW_STYLE}
+              className={`${ROW_CLASS} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
             >
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex items-center gap-2">
+                <TraceScoreMark trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
@@ -178,6 +218,11 @@ export function TracesTable({
               <div className="min-w-0">
                 <TraceOutputCell trace={trace} />
               </div>
+              <TraceScoreCells
+                trace={trace}
+                columns={scoreColumns}
+                layout="row"
+              />
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 {formatTraceDate(trace.created_at)}
               </div>
@@ -196,36 +241,42 @@ export function TracesTable({
       <div className="md:hidden space-y-3">
         {traces.map((trace) => {
           return (
-          <div
-            key={trace.uuid}
-            onClick={() => onOpen(trace.uuid)}
-            className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {trace.input_preview && (
-                  <p className="text-sm font-medium text-foreground line-clamp-2">
-                    {trace.input_preview}
-                  </p>
-                )}
+            <div
+              key={trace.uuid}
+              onClick={() => onOpen(trace.uuid)}
+              className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex items-start gap-2">
+                  <TraceScoreMark trace={trace} />
+                  {trace.input_preview && (
+                    <p className="text-sm font-medium text-foreground line-clamp-2">
+                      {trace.input_preview}
+                    </p>
+                  )}
+                </div>
+                <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <SelectCheckbox {...checkboxProps(trace)} />
-            </div>
-            <div className="mt-2">
-              <TraceOutputCell trace={trace} />
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-muted-foreground">
-                {formatTraceDate(trace.created_at)}
-              </span>
-              <div className="ml-auto">
-                <DeleteIconButton
-                  onClick={() => onDelete(trace)}
-                  title="Delete trace"
-                />
+              <div className="mt-2">
+                <TraceOutputCell trace={trace} />
+              </div>
+              <TraceScoreCells
+                trace={trace}
+                columns={scoreColumns}
+                layout="card"
+              />
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-muted-foreground">
+                  {formatTraceDate(trace.created_at)}
+                </span>
+                <div className="ml-auto">
+                  <DeleteIconButton
+                    onClick={() => onDelete(trace)}
+                    title="Delete trace"
+                  />
+                </div>
               </div>
             </div>
-          </div>
           );
         })}
       </div>

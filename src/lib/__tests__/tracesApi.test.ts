@@ -2,28 +2,37 @@ import {
   fetchTraces,
   fetchTrace,
   fetchTraceLabels,
+  fetchTraceScores,
+  fetchTraceScoringEligibility,
+  setAgentTraceScoring,
+  configWithTraceScoring,
+  fetchTraceUsage,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
   validateApiKeyForAgent,
   traceInputTurns,
   MAX_TRACES_PAGE_SIZE,
+  type TraceScoreAverage,
 } from "../tracesApi";
-import { apiGet, apiPost } from "../api";
+import { apiGet, apiPost, apiPut } from "../api";
 
 jest.mock("../api", () => ({
   __esModule: true,
   apiGet: jest.fn(),
   apiPost: jest.fn(),
+  apiPut: jest.fn(),
   getBackendUrl: jest.fn(() => "https://api.example.com"),
 }));
 
 const mockApiGet = apiGet as jest.Mock;
 const mockApiPost = apiPost as jest.Mock;
+const mockApiPut = apiPut as jest.Mock;
 
 beforeEach(() => {
   mockApiGet.mockReset();
   mockApiPost.mockReset();
+  mockApiPut.mockReset();
 });
 
 describe("fetchTraces", () => {
@@ -161,6 +170,90 @@ describe("fetchTrace", () => {
 
     expect(mockApiGet).toHaveBeenCalledWith("/traces/t1", "tok");
     expect(result).toEqual({ uuid: "t1" });
+  });
+});
+
+describe("fetchTraceScores", () => {
+  it("GETs the full scoring history, newest first", async () => {
+    const payload = { runs: [{ run_uuid: "r1", status: "completed" }] };
+    mockApiGet.mockResolvedValue(payload);
+
+    await expect(fetchTraceScores("tok", "t1")).resolves.toBe(payload);
+    expect(mockApiGet).toHaveBeenCalledWith("/traces/t1/scores", "tok");
+  });
+});
+
+describe("fetchTraceScoringEligibility", () => {
+  it("GETs the JWT eligibility partition for the agent", async () => {
+    const payload = { eligible: [], ineligible: [] };
+    mockApiGet.mockResolvedValue(payload);
+
+    await expect(fetchTraceScoringEligibility("tok", "ag-1")).resolves.toBe(
+      payload,
+    );
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/agents/ag-1/trace-scoring-eligibility",
+      "tok",
+    );
+  });
+});
+
+describe("configWithTraceScoring", () => {
+  it("keeps everything already stored, inside and outside the traces block", () => {
+    expect(
+      configWithTraceScoring(
+        {
+          system_prompt: "hi",
+          traces: { retention_days: 30, scoring: { last_run: "x" } },
+        },
+        true,
+      ),
+    ).toEqual({
+      system_prompt: "hi",
+      traces: {
+        retention_days: 30,
+        scoring: { last_run: "x", enabled: true },
+      },
+    });
+  });
+
+  it("builds the block when the config has never held one", () => {
+    expect(configWithTraceScoring({ system_prompt: "hi" }, false)).toEqual({
+      system_prompt: "hi",
+      traces: { scoring: { enabled: false } },
+    });
+  });
+});
+
+describe("setAgentTraceScoring", () => {
+  it("sends the stored config back with the setting changed", async () => {
+    mockApiPut.mockResolvedValue({ trace_scoring_enabled: true });
+
+    await expect(
+      setAgentTraceScoring("tok", "ag-1", { system_prompt: "hi" }, true),
+    ).resolves.toEqual({ trace_scoring_enabled: true });
+    expect(mockApiPut).toHaveBeenCalledWith("/agents/ag-1", "tok", {
+      config: { system_prompt: "hi", traces: { scoring: { enabled: true } } },
+    });
+  });
+});
+
+describe("fetchTraceUsage", () => {
+  it("reads how much of the workspace limits is used", async () => {
+    mockApiGet.mockResolvedValue({
+      traces_stored: 412,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+
+    await expect(fetchTraceUsage("tok")).resolves.toEqual({
+      traces_stored: 412,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+    expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
   });
 });
 
@@ -484,5 +577,78 @@ describe("traceInputTurns", () => {
     expect(traceInputTurns("   ")).toEqual([]);
     expect(traceInputTurns(null)).toEqual([]);
     expect(traceInputTurns(undefined)).toEqual([]);
+  });
+});
+
+describe("fetchTraces score averages", () => {
+  it("asks for the averages only when they are wanted", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      includeScoreAverages: true,
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get(
+        "include_score_averages",
+      ),
+    ).toBe("true");
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 50,
+      agentId: "ag-1",
+      includeScoreAverages: false,
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has(
+        "include_score_averages",
+      ),
+    ).toBe(false);
+
+    await fetchTraces("tok", { limit: 50, offset: 50, agentId: "ag-1" });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[2][0].split("?")[1]).has(
+        "include_score_averages",
+      ),
+    ).toBe(false);
+  });
+
+  it("hands back the averages the backend sent", async () => {
+    const score_averages: TraceScoreAverage[] = [
+      {
+        evaluator_uuid: "ev-1",
+        name: "Tone",
+        output_type: "binary",
+        traces_scored: 40,
+        average: 0.75,
+      },
+      {
+        evaluator_uuid: "ev-2",
+        name: "Helpfulness",
+        output_type: "rating",
+        traces_scored: 40,
+        average: 3.5,
+        scale_min: 1,
+        scale_max: 5,
+      },
+    ];
+    mockApiGet.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+      score_averages,
+    });
+
+    const result = await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      includeScoreAverages: true,
+    });
+    expect(result.score_averages).toEqual(score_averages);
   });
 });

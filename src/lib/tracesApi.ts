@@ -1,4 +1,4 @@
-import { apiGet, apiPost, getBackendUrl, Paginated } from "./api";
+import { apiGet, apiPost, apiPut, getBackendUrl, Paginated } from "./api";
 
 /** One turn of stored conversation history, OpenAI chat format. Extra keys
  *  (`tool_calls`, `tool_call_id`, `name`, ...) are preserved by the backend
@@ -50,6 +50,57 @@ export type TraceSummary = {
   tool_call_count: number;
   metadata_count: number;
   created_at: string;
+  /** Latest scoring run for this trace. Absent when scoring has never run. */
+  latest_run_status?: TraceScoringStatus | null;
+  /** Why the latest run was skipped or failed, e.g. "over_limit". */
+  latest_run_error?: string | null;
+  /** One entry per evaluator on the latest completed run, the same shape a
+   *  scoring run carries. Empty until the run finishes. */
+  results?: TraceScoreResult[] | null;
+};
+
+/** Status of one durable trace-scoring run. */
+export type TraceScoringStatus =
+  "pending" | "processing" | "completed" | "failed" | "skipped";
+
+export type TraceScoreResult = {
+  evaluator_uuid: string;
+  name: string;
+  output_type: "binary" | "rating";
+  scale_min?: number | null;
+  scale_max?: number | null;
+  /** The judged result: 0 or 1 for binary, the numeric score for rating. */
+  value: number;
+  reasoning?: string | null;
+  passed: boolean;
+};
+
+export type TraceScoringRun = {
+  run_uuid: string;
+  status: TraceScoringStatus;
+  created_at: string;
+  completed_at?: string | null;
+  error?: string | null;
+  results: TraceScoreResult[];
+};
+
+export type TraceScoringIneligibleReason =
+  "wrong_type_for_agent" | "no_live_version" | "declares_variables";
+
+export type TraceScoringEligibleEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+};
+
+export type TraceScoringIneligibleEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+  reason: TraceScoringIneligibleReason;
+};
+
+export type TraceScoringEligibility = {
+  eligible: TraceScoringEligibleEvaluator[];
+  ineligible: TraceScoringIneligibleEvaluator[];
 };
 
 export type TraceDetail = {
@@ -90,6 +141,22 @@ export type TraceOutputType = "response" | "tool_call";
 /** The output filter, where "all" means no filter at all. */
 export type TraceOutputFilter = "all" | TraceOutputType;
 
+/** One evaluator's running average across every trace the filters match, not
+ *  just the page. A yes-or-no evaluator averages ones and zeros, so its mean
+ *  is the share that passed. */
+export type TraceScoreAverage = {
+  evaluator_uuid: string;
+  name: string;
+  output_type: "binary" | "rating";
+  /** How many traces this evaluator has scored. */
+  traces_scored: number;
+  /** The mean of its scores. A yes-or-no evaluator averages ones and zeros,
+   *  so this is the share that passed. */
+  average: number;
+  scale_min?: number | null;
+  scale_max?: number | null;
+};
+
 export type TraceListParams = {
   limit: number;
   offset: number;
@@ -103,6 +170,9 @@ export type TraceListParams = {
    *  output has tool calls and no reply ("tool_call"). "all" keeps everything
    *  and is left off here. */
   outputType?: TraceOutputFilter;
+  /** Ask for `score_averages` beside the page. Costly, so only when the
+   *  filters change rather than on every page or poll. */
+  includeScoreAverages?: boolean;
   /** Keep only traces carrying any of these labels, matched exactly and
    *  case-sensitively. An empty list is left off here. */
   labels?: string[];
@@ -116,8 +186,16 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q, outputType, labels }: TraceListParams,
-): Promise<Paginated<TraceSummary>> {
+  {
+    limit,
+    offset,
+    agentId,
+    q,
+    outputType,
+    labels,
+    includeScoreAverages,
+  }: TraceListParams,
+): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
@@ -127,10 +205,12 @@ export async function fetchTraces(
     params.set("output_type", outputType);
   }
   for (const label of labels ?? []) params.append("labels", label);
-  return apiGet<Paginated<TraceSummary>>(
-    `/traces?${params.toString()}`,
-    accessToken,
-  );
+  // Averages read every matching trace, not the page, so they are asked for
+  // when the filters change and left off while paging through the result.
+  if (includeScoreAverages) params.set("include_score_averages", "true");
+  return apiGet<
+    Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }
+  >(`/traces?${params.toString()}`, accessToken);
 }
 
 /** Fetch one trace with its full conversation history, output, and metadata. */
@@ -139,6 +219,86 @@ export async function fetchTrace(
   traceUuid: string,
 ): Promise<TraceDetail> {
   return apiGet<TraceDetail>(`/traces/${traceUuid}`, accessToken);
+}
+
+/** Every scoring run for this trace, newest first. */
+export async function fetchTraceScores(
+  accessToken: string,
+  traceUuid: string,
+): Promise<{ runs: TraceScoringRun[] }> {
+  return apiGet<{ runs: TraceScoringRun[] }>(
+    `/traces/${encodeURIComponent(traceUuid)}/scores`,
+    accessToken,
+  );
+}
+
+/** JWT-only: which linked evaluators can score this agent's traces. */
+export async function fetchTraceScoringEligibility(
+  accessToken: string,
+  agentUuid: string,
+): Promise<TraceScoringEligibility> {
+  return apiGet<TraceScoringEligibility>(
+    `/agents/${encodeURIComponent(agentUuid)}/trace-scoring-eligibility`,
+    accessToken,
+  );
+}
+
+/**
+ * The setting's home inside the agent's config. Saving replaces the whole
+ * config rather than merging it, so everything already stored alongside the
+ * setting is carried over. The one place that knows the path.
+ */
+export function configWithTraceScoring(
+  storedConfig: Record<string, unknown>,
+  enabled: boolean,
+): Record<string, unknown> {
+  const traces = (storedConfig.traces ?? {}) as Record<string, unknown>;
+  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
+  return {
+    ...storedConfig,
+    traces: { ...traces, scoring: { ...scoring, enabled } },
+  };
+}
+
+/**
+ * Whether this agent scores its new traces, read from its config the way the
+ * backend reads it: on unless it was explicitly turned off. Read from the
+ * config rather than a field beside it, because not every answer carries one.
+ */
+export function traceScoringEnabled(
+  config: Record<string, unknown> | null | undefined,
+): boolean {
+  const traces = (config?.traces ?? {}) as Record<string, unknown>;
+  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
+  return scoring.enabled !== false;
+}
+
+/** Turn automatic scoring of newly ingested traces on or off. */
+export async function setAgentTraceScoring(
+  accessToken: string,
+  agentUuid: string,
+  storedConfig: Record<string, unknown>,
+  enabled: boolean,
+): Promise<{ config?: Record<string, unknown> }> {
+  return apiPut<{ config?: Record<string, unknown> }>(
+    `/agents/${encodeURIComponent(agentUuid)}`,
+    accessToken,
+    { config: configWithTraceScoring(storedConfig, enabled) },
+  );
+}
+
+/** How many traces this workspace has stored and scored, against its limits. */
+export type TraceUsage = {
+  traces_stored: number;
+  max_traces: number;
+  traces_scored: number;
+  max_scored_traces: number;
+};
+
+export async function fetchTraceUsage(
+  accessToken: string,
+): Promise<TraceUsage> {
+  return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
 /**

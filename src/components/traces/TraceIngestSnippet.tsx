@@ -86,17 +86,21 @@ function FieldList({
 /**
  * The request that sends one trace, in the reader's language of choice, beside
  * what each field means. Used by the setup steps before the first trace lands
- * and by the "View code" dialog afterwards, so both show the same thing.
+ * and by the "Integration guide" dialog afterwards, so both show the same thing.
  */
 export function TraceIngestSnippet({
   agentUuid,
   apiKey,
   agentNature = "conversation",
+  fillHeight = false,
 }: {
   agentUuid: string;
   /** The key created during setup, when there is one. */
   apiKey?: string | null;
   agentNature?: AgentNature;
+  /** Fit a fixed-height box: the code stays put and the notes scroll beside
+   *  it. Off on the setup steps, where the page scrolls as one. */
+  fillHeight?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [language, setLanguage] = useState<SnippetLanguage>("curl");
@@ -126,29 +130,12 @@ export function TraceIngestSnippet({
   return (
     // The code gets the larger share: a key and a URL on one line need the room
     // more than the explanations do.
-    <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4">
-      <div className="min-w-0 space-y-2">
-        <div className="flex items-center justify-end gap-2">
-          <span className="text-xs text-muted-foreground">
-            Include optional fields
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={includeOptional}
-            aria-label="Include optional fields"
-            onClick={() => setIncludeOptional((value) => !value)}
-            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-              includeOptional ? "bg-foreground" : "bg-muted-foreground/40"
-            }`}
-          >
-            <span
-              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                includeOptional ? "translate-x-4" : "translate-x-1"
-              }`}
-            />
-          </button>
-        </div>
+    <div
+      className={`flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4 ${
+        fillHeight ? "lg:h-full lg:min-h-0" : ""
+      }`}
+    >
+      <div className={`min-w-0 ${fillHeight ? "lg:overflow-y-auto" : ""}`}>
         {/* Tabs on the left of the header bar, copy on the right, code below. */}
         <div className="border border-border rounded-lg overflow-hidden bg-muted/40">
           <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
@@ -186,7 +173,11 @@ export function TraceIngestSnippet({
         </div>
       </div>
 
-      <div className="min-w-0 space-y-3">
+      <div
+        className={`min-w-0 space-y-3 ${
+          fillHeight ? "lg:overflow-y-auto lg:min-h-0" : ""
+        }`}
+      >
         {!apiKey && (
           <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-muted-foreground">
             <svg
@@ -223,6 +214,26 @@ export function TraceIngestSnippet({
         <div className="space-y-2">
           <p className="text-xs font-medium text-foreground">Optional</p>
           <FieldList optional agentNature={agentNature} />
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={includeOptional}
+              onClick={() => setIncludeOptional((value) => !value)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                includeOptional ? "bg-foreground" : "bg-border"
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                  includeOptional ? "translate-x-4" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className="text-sm text-muted-foreground">
+              Include optional fields in the code
+            </span>
+          </label>
         </div>
       </div>
     </div>

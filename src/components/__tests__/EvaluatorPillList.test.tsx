@@ -110,11 +110,77 @@ describe("EvaluatorPillList", () => {
     );
   });
 
-  it("shows each visible evaluator as a button, not a link", () => {
+  it("shows every evaluator as a wrapping pill in flow layout, with no +N chip", () => {
     render(
       <EvaluatorPillList
+        layout="flow"
+        evaluators={[
+          { uuid: "1", name: "Conciseness" },
+          { uuid: "2", name: "Correctness" },
+          { uuid: "3", name: "Helpfulness" },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Conciseness" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Correctness" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Helpfulness" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+
+  it("wraps the flow pills in one row, with nothing folded away", () => {
+    const { container } = render(
+      <EvaluatorPillList
+        layout="flow"
+        evaluators={[
+          { uuid: "1", name: "Correctness" },
+          { uuid: "2", name: "Tone" },
+        ]}
+      />,
+    );
+    const pill = screen.getByRole("button", { name: "Correctness" });
+    expect(pill.parentElement!.className).toContain("flex-wrap");
+    expect(screen.getByRole("button", { name: "Tone" })).toBeInTheDocument();
+    expect(container.textContent).not.toContain("+1");
+  });
+
+  it("shows a flow pill with no evaluator behind it as plain text", () => {
+    render(<EvaluatorPillList layout="flow" evaluators={[{ name: "Tone" }]} />);
+    expect(screen.getByText("Tone")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when a flow list is empty", () => {
+    render(<EvaluatorPillList layout="flow" evaluators={[]} />);
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("opens a preview from a flow pill", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorPillList
+        layout="flow"
         evaluators={[{ uuid: "1", name: "Conciseness" }]}
       />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Conciseness" }));
+
+    expect(
+      await screen.findByText("Judge whether the reply is concise."),
+    ).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith("1", "tok");
+  });
+
+  it("shows each visible evaluator as a button, not a link", () => {
+    render(
+      <EvaluatorPillList evaluators={[{ uuid: "1", name: "Conciseness" }]} />,
     );
     expect(
       screen.getByRole("button", { name: "Conciseness" }),
@@ -125,9 +191,7 @@ describe("EvaluatorPillList", () => {
   it("opens a preview of how the evaluator judges when a pill is clicked", async () => {
     const user = setupUser();
     render(
-      <EvaluatorPillList
-        evaluators={[{ uuid: "1", name: "Conciseness" }]}
-      />,
+      <EvaluatorPillList evaluators={[{ uuid: "1", name: "Conciseness" }]} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Conciseness" }));
@@ -141,9 +205,7 @@ describe("EvaluatorPillList", () => {
   it("closes the preview and shows nothing else open", async () => {
     const user = setupUser();
     render(
-      <EvaluatorPillList
-        evaluators={[{ uuid: "1", name: "Conciseness" }]}
-      />,
+      <EvaluatorPillList evaluators={[{ uuid: "1", name: "Conciseness" }]} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Conciseness" }));
@@ -193,37 +255,37 @@ describe("the full name on hover", () => {
   });
 });
 
-  it("keeps watching the pill after the name turns out to be cut off", async () => {
-    // The wrapper around the pill changes when the name is cut off, which
-    // mounts a new span. If the size watcher stayed on the old one, widening
-    // the column later would never clear the hover text.
-    const observed: Element[] = [];
-    class RecordingResizeObserver {
-      observe(el: Element) {
-        observed.push(el);
-      }
-      disconnect() {}
+it("keeps watching the pill after the name turns out to be cut off", async () => {
+  // The wrapper around the pill changes when the name is cut off, which
+  // mounts a new span. If the size watcher stayed on the old one, widening
+  // the column later would never clear the hover text.
+  const observed: Element[] = [];
+  class RecordingResizeObserver {
+    observe(el: Element) {
+      observed.push(el);
     }
-    const previous = global.ResizeObserver;
-    (
-      global as unknown as { ResizeObserver: typeof RecordingResizeObserver }
-    ).ResizeObserver = RecordingResizeObserver;
-    const scrollWidth = jest
-      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
-      .mockReturnValue(300);
-    const clientWidth = jest
-      .spyOn(HTMLElement.prototype, "clientWidth", "get")
-      .mockReturnValue(80);
+    disconnect() {}
+  }
+  const previous = global.ResizeObserver;
+  (
+    global as unknown as { ResizeObserver: typeof RecordingResizeObserver }
+  ).ResizeObserver = RecordingResizeObserver;
+  const scrollWidth = jest
+    .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+    .mockReturnValue(300);
+  const clientWidth = jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(80);
 
-    render(<NamePillList names={["a very long model name indeed"]} />);
+  render(<NamePillList names={["a very long model name indeed"]} />);
 
-    await waitFor(() => expect(observed.length).toBeGreaterThan(1));
-    expect(document.body.contains(observed[observed.length - 1])).toBe(true);
+  await waitFor(() => expect(observed.length).toBeGreaterThan(1));
+  expect(document.body.contains(observed[observed.length - 1])).toBe(true);
 
-    scrollWidth.mockRestore();
-    clientWidth.mockRestore();
-    (global as unknown as { ResizeObserver: unknown }).ResizeObserver = previous;
-  });
+  scrollWidth.mockRestore();
+  clientWidth.mockRestore();
+  (global as unknown as { ResizeObserver: unknown }).ResizeObserver = previous;
+});
 
 describe("the evaluators folded into the +N chip", () => {
   it("opens a preview when one of them is clicked", async () => {
@@ -381,4 +443,20 @@ describe("a cell with room for one name", () => {
     expect(screen.getByText("a")).toBeInTheDocument();
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
   });
+});
+
+it("hands the click to the parent when it owns the preview", async () => {
+  const user = setupUser();
+  const onOpenEvaluator = jest.fn();
+  render(
+    <EvaluatorPillList
+      layout="flow"
+      evaluators={[{ uuid: "ev-1", name: "Tone" }]}
+      onOpenEvaluator={onOpenEvaluator}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Tone" }));
+  expect(onOpenEvaluator).toHaveBeenCalledWith({ uuid: "ev-1", name: "Tone" });
+  // The list opens nothing of its own, so a popup holding it can close.
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });

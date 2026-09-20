@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 
 type RefreshButtonProps = {
@@ -24,12 +25,30 @@ export function RefreshButton({
   className,
 }: RefreshButtonProps) {
   const isDisabled = disabled || loading;
+  // A read that answers in a few milliseconds would otherwise flick the arrow
+  // round too fast to see, and the click would look like it did nothing.
+  const [spinning, setSpinning] = useState(false);
+  const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (spinTimer.current) clearTimeout(spinTimer.current);
+    },
+    [],
+  );
+  const spinOnce = () => {
+    if (spinTimer.current) clearTimeout(spinTimer.current);
+    setSpinning(true);
+    spinTimer.current = setTimeout(() => setSpinning(false), 600);
+  };
 
   return (
     <Tooltip content={tooltip} position="top">
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => {
+          spinOnce();
+          onClick();
+        }}
         disabled={isDisabled}
         aria-label={tooltip}
         className={`flex items-center justify-center ${
@@ -37,7 +56,7 @@ export function RefreshButton({
         } rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-200 hover:bg-slate-500/20 dark:hover:bg-slate-500/25 ${className ?? ""}`}
       >
         <svg
-          className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+          className={`w-4 h-4 ${loading || spinning ? "animate-spin" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

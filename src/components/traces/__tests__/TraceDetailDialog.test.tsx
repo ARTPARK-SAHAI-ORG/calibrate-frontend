@@ -6,12 +6,13 @@ import {
   toTestCaseOutput,
   turnsToHistory,
 } from "../TraceDetailDialog";
-import { fetchTrace, TraceDetail } from "@/lib/tracesApi";
+import { fetchTrace, fetchTraceScores, TraceDetail } from "@/lib/tracesApi";
 
 jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
   ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: jest.fn(),
+  fetchTraceScores: jest.fn(),
 }));
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
@@ -19,6 +20,7 @@ jest.mock("../../../lib/reportError", () => ({
 }));
 
 const mockFetchTrace = fetchTrace as jest.Mock;
+const mockFetchTraceScores = fetchTraceScores as jest.Mock;
 
 const detail: TraceDetail = {
   uuid: "t1",
@@ -45,7 +47,11 @@ const detail: TraceDetail = {
   updated_at: "2026-07-20T10:00:00Z",
 };
 
-beforeEach(() => mockFetchTrace.mockReset());
+beforeEach(() => {
+  mockFetchTrace.mockReset();
+  mockFetchTraceScores.mockReset();
+  mockFetchTraceScores.mockResolvedValue({ runs: [] });
+});
 
 describe("humanTraceName", () => {
   it("uses the last user turn", () => {
@@ -533,6 +539,241 @@ it("surfaces an error when the fetch fails", async () => {
   await waitFor(() =>
     expect(screen.getByText(/Failed to load this trace/)).toBeInTheDocument(),
   );
+});
+
+it("fetches scores and draws only the latest run in the right column, meta on the left", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        completed_at: "2026-08-29T12:01:00Z",
+        error: null,
+        results: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Tone",
+            evaluator_type: "llm",
+            output_type: "binary",
+            value: 1,
+            reasoning: "Greeting was present.",
+            evaluator_version_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            passed: true,
+          },
+        ],
+      },
+      {
+        run_uuid: "run-old",
+        status: "skipped",
+        created_at: "2026-08-28T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getAllByText("Tone").length).toBeGreaterThan(0),
+  );
+  expect(mockFetchTraceScores).toHaveBeenCalledWith("tok", "t1");
+  // Drawn twice: the right column on desktop and under the conversation on
+  // mobile, the same way a test run's evaluators are.
+  const scoreHeadings = screen.getAllByRole("heading", { name: "Scores" });
+  expect(scoreHeadings).toHaveLength(2);
+  expect(scoreHeadings[0].closest(".md\\:hidden")).not.toBeNull();
+  expect(scoreHeadings[1].closest(".md\\:flex")).not.toBeNull();
+  expect(
+    screen.getByRole("separator", { name: "Resize scores panel" }),
+  ).toBeInTheDocument();
+  // Column order in the DOM: meta, then the conversation, then the scores.
+  const meta = screen.getByText("msg-1");
+  const conversation = screen.getByText("When is the next vaccination?");
+  const scores = scoreHeadings[1];
+  expect(
+    meta.compareDocumentPosition(conversation) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    conversation.compareDocumentPosition(scores) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  // Only the latest run: no run headings, no status pill, no earlier run's reason.
+  expect(
+    screen.queryByText(/Latest scores|Earlier scores/),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("No evaluators could score this trace"),
+  ).not.toBeInTheDocument();
+});
+
+it("says what each evaluator is for, from the words the agent page passes in", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        completed_at: "2026-08-29T12:01:00Z",
+        error: null,
+        results: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Tone",
+            output_type: "binary",
+            value: 1,
+            reasoning: "Greeting was present.",
+            passed: true,
+          },
+          {
+            evaluator_uuid: "ev-2",
+            name: "Helpfulness",
+            output_type: "binary",
+            value: 0,
+            reasoning: "Missed the question.",
+            passed: false,
+          },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      evaluatorDescriptions={{ "ev-1": "Was the caller greeted politely?" }}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getAllByText("Tone").length).toBeGreaterThan(0),
+  );
+  // Once under the conversation on mobile, once in the right column.
+  expect(screen.getAllByText("Was the caller greeted politely?")).toHaveLength(
+    2,
+  );
+  // An evaluator with no words has none put under its name.
+  expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
+});
+
+it("refetches scores while a run is still in progress", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-open",
+        status: "processing",
+        created_at: "2026-08-29T12:00:00Z",
+        results: [],
+      },
+    ],
+  });
+  const setIntervalSpy = jest.spyOn(window, "setInterval");
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
+      0,
+    ),
+  );
+  const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
+  expect(pollCall).toBeDefined();
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-open",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        completed_at: "2026-08-29T12:01:00Z",
+        results: [],
+      },
+    ],
+  });
+  await act(async () => {
+    (pollCall![0] as () => void)();
+  });
+  await waitFor(() =>
+    expect(screen.queryByText("Scoring this trace.")).not.toBeInTheDocument(),
+  );
+  setIntervalSpy.mockRestore();
+});
+
+it("still shows the trace when scores cannot be loaded", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockRejectedValue(new Error("scores down"));
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByText("When is the next vaccination?"),
+    ).toBeInTheDocument(),
+  );
+  expect(
+    screen.getAllByText("Could not load scores for this trace."),
+  ).toHaveLength(2);
+});
+
+it("keeps the last scores if a later poll fails", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-open",
+        status: "pending",
+        created_at: "2026-08-29T12:00:00Z",
+        results: [],
+      },
+    ],
+  });
+  const setIntervalSpy = jest.spyOn(window, "setInterval");
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
+      0,
+    ),
+  );
+  const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
+  mockFetchTraceScores.mockRejectedValue(new Error("poll failed"));
+  await act(async () => {
+    (pollCall![0] as () => void)();
+  });
+  expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(0);
+  setIntervalSpy.mockRestore();
 });
 
 describe("a general agent's trace", () => {
