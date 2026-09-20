@@ -56,7 +56,7 @@ export function TraceScoringChip({ traceScoring }: TraceScoringChipProps) {
       </div>
 
       {eligible.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           <p className="flex items-center gap-2 text-xs font-medium text-gray-900">
             <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 text-green-600" />
             Evaluators used for scoring
@@ -73,29 +73,35 @@ export function TraceScoringChip({ traceScoring }: TraceScoringChipProps) {
       )}
 
       {ineligible.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           <p className="flex items-center gap-2 text-xs font-medium text-gray-900">
             <XIcon className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
             Evaluators not used for scoring
           </p>
-          {/* Grouped by reason, so a name is never filed under the wrong one. */}
-          {[...new Set(ineligible.map((item) => item.reason))].map((reason) => (
-            <div key={reason} className="space-y-2">
-              <p className="text-xs text-gray-600 leading-relaxed">
-                {ineligibleReasonCopy(reason)}
-              </p>
-              <EvaluatorPillList
-                onOpenEvaluator={setPreview}
-                layout="flow"
-                evaluators={ineligible
-                  .filter((item) => item.reason === reason)
-                  .map((item) => ({
-                    uuid: item.evaluator_uuid,
-                    name: item.name,
-                  }))}
-              />
-            </div>
-          ))}
+          {/* Grouped by reason, so a name is never filed under the wrong one.
+              A reason sits right under the heading it belongs to, and the
+              groups themselves stay apart. */}
+          <div className="space-y-4">
+            {[...new Set(ineligible.map((item) => item.reason))].map(
+              (reason) => (
+                <div key={reason} className="space-y-2">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {ineligibleReasonCopy(reason)}
+                  </p>
+                  <EvaluatorPillList
+                    onOpenEvaluator={setPreview}
+                    layout="flow"
+                    evaluators={ineligible
+                      .filter((item) => item.reason === reason)
+                      .map((item) => ({
+                        uuid: item.evaluator_uuid,
+                        name: item.name,
+                      }))}
+                  />
+                </div>
+              ),
+            )}
+          </div>
         </div>
       )}
 
