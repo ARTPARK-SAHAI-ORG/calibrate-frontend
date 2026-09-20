@@ -449,9 +449,9 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.queryByText("Model provider")).not.toBeInTheDocument();
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -470,6 +470,24 @@ describe("AgentConnectionTabContent", () => {
     });
     expect(screen.getByText("Model provider")).toBeInTheDocument();
     expect(screen.getByText(/"model": "gpt-4.1"/)).toBeInTheDocument();
+  });
+
+  function benchmarkBox() {
+    return screen.getByRole("switch", {
+      name: "Support benchmarking different models",
+    }).parentElement!.parentElement!;
+  }
+
+  it("keeps the model provider picker inside the benchmarking box", () => {
+    const { unmount } = renderComponent();
+    expect(benchmarkBox().className).not.toContain("border-foreground/40");
+    unmount();
+
+    renderComponent({
+      connectionConfig: makeConfig({ supports_benchmark: true }),
+    });
+    expect(benchmarkBox().className).toContain("border-foreground/40");
+    expect(benchmarkBox()).toContainElement(screen.getByText("Model provider"));
   });
 
   it("falls back to a generic model name for an unknown provider", () => {
@@ -503,9 +521,9 @@ describe("AgentConnectionTabContent", () => {
     });
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
