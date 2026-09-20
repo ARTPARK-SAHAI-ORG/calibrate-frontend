@@ -357,6 +357,22 @@ beforeEach(() => {
 });
 
 /** The last arguments `useTraces` was called with, i.e. what is on screen now. */
+/**
+ * The output kind and the labels sit behind one filter button, and nothing is
+ * asked for until Apply, so a test picks the same way a reader does.
+ */
+async function applyTraceFilter(
+  user: ReturnType<typeof setupUser>,
+  { output, labels = [] }: { output?: string; labels?: string[] },
+) {
+  await user.click(screen.getByRole("button", { name: "Filter traces" }));
+  if (output) await user.click(screen.getByRole("button", { name: output }));
+  for (const label of labels) {
+    await user.click(screen.getByRole("button", { name: label }));
+  }
+  await user.click(screen.getByRole("button", { name: "Apply" }));
+}
+
 function lastTracesArgs() {
   return mockUseTraces.mock.calls[mockUseTraces.mock.calls.length - 1][0];
 }
@@ -404,7 +420,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Integration guide" }));
 
     expect(
-      screen.getByRole("heading", { name: "Send your first trace" }),
+      screen.getByRole("heading", { name: "Integration guide" }),
     ).toBeInTheDocument();
     expect(document.querySelector("pre")?.textContent).toContain(
       '"agent_id": "agent-1"',
@@ -772,7 +788,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     expect(lastTracesArgs().outputType).toBe("all");
-    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await applyTraceFilter(user, { output: "Tool call" });
 
     await waitFor(() => expect(lastTracesArgs().outputType).toBe("tool_call"));
   });
@@ -786,8 +802,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     expect(lastTracesArgs().labels).toEqual([]);
-    await user.click(screen.getByText("All labels"));
-    await user.click(screen.getByText("production"));
+    await applyTraceFilter(user, { labels: ["production"] });
 
     await waitFor(() =>
       expect(lastTracesArgs().labels).toEqual(["production"]),
@@ -819,8 +834,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    await user.click(screen.getByText("All labels"));
-    await user.click(screen.getByText("production"));
+    await applyTraceFilter(user, { labels: ["production"] });
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
@@ -852,8 +866,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByLabelText("Select all traces"));
     expect(screen.getByText("trace selected")).toBeInTheDocument();
 
-    await user.click(screen.getByText("All labels"));
-    await user.click(screen.getByText("production"));
+    await applyTraceFilter(user, { labels: ["production"] });
 
     // The tick was made against the old list, so acting on it would reach
     // traces the new one does not hold.
@@ -875,8 +888,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    await user.click(screen.getByText("All labels"));
-    await user.click(screen.getByText("production"));
+    await applyTraceFilter(user, { labels: ["production"] });
 
     expect(screen.getByText("No traces match your filter")).toBeInTheDocument();
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
@@ -913,8 +925,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
-    await user.click(screen.getByText("All labels"));
-    await user.click(screen.getByText("production"));
+    await applyTraceFilter(user, { labels: ["production"] });
     await act(async () => {
       answers.forEach((answer) => answer());
     });
@@ -922,10 +933,12 @@ describe("TracesTabContent", () => {
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
 
-  it("leaves the label filter out when the traces carry no labels", () => {
+  it("leaves the label filter out when the traces carry no labels", async () => {
+    const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    expect(screen.queryByText("All labels")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Filter traces" }));
+    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
   });
 
   it("says nothing matched instead of the setup steps when a label is picked", () => {
@@ -1045,7 +1058,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} agentNature="general" />);
 
     // The list itself is filtered to replies, so no counting is needed.
-    await user.click(screen.getByRole("button", { name: "Response" }));
+    await applyTraceFilter(user, { output: "Response" });
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
@@ -1126,7 +1139,7 @@ describe("TracesTabContent", () => {
     mockUseTraces.mockReturnValue(
       tracesResult([], { loadedOutputType: "tool_call" }),
     );
-    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await applyTraceFilter(user, { output: "Tool call" });
 
     await waitFor(() =>
       expect(
@@ -1143,7 +1156,7 @@ describe("TracesTabContent", () => {
     mockUseTraces.mockReturnValue(
       tracesResult([], { loadedQ: "polio", loadedOutputType: "tool_call" }),
     );
-    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await applyTraceFilter(user, { output: "Tool call" });
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() =>
@@ -1160,7 +1173,7 @@ describe("TracesTabContent", () => {
     mockUseTraces.mockReturnValue(
       tracesResult([], { loadedOutputType: "tool_call" }),
     );
-    await user.click(screen.getByRole("button", { name: "Tool call" }));
+    await applyTraceFilter(user, { output: "Tool call" });
     await waitFor(() =>
       expect(
         screen.getByText("No traces match your filter"),
@@ -1169,7 +1182,7 @@ describe("TracesTabContent", () => {
 
     // Back to All. The rows on screen are still the filtered ones until the
     // full list has loaded, so the setup steps must not appear in between.
-    await user.click(screen.getByRole("button", { name: "All" }));
+    await applyTraceFilter(user, { output: "All" });
 
     expect(screen.queryByTestId("traces-empty-state")).not.toBeInTheDocument();
   });

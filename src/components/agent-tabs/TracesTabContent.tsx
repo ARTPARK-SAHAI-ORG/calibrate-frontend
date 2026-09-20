@@ -20,18 +20,17 @@ import {
   type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
-import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import {
   SubmitForLabellingButton,
   SUBMIT_FOR_LABELLING_CLASS,
 } from "@/components/human-labelling/labellingSubmit";
-import { SearchIcon } from "@/components/icons";
+import { TracesFilter } from "@/components/traces/TracesFilter";
+import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
   Button,
   LoadingState,
   SearchInput,
-  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
@@ -60,16 +59,6 @@ import {
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
-
-/** What a trace's output can be filtered down to. A trace that both replied
- *  and called tools counts as a reply, which is also how "Add to tests"
- *  decides: one selected trace with a reply makes the whole batch judge
- *  replies. */
-const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "response", label: "Response" },
-  { value: "tool_call", label: "Tool call" },
-];
 
 /**
  * The Monitoring tab on the agent detail page: the production conversations sent
@@ -679,37 +668,23 @@ export function TracesTabContent({
             placeholder="Search traces"
             className="w-full sm:w-2/5"
           />
-          <SegmentedFilter
-            value={outputFilter}
-            onChange={setOutputFilter}
-            options={OUTPUT_FILTER_OPTIONS}
-            className="sm:mr-auto"
-            ariaLabel="Filter traces by output"
+          {/* One control for both the output kind and the labels, so the row
+              stays the search box and the thing that narrows it. */}
+          <TracesFilter
+            value={{ outputType: outputFilter, labels: labelFilter }}
+            labels={allLabels}
+            onApply={(next) => {
+              setOutputFilter(next.outputType);
+              setLabelFilter(next.labels);
+            }}
           />
-          {/* Only worth showing once traces carry labels; an agent that sends
-              none would otherwise get an empty picker it can do nothing with. */}
-          {allLabels.length > 0 && (
-            <MultiSelectPicker
-              items={allLabels.map((label) => ({ uuid: label, name: label }))}
-              selectedItems={labelFilter.map((label) => ({
-                uuid: label,
-                name: label,
-              }))}
-              onSelectionChange={(picked) =>
-                setLabelFilter(picked.map((item) => item.uuid))
-              }
-              placeholder="All labels"
-              searchPlaceholder="Search labels"
-              size="sm"
-              className="w-full sm:w-48"
-            />
-          )}
-          {/* Stands the same height as the search box and the labels
-              picker beside it. */}
+          {/* Not a filter, so it sits apart from the two that are. */}
           <Button
-            variant="secondary"
+            variant="ghost"
+            className="sm:ml-auto"
             onClick={() => setIntegrationGuideOpen(true)}
           >
+            <CodeIcon className="w-5 h-5" />
             Integration guide
           </Button>
         </div>
