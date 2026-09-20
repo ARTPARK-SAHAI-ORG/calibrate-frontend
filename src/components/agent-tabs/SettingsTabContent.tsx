@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Tooltip } from "@/components/Tooltip";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 
 type SettingsTabContentProps = {
@@ -22,6 +23,33 @@ export function SettingsTabContent({
     traceScoring.saving ||
     (!traceScoring.enabled &&
       (traceScoring.eligibility === null || traceScoring.enableBlocked));
+  // A disabled control has to say why, and the reason belongs on the control
+  // rather than in a line that makes this card taller than its neighbours.
+  const blockedReason = traceScoring.enableBlocked
+    ? "None of this agent's evaluators can score traces. Choose evaluators on the Evaluators tab."
+    : null;
+  const scoringSwitch = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={traceScoring.enabled}
+      aria-label="Score new traces automatically"
+      disabled={scoringDisabled}
+      onClick={() => void traceScoring.setEnabled(!traceScoring.enabled)}
+      className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 border-2 flex-shrink-0 ${
+        traceScoring.enabled
+          ? "bg-green-500 border-green-500"
+          : "bg-muted border-muted-foreground/30"
+      }`}
+    >
+      <div
+        className={`absolute top-0.5 w-4 md:w-5 h-4 md:h-5 rounded-full bg-white shadow-md transition-transform ${
+          traceScoring.enabled ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="border border-border rounded-xl overflow-hidden">
@@ -82,45 +110,33 @@ export function SettingsTabContent({
         </div>
       </div>
 
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="px-3 md:px-4 py-3 md:py-4 flex items-start md:items-center justify-between gap-3">
-          <div className="flex flex-col-reverse md:flex-row items-start md:items-center gap-2 md:gap-4">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={traceScoring.enabled}
-              aria-label="Score new traces automatically"
-              disabled={scoringDisabled}
-              onClick={() => void traceScoring.setEnabled(!traceScoring.enabled)}
-              className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 border-2 flex-shrink-0 ${
-                traceScoring.enabled
-                  ? "bg-green-500 border-green-500"
-                  : "bg-muted border-muted-foreground/30"
-              }`}
-            >
-              <div
-                className={`absolute top-0.5 w-4 md:w-5 h-4 md:h-5 rounded-full bg-white shadow-md transition-transform ${
-                  traceScoring.enabled ? "translate-x-5" : "translate-x-0.5"
-                }`}
-              />
-            </button>
-            <div>
-              <h3 className="text-sm md:text-base font-medium text-foreground">
-                Score new traces automatically
-              </h3>
-              <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                New traces this agent receives are scored with its evaluators.
-              </p>
-              {traceScoring.saveError || traceScoring.eligibilityError ? (
-                <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
-                  {traceScoring.saveError ?? traceScoring.eligibilityError}
+      <div className="space-y-3 md:space-y-4">
+        <h2 className="text-sm md:text-base font-semibold text-foreground">
+          Traces
+        </h2>
+        <div className="border border-border rounded-xl overflow-hidden">
+          <div className="px-3 md:px-4 py-3 md:py-4 flex items-start md:items-center justify-between gap-3">
+            <div className="flex flex-col-reverse md:flex-row items-start md:items-center gap-2 md:gap-4">
+              {blockedReason ? (
+                <Tooltip content={blockedReason} position="top">
+                  {scoringSwitch}
+                </Tooltip>
+              ) : (
+                scoringSwitch
+              )}
+              <div>
+                <h3 className="text-sm md:text-base font-medium text-foreground">
+                  Score new traces automatically
+                </h3>
+                <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                  New traces this agent receives are scored with its evaluators.
                 </p>
-              ) : traceScoring.enableBlocked ? (
-                <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                  Scoring cannot be turned on because none of this agent&apos;s
-                  evaluators can score traces.
-                </p>
-              ) : null}
+                {traceScoring.saveError || traceScoring.eligibilityError ? (
+                  <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
+                    {traceScoring.saveError ?? traceScoring.eligibilityError}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

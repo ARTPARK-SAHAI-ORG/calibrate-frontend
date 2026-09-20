@@ -305,6 +305,9 @@ export function TraceDetailDialog({
   const trace = isOpen && loaded?.uuid === traceUuid ? loaded.trace : null;
   const visibleRun = loaded?.uuid === traceUuid ? latestRun : null;
   const hasOpenScoreRun = isTraceScoringInProgress(visibleRun?.status);
+  // Nothing has tried to score this trace, so it gets no scores column at all
+  // rather than a wide empty one saying so.
+  const showScores = !!trace && (visibleRun !== null || scoresError !== null);
 
   useEffect(() => {
     if (!isOpen || !traceUuid || !accessToken) return;
@@ -479,17 +482,13 @@ export function TraceDetailDialog({
               ))}
             {/* Scores under the conversation on mobile only; on desktop
                 they sit in the right column, the way a test run's do. */}
-            {trace && (
+            {showScores && (
               <div className="md:hidden border-t border-border">
-                <TraceScorePanel
-                  run={visibleRun}
-                  isLoading={isLoading}
-                  error={scoresError}
-                />
+                <TraceScorePanel run={visibleRun} error={scoresError} />
               </div>
             )}
           </div>
-          {trace && (
+          {showScores && (
             <>
               <ResizeHandle
                 onMouseDown={scoresPanel.startDrag}
@@ -504,11 +503,7 @@ export function TraceDetailDialog({
                 className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
               >
                 <div className="flex-1 overflow-y-auto">
-                  <TraceScorePanel
-                    run={visibleRun}
-                    isLoading={isLoading}
-                    error={scoresError}
-                  />
+                  <TraceScorePanel run={visibleRun} error={scoresError} />
                 </div>
               </div>
             </>

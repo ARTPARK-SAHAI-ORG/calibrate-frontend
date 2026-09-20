@@ -9,9 +9,9 @@ import {
 import type { TraceScoreResult, TraceScoringRun } from "@/lib/tracesApi";
 
 type TraceScorePanelProps = {
-  /** The newest scoring run for this trace, or null when it has none. */
+  /** The newest scoring run for this trace. The parent leaves the whole
+   *  column out when there is none, so this is only null beside an error. */
   run: TraceScoringRun | null;
-  isLoading?: boolean;
   error?: string | null;
 };
 
@@ -77,25 +77,15 @@ function RunBody({ run }: { run: TraceScoringRun }) {
  * The latest scoring run for one trace, laid out like the evaluators column
  * of the test results window: a heading, then one verdict card per evaluator.
  */
-export function TraceScorePanel({
-  run,
-  isLoading = false,
-  error = null,
-}: TraceScorePanelProps) {
+export function TraceScorePanel({ run, error = null }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Scores</h3>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading scores…</p>
-      ) : error ? (
+      {error ? (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      ) : !run ? (
-        <p className="text-sm text-muted-foreground">
-          This trace has not been scored.
-        </p>
-      ) : (
+      ) : run ? (
         <RunBody run={run} />
-      )}
+      ) : null}
     </div>
   );
 }

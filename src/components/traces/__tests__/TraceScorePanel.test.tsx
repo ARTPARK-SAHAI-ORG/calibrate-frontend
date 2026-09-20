@@ -156,15 +156,7 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   ).toBeInTheDocument();
 });
 
-it("shows loading, error, and empty copy", () => {
-  const { rerender } = render(<TraceScorePanel run={null} isLoading />);
-  expect(screen.getByText("Loading scores…")).toBeInTheDocument();
-
-  rerender(<TraceScorePanel run={null} error="Could not load scores." />);
+it("shows the error when the scores could not be loaded", () => {
+  render(<TraceScorePanel run={null} error="Could not load scores." />);
   expect(screen.getByText("Could not load scores.")).toBeInTheDocument();
-
-  rerender(<TraceScorePanel run={null} />);
-  expect(
-    screen.getByText("This trace has not been scored."),
-  ).toBeInTheDocument();
 });

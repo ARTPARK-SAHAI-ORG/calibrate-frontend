@@ -3,9 +3,16 @@ import { render, screen, setupUser, fireEvent } from "@/test-utils";
 import { SettingsTabContent } from "../SettingsTabContent";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 
-const eligible = { eligible: [{ evaluator_uuid: "ev-1", evaluator_version_id: "v1", name: "Tone" }], ineligible: [] };
+const eligible = {
+  eligible: [
+    { evaluator_uuid: "ev-1", evaluator_version_id: "v1", name: "Tone" },
+  ],
+  ineligible: [],
+};
 
-function scoring(overrides: Partial<TraceScoringControls> = {}): TraceScoringControls {
+function scoring(
+  overrides: Partial<TraceScoringControls> = {},
+): TraceScoringControls {
   return {
     enabled: false,
     saving: false,
@@ -29,7 +36,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
         traceScoring={scoring()}
-      />
+      />,
     );
 
     const toggleButton = container.querySelector("button") as HTMLButtonElement;
@@ -47,7 +54,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
         traceScoring={scoring()}
-      />
+      />,
     );
 
     const toggleButton = container.querySelector("button") as HTMLButtonElement;
@@ -64,7 +71,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
         traceScoring={scoring()}
-      />
+      />,
     );
 
     const input = screen.getByDisplayValue("5");
@@ -81,7 +88,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
         traceScoring={scoring()}
-      />
+      />,
     );
 
     const input = screen.getByDisplayValue("5");
@@ -99,7 +106,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
         traceScoring={scoring()}
-      />
+      />,
     );
 
     const input = screen.getByDisplayValue("5");
@@ -115,7 +122,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
         traceScoring={scoring()}
-      />
+      />,
     );
     expect(screen.getByText("Max assistant turns")).toBeInTheDocument();
   });
@@ -129,7 +136,7 @@ describe("SettingsTabContent", () => {
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
         traceScoring={controls}
-      />
+      />,
     );
     return {
       controls,
@@ -146,8 +153,8 @@ describe("SettingsTabContent", () => {
     expect(switchEl).not.toBeDisabled();
     expect(
       screen.getByText(
-        "New traces this agent receives are scored with its evaluators."
-      )
+        "New traces this agent receives are scored with its evaluators.",
+      ),
     ).toBeInTheDocument();
     await user.click(switchEl);
     expect(controls.setEnabled).toHaveBeenCalledWith(true);
@@ -167,31 +174,48 @@ describe("SettingsTabContent", () => {
 
   it("can still be turned off while eligibility is unknown", () => {
     expect(
-      renderScoring({ enabled: true, eligibility: null }).switchEl
+      renderScoring({ enabled: true, eligibility: null }).switchEl,
     ).not.toBeDisabled();
   });
 
   it("is disabled while saving", () => {
-    expect(renderScoring({ enabled: true, saving: true }).switchEl).toBeDisabled();
+    expect(
+      renderScoring({ enabled: true, saving: true }).switchEl,
+    ).toBeDisabled();
   });
 
-  it("is disabled and explains why when no evaluator can score", () => {
+  it("is disabled and says why on hover when no evaluator can score", async () => {
+    const user = setupUser();
     const { switchEl } = renderScoring({
       eligibility: { eligible: [], ineligible: [] },
       enableBlocked: true,
     });
     expect(switchEl).toBeDisabled();
+    // The reason rides on the control, so the card stays the height of its
+    // neighbours instead of carrying an extra line.
+    await user.hover(switchEl);
     expect(
-      screen.getByText(
-        "Scoring cannot be turned on because none of this agent's evaluators can score traces."
-      )
+      await screen.findByText(
+        "None of this agent's evaluators can score traces. Choose evaluators on the Evaluators tab.",
+      ),
     ).toBeInTheDocument();
   });
 
   it("shows the save error", () => {
     renderScoring({ saveError: "Could not update automatic scoring." });
+    expect(screen.getByText("Could not update automatic scoring.")).toHaveClass(
+      "text-red-600",
+    );
+  });
+
+  it("keeps the scoring switch under a Traces heading", () => {
+    renderScoring({});
+    const heading = screen.getByRole("heading", { name: "Traces" });
+    expect(heading).toBeInTheDocument();
     expect(
-      screen.getByText("Could not update automatic scoring.")
-    ).toHaveClass("text-red-600");
+      heading.compareDocumentPosition(
+        screen.getByRole("switch", { name: "Score new traces automatically" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
