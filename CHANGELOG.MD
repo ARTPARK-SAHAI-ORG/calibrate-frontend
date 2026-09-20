@@ -1,5 +1,6 @@
 ## September 2026
 
+- The monitoring tab now tells you when a trace could not be scored and when you have hit the storage limit, and hover text throughout the app now shows properly, including on touch screens ([#628](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/628))
 - On the Monitoring tab, filtering by output kind and labels now happens through one control beside the search box, and the integration guide window is titled correctly once traces already exist ([#623](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/623))
 - The Connection tab now links to the documentation for connecting an agent, and links to the documentation elsewhere in the app that used to go nowhere now work ([#621](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/621))
 - On a connection agent, the switch to support benchmarking different models now sits in its own box with a note explaining what it does, and the model provider list just says "OpenRouter" instead of "OpenRouter (all providers)" ([#626](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/626))
