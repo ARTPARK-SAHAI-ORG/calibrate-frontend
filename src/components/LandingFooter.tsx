@@ -1,7 +1,7 @@
 "use client";
 
 import { Link } from "@/lib/nav";
-import { WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
+import { DOCS_URL, WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 export function LandingFooter() {
   return (
@@ -23,7 +23,7 @@ export function LandingFooter() {
             <ul className="space-y-4">
               <li>
                 <a
-                  href={process.env.NEXT_PUBLIC_DOCS_URL}
+                  href={DOCS_URL}
                   className="hover:text-gray-900 transition-colors"
                 >
                   Documentation

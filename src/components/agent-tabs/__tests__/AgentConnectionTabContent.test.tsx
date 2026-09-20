@@ -4,6 +4,10 @@ import {
   AgentConnectionTabContent,
   type ConnectionConfig,
 } from "../AgentConnectionTabContent";
+import {
+  AGENT_CONNECTIONS_DOCS_URL,
+  AGENT_CONNECTION_EXAMPLE_DOCS_URL,
+} from "@/constants/links";
 
 const verifyAdHoc = jest.fn();
 const dismiss = jest.fn();
@@ -113,6 +117,51 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.getByText("Not verified")).toBeInTheDocument();
     const verifyButton = screen.getByText("Verify").closest("button");
     expect(verifyButton).toBeDisabled();
+  });
+
+  it("links the agent URL help text to the agent connections docs", () => {
+    renderComponent();
+    const link = screen.getByRole("link", {
+      name: "Read how to connect your agent",
+    });
+    expect(link).toHaveAttribute("href", AGENT_CONNECTIONS_DOCS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("puts the worked example beside the expected format heading", () => {
+    renderComponent();
+    const link = screen.getByRole("link", { name: "See an example" });
+    expect(link).toHaveAttribute("href", AGENT_CONNECTION_EXAMPLE_DOCS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+
+    // Same row as the heading, pushed to its right.
+    const row = link.parentElement!;
+    expect(row).toHaveTextContent("Expected request & response format");
+    expect(row.className).toContain("justify-between");
+  });
+
+  it("draws both documentation links in blue, with no underline", () => {
+    renderComponent();
+    for (const name of ["Read how to connect your agent", "See an example"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.className).not.toMatch(/underline/);
+      // Split on whitespace so a `hover:text-blue-…` class cannot satisfy this.
+      const restingColours = link.className
+        .split(/\s+/)
+        .filter((cls) => /^text-blue-\d00$/.test(cls));
+      expect(restingColours.length).toBeGreaterThan(0);
+      expect(link.querySelector("svg")).toBeInTheDocument();
+    }
+  });
+
+  it("draws See an example as a button, not as a line of text", () => {
+    renderComponent();
+    const link = screen.getByRole("link", { name: "See an example" });
+    expect(link.className).toContain("bg-blue-500/15");
+    expect(link.className).toContain("border-blue-500/40");
+    expect(link.className).toMatch(/\brounded-md\b/);
   });
 
   it("enables the verify button once a URL is entered", () => {

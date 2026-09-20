@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
 import { LearnTableOfContents } from "@/components/learn/LearnTableOfContents";
-import { WEBINARS_URL } from "@/constants/links";
+import { DOCS_URL, WEBINARS_URL } from "@/constants/links";
 
 /** A link inside a summary. Declared above the lists because they use it as
  * soon as this file loads. */
@@ -263,7 +263,7 @@ export default function LearnPage() {
 
           <div className="mt-8 md:mt-10 flex flex-row flex-wrap items-center justify-center gap-2 md:gap-3">
             <a
-              href={process.env.NEXT_PUBLIC_DOCS_URL}
+              href={DOCS_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={topLinkClass}

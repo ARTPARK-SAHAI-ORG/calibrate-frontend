@@ -1,21 +1,14 @@
 import { render, screen } from "@/test-utils";
 import { LandingFooter } from "../LandingFooter";
-import { WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
+import { DOCS_URL, WEBINARS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 describe("LandingFooter", () => {
-  const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = "https://docs.example.com";
-  });
-
-  afterEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
-  });
-
   it("renders resource links", () => {
     render(<LandingFooter />);
-    expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Documentation" })).toHaveAttribute(
+      "href",
+      DOCS_URL,
+    );
     expect(
       screen.queryByRole("link", { name: "CLI" }),
     ).not.toBeInTheDocument();

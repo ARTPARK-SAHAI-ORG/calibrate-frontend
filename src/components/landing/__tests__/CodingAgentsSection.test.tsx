@@ -1,17 +1,8 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { CodingAgentsSection, installCommand } from "../CodingAgentsSection";
+import { DOCS_URL } from "@/constants/links";
 
 describe("CodingAgentsSection", () => {
-  const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = "https://docs.example.com";
-  });
-
-  afterEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
-  });
-
   it("shows the heading and all three worked examples", () => {
     render(<CodingAgentsSection />);
     expect(
@@ -85,7 +76,7 @@ describe("CodingAgentsSection", () => {
     render(<CodingAgentsSection />);
     expect(screen.getByRole("link", { name: "Read the docs" })).toHaveAttribute(
       "href",
-      "https://docs.example.com/agents/overview",
+      `${DOCS_URL}/agents/overview`,
     );
   });
 
