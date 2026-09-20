@@ -33,8 +33,9 @@ export const PIPECAT_STT_TTFS_URL =
 
 /** Calibrate's own documentation. Set NEXT_PUBLIC_DOCS_URL to point a
  * self-hosted copy at its own docs site. */
-export const DOCS_URL =
-  process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.calibrate.artpark.ai";
+export const DOCS_URL = (
+  process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.calibrate.artpark.ai"
+).replace(/\/+$/, "");
 
 /** How to connect an already-deployed agent to Calibrate: the endpoint shape,
  * configuring it, verifying it, and benchmarking across models. Linked from the

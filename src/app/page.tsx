@@ -618,6 +618,7 @@ const tabs: LandingTab[] = [
 
 import {
   ARTPARK_WEBSITE_URL,
+  DOCS_URL,
   GITHUB_REPO_URL,
   WHATSAPP_INVITE_URL,
 } from "@/constants/links";
@@ -1404,7 +1405,7 @@ export default function HomePage() {
 
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mt-8 md:mt-10 px-4 text-center">
           <a
-            href={`${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`}
+            href={`${DOCS_URL}/integrations`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"

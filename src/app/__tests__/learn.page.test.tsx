@@ -9,7 +9,7 @@
  */
 import { render, screen, within } from "@/test-utils";
 import LearnPage from "../learn/page";
-import { WEBINARS_URL } from "@/constants/links";
+import { DOCS_URL, WEBINARS_URL } from "@/constants/links";
 
 type ExpectedTalk = {
   id: string;
@@ -96,16 +96,6 @@ function sessionOnPage(id: string) {
 }
 
 describe("LearnPage", () => {
-  const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = "https://docs.example.com";
-  });
-
-  afterEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
-  });
-
   it("shows every entry, in the order we published them", () => {
     render(<LearnPage />);
     const onPage = screen
@@ -201,7 +191,7 @@ describe("LearnPage", () => {
     const main = within(screen.getByRole("main"));
     expect(main.getByRole("link", { name: "Documentation" })).toHaveAttribute(
       "href",
-      "https://docs.example.com",
+      DOCS_URL,
     );
     expect(
       main.getByRole("link", { name: "Upcoming sessions" }),
