@@ -30,3 +30,13 @@ export const PIPECAT_SEMANTIC_WER_URL =
  * transcription segment is received. Linked from the STT results About tab. */
 export const PIPECAT_STT_TTFS_URL =
   "https://github.com/pipecat-ai/stt-benchmark#ttfs-measurement";
+
+/** Calibrate's own documentation. Set NEXT_PUBLIC_DOCS_URL to point a
+ * self-hosted copy at its own docs site. */
+export const DOCS_URL =
+  process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.calibrate.artpark.ai";
+
+/** How to connect an already-deployed agent to Calibrate: the endpoint shape,
+ * configuring it, verifying it, and benchmarking across models. Linked from the
+ * agent's Connection tab. */
+export const AGENT_CONNECTIONS_DOCS_URL = `${DOCS_URL}/core-concepts/agent-connections`;

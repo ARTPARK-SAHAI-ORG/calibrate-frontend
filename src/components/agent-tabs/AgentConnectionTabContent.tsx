@@ -20,6 +20,7 @@ import {
   BENCHMARK_PROVIDERS,
   DEFAULT_BENCHMARK_PROVIDER,
 } from "@/components/agent-tabs/benchmarkProviders";
+import { AGENT_CONNECTIONS_DOCS_URL } from "@/constants/links";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -413,7 +414,15 @@ export function AgentConnectionTabContent({
             />
             <p className="text-xs text-muted-foreground">
               Calibrate will create a POST request to this URL with the{" "}
-              {isGeneral ? "input" : "conversation messages"}
+              {isGeneral ? "input" : "conversation messages"}.{" "}
+              <a
+                href={AGENT_CONNECTIONS_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                Read how to connect your agent
+              </a>
             </p>
           </div>
 

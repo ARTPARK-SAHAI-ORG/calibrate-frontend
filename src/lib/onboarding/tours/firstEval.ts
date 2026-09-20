@@ -20,7 +20,7 @@ import {
   isDefaultEvaluator,
   type EvaluatorData,
 } from "@/lib/evaluatorApi";
-import { WHATSAPP_INVITE_URL } from "@/constants/links";
+import { DOCS_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
   clickByText,
   clickElement,
@@ -37,14 +37,12 @@ export const FIRST_EVAL_TOUR_ID = "first-eval";
 
 // The welcome card's help links (driver.js renders the description as HTML).
 function welcomeDescription(): string {
-  const docsUrl =
-    process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.calibrate.artpark.ai";
   // No underline (modern link style); the accent color + weight signal it.
   const link = (href: string, text: string) =>
     `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--tour-link, #6366f1);font-weight:500;text-decoration:none;">${text}</a>`;
   const links = [
     link(WHATSAPP_INVITE_URL, "Talk to us"),
-    link(docsUrl, "Read the docs"),
+    link(DOCS_URL, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
   const bodyStyle = 'style="line-height:1.55;"';
   const gapStyle = 'style="margin-top:0.75em;line-height:1.55;"';
