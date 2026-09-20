@@ -541,7 +541,7 @@ export function AgentConnectionTabContent({
                 </label>
                 <p className="text-xs text-muted-foreground">
                   Calibrate sends a model name with every request, so the same
-                  tests can be run on several models.
+                  tests can be run on several models
                 </p>
               </div>
               <button
@@ -570,7 +570,7 @@ export function AgentConnectionTabContent({
                 </label>
                 <p className="text-xs text-muted-foreground">
                   Choose the provider your agent uses to route model requests
-                  during benchmarks.
+                  during benchmarks
                 </p>
                 <div className="relative">
                   <select
