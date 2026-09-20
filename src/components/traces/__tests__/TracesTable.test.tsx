@@ -35,7 +35,7 @@ function renderTable(
     disabled: false,
     label: "Select trace",
   }));
-  render(
+  const view = render(
     <TracesTable
       traces={[trace()]}
       checkboxProps={checkboxProps}
@@ -47,7 +47,7 @@ function renderTable(
       {...props}
     />,
   );
-  return { onOpen, onDelete, onToggleSelectAll };
+  return { ...view, onOpen, onDelete, onToggleSelectAll };
 }
 
 describe("formatTraceDate", () => {
@@ -252,7 +252,7 @@ describe("TracesTable", () => {
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
     expect(header.style.gridTemplateColumns).toBe(
-      "40px 400px 400px 10ch 10ch 160px auto",
+      "40px 400px 400px 10ch 11ch 160px auto",
     );
   });
 
@@ -296,7 +296,8 @@ describe("TracesTable", () => {
       ],
       traces: [trace({})],
     });
-    const expected = `40px 400px 400px 10ch ${longName.length + 1}ch 160px auto`;
+    // The name plus the arrow that orders the column.
+    const expected = `40px 400px 400px 10ch ${longName.length + 3}ch 160px auto`;
     const header = screen
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
@@ -341,5 +342,62 @@ describe("TracesTable", () => {
     const { onToggleSelectAll } = renderTable();
     await user.click(screen.getByLabelText("Select all traces"));
     expect(onToggleSelectAll).toHaveBeenCalled();
+  });
+
+  it("orders the list by an evaluator when its heading is clicked", async () => {
+    const user = setupUser();
+    const onSortByEvaluator = jest.fn();
+    renderTable({
+      scoreColumns: columns,
+      sortByEvaluator: "ev-1",
+      sortOrder: "asc",
+      onSortByEvaluator,
+      traces: [trace({})],
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: /^Sort traces by Tone/ }),
+    );
+    expect(onSortByEvaluator).toHaveBeenCalledWith("ev-1");
+  });
+
+  it("turns the arrow round to show which way the order runs", () => {
+    const arrowClass = () => {
+      const arrow = screen
+        .getByRole("button", { name: /^Sort traces by Tone/ })
+        .querySelector("svg");
+      expect(arrow).not.toBeNull();
+      return arrow?.getAttribute("class") ?? "";
+    };
+    const sorted = (sortOrder: "asc" | "desc") => ({
+      scoreColumns: columns,
+      sortByEvaluator: "ev-1",
+      sortOrder,
+      onSortByEvaluator: jest.fn(),
+      traces: [trace({})],
+    });
+
+    const desc = renderTable(sorted("desc"));
+    expect(arrowClass()).not.toContain("rotate-180");
+    desc.unmount();
+
+    renderTable(sorted("asc"));
+    expect(arrowClass()).toContain("rotate-180");
+    // The arrow is the only thing that shows it on screen, so the heading has
+    // to say it too.
+    expect(
+      screen.getByRole("button", {
+        name: "Sort traces by Tone, ordered lowest first",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the evaluator heading as plain text when the list cannot be ordered", () => {
+    renderTable({ scoreColumns: columns, traces: [trace({})] });
+
+    expect(
+      screen.queryByRole("button", { name: /^Sort traces by/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("Tone").length).toBeGreaterThan(0);
   });
 });

@@ -1,12 +1,18 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTraces } from "@/hooks/useTraces";
 import { fetchTraces } from "@/lib/tracesApi";
-import type { TraceOutputFilter } from "@/lib/tracesApi";
+import type {
+  TraceOutputFilter,
+  TraceScoreFilters,
+  TraceSortOrder,
+} from "@/lib/tracesApi";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
+  // The hook builds its own key from the real helper, so keep that one real.
+  traceScoreParams: jest.requireActual("../../lib/tracesApi").traceScoreParams,
   fetchTraces: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
@@ -47,6 +53,9 @@ describe("useTraces", () => {
       q: "",
       outputType: "all",
       labels: [],
+      scores: {},
+      sortByEvaluator: null,
+      sortOrder: "desc",
       includeScoreAverages: true,
     });
   });
@@ -406,6 +415,9 @@ describe("useTraces", () => {
         q: "",
         outputType: "all",
         labels: ["production"],
+        scores: {},
+        sortByEvaluator: null,
+        sortOrder: "desc",
         includeScoreAverages: true,
       }),
     );
@@ -661,6 +673,65 @@ describe("useTraces score averages", () => {
     );
   });
 
+  it("asks again when the score conditions change, and not when the order does", async () => {
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1" }], 1),
+      score_averages: averages,
+    });
+
+    const { result, rerender } = renderHook(
+      ({
+        scores,
+        sortByEvaluator,
+      }: {
+        scores: Record<string, string>;
+        sortByEvaluator: string | null;
+      }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId: "ag-1",
+          scores,
+          sortByEvaluator,
+        }),
+      { initialProps: { scores: {}, sortByEvaluator: null } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // The backend narrows the averages by the same conditions, so the cards
+    // above the table would otherwise describe a different set of traces
+    // than the rows underneath them.
+    const narrowed = [{ ...averages[0], traces_scored: 2, average: 0 }];
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t2" }], 1),
+      score_averages: narrowed,
+    });
+    rerender({ scores: { "ev-1": "failed" }, sortByEvaluator: null });
+
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({
+          scores: { "ev-1": "failed" },
+          includeScoreAverages: true,
+        }),
+      ),
+    );
+    await waitFor(() => expect(result.current.scoreAverages).toEqual(narrowed));
+
+    // Ordering the list changes nothing about which traces match, so paying
+    // for another pass over all of them would be waste.
+    rerender({ scores: { "ev-1": "failed" }, sortByEvaluator: "ev-1" });
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({
+          sortByEvaluator: "ev-1",
+          includeScoreAverages: false,
+        }),
+      ),
+    );
+  });
+
   it("does not ask again for the next page, and keeps the averages on screen", async () => {
     mockFetchTraces.mockResolvedValue({
       ...page([{ uuid: "t1" }], 120),
@@ -711,5 +782,141 @@ describe("useTraces score averages", () => {
     expect(result.current.scoreAverages).toEqual(averages);
     unmount();
     setIntervalSpy.mockRestore();
+  });
+});
+
+describe("useTraces score filters and evaluator sorting", () => {
+  it("sends the picked score conditions and the evaluator to sort by", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+
+    const { result } = renderHook(() =>
+      useTraces({
+        accessToken: "tok",
+        agentId: "ag-1",
+        scores: { "ev-1": "failed", "ev-2": ">=4" },
+        sortByEvaluator: "ev-2",
+        sortOrder: "asc",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({
+        scores: { "ev-1": "failed", "ev-2": ">=4" },
+        sortByEvaluator: "ev-2",
+        sortOrder: "asc",
+      }),
+    );
+  });
+
+  it("returns to the first page when the score conditions change", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 200));
+
+    const { result, rerender } = renderHook(
+      ({ scores }: { scores: TraceScoreFilters }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", scores }),
+      { initialProps: { scores: {} as TraceScoreFilters } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ scores: { "ev-1": "passed" } });
+
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({
+          scores: { "ev-1": "passed" },
+          offset: 0,
+        }),
+      ),
+    );
+  });
+
+  it("returns to the first page when the sorted evaluator or its direction changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 200));
+
+    const { result, rerender } = renderHook(
+      ({
+        sortByEvaluator,
+        sortOrder,
+      }: {
+        sortByEvaluator: string | null;
+        sortOrder: TraceSortOrder;
+      }) =>
+        useTraces({
+          accessToken: "tok",
+          agentId: "ag-1",
+          sortByEvaluator,
+          sortOrder,
+        }),
+      {
+        initialProps: {
+          sortByEvaluator: null as string | null,
+          sortOrder: "desc" as TraceSortOrder,
+        },
+      },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ sortByEvaluator: "ev-1", sortOrder: "desc" });
+    await waitFor(() => expect(result.current.offset).toBe(0));
+
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ sortByEvaluator: "ev-1", sortOrder: "asc" });
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ sortByEvaluator: "ev-1", sortOrder: "asc" }),
+    );
+  });
+
+  it("does not refetch when the same conditions arrive in a new object", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+
+    const { result, rerender } = renderHook(
+      ({ scores }: { scores: TraceScoreFilters }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", scores }),
+      { initialProps: { scores: { "ev-1": "passed" } } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockFetchTraces).toHaveBeenCalledTimes(1);
+
+    rerender({ scores: { "ev-1": "passed" } });
+
+    await waitFor(() => expect(mockFetchTraces).toHaveBeenCalledTimes(1));
+  });
+
+  it("reports the score conditions the rows on screen came from", async () => {
+    let resolvePage: (value: unknown) => void = () => {};
+    mockFetchTraces.mockResolvedValueOnce(page([{ uuid: "a" }], 1));
+
+    const { result, rerender } = renderHook(
+      ({ scores }: { scores: TraceScoreFilters }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", scores }),
+      { initialProps: { scores: {} as TraceScoreFilters } },
+    );
+    await waitFor(() => expect(result.current.loadedScores).toEqual({}));
+
+    mockFetchTraces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePage = resolve;
+      }),
+    );
+    rerender({ scores: { "ev-1": "failed" } });
+    // The new filter is in flight, so the rows are still the old ones.
+    expect(result.current.loadedScores).toEqual({});
+
+    await act(async () => {
+      resolvePage(page([], 0));
+    });
+    expect(result.current.loadedScores).toEqual({ "ev-1": "failed" });
   });
 });

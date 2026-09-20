@@ -157,6 +157,30 @@ export type TraceScoreAverage = {
   scale_max?: number | null;
 };
 
+/**
+ * One condition per evaluator, keyed by the evaluator's id. A trace is listed
+ * only when every one of them holds against its latest scoring run.
+ *
+ * A condition is either `passed` / `failed`, which read the same verdict the
+ * table shows, or a comparison against a rating's number: `=4`, `!=4`, `<4`,
+ * `<=4`, `>4`, `>=4`.
+ */
+export type TraceScoreFilters = Record<string, string>;
+
+/**
+ * The repeated `score` value both the list and the bulk endpoints read, one
+ * `evaluator:condition` per entry. Written once here so the two callers cannot
+ * disagree about the format.
+ */
+export function traceScoreParams(scores?: TraceScoreFilters): string[] {
+  return Object.entries(scores ?? {})
+    .filter(([uuid, condition]) => uuid && condition)
+    .map(([uuid, condition]) => `${uuid}:${condition}`);
+}
+
+/** Which way a sorted column runs. */
+export type TraceSortOrder = "asc" | "desc";
+
 export type TraceListParams = {
   limit: number;
   offset: number;
@@ -176,6 +200,15 @@ export type TraceListParams = {
   /** Keep only traces carrying any of these labels, matched exactly and
    *  case-sensitively. An empty list is left off here. */
   labels?: string[];
+  /** Keep only traces whose latest scores match every one of these
+   *  conditions. An empty set is left off here. */
+  scores?: TraceScoreFilters;
+  /** Order by this evaluator's score rather than newest first. Traces it has
+   *  not scored come last whichever way the order runs, since an unscored
+   *  trace is unknown rather than zero. */
+  sortByEvaluator?: string | null;
+  /** Which way `sortByEvaluator` runs. Ignored without it. */
+  sortOrder?: TraceSortOrder;
 };
 
 /**
@@ -193,6 +226,9 @@ export async function fetchTraces(
     q,
     outputType,
     labels,
+    scores,
+    sortByEvaluator,
+    sortOrder,
     includeScoreAverages,
   }: TraceListParams,
 ): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
@@ -205,6 +241,11 @@ export async function fetchTraces(
     params.set("output_type", outputType);
   }
   for (const label of labels ?? []) params.append("labels", label);
+  for (const score of traceScoreParams(scores)) params.append("score", score);
+  if (sortByEvaluator) {
+    params.set("sort_by_evaluator", sortByEvaluator);
+    params.set("sort_order", sortOrder ?? "desc");
+  }
   // Averages read every matching trace, not the page, so they are asked for
   // when the filters change and left off while paging through the result.
   if (includeScoreAverages) params.set("include_score_averages", "true");
@@ -353,6 +394,7 @@ export type TraceFilters = {
   q?: string;
   outputType?: TraceOutputFilter;
   labels?: string[];
+  scores?: TraceScoreFilters;
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -366,6 +408,8 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
     body.output_type = filters.outputType;
   }
   if (filters.labels?.length) body.labels = filters.labels;
+  const score = traceScoreParams(filters.scores);
+  if (score.length) body.score = score;
   return body;
 }
 

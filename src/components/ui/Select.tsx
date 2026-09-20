@@ -18,7 +18,7 @@ export function Select({
     <div className={`relative ${wrapperClassName}`}>
       <select
         {...rest}
-        className={`appearance-none w-full h-10 pl-3 pr-9 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:bg-muted/30 disabled:text-muted-foreground ${className}`}
+        className={`appearance-none w-full h-10 pl-3 pr-9 rounded-md text-sm border border-border bg-background text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:bg-muted/30 disabled:text-muted-foreground ${className}`}
       >
         {children}
       </select>

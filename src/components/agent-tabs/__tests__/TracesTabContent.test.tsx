@@ -229,6 +229,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
       agentId: string;
       outputType?: string;
       labels?: string[];
+      scores?: Record<string, string>;
     } | null;
     agentNature?: string;
     onConverted: (
@@ -247,6 +248,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
                 selectAll.labels ?? []
               ).join(",")}`
             : "none"}
+        </span>
+        <span data-testid="convert-select-all-scores">
+          {JSON.stringify(selectAll?.scores ?? null)}
         </span>
         <span data-testid="convert-nature">{agentNature}</span>
         <button
@@ -302,6 +306,7 @@ function tracesResult(
     loadedQ: "",
     loadedOutputType: "all",
     loadedLabels: [],
+    loadedScores: {},
     scoreAverages: [],
     offset: 0,
     setOffset: jest.fn(),
@@ -2219,5 +2224,269 @@ describe("TracesTabContent", () => {
     );
     rerender(<TracesTabContent {...tabProps} />);
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-3");
+  });
+
+  describe("narrowing and ordering the list by what the evaluators scored", () => {
+    it("asks the backend for the traces an evaluator marked a certain way", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      expect(lastTracesArgs().scores).toEqual({});
+      await user.selectOptions(
+        screen.getByLabelText("Filter traces by Tone"),
+        "failed",
+      );
+
+      await waitFor(() =>
+        expect(lastTracesArgs().scores).toEqual({ "ev-1": "failed" }),
+      );
+    });
+
+    it("offers a rating evaluator's own scores, taken from the running averages", async () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "rating",
+              scale_min: 1,
+              scale_max: 3,
+              traces_scored: 6,
+              average: 2,
+            },
+          ],
+        }),
+      );
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      const picker = screen.getByLabelText("Filter traces by Tone");
+      // Each score on the scale, and the middle ones with everything below.
+      expect(
+        Array.from(picker.querySelectorAll("option")).map((o) => o.textContent),
+      ).toEqual([
+        "Tone: any score",
+        "Tone: scored 1",
+        "Tone: scored 2",
+        "Tone: scored 3",
+        "Tone: scored 2 or below",
+      ]);
+
+      await user.selectOptions(picker, "<=2");
+      await waitFor(() =>
+        expect(lastTracesArgs().scores).toEqual({ "ev-1": "<=2" }),
+      );
+    });
+
+    it("orders the list by an evaluator's scores, turns the order round, then goes back to newest first", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      expect(lastTracesArgs().sortByEvaluator).toBeNull();
+      const heading = () =>
+        screen.getByRole("button", { name: /^Sort traces by Tone/ });
+
+      // Lowest first, where the poor answers are.
+      await user.click(heading());
+      await waitFor(() =>
+        expect(lastTracesArgs().sortByEvaluator).toBe("ev-1"),
+      );
+      expect(lastTracesArgs().sortOrder).toBe("asc");
+
+      await user.click(heading());
+      await waitFor(() => expect(lastTracesArgs().sortOrder).toBe("desc"));
+      expect(lastTracesArgs().sortByEvaluator).toBe("ev-1");
+
+      await user.click(heading());
+      await waitFor(() => expect(lastTracesArgs().sortByEvaluator).toBeNull());
+    });
+
+    it("says nothing matched instead of the setup steps when a score is picked", async () => {
+      // Nothing carries the score, and the rows for it have not arrived yet, so
+      // `loadedScores` is still empty: exactly the moment after the pick.
+      mockUseTraces.mockImplementation(
+        (args: { scores: Record<string, string> }) =>
+          Object.keys(args.scores).length > 0
+            ? tracesResult([], { total: 0 })
+            : tracesResult([trace()]),
+      );
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.selectOptions(
+        screen.getByLabelText("Filter traces by Tone"),
+        "failed",
+      );
+
+      expect(
+        screen.getByText("No traces match your filter"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("traces-empty-state"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("drops the ticked rows when a score is picked", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    expect(screen.getByText("1")).toBeInTheDocument();
+
+    await user.selectOptions(
+      screen.getByLabelText("Filter traces by Tone"),
+      "failed",
+    );
+
+    // The rows the reader ticked may not be in the narrowed list at all, so
+    // nothing is left ticked for the next action to work on.
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
+  it("counts the kinds of trace under the picked score, not the whole list", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    fetchTraces.mockImplementation(
+      async (_token: string, params: { outputType: string }) => ({
+        items: [],
+        total: params.outputType === "response" ? 4 : 0,
+        limit: 1,
+        offset: 0,
+      }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.selectOptions(
+      screen.getByLabelText("Filter traces by Tone"),
+      "failed",
+    );
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    await waitFor(() => expect(fetchTraces).toHaveBeenCalled());
+    for (const [, params] of fetchTraces.mock.calls) {
+      expect(params.scores).toEqual({ "ev-1": "failed" });
+    }
+  });
+
+  it("hands the bulk action the score the reader picked", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    fetchTraces.mockImplementation(
+      async (_token: string, params: { outputType: string }) => ({
+        items: [],
+        total: params.outputType === "response" ? 4 : 0,
+        limit: 1,
+        offset: 0,
+      }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.selectOptions(
+      screen.getByLabelText("Filter traces by Tone"),
+      "failed",
+    );
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    // The backend re-reads the rows from this, so a missing condition would
+    // turn tests out of every trace rather than the ones on screen.
+    await waitFor(() =>
+      expect(screen.getByTestId("convert-select-all-scores")).toHaveTextContent(
+        JSON.stringify({ "ev-1": "failed" }),
+      ),
+    );
+  });
+
+  it("keeps a rating's own scores in its picker after the filter hides them", async () => {
+    const rated = {
+      items: [trace({ uuid: "trace-1" })],
+      scoreAverages: [
+        {
+          evaluator_uuid: "ev-1",
+          name: "Tone",
+          output_type: "rating" as const,
+          traces_scored: 3,
+          average: 4,
+          scale_min: 1,
+          scale_max: 5,
+        },
+      ],
+    };
+    mockUseTraces.mockReturnValue(tracesResult(rated.items, rated));
+    const user = setupUser();
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    const picker = () => screen.getByLabelText("Filter traces by Tone");
+    await user.selectOptions(picker(), "<=2");
+    expect(picker()).toHaveValue("<=2");
+
+    // The backend narrows the averages by the same filter, so an evaluator
+    // that scored none of the matching traces comes back with nothing
+    // describing it. Its numbers still have to be on offer.
+    mockUseTraces.mockReturnValue(tracesResult([], { scoreAverages: [] }));
+    rerender(<TracesTabContent {...tabProps} />);
+
+    expect(picker()).toHaveValue("<=2");
+    expect(
+      screen.getByRole("option", { name: "Tone: scored 2 or below" }),
+    ).toBeInTheDocument();
+  });
+
+  it("starts the order again when a different evaluator is picked to sort by", async () => {
+    const twoEvaluators = {
+      ...tabProps,
+      traceScoring: {
+        ...traceScoring,
+        eligibility: {
+          eligible: [
+            {
+              evaluator_uuid: "ev-1",
+              evaluator_version_id: "v1",
+              name: "Tone",
+            },
+            {
+              evaluator_uuid: "ev-2",
+              evaluator_version_id: "v2",
+              name: "Accuracy",
+            },
+          ],
+          ineligible: [],
+        },
+      },
+    };
+    const user = setupUser();
+    render(<TracesTabContent {...twoEvaluators} />);
+
+    const tone = () =>
+      screen.getByRole("button", { name: /^Sort traces by Tone/ });
+    await user.click(tone());
+    await user.click(tone());
+    expect(lastTracesArgs()).toMatchObject({
+      sortByEvaluator: "ev-1",
+      sortOrder: "desc",
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: /^Sort traces by Accuracy/ }),
+    );
+
+    // A new column starts at its own lowest scores, not halfway through the
+    // cycle the last one was in.
+    expect(lastTracesArgs()).toMatchObject({
+      sortByEvaluator: "ev-2",
+      sortOrder: "asc",
+    });
   });
 });
