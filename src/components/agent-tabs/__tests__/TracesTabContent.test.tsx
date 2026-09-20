@@ -368,15 +368,34 @@ beforeEach(() => {
  */
 async function applyTraceFilter(
   user: ReturnType<typeof setupUser>,
-  { output, labels = [] }: { output?: string; labels?: string[] },
+  {
+    output,
+    labels = [],
+    scores = {},
+  }: {
+    output?: string;
+    labels?: string[];
+    /** Evaluator name to the condition picked for it, e.g. `{ Tone: "failed" }`. */
+    scores?: Record<string, string>;
+  },
 ) {
-  await user.click(screen.getByRole("button", { name: "Filter traces" }));
+  await openTraceFilter(user);
   if (output) await user.click(screen.getByRole("button", { name: output }));
   for (const label of labels) {
     await user.click(screen.getByRole("checkbox", { name: label }));
   }
+  for (const [name, condition] of Object.entries(scores)) {
+    await user.selectOptions(
+      screen.getByLabelText(`Filter traces by ${name}`),
+      condition,
+    );
+  }
   await user.click(screen.getByRole("button", { name: /^Apply/ }));
 }
+
+/** The panel the pickers live in, for a test that only reads what is offered. */
+const openTraceFilter = (user: ReturnType<typeof setupUser>) =>
+  user.click(screen.getByRole("button", { name: "Filter traces" }));
 
 function lastTracesArgs() {
   return mockUseTraces.mock.calls[mockUseTraces.mock.calls.length - 1][0];
@@ -2232,10 +2251,7 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
 
       expect(lastTracesArgs().scores).toEqual({});
-      await user.selectOptions(
-        screen.getByLabelText("Filter traces by Tone"),
-        "failed",
-      );
+      await applyTraceFilter(user, { scores: { Tone: "failed" } });
 
       await waitFor(() =>
         expect(lastTracesArgs().scores).toEqual({ "ev-1": "failed" }),
@@ -2261,19 +2277,21 @@ describe("TracesTabContent", () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
 
+      await openTraceFilter(user);
       const picker = screen.getByLabelText("Filter traces by Tone");
       // Each score on the scale, and the middle ones with everything below.
       expect(
         Array.from(picker.querySelectorAll("option")).map((o) => o.textContent),
       ).toEqual([
-        "Tone: any score",
-        "Tone: scored 1",
-        "Tone: scored 2",
-        "Tone: scored 3",
-        "Tone: scored 2 or below",
+        "Any score",
+        "Scored 1",
+        "Scored 2",
+        "Scored 3",
+        "Scored 2 or below",
       ]);
 
       await user.selectOptions(picker, "<=2");
+      await user.click(screen.getByRole("button", { name: /^Apply/ }));
       await waitFor(() =>
         expect(lastTracesArgs().scores).toEqual({ "ev-1": "<=2" }),
       );
@@ -2314,10 +2332,7 @@ describe("TracesTabContent", () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
 
-      await user.selectOptions(
-        screen.getByLabelText("Filter traces by Tone"),
-        "failed",
-      );
+      await applyTraceFilter(user, { scores: { Tone: "failed" } });
 
       expect(
         screen.getByText("No traces match your filter"),
@@ -2338,10 +2353,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByLabelText("Select all traces"));
     expect(screen.getByText("1")).toBeInTheDocument();
 
-    await user.selectOptions(
-      screen.getByLabelText("Filter traces by Tone"),
-      "failed",
-    );
+    await applyTraceFilter(user, { scores: { Tone: "failed" } });
 
     // The rows the reader ticked may not be in the narrowed list at all, so
     // nothing is left ticked for the next action to work on.
@@ -2363,10 +2375,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    await user.selectOptions(
-      screen.getByLabelText("Filter traces by Tone"),
-      "failed",
-    );
+    await applyTraceFilter(user, { scores: { Tone: "failed" } });
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
@@ -2392,10 +2401,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    await user.selectOptions(
-      screen.getByLabelText("Filter traces by Tone"),
-      "failed",
-    );
+    await applyTraceFilter(user, { scores: { Tone: "failed" } });
     await user.click(screen.getByLabelText("Select all traces"));
     await user.click(screen.getByText("Select all 4 traces"));
     await user.click(screen.getByText("Add to tests (4)"));
@@ -2429,8 +2435,7 @@ describe("TracesTabContent", () => {
     const { rerender } = render(<TracesTabContent {...tabProps} />);
 
     const picker = () => screen.getByLabelText("Filter traces by Tone");
-    await user.selectOptions(picker(), "<=2");
-    expect(picker()).toHaveValue("<=2");
+    await applyTraceFilter(user, { scores: { Tone: "<=2" } });
 
     // The backend narrows the averages by the same filter, so an evaluator
     // that scored none of the matching traces comes back with nothing
@@ -2438,9 +2443,10 @@ describe("TracesTabContent", () => {
     mockUseTraces.mockReturnValue(tracesResult([], { scoreAverages: [] }));
     rerender(<TracesTabContent {...tabProps} />);
 
+    await openTraceFilter(user);
     expect(picker()).toHaveValue("<=2");
     expect(
-      screen.getByRole("option", { name: "Tone: scored 2 or below" }),
+      screen.getByRole("option", { name: "Scored 2 or below" }),
     ).toBeInTheDocument();
   });
 

@@ -12,10 +12,6 @@ import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog
 import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
-  TraceScoreFilterBar,
-  type TraceScoreFilterEvaluator,
-} from "@/components/traces/TraceScoreFilterBar";
-import {
   AddRunToLabellingTaskDialog,
   isLabellableOutput,
   isToolCallOutput,
@@ -28,7 +24,10 @@ import {
   SubmitForLabellingButton,
   SUBMIT_FOR_LABELLING_CLASS,
 } from "@/components/human-labelling/labellingSubmit";
-import { TracesFilter } from "@/components/traces/TracesFilter";
+import {
+  TracesFilter,
+  type TraceScoreFilterEvaluator,
+} from "@/components/traces/TracesFilter";
 import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -135,11 +134,12 @@ export function TracesTabContent({
   );
   const [labelFilter, setLabelFilter] = useState<string[]>([]);
 
-  // One condition per evaluator, all of which have to hold. Clicking an
-  // evaluator column orders the list by its scores, lowest first, which is
-  // where the poor answers are and what every other sortable table here does;
-  // clicking it again turns the order round, and once more goes back to
-  // newest first.
+  // One condition per evaluator, all of which have to hold. They are picked
+  // in the same panel as the output kind and the labels, and applied with
+  // them. Clicking an evaluator column orders the list by its scores, lowest
+  // first, which is where the poor answers are and what every other sortable
+  // table here does; clicking it again turns the order round, and once more
+  // goes back to newest first.
   const [scoreFilter, setScoreFilter] = useState<TraceScoreFilters>({});
   const [sortByEvaluator, setSortByEvaluator] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<TraceSortOrder>("asc");
@@ -751,11 +751,17 @@ export function TracesTabContent({
           {/* One control for both the output kind and the labels, so the row
               stays the search box and the thing that narrows it. */}
           <TracesFilter
-            value={{ outputType: outputFilter, labels: labelFilter }}
+            value={{
+              outputType: outputFilter,
+              labels: labelFilter,
+              scores: scoreFilter,
+            }}
             labels={allLabels}
+            scoreEvaluators={scoreFilterEvaluators}
             onApply={(next) => {
               setOutputFilter(next.outputType);
               setLabelFilter(next.labels);
+              setScoreFilter(next.scores);
             }}
           />
           {/* Not a filter, so it sits apart from the two that are, at the

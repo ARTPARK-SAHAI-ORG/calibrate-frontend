@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { SegmentedFilter } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { FilterIcon } from "@/components/icons";
-import type { TraceOutputFilter } from "@/lib/tracesApi";
+import { defaultBinaryLabel } from "@/lib/binaryLabels";
+import type { TraceOutputFilter, TraceScoreFilters } from "@/lib/tracesApi";
 
 /** What a trace's output can be filtered down to. A trace that both replied
  *  and called tools counts as a reply, which is also how "Add to tests"
@@ -19,15 +20,72 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
 /** Past this many labels the list is worth searching rather than scrolling. */
 const SEARCH_LABELS_FROM = 8;
 
+/** One evaluator the list can be narrowed by, with whatever the scores the
+ *  page has seen say about how it judges. A rating is offered by its numbers,
+ *  so an evaluator whose scale is not known yet falls back to the verdict. */
+export type TraceScoreFilterEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+  output_type?: "binary" | "rating" | null;
+  scale_min?: number | null;
+  scale_max?: number | null;
+};
+
+/**
+ * What one evaluator can be narrowed by. A yes-or-no evaluator offers its two
+ * verdicts, in the same words its cells use. A rating offers each score on its
+ * scale, and each score with everything below it, which is how a reader looks
+ * for the poor answers. Neither end gets an "or below": on the lowest score it
+ * would mean the same as the score itself, and on the highest it would mean
+ * the whole scale.
+ */
+export function scoreConditionOptions(
+  evaluator: TraceScoreFilterEvaluator,
+  // `value` is the condition sent to the backend, e.g. "failed" or "<=3";
+  // `label` is what the option reads as beside the evaluator's name.
+): { value: string; label: string }[] {
+  const min = evaluator.scale_min;
+  const max = evaluator.scale_max;
+  if (
+    evaluator.output_type !== "rating" ||
+    typeof min !== "number" ||
+    typeof max !== "number" ||
+    max <= min
+  ) {
+    return [
+      { value: "passed", label: defaultBinaryLabel(true) },
+      { value: "failed", label: defaultBinaryLabel(false) },
+    ];
+  }
+  const values = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  return [
+    ...values.map((value) => ({
+      value: `=${value}`,
+      label: `Scored ${value}`,
+    })),
+    ...values.slice(1, -1).map((value) => ({
+      value: `<=${value}`,
+      label: `Scored ${value} or below`,
+    })),
+  ];
+}
+
 export type TracesFilterValue = {
   outputType: TraceOutputFilter;
   labels: string[];
+  /** One condition per evaluator, all of which have to hold. */
+  scores: TraceScoreFilters;
 };
 
 /** How many choices are on, so the button can say so without being opened.
- *  Each picked label counts, since that is what the reader ticked. */
+ *  Each picked label counts, since that is what the reader ticked, and so does
+ *  each evaluator the reader has set a condition on. */
 function traceFilterCount(value: TracesFilterValue): number {
-  return (value.outputType === "all" ? 0 : 1) + value.labels.length;
+  return (
+    (value.outputType === "all" ? 0 : 1) +
+    value.labels.length +
+    Object.keys(value.scores).length
+  );
 }
 
 /**
@@ -39,11 +97,15 @@ function traceFilterCount(value: TracesFilterValue): number {
 export function TracesFilter({
   value,
   labels,
+  scoreEvaluators = [],
   onApply,
 }: {
   value: TracesFilterValue;
   /** Every label the agent's traces carry, not just the ones on this page. */
   labels: string[];
+  /** The evaluators that score this agent's traces. None leaves the scores
+   *  section out, the way no labels leaves the labels section out. */
+  scoreEvaluators?: TraceScoreFilterEvaluator[];
   onApply: (next: TracesFilterValue) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -77,6 +139,14 @@ export function TracesFilter({
     setLabelSearch("");
     setOpen(true);
   };
+
+  const setScore = (evaluatorUuid: string, condition: string) =>
+    setDraft((d) => {
+      const scores = { ...d.scores };
+      if (condition) scores[evaluatorUuid] = condition;
+      else delete scores[evaluatorUuid];
+      return { ...d, scores };
+    });
 
   const toggleLabel = (label: string) =>
     setDraft((d) => ({
@@ -127,6 +197,41 @@ export function TracesFilter({
             ariaLabel="Filter traces by output"
           />
 
+          {scoreEvaluators.length > 0 && (
+            <>
+              <p className="text-xs text-muted-foreground mt-3 mb-1.5">
+                Scores
+              </p>
+              <div className="space-y-1.5">
+                {scoreEvaluators.map((evaluator) => (
+                  <label
+                    key={evaluator.evaluator_uuid}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="flex-1 min-w-0 truncate text-sm">
+                      {evaluator.name}
+                    </span>
+                    <select
+                      value={draft.scores[evaluator.evaluator_uuid] ?? ""}
+                      onChange={(e) =>
+                        setScore(evaluator.evaluator_uuid, e.target.value)
+                      }
+                      aria-label={`Filter traces by ${evaluator.name}`}
+                      className="w-36 h-8 px-2 rounded-md text-sm border border-border bg-background text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="">Any score</option>
+                      {scoreConditionOptions(evaluator).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
           {labels.length > 0 && (
             <>
               <p className="text-xs text-muted-foreground mt-3 mb-1.5">
@@ -173,7 +278,9 @@ export function TracesFilter({
           <div className="flex items-center justify-between border-t border-border mt-3 pt-3">
             <button
               type="button"
-              onClick={() => setDraft({ outputType: "all", labels: [] })}
+              onClick={() =>
+                setDraft({ outputType: "all", labels: [], scores: {} })
+              }
               disabled={draftCount === 0}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
