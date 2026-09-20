@@ -449,9 +449,9 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.queryByText("Model provider")).not.toBeInTheDocument();
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -472,6 +472,39 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.getByText(/"model": "gpt-4.1"/)).toBeInTheDocument();
   });
 
+  function benchmarkBox() {
+    return screen.getByRole("switch", {
+      name: "Support benchmarking different models",
+    }).parentElement!.parentElement!;
+  }
+
+  it("names both switches in the tab, so each can be found on its own", () => {
+    renderComponent();
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    expect(
+      screen.getByRole("switch", {
+        name: "Does your agent return tool calls?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the model provider picker inside the benchmarking box", () => {
+    const { unmount } = renderComponent();
+    expect(benchmarkBox().className).not.toContain("border-foreground/40");
+    unmount();
+
+    renderComponent({
+      connectionConfig: makeConfig({ supports_benchmark: true }),
+    });
+    expect(benchmarkBox().className).toContain("border-foreground/40");
+    expect(benchmarkBox()).toContainElement(screen.getByText("Model provider"));
+  });
+
   it("falls back to a generic model name for an unknown provider", () => {
     renderComponent({
       connectionConfig: makeConfig({
@@ -486,7 +519,7 @@ describe("AgentConnectionTabContent", () => {
     const { onConnectionConfigChange } = renderComponent({
       connectionConfig: makeConfig({ supports_benchmark: true }),
     });
-    const select = screen.getByDisplayValue("OpenRouter (all providers)");
+    const select = screen.getByDisplayValue("OpenRouter");
     fireEvent.change(select, { target: { value: "anthropic" } });
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({ benchmark_provider: "anthropic" }),
@@ -503,9 +536,9 @@ describe("AgentConnectionTabContent", () => {
     });
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
