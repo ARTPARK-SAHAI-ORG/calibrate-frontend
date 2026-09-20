@@ -368,7 +368,7 @@ async function applyTraceFilter(
   await user.click(screen.getByRole("button", { name: "Filter traces" }));
   if (output) await user.click(screen.getByRole("button", { name: output }));
   for (const label of labels) {
-    await user.click(screen.getByRole("button", { name: label }));
+    await user.click(screen.getByRole("checkbox", { name: label }));
   }
   await user.click(screen.getByRole("button", { name: "Apply" }));
 }

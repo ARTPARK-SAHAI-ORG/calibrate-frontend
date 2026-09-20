@@ -26,7 +26,7 @@ export type TracesFilterValue = {
 
 /** How many choices are on, so the button can say so without being opened.
  *  Each picked label counts, since that is what the reader ticked. */
-export function traceFilterCount(value: TracesFilterValue): number {
+function traceFilterCount(value: TracesFilterValue): number {
   return (value.outputType === "all" ? 0 : 1) + value.labels.length;
 }
 
@@ -151,39 +151,18 @@ export function TracesFilter({
                   shown.map((label) => {
                     const checked = draft.labels.includes(label);
                     return (
-                      <button
+                      <label
                         key={label}
-                        type="button"
-                        onClick={() => toggleLabel(label)}
-                        aria-pressed={checked}
-                        className="w-full flex items-center gap-2 px-1 py-1.5 rounded text-sm text-left cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="w-full flex items-center gap-2 px-1 py-1.5 rounded text-sm cursor-pointer hover:bg-muted/50 transition-colors"
                       >
-                        <span
-                          aria-hidden
-                          className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
-                            checked
-                              ? "bg-foreground border-foreground"
-                              : "border-border"
-                          }`}
-                        >
-                          {checked && (
-                            <svg
-                              className="w-2.5 h-2.5 text-background"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
-                        </span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleLabel(label)}
+                          className="w-4 h-4 flex-shrink-0 cursor-pointer accent-foreground"
+                        />
                         <span className="truncate">{label}</span>
-                      </button>
+                      </label>
                     );
                   })
                 )}

@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, setupUser } from "@/test-utils";
 import {
   TracesFilter,
-  traceFilterCount,
   type TracesFilterValue,
 } from "@/components/traces/TracesFilter";
 
@@ -26,7 +25,7 @@ it("reports both choices together, and only once Apply is clicked", async () => 
 
   await openPanel(user);
   await user.click(screen.getByRole("button", { name: "Response" }));
-  await user.click(screen.getByRole("button", { name: "production" }));
+  await user.click(screen.getByRole("checkbox", { name: "production" }));
   expect(onApply).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Apply" }));
@@ -50,14 +49,13 @@ it("counts nothing when no choice is on", () => {
   setup();
 
   expect(screen.queryByText("0")).not.toBeInTheDocument();
-  expect(traceFilterCount(NONE)).toBe(0);
 });
 
 it("drops a tick that was never applied", async () => {
   const { user, onApply } = setup();
 
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "production" }));
+  await user.click(screen.getByRole("checkbox", { name: "production" }));
   // Closing is the reader changing their mind, so the tick goes with it.
   await user.keyboard("{Escape}");
   await openPanel(user);
@@ -115,7 +113,7 @@ it("unticks a label that was already on", async () => {
   const { user, onApply } = setup({ outputType: "all", labels: ["staging"] });
 
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "staging" }));
+  await user.click(screen.getByRole("checkbox", { name: "staging" }));
   await user.click(screen.getByRole("button", { name: "Apply" }));
 
   expect(onApply).toHaveBeenCalledWith({ outputType: "all", labels: [] });
@@ -137,9 +135,9 @@ it("searches the labels once there are enough of them to scroll", async () => {
   await openPanel(user);
   await user.type(screen.getByLabelText("Search labels"), "label-3");
 
-  expect(screen.getByRole("button", { name: "label-3" })).toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "label-3" })).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "label-4" }),
+    screen.queryByRole("checkbox", { name: "label-4" }),
   ).not.toBeInTheDocument();
 });
 
