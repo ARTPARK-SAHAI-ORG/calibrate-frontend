@@ -30,11 +30,17 @@ import {
   AGENT_CONNECTION_EXAMPLE_DOCS_URL,
 } from "@/constants/links";
 
-/** Documentation links on this tab. No underline, so they read as part of the
- * copy around them; the darker colour, the weight and the arrow are what make
- * them stand out from the muted text they sit in. */
+/** A documentation link sitting inside a line of grey helper text. Blue and
+ * medium weight so it does not disappear into the copy around it, with the
+ * arrow instead of an underline to say it opens outside the app. */
 const DOCS_LINK_CLASS =
-  "inline-flex items-center gap-1 font-medium text-foreground hover:text-foreground/70 transition-colors whitespace-nowrap";
+  "inline-flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors whitespace-nowrap";
+
+/** A documentation link that stands on its own rather than inside a sentence,
+ * so it is drawn as a button. Same classes as the blue button on the bulk
+ * upload dialog, so the two cannot drift apart. */
+const DOCS_BUTTON_CLASS =
+  "h-8 px-3 rounded-md text-xs font-semibold border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/60 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -731,10 +737,10 @@ export function AgentConnectionTabContent({
               href={AGENT_CONNECTION_EXAMPLE_DOCS_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className={`${DOCS_LINK_CLASS} text-xs md:text-sm`}
+              className={DOCS_BUTTON_CLASS}
             >
               See an example
-              <ExternalLinkIcon className="w-3 h-3" />
+              <ExternalLinkIcon className="w-3.5 h-3.5" />
             </a>
           </div>
           <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border bg-muted/10">
