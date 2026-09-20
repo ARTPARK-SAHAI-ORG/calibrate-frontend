@@ -248,6 +248,221 @@ describe("Tooltip", () => {
     rectSpy.mockRestore();
   });
 
+  it("lines the popup's right edge up with the trigger when alignEnd is set", async () => {
+    const user = setupUser();
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 400,
+        bottom: 420,
+        left: 500,
+        right: 600,
+        width: 100,
+        height: 20,
+        x: 500,
+        y: 400,
+        toJSON: () => {},
+      } as DOMRect);
+
+    render(
+      <Tooltip content="Right aligned tip" position="top" alignEnd>
+        <button>EndTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("EndTrigger"));
+    const popup = await screen.findByText("Right aligned tip");
+    const box = popup.closest("div.fixed") as HTMLElement;
+
+    // The popup is pulled back by its whole width, so `left` is the trigger's
+    // own right edge rather than its centre.
+    expect(box.style.transform).toBe("translateX(-100%)");
+    expect(parseFloat(box.style.left)).toBe(600);
+    // The arrow moves off the centre to sit near that same right edge.
+    expect(popup.querySelector("div.absolute")?.className).toContain("right-4");
+
+    rectSpy.mockRestore();
+  });
+
+  it("centres the popup when alignEnd is not set", async () => {
+    const user = setupUser();
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 400,
+        bottom: 420,
+        left: 500,
+        right: 600,
+        width: 100,
+        height: 20,
+        x: 500,
+        y: 400,
+        toJSON: () => {},
+      } as DOMRect);
+
+    render(
+      <Tooltip content="Centred tip" position="top">
+        <button>CentreTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("CentreTrigger"));
+    const box = (await screen.findByText("Centred tip")).closest(
+      "div.fixed",
+    ) as HTMLElement;
+    expect(box.style.transform).toBe("translateX(-50%)");
+    expect(parseFloat(box.style.left)).toBe(550);
+
+    rectSpy.mockRestore();
+  });
+
+  it("keeps a right-aligned popup inside the window", async () => {
+    const user = setupUser();
+    // A trigger hard against the left of the window: a popup whose right edge
+    // is lined up with it would hang off the left, so it is pushed back in.
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 400,
+        bottom: 420,
+        left: 0,
+        right: 4,
+        width: 4,
+        height: 20,
+        x: 0,
+        y: 400,
+        toJSON: () => {},
+      } as DOMRect);
+    const width = jest
+      .spyOn(HTMLElement.prototype, "offsetWidth", "get")
+      .mockReturnValue(200);
+
+    render(
+      <Tooltip content="Clamped end tip" position="top" alignEnd>
+        <button>ClampTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("ClampTrigger"));
+    const box = (await screen.findByText("Clamped end tip")).closest(
+      "div.fixed",
+    ) as HTMLElement;
+    // The whole popup sits to the left of `left`, so `left` has to be at
+    // least the popup's width plus the 12px edge gap.
+    await waitFor(() => expect(parseFloat(box.style.left)).toBe(212));
+
+    width.mockRestore();
+    rectSpy.mockRestore();
+  });
+
+  it("puts the caller's own styles on the popup", async () => {
+    const user = setupUser();
+    render(
+      <Tooltip content="Roomy tip" contentStyle={{ width: "24rem" }}>
+        <button>StyledTrigger</button>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("StyledTrigger"));
+    const popup = await screen.findByText("Roomy tip");
+    expect(popup.style.width).toBe("24rem");
+  });
+
+  it("does not move the popup once a close is already on its way", async () => {
+    const user = setupUser();
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 400,
+        bottom: 420,
+        left: 500,
+        right: 600,
+        width: 100,
+        height: 20,
+        x: 500,
+        y: 400,
+        toJSON: () => {},
+      } as DOMRect);
+
+    render(
+      <Tooltip content="Leaving tip" position="top">
+        <button>LeavingTrigger</button>
+      </Tooltip>,
+    );
+
+    const trigger = screen.getByText("LeavingTrigger").parentElement!;
+    await user.hover(screen.getByText("LeavingTrigger"));
+    const box = (await screen.findByText("Leaving tip")).closest(
+      "div.fixed",
+    ) as HTMLElement;
+    await waitFor(() => expect(parseFloat(box.style.left)).toBe(550));
+
+    // The pointer has left and the popup is living out its grace period. The
+    // trigger is being taken off the page, so it now measures as nothing:
+    // measuring again here would park the popup in the corner on the way out.
+    fireEvent.mouseLeave(trigger);
+    rectSpy.mockReturnValue({
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    } as DOMRect);
+    fireEvent.scroll(window);
+
+    expect(parseFloat(box.style.left)).toBe(550);
+    rectSpy.mockRestore();
+  });
+
+  it("keeps positioning itself after the pointer leaves and comes straight back", async () => {
+    const user = setupUser();
+    const rect = (left: number) =>
+      ({
+        top: 400,
+        bottom: 420,
+        left,
+        right: left + 100,
+        width: 100,
+        height: 20,
+        x: left,
+        y: 400,
+        toJSON: () => {},
+      }) as DOMRect;
+    const rectSpy = jest
+      .spyOn(HTMLDivElement.prototype, "getBoundingClientRect")
+      .mockReturnValue(rect(500));
+
+    render(
+      <Tooltip content="Second look" position="top">
+        <button>AgainTrigger</button>
+      </Tooltip>,
+    );
+
+    const trigger = screen.getByText("AgainTrigger").parentElement!;
+    await user.hover(screen.getByText("AgainTrigger"));
+    const box = (await screen.findByText("Second look")).closest(
+      "div.fixed",
+    ) as HTMLElement;
+    await waitFor(() => expect(parseFloat(box.style.left)).toBe(550));
+
+    // Leaving and coming straight back, inside the 150ms the popup waits
+    // before closing. The waiting close has to be forgotten, not just
+    // stopped: a close left on the books freezes the popup where it stood.
+    fireEvent.mouseLeave(trigger);
+    fireEvent.mouseEnter(trigger);
+    rectSpy.mockReturnValue(rect(200));
+    fireEvent.scroll(window);
+
+    expect(screen.getByText("Second look")).toBeInTheDocument();
+    expect(parseFloat(box.style.left)).toBe(250);
+
+    rectSpy.mockRestore();
+  });
+
   it("clamps vertical position for a bottom-positioned tooltip overflowing the viewport", async () => {
     const user = setupUser();
     const rectSpy = jest

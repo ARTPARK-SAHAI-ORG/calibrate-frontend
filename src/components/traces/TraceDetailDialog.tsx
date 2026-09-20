@@ -39,6 +39,10 @@ type TraceDetailDialogProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** What each evaluator is for, by evaluator id. The scores a trace carries
+   *  name the evaluator but not what it judges, so the words come from the
+   *  agent's own evaluator list. */
+  evaluatorDescriptions?: Record<string, string>;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -284,6 +288,7 @@ export function TraceDetailDialog({
   hasPrev = false,
   hasNext = false,
   position,
+  evaluatorDescriptions,
   isSelected = false,
   onToggleSelected,
   selectedCount = 0,
@@ -484,7 +489,11 @@ export function TraceDetailDialog({
                 they sit in the right column, the way a test run's do. */}
             {showScores && (
               <div className="md:hidden border-t border-border">
-                <TraceScorePanel run={visibleRun} error={scoresError} />
+                <TraceScorePanel
+                  run={visibleRun}
+                  error={scoresError}
+                  descriptions={evaluatorDescriptions}
+                />
               </div>
             )}
           </div>
@@ -503,7 +512,11 @@ export function TraceDetailDialog({
                 className="hidden md:flex w-[var(--verdict-w)] flex-col overflow-hidden"
               >
                 <div className="flex-1 overflow-y-auto">
-                  <TraceScorePanel run={visibleRun} error={scoresError} />
+                  <TraceScorePanel
+                    run={visibleRun}
+                    error={scoresError}
+                    descriptions={evaluatorDescriptions}
+                  />
                 </div>
               </div>
             </>

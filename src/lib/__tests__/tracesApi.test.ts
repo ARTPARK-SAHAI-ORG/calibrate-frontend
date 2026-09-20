@@ -13,6 +13,7 @@ import {
   validateApiKeyForAgent,
   traceInputTurns,
   MAX_TRACES_PAGE_SIZE,
+  type TraceScoreAverage,
 } from "../tracesApi";
 import { apiGet, apiPost, apiPut } from "../api";
 
@@ -576,5 +577,78 @@ describe("traceInputTurns", () => {
     expect(traceInputTurns("   ")).toEqual([]);
     expect(traceInputTurns(null)).toEqual([]);
     expect(traceInputTurns(undefined)).toEqual([]);
+  });
+});
+
+describe("fetchTraces score averages", () => {
+  it("asks for the averages only when they are wanted", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      includeScoreAverages: true,
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get(
+        "include_score_averages",
+      ),
+    ).toBe("true");
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 50,
+      agentId: "ag-1",
+      includeScoreAverages: false,
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has(
+        "include_score_averages",
+      ),
+    ).toBe(false);
+
+    await fetchTraces("tok", { limit: 50, offset: 50, agentId: "ag-1" });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[2][0].split("?")[1]).has(
+        "include_score_averages",
+      ),
+    ).toBe(false);
+  });
+
+  it("hands back the averages the backend sent", async () => {
+    const score_averages: TraceScoreAverage[] = [
+      {
+        evaluator_uuid: "ev-1",
+        name: "Tone",
+        output_type: "binary",
+        traces_scored: 40,
+        average: 0.75,
+      },
+      {
+        evaluator_uuid: "ev-2",
+        name: "Helpfulness",
+        output_type: "rating",
+        traces_scored: 40,
+        average: 3.5,
+        scale_min: 1,
+        scale_max: 5,
+      },
+    ];
+    mockApiGet.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+      score_averages,
+    });
+
+    const result = await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      includeScoreAverages: true,
+    });
+    expect(result.score_averages).toEqual(score_averages);
   });
 });

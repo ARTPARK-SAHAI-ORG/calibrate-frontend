@@ -23,8 +23,13 @@ export function dedupeSourceEvaluators(
   return out;
 }
 
-const DEFAULT_BUTTON_CLASS =
-  "hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20";
+// The look this button has everywhere. Kept in one piece so a caller that
+// needs it on small screens too cannot drift from the colour.
+const SUBMIT_LOOK =
+  "items-center gap-2 h-8 px-3 rounded-lg text-[13px] font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20";
+const DEFAULT_BUTTON_CLASS = `hidden md:inline-flex ${SUBMIT_LOOK}`;
+/** The same button, shown at every width. */
+export const SUBMIT_FOR_LABELLING_CLASS = `inline-flex ${SUBMIT_LOOK}`;
 
 /**
  * The "Submit for labelling" button shared by the STT and simulation result

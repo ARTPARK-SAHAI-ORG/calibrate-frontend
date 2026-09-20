@@ -47,6 +47,7 @@ describe("useTraces", () => {
       q: "",
       outputType: "all",
       labels: [],
+      includeScoreAverages: true,
     });
   });
 
@@ -405,6 +406,7 @@ describe("useTraces", () => {
         q: "",
         outputType: "all",
         labels: ["production"],
+        includeScoreAverages: true,
       }),
     );
   });
@@ -594,6 +596,119 @@ describe("useTraces", () => {
       await slow;
     });
     expect(result.current.items[0].latest_run_status).toBe("completed");
+    unmount();
+    setIntervalSpy.mockRestore();
+  });
+});
+
+describe("useTraces score averages", () => {
+  const averages = [
+    {
+      evaluator_uuid: "ev-1",
+      name: "Tone",
+      output_type: "binary" as const,
+      traces_scored: 12,
+      average: 0.5,
+    },
+  ];
+
+  it("asks for the averages on the first load and keeps what came back", async () => {
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1" }], 120),
+      score_averages: averages,
+    });
+
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", pageSize: 50 }),
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ includeScoreAverages: true }),
+    );
+    expect(result.current.scoreAverages).toEqual(averages);
+  });
+
+  it("asks again when the search changes", async () => {
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1" }], 1),
+      score_averages: averages,
+    });
+
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", q }),
+      { initialProps: { q: "" } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const newAverages = [{ ...averages[0], traces_scored: 3, average: 1 }];
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t2" }], 1),
+      score_averages: newAverages,
+    });
+    rerender({ q: "hello" });
+
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ q: "hello", includeScoreAverages: true }),
+      ),
+    );
+    await waitFor(() =>
+      expect(result.current.scoreAverages).toEqual(newAverages),
+    );
+  });
+
+  it("does not ask again for the next page, and keeps the averages on screen", async () => {
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1" }], 120),
+      score_averages: averages,
+    });
+
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", pageSize: 50 }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // The next page carries no averages at all.
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t2" }], 120));
+    await act(async () => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ offset: 50, includeScoreAverages: false }),
+      ),
+    );
+    expect(result.current.scoreAverages).toEqual(averages);
+  });
+
+  it("does not ask for them on a silent poll", async () => {
+    const setIntervalSpy = jest.spyOn(window, "setInterval");
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1", latest_run_status: "pending" }], 1),
+      score_averages: averages,
+    });
+
+    const { result, unmount } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const pollCall = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === POLLING_INTERVAL_MS,
+    );
+    expect(pollCall).toBeDefined();
+    await act(async () => {
+      (pollCall![0] as () => void)();
+    });
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ includeScoreAverages: false }),
+    );
+    expect(result.current.scoreAverages).toEqual(averages);
     unmount();
     setIntervalSpy.mockRestore();
   });

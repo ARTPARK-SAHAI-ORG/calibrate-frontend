@@ -81,9 +81,9 @@ describe("evaluatorDisplayName", () => {
     ).toBe("Looked Up");
   });
   it("falls back to a truncated uuid when nothing else is available", () => {
-    expect(
-      evaluatorDisplayName({ evaluator_id: "abcdefghij" }, {}),
-    ).toBe("abcdefgh");
+    expect(evaluatorDisplayName({ evaluator_id: "abcdefghij" }, {})).toBe(
+      "abcdefgh",
+    );
   });
   it("ignores blank names", () => {
     expect(
@@ -158,9 +158,39 @@ describe("orderedSnapshotsForRun", () => {
         { uuid: "a", payload: {} },
       ],
       runs: [
-        { uuid: "r1", job_id: "job1", item_id: "a", evaluator_id: "e1", evaluator_version_id: "v1", value: null, status: "completed", created_at: "", completed_at: null },
-        { uuid: "r2", job_id: "job1", item_id: "b", evaluator_id: "e1", evaluator_version_id: "v1", value: null, status: "completed", created_at: "", completed_at: null },
-        { uuid: "r3", job_id: "job1", item_id: "a", evaluator_id: "e2", evaluator_version_id: "v1", value: null, status: "completed", created_at: "", completed_at: null },
+        {
+          uuid: "r1",
+          job_id: "job1",
+          item_id: "a",
+          evaluator_id: "e1",
+          evaluator_version_id: "v1",
+          value: null,
+          status: "completed",
+          created_at: "",
+          completed_at: null,
+        },
+        {
+          uuid: "r2",
+          job_id: "job1",
+          item_id: "b",
+          evaluator_id: "e1",
+          evaluator_version_id: "v1",
+          value: null,
+          status: "completed",
+          created_at: "",
+          completed_at: null,
+        },
+        {
+          uuid: "r3",
+          job_id: "job1",
+          item_id: "a",
+          evaluator_id: "e2",
+          evaluator_version_id: "v1",
+          value: null,
+          status: "completed",
+          created_at: "",
+          completed_at: null,
+        },
       ],
     });
     const out = orderedSnapshotsForRun(job);
@@ -300,11 +330,15 @@ describe("computeEvaluatorHumanAgreement", () => {
   });
 
   it("returns null when nothing is comparable", () => {
-    expect(computeEvaluatorHumanAgreement([mkAnn("x")], true, "binary")).toBeNull();
+    expect(
+      computeEvaluatorHumanAgreement([mkAnn("x")], true, "binary"),
+    ).toBeNull();
   });
   it("computes fraction aligned with the machine value", () => {
     const anns = [mkAnn(true), mkAnn(false), mkAnn(true)];
-    expect(computeEvaluatorHumanAgreement(anns, true, "binary")).toBeCloseTo(2 / 3);
+    expect(computeEvaluatorHumanAgreement(anns, true, "binary")).toBeCloseTo(
+      2 / 3,
+    );
   });
 });
 
@@ -397,25 +431,28 @@ describe("exportInputCols", () => {
 
 describe("serializeMessages", () => {
   it("serializes plain content messages", () => {
-    expect(
-      serializeMessages([{ role: "user", content: "hi" }]),
-    ).toBe("user: hi");
+    expect(serializeMessages([{ role: "user", content: "hi" }])).toBe(
+      "user: hi",
+    );
   });
   it("serializes tool_calls messages", () => {
     const out = serializeMessages([
       {
         role: "assistant",
-        tool_calls: [
-          { function: { name: "lookup", arguments: '{"q":"x"}' } },
-        ],
+        tool_calls: [{ function: { name: "lookup", arguments: '{"q":"x"}' } }],
       },
     ]);
     expect(out).toBe('assistant (tool_call): lookup({"q":"x"})');
   });
   it("skips falsy / non-object messages", () => {
-    expect(serializeMessages([null, undefined, "str", { role: "user", content: "ok" }])).toBe(
-      "user: ok",
-    );
+    expect(
+      serializeMessages([
+        null,
+        undefined,
+        "str",
+        { role: "user", content: "ok" },
+      ]),
+    ).toBe("user: ok");
   });
   it("defaults role to 'unknown' and content to empty string", () => {
     expect(serializeMessages([{}])).toBe("unknown: ");
@@ -456,10 +493,9 @@ describe("extractPayloadInputValues", () => {
     expect(out).toEqual(["user: hi", "hello"]);
   });
   it("defaults llm fields when missing/malformed", () => {
-    expect(extractPayloadInputValues({ chat_history: "not-array" }, "llm")).toEqual([
-      "",
-      "",
-    ]);
+    expect(
+      extractPayloadInputValues({ chat_history: "not-array" }, "llm"),
+    ).toEqual(["", ""]);
   });
   it("extracts a serialized transcript for conversation/other types", () => {
     const out = extractPayloadInputValues(
@@ -476,25 +512,32 @@ describe("extractPayloadInputValues", () => {
 describe("annotatorDisplayName", () => {
   it("uses annotator_name when present", () => {
     expect(
-      annotatorDisplayName({ annotator_name: "Jane", annotator_id: "abcdefgh12" }),
+      annotatorDisplayName({
+        annotator_name: "Jane",
+        annotator_id: "abcdefgh12",
+      }),
     ).toBe("Jane");
   });
   it("falls back to a truncated id", () => {
     expect(
-      annotatorDisplayName({ annotator_name: null, annotator_id: "abcdefgh12" }),
+      annotatorDisplayName({
+        annotator_name: null,
+        annotator_id: "abcdefgh12",
+      }),
     ).toBe("abcdefgh");
   });
   it("falls back to id when name is blank", () => {
     expect(
-      annotatorDisplayName({ annotator_name: "   ", annotator_id: "abcdefgh12" }),
+      annotatorDisplayName({
+        annotator_name: "   ",
+        annotator_id: "abcdefgh12",
+      }),
     ).toBe("abcdefgh");
   });
 });
 
 describe("summariseEvaluatorRuns", () => {
-  const row = (
-    overrides: Partial<EvaluatorRunRow> = {},
-  ): EvaluatorRunRow => ({
+  const row = (overrides: Partial<EvaluatorRunRow> = {}): EvaluatorRunRow => ({
     uuid: "r",
     job_id: "j",
     item_id: "i",
@@ -506,7 +549,11 @@ describe("summariseEvaluatorRuns", () => {
     completed_at: "",
     ...overrides,
   });
-  const binaryEv: JobEvaluator = { uuid: "ev-1", name: "E", output_type: "binary" };
+  const binaryEv: JobEvaluator = {
+    uuid: "ev-1",
+    name: "E",
+    output_type: "binary",
+  };
   const ratingEv: JobEvaluator = {
     uuid: "ev-1",
     name: "E",
@@ -567,11 +614,10 @@ describe("summariseEvaluatorRuns", () => {
   });
 
   it("drops the scale max when the evaluator has none", () => {
-    const out = summariseEvaluatorRuns(
-      [row({ value: { value: 2 } })],
-      key,
-      { ...ratingEv, scale_max: null },
-    );
+    const out = summariseEvaluatorRuns([row({ value: { value: 2 } })], key, {
+      ...ratingEv,
+      scale_max: null,
+    });
     expect(out?.value).toBe("2");
     expect(out?.title).toBe("Average across 1 item");
     // No scale max, so there is no position to colour the number by.
@@ -583,7 +629,11 @@ describe("summariseEvaluatorRuns", () => {
       [
         row({ uuid: "a", value: { value: true } }),
         row({ uuid: "b", evaluator_id: "other", value: { value: false } }),
-        row({ uuid: "c", evaluator_version_id: "ver-2", value: { value: false } }),
+        row({
+          uuid: "c",
+          evaluator_version_id: "ver-2",
+          value: { value: false },
+        }),
       ],
       key,
       binaryEv,
@@ -653,7 +703,9 @@ function makeJob(overrides: Partial<EvaluatorRunJob> = {}): EvaluatorRunJob {
   };
 }
 
-function makeTask(overrides: Partial<LabellingTaskFull> = {}): LabellingTaskFull {
+function makeTask(
+  overrides: Partial<LabellingTaskFull> = {},
+): LabellingTaskFull {
   return {
     uuid: "task-1",
     name: "Task",
@@ -749,7 +801,9 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText("1/2")).toBeInTheDocument();
     // The finished item is marked done in the item strip; the other is not.
-    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByTitle("Item 2").length).toBeGreaterThan(0);
   });
 
@@ -802,7 +856,10 @@ describe("EvaluatorRunDetailView", () => {
 
   it("navigates between items with Previous/Next and shows item name", () => {
     const job = makeJob({
-      runs: [makeRun({ item_id: "item-1" }), makeRun({ uuid: "run-2", item_id: "item-2" })],
+      runs: [
+        makeRun({ item_id: "item-1" }),
+        makeRun({ uuid: "run-2", item_id: "item-2" }),
+      ],
     });
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
@@ -818,7 +875,10 @@ describe("EvaluatorRunDetailView", () => {
   it("Next/Previous buttons move currentIndex and disable at bounds", async () => {
     const user = setupUser();
     const job = makeJob({
-      runs: [makeRun({ item_id: "item-1" }), makeRun({ uuid: "run-2", item_id: "item-2" })],
+      runs: [
+        makeRun({ item_id: "item-1" }),
+        makeRun({ uuid: "run-2", item_id: "item-2" }),
+      ],
     });
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
@@ -859,10 +919,19 @@ describe("EvaluatorRunDetailView", () => {
   it("shows the disagreement filter toggle only when disagreements exist, and filters items", async () => {
     const user = setupUser();
     const job = makeJob({
-      runs: [makeRun({ item_id: "item-1" }), makeRun({ uuid: "run-2", item_id: "item-2" })],
+      runs: [
+        makeRun({ item_id: "item-1" }),
+        makeRun({ uuid: "run-2", item_id: "item-2" }),
+      ],
       human_agreement: {
         evaluators: [
-          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1", agreement: 0.5, pair_count: 1, item_count: 1 },
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.5,
+            pair_count: 1,
+            item_count: 1,
+          },
         ],
         items: [
           {
@@ -893,7 +962,9 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    const toggle = screen.getByRole("button", { name: "Show disagreements only" });
+    const toggle = screen.getByRole("button", {
+      name: "Show disagreements only",
+    });
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
     await user.click(toggle);
     expect(screen.getByText("Showing disagreements only")).toBeInTheDocument();
@@ -1036,9 +1107,7 @@ describe("EvaluatorRunDetailView", () => {
         versionLabels={{}}
       />,
     );
-    expect(
-      screen.queryByRole("button", { name: "+ Add filter" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "+ Add filter" })).toBeNull();
   });
 
   it("narrows the items to those a rating evaluator scored at the picked level", async () => {
@@ -1180,7 +1249,9 @@ describe("EvaluatorRunDetailView", () => {
     await addFilter(user, "Binary Evaluator", "Correct");
     await user.click(valueOption("Wrong"));
     expect(
-      screen.getByRole("button", { name: "Binary Evaluator is Correct or Wrong" }),
+      screen.getByRole("button", {
+        name: "Binary Evaluator is Correct or Wrong",
+      }),
     ).toBeInTheDocument();
     // Both items are back, since each scored one of the two.
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
@@ -1343,7 +1414,7 @@ describe("EvaluatorRunDetailView", () => {
       />,
     );
     expect(
-      screen.queryByRole("button", { name: /disagreements only/ }),
+      screen.queryByRole("button", { name: /Showing disagreements only/ }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
     expect(
@@ -1370,12 +1441,19 @@ describe("EvaluatorRunDetailView", () => {
   it("renders the top-level evaluator pill row as a button (linked) when no agreement cards will render", () => {
     const job = makeJob({ runs: [], items: [] });
     render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{ "v-bin-1": "v1" }} linkEvaluators />,
+      <EvaluatorRunDetailView
+        job={job}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators
+      />,
     );
     expect(
       screen.getByRole("button", { name: /Binary Evaluator/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Binary Evaluator/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Binary Evaluator/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
@@ -1402,7 +1480,12 @@ describe("EvaluatorRunDetailView", () => {
     const user = setupUser();
     const job = makeJob({ runs: [], items: [] });
     render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{ "v-bin-1": "v1" }} linkEvaluators />,
+      <EvaluatorRunDetailView
+        job={job}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /Binary Evaluator/i }));
@@ -1418,7 +1501,12 @@ describe("EvaluatorRunDetailView", () => {
   it("renders the top-level evaluator pill row as plain text (no button, no modal) when linkEvaluators=false", () => {
     const job = makeJob({ runs: [], items: [] });
     render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} linkEvaluators={false} />,
+      <EvaluatorRunDetailView
+        job={job}
+        task={makeTask()}
+        versionLabels={{}}
+        linkEvaluators={false}
+      />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(
@@ -1444,7 +1532,13 @@ describe("EvaluatorRunDetailView", () => {
       runs: [makeRun()],
       human_agreement: {
         evaluators: [
-          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1", agreement: null, pair_count: 0, item_count: 0 },
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: null,
+            pair_count: 0,
+            item_count: 0,
+          },
         ],
         items: [],
       },
@@ -1462,7 +1556,13 @@ describe("EvaluatorRunDetailView", () => {
       runs: [makeRun()],
       human_agreement: {
         evaluators: [
-          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1", agreement: 0.8, pair_count: 2, item_count: 1 },
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.8,
+            pair_count: 2,
+            item_count: 1,
+          },
         ],
         items: [
           {
@@ -1490,7 +1590,11 @@ describe("EvaluatorRunDetailView", () => {
       },
     });
     render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{ "v-bin-1": "v1" }} />,
+      <EvaluatorRunDetailView
+        job={job}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+      />,
     );
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
@@ -1596,7 +1700,13 @@ describe("EvaluatorRunDetailView", () => {
       status: "in_progress",
       human_agreement: {
         evaluators: [
-          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1", agreement: 0.8, pair_count: 2, item_count: 1 },
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.8,
+            pair_count: 2,
+            item_count: 1,
+          },
         ],
         items: [],
       },
@@ -1620,7 +1730,9 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    expect(screen.getByText("No result recorded for this item.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No result recorded for this item."),
+    ).toBeInTheDocument();
   });
 
   it("falls back to task.items via job.details.item_ids when job.items is absent", () => {
@@ -1631,8 +1743,22 @@ describe("EvaluatorRunDetailView", () => {
     });
     const task = makeTask({
       items: [
-        { id: 1, uuid: "t-1", task_id: "task-1", payload: { name: "Task Item 1" }, created_at: "", deleted_at: null },
-        { id: 2, uuid: "t-2", task_id: "task-1", payload: { name: "Task Item 2" }, created_at: "", deleted_at: null },
+        {
+          id: 1,
+          uuid: "t-1",
+          task_id: "task-1",
+          payload: { name: "Task Item 1" },
+          created_at: "",
+          deleted_at: null,
+        },
+        {
+          id: 2,
+          uuid: "t-2",
+          task_id: "task-1",
+          payload: { name: "Task Item 2" },
+          created_at: "",
+          deleted_at: null,
+        },
       ],
     });
     render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
@@ -1647,8 +1773,22 @@ describe("EvaluatorRunDetailView", () => {
     });
     const task = makeTask({
       items: [
-        { id: 1, uuid: "t-1", task_id: "task-1", payload: { name: "Task Item 1" }, created_at: "", deleted_at: null },
-        { id: 2, uuid: "t-2", task_id: "task-1", payload: { name: "Task Item 2" }, created_at: "", deleted_at: null },
+        {
+          id: 1,
+          uuid: "t-1",
+          task_id: "task-1",
+          payload: { name: "Task Item 1" },
+          created_at: "",
+          deleted_at: null,
+        },
+        {
+          id: 2,
+          uuid: "t-2",
+          task_id: "task-1",
+          payload: { name: "Task Item 2" },
+          created_at: "",
+          deleted_at: null,
+        },
       ],
     });
     render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
@@ -1657,11 +1797,29 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("falls back to all of task.items capped by item_count when nothing else narrows it", () => {
-    const job = makeJob({ items: undefined, details: { item_count: 1 }, runs: [] });
+    const job = makeJob({
+      items: undefined,
+      details: { item_count: 1 },
+      runs: [],
+    });
     const task = makeTask({
       items: [
-        { id: 1, uuid: "t-1", task_id: "task-1", payload: { name: "Only Item" }, created_at: "", deleted_at: null },
-        { id: 2, uuid: "t-2", task_id: "task-1", payload: { name: "Second Item" }, created_at: "", deleted_at: null },
+        {
+          id: 1,
+          uuid: "t-1",
+          task_id: "task-1",
+          payload: { name: "Only Item" },
+          created_at: "",
+          deleted_at: null,
+        },
+        {
+          id: 2,
+          uuid: "t-2",
+          task_id: "task-1",
+          payload: { name: "Second Item" },
+          created_at: "",
+          deleted_at: null,
+        },
       ],
     });
     render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
@@ -1674,7 +1832,13 @@ describe("EvaluatorRunDetailView", () => {
       runs: [makeRun()],
       human_agreement: {
         evaluators: [
-          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1", agreement: 0.8, pair_count: 2, item_count: 1 },
+          {
+            evaluator_id: "ev-bin",
+            evaluator_version_id: "v-bin-1",
+            agreement: 0.8,
+            pair_count: 2,
+            item_count: 1,
+          },
         ],
         items: [
           {
@@ -1800,9 +1964,7 @@ describe("EvaluatorResultsPane", () => {
   };
 
   it("shows an empty state when there are no evaluators", () => {
-    render(
-      <EvaluatorResultsPane {...baseProps} evaluators={[]} runs={[]} />,
-    );
+    render(<EvaluatorResultsPane {...baseProps} evaluators={[]} runs={[]} />);
     expect(screen.getByText("No evaluators in this run.")).toBeInTheDocument();
   });
 
@@ -1849,7 +2011,9 @@ describe("EvaluatorResultsPane", () => {
         ]}
       />,
     );
-    expect(screen.queryByRole("button", { name: "Alice" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Alice" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Great job")).toBeInTheDocument();
   });
 
@@ -1857,7 +2021,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-rate", evaluator_version_id: "v-rate-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-rate", evaluator_version_id: "v-rate-1" },
+        ]}
         evaluatorNamesById={{ "ev-rate": "Rating Evaluator" }}
         getJobEvaluator={() => evaluatorRating}
         runs={[
@@ -1877,7 +2043,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
       />,
     );
@@ -1889,7 +2057,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun({ value: { skipped: true } })]}
       />,
     );
@@ -2023,7 +2193,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[]}
       />,
     );
@@ -2037,14 +2209,18 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         filterDisagreements
         humanAgreementForItem={null}
       />,
     );
     expect(
-      screen.getByText("All evaluators agree with human annotations on this item."),
+      screen.getByText(
+        "All evaluators agree with human annotations on this item.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -2075,7 +2251,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         humanAgreementForItem={humanAgreementForItem}
       />,
@@ -2112,7 +2290,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         humanAgreementForItem={humanAgreementForItem}
         hideAgreementGlyph
@@ -2148,13 +2328,17 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun({ value: { value: null } })]}
         humanAgreementForItem={humanAgreementForItem}
         alwaysShowSourcePills
       />,
     );
-    expect(screen.queryByRole("button", { name: "Evaluator" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Evaluator" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Correct")).toBeInTheDocument();
   });
 
@@ -2162,19 +2346,25 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         alwaysShowSourcePills
       />,
     );
-    expect(screen.getByRole("button", { name: "Evaluator" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Evaluator" }),
+    ).toBeInTheDocument();
   });
 
   it("shows version label in the source pill when showVersionInSourcePill is set", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         alwaysShowSourcePills
         showVersionInSourcePill
@@ -2186,7 +2376,10 @@ describe("EvaluatorResultsPane", () => {
 
   it("renders grouped evaluator cards with version pills when groupVersionsByEvaluator is set", async () => {
     const user = setupUser();
-    const getJobEvaluator = (key: { evaluator_id: string; evaluator_version_id?: string }) =>
+    const getJobEvaluator = (key: {
+      evaluator_id: string;
+      evaluator_version_id?: string;
+    }) =>
       key.evaluator_version_id === "v-bin-2"
         ? { ...evaluatorBinary, evaluator_version_id: "v-bin-2" }
         : evaluatorBinary;
@@ -2200,7 +2393,11 @@ describe("EvaluatorResultsPane", () => {
         ]}
         runs={[
           makeRun({ value: { value: true } }),
-          makeRun({ uuid: "run-2", evaluator_version_id: "v-bin-2", value: { value: false } }),
+          makeRun({
+            uuid: "run-2",
+            evaluator_version_id: "v-bin-2",
+            value: { value: false },
+          }),
         ]}
         versionLabels={{ "v-bin-1": "v1", "v-bin-2": "v2" }}
         groupVersionsByEvaluator
@@ -2237,7 +2434,9 @@ describe("EvaluatorResultsPane", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         humanAgreementForItem={humanAgreementForItem}
       />,
@@ -2274,14 +2473,18 @@ describe("EvaluatorResultsPane", () => {
       <EvaluatorResultsPane
         {...baseProps}
         getJobEvaluator={getJobEvaluator}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun()]}
         humanAgreementForItem={humanAgreementForItem}
         groupVersionsByEvaluator
         annotatorFilterActive
       />,
     );
-    expect(screen.queryByRole("button", { name: "Alice" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Alice" }),
+    ).not.toBeInTheDocument();
     // The evaluator version pill still shows since it has a value.
     expect(screen.getByText("Correct")).toBeInTheDocument();
   });
@@ -2313,7 +2516,9 @@ describe("EvaluatorResultsPane", () => {
       <EvaluatorResultsPane
         {...baseProps}
         getJobEvaluator={getJobEvaluator}
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         runs={[makeRun({ value: { value: null } })]}
         humanAgreementForItem={humanAgreementForItem}
         groupVersionsByEvaluator
@@ -2331,9 +2536,18 @@ describe("ItemDetailPane", () => {
   it("renders ItemPane and EvaluatorResultsPane side by side", () => {
     render(
       <ItemDetailPane
-        item={{ id: 0, uuid: "item-1", task_id: "task-1", payload: { description: "Desc here" }, created_at: "", deleted_at: null }}
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload: { description: "Desc here" },
+          created_at: "",
+          deleted_at: null,
+        }}
         taskType="llm"
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
         getJobEvaluator={() => evaluatorBinary}
         runs={[makeRun()]}
@@ -2351,7 +2565,14 @@ describe("ItemDetailPane", () => {
   const renderWithType = (taskType: "llm" | "conversation" | "stt") =>
     render(
       <ItemDetailPane
-        item={{ id: 0, uuid: "item-1", task_id: "task-1", payload: {}, created_at: "", deleted_at: null }}
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload: {},
+          created_at: "",
+          deleted_at: null,
+        }}
         taskType={taskType}
         evaluators={[]}
         evaluatorNamesById={{}}
@@ -2387,9 +2608,18 @@ describe("ItemDetailPane expected tool calls", () => {
   const renderPane = (payload: Record<string, unknown>) =>
     render(
       <ItemDetailPane
-        item={{ id: 0, uuid: "item-1", task_id: "task-1", payload, created_at: "", deleted_at: null }}
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload,
+          created_at: "",
+          deleted_at: null,
+        }}
         taskType="llm"
-        evaluators={[{ evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" }]}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
         evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
         getJobEvaluator={() => evaluatorBinary}
         runs={[makeRun()]}

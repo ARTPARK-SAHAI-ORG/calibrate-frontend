@@ -44,7 +44,9 @@ jest.mock("../../../lib/tracesApi", () => ({
 
 // The agent's own evaluators decide whether the attach prompt has anything to
 // ask about, so they are driven from the test rather than the network.
-const fetchAgentEvaluators = jest.fn(async () => [] as { uuid: string }[]);
+const fetchAgentEvaluators = jest.fn(
+  async () => [] as { uuid: string; description?: string }[],
+);
 const addEvaluatorsToAgent = jest.fn(async () => ({}));
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: () => fetchAgentEvaluators(),
@@ -155,6 +157,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     isSelected,
     onToggleSelected,
     selectedCount,
+    evaluatorDescriptions,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -166,10 +169,16 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     isSelected?: boolean;
     onToggleSelected?: () => void;
     selectedCount?: number;
+    evaluatorDescriptions?: Record<string, string>;
   }) =>
     isOpen ? (
       <div data-testid="trace-detail">
         {traceUuid}
+        <span data-testid="trace-detail-descriptions">
+          {Object.entries(evaluatorDescriptions ?? {})
+            .map(([uuid, description]) => `${uuid}=${description}`)
+            .join(",")}
+        </span>
         <button
           type="button"
           onClick={onToggleSelected}
@@ -293,6 +302,7 @@ function tracesResult(
     loadedQ: "",
     loadedOutputType: "all",
     loadedLabels: [],
+    scoreAverages: [],
     offset: 0,
     setOffset: jest.fn(),
     loadedOffset: 0,
@@ -312,7 +322,6 @@ function tracesResult(
 // callbacks: one to reload the Tests tab, one to open it.
 const onTestsCreated = jest.fn();
 const onViewTests = jest.fn();
-const onGoToSettings = jest.fn();
 const onGoToEvaluators = jest.fn();
 const setEnabled = jest.fn(async () => {});
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
@@ -329,12 +338,12 @@ const traceScoring = {
   eligibilityError: null,
   saveError: null,
   enableBlocked: false,
+  cannotEnable: false,
 };
 const tabProps = {
   agentUuid: "agent-1",
   onTestsCreated,
   onViewTests,
-  onGoToSettings,
   onGoToEvaluators,
   traceScoring,
 };
@@ -442,21 +451,23 @@ describe("TracesTabContent", () => {
     expect(lastTracesArgs().poll).toBe(false);
   });
 
-  describe("the scoring line above the list", () => {
-    it("says new traces are not scored and sends the reader to Settings", async () => {
+  describe("the scoring state above the list", () => {
+    it("shows the scoring pill beside the list, with the controls it needs", async () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
-      expect(
-        screen.getByText("New traces are not scored automatically."),
-      ).toBeInTheDocument();
-      await user.click(
-        screen.getByRole("button", { name: "Turn on in Settings" }),
-      );
-      expect(onGoToSettings).toHaveBeenCalled();
+
+      // Scoring is off, so the pill says so. The switch itself lives in the
+      // pill, which asks before it changes anything.
+      const pill = screen.getByRole("button", {
+        name: "Continuous monitoring off",
+      });
+      expect(pill).toBeInTheDocument();
+      await user.click(pill);
+      await user.click(screen.getByRole("button", { name: "Turn on" }));
+      expect(setEnabled).toHaveBeenCalledWith(true);
     });
 
-    it("says new traces are scored, and sends the reader to Settings to stop it", async () => {
-      const user = setupUser();
+    it("shows the pill turned on when this agent scores its new traces", () => {
       render(
         <TracesTabContent
           {...tabProps}
@@ -464,74 +475,25 @@ describe("TracesTabContent", () => {
         />,
       );
       expect(
-        screen.getByText(
-          "New traces are scored automatically with this agent's evaluators.",
-        ),
-      ).toBeInTheDocument();
-      // The switch lives in Settings, so this only takes the reader there.
-      await user.click(
-        screen.getByRole("button", { name: "Turn off in Settings" }),
-      );
-      expect(onGoToSettings).toHaveBeenCalled();
-      expect(setEnabled).not.toHaveBeenCalled();
-    });
-
-    it("shows a failed save from the Settings switch on this line too", () => {
-      render(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={{
-            ...traceScoring,
-            enabled: true,
-            saveError: "Could not save.",
-          }}
-        />,
-      );
-      expect(screen.getByText("Could not save.")).toBeInTheDocument();
-    });
-
-    it("still offers Settings when turning on is blocked", () => {
-      render(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={{ ...traceScoring, enableBlocked: true }}
-        />,
-      );
-      expect(
-        screen.getByRole("button", { name: "Turn on in Settings" }),
+        screen.getByRole("button", { name: "Continuous monitoring on" }),
       ).toBeInTheDocument();
     });
 
-    it("names the evaluators that cannot score traces, with the reason", () => {
-      render(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={{
-            ...traceScoring,
-            eligibility: {
-              eligible: [
-                {
-                  evaluator_uuid: "ev-1",
-                  evaluator_version_id: "v1",
-                  name: "Tone",
-                },
-              ],
-              ineligible: [
-                {
-                  evaluator_uuid: "ev-2",
-                  name: "Old judge",
-                  reason: "no_live_version",
-                },
-              ],
-            },
-          }}
-        />,
+    it("puts the refresh button beside the pill, not in the toolbar", () => {
+      render(<TracesTabContent {...tabProps} />);
+
+      const refresh = screen.getByRole("button", { name: "Refresh" });
+      const pill = screen.getByRole("button", {
+        name: "Continuous monitoring off",
+      });
+      // The smallest box holding both: it must not be the toolbar, or the
+      // refresh button would be back beside the search box.
+      let shared: HTMLElement | null = refresh.parentElement;
+      while (shared && !shared.contains(pill)) shared = shared.parentElement;
+      expect(shared).not.toBeNull();
+      expect(shared).not.toContainElement(
+        screen.getByPlaceholderText("Search traces"),
       );
-      expect(
-        screen.getByText("These evaluators cannot score traces:"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Old judge")).toBeInTheDocument();
-      expect(screen.getByText("Has no live version")).toBeInTheDocument();
     });
 
     it("says the workspace hit its scoring limit, naming the number, with a way to ask for more", async () => {
@@ -574,7 +536,7 @@ describe("TracesTabContent", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("keeps both lines off the setup steps", () => {
+    it("keeps both warning lines off the setup steps", () => {
       mockUseTraces.mockReturnValue(tracesResult([]));
       render(
         <TracesTabContent
@@ -596,9 +558,73 @@ describe("TracesTabContent", () => {
       );
       expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
       expect(
-        screen.queryByText("New traces are not scored automatically."),
+        screen.queryByRole("button", { name: "Evaluators tab" }),
       ).not.toBeInTheDocument();
-      expect(screen.queryByText("Old judge")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/this workspace has scored as many traces/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows a card per evaluator average, above the toolbar", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              traces_scored: 4,
+              average: 0.5,
+            },
+          ],
+        }),
+      );
+      render(<TracesTabContent {...tabProps} />);
+
+      expect(screen.getByText("Production quality")).toBeInTheDocument();
+      // Half of the four scored traces passed.
+      expect(screen.getByText("50%")).toBeInTheDocument();
+    });
+
+    it("shows no averages when the backend sent none", () => {
+      render(<TracesTabContent {...tabProps} />);
+      expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
+    });
+
+    it("keeps the averages off the setup steps", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              traces_scored: 4,
+              average: 0.5,
+            },
+          ],
+        }),
+      );
+      render(<TracesTabContent {...tabProps} />);
+
+      expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+      expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
+    });
+
+    it("tells the detail window what each evaluator judges", async () => {
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", description: "Is the reply polite?" },
+      ]);
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.click(screen.getAllByText("When is the next vaccination?")[0]);
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId("trace-detail-descriptions"),
+        ).toHaveTextContent("ev-1=Is the reply polite?"),
+      );
     });
 
     it("hands the table one column per evaluator that can score, once scoring is on", () => {
@@ -679,14 +705,6 @@ describe("TracesTabContent", () => {
       expect(
         screen.getByRole("button", { name: "Evaluators tab" }).parentElement,
       ).toHaveTextContent(/Every evaluator added to this agent uses variables/);
-      // The switch cannot be turned on, so nothing offers to.
-      expect(
-        screen.queryByRole("button", { name: "Turn on in Settings" }),
-      ).not.toBeInTheDocument();
-      // The line says why, so the list of evaluators would only repeat it.
-      expect(
-        screen.queryByText("These evaluators cannot score traces:"),
-      ).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
       expect(onGoToEvaluators).toHaveBeenCalled();
     });
@@ -729,7 +747,7 @@ describe("TracesTabContent", () => {
 
     const nextButton = screen.getByRole("button", { name: "Next page" });
 
-    expect(screen.getByText(/Showing/)).toBeInTheDocument();
+    expect(screen.getByText("1–1 of 25 traces")).toBeInTheDocument();
     expect(
       nextButton.compareDocumentPosition(screen.getByText("Input")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1315,6 +1333,18 @@ describe("TracesTabContent", () => {
 
     expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
     expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
+  });
+
+  it("unticks everything when Clear is pressed", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
   });
 
   it("warns that single and bulk deletion cannot be undone", async () => {

@@ -23,7 +23,9 @@ function trace(overrides: Partial<TraceSummary> = {}): TraceSummary {
   };
 }
 
-function renderTable(props: Partial<React.ComponentProps<typeof TracesTable>> = {}) {
+function renderTable(
+  props: Partial<React.ComponentProps<typeof TracesTable>> = {},
+) {
   const onOpen = jest.fn();
   const onDelete = jest.fn();
   const onToggleSelectAll = jest.fn();
@@ -102,9 +104,9 @@ describe("TracesTable", () => {
   it("renders the input preview in the Input column", () => {
     renderTable();
 
-    expect(
-      screen.getAllByText("When is the next vaccination?"),
-    ).toHaveLength(2);
+    expect(screen.getAllByText("When is the next vaccination?")).toHaveLength(
+      2,
+    );
     expect(screen.queryByText("msg-1")).not.toBeInTheDocument();
     expect(screen.getAllByText("At 14 weeks.").length).toBeGreaterThan(0);
   });
@@ -163,7 +165,9 @@ describe("TracesTable", () => {
 
     expect(screen.queryByText("No message ID")).not.toBeInTheDocument();
     expect(screen.queryByText("No conversation ID")).not.toBeInTheDocument();
-    expect(screen.getAllByText("When is the next vaccination?")).toHaveLength(2);
+    expect(screen.getAllByText("When is the next vaccination?")).toHaveLength(
+      2,
+    );
   });
 
   it("shows only the simplified desktop columns", () => {
@@ -200,15 +204,33 @@ describe("TracesTable", () => {
         trace({
           latest_run_status: "completed",
           results: [
-            { evaluator_uuid: "ev-1", name: "ev-1", output_type: "binary", value: 1, passed: true },
-            { evaluator_uuid: "ev-2", name: "ev-2", output_type: "rating", value: 4, passed: true },
+            {
+              evaluator_uuid: "ev-1",
+              name: "ev-1",
+              output_type: "binary",
+              value: 1,
+              passed: true,
+            },
+            {
+              evaluator_uuid: "ev-2",
+              name: "ev-2",
+              output_type: "rating",
+              value: 4,
+              passed: true,
+            },
           ],
         }),
         trace({
           uuid: "t2",
           latest_run_status: "completed",
           results: [
-            { evaluator_uuid: "ev-1", name: "ev-1", output_type: "binary", value: 0, passed: false },
+            {
+              evaluator_uuid: "ev-1",
+              name: "ev-1",
+              output_type: "binary",
+              value: 0,
+              passed: false,
+            },
           ],
         }),
       ],
@@ -217,18 +239,20 @@ describe("TracesTable", () => {
     expect(screen.getAllByText("Tone")).toHaveLength(3);
     expect(screen.getAllByText("Accuracy")).toHaveLength(3);
     // Desktop cell and mobile block for each row.
-    expect(screen.getAllByText("Success")).toHaveLength(2);
-    expect(screen.getAllByText("4")).toHaveLength(2);
-    expect(screen.getAllByText("Fail")).toHaveLength(2);
+    expect(screen.getAllByText("Correct")).toHaveLength(2);
+    expect(screen.getAllByText("Score: 4")).toHaveLength(2);
+    expect(screen.getAllByText("Wrong")).toHaveLength(2);
     // The second row has no Accuracy score.
-    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
   });
 
   it("sizes the grid inline, one track per evaluator, so Tailwind need not compile it", () => {
     renderTable({ scoreColumns: columns, traces: [trace({})] });
-    const header = screen.getByText("Input").closest("div[style]") as HTMLElement;
+    const header = screen
+      .getByText("Input")
+      .closest("div[style]") as HTMLElement;
     expect(header.style.gridTemplateColumns).toBe(
-      "40px minmax(0,1fr) minmax(0,1fr) minmax(6rem,0.5fr) minmax(6rem,0.5fr) 160px auto",
+      "40px 400px 400px 10ch 10ch 160px auto",
     );
   });
 
@@ -238,9 +262,7 @@ describe("TracesTable", () => {
       traces: [trace({ latest_run_status: "processing" })],
     });
     // Desktop row and mobile card.
-    expect(screen.getAllByRole("img", { name: "Being scored" })).toHaveLength(
-      2,
-    );
+    expect(screen.getAllByRole("img", { name: "In progress" })).toHaveLength(2);
   });
 
   it("says why beside a trace nothing could score, leaving its columns empty", () => {
@@ -259,8 +281,43 @@ describe("TracesTable", () => {
         name: "No evaluators could score this trace",
       }),
     ).toHaveLength(2);
-    // Two evaluator columns for each row, on desktop and on mobile.
-    expect(screen.getAllByText("—")).toHaveLength(8);
+    // Only the trace nothing has tried yet is waiting on a score: two
+    // evaluator columns, on desktop and on mobile. The skipped trace says why
+    // once, beside its input, and leaves its columns empty.
+    expect(screen.getAllByText("Not scored yet")).toHaveLength(4);
+  });
+
+  it("widens an evaluator track to its own name, and uses one template everywhere", () => {
+    const longName = "Answered the caller's actual question";
+    renderTable({
+      scoreColumns: [
+        { evaluator_uuid: "ev-1", name: "Tone" },
+        { evaluator_uuid: "ev-2", name: longName },
+      ],
+      traces: [trace({})],
+    });
+    const expected = `40px 400px 400px 10ch ${longName.length + 1}ch 160px auto`;
+    const header = screen
+      .getByText("Input")
+      .closest("div[style]") as HTMLElement;
+    expect(header.style.gridTemplateColumns).toBe(expected);
+    // The row is its own grid, so it has to carry the same template or the
+    // columns would not line up.
+    const row = screen
+      .getAllByText("When is the next vaccination?")[0]
+      .closest("div[style]") as HTMLElement;
+    expect(row.style.gridTemplateColumns).toBe(expected);
+  });
+
+  it("shows the whole evaluator name in the header, with no hover text", () => {
+    const longName = "Answered the caller's actual question";
+    renderTable({
+      scoreColumns: [{ evaluator_uuid: "ev-1", name: longName }],
+      traces: [trace({})],
+    });
+    const header = screen.getAllByText(longName)[0];
+    expect(header).toHaveTextContent(longName);
+    expect(header).not.toHaveAttribute("title");
   });
 
   it("opens a trace when its row is clicked", async () => {

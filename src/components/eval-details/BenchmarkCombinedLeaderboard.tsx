@@ -362,7 +362,9 @@ export function BenchmarkCombinedLeaderboard({
   // What the notes above already say. Worked out once, because it decides two
   // things: whether the bare "no data" line is the only thing left to show,
   // and whether the table can be left out.
-  const counted = modelResults.map((m) => benchmarkAnsweredPassFail(m, runOver));
+  const counted = modelResults.map((m) =>
+    benchmarkAnsweredPassFail(m, runOver),
+  );
   const noteExplainsIt =
     runStopped ||
     failureReason !== null ||

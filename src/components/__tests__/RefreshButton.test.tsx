@@ -1,4 +1,4 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { act, fireEvent, render, screen, setupUser } from "@/test-utils";
 import { RefreshButton } from "../RefreshButton";
 
 describe("RefreshButton", () => {
@@ -36,6 +36,50 @@ describe("RefreshButton", () => {
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveClass(
       "extra-class",
     );
+  });
+
+  it("keeps the arrow turning for a moment even when the read answers at once", () => {
+    jest.useFakeTimers();
+    const onClick = jest.fn();
+    render(<RefreshButton onClick={onClick} />);
+    const button = screen.getByRole("button", { name: "Refresh" });
+    const arrow = button.querySelector("svg") as SVGElement;
+
+    expect(arrow).not.toHaveClass("animate-spin");
+    fireEvent.click(button);
+    // `loading` is never true here: a read this fast would otherwise flick the
+    // arrow round too quickly to see.
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(arrow).toHaveClass("animate-spin");
+
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    expect(arrow).not.toHaveClass("animate-spin");
+    jest.useRealTimers();
+  });
+
+  it("restarts the turn when clicked again before it has finished", () => {
+    jest.useFakeTimers();
+    render(<RefreshButton onClick={jest.fn()} />);
+    const button = screen.getByRole("button", { name: "Refresh" });
+    const arrow = button.querySelector("svg") as SVGElement;
+
+    fireEvent.click(button);
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    fireEvent.click(button);
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(arrow).toHaveClass("animate-spin");
+
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(arrow).not.toHaveClass("animate-spin");
+    jest.useRealTimers();
   });
 
   it("stands as tall as the search box in a list toolbar", () => {

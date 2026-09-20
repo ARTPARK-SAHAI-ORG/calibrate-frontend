@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { TraceScoringConfirmDialog } from "@/components/traces/TraceScoringConfirmDialog";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { nothingCanScoreCopy } from "@/lib/traceScoring";
+import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
 
 type SettingsTabContentProps = {
   agentSpeaksFirst: boolean;
@@ -23,25 +24,18 @@ export function SettingsTabContent({
   traceScoring,
   onGoToEvaluators,
 }: SettingsTabContentProps) {
-  const scoringDisabled =
-    traceScoring.saving ||
-    (!traceScoring.enabled &&
-      (traceScoring.eligibility === null || traceScoring.enableBlocked));
+  // What the switch is asking to do, while the confirmation is on screen.
+  const [pendingScoring, setPendingScoring] = useState<boolean | null>(null);
+  const scoringDisabled = traceScoring.saving || traceScoring.cannotEnable;
   // Not clickable when nothing can score, but drawn as usual: dimming it makes
   // it hard to see that it is a switch at all. The reason rides on the control,
   // where the tooltip stays open long enough to click through to Evaluators.
   const blockedReason = traceScoring.enableBlocked ? (
     <span>
-      {nothingCanScoreCopy(traceScoring.eligibility?.ineligible ?? [])} Choose
-      evaluators without variables in the{" "}
-      <button
-        type="button"
-        onClick={onGoToEvaluators}
-        className="font-semibold cursor-pointer hover:opacity-80"
-      >
-        Evaluators tab
-      </button>
-      .
+      <NothingCanScoreMessage
+        ineligible={traceScoring.eligibility?.ineligible ?? []}
+        onGoToEvaluators={onGoToEvaluators}
+      />
     </span>
   ) : null;
   const scoringSwitch = (
@@ -49,9 +43,9 @@ export function SettingsTabContent({
       type="button"
       role="switch"
       aria-checked={traceScoring.enabled}
-      aria-label="Score new traces automatically"
+      aria-label="Enable continuous monitoring"
       disabled={scoringDisabled}
-      onClick={() => void traceScoring.setEnabled(!traceScoring.enabled)}
+      onClick={() => setPendingScoring(!traceScoring.enabled)}
       className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed border-2 flex-shrink-0 ${
         traceScoring.enabled
           ? "bg-green-500 border-green-500"
@@ -68,6 +62,11 @@ export function SettingsTabContent({
 
   return (
     <div className="space-y-4 md:space-y-6">
+      <TraceScoringConfirmDialog
+        pending={pendingScoring}
+        onClose={() => setPendingScoring(null)}
+        onConfirm={(next) => void traceScoring.setEnabled(next)}
+      />
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="px-3 md:px-4 py-3 md:py-4 flex items-start md:items-center justify-between gap-3">
           <div className="flex flex-col-reverse md:flex-row items-start md:items-center gap-2 md:gap-4">
@@ -128,7 +127,7 @@ export function SettingsTabContent({
 
       <div className="space-y-3 md:space-y-4">
         <h2 className="text-sm md:text-base font-semibold text-foreground">
-          Traces
+          Monitoring
         </h2>
         <div className="border border-border rounded-xl overflow-hidden">
           <div className="px-3 md:px-4 py-3 md:py-4 flex items-start md:items-center justify-between gap-3">
@@ -142,11 +141,30 @@ export function SettingsTabContent({
               )}
               <div>
                 <h3 className="text-sm md:text-base font-medium text-foreground">
-                  Score new traces automatically
+                  Enable continuous monitoring
                 </h3>
-                <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                  New traces this agent receives are scored with its evaluators.
-                </p>
+                {/* A div, not a p: the hover text wraps its trigger in a div,
+                    which a paragraph cannot hold. */}
+                <div className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                  New traces for this agent are scored using the{" "}
+                  <Tooltip
+                    content="Evaluators without any variables"
+                    position="top"
+                    className="inline"
+                  >
+                    <span className="text-foreground font-medium decoration-dotted decoration-muted-foreground underline underline-offset-2 cursor-pointer">
+                      valid evaluators
+                    </span>
+                  </Tooltip>{" "}
+                  added in the{" "}
+                  <button
+                    type="button"
+                    onClick={onGoToEvaluators}
+                    className="font-medium text-foreground hover:opacity-80 cursor-pointer"
+                  >
+                    Evaluators tab
+                  </button>
+                </div>
                 {traceScoring.saveError || traceScoring.eligibilityError ? (
                   <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
                     {traceScoring.saveError ?? traceScoring.eligibilityError}

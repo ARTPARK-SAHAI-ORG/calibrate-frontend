@@ -296,7 +296,9 @@ describe("a comparison where no model answered anything", () => {
   it("keeps the table when no note says why there is nothing to show", () => {
     render(
       <BenchmarkCombinedLeaderboard
-        leaderboardSummary={[{ model: "a", passed: "0", total: "2", pass_rate: "0" }]}
+        leaderboardSummary={[
+          { model: "a", passed: "0", total: "2", pass_rate: "0" },
+        ]}
         modelResults={[
           {
             model: "a",

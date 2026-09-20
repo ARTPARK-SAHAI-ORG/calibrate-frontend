@@ -5,6 +5,7 @@ import type { TraceScoringRun } from "@/lib/tracesApi";
 jest.mock("../../EvaluatorVerdictCard", () => ({
   EvaluatorVerdictCard: ({
     name,
+    description,
     outputType,
     match,
     score,
@@ -14,6 +15,7 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     enableLink,
   }: {
     name: string;
+    description?: string | null;
     outputType: string;
     match?: boolean | null;
     score?: number | null;
@@ -25,7 +27,7 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     <div data-testid={`verdict-${name}`}>
       {name} {outputType} match:{String(match)} score:{String(score)} max:
       {String(scaleMax)} {reasoning} version:{String(versionLabel)} link:
-      {String(enableLink)}
+      {String(enableLink)} about:{String(description)}
     </div>
   ),
 }));
@@ -94,11 +96,11 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   const { rerender, container } = render(
     <TraceScorePanel
       run={{
-          run_uuid: "r1",
-          status: "pending",
-          created_at: "2026-08-29T12:00:00Z",
-          results: [],
-        }}
+        run_uuid: "r1",
+        status: "pending",
+        created_at: "2026-08-29T12:00:00Z",
+        results: [],
+      }}
     />,
   );
   expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
@@ -107,11 +109,11 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   rerender(
     <TraceScorePanel
       run={{
-          run_uuid: "r2",
-          status: "processing",
-          created_at: "2026-08-29T12:00:00Z",
-          results: [],
-        }}
+        run_uuid: "r2",
+        status: "processing",
+        created_at: "2026-08-29T12:00:00Z",
+        results: [],
+      }}
     />,
   );
   expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
@@ -120,12 +122,12 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   rerender(
     <TraceScorePanel
       run={{
-          run_uuid: "r3",
-          status: "skipped",
-          created_at: "2026-08-29T12:00:00Z",
-          error: "no_usable_evaluators",
-          results: [],
-        }}
+        run_uuid: "r3",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
     />,
   );
   expect(
@@ -143,17 +145,31 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
   rerender(
     <TraceScorePanel
       run={{
-          run_uuid: "r4",
-          status: "completed",
-          created_at: "2026-08-29T12:00:00Z",
-          completed_at: "2026-08-29T12:01:00Z",
-          results: [],
-        }}
+        run_uuid: "r4",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        completed_at: "2026-08-29T12:01:00Z",
+        results: [],
+      }}
     />,
   );
-  expect(
-    screen.getByText("This run produced no scores."),
-  ).toBeInTheDocument();
+  expect(screen.getByText("This run produced no scores.")).toBeInTheDocument();
+});
+
+it("gives each card what its own evaluator is for, and nothing for one with no words", () => {
+  render(
+    <TraceScorePanel
+      run={completed}
+      descriptions={{ "ev-1": "Was the caller greeted politely?" }}
+    />,
+  );
+
+  expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
+    "about:Was the caller greeted politely?",
+  );
+  expect(screen.getByTestId("verdict-Helpfulness")).toHaveTextContent(
+    "about:undefined",
+  );
 });
 
 it("shows the error when the scores could not be loaded", () => {

@@ -619,6 +619,59 @@ it("fetches scores and draws only the latest run in the right column, meta on th
   ).not.toBeInTheDocument();
 });
 
+it("says what each evaluator is for, from the words the agent page passes in", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        completed_at: "2026-08-29T12:01:00Z",
+        error: null,
+        results: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Tone",
+            output_type: "binary",
+            value: 1,
+            reasoning: "Greeting was present.",
+            passed: true,
+          },
+          {
+            evaluator_uuid: "ev-2",
+            name: "Helpfulness",
+            output_type: "binary",
+            value: 0,
+            reasoning: "Missed the question.",
+            passed: false,
+          },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      evaluatorDescriptions={{ "ev-1": "Was the caller greeted politely?" }}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getAllByText("Tone").length).toBeGreaterThan(0),
+  );
+  // Once under the conversation on mobile, once in the right column.
+  expect(screen.getAllByText("Was the caller greeted politely?")).toHaveLength(
+    2,
+  );
+  // An evaluator with no words has none put under its name.
+  expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
+});
+
 it("refetches scores while a run is still in progress", async () => {
   mockFetchTrace.mockResolvedValue(detail);
   mockFetchTraceScores.mockResolvedValue({

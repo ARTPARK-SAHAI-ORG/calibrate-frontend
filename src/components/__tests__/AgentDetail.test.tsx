@@ -330,7 +330,7 @@ describe("AgentDetail", () => {
     // Data extraction tab is temporarily hidden (extraction UI removed for now)
     expect(screen.queryByText("Data extraction")).not.toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
-    expect(screen.getByText("Traces")).toBeInTheDocument();
+    expect(screen.getByText("Monitoring")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
@@ -347,7 +347,7 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Verify")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
-    expect(screen.getByText("Traces")).toBeInTheDocument();
+    expect(screen.getByText("Monitoring")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
@@ -440,7 +440,7 @@ describe("AgentDetail", () => {
           "Evaluations",
           "Tests",
           "Evaluators",
-          "Traces",
+          "Monitoring",
           "Connection",
           "Tools",
           "Settings",
@@ -450,7 +450,7 @@ describe("AgentDetail", () => {
       "Evaluations",
       "Tests",
       "Evaluators",
-      "Traces",
+      "Monitoring",
       "Connection",
       "Tools",
       "Settings",
@@ -474,7 +474,7 @@ describe("AgentDetail", () => {
           "Evaluations",
           "Tests",
           "Evaluators",
-          "Traces",
+          "Monitoring",
           "Settings",
         ].includes(label ?? ""),
       );
@@ -484,7 +484,7 @@ describe("AgentDetail", () => {
       "Evaluations",
       "Tests",
       "Evaluators",
-      "Traces",
+      "Monitoring",
       "Settings",
     ]);
   });
@@ -508,7 +508,7 @@ describe("AgentDetail", () => {
     );
     expectVisibleTab("tests-tab-content", "tools-tab-content");
 
-    await user.click(screen.getByText("Traces"));
+    await user.click(screen.getByText("Monitoring"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${buildAgent.uuid}-scoring-active`,
     );
@@ -547,7 +547,7 @@ describe("AgentDetail", () => {
       }),
     );
 
-    await user.click(screen.getByText("Traces"));
+    await user.click(screen.getByText("Monitoring"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${buildAgent.uuid}-scoring-active`,
     );
@@ -555,8 +555,8 @@ describe("AgentDetail", () => {
       expect.objectContaining({ isActive: true }),
     );
 
-    // The banner's link lands on Settings, which shows the same control.
-    await user.click(screen.getByText("GoToSettings"));
+    // Settings shows the same control, with the switch on it.
+    await user.click(screen.getByText("Settings"));
     expectVisibleTab("settings-tab-content", "traces-tab-content");
     expect(screen.getByTestId("settings-tab-content")).toHaveTextContent(
       "SettingsTabContent-scoring",
@@ -636,7 +636,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByText("Traces"));
+    await user.click(screen.getByText("Monitoring"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
       `TracesTabContent-${connectionAgent.uuid}-scoring-active`,
     );

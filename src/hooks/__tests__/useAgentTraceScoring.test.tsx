@@ -223,6 +223,7 @@ it("notifies the parent after a successful toggle", async () => {
       accessToken: "tok",
       agentUuid: "ag-1",
       enabled: false,
+      config: {},
       onEnabledChange,
     }),
   );
@@ -376,4 +377,20 @@ it("keeps eligibility as checked when a validation 422 refuses the save", async 
   expect(result.current.enableBlocked).toBe(false);
   expect(result.current.eligibility?.eligible).toHaveLength(1);
   expect(result.current.saveError).toMatch(/Field required/);
+});
+
+it("says scoring cannot be turned on until it knows what can score", async () => {
+  const { result } = setup(false);
+  // Nothing known yet, so the switch has to stay shut.
+  expect(result.current.cannotEnable).toBe(true);
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
+  // An evaluator can score, so it opens.
+  expect(result.current.cannotEnable).toBe(false);
+});
+
+it("leaves the switch open while scoring is already on", async () => {
+  const { result } = setup(true);
+  expect(result.current.cannotEnable).toBe(false);
+  await waitFor(() => expect(result.current.eligibility).not.toBeNull());
+  expect(result.current.cannotEnable).toBe(false);
 });

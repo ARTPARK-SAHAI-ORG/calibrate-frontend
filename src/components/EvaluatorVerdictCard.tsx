@@ -1,5 +1,7 @@
 "use client";
 
+import { Tooltip } from "@/components/Tooltip";
+
 // Single source of truth for the per-evaluator card surface used in:
 //
 //   - LLM / benchmark test results        (read mode)
@@ -187,14 +189,18 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               used to be clipped mid-character by a sideways scroll box
               whose scrollbar was hidden, which just looked broken. */}
           <div className="flex-1 min-w-0 flex items-center gap-1.5">
-            <span className="min-w-0 truncate" title={props.name}>
-              <NameLabel
-                name={props.name}
-                uuid={props.evaluatorUuid}
-                enableLink={props.enableLink}
-                onOpenPreview={setPreviewEvaluator}
-              />
-            </span>
+            {/* The name is clipped when long, so the whole of it is on hover.
+                The browser's own box is not allowed here. */}
+            <Tooltip content={props.name} position="top" className="min-w-0">
+              <span className="min-w-0 truncate block">
+                <NameLabel
+                  name={props.name}
+                  uuid={props.evaluatorUuid}
+                  enableLink={props.enableLink}
+                  onOpenPreview={setPreviewEvaluator}
+                />
+              </span>
+            </Tooltip>
             {props.versionLabel && (
               <span className="flex-shrink-0 font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground whitespace-nowrap">
                 {props.versionLabel}
@@ -272,7 +278,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       {props.mode === "read" && open && toggleKind && (
         <div
           data-reasoning-body
-          className="pt-2 border-t border-border/60 space-y-3"
+          className="pt-2 border-t border-foreground/15 space-y-3"
         >
           {hasVariables && (
             <VariableValuesBlock values={props.variableValues!} />
@@ -316,7 +322,7 @@ function NameLabel({
       <button
         type="button"
         onClick={() => onOpenPreview({ uuid, name })}
-        className={`${cls} hover:underline underline-offset-2 cursor-pointer`}
+        className={`${cls} cursor-pointer`}
       >
         {name}
       </button>

@@ -13,6 +13,8 @@ type TraceScorePanelProps = {
    *  column out when there is none, so this is only null beside an error. */
   run: TraceScoringRun | null;
   error?: string | null;
+  /** What each evaluator is for, by evaluator id. */
+  descriptions?: Record<string, string>;
 };
 
 /** The verdict card keeps binary and rating displays apart, so the stored
@@ -27,7 +29,13 @@ function verdictFields(result: TraceScoreResult): {
   return { match: result.passed };
 }
 
-function RunBody({ run }: { run: TraceScoringRun }) {
+function RunBody({
+  run,
+  descriptions,
+}: {
+  run: TraceScoringRun;
+  descriptions?: Record<string, string>;
+}) {
   if (isTraceScoringInProgress(run.status)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -60,6 +68,7 @@ function RunBody({ run }: { run: TraceScoringRun }) {
           key={`${run.run_uuid}-${result.evaluator_uuid}`}
           mode="read"
           name={result.name}
+          description={descriptions?.[result.evaluator_uuid]}
           outputType={result.output_type}
           {...verdictFields(result)}
           reasoning={result.reasoning}
@@ -77,14 +86,18 @@ function RunBody({ run }: { run: TraceScoringRun }) {
  * The latest scoring run for one trace, laid out like the evaluators column
  * of the test results window: a heading, then one verdict card per evaluator.
  */
-export function TraceScorePanel({ run, error = null }: TraceScorePanelProps) {
+export function TraceScorePanel({
+  run,
+  error = null,
+  descriptions,
+}: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Scores</h3>
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : run ? (
-        <RunBody run={run} />
+        <RunBody run={run} descriptions={descriptions} />
       ) : null}
     </div>
   );

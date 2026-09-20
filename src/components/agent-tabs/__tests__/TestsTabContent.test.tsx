@@ -603,7 +603,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
+    expect(screen.getByText("1–10 of 12 tests")).toBeInTheDocument();
     expect(screen.queryAllByText("Paged test 11")).toHaveLength(0);
   });
 
@@ -614,7 +614,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByLabelText("Next page"));
     await screen.findAllByText("Paged test 11");
-    expect(screen.getByText("Showing 11–12 of 12 tests")).toBeInTheDocument();
+    expect(screen.getByText("11–12 of 12 tests")).toBeInTheDocument();
     expect(screen.queryAllByText("Paged test 1")).toHaveLength(0);
 
     await user.click(screen.getByLabelText("Previous page"));
@@ -670,7 +670,7 @@ describe("TestsTabContent — paging", () => {
         "11 of 12",
       ),
     );
-    expect(screen.getByText("Showing 11–12 of 12 tests")).toBeInTheDocument();
+    expect(screen.getByText("11–12 of 12 tests")).toBeInTheDocument();
   });
 
   it("steps back a page from the first test on it", async () => {
@@ -694,7 +694,7 @@ describe("TestsTabContent — paging", () => {
         "10 of 12",
       ),
     );
-    expect(screen.getByText("Showing 1–10 of 12 tests")).toBeInTheDocument();
+    expect(screen.getByText("1–10 of 12 tests")).toBeInTheDocument();
   });
 
   it("withholds the stepping props while the attach-evaluators prompt is up", async () => {
@@ -812,14 +812,14 @@ describe("TestsTabContent — paging", () => {
     await screen.findAllByText("Paged test 1");
 
     await user.click(screen.getByLabelText("Next page"));
-    await screen.findByText("Showing 11–12 of 12 tests");
+    await screen.findByText("11–12 of 12 tests");
 
     await user.click(screen.getByText("Create test"));
     await screen.findByTestId("add-test-dialog");
     await user.click(screen.getByText("SetName"));
     await user.click(screen.getByText("SubmitResponse"));
 
-    await screen.findByText("Showing 1–10 of 12 tests");
+    await screen.findByText("1–10 of 12 tests");
   });
 
   it("keeps the filters on screen when the chosen type has no tests", async () => {
@@ -866,7 +866,7 @@ describe("TestsTabContent — paging", () => {
     // fetch — asserting that fetch never fires proves the count was checked
     // before the selection was resolved, not just before the run POST.
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
-    await screen.findByText("Showing 1–10 of 12 tests");
+    await screen.findByText("1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
@@ -960,7 +960,7 @@ describe("TestsTabContent — paging", () => {
 
     // 13 tests, 12 of them reply tests: the reply filter spans two pages.
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
-    await screen.findByText("Showing 1–10 of 12 tests");
+    await screen.findByText("1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(
@@ -994,7 +994,7 @@ describe("TestsTabContent — paging", () => {
     await screen.findAllByText("Paged test 1");
 
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
-    await screen.findByText("Showing 1–10 of 12 tests");
+    await screen.findByText("1–10 of 12 tests");
     await user.click(screen.getByTitle("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(screen.getByTestId("compare-header"));
@@ -1528,9 +1528,7 @@ describe("TestsTabContent: run and compare from the run window", () => {
     // Closing the comparison window lands the reader on Evaluations, which
     // opens the run from the address. A copy left open here would be hidden
     // behind that tab and still read the same run over and over.
-    await waitFor(() =>
-      expect(onRunWindowClosed).toHaveBeenCalledTimes(1),
-    );
+    await waitFor(() => expect(onRunWindowClosed).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect(setRunIdParamMock).toHaveBeenLastCalledWith("task-from-comparison");
   });

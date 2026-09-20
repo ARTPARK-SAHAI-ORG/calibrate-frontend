@@ -3,7 +3,7 @@
 import React from "react";
 import { PAGE_SIZE_OPTIONS } from "@/hooks/usePageSize";
 
-/** The "Per page" picker for the server-paginated list bar (Traces tab,
+/** The "Per page" picker for the server-paginated list bar (Monitoring tab,
  *  human-alignment items tab). See CLAUDE.md → Server-paginated list bar. */
 export function PageSizeSelect({
   value,

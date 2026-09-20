@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TraceScoreAverage } from "@/lib/tracesApi";
 import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -67,6 +68,10 @@ export function useTraces({
   const [loadedLabels, setLoadedLabels] = useState<string[]>([]);
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
+  // Running averages over every matching trace, kept while paging through the
+  // result and asked for again only when the filters change.
+  const [scoreAverages, setScoreAverages] = useState<TraceScoreAverage[]>([]);
+  const averagesKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
   // The normal load whose spinner is on screen. A silent re-read must not
   // stop it from clearing that spinner when it answers.
@@ -79,7 +84,10 @@ export function useTraces({
   const load = useCallback(
     async (
       targetOffset: number,
-      { silent = false }: { silent?: boolean } = {},
+      {
+        silent = false,
+        withAverages = false,
+      }: { silent?: boolean; withAverages?: boolean } = {},
     ): Promise<number> => {
       if (!accessToken) return 0;
       // Silent polls get their own id too: two overlapping 3s refreshes
@@ -91,6 +99,12 @@ export function useTraces({
         setError(null);
       }
       try {
+        // The filters these rows come from. A new combination is worth the
+        // extra pass over every matching trace; a new page of the same one
+        // is not.
+        const filterKey = JSON.stringify([agentId, q, outputType, labelKey]);
+        const wantAverages =
+          withAverages || averagesKeyRef.current !== filterKey;
         const page = await fetchTraces(accessToken, {
           limit: pageSize,
           offset: targetOffset,
@@ -98,10 +112,15 @@ export function useTraces({
           q,
           outputType,
           labels,
+          includeScoreAverages: wantAverages,
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
         setItems(page.items ?? []);
+        if (wantAverages) {
+          averagesKeyRef.current = filterKey;
+          setScoreAverages(page.score_averages ?? []);
+        }
         setTotal(nextTotal);
         setLoadedQ(q);
         setLoadedOutputType(outputType);
@@ -131,7 +150,9 @@ export function useTraces({
   }, [load, offset]);
 
   const refetch = useCallback(async () => {
-    const nextTotal = await load(offset);
+    // Refresh is the reader asking for current numbers, so the averages come
+    // with it even though they cost a pass over every matching trace.
+    const nextTotal = await load(offset, { withAverages: true });
     return nextTotal === 0;
   }, [load, offset]);
 
@@ -179,6 +200,7 @@ export function useTraces({
 
   return {
     items,
+    scoreAverages,
     total,
     loadedQ,
     loadedOutputType,

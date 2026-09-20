@@ -39,7 +39,10 @@ export async function readNameConflictMessage(
   if (response.status !== 409) return null;
   try {
     const data = (await response.clone().json()) as { detail?: unknown };
-    if (typeof data?.detail === "string" && /already exists/i.test(data.detail)) {
+    if (
+      typeof data?.detail === "string" &&
+      /already exists/i.test(data.detail)
+    ) {
       return data.detail;
     }
   } catch {

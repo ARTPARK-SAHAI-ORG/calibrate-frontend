@@ -11,8 +11,6 @@ export type EvaluatorPillItem = {
    */
   uuid?: string | null;
   name: string;
-  /** Extra copy next to the pill in `flow` layout, e.g. why it cannot score. */
-  detail?: string;
 };
 
 const EVALUATOR_PILL_CLASSES =
@@ -100,14 +98,14 @@ function pillKey(ev: EvaluatorPillItem, index: number) {
  * Fixed-width evaluators cell by default: shows up to `maxVisible` pills (each
  * opens how that evaluator judges in a preview), and folds the rest into a
  * "+N" chip whose tooltip lists the remaining evaluators as the same pills on
- * hover. `flow` is the same pills wrapping in a card, with optional `detail`
- * next to each name. One instance owns the preview modal rather than lifting
+ * hover. `flow` is the same pills wrapping in a row. One instance owns the preview modal rather than lifting
  * it to the parent — only one can be open per list anyway.
  */
 export function EvaluatorPillList({
   evaluators,
   maxVisible = 2,
   layout = "cell",
+  onOpenEvaluator,
 }: {
   evaluators: EvaluatorPillItem[];
   /**
@@ -118,6 +116,12 @@ export function EvaluatorPillList({
   maxVisible?: number;
   /** `cell` fits a table column; `flow` wraps every pill in a card. */
   layout?: "cell" | "flow";
+  /**
+   * Hand the click to the parent instead of opening the preview here. For a
+   * list drawn inside a hover popup: the popup closes on the click, and a
+   * preview opened inside it would be taken down with it.
+   */
+  onOpenEvaluator?: (evaluator: { uuid: string; name: string }) => void;
 }) {
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
@@ -128,14 +132,13 @@ export function EvaluatorPillList({
     ev.uuid
       ? (e: React.MouseEvent) => {
           e.stopPropagation();
-          setPreviewEvaluator({
-            uuid: ev.uuid as string,
-            name: ev.name,
-          });
+          const opened = { uuid: ev.uuid as string, name: ev.name };
+          if (onOpenEvaluator) onOpenEvaluator(opened);
+          else setPreviewEvaluator(opened);
         }
       : undefined;
 
-  const modal = (
+  const modal = onOpenEvaluator ? null : (
     <EvaluatorPreviewModal
       evaluatorUuid={previewEvaluator?.uuid ?? null}
       evaluatorName={previewEvaluator?.name}
@@ -152,19 +155,14 @@ export function EvaluatorPillList({
   if (layout === "flow") {
     return (
       <>
-        <div className="flex flex-col items-start gap-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {evaluators.map((ev, index) => (
-            <div
+            <NamePill
               key={pillKey(ev, index)}
-              className="flex flex-wrap items-center gap-2 min-w-0"
-            >
-              <NamePill name={ev.name} wrap onOpen={openFor(ev)} />
-              {ev.detail ? (
-                <span className="text-xs md:text-sm text-muted-foreground">
-                  {ev.detail}
-                </span>
-              ) : null}
-            </div>
+              name={ev.name}
+              wrap
+              onOpen={openFor(ev)}
+            />
           ))}
         </div>
         {modal}

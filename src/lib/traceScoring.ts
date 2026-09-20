@@ -1,7 +1,6 @@
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
-  TraceSummary,
 } from "./tracesApi";
 
 /** A run that is still open and should be refetched. */
@@ -32,9 +31,7 @@ export function ineligibleReasonCopy(
  * is variables, which have nowhere to be filled in for a trace, so that case
  * says so plainly rather than leaving the reader to guess.
  */
-export function nothingCanScoreCopy(
-  ineligible: { reason: string }[],
-): string {
+export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
   if (ineligible.length === 0) {
     return "This agent has no evaluators, so its traces are not scored.";
   }
@@ -44,17 +41,21 @@ export function nothingCanScoreCopy(
   return "None of this agent's evaluators can score traces.";
 }
 
-/** Why a scoring run was skipped or failed. */
+/**
+ * Why a scoring run was skipped or failed.
+ *
+ * The backend also has `trace_deleted` and `agent_deleted`, which no reader
+ * can reach: a run abandoned because its trace or its agent went away has no
+ * row left to show it on. They fall through to the general line.
+ */
 export function scoringRunErrorCopy(error: string | null | undefined): string {
   switch (error) {
     case "over_limit":
       return "This workspace has scored as many traces as its limit allows";
     case "no_usable_evaluators":
       return "No evaluators could score this trace";
-    case "trace_deleted":
-      return "This trace was deleted before scoring finished";
-    case "agent_deleted":
-      return "This agent was deleted before scoring finished";
+    case "scoring_disabled":
+      return "Monitoring was turned off before this trace was scored";
     case "unsupported_interaction_type":
       return "This kind of agent cannot be scored yet";
     default:

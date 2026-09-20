@@ -38,6 +38,12 @@ export type TraceScoringControls = {
   saveError: string | null;
   /** true when scoring is off and no linked evaluator can score */
   enableBlocked: boolean;
+  /**
+   * true when the switch cannot be turned on: nothing can score, or which
+   * evaluators can score is not known yet. Every control that turns scoring on
+   * reads this, so none of them has to work it out again.
+   */
+  cannotEnable: boolean;
 };
 
 /**
@@ -96,6 +102,7 @@ export function useAgentTraceScoring({
 
   const canEnable = (eligibility?.eligible.length ?? 0) > 0;
   const enableBlocked = !enabled && eligibility !== null && !canEnable;
+  const cannotEnable = !enabled && (eligibility === null || enableBlocked);
 
   const setEnabled = useCallback(
     async (next: boolean) => {
@@ -146,5 +153,6 @@ export function useAgentTraceScoring({
     eligibilityError,
     saveError,
     enableBlocked,
+    cannotEnable,
   };
 }

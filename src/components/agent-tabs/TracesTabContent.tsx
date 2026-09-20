@@ -9,6 +9,8 @@ import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
+import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
+import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
   isLabellableOutput,
@@ -19,10 +21,12 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
-import { SubmitForLabellingButton } from "@/components/human-labelling/labellingSubmit";
+import {
+  SubmitForLabellingButton,
+  SUBMIT_FOR_LABELLING_CLASS,
+} from "@/components/human-labelling/labellingSubmit";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
-import { EvaluatorPillList } from "@/components/EvaluatorPillList";
 import {
   Button,
   LoadingState,
@@ -41,8 +45,11 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { ineligibleReasonCopy, nothingCanScoreCopy } from "@/lib/traceScoring";
+import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
+import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
+import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
+import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
   fetchTraceUsage,
@@ -65,7 +72,7 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
 ];
 
 /**
- * The Traces tab on the agent detail page: the production conversations sent
+ * The Monitoring tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
 /** The two facts the labelling rule needs, read off a list row. The row
@@ -82,7 +89,6 @@ export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
   traceScoring,
-  onGoToSettings,
   onGoToEvaluators,
   isActive = true,
   onTestsCreated,
@@ -95,8 +101,6 @@ export function TracesTabContent({
   agentNature?: "conversation" | "general";
   /** Automatic scoring of new traces: on or off, and which evaluators can do it. */
   traceScoring: TraceScoringControls;
-  /** Opens the Settings tab, where scoring is turned on. */
-  onGoToSettings: () => void;
   /** Opens the Evaluators tab, where the set that scores traces is chosen. */
   onGoToEvaluators: () => void;
   /** The traces tab is on screen. Polling pauses when this is false. */
@@ -142,6 +146,7 @@ export function TracesTabContent({
     loadedQ,
     loadedOutputType,
     loadedLabels,
+    scoreAverages,
     offset,
     setOffset,
     loadedOffset,
@@ -422,15 +427,15 @@ export function TracesTabContent({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const ineligible = traceScoring.eligibility?.ineligible ?? [];
-  const eligible = traceScoring.eligibility?.eligible ?? [];
+  const eligibility = traceScoring.eligibility;
   const nothingCanScore =
-    traceScoring.eligibility !== null && eligible.length === 0;
+    eligibility !== null && eligibility.eligible.length === 0;
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
   const scoreColumns = useMemo(() => {
     const byId = new Map<string, { evaluator_uuid: string; name: string }>();
-    for (const item of eligible) {
+    for (const item of eligibility?.eligible ?? []) {
       byId.set(item.evaluator_uuid, {
         evaluator_uuid: item.evaluator_uuid,
         name: item.name,
@@ -447,10 +452,62 @@ export function TracesTabContent({
       }
     }
     return [...byId.values()];
-  }, [eligible, items]);
+  }, [eligibility, items]);
   // The backend marks a trace it could not score for the workspace cap, so the
   // page can say so without asking for the limit itself.
+  // A trace's scores name each evaluator but not what it judges, so the words
+  // come from the agent's own evaluator list, read once for the tab.
+  const [evaluatorDescriptions, setEvaluatorDescriptions] = useState<
+    Record<string, string>
+  >({});
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    fetchAgentEvaluators(agentUuid, accessToken)
+      .then((list) => {
+        if (cancelled) return;
+        const byId: Record<string, string> = {};
+        for (const item of list) {
+          if (item.description) byId[item.uuid] = item.description;
+        }
+        setEvaluatorDescriptions(byId);
+      })
+      .catch((err) => reportError("Error fetching agent evaluators:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [agentUuid, accessToken]);
+
+  // The backend's own averages over every matching trace, not the page.
+  const scoreCards = useMemo(
+    () =>
+      scoreAverages.map((average) => ({
+        evaluatorId: average.evaluator_uuid,
+        name: average.name,
+        stat: formatEvaluatorResultStat(
+          average.output_type === "rating"
+            ? { count: average.traces_scored, mean: average.average }
+            : {
+                count: average.traces_scored,
+                // A yes-or-no evaluator averages ones and zeros, so its
+                // average is the share that passed.
+                trueCount: Math.round(average.average * average.traces_scored),
+              },
+          {
+            output_type: average.output_type,
+            scale_min: average.scale_min,
+            scale_max: average.scale_max,
+          },
+          "item",
+        ),
+      })),
+    [scoreAverages],
+  );
+
   const overLimit = items.some((t) => t.latest_run_error === "over_limit");
+  const isScoringNow =
+    traceScoring.enabled &&
+    items.some((t) => isTraceScoringInProgress(t.latest_run_status));
   // Only asked for once the cap has actually bitten, so the line carries the
   // workspace's own number rather than a guess.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
@@ -552,60 +609,20 @@ export function TracesTabContent({
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
-      {hasLoaded && !showEmptyState && (
+      {/* Quiet while scoring works: the chip in the toolbar carries the state
+          and its detail. Only a real problem takes a row of its own. */}
+      {hasLoaded && !showEmptyState && (nothingCanScore || overLimit) && (
         <div className="space-y-3">
-          <div
-            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border px-3 py-2 ${
-              nothingCanScore
-                ? "border-amber-500/40 bg-amber-500/10"
-                : "border-border bg-muted/30"
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span
-                className={`text-sm ${
-                  nothingCanScore
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {nothingCanScore ? (
-                  <>
-                    {nothingCanScoreCopy(ineligible)} Choose evaluators without
-                    variables in the{" "}
-                    <button
-                      type="button"
-                      onClick={onGoToEvaluators}
-                      className="font-semibold cursor-pointer hover:opacity-80"
-                    >
-                      Evaluators tab
-                    </button>
-                    .
-                  </>
-                ) : traceScoring.enabled ? (
-                  "New traces are scored automatically with this agent's evaluators."
-                ) : (
-                  "New traces are not scored automatically."
-                )}
-                {traceScoring.saveError && (
-                  <span className="text-red-600 dark:text-red-400">
-                    {" "}
-                    {traceScoring.saveError}
-                  </span>
-                )}
-              </span>
-              {/* Nothing to turn on or off while no evaluator can score. */}
-              {/* The switch itself lives in Settings, so both states send the
-                  reader to the same place rather than half of it living here. */}
-              {nothingCanScore ? null : (
-                <Button size="sm" variant="secondary" onClick={onGoToSettings}>
-                  {traceScoring.enabled
-                    ? "Turn off in Settings"
-                    : "Turn on in Settings"}
-                </Button>
-              )}
+          {nothingCanScore && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                <NothingCanScoreMessage
+                  ineligible={ineligible}
+                  onGoToEvaluators={onGoToEvaluators}
+                />
+              </p>
             </div>
-          </div>
+          )}
           {overLimit && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
@@ -624,24 +641,26 @@ export function TracesTabContent({
               </p>
             </div>
           )}
-          {/* When nothing can score, the line above already says why, so the
-              list of evaluators would only repeat it. */}
-          {!nothingCanScore && ineligible.length > 0 && (
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 space-y-2">
-              <p className="text-sm text-muted-foreground">
-                These evaluators cannot score traces:
-              </p>
-              <EvaluatorPillList
-                layout="flow"
-                evaluators={ineligible.map((item) => ({
-                  uuid: item.evaluator_uuid,
-                  name: item.name,
-                  detail: ineligibleReasonCopy(item.reason),
-                }))}
-              />
-            </div>
-          )}
         </div>
+      )}
+
+      {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
+        <EvaluatorScoreCards
+          heading="Production quality"
+          description="Live average of the scores for each evaluator across all the production traces"
+          cards={scoreCards}
+          singleRow
+          headingAside={
+            // Only while a trace really is being scored: a pulse over numbers
+            // that cannot move reads as live when it is not.
+            isScoringNow ? (
+              <span
+                aria-hidden
+                className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
+              />
+            ) : null
+          }
+        />
       )}
 
       {error && (
@@ -685,13 +704,8 @@ export function TracesTabContent({
               className="w-full sm:w-48"
             />
           )}
-          {/* Both stand the same height as the search box and the labels
-              picker beside them. */}
-          <RefreshButton
-            size="md"
-            loading={isRefreshing}
-            onClick={() => void handleRefresh()}
-          />
+          {/* Stands the same height as the search box and the labels
+              picker beside it. */}
           <Button
             variant="secondary"
             onClick={() => setIntegrationGuideOpen(true)}
@@ -800,7 +814,7 @@ export function TracesTabContent({
                           ? prepareLabelling([])
                           : setEvaluatorStepOpen(true)
                       }
-                      className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      className={SUBMIT_FOR_LABELLING_CLASS}
                     />
                   )}
                   <Button
@@ -811,6 +825,13 @@ export function TracesTabContent({
                   >
                     Delete selected ({selectionCount})
                   </Button>
+                  <button
+                    type="button"
+                    onClick={deletion.clearSelection}
+                    className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
                 </div>
               )}
             </div>
@@ -829,7 +850,7 @@ export function TracesTabContent({
               </p>
             </div>
           ) : (
-            <div className="space-y-1 pt-1">
+            <div className="space-y-3 pt-2">
               <ServerPaginatedListBar
                 total={total}
                 offset={offset}
@@ -843,6 +864,15 @@ export function TracesTabContent({
                 prevDisabled={!hasPrev || isLoading}
                 nextDisabled={!hasNext || isLoading}
                 itemNoun="trace"
+                trailing={
+                  <div className="flex items-center gap-3">
+                    <RefreshButton
+                      loading={isRefreshing}
+                      onClick={() => void handleRefresh()}
+                    />
+                    <TraceScoringChip traceScoring={traceScoring} />
+                  </div>
+                }
               />
 
               <TracesTable
@@ -868,6 +898,7 @@ export function TracesTabContent({
       />
 
       <TraceDetailDialog
+        evaluatorDescriptions={evaluatorDescriptions}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}

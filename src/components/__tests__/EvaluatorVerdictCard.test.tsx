@@ -71,9 +71,7 @@ describe("readVerdictTone", () => {
     );
   });
   it("returns red for rating score at scaleMin", () => {
-    expect(readVerdictTone({ score: 1, scaleMax: 5, scaleMin: 1 })).toBe(
-      "red",
-    );
+    expect(readVerdictTone({ score: 1, scaleMax: 5, scaleMin: 1 })).toBe("red");
   });
   it("returns amber for rating score between bounds", () => {
     expect(readVerdictTone({ score: 3, scaleMax: 5, scaleMin: 1 })).toBe(
@@ -355,7 +353,9 @@ describe("EvaluatorVerdictCard - header extras", () => {
     const pill = screen.getByText("v3");
     const nameWrapper = screen.getByText("Eval").parentElement!;
     const row = pill.parentElement!;
-    expect(nameWrapper.parentElement).toBe(row);
+    // The name sits inside a hover wrapper, so it is a descendant of the row
+    // rather than its direct child.
+    expect(row.contains(nameWrapper)).toBe(true);
     expect(row.className).toContain("flex");
     expect(nameWrapper.className).toContain("truncate");
     expect(nameWrapper.className).toContain("min-w-0");
@@ -374,13 +374,60 @@ describe("EvaluatorVerdictCard - header extras", () => {
         evaluatorUuid="abc-123"
       />,
     );
-    expect(screen.queryByRole("link", { name: "Linked Eval" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Linked Eval" }),
+    ).not.toBeInTheDocument();
     const nameButton = screen.getByRole("button", { name: "Linked Eval" });
     await user.click(nameButton);
     expect(
       await screen.findByRole("heading", { name: "Linked Eval" }),
     ).toBeInTheDocument();
     expect(mockFetchEvaluatorDetail).toHaveBeenCalledWith("abc-123", "tok");
+  });
+
+  it("leaves the evaluator name to the app's own hover text, not the browser's", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Linked Eval"
+        outputType="binary"
+        match={true}
+        enableLink
+        evaluatorUuid="abc-123"
+      />,
+    );
+    // The browser's own box is a grey rectangle in its own font that ignores
+    // every style in this app, and it never shows on a touch screen.
+    expect(
+      screen.getByRole("button", { name: "Linked Eval" }),
+    ).not.toHaveAttribute("title");
+  });
+
+  it("does not underline the evaluator name", () => {
+    const { rerender } = render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Linked Eval"
+        outputType="binary"
+        match={true}
+        enableLink
+        evaluatorUuid="abc-123"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Linked Eval" }).className,
+    ).not.toContain("underline");
+
+    rerender(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Plain Eval"
+        outputType="binary"
+        match={true}
+      />,
+    );
+    expect(screen.getByText("Plain Eval").className).not.toContain("underline");
+    expect(screen.getByText("Plain Eval")).not.toHaveAttribute("title");
   });
 
   it("renders name as plain text when enableLink is false", () => {
@@ -393,7 +440,9 @@ describe("EvaluatorVerdictCard - header extras", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Plain Eval" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Plain Eval" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Plain Eval")).toBeInTheDocument();
   });
 
@@ -408,7 +457,9 @@ describe("EvaluatorVerdictCard - header extras", () => {
       />,
     );
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Plain Eval 2" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Plain Eval 2" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -429,9 +480,7 @@ describe("EvaluatorVerdictCard - read mode reasoning/variables toggle", () => {
       screen.queryByText("Because it matched exactly."),
     ).not.toBeInTheDocument();
     await user.click(toggle);
-    expect(
-      screen.getByText("Because it matched exactly."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Because it matched exactly.")).toBeInTheDocument();
     expect(screen.getByText("Hide reasoning")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Hide reasoning/i }));
     expect(
@@ -548,7 +597,12 @@ describe("EvaluatorVerdictCard - write mode binary", () => {
 
   it("highlights the false button when value is false", () => {
     render(
-      <EvaluatorVerdictCard mode="write" name="Eval" outputType="binary" value={false} />,
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={false}
+      />,
     );
     expect(screen.getByRole("button", { name: "Wrong" })).toHaveClass(
       "bg-red-600",
@@ -660,9 +714,9 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
     ).toBeInTheDocument();
     // Rubrics switch the pair to the wider left-aligned layout so the
     // text has room to wrap.
-    expect(
-      screen.getByRole("button", { name: /Answers fully/ }),
-    ).toHaveClass("text-left");
+    expect(screen.getByRole("button", { name: /Answers fully/ })).toHaveClass(
+      "text-left",
+    );
     // The description sits inside the option button, so the whole card
     // stays a single click target.
     await user.click(
@@ -932,11 +986,19 @@ describe("ReasoningToggleButton", () => {
 
   it("renders variables kind labels", () => {
     const { rerender } = render(
-      <ReasoningToggleButton open={false} onToggle={jest.fn()} kind="variables" />,
+      <ReasoningToggleButton
+        open={false}
+        onToggle={jest.fn()}
+        kind="variables"
+      />,
     );
     expect(screen.getByText("See variables")).toBeInTheDocument();
     rerender(
-      <ReasoningToggleButton open={true} onToggle={jest.fn()} kind="variables" />,
+      <ReasoningToggleButton
+        open={true}
+        onToggle={jest.fn()}
+        kind="variables"
+      />,
     );
     expect(screen.getByText("Hide variables")).toBeInTheDocument();
   });

@@ -141,6 +141,22 @@ export type TraceOutputType = "response" | "tool_call";
 /** The output filter, where "all" means no filter at all. */
 export type TraceOutputFilter = "all" | TraceOutputType;
 
+/** One evaluator's running average across every trace the filters match, not
+ *  just the page. A yes-or-no evaluator averages ones and zeros, so its mean
+ *  is the share that passed. */
+export type TraceScoreAverage = {
+  evaluator_uuid: string;
+  name: string;
+  output_type: "binary" | "rating";
+  /** How many traces this evaluator has scored. */
+  traces_scored: number;
+  /** The mean of its scores. A yes-or-no evaluator averages ones and zeros,
+   *  so this is the share that passed. */
+  average: number;
+  scale_min?: number | null;
+  scale_max?: number | null;
+};
+
 export type TraceListParams = {
   limit: number;
   offset: number;
@@ -154,6 +170,9 @@ export type TraceListParams = {
    *  output has tool calls and no reply ("tool_call"). "all" keeps everything
    *  and is left off here. */
   outputType?: TraceOutputFilter;
+  /** Ask for `score_averages` beside the page. Costly, so only when the
+   *  filters change rather than on every page or poll. */
+  includeScoreAverages?: boolean;
   /** Keep only traces carrying any of these labels, matched exactly and
    *  case-sensitively. An empty list is left off here. */
   labels?: string[];
@@ -167,8 +186,16 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  { limit, offset, agentId, q, outputType, labels }: TraceListParams,
-): Promise<Paginated<TraceSummary>> {
+  {
+    limit,
+    offset,
+    agentId,
+    q,
+    outputType,
+    labels,
+    includeScoreAverages,
+  }: TraceListParams,
+): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
@@ -178,10 +205,12 @@ export async function fetchTraces(
     params.set("output_type", outputType);
   }
   for (const label of labels ?? []) params.append("labels", label);
-  return apiGet<Paginated<TraceSummary>>(
-    `/traces?${params.toString()}`,
-    accessToken,
-  );
+  // Averages read every matching trace, not the page, so they are asked for
+  // when the filters change and left off while paging through the result.
+  if (includeScoreAverages) params.set("include_score_averages", "true");
+  return apiGet<
+    Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }
+  >(`/traces?${params.toString()}`, accessToken);
 }
 
 /** Fetch one trace with its full conversation history, output, and metadata. */

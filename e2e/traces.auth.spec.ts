@@ -75,8 +75,8 @@ async function deleteAllTracesOfAgent(
 
 // Switch from the agent detail page to its Traces tab (writes ?tab=traces).
 async function openTracesTab(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Traces", exact: true }).click();
-  await expect(page).toHaveURL(/tab=traces/);
+  await page.getByRole("button", { name: "Monitoring", exact: true }).click();
+  await expect(page).toHaveURL(/tab=monitoring/);
 }
 
 test.describe("Agent Traces tab (authenticated, real backend)", () => {
@@ -132,7 +132,10 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         message_id: otherMsgId,
         conversation_id: `e2e-conv-other-${stamp}`,
         input: [
-          { role: "user", content: `Tell me about booster doses ${otherMsgId}` },
+          {
+            role: "user",
+            content: `Tell me about booster doses ${otherMsgId}`,
+          },
         ],
         output: { response: "A different agent's answer." },
       },
@@ -209,7 +212,9 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
         agent_id: agentUuid,
         message_id: msgId,
         conversation_id: `e2e-conv-grp-${stamp}`,
-        input: [{ role: "user", content: `A question worth testing. ${msgId}` }],
+        input: [
+          { role: "user", content: `A question worth testing. ${msgId}` },
+        ],
         output: { response: "An answer." },
       },
     });

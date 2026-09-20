@@ -4,7 +4,6 @@ import React from "react";
 import { ToolIcon } from "@/components/icons";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
-import { Tooltip } from "@/components/Tooltip";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
 import {
   TraceScoreCells,
@@ -137,6 +136,10 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
  * detail view. Desktop markup matches the other resource lists (CSS grid,
  * not an HTML table).
  */
+// Tailwind only compiles class names it can read in the source, so the column
+// widths are an inline style; everything fixed stays a class.
+const ROW_CLASS = "grid gap-4 px-4 min-w-max";
+
 export function TracesTable({
   traces,
   checkboxProps,
@@ -147,16 +150,23 @@ export function TracesTable({
   onDelete,
   scoreColumns = [],
 }: TracesTableProps) {
-  // Tailwind only compiles class names it can read in the source, so a grid
-  // whose column count depends on the evaluators has to be an inline style.
-  const ROW_CLASS = "grid gap-4 px-4";
+  // Each evaluator column is as wide as its own name, in the same template for
+  // every row, so nothing is cut and the columns still line up.
+  const evaluatorTracks = scoreColumns
+    .map((column) => `${Math.max(10, column.name.length + 1)}ch`)
+    .join(" ");
   const ROW_STYLE = {
-    gridTemplateColumns: `40px minmax(0,1fr) minmax(0,1fr)${" minmax(6rem,0.5fr)".repeat(scoreColumns.length)} 160px auto`,
+    // Every track is a fixed width, because each row is its own grid: a track
+    // sized to its content would come out different on every row and the
+    // columns would not line up. The table scrolls sideways instead.
+    gridTemplateColumns: `40px 400px 400px${
+      evaluatorTracks ? ` ${evaluatorTracks}` : ""
+    } 160px auto`,
   };
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+      <div className="hidden md:block border border-border rounded-xl overflow-x-auto">
         <div
           style={ROW_STYLE}
           className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
@@ -174,16 +184,12 @@ export function TracesTable({
             Output
           </div>
           {scoreColumns.map((column) => (
-            <Tooltip
+            <div
               key={column.evaluator_uuid}
-              content={column.name}
-              position="top"
-              className="min-w-0"
+              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
             >
-              <div className="text-sm font-medium text-muted-foreground truncate">
-                {column.name}
-              </div>
-            </Tooltip>
+              {column.name}
+            </div>
           ))}
           <div className="text-sm font-medium text-muted-foreground">
             Created
