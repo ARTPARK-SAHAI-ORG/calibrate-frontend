@@ -104,7 +104,9 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
       }}
     />,
   );
-  expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
+  expect(
+    screen.getByText("Running the evaluators on this trace"),
+  ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
@@ -117,7 +119,9 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
       }}
     />,
   );
-  expect(screen.getByText("Scoring this trace.")).toBeInTheDocument();
+  expect(
+    screen.getByText("Running the evaluators on this trace"),
+  ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).toBeInTheDocument();
 
   rerender(
