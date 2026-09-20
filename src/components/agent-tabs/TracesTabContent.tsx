@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
@@ -83,6 +83,7 @@ export function TracesTabContent({
   agentNature = "conversation",
   traceScoring,
   onGoToSettings,
+  onGoToEvaluators,
   isActive = true,
   onTestsCreated,
   onViewTests,
@@ -96,6 +97,8 @@ export function TracesTabContent({
   traceScoring: TraceScoringControls;
   /** Opens the Settings tab, where scoring is turned on. */
   onGoToSettings: () => void;
+  /** Opens the Evaluators tab, where the set that scores traces is chosen. */
+  onGoToEvaluators: () => void;
   /** The traces tab is on screen. Polling pauses when this is false. */
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
@@ -419,6 +422,32 @@ export function TracesTabContent({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const ineligible = traceScoring.eligibility?.ineligible ?? [];
+  const eligible = traceScoring.eligibility?.eligible ?? [];
+  const nothingCanScore =
+    traceScoring.eligibility !== null && eligible.length === 0;
+  // One column per evaluator that can score now, plus any that scored a trace
+  // on this page, so taking an evaluator off the agent does not hide the
+  // scores it already gave.
+  const scoreColumns = useMemo(() => {
+    const byId = new Map<string, { evaluator_uuid: string; name: string }>();
+    for (const item of eligible) {
+      byId.set(item.evaluator_uuid, {
+        evaluator_uuid: item.evaluator_uuid,
+        name: item.name,
+      });
+    }
+    for (const trace of items) {
+      for (const result of trace.results ?? []) {
+        if (!byId.has(result.evaluator_uuid)) {
+          byId.set(result.evaluator_uuid, {
+            evaluator_uuid: result.evaluator_uuid,
+            name: result.name,
+          });
+        }
+      }
+    }
+    return [...byId.values()];
+  }, [eligible, items]);
   // The backend marks a trace it could not score for the workspace cap, so the
   // page can say so without asking for the limit itself.
   const overLimit = items.some((t) => t.latest_run_error === "over_limit");
@@ -528,9 +557,11 @@ export function TracesTabContent({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className="text-sm text-muted-foreground">
-                {traceScoring.enabled
-                  ? "New traces are scored automatically with this agent's evaluators."
-                  : "New traces are not scored automatically."}
+                {nothingCanScore
+                  ? "New traces are not being scored because none of this agent's evaluators can score traces."
+                  : traceScoring.enabled
+                    ? "New traces are scored automatically with this agent's evaluators."
+                    : "New traces are not scored automatically."}
                 {traceScoring.saveError && (
                   <span className="text-red-600 dark:text-red-400">
                     {" "}
@@ -538,6 +569,13 @@ export function TracesTabContent({
                   </span>
                 )}
               </span>
+              <button
+                type="button"
+                onClick={onGoToEvaluators}
+                className="text-sm underline text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                Choose the evaluators
+              </button>
               {traceScoring.enabled ? (
                 <Button
                   size="sm"
@@ -799,11 +837,7 @@ export function TracesTabContent({
                 onToggleSelectAll={deletion.toggleSelectAll}
                 onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
-                scoreColumns={
-                  traceScoring.enabled || items.some((t) => t.latest_run_status)
-                    ? (traceScoring.eligibility?.eligible ?? [])
-                    : []
-                }
+                scoreColumns={scoreColumns}
               />
             </div>
           )}

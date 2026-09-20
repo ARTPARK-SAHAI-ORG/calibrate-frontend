@@ -313,6 +313,7 @@ function tracesResult(
 const onTestsCreated = jest.fn();
 const onViewTests = jest.fn();
 const onGoToSettings = jest.fn();
+const onGoToEvaluators = jest.fn();
 const setEnabled = jest.fn(async () => {});
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
 const traceScoring = {
@@ -334,6 +335,7 @@ const tabProps = {
   onTestsCreated,
   onViewTests,
   onGoToSettings,
+  onGoToEvaluators,
   traceScoring,
 };
 
@@ -614,9 +616,69 @@ describe("TracesTabContent", () => {
       expect(screen.getAllByText("Tone")).toHaveLength(2);
     });
 
-    it("shows no evaluator columns while scoring is off and nothing has been scored", () => {
-      render(<TracesTabContent {...tabProps} />);
+    it("shows no evaluator columns when nothing can score and nothing has been scored", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: { eligible: [], ineligible: [] },
+          }}
+        />,
+      );
       expect(screen.queryByText("Tone")).not.toBeInTheDocument();
+    });
+
+    it("keeps a column for an evaluator that scored a trace but has since left the agent", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({
+            latest_run_status: "completed",
+            results: [
+              {
+                evaluator_uuid: "ev-gone",
+                name: "Retired judge",
+                output_type: "binary",
+                value: 1,
+                passed: true,
+              },
+            ],
+          }),
+        ]),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: { eligible: [], ineligible: [] },
+          }}
+        />,
+      );
+      expect(screen.getAllByText("Retired judge").length).toBeGreaterThan(0);
+    });
+
+    it("says nothing is being scored when no evaluator can, and points at the Evaluators tab", async () => {
+      const user = setupUser();
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled: true,
+            eligibility: { eligible: [], ineligible: [] },
+          }}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "New traces are not being scored because none of this agent's evaluators can score traces.",
+        ),
+      ).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "Choose the evaluators" }),
+      );
+      expect(onGoToEvaluators).toHaveBeenCalled();
     });
   });
 

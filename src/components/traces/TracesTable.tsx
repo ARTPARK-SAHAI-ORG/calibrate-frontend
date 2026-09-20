@@ -6,7 +6,11 @@ import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
-import { TraceScoreCells, type TraceScoreColumn } from "./TraceScoringSummary";
+import {
+  TraceScoreCells,
+  TraceScoreMark,
+  type TraceScoreColumn,
+} from "./TraceScoringSummary";
 
 type CheckboxProps = {
   checked: boolean;
@@ -128,7 +132,6 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-
 /**
  * The traces list: a table on desktop and cards on mobile. Rows open the
  * detail view. Desktop markup matches the other resource lists (CSS grid,
@@ -167,7 +170,9 @@ export function TracesTable({
             />
           </div>
           <div className="text-sm font-medium text-muted-foreground">Input</div>
-          <div className="text-sm font-medium text-muted-foreground">Output</div>
+          <div className="text-sm font-medium text-muted-foreground">
+            Output
+          </div>
           {scoreColumns.map((column) => (
             <Tooltip
               key={column.evaluator_uuid}
@@ -180,7 +185,9 @@ export function TracesTable({
               </div>
             </Tooltip>
           ))}
-          <div className="text-sm font-medium text-muted-foreground">Created</div>
+          <div className="text-sm font-medium text-muted-foreground">
+            Created
+          </div>
           <div className="w-8" />
         </div>
         {traces.map((trace) => {
@@ -194,7 +201,8 @@ export function TracesTable({
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex items-center gap-2">
+                <TraceScoreMark trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
@@ -227,41 +235,42 @@ export function TracesTable({
       <div className="md:hidden space-y-3">
         {traces.map((trace) => {
           return (
-          <div
-            key={trace.uuid}
-            onClick={() => onOpen(trace.uuid)}
-            className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {trace.input_preview && (
-                  <p className="text-sm font-medium text-foreground line-clamp-2">
-                    {trace.input_preview}
-                  </p>
-                )}
+            <div
+              key={trace.uuid}
+              onClick={() => onOpen(trace.uuid)}
+              className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex items-start gap-2">
+                  <TraceScoreMark trace={trace} />
+                  {trace.input_preview && (
+                    <p className="text-sm font-medium text-foreground line-clamp-2">
+                      {trace.input_preview}
+                    </p>
+                  )}
+                </div>
+                <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <SelectCheckbox {...checkboxProps(trace)} />
-            </div>
-            <div className="mt-2">
-              <TraceOutputCell trace={trace} />
-            </div>
-            <TraceScoreCells
-              trace={trace}
-              columns={scoreColumns}
-              layout="card"
-            />
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-muted-foreground">
-                {formatTraceDate(trace.created_at)}
-              </span>
-              <div className="ml-auto">
-                <DeleteIconButton
-                  onClick={() => onDelete(trace)}
-                  title="Delete trace"
-                />
+              <div className="mt-2">
+                <TraceOutputCell trace={trace} />
+              </div>
+              <TraceScoreCells
+                trace={trace}
+                columns={scoreColumns}
+                layout="card"
+              />
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-muted-foreground">
+                  {formatTraceDate(trace.created_at)}
+                </span>
+                <div className="ml-auto">
+                  <DeleteIconButton
+                    onClick={() => onDelete(trace)}
+                    title="Delete trace"
+                  />
+                </div>
               </div>
             </div>
-          </div>
           );
         })}
       </div>

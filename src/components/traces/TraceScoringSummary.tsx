@@ -1,9 +1,9 @@
 "use client";
 
 import { Tooltip } from "@/components/Tooltip";
+import { RunStateMark } from "@/components/ui";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
-import { getStatusBadgeClass } from "@/lib/status";
 import {
   isTraceScoringInProgress,
   scoringRunErrorCopy,
@@ -56,46 +56,46 @@ function ScoreValue({
 }
 
 /**
- * The evaluator cells of one trace row. A run still going, or one that failed
- * or was skipped, is one cell across every evaluator column; a finished run
- * is one cell per evaluator.
+ * How the scoring of one trace went, beside its input, the way a run's mark
+ * sits beside its name. A trace nothing has tried to score carries no mark.
  */
-export function TraceScoreCells({ trace, columns, layout }: Props) {
-  if (columns.length === 0) return null;
+export function TraceScoreMark({
+  trace,
+}: {
+  trace: Pick<TraceSummary, "latest_run_status" | "latest_run_error">;
+}) {
   const status = trace.latest_run_status;
-
-  // A run that has not finished says so once, across every evaluator column.
-  if (status && status !== "completed") {
-    const mark = isTraceScoringInProgress(status) ? (
-      <span role="img" aria-label="Scoring" className="inline-flex">
-        <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
-      </span>
-    ) : (
-      <Tooltip
-        content={scoringRunErrorCopy(trace.latest_run_error)}
-        position="top"
-      >
-        <span
-          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(status)}`}
-        >
-          {status === "failed" ? "Failed" : "Skipped"}
+  if (!status) return null;
+  if (isTraceScoringInProgress(status)) {
+    const words =
+      status === "pending" ? "Waiting to be scored" : "Being scored";
+    return (
+      <Tooltip content={words} position="top">
+        <span role="img" aria-label={words} className="inline-flex">
+          <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
         </span>
       </Tooltip>
     );
-    return layout === "card" ? (
-      <div className="mt-2">{mark}</div>
-    ) : (
-      <div
-        className="min-w-0 flex items-center"
-        style={{ gridColumn: `span ${columns.length}` }}
-      >
-        {mark}
-      </div>
-    );
   }
+  if (status === "completed") {
+    return <RunStateMark state="finished" tooltip="Scored" />;
+  }
+  return (
+    <RunStateMark
+      state={status === "failed" ? "error" : "none_run"}
+      tooltip={scoringRunErrorCopy(trace.latest_run_error)}
+    />
+  );
+}
 
-  // Finished, or never scored: one cell each. ScoreValue draws the dash when
-  // there is nothing for that evaluator, which is every cell of an unscored row.
+/**
+ * The evaluator cells of one trace row: one per column, holding that
+ * evaluator's result. How the run itself went is the mark beside the input,
+ * so a run with no results leaves these cells empty rather than explaining
+ * itself once per column.
+ */
+export function TraceScoreCells({ trace, columns, layout }: Props) {
+  if (columns.length === 0) return null;
   if (layout === "card") {
     return (
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">

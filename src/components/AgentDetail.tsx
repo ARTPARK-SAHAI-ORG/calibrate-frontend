@@ -1431,6 +1431,7 @@ export function AgentDetail({
               agentNature={agent.interaction_type ?? "conversation"}
               traceScoring={traceScoring}
               onGoToSettings={() => performTabSwitch("settings")}
+              onGoToEvaluators={() => performTabSwitch("evaluators")}
               isActive={activeTab === "traces"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}

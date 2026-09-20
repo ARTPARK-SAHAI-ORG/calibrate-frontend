@@ -232,25 +232,35 @@ describe("TracesTable", () => {
     );
   });
 
-  it("shows one spinner across the evaluator columns while scoring runs", () => {
+  it("marks how the scoring went beside the input, not in the columns", () => {
     renderTable({
       scoreColumns: columns,
       traces: [trace({ latest_run_status: "processing" })],
     });
-    const spinners = screen.getAllByLabelText("Scoring");
-    expect(spinners).toHaveLength(2);
-    expect(spinners[0].parentElement).toHaveStyle({ gridColumn: "span 2" });
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    // Desktop row and mobile card.
+    expect(screen.getAllByRole("img", { name: "Being scored" })).toHaveLength(
+      2,
+    );
   });
 
-  it("shows one Failed pill across the evaluator columns, and dashes with no run", () => {
+  it("says why beside a trace nothing could score, leaving its columns empty", () => {
     renderTable({
       scoreColumns: columns,
-      traces: [trace({ latest_run_status: "failed" }), trace({ uuid: "t2" })],
+      traces: [
+        trace({
+          latest_run_status: "skipped",
+          latest_run_error: "no_usable_evaluators",
+        }),
+        trace({ uuid: "t2" }),
+      ],
     });
-    expect(screen.getAllByText("Failed")).toHaveLength(2);
-    // Two columns, desktop and mobile, for the never-scored row.
-    expect(screen.getAllByText("—")).toHaveLength(4);
+    expect(
+      screen.getAllByRole("img", {
+        name: "No evaluators could score this trace",
+      }),
+    ).toHaveLength(2);
+    // Two evaluator columns for each row, on desktop and on mobile.
+    expect(screen.getAllByText("—")).toHaveLength(8);
   });
 
   it("opens a trace when its row is clicked", async () => {

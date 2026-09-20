@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { TraceScoreCells } from "../TraceScoringSummary";
+import { TraceScoreCells, TraceScoreMark } from "../TraceScoringSummary";
 
 const columns = [
   { evaluator_uuid: "ev-1", name: "Tone" },
@@ -22,27 +22,6 @@ it("shows a dash per column when this trace has never been scored", () => {
   expect(screen.getAllByText("—")).toHaveLength(2);
 });
 
-it("shows one spinner across every column while scoring is waiting or running", () => {
-  const { rerender } = render(
-    <TraceScoreCells
-      trace={{ latest_run_status: "pending" }}
-      columns={columns}
-      layout="row"
-    />,
-  );
-  expect(screen.getByLabelText("Scoring").parentElement).toHaveStyle({
-    gridColumn: "span 2",
-  });
-  rerender(
-    <TraceScoreCells
-      trace={{ latest_run_status: "processing" }}
-      columns={columns}
-      layout="row"
-    />,
-  );
-  expect(screen.getByLabelText("Scoring")).toBeInTheDocument();
-  expect(screen.queryByText("—")).not.toBeInTheDocument();
-});
 
 it("shows Success or Fail for a binary evaluator and the number for a rating one", () => {
   render(
@@ -80,27 +59,6 @@ it("shows a dash for an evaluator the completed run has no score for", () => {
   expect(screen.getByText("—")).toBeInTheDocument();
 });
 
-it("shows one Failed or Skipped pill across every column", () => {
-  const { rerender } = render(
-    <TraceScoreCells
-      trace={{ latest_run_status: "failed" }}
-      columns={columns}
-      layout="row"
-    />,
-  );
-  // The pill sits in a tooltip now, so the grid cell is the nearest styled box.
-  expect(screen.getByText("Failed").closest("div[style]")).toHaveStyle({
-    gridColumn: "span 2",
-  });
-  rerender(
-    <TraceScoreCells
-      trace={{ latest_run_status: "skipped" }}
-      columns={columns}
-      layout="row"
-    />,
-  );
-  expect(screen.getByText("Skipped")).toBeInTheDocument();
-});
 
 it("labels each evaluator on a mobile card", () => {
   render(
@@ -121,31 +79,60 @@ it("labels each evaluator on a mobile card", () => {
   expect(screen.getByText("—")).toBeInTheDocument();
 });
 
-it("shows one spinner and no labels on a mobile card while scoring runs", () => {
-  render(
-    <TraceScoreCells
-      trace={{ latest_run_status: "pending" }}
-      columns={columns}
-      layout="card"
-    />,
-  );
-  expect(screen.getByLabelText("Scoring")).toBeInTheDocument();
-  expect(screen.queryByText("Tone")).not.toBeInTheDocument();
-});
 
-it("says why on the pill when the workspace has hit its scoring limit", async () => {
-  const user = setupUser();
-  render(
-    <TraceScoreCells
-      trace={{ latest_run_status: "skipped", latest_run_error: "over_limit" }}
-      columns={columns}
-      layout="row"
-    />,
-  );
-  await user.hover(screen.getByText("Skipped"));
-  expect(
-    await screen.findByText(
-      "This workspace has scored as many traces as its limit allows",
-    ),
-  ).toBeInTheDocument();
+
+describe("TraceScoreMark", () => {
+  it("says a trace was scored", () => {
+    render(<TraceScoreMark trace={{ latest_run_status: "completed" }} />);
+    expect(screen.getByRole("img", { name: "Scored" })).toBeInTheDocument();
+  });
+
+  it("says why on a trace the workspace limit refused", async () => {
+    const user = setupUser();
+    render(
+      <TraceScoreMark
+        trace={{ latest_run_status: "skipped", latest_run_error: "over_limit" }}
+      />,
+    );
+    const mark = screen.getByRole("img", {
+      name: "This workspace has scored as many traces as its limit allows",
+    });
+    await user.hover(mark);
+    expect(
+      await screen.findByText(
+        "This workspace has scored as many traces as its limit allows",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says why on a trace whose scoring broke", () => {
+    render(
+      <TraceScoreMark
+        trace={{ latest_run_status: "failed", latest_run_error: "agent_deleted" }}
+      />,
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "This agent was deleted before scoring finished",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("spins while the trace is waiting and while it is being scored", () => {
+    const { rerender } = render(
+      <TraceScoreMark trace={{ latest_run_status: "pending" }} />,
+    );
+    expect(
+      screen.getByRole("img", { name: "Waiting to be scored" }),
+    ).toBeInTheDocument();
+    rerender(<TraceScoreMark trace={{ latest_run_status: "processing" }} />);
+    expect(
+      screen.getByRole("img", { name: "Being scored" }),
+    ).toBeInTheDocument();
+  });
+
+  it("draws nothing for a trace nothing has tried to score", () => {
+    const { container } = render(<TraceScoreMark trace={{}} />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });
