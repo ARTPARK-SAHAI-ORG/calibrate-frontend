@@ -2,7 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useVerifyConnection } from "@/hooks";
-import { SpinnerIcon, CheckCircleIcon, AlertIcon } from "@/components/icons";
+import {
+  SpinnerIcon,
+  CheckCircleIcon,
+  AlertIcon,
+  ExternalLinkIcon,
+} from "@/components/icons";
 import {
   VerifyRequestPreviewDialog,
   type MessageRow,
@@ -20,7 +25,16 @@ import {
   BENCHMARK_PROVIDERS,
   DEFAULT_BENCHMARK_PROVIDER,
 } from "@/components/agent-tabs/benchmarkProviders";
-import { AGENT_CONNECTIONS_DOCS_URL } from "@/constants/links";
+import {
+  AGENT_CONNECTIONS_DOCS_URL,
+  AGENT_CONNECTION_EXAMPLE_DOCS_URL,
+} from "@/constants/links";
+
+/** Documentation links on this tab. No underline, so they read as part of the
+ * copy around them; the darker colour, the weight and the arrow are what make
+ * them stand out from the muted text they sit in. */
+const DOCS_LINK_CLASS =
+  "inline-flex items-center gap-1 font-medium text-foreground hover:text-foreground/70 transition-colors whitespace-nowrap";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -419,9 +433,10 @@ export function AgentConnectionTabContent({
                 href={AGENT_CONNECTIONS_DOCS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-foreground underline-offset-2 hover:underline"
+                className={DOCS_LINK_CLASS}
               >
                 Read how to connect your agent
+                <ExternalLinkIcon className="w-3 h-3" />
               </a>
             </p>
           </div>
@@ -695,21 +710,32 @@ export function AgentConnectionTabContent({
 
         {/* Expected Format */}
         <div className="border border-border rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-3 md:px-4 py-3 text-sm md:text-base font-medium text-foreground">
-            <svg
-              className="w-4 h-4 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center justify-between gap-3 px-3 md:px-4 py-3 text-sm md:text-base font-medium text-foreground">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                />
+              </svg>
+              Expected request &amp; response format
+            </div>
+            <a
+              href={AGENT_CONNECTION_EXAMPLE_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${DOCS_LINK_CLASS} text-xs md:text-sm`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-              />
-            </svg>
-            Expected request &amp; response format
+              See an example
+              <ExternalLinkIcon className="w-3 h-3" />
+            </a>
           </div>
           <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border bg-muted/10">
             <div className="pt-4 space-y-3">

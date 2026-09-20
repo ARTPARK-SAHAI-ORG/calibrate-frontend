@@ -41,3 +41,7 @@ export const DOCS_URL = (
  * configuring it, verifying it, and benchmarking across models. Linked from the
  * agent's Connection tab. */
 export const AGENT_CONNECTIONS_DOCS_URL = `${DOCS_URL}/core-concepts/agent-connections`;
+
+/** The worked example inside that page: the route to add to your own agent so
+ * Calibrate can call it. Linked from the expected format panel. */
+export const AGENT_CONNECTION_EXAMPLE_DOCS_URL = `${AGENT_CONNECTIONS_DOCS_URL}#add-a-calibrate-endpoint`;

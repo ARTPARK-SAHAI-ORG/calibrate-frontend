@@ -4,7 +4,10 @@ import {
   AgentConnectionTabContent,
   type ConnectionConfig,
 } from "../AgentConnectionTabContent";
-import { AGENT_CONNECTIONS_DOCS_URL } from "@/constants/links";
+import {
+  AGENT_CONNECTIONS_DOCS_URL,
+  AGENT_CONNECTION_EXAMPLE_DOCS_URL,
+} from "@/constants/links";
 
 const verifyAdHoc = jest.fn();
 const dismiss = jest.fn();
@@ -124,6 +127,30 @@ describe("AgentConnectionTabContent", () => {
     expect(link).toHaveAttribute("href", AGENT_CONNECTIONS_DOCS_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("puts the worked example beside the expected format heading", () => {
+    renderComponent();
+    const link = screen.getByRole("link", { name: "See an example" });
+    expect(link).toHaveAttribute("href", AGENT_CONNECTION_EXAMPLE_DOCS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+
+    // Same row as the heading, pushed to its right.
+    const row = link.parentElement!;
+    expect(row).toHaveTextContent("Expected request & response format");
+    expect(row.className).toContain("justify-between");
+  });
+
+  it("gives both documentation links no underline, so the weight and the arrow carry them", () => {
+    renderComponent();
+    for (const name of ["Read how to connect your agent", "See an example"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.className).not.toMatch(/underline/);
+      expect(link.className).toContain("font-medium");
+      expect(link.className).toContain("text-foreground");
+      expect(link.querySelector("svg")).toBeInTheDocument();
+    }
   });
 
   it("enables the verify button once a URL is entered", () => {
