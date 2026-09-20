@@ -1,8 +1,9 @@
 "use client";
 
-import React, { Fragment, useEffect, useRef, useState } from "react";
+import React, { Fragment, useRef, useState } from "react";
 import { SegmentedFilter } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
+import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
 import {
   ChevronDownIcon,
   FilterIcon,
@@ -36,14 +37,6 @@ export type TraceScoreFilterEvaluator = {
   scale_max?: number | null;
 };
 
-/**
- * What one evaluator can be narrowed by. A yes-or-no evaluator offers its two
- * verdicts, in the same words its cells use. A rating offers each score on its
- * scale, and each score with everything below it, which is how a reader looks
- * for the poor answers. Neither end gets an "or below": on the lowest score it
- * would mean the same as the score itself, and on the highest it would mean
- * the whole scale.
- */
 /** How an option should read: a verdict the evaluator gives, or a plain score. */
 export type ScoreConditionTone = "pass" | "fail" | "neutral";
 
@@ -140,23 +133,7 @@ export function TracesFilter({
   const [labelSearch, setLabelSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Closing drops the draft: what is on screen behind the panel is what was
-  // applied, so an unapplied tick must not survive the next opening.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOnOutside(open, rootRef, () => setOpen(false));
 
   const activeCount = traceFilterCount(value);
   const draftCount = traceFilterCount(draft);

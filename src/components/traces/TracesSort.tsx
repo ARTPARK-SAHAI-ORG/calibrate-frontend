@@ -1,8 +1,9 @@
 "use client";
 
-import React, { Fragment, useEffect, useRef, useState } from "react";
+import React, { Fragment, useRef, useState } from "react";
 import { SegmentedFilter, type SegmentedFilterOption } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
+import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
 import { ArrowDownIcon, SortIcon } from "@/components/icons";
 import type { TraceSortOrder } from "@/lib/tracesApi";
 
@@ -60,21 +61,7 @@ export function TracesSort({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOnOutside(open, rootRef, () => setOpen(false));
 
   if (evaluators.length === 0) return null;
 
