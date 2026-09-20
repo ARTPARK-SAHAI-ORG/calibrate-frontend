@@ -370,7 +370,7 @@ async function applyTraceFilter(
   for (const label of labels) {
     await user.click(screen.getByRole("checkbox", { name: label }));
   }
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(screen.getByRole("button", { name: /^Apply/ }));
 }
 
 function lastTracesArgs() {
@@ -581,7 +581,7 @@ describe("TracesTabContent", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("shows a card per evaluator average, above the toolbar", () => {
+    it("shows a card per evaluator average, under the search and filter row", () => {
       mockUseTraces.mockReturnValue(
         tracesResult([trace()], {
           scoreAverages: [
@@ -597,9 +597,60 @@ describe("TracesTabContent", () => {
       );
       render(<TracesTabContent {...tabProps} />);
 
-      expect(screen.getByText("Production quality")).toBeInTheDocument();
+      const heading = screen.getByText("Production quality");
+      expect(heading).toBeInTheDocument();
       // Half of the four scored traces passed.
       expect(screen.getByText("50%")).toBeInTheDocument();
+      // The numbers follow the filters, so they belong under the controls
+      // that set them, not above.
+      expect(
+        screen
+          .getByPlaceholderText("Search traces")
+          .compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("pulses beside the heading only while a trace is being scored", () => {
+      const averages = [
+        {
+          evaluator_uuid: "ev-1",
+          name: "Tone",
+          output_type: "binary",
+          traces_scored: 4,
+          average: 0.5,
+        },
+      ];
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace({ latest_run_status: "processing" })], {
+          scoreAverages: averages,
+        }),
+      );
+      const { unmount } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+
+      const pulse = () => document.querySelector(".animate-pulse.rounded-full");
+      expect(pulse()).toBeInTheDocument();
+      unmount();
+
+      // Nothing being scored: a pulse over numbers that cannot move would
+      // read as live when it is not.
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace({ latest_run_status: "completed" })], {
+          scoreAverages: averages,
+        }),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+
+      expect(pulse()).not.toBeInTheDocument();
     });
 
     it("shows no averages when the backend sent none", () => {

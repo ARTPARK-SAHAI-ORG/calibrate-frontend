@@ -175,10 +175,14 @@ export function TracesFilter({
               type="button"
               onClick={() => setDraft({ outputType: "all", labels: [] })}
               disabled={draftCount === 0}
-              className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Clear all
+              Clear all filters
             </button>
+            {/* The count on the button rather than on the panel: it is the
+                reader's own ticking read back to them, beside the thing that
+                acts on it, since the number on the toolbar cannot move until
+                this is pressed. */}
             <button
               type="button"
               onClick={() => {
@@ -187,7 +191,7 @@ export function TracesFilter({
               }}
               className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
             >
-              Apply
+              {draftCount > 0 ? `Apply (${draftCount})` : "Apply"}
             </button>
           </div>
         </div>

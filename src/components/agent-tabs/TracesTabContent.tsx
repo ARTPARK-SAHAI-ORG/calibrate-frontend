@@ -596,11 +596,24 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
+  const hasWarning = nothingCanScore || overLimit;
+
+  const integrationGuideButton = (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => setIntegrationGuideOpen(true)}
+    >
+      <CodeIcon className="w-4 h-4" />
+      Integration guide
+    </Button>
+  );
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
       {/* Quiet while scoring works: the chip in the toolbar carries the state
           and its detail. Only a real problem takes a row of its own. */}
-      {hasLoaded && !showEmptyState && (nothingCanScore || overLimit) && (
+      {hasLoaded && !showEmptyState && hasWarning && (
         <div className="space-y-3">
           {nothingCanScore && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
@@ -633,25 +646,6 @@ export function TracesTabContent({
         </div>
       )}
 
-      {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
-        <EvaluatorScoreCards
-          heading="Production quality"
-          description="Live average of the scores for each evaluator across all the production traces"
-          cards={scoreCards}
-          singleRow
-          headingAside={
-            // Only while a trace really is being scored: a pulse over numbers
-            // that cannot move reads as live when it is not.
-            isScoringNow ? (
-              <span
-                aria-hidden
-                className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
-              />
-            ) : null
-          }
-        />
-      )}
-
       {error && (
         <div className="border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
           {error}
@@ -678,16 +672,29 @@ export function TracesTabContent({
               setLabelFilter(next.labels);
             }}
           />
-          {/* Not a filter, so it sits apart from the two that are. */}
-          <Button
-            variant="ghost"
-            className="sm:ml-auto"
-            onClick={() => setIntegrationGuideOpen(true)}
-          >
-            <CodeIcon className="w-5 h-5" />
-            Integration guide
-          </Button>
+          {/* Not a filter, so it sits apart from the two that are, at the
+              far end of the row. */}
+          <div className="sm:ml-auto">{integrationGuideButton}</div>
         </div>
+      )}
+
+      {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
+        <EvaluatorScoreCards
+          heading="Production quality"
+          description="Live average of the scores for each evaluator across all the production traces"
+          cards={scoreCards}
+          singleRow
+          headingAside={
+            // Only while a trace really is being scored: a pulse over numbers
+            // that cannot move reads as live when it is not.
+            isScoringNow ? (
+              <span
+                aria-hidden
+                className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
+              />
+            ) : null
+          }
+        />
       )}
 
       {!hasLoaded ? (

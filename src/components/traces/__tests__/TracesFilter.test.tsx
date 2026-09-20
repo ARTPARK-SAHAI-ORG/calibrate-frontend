@@ -17,6 +17,10 @@ function setup(
   return { user, onApply };
 }
 
+/** Apply carries the draft count, so it is matched on its leading word. */
+const applyButton = () => screen.getByRole("button", { name: /^Apply/ });
+const queryApplyButton = () => screen.queryByRole("button", { name: /^Apply/ });
+
 const openPanel = (user: ReturnType<typeof setupUser>) =>
   user.click(screen.getByRole("button", { name: "Filter traces" }));
 
@@ -28,15 +32,30 @@ it("reports both choices together, and only once Apply is clicked", async () => 
   await user.click(screen.getByRole("checkbox", { name: "production" }));
   expect(onApply).not.toHaveBeenCalled();
 
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
     outputType: "response",
     labels: ["production"],
   });
-  expect(
-    screen.queryByRole("button", { name: "Apply" }),
-  ).not.toBeInTheDocument();
+  expect(queryApplyButton()).not.toBeInTheDocument();
+});
+
+it("counts the picks on Apply, before they narrow anything", async () => {
+  const { user, onApply } = setup();
+
+  await openPanel(user);
+  expect(applyButton()).toHaveTextContent("Apply");
+
+  await user.click(screen.getByRole("checkbox", { name: "production" }));
+  expect(applyButton()).toHaveTextContent("Apply (1)");
+
+  await user.click(screen.getByRole("button", { name: "Response" }));
+  expect(applyButton()).toHaveTextContent("Apply (2)");
+
+  // The toolbar's own number cannot move until the list actually changes.
+  expect(screen.queryByText("2")).not.toBeInTheDocument();
+  expect(onApply).not.toHaveBeenCalled();
 });
 
 it("says on the button how many choices are on", () => {
@@ -59,7 +78,7 @@ it("drops a tick that was never applied", async () => {
   // Closing is the reader changing their mind, so the tick goes with it.
   await user.keyboard("{Escape}");
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({ outputType: "all", labels: [] });
 });
@@ -70,9 +89,7 @@ it("closes again when the button is clicked a second time", async () => {
   await openPanel(user);
   await openPanel(user);
 
-  expect(
-    screen.queryByRole("button", { name: "Apply" }),
-  ).not.toBeInTheDocument();
+  expect(queryApplyButton()).not.toBeInTheDocument();
   expect(onApply).not.toHaveBeenCalled();
 });
 
@@ -82,9 +99,7 @@ it("closes without applying when the reader clicks away", async () => {
   await openPanel(user);
   await user.click(document.body);
 
-  expect(
-    screen.queryByRole("button", { name: "Apply" }),
-  ).not.toBeInTheDocument();
+  expect(queryApplyButton()).not.toBeInTheDocument();
   expect(onApply).not.toHaveBeenCalled();
 });
 
@@ -95,8 +110,8 @@ it("clears both dimensions at once", async () => {
   });
 
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "Clear all" }));
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(screen.getByRole("button", { name: "Clear all filters" }));
+  await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({ outputType: "all", labels: [] });
 });
@@ -106,7 +121,9 @@ it("has nothing to clear when nothing is picked", async () => {
 
   await openPanel(user);
 
-  expect(screen.getByRole("button", { name: "Clear all" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Clear all filters" }),
+  ).toBeDisabled();
 });
 
 it("unticks a label that was already on", async () => {
@@ -114,7 +131,7 @@ it("unticks a label that was already on", async () => {
 
   await openPanel(user);
   await user.click(screen.getByRole("checkbox", { name: "staging" }));
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({ outputType: "all", labels: [] });
 });
