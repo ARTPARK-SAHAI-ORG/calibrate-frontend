@@ -14,6 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > Branding note: UI says "Calibrate" everywhere, but legacy external infra may still reference "pense". The WhatsApp community URL lives in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`) — import from there, never hardcode.
 
+> Every outside address the app links to lives in `src/constants/links.ts` — import from there, never hardcode and never read the environment variable directly. Documentation links use `DOCS_URL` (or `AGENT_CONNECTIONS_DOCS_URL` for the agent connections page), which reads `NEXT_PUBLIC_DOCS_URL`, falls back to the hosted docs, and drops a trailing slash. Reading `process.env.NEXT_PUBLIC_DOCS_URL` straight into an `href` is what shipped four links pointing at `undefined` on any deploy without that setting.
+
 ## Commands
 
 ```bash
