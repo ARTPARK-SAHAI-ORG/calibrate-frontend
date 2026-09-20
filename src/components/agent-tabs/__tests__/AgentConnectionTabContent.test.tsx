@@ -504,7 +504,7 @@ describe("AgentConnectionTabContent", () => {
     const { onConnectionConfigChange } = renderComponent({
       connectionConfig: makeConfig({ supports_benchmark: true }),
     });
-    const select = screen.getByDisplayValue("OpenRouter (all providers)");
+    const select = screen.getByDisplayValue("OpenRouter");
     fireEvent.change(select, { target: { value: "anthropic" } });
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({ benchmark_provider: "anthropic" }),

@@ -378,82 +378,6 @@ export function AgentConnectionTabContent({
       <div className="space-y-6 md:space-y-8">
         {/* Endpoint Section */}
         <div className="space-y-4 md:space-y-6">
-          {/* Benchmark toggle */}
-          <div
-            className={`rounded-xl border p-3 md:p-4 transition-colors ${
-              supportsBenchmark
-                ? "border-foreground/40 bg-accent"
-                : "border-border bg-muted/20"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <label className="block text-sm md:text-base font-medium text-foreground">
-                  Support benchmarking different models
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Calibrate sends a model name with every request, so the same
-                  tests can be run on several models.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={supportsBenchmark}
-                aria-label="Support benchmarking different models"
-                onClick={handleBenchmarkToggle}
-                disabled={isSaving}
-                className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                  supportsBenchmark ? "bg-foreground" : "bg-border"
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                    supportsBenchmark ? "translate-x-4" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {supportsBenchmark && (
-              <div className="mt-3 space-y-2 border-t border-foreground/15 pt-3">
-                <label className="block text-sm md:text-base font-medium text-foreground">
-                  Model provider
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Choose the provider your agent uses to route model requests
-                  during benchmarks.
-                </p>
-                <div className="relative">
-                  <select
-                    value={benchmarkProvider}
-                    onChange={(e) => handleProviderChange(e.target.value)}
-                    className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
-                  >
-                    {BENCHMARK_PROVIDERS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  <svg
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Agent URL */}
           <div className="space-y-1.5">
             <label className="block text-sm md:text-base font-medium text-foreground">
@@ -601,6 +525,82 @@ export function AgentConnectionTabContent({
             helpText="Extra fields sent to your agent on every request, alongside the conversation history"
             disabled={isSaving}
           />
+
+          {/* Benchmark toggle */}
+          <div
+            className={`rounded-xl border p-3 md:p-4 transition-colors ${
+              supportsBenchmark
+                ? "border-foreground/40 bg-accent"
+                : "border-border bg-muted/20"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm md:text-base font-medium text-foreground">
+                  Support benchmarking different models
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Calibrate sends a model name with every request, so the same
+                  tests can be run on several models.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={supportsBenchmark}
+                aria-label="Support benchmarking different models"
+                onClick={handleBenchmarkToggle}
+                disabled={isSaving}
+                className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  supportsBenchmark ? "bg-foreground" : "bg-border"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                    supportsBenchmark ? "translate-x-4" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {supportsBenchmark && (
+              <div className="mt-3 space-y-2 border-t border-foreground/15 pt-3">
+                <label className="block text-sm md:text-base font-medium text-foreground">
+                  Model provider
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Choose the provider your agent uses to route model requests
+                  during benchmarks.
+                </p>
+                <div className="relative">
+                  <select
+                    value={benchmarkProvider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
+                  >
+                    {BENCHMARK_PROVIDERS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
